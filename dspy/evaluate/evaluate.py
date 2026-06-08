@@ -25,10 +25,10 @@ from dspy.utils.callback import with_callbacks
 from dspy.utils.parallelizer import ParallelExecutor
 
 try:
-    from IPython.display import HTML as IPythonHTML
-    from IPython.display import display as ipython_display
+    from IPython.display import HTML as IPYTHON_HTML  # ty: ignore[unresolved-import]
+    from IPython.display import display as ipython_display  # ty: ignore[unresolved-import]
 except ImportError:
-    IPythonHTML = None
+    IPYTHON_HTML = None
     ipython_display = None
 
 
@@ -267,7 +267,7 @@ class Evaluate:
         display_dataframe(df_to_display)
 
         if truncated_rows > 0:
-            if ipython_display is not None and IPythonHTML is not None:
+            if ipython_display is not None and IPYTHON_HTML is not None:
                 message = f"""
             <div style='
                 text-align: center;
@@ -278,7 +278,7 @@ class Evaluate:
                 ... {truncated_rows} more rows not displayed ...
             </div>
             """
-                ipython_display(IPythonHTML(message))
+                ipython_display(IPYTHON_HTML(message))
             else:
                 logger.info("%s more rows not displayed", truncated_rows)
 

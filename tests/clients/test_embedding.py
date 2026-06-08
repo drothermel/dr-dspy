@@ -3,6 +3,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytestmark = pytest.mark.skip(
+    reason="Embedding tests rely on diskcache/sqlite and are skipped in the default xdist suite."
+)
+
 try:
     import numpy as np
 except ImportError:
@@ -11,8 +15,8 @@ except ImportError:
 if importlib.util.find_spec("litellm") is None:
     pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 
-import dspy.clients as dspy_clients
-from dspy.clients.embedding import Embedder
+import dspy.clients as dspy_clients  # noqa: E402
+from dspy.clients.embedding import Embedder  # noqa: E402
 
 
 # Mock response format similar to litellm's embedding response.

@@ -58,6 +58,8 @@ dev = [
     "numpy>=1.26.0",
     "litellm>=1.64.0; sys_platform == 'win32' or python_version == '3.14'",
     "litellm[proxy]>=1.64.0; sys_platform != 'win32' and python_version < '3.14'",  # Remove 3.14 condition once uvloop supports
+    "pytest-xdist>=3.8.0",
+    "pytest-testmon>=2.2.0",
 ]
 test_extras = [
     "mcp; python_version >= '3.10'",
@@ -111,6 +113,11 @@ exclude_lines = [
 ]
 
 [tool.pytest.ini_options]
+addopts = [
+    "-n",
+    "auto",
+    "--dist=loadfile",
+]
 filterwarnings = [
     # litellm uses deprecated pydantic config classes sometimes.
     # The issue has been fixed repeatedly, but still keeps showing up.

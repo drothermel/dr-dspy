@@ -91,11 +91,12 @@ def test_databricks_rm_rejects_legacy_query_type_values(monkeypatch: pytest.Monk
     import dspy.retrievers.databricks_rm as databricks_rm
 
     monkeypatch.setattr(databricks_rm, "_databricks_sdk_installed", False)
+    auth_value = "not-a-secret"
 
     retriever = databricks_rm.DatabricksRM(
         databricks_index_name="index",
         databricks_endpoint="https://example.databricks.com",
-        databricks_token="not-a-secret",
+        databricks_token=auth_value,
         docs_id_column_name="id",
         text_column_name="text",
     )

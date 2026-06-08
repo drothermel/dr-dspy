@@ -57,6 +57,9 @@ assertion.log
 /.devcontainer/.personalization.sh
 
 .mypy_cache
+.pytest_cache/
+.testmondata
+.testmondata-*
 CLAUDE.local.md
 dummy.csv
 docs/docs/**/*.json*
