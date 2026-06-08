@@ -1,18 +1,10 @@
-import warnings
-
 import pydantic
 
 from dspy.utils.constants import IS_TYPE_UNDEFINED
 
 # DSPy-specific field arguments are stored separately from Pydantic Field arguments. If Pydantic adds one of these names, this list will need explicit conflict handling.
-DSPY_FIELD_ARG_NAMES = ["desc", "prefix", "__dspy_field_type", IS_TYPE_UNDEFINED]
-
-_DEPRECATED_FIELD_ARGS = {
-    "prefix": (
-        "The 'prefix' argument in InputField/OutputField is deprecated and has no effect in DSPy. "
-        "It will be removed in a future version."
-    ),
-}
+DSPY_FIELD_ARG_NAMES = ["desc", "__dspy_field_type", IS_TYPE_UNDEFINED]
+_REJECTED_FIELD_ARGS = frozenset({"prefix"})
 
 PYDANTIC_CONSTRAINT_MAP = {
     "gt": "greater than: ",
@@ -60,17 +52,16 @@ def _translate_pydantic_field_constraints(**kwargs):
     return ", ".join(constraints)
 
 
-def _warn_deprecated_field_args(**kwargs) -> None:
-    for arg, message in _DEPRECATED_FIELD_ARGS.items():
-        if arg in kwargs:
-            warnings.warn(message, DeprecationWarning, stacklevel=3)
+def _reject_unknown_field_args(field_name: str, **kwargs) -> None:
+    for arg in _REJECTED_FIELD_ARGS.intersection(kwargs):
+        raise TypeError(f"{field_name}() got an unexpected keyword argument {arg!r}")
 
 
 def InputField(**kwargs):  # noqa: N802
-    _warn_deprecated_field_args(**kwargs)
+    _reject_unknown_field_args("InputField", **kwargs)
     return pydantic.Field(**move_kwargs(**kwargs, __dspy_field_type="input"))
 
 
 def OutputField(**kwargs):  # noqa: N802
-    _warn_deprecated_field_args(**kwargs)
+    _reject_unknown_field_args("OutputField", **kwargs)
     return pydantic.Field(**move_kwargs(**kwargs, __dspy_field_type="output"))

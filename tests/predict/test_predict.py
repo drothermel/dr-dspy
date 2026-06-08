@@ -273,7 +273,7 @@ def test_signature_fields_after_dump_and_load_state(tmp_path):
         """I am not a pure instruction."""
 
         sentence = InputField(desc="I am a malicious input!")
-        sentiment = OutputField(desc="I am a malicious output!", prefix="I am a prefix!")
+        sentiment = OutputField(desc="I am a malicious output!")
 
     new_instance = Predict(CustomSignature2)
     assert new_instance.signature.dump_state() != original_instance.signature.dump_state()

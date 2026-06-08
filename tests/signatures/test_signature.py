@@ -1,6 +1,6 @@
 import pickle
 from types import UnionType
-from typing import Any, Union
+from typing import Any, Union, get_args, get_origin
 
 import cloudpickle
 import pydantic
@@ -47,13 +47,9 @@ def test_no_input_output2():
             input1: str = pydantic.Field()
 
 
-def test_all_fields_have_prefix():
-    class TestSignature(Signature):
-        input = InputField(prefix="Modified:")
-        output = OutputField()
-
-    assert TestSignature.input_fields["input"].json_schema_extra["prefix"] == "Modified:"  # ty:ignore[not-subscriptable]
-    assert TestSignature.output_fields["output"].json_schema_extra["prefix"] == "Output:"  # ty:ignore[not-subscriptable]
+def test_input_field_rejects_prefix_kwarg():
+    with pytest.raises(TypeError):
+        InputField(prefix="Modified:")
 
 
 def test_signature_parsing():
@@ -451,20 +447,21 @@ def test_pep604_union_type_inline():
     assert str in output_union_annotation.__args__
 
 
-def test_reject_legacy_union_string_signatures():
-    with pytest.raises(ValueError, match=r"typing\.Optional"):
-        Signature("input: Optional[str] -> output: str")  # ty:ignore[too-many-positional-arguments]
+def test_typing_union_string_signatures():
+    sig = Signature("input: int -> output: typing.Union[int, str]")  # ty:ignore[too-many-positional-arguments]
+    output_annotation = sig.output_fields["output"].annotation  # ty:ignore[unresolved-attribute]
+    assert get_origin(output_annotation) is Union
+    assert set(get_args(output_annotation)) == {int, str}
 
-    with pytest.raises(ValueError, match=r"typing\.Union"):
-        Signature("input: int -> output: Union[int, str]")  # ty:ignore[too-many-positional-arguments]
 
+def test_typing_union_class_signatures():
+    class LegacyUnionSignature(Signature):
+        input: str = InputField()
+        output: Union[int, str] = OutputField()
 
-def test_reject_legacy_union_class_signatures():
-    with pytest.raises(ValueError, match=r"typing\.Union"):
-
-        class LegacyUnionSignature(Signature):
-            input: str = InputField()
-            output: Union[int, str] = OutputField()
+    output_annotation = LegacyUnionSignature.output_fields["output"].annotation
+    assert get_origin(output_annotation) is Union
+    assert set(get_args(output_annotation)) == {int, str}
 
 
 def test_pep604_union_type_inline_nested():

@@ -64,7 +64,6 @@ class Evaluate:
         failure_score: float = 0.0,
         save_as_csv: str | None = None,
         save_as_json: str | None = None,
-        **kwargs,
     ) -> None:
         """
         Args:
@@ -92,11 +91,6 @@ class Evaluate:
         self.failure_score = failure_score
         self.save_as_csv = save_as_csv
         self.save_as_json = save_as_json
-
-        if "return_outputs" in kwargs:
-            raise ValueError(
-                "`return_outputs` is no longer supported. Results are always returned inside the `results` field of the `EvaluationResult` object."
-            )
 
     @with_callbacks
     def __call__(

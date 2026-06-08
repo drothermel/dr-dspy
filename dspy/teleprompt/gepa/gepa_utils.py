@@ -190,13 +190,11 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             devset=batch,
             metric=self.metric_fn,
             num_threads=self.num_threads,
-            return_all_scores=True,
             failure_score=self.failure_score,
             provide_traceback=True,
             max_errors=len(batch) * 100,
-            callback_metadata=callback_metadata,
         )
-        res = evaluator(program)
+        res = evaluator(program, callback_metadata=callback_metadata)
         outputs = [r[1] for r in res.results]
         scores = [r[2] for r in res.results]
         scores = [s["score"] if hasattr(s, "score") else s for s in scores]

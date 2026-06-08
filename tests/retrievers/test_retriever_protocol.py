@@ -87,24 +87,6 @@ def test_databricks_rm_direct_call_preserves_prediction_shape(monkeypatch: pytes
     assert result.extra_columns == [{"score": 0.9, "source": "b"}, {"score": 0.5, "source": "c"}]  # ty:ignore[unresolved-attribute]
 
 
-def test_databricks_rm_rejects_legacy_query_type_values(monkeypatch: pytest.MonkeyPatch) -> None:
-    import dspy.retrievers.databricks_rm as databricks_rm
-
-    monkeypatch.setattr(databricks_rm, "_databricks_sdk_installed", False)
-    auth_value = "not-a-secret"
-
-    retriever = databricks_rm.DatabricksRM(
-        databricks_index_name="index",
-        databricks_endpoint="https://example.databricks.com",
-        databricks_token=auth_value,
-        docs_id_column_name="id",
-        text_column_name="text",
-    )
-
-    with pytest.raises(ValueError, match="query_type 'vector' and 'text' are no longer supported"):
-        retriever.forward("example query", query_type="text")
-
-
 def test_weaviate_rm_direct_call_preserves_long_text_shape() -> None:
     pytest.importorskip("weaviate")
     from dspy.retrievers.weaviate_rm import WeaviateRM

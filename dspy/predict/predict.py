@@ -120,9 +120,6 @@ class Predict(Module, Parameter):
             else None
         )
 
-        if "extended_signature" in state:  # legacy, up to and including 2.5, for CoT.
-            raise NotImplementedError("Loading extended_signature is no longer supported in DSPy 2.6+")
-
         return self
 
     def _get_positional_args_error_message(self) -> str:

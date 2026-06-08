@@ -248,13 +248,6 @@ class DatabricksRM:
             or a ``dspy.primitives.prediction.Prediction`` object when ``use_with_databricks_agent_framework`` is
             ``False``.
         """
-        if query_type in {"vector", "text"}:
-            raise ValueError(
-                "query_type 'vector' and 'text' are no longer supported. Pass a string query for text search "
-                "or a list of floats for vector search, and use Databricks query_type values such as 'ANN' "
-                "or 'HYBRID'."
-            )
-
         if isinstance(query, str):
             query_text = query
             query_vector = None
