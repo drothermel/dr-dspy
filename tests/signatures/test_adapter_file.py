@@ -152,8 +152,8 @@ def test_file_repr_with_file_id():
 def test_file_str():
     file_obj = File.from_bytes(b"test")
     str_repr = str(file_obj)
-    assert "<<CUSTOM-TYPE-START-IDENTIFIER>>" in str_repr
-    assert "<<CUSTOM-TYPE-END-IDENTIFIER>>" in str_repr
+    assert str_repr.startswith('[{"type": "file",')
+    assert str_repr.endswith("}]")
 
 
 def test_encode_file_to_dict_from_path(sample_text_file):

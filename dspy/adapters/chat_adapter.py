@@ -9,9 +9,11 @@ from typing_extensions import override
 from dspy.adapters.base import Adapter
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import (
+    build_multimodal_user_message_content,
     format_field_value,
     get_annotation_name,
     get_field_description_string,
+    inputs_include_multimodal_custom_type_values,
     parse_value,
     translate_field_type,
 )
@@ -165,7 +167,18 @@ class ChatAdapter(Adapter):
         prefix: str = "",
         suffix: str = "",
         main_request: bool = False,
-    ) -> str:
+    ) -> str | list[dict[str, Any]]:
+        if inputs_include_multimodal_custom_type_values(signature, inputs):
+            output_requirements = self.user_message_output_requirements(signature) if main_request else None
+            return build_multimodal_user_message_content(
+                signature,
+                inputs,
+                prefix=prefix,
+                suffix=suffix,
+                main_request=main_request,
+                output_requirements=output_requirements,
+            )
+
         messages = [prefix]
         for k, v in signature.input_fields.items():
             if k in inputs:

@@ -651,32 +651,27 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
             "content": [
                 {
                     "type": "text",
-                    "text": "This is an example of the task, though some input or output fields are not "
-                    "supplied.\n"
-                    "\n"
-                    "<image>\n",
+                    "text": "This is an example of the task, though some input or output fields are not supplied.",
                 },
+                {"type": "text", "text": "<image>\n"},
                 {"type": "image_url", "image_url": {"url": "https://example.com/demo.png"}},
+                {"type": "text", "text": "\n</image>"},
                 {
                     "type": "text",
-                    "text": "\n"
-                    "</image>\n"
-                    "\n"
-                    "<tools>\n"
+                    "text": "\n\n<tools>\n"
                     '["search, whose description is <desc>Search for documents.</desc>. It '
                     "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
                     "'default': 3}}.\"]\n"
-                    "</tools>\n"
-                    "\n"
-                    "<profile>\n"
+                    "</tools>",
+                },
+                {
+                    "type": "text",
+                    "text": "\n\n<profile>\n"
                     '{"name": "Ada", "location": {"city": "London", "country": "UK"}, '
                     '"interests": ["math", "machines"]}\n'
-                    "</profile>\n"
-                    "\n"
-                    "<question>\n"
-                    "What should we mention?\n"
-                    "</question>",
+                    "</profile>",
                 },
+                {"type": "text", "text": "\n\n<question>\nWhat should we mention?\n</question>"},
             ],
         },
         {
@@ -703,28 +698,29 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
             "content": [
                 {"type": "text", "text": "<image>\n"},
                 {"type": "image_url", "image_url": {"url": "https://example.com/current.png"}},
+                {"type": "text", "text": "\n</image>"},
                 {
                     "type": "text",
-                    "text": "\n"
-                    "</image>\n"
-                    "\n"
-                    "<tools>\n"
+                    "text": "\n\n<tools>\n"
                     '["search, whose description is <desc>Search for documents.</desc>. It '
                     "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
                     "'default': 3}}.\"]\n"
-                    "</tools>\n"
-                    "\n"
-                    "<profile>\n"
+                    "</tools>",
+                },
+                {
+                    "type": "text",
+                    "text": "\n\n<profile>\n"
                     '{"name": "Grace", "location": {"city": "Arlington", "country": "USA"}, '
                     '"interests": ["compilers", "navy"]}\n'
-                    "</profile>\n"
-                    "\n"
-                    "<question>\n"
-                    "What should the answer include?\n"
-                    "</question>\n"
-                    "\n"
-                    "Respond with the corresponding output fields wrapped in XML tags "
-                    "`<answer>`.",
+                    "</profile>",
+                },
+                {
+                    "type": "text",
+                    "text": "\n\n<question>\nWhat should the answer include?\n</question>",
+                },
+                {
+                    "type": "text",
+                    "text": "\n\nRespond with the corresponding output fields wrapped in XML tags `<answer>`.",
                 },
             ],
         },

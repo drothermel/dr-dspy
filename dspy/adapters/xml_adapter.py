@@ -5,7 +5,12 @@ from pydantic.fields import FieldInfo
 from typing_extensions import override
 
 from dspy.adapters.chat_adapter import ChatAdapter, FieldInfoWithName
-from dspy.adapters.utils import format_field_value, translate_field_type
+from dspy.adapters.utils import (
+    build_multimodal_user_message_content,
+    format_field_value,
+    inputs_include_multimodal_custom_type_values,
+    translate_field_type,
+)
 from dspy.signatures.signature import Signature
 
 
@@ -49,7 +54,19 @@ class XMLAdapter(ChatAdapter):
         prefix: str = "",
         suffix: str = "",
         main_request: bool = False,
-    ) -> str:
+    ) -> str | list[dict[str, Any]]:
+        if inputs_include_multimodal_custom_type_values(signature, inputs):
+            output_requirements = self.user_message_output_requirements(signature) if main_request else None
+            return build_multimodal_user_message_content(
+                signature,
+                inputs,
+                prefix=prefix,
+                suffix=suffix,
+                main_request=main_request,
+                output_requirements=output_requirements,
+                field_wrapper="xml",
+            )
+
         messages = [prefix]
 
         messages.append(

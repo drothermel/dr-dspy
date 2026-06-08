@@ -85,7 +85,7 @@ class Code(Type):
     @pydantic.model_serializer()
     @override
     def serialize_model(self) -> str:
-        """Override to bypass the <<CUSTOM-TYPE-START-IDENTIFIER>> and <<CUSTOM-TYPE-END-IDENTIFIER>> tags."""
+        """Serialize code as plain text instead of JSON content blocks."""
         return self.format()
 
     @classmethod

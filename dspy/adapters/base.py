@@ -6,10 +6,6 @@ from typing import TYPE_CHECKING, Any, cast, get_args, get_origin
 
 import json_repair
 
-from dspy.adapters._legacy_type_markers import (
-    _expand_legacy_custom_type_markers_in_chat_message,
-    _expand_legacy_custom_type_markers_in_lm_message,
-)
 from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.history import History
@@ -256,9 +252,7 @@ class Adapter:
         adapters render `LMMessage` / `LMPart` directly.
         """
         return [
-            _expand_legacy_custom_type_markers_in_lm_message(
-                message if isinstance(message, LMMessage) else self._chat_dict_to_lm_message(message)
-            )
+            message if isinstance(message, LMMessage) else self._chat_dict_to_lm_message(message)
             for message in messages
         ]
 
@@ -412,7 +406,7 @@ class Adapter:
             if content:
                 messages.append({"role": "user", "content": content})
 
-        return [_expand_legacy_custom_type_markers_in_chat_message(message) for message in messages]
+        return messages
 
     def format_system_message(self, signature: type[Signature]) -> str:
         """Format the system message for the LM call.
@@ -474,7 +468,7 @@ class Adapter:
         prefix: str = "",
         suffix: str = "",
         main_request: bool = False,
-    ) -> str:
+    ) -> str | list[dict[str, Any]]:
         """Format the user message content.
 
         This method formats the user message content, which can be used in formatting few-shot examples, conversation
@@ -487,7 +481,7 @@ class Adapter:
             suffix: A suffix to the user message content.
 
         Returns:
-            A string that contains the user message content.
+            User message content as a string or OpenAI-style content blocks when inputs include custom types.
         """
         raise NotImplementedError
 

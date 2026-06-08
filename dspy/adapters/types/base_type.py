@@ -1,21 +1,16 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import TYPE_CHECKING, Any, get_args, get_origin
 
-import json_repair
 import pydantic
 
 if TYPE_CHECKING:
     from litellm import ModelResponseStream
 
     from dspy.clients.base_lm import BaseLM
-    from dspy.core.types import LMConfig, LMOutput
+    from dspy.core.types import LMConfig, LMOutput, LMPart
     from dspy.signatures.signature import Signature
-
-CUSTOM_TYPE_START_IDENTIFIER = "<<CUSTOM-TYPE-START-IDENTIFIER>>"
-CUSTOM_TYPE_END_IDENTIFIER = "<<CUSTOM-TYPE-END-IDENTIFIER>>"
 
 
 class Type(pydantic.BaseModel):
@@ -69,13 +64,41 @@ class Type(pydantic.BaseModel):
 
         return result
 
+    def renders_as_content_blocks(self) -> bool:
+        formatted = self.format()
+        if not isinstance(formatted, list) or not formatted:
+            return False
+        return all(isinstance(block, dict) and "type" in block for block in formatted)
+
+    def to_lm_parts(self) -> list[LMPart]:
+        """Render this custom type as normalized LM parts."""
+        from dspy.core.types import LMTextPart, _parts_from_openai_content
+
+        formatted = self.format()
+        if isinstance(formatted, str):
+            return [LMTextPart(text=formatted)]
+        if isinstance(formatted, list):
+            return _parts_from_openai_content(formatted)
+        if isinstance(formatted, dict):
+            return _parts_from_openai_content([formatted])
+        return [LMTextPart(text=str(formatted))]
+
+    def to_content_blocks(self) -> list[dict[str, Any]]:
+        """Render this custom type as OpenAI chat content blocks."""
+        formatted = self.format()
+        if isinstance(formatted, str):
+            return [{"type": "text", "text": formatted}]
+        if isinstance(formatted, list):
+            return [block if isinstance(block, dict) else {"type": "text", "text": str(block)} for block in formatted]
+        if isinstance(formatted, dict):
+            return [(formatted)]
+        return [{"type": "text", "text": str(formatted)}]
+
     @pydantic.model_serializer()
     def serialize_model(self) -> object:
         formatted = self.format()
         if isinstance(formatted, list):
-            return (
-                f"{CUSTOM_TYPE_START_IDENTIFIER}{json.dumps(formatted, ensure_ascii=False)}{CUSTOM_TYPE_END_IDENTIFIER}"
-            )
+            return json.dumps(formatted, ensure_ascii=False)
         return formatted
 
     @classmethod
@@ -147,87 +170,3 @@ class Type(pydantic.BaseModel):
     def parse_lm_response(cls, response: str | dict[str, Any]) -> Type | None:
         _ = response
         return None
-
-
-def split_message_content_for_custom_types(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Split user message content into a list of content blocks.
-
-    This method splits each user message's content in the `messages` list to be a list of content block, so that
-    the custom types like `Image` can be properly formatted for better quality. For example, the split content
-    may look like below if the user message has an `Image` object:
-
-    ```
-    [
-        {"type": "text", "text": "{text_before_image}"},
-        {"type": "image_url", "image_url": {"url": "{image_url}"}},
-        {"type": "text", "text": "{text_after_image}"},
-    ]
-    ```
-
-    This is implemented by finding the `<<CUSTOM-TYPE-START-IDENTIFIER>>` and `<<CUSTOM-TYPE-END-IDENTIFIER>>`
-    in the user message content and splitting the content around them. The `<<CUSTOM-TYPE-START-IDENTIFIER>>`
-    and `<<CUSTOM-TYPE-END-IDENTIFIER>>` are the reserved identifiers for the custom types as in `dspy.Type`.
-
-    Args:
-        messages: a list of messages sent to the LM. The format is the same as [OpenAI API's messages
-            format](https://platform.openai.com/docs/guides/chat-completions/response-format).
-
-    Returns:
-        A list of messages with the content split into a list of content blocks around custom types content.
-    """
-    for message in messages:
-        if message["role"] != "user":
-            # Custom type messages are only in user messages
-            continue
-
-        pattern = rf"{CUSTOM_TYPE_START_IDENTIFIER}(.*?){CUSTOM_TYPE_END_IDENTIFIER}"
-        result = []
-        last_end = 0
-        # DSPy adapter always formats user input into a string content before custom type splitting
-        content: str = message["content"]
-
-        for match in re.finditer(pattern, content, re.DOTALL):
-            start, end = match.span()
-
-            # Add text before the current block
-            if start > last_end:
-                result.append({"type": "text", "text": content[last_end:start]})
-
-            # Parse the JSON inside the block
-            custom_type_content = match.group(1).strip()
-            parsed = None
-
-            for parse_fn in [json.loads, _parse_doubly_quoted_json, json_repair.loads]:
-                try:
-                    parsed = parse_fn(custom_type_content)
-                    break
-                except json.JSONDecodeError:
-                    continue
-
-            if isinstance(parsed, list):
-                result.extend(parsed)
-            else:
-                # fallback to raw string if it's not valid JSON
-                result.append({"type": "text", "text": custom_type_content})
-
-            last_end = end
-
-        if last_end == 0:
-            # No custom type found, return the original message
-            continue
-
-        # Add any remaining text after the last match
-        if last_end < len(content):
-            result.append({"type": "text", "text": content[last_end:]})
-
-        message["content"] = result
-
-    return messages
-
-
-def _parse_doubly_quoted_json(json_str: str) -> object:
-    """
-    Parse a doubly quoted JSON string into a Python dict.
-    `dspy.Type` can be json-encoded twice if included in either list or dict, e.g., `list[dspy.experimental.Document]`
-    """
-    return json.loads(json.loads(f'"{json_str}"'))

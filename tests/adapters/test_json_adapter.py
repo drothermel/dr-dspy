@@ -324,28 +324,24 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
             "content": [
                 {
                     "type": "text",
-                    "text": "This is an example of the task, though some input or output fields are not "
-                    "supplied.\n"
-                    "\n"
-                    "[[ ## image ## ]]\n",
+                    "text": "This is an example of the task, though some input or output fields are not supplied.",
                 },
+                {"type": "text", "text": "[[ ## image ## ]]\n"},
                 {"type": "image_url", "image_url": {"url": "https://example.com/demo.png"}},
                 {
                     "type": "text",
-                    "text": "\n"
-                    "\n"
-                    "[[ ## tools ## ]]\n"
+                    "text": "\n\n[[ ## tools ## ]]\n"
                     '["search, whose description is <desc>Search for documents.</desc>. It '
                     "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
-                    "'default': 3}}.\"]\n"
-                    "\n"
-                    "[[ ## profile ## ]]\n"
-                    '{"name": "Ada", "location": {"city": "London", "country": "UK"}, '
-                    '"interests": ["math", "machines"]}\n'
-                    "\n"
-                    "[[ ## question ## ]]\n"
-                    "What should we mention?",
+                    "'default': 3}}.\"]",
                 },
+                {
+                    "type": "text",
+                    "text": "\n\n[[ ## profile ## ]]\n"
+                    '{"name": "Ada", "location": {"city": "London", "country": "UK"}, '
+                    '"interests": ["math", "machines"]}',
+                },
+                {"type": "text", "text": "\n\n[[ ## question ## ]]\nWhat should we mention?"},
             ],
         },
         {
@@ -386,21 +382,24 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
                 {"type": "image_url", "image_url": {"url": "https://example.com/current.png"}},
                 {
                     "type": "text",
-                    "text": "\n"
-                    "\n"
-                    "[[ ## tools ## ]]\n"
+                    "text": "\n\n[[ ## tools ## ]]\n"
                     '["search, whose description is <desc>Search for documents.</desc>. It '
                     "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
-                    "'default': 3}}.\"]\n"
-                    "\n"
-                    "[[ ## profile ## ]]\n"
+                    "'default': 3}}.\"]",
+                },
+                {
+                    "type": "text",
+                    "text": "\n\n[[ ## profile ## ]]\n"
                     '{"name": "Grace", "location": {"city": "Arlington", "country": "USA"}, '
-                    '"interests": ["compilers", "navy"]}\n'
-                    "\n"
-                    "[[ ## question ## ]]\n"
-                    "What should the answer include?\n"
-                    "\n"
-                    "Respond with a JSON object in the following order of fields: `answer` "
+                    '"interests": ["compilers", "navy"]}',
+                },
+                {
+                    "type": "text",
+                    "text": "\n\n[[ ## question ## ]]\nWhat should the answer include?",
+                },
+                {
+                    "type": "text",
+                    "text": "\n\nRespond with a JSON object in the following order of fields: `answer` "
                     "(must be formatted as a valid Python AnswerCard).",
                 },
             ],

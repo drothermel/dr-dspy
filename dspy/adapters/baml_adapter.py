@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.adapters.json_adapter import JSONAdapter
+from dspy.adapters.utils import build_multimodal_user_message_content, inputs_include_multimodal_custom_type_values
 from dspy.adapters.utils import format_field_value as original_format_field_value
 from dspy.signatures.signature import Signature
 
@@ -234,8 +235,19 @@ class BAMLAdapter(JSONAdapter):
         prefix: str = "",
         suffix: str = "",
         main_request: bool = False,
-    ) -> str:
+    ) -> str | list[dict[str, Any]]:
         """Overrides the base method to render Pydantic input instances as clean JSON."""
+        if inputs_include_multimodal_custom_type_values(signature, inputs):
+            output_requirements = self.user_message_output_requirements(signature) if main_request else None
+            return build_multimodal_user_message_content(
+                signature,
+                inputs,
+                prefix=prefix,
+                suffix=suffix,
+                main_request=main_request,
+                output_requirements=output_requirements,
+            )
+
         messages = [prefix]
         for key, field_info in signature.input_fields.items():
             if key in inputs:

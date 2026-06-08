@@ -725,28 +725,24 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
             "content": [
                 {
                     "type": "text",
-                    "text": "This is an example of the task, though some input or output fields are not "
-                    "supplied.\n"
-                    "\n"
-                    "[[ ## image ## ]]\n",
+                    "text": "This is an example of the task, though some input or output fields are not supplied.",
                 },
+                {"type": "text", "text": "[[ ## image ## ]]\n"},
                 {"type": "image_url", "image_url": {"url": "https://example.com/demo.png"}},
                 {
                     "type": "text",
-                    "text": "\n"
-                    "\n"
-                    "[[ ## tools ## ]]\n"
+                    "text": "\n\n[[ ## tools ## ]]\n"
                     '["search, whose description is <desc>Search for documents.</desc>. It '
                     "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
-                    "'default': 3}}.\"]\n"
-                    "\n"
-                    "[[ ## profile ## ]]\n"
-                    '{"name": "Ada", "location": {"city": "London", "country": "UK"}, '
-                    '"interests": ["math", "machines"]}\n'
-                    "\n"
-                    "[[ ## question ## ]]\n"
-                    "What should we mention?",
+                    "'default': 3}}.\"]",
                 },
+                {
+                    "type": "text",
+                    "text": "\n\n[[ ## profile ## ]]\n"
+                    '{"name": "Ada", "location": {"city": "London", "country": "UK"}, '
+                    '"interests": ["math", "machines"]}',
+                },
+                {"type": "text", "text": "\n\n[[ ## question ## ]]\nWhat should we mention?"},
             ],
         },
         {
@@ -779,21 +775,24 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
                 {"type": "image_url", "image_url": {"url": "https://example.com/current.png"}},
                 {
                     "type": "text",
-                    "text": "\n"
-                    "\n"
-                    "[[ ## tools ## ]]\n"
+                    "text": "\n\n[[ ## tools ## ]]\n"
                     '["search, whose description is <desc>Search for documents.</desc>. It '
                     "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
-                    "'default': 3}}.\"]\n"
-                    "\n"
-                    "[[ ## profile ## ]]\n"
+                    "'default': 3}}.\"]",
+                },
+                {
+                    "type": "text",
+                    "text": "\n\n[[ ## profile ## ]]\n"
                     '{"name": "Grace", "location": {"city": "Arlington", "country": "USA"}, '
-                    '"interests": ["compilers", "navy"]}\n'
-                    "\n"
-                    "[[ ## question ## ]]\n"
-                    "What should the answer include?\n"
-                    "\n"
-                    "Respond with the corresponding output fields, starting with the field `[[ "
+                    '"interests": ["compilers", "navy"]}',
+                },
+                {
+                    "type": "text",
+                    "text": "\n\n[[ ## question ## ]]\nWhat should the answer include?",
+                },
+                {
+                    "type": "text",
+                    "text": "\n\nRespond with the corresponding output fields, starting with the field `[[ "
                     "## answer ## ]]` (must be formatted as a valid Python AnswerCard), and "
                     "then ending with the marker for `[[ ## completed ## ]]`.",
                 },
@@ -961,9 +960,8 @@ def test_chat_adapter_format_exact_messages_with_citations_output_demo():
         {
             "role": "assistant",
             "content": "[[ ## citations ## ]]\n"
-            '<<CUSTOM-TYPE-START-IDENTIFIER>>[{"type": "char_location", "cited_text": "alpha", '
-            '"document_index": 0, "start_char_index": 0, "end_char_index": '
-            "5}]<<CUSTOM-TYPE-END-IDENTIFIER>>\n"
+            '[{"type": "char_location", "cited_text": "alpha", "document_index": 0, '
+            '"start_char_index": 0, "end_char_index": 5}]\n'
             "\n"
             "[[ ## completed ## ]]\n",
         },
@@ -2052,11 +2050,9 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
             "content": [
                 {
                     "type": "text",
-                    "text": "This is an example of the task, though some input or output fields are not "
-                    "supplied.\n"
-                    "\n"
-                    "[[ ## image ## ]]\n",
+                    "text": "This is an example of the task, though some input or output fields are not supplied.",
                 },
+                {"type": "text", "text": "[[ ## image ## ]]\n"},
                 {"type": "image_url", "image_url": {"url": "https://example.com/demo.png"}},
                 {"type": "text", "text": "\n\n[[ ## audio ## ]]\n"},
                 {"type": "input_audio", "input_audio": {"data": "REVNTw==", "format": "wav"}},
@@ -2073,24 +2069,22 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
                 {"type": "event", "event": {"label": "demo-event"}},
                 {
                     "type": "text",
-                    "text": "\n"
-                    "\n"
-                    "[[ ## tools ## ]]\n"
+                    "text": "\n\n[[ ## tools ## ]]\n"
                     '["search, whose description is <desc>Search for documents.</desc>. It '
                     "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
-                    "'default': 3}}.\"]\n"
-                    "\n"
-                    "[[ ## profile ## ]]\n"
-                    '{"name": "Ada", "location": {"city": "London", "country": "UK"}, '
-                    '"interests": ["math", "machines"]}\n'
-                    "\n"
-                    "[[ ## context ## ]]\n"
-                    "[1] «demo context one»\n"
-                    "[2] «demo context two»\n"
-                    "\n"
-                    "[[ ## question ## ]]\n"
-                    "What should we mention?",
+                    "'default': 3}}.\"]",
                 },
+                {
+                    "type": "text",
+                    "text": "\n\n[[ ## profile ## ]]\n"
+                    '{"name": "Ada", "location": {"city": "London", "country": "UK"}, '
+                    '"interests": ["math", "machines"]}',
+                },
+                {
+                    "type": "text",
+                    "text": "\n\n[[ ## context ## ]]\n[1] «demo context one»\n[2] «demo context two»",
+                },
+                {"type": "text", "text": "\n\n[[ ## question ## ]]\nWhat should we mention?"},
             ],
         },
         {
@@ -2173,25 +2167,28 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
                 {"type": "event", "event": {"label": "current-event"}},
                 {
                     "type": "text",
-                    "text": "\n"
-                    "\n"
-                    "[[ ## tools ## ]]\n"
+                    "text": "\n\n[[ ## tools ## ]]\n"
                     '["search, whose description is <desc>Search for documents.</desc>. It '
                     "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
-                    "'default': 3}}.\"]\n"
-                    "\n"
-                    "[[ ## profile ## ]]\n"
+                    "'default': 3}}.\"]",
+                },
+                {
+                    "type": "text",
+                    "text": "\n\n[[ ## profile ## ]]\n"
                     '{"name": "Grace", "location": {"city": "Arlington", "country": "USA"}, '
-                    '"interests": ["compilers", "navy"]}\n'
-                    "\n"
-                    "[[ ## context ## ]]\n"
-                    "[1] «current context one»\n"
-                    "[2] «current context two»\n"
-                    "\n"
-                    "[[ ## question ## ]]\n"
-                    "What should the answer include?\n"
-                    "\n"
-                    "Respond with the corresponding output fields, starting with the field `[[ "
+                    '"interests": ["compilers", "navy"]}',
+                },
+                {
+                    "type": "text",
+                    "text": "\n\n[[ ## context ## ]]\n[1] «current context one»\n[2] «current context two»",
+                },
+                {
+                    "type": "text",
+                    "text": "\n\n[[ ## question ## ]]\nWhat should the answer include?",
+                },
+                {
+                    "type": "text",
+                    "text": "\n\nRespond with the corresponding output fields, starting with the field `[[ "
                     "## answer ## ]]` (must be formatted as a valid Python AnswerCard), then "
                     "`[[ ## verdict ## ]]` (must be formatted as a valid Python Literal['yes', "
                     "'no']), then `[[ ## confidence ## ]]` (must be formatted as a valid Python "
