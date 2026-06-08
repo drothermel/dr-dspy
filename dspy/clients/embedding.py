@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from dspy.clients._litellm import get_litellm
-from dspy.clients.cache import request_cache
 from dspy.utils.lazy_import import require
 
 np = require("numpy")
@@ -22,7 +21,7 @@ class Embedder:
     2. Custom embedding functions that you provide
 
     For hosted models, simply pass the model name as a string (e.g., "openai/text-embedding-3-small"). The class will use
-    litellm to handle the API calls and caching.
+    litellm to handle the API calls.
 
     For custom embedding models, pass a callable function that:
     - Takes a list of strings as input.
@@ -36,7 +35,6 @@ class Embedder:
             model, must be an embedding model supported by litellm) or a callable that represents a custom embedding
             model.
         batch_size (int, optional): The default batch size for processing inputs in batches. Defaults to 200.
-        caching (bool, optional): Whether to cache the embedding response when using a hosted model. Defaults to True.
         **kwargs: Additional default keyword arguments to pass to the embedding model.
 
     Examples:
@@ -83,15 +81,12 @@ class Embedder:
         ```
     """
 
-    def __init__(
-        self, model: str | Callable, batch_size: int = 200, caching: bool = True, **kwargs: dict[str, Any]
-    ) -> None:
+    def __init__(self, model: str | Callable, batch_size: int = 200, **kwargs: dict[str, Any]) -> None:
         self.model = model
         self.batch_size = batch_size
-        self.caching = caching
         self.default_kwargs = kwargs
 
-    def _preprocess(self, inputs, batch_size=None, caching=None, **kwargs):
+    def _preprocess(self, inputs, batch_size=None, **kwargs):
         if isinstance(inputs, str):
             is_single_input = True
             inputs = [inputs]
@@ -102,7 +97,6 @@ class Embedder:
             raise ValueError("All inputs must be strings.")
 
         batch_size = batch_size or self.batch_size
-        caching = caching if caching is not None else self.caching
         merged_kwargs = self.default_kwargs.copy()
         merged_kwargs.update(kwargs)
 
@@ -110,7 +104,7 @@ class Embedder:
         for i in range(0, len(inputs), batch_size):
             input_batches.append(inputs[i : i + batch_size])  # noqa: PERF401 dynamic typing/lint migration for scoped ty adoption
 
-        return input_batches, caching, merged_kwargs, is_single_input
+        return input_batches, merged_kwargs, is_single_input
 
     def _postprocess(self, embeddings_list, is_single_input):
         embeddings = np.array(embeddings_list, dtype=np.float32)
@@ -122,7 +116,6 @@ class Embedder:
         self,
         inputs: str | list[str],
         batch_size: int | None = None,
-        caching: bool | None = None,
         **kwargs: dict[str, Any],
     ) -> np.ndarray:
         """Compute embeddings for the given inputs.
@@ -131,8 +124,6 @@ class Embedder:
             inputs: The inputs to compute embeddings for, can be a single string or a list of strings.
             batch_size (int, optional): The batch size for processing inputs. If None, defaults to the batch_size set
                 during initialization.
-            caching (bool, optional): Whether to cache the embedding response when using a hosted model. If None,
-                defaults to the caching setting from initialization.
             kwargs: Additional keyword arguments to pass to the embedding model. These will override the default
                 kwargs provided during initialization.
 
@@ -140,55 +131,32 @@ class Embedder:
             numpy.ndarray: If the input is a single string, returns a 1D numpy array representing the embedding.
             If the input is a list of strings, returns a 2D numpy array of embeddings, one embedding per row.
         """
-        input_batches, caching, kwargs, is_single_input = self._preprocess(
+        input_batches, kwargs, is_single_input = self._preprocess(
             inputs=inputs,
             batch_size=batch_size,
-            caching=caching,
             **kwargs,
         )
 
         embeddings_list = []
-        acompute_embeddings = _cached_acompute_embeddings if caching else _acompute_embeddings
-
         for batch in input_batches:
-            embeddings_list.extend(
-                await acompute_embeddings(model=self.model, batch_inputs=batch, caching=caching, **kwargs)
-            )
+            embeddings_list.extend(await _acompute_embeddings(model=self.model, batch_inputs=batch, **kwargs))
         return self._postprocess(embeddings_list=embeddings_list, is_single_input=is_single_input)
 
-    async def acall(self, inputs, batch_size=None, caching=None, **kwargs):
-        return await self.__call__(inputs, batch_size=batch_size, caching=caching, **kwargs)
+    async def acall(self, inputs, batch_size=None, **kwargs):
+        return await self.__call__(inputs, batch_size=batch_size, **kwargs)
 
 
-def _compute_embeddings(model, batch_inputs, caching=False, **kwargs):
+async def _acompute_embeddings(model, batch_inputs, **kwargs):
     if isinstance(model, str):
-        caching = caching and _get_litellm().cache is not None
-        embedding_response = _get_litellm().embedding(model=model, input=batch_inputs, caching=caching, **kwargs)
+        embedding_response = await _get_litellm().aembedding(
+            model=model,
+            input=batch_inputs,
+            caching=False,
+            **kwargs,
+        )
         return [data["embedding"] for data in embedding_response.data]
     if callable(model):
         return model(batch_inputs, **kwargs)
     raise ValueError(
         f"`model` in `dspy.clients.embedding.Embedder` must be a string or a callable, but got {type(model)}."
     )
-
-
-@request_cache(ignored_args_for_cache_key=["api_key", "api_base", "base_url"])
-def _cached_compute_embeddings(model, batch_inputs, caching=True, **kwargs):
-    return _compute_embeddings(model=model, batch_inputs=batch_inputs, caching=caching, **kwargs)
-
-
-async def _acompute_embeddings(model, batch_inputs, caching=False, **kwargs):
-    if isinstance(model, str):
-        caching = caching and _get_litellm().cache is not None
-        embedding_response = await _get_litellm().aembedding(model=model, input=batch_inputs, caching=caching, **kwargs)
-        return [data["embedding"] for data in embedding_response.data]
-    if callable(model):
-        return model(batch_inputs, **kwargs)
-    raise ValueError(
-        f"`model` in `dspy.clients.embedding.Embedder` must be a string or a callable, but got {type(model)}."
-    )
-
-
-@request_cache(ignored_args_for_cache_key=["api_key", "api_base", "base_url"])
-async def _cached_acompute_embeddings(model, batch_inputs, caching=True, **kwargs):
-    return await _acompute_embeddings(model=model, batch_inputs=batch_inputs, caching=caching, **kwargs)

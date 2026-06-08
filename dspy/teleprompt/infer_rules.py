@@ -166,7 +166,7 @@ class RulesInductionProgram(Module):
     async def aforward(self, examples_text):
         with settings.context(**self.teacher_settings):
             # Generate rules with a fresh rollout and non-zero temperature.
-            lm = settings.lm.copy(rollout_id=self.rng.randint(0, 10**9), temperature=1.0)
+            lm = settings.lm.copy(temperature=1.0)
             with settings.context(lm=lm):
                 rules = (await self.rules_induction(examples_text=examples_text)).natural_language_rules
 

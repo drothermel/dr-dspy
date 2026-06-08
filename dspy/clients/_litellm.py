@@ -15,7 +15,7 @@ def _configure_litellm_defaults(litellm: types.ModuleType) -> None:
     """Apply DSPy's global LiteLLM defaults once when LiteLLM is first imported."""
     litellm.telemetry = False  # ty:ignore[unresolved-attribute]
     litellm.cache = (  # ty:ignore[unresolved-attribute]
-        None  # By default we disable LiteLLM cache and use DSPy on-disk cache.
+        None  # Disable LiteLLM's built-in response cache.
     )
     if not getattr(litellm, "_dspy_logging_configured", False):
         litellm.suppress_debug_info = True  # ty:ignore[unresolved-attribute]

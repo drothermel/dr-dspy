@@ -148,14 +148,12 @@ class Refine(Module):
 
     async def aforward(self, **kwargs):
         lm = self.module.get_lm() or settings.lm
-        start = lm.kwargs.get("rollout_id", 0)
-        rollout_ids = [start + i for i in range(self.N)]
         best_pred, best_trace, best_reward = None, None, -float("inf")
         advice = None
         adapter = settings.adapter or ChatAdapter()
 
-        for idx, rid in enumerate(rollout_ids):
-            lm_ = lm.copy(rollout_id=rid, temperature=1.0)
+        for idx in range(self.N):
+            lm_ = lm.copy(temperature=1.0)
             mod = self.module.deepcopy()
             mod.set_lm(lm_)
 

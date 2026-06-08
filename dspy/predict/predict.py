@@ -62,8 +62,8 @@ class Predict(Module, Parameter):
                     inputs: tuple = (input_field("q"),)
                     outputs: tuple = (output_field("a"),)
 
-                predict = Predict(QATaskSpec(), rollout_id=1, temperature=1.0)
-                result = await predict(q="What is 1 + 52?", config={"rollout_id": 2, "temperature": 1.0})
+                predict = Predict(QATaskSpec(), temperature=1.0)
+                result = await predict(q="What is 1 + 52?", config={"temperature": 1.0})
     """
 
     def __init__(self, task_spec: TaskSpec, callbacks: list[BaseCallback] | None = None, **config) -> None:

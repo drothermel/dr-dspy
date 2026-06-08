@@ -50,8 +50,7 @@ class BootstrapFewShot(Teleprompter):
         """A Teleprompter class that composes a set of demos/examples to go into a predictor's prompt.
         These demos come from a combination of labeled examples in the training set, and bootstrapped demos.
 
-        Each bootstrap round copies the LM with a new ``rollout_id`` at ``temperature=1.0`` to
-        bypass caches and gather diverse traces.
+        Each bootstrap round copies the LM at ``temperature=1.0`` to gather diverse traces.
 
         Args:
             metric (Callable): A function that compares an expected value and predicted value,
@@ -179,8 +178,7 @@ class BootstrapFewShot(Teleprompter):
         try:
             with settings.context(trace=[], **self.teacher_settings):
                 lm = settings.lm
-                # Use a fresh rollout with temperature=1.0 to bypass caches.
-                lm = lm.copy(rollout_id=round_idx, temperature=1.0) if round_idx > 0 else lm
+                lm = lm.copy(temperature=1.0) if round_idx > 0 else lm
                 new_settings = {"lm": lm} if round_idx > 0 else {}
 
                 with settings.context(**new_settings):

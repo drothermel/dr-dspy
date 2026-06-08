@@ -3,7 +3,6 @@ from typing import Any
 
 import requests
 
-from dspy.clients.cache import request_cache
 from dspy.dsp.utils.utils import dotdict
 
 # TODO: Support resolving hosted ColBERT index names to service URLs instead of requiring callers to pass url/port.
@@ -38,8 +37,7 @@ class ColBERTv2:
         return [dotdict(psg) for psg in topk]
 
 
-@request_cache()
-def colbertv2_get_request_v2(url: str, query: str, k: int):
+def colbertv2_get_request(url: str, query: str, k: int):
     assert k <= 100, "Only k <= 100 is supported for the hosted ColBERTv2 server at the moment."
 
     payload = {"query": query, "k": k}
@@ -58,16 +56,7 @@ def colbertv2_get_request_v2(url: str, query: str, k: int):
     return topk[:k]
 
 
-@request_cache()
-def colbertv2_get_request_v2_wrapped(*args, **kwargs):
-    return colbertv2_get_request_v2(*args, **kwargs)
-
-
-colbertv2_get_request = colbertv2_get_request_v2_wrapped
-
-
-@request_cache()
-def colbertv2_post_request_v2(url: str, query: str, k: int):
+def colbertv2_post_request(url: str, query: str, k: int):
     headers = {"Content-Type": "application/json; charset=utf-8"}
     payload = {"query": query, "k": k}
     res = requests.post(url, json=payload, headers=headers, timeout=10)
@@ -81,14 +70,6 @@ def colbertv2_post_request_v2(url: str, query: str, k: int):
         raise ValueError(f"ColBERTv2 server returned an unexpected response: {res_json}")
 
     return res_json["topk"][:k]
-
-
-@request_cache()
-def colbertv2_post_request_v2_wrapped(*args, **kwargs):
-    return colbertv2_post_request_v2(*args, **kwargs)
-
-
-colbertv2_post_request = colbertv2_post_request_v2_wrapped
 
 
 class ColBERTv2RetrieverLocal:

@@ -20,19 +20,16 @@ logger = logging.getLogger(__name__)
 def prepare_models_for_resampling(*, program: Module, n: int, teacher_settings: dict | None = None):
     lm = program.get_lm() or settings.lm
 
-    start_rollout_id = lm.kwargs.get("rollout_id", 0)
-    rollout_ids = [start_rollout_id + i for i in range(n)]
-
-    start_rollout_idx, models = 0, []
-    # If we have a teacher model, use this as the first model
+    models = []
     if teacher_settings:
         teacher_lm = teacher_settings.get("lm") or lm
-        teacher_lm.kwargs["rollout_id"] = rollout_ids[start_rollout_idx]
+        teacher_lm.kwargs["temperature"] = 1.0
         models.append(teacher_lm)
-        start_rollout_idx += 1
+        remaining = n - 1
+    else:
+        remaining = n
 
-    # The rest of the models are just copies of the base model
-    models.extend([lm.copy(rollout_id=r, temperature=1.0) for r in rollout_ids[start_rollout_idx:]])
+    models.extend([lm.copy(temperature=1.0) for _ in range(remaining)])
 
     return models
 

@@ -371,14 +371,6 @@ class GRPO(FinetuneTeleprompter):
         )
         num_samples_per_input = self.num_rollouts_per_grpo_step // len(teachers)
 
-        # We will disable the LM cache for all programs (student and teachers)
-        # These will be reverted to their original state at the end of the
-        # training
-        lm_cache_dict = {}
-        disable_lm_cache(program=student, lm_cache_dict=lm_cache_dict)
-        for t in teachers:
-            disable_lm_cache(program=t, lm_cache_dict=lm_cache_dict)
-
         for pred in student.predictors():
             train_kwargs = self.train_kwargs[pred.lm]
             train_kwargs = {} if train_kwargs is None else train_kwargs
@@ -620,7 +612,7 @@ class GRPO(FinetuneTeleprompter):
                         )
                     if len(set(map(repr, grpo_train_group))) < 2:
                         logger.warning(
-                            f"GRPOGroup has no diversity. This could be due to low temperature, or low number of rollouts, or the cache could be enabled inadvertently. The GRPOGroup is {grpo_train_group}."
+                            f"GRPOGroup has no diversity. This could be due to low temperature or a low number of rollouts. The GRPOGroup is {grpo_train_group}."
                         )
 
             # We now run the GRPO step. Notes:
@@ -709,33 +701,6 @@ class GRPO(FinetuneTeleprompter):
         for job in grpo_training_jobs.values():
             job.terminate()
 
-        recover_lm_cache(program=student, lm_cache_dict=lm_cache_dict)
-        for t in teachers:
-            recover_lm_cache(program=t, lm_cache_dict=lm_cache_dict)
-
         logger.info("GRPO compiler has finished compiling the student program")
         student._compiled = True
         return student
-
-
-def disable_lm_cache(program: Module, lm_cache_dict: dict) -> None:
-    """Disable the LM cache for all predictors in the program."""
-    for pred in program.predictors():
-        if not pred.lm:
-            raise ValueError(f"Cannot disable cache: predictor {pred} does not have an LM set.")
-        if pred.lm not in lm_cache_dict:  # Check to avoid overwriting the cache
-            lm_cache_dict[pred.lm] = pred.lm.cache
-        pred.lm.cache = False
-
-
-def recover_lm_cache(program: Module, lm_cache_dict: dict) -> None:
-    """Recover the LM caches for all predictors in the program to their original state."""
-    for pred in program.predictors():
-        if pred.lm in lm_cache_dict:
-            pred.lm.cache = lm_cache_dict[pred.lm]
-        else:
-            # We do not expect this branch to execute at all since all the LMs
-            # are modified in place and no new LMs are created during training.
-            # However, we do not complain if this happens since this is a
-            # relatively minor feature. We default the LM cache to True.
-            pred.lm.cache = True

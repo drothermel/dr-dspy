@@ -442,10 +442,7 @@ class GroundedProposer(Proposer):
             verbose=self.verbose,
         )
 
-        rollout_lm = self.prompt_model.copy(
-            rollout_id=self.rng.randint(0, 10**9),
-            temperature=self.init_temperature,
-        )
+        rollout_lm = self.prompt_model.copy(temperature=self.init_temperature)
 
         with settings.context(lm=rollout_lm):
             proposed_instruction = (
