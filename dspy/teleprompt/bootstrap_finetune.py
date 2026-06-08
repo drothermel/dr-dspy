@@ -20,13 +20,13 @@ class FinetuneTeleprompter(Teleprompter):
     def __init__(
         self,
         train_kwargs: dict[str, Any] | dict[LM, dict[str, Any]] | None = None,
-    ):
+    ) -> None:
         self.train_kwargs: dict[LM, Any] = self.convert_to_lm_dict(train_kwargs or {})
 
     @staticmethod
     def convert_to_lm_dict(arg) -> dict[LM, Any]:
         non_empty_dict = arg and isinstance(arg, dict)
-        if non_empty_dict and all(isinstance(k, LM) for k in arg.keys()):
+        if non_empty_dict and all(isinstance(k, LM) for k in arg):
             return arg
         # Default to using the same value for all LMs
         return defaultdict(lambda: arg)
@@ -41,13 +41,8 @@ class BootstrapFinetune(FinetuneTeleprompter):
         adapter: Adapter | dict[LM, Adapter] | None = None,
         exclude_demos: bool = False,
         num_threads: int | None = None,
-    ):
-        # TODO(feature): Inputs train_kwargs (a dict with string keys) and
-        # adapter (Adapter) can depend on the LM they are used with. We are
-        # takingthese as parameters for the time being. However, they can be
-        # attached to LMs themselves -- an LM could know which adapter it should
-        # be used with along with the train_kwargs. This will lead the only
-        # required argument for LM.finetune() to be the train dataset.
+    ) -> None:
+        # TODO(feature): Move LM-specific train_kwargs and adapter selection onto LM instances so LM.finetune() only needs train_data.
 
         super().__init__(train_kwargs=train_kwargs)
         self.metric = metric
@@ -199,41 +194,17 @@ def build_call_data_from_trace(
     adapter: Adapter,
     exclude_demos: bool = False,
 ) -> dict[str, list[dict[str, Any]]]:
-    # Find data that's relevant to the predictor
-    pred, inputs, outputs = trace[pred_ind]  # assuming that the order is kept
+    # Trace order must match student.predictors(); pred_ind selects that predictor's invocation.
+    pred, inputs, outputs = trace[pred_ind]
 
     demos = [] if exclude_demos else pred.demos
-    call_data = adapter.format_finetune_data(
+    return adapter.format_finetune_data(
         signature=pred.signature,
         demos=demos,
         inputs=inputs,
         outputs=outputs,
     )
-    return call_data
 
-
-# # TODO(PR) check with team
-# def bootstrap_trace_data_one_example(
-#     example: Example,
-#     program: Program,
-#     metric: Optional[Callable] = None
-# ) -> dict[str, Any]:
-#     # Return a dict with the following keys:
-#     #     example, prediction, trace, and score (if metric != None)
-#     with settings.context(trace=[]):
-#         prediction = program(**example.inputs())
-#         trace = dspy.settings.trace
-#         score = metric(example, prediction, trace) if metric else None
-
-#     data_dict = dict(
-#         example=example,
-#         prediction=prediction,
-#         trace=trace,
-#     )
-#     if metric:
-#         data_dict["score"] = score
-
-#     return data_dict
 
 
 # Note: Shared below are useful functions for preparing student/teacher programs
@@ -277,7 +248,7 @@ def prepare_teacher(student: Module, teacher: Module | None = None) -> Module:
     return teacher
 
 
-def assert_structural_equivalency(program1: object, program2: object):
+def assert_structural_equivalency(program1: object, program2: object) -> None:
     assert isinstance(program1, Module)
     assert isinstance(program2, Module)
 
@@ -294,7 +265,7 @@ def assert_structural_equivalency(program1: object, program2: object):
         assert isinstance(pred2, Predict)
 
 
-def assert_no_shared_predictor(program1: Module, program2: Module):
+def assert_no_shared_predictor(program1: Module, program2: Module) -> None:
     id_to_name1 = {id(p): n for n, p in program1.named_predictors()}
     id_to_name2 = {id(p): n for n, p in program2.named_predictors()}
     shared_ids = set(id_to_name1.keys()) & set(id_to_name2.keys())
@@ -309,13 +280,13 @@ def get_unique_lms(program: Module) -> list[LM]:
     return list(set(lms))
 
 
-def launch_lms(program: Module):
+def launch_lms(program: Module) -> None:
     lms = get_unique_lms(program)
     for lm in lms:
         lm.launch()
 
 
-def kill_lms(program: Module):
+def kill_lms(program: Module) -> None:
     lms = get_unique_lms(program)
     for lm in lms:
         lm.kill()

@@ -1,5 +1,5 @@
 import re
-from typing import Any, ClassVar
+from typing import ClassVar, cast
 
 import pydantic
 from pydantic import create_model
@@ -77,11 +77,11 @@ class Code(Type):
 
     language: ClassVar[str] = "python"
 
-    def format(self):
+    def format(self) -> str:
         return f"{self.code}"
 
     @pydantic.model_serializer()
-    def serialize_model(self):
+    def serialize_model(self) -> str:
         """Override to bypass the <<CUSTOM-TYPE-START-IDENTIFIER>> and <<CUSTOM-TYPE-END-IDENTIFIER>> tags."""
         return self.format()
 
@@ -95,7 +95,7 @@ class Code(Type):
 
     @pydantic.model_validator(mode="before")
     @classmethod
-    def validate_input(cls, data: Any):
+    def validate_input(cls, data: object) -> object:
         if isinstance(data, cls):
             return data
 
@@ -103,6 +103,7 @@ class Code(Type):
             return {"code": _filter_code(data)}
 
         if isinstance(data, dict):
+            data = cast("dict[str, object]", data)
             if "code" not in data:
                 raise ValueError("`code` field is required for `dspy.adapters.types.code.Code`")
             if not isinstance(data["code"], str):
@@ -132,10 +133,10 @@ def _filter_code(code: str) -> str:
 
 
 # Patch __class_getitem__ directly on the class to support Code["python"] syntax.
-def _code_class_getitem(cls, language):
+def _code_class_getitem(cls: type[Code], language: str) -> type[Code]:
     code_with_language_cls = create_model(f"{cls.__name__}_{language}", __base__=cls)
     code_with_language_cls.language = language
     return code_with_language_cls
 
 
-Code.__class_getitem__ = classmethod(_code_class_getitem)
+Code.__class_getitem__ = classmethod(_code_class_getitem)  # ty: ignore[invalid-assignment]

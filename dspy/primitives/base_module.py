@@ -9,15 +9,14 @@ import orjson
 
 from dspy.utils.saving import get_dependency_versions
 
-# NOTE: Note: It's important (temporary decision) to maintain named_parameters that's different in behavior from
-# named_sub_modules for the time being.
+# named_parameters intentionally remains less recursive than named_sub_modules for compatibility; revisit only with caller/test migration.
 
 
 logger = logging.getLogger(__name__)
 
 
 class BaseModule:
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     def named_parameters(self):
@@ -31,17 +30,16 @@ class BaseModule:
         visited = set()
         named_parameters = []
 
-        def add_parameter(param_name, param_value):
+        def add_parameter(param_name, param_value) -> None:
             if isinstance(param_value, Parameter):
                 if id(param_value) not in visited:
                     visited.add(id(param_value))
                     named_parameters.append((param_name, param_value))
 
-            elif isinstance(param_value, Module):
+            elif isinstance(param_value, Module) and not getattr(param_value, "_compiled", False):
                 # When a sub-module is pre-compiled, keep it frozen.
-                if not getattr(param_value, "_compiled", False):
-                    for sub_name, param in param_value.named_parameters():
-                        add_parameter(f"{param_name}.{sub_name}", param)
+                for sub_name, param in param_value.named_parameters():
+                    add_parameter(f"{param_name}.{sub_name}", param)
 
         if isinstance(self, Parameter):
             add_parameter("self", self)
@@ -79,7 +77,7 @@ class BaseModule:
         queue = deque([("self", self)])
         seen = {id(self)}
 
-        def add_to_queue(name, item):
+        def add_to_queue(name, item) -> None:
             if id(item) not in seen:
                 seen.add(id(item))
                 queue.append((name, item))
@@ -122,7 +120,6 @@ class BaseModule:
 
         # Create an empty instance.
         new_instance = self.__class__.__new__(self.__class__)
-        # Set attribuetes of the copied instance.
         for attr, value in self.__dict__.items():
             if isinstance(value, BaseModule):
                 setattr(new_instance, attr, value.deepcopy())
@@ -156,10 +153,10 @@ class BaseModule:
     def dump_state(self, json_mode=True):
         return {name: param.dump_state(json_mode=json_mode) for name, param in self.named_parameters()}
 
-    def load_state(self, state, *, allow_unsafe_lm_state=False):
+    def load_state(self, state, *, allow_unsafe_lm_state=False) -> None:
         from dspy.predict.predict import Predict
 
-        def _apply(module):
+        def _apply(module) -> None:
             for name, param in module.named_parameters():
                 if isinstance(param, Predict):
                     param.load_state(state[name], allow_unsafe_lm_state=allow_unsafe_lm_state)
@@ -168,7 +165,7 @@ class BaseModule:
 
         _apply(self.deepcopy())  # trial run raises before self is touched
         _apply(self)
-    def save(self, path, save_program=False, modules_to_serialize=None):
+    def save(self, path, save_program=False, modules_to_serialize=None) -> None:
         """Save the module.
 
         Save the module to a directory or a file. There are two modes:
@@ -217,14 +214,14 @@ class BaseModule:
                 for module in modules_to_serialize:
                     cloudpickle.register_pickle_by_value(module)
 
-                with open(path / "program.pkl", "wb") as f:
+                with (path / "program.pkl").open("wb") as f:
                     cloudpickle.dump(self, f)
             except Exception as e:
                 raise RuntimeError(
                     f"Saving failed with error: {e}. Please remove the non-picklable attributes from your DSPy program, "
                     "or consider using state-only saving by setting `save_program=False`."
                 )
-            with open(path / "metadata.json", "wb") as f:
+            with (path / "metadata.json").open("wb") as f:
                 f.write(orjson.dumps(metadata, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE))
 
             return
@@ -233,7 +230,7 @@ class BaseModule:
             state = self.dump_state()
             state["metadata"] = metadata
             try:
-                with open(path, "wb") as f:
+                with path.open("wb") as f:
                     f.write(orjson.dumps(state, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE))
             except Exception as e:
                 raise RuntimeError(
@@ -246,12 +243,12 @@ class BaseModule:
                           'this, prefer saving using json format using module.save("module.json").')
             state = self.dump_state(json_mode=False)
             state["metadata"] = metadata
-            with open(path, "wb") as f:
+            with path.open("wb") as f:
                 cloudpickle.dump(state, f)
         else:
             raise ValueError(f"`path` must end with `.json` or `.pkl` when `save_program=False`, but received: {path}")
 
-    def load(self, path, allow_pickle=False, allow_unsafe_lm_state=False):
+    def load(self, path, allow_pickle=False, allow_unsafe_lm_state=False) -> None:
         """Load the saved module. You may also want to check out dspy.load, if you want to
         load an entire program, not just the state for an existing program.
 
@@ -266,14 +263,14 @@ class BaseModule:
         path = Path(path)
 
         if path.suffix == ".json":
-            with open(path, "rb") as f:
+            with path.open("rb") as f:
                 state = orjson.loads(f.read())
         elif path.suffix == ".pkl":
             if not allow_pickle:
                 raise ValueError("Loading .pkl files can run arbitrary code, which may be dangerous. Prefer "
                                  "saving with .json files if possible. Set `allow_pickle=True` "
                                  "if you are sure about the source of the file and in a trusted environment.")
-            with open(path, "rb") as f:
+            with path.open("rb") as f:
                 state = cloudpickle.load(f)
         else:
             raise ValueError(f"`path` must end with `.json` or `.pkl`, but received: {path}")

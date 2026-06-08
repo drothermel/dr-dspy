@@ -110,7 +110,7 @@ def test_pot_code_generation_persistent_errors():
     settings.configure(lm=lm)
 
     pot = ProgramOfThought(BasicQA, max_iters=max_iters)
-    with pytest.raises(RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: ZeroDivisionError:"):
+    with pytest.raises(RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: ZeroDivisionError:"):  # noqa: RUF043
         pot(question="What is 1+1?")
 
 
@@ -127,7 +127,7 @@ def test_pot_code_parse_error():
     with (
         patch("dspy.predict.program_of_thought.ProgramOfThought._execute_code") as mock_execute_code,
         pytest.raises(
-            RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: Error: Code format is not correct."
+            RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: Error: Code format is not correct."  # noqa: RUF043
         ),
     ):
         pot(question="What is 1+1?")

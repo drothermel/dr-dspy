@@ -39,7 +39,6 @@ def convert_mcp_tool(session: "mcp.ClientSession", tool: "mcp.types.Tool") -> To
     """
     args, arg_types, arg_desc = convert_input_schema_to_tool_args(tool.inputSchema)
 
-    # Convert the MCP tool and Session to a single async method
     async def func(*args, **kwargs):
         result = await session.call_tool(tool.name, arguments=kwargs)
         return _convert_mcp_tool_result(result)

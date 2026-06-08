@@ -2,20 +2,22 @@ from __future__ import annotations
 
 import functools
 import sys
-import types
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dspy.utils.lazy_import import require
+
+if TYPE_CHECKING:
+    import types
 
 
 @functools.cache
 def _configure_litellm_defaults(litellm: types.ModuleType) -> None:
     """Apply DSPy's global LiteLLM defaults once when LiteLLM is first imported."""
-    litellm.telemetry = False
-    litellm.cache = None  # By default we disable LiteLLM cache and use DSPy on-disk cache.
+    litellm.telemetry = False  # ty:ignore[unresolved-attribute]
+    litellm.cache = None  # By default we disable LiteLLM cache and use DSPy on-disk cache.  # ty:ignore[unresolved-attribute]
     if not getattr(litellm, "_dspy_logging_configured", False):
-        litellm.suppress_debug_info = True
-        litellm._dspy_logging_configured = True
+        litellm.suppress_debug_info = True  # ty:ignore[unresolved-attribute]
+        litellm._dspy_logging_configured = True  # ty:ignore[unresolved-attribute]
 
 
 def _materialize_litellm(litellm: types.ModuleType) -> None:

@@ -33,7 +33,7 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    def forward(self, **kwargs):
+    def forward(self, **kwargs: object):
         return self.predictor(**kwargs)
 
 
@@ -88,7 +88,7 @@ def test_error_handling_during_bootstrap():
             super().__init__()
             self.predictor = Predict(signature)
 
-        def forward(self, **kwargs):
+        def forward(self, **kwargs: object):
             raise RuntimeError("Simulated error")
 
     student = SimpleModule("input -> output")

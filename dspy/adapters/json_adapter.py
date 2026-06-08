@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import Any, get_origin
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar, get_origin
 
 import json_repair
 import pydantic
@@ -22,6 +23,7 @@ from dspy.utils.callback import BaseCallback
 from dspy.utils.exceptions import AdapterParseError, LMError
 
 logger = logging.getLogger(__name__)
+AdapterCallResult = TypeVar("AdapterCallResult", list[dict[str, Any]], Awaitable[list[dict[str, Any]]])
 
 
 def _has_open_ended_mapping(signature: SignatureMeta) -> bool:
@@ -43,7 +45,7 @@ class JSONAdapter(ChatAdapter):
         callbacks: list[BaseCallback] | None = None,
         use_native_function_calling: bool = True,
         parallel_tool_calls: bool | None = None,
-    ):
+    ) -> None:
         # JSONAdapter uses native function calling by default.
         super().__init__(
             callbacks=callbacks,
@@ -51,7 +53,17 @@ class JSONAdapter(ChatAdapter):
             parallel_tool_calls=parallel_tool_calls,
         )
 
-    def _json_adapter_call_common(self, lm, lm_kwargs, signature, demos, inputs, call_fn):
+    def _json_adapter_call_common(
+        self,
+        lm: BaseLM,
+        lm_kwargs: dict[str, Any],
+        signature: type[Signature],
+        demos: list[dict[str, Any]],
+        inputs: dict[str, Any],
+        call_fn: Callable[
+            [BaseLM, dict[str, Any], type[Signature], list[dict[str, Any]], dict[str, Any]], AdapterCallResult
+        ],
+    ) -> AdapterCallResult | None:
         """Common call logic to be used for both sync and async calls."""
         if "response_format" not in lm.supported_params:
             return call_fn(lm, lm_kwargs, signature, demos, inputs)
@@ -63,6 +75,7 @@ class JSONAdapter(ChatAdapter):
             # So we fall back to json mode if native function calling is disabled and ToolCalls is present.
             lm_kwargs["response_format"] = {"type": "json_object"}
             return call_fn(lm, lm_kwargs, signature, demos, inputs)
+        return None
 
     def __call__(
         self,
@@ -122,7 +135,7 @@ class JSONAdapter(ChatAdapter):
         parts = []
         parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
 
-        def format_signature_fields_for_instructions(fields: dict[str, FieldInfo], role: str):
+        def format_signature_fields_for_instructions(fields: dict[str, FieldInfo], role: str) -> str:
             return self.format_field_with_value(
                 fields_with_values={
                     FieldInfoWithName(name=field_name, info=field_info): translate_field_type(field_name, field_info)
@@ -138,7 +151,7 @@ class JSONAdapter(ChatAdapter):
         return "\n\n".join(parts).strip()
 
     def user_message_output_requirements(self, signature: type[Signature]) -> str:
-        def type_info(v):
+        def type_info(v: FieldInfo) -> str:
             if v.annotation == ToolCalls:
                 return ' (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]})'
             return (
@@ -156,7 +169,7 @@ class JSONAdapter(ChatAdapter):
         self,
         signature: type[Signature],
         outputs: dict[str, Any],
-        missing_field_message=None,
+        missing_field_message: str | None = None,
     ) -> str:
         fields_with_values = {
             FieldInfoWithName(name=k, info=v): outputs.get(k, missing_field_message)
@@ -177,7 +190,7 @@ class JSONAdapter(ChatAdapter):
         if not isinstance(fields, dict):
             raise AdapterParseError(
                 adapter_name="JSONAdapter",
-                signature=signature,
+                signature=signature,  # ty: ignore[invalid-argument-type]
                 lm_response=completion,
                 message="LM response cannot be serialized to a JSON object.",
             )
@@ -192,9 +205,9 @@ class JSONAdapter(ChatAdapter):
         if fields.keys() != signature.output_fields.keys():
             raise AdapterParseError(
                 adapter_name="JSONAdapter",
-                signature=signature,
+                signature=signature,  # ty: ignore[invalid-argument-type]
                 lm_response=completion,
-                parsed_result=fields,
+                parsed_result=fields,  # ty: ignore[invalid-argument-type]
             )
 
         return fields
@@ -216,10 +229,9 @@ class JSONAdapter(ChatAdapter):
                 formatted_field_value = format_field_value(field_info=field.info, value=field_value)
                 output.append(f"[[ ## {field.name} ## ]]\n{formatted_field_value}")
             return "\n\n".join(output).strip()
-        else:
-            d = fields_with_values.items()
-            d = {k.name: v for k, v in d}
-            return json.dumps(serialize_for_json(d), indent=2, ensure_ascii=False)
+        d = fields_with_values.items()
+        d = {k.name: v for k, v in d}
+        return json.dumps(serialize_for_json(d), indent=2, ensure_ascii=False)
 
     def format_finetune_data(
         self, signature: type[Signature], demos: list[dict[str, Any]], inputs: dict[str, Any], outputs: dict[str, Any]
@@ -241,7 +253,7 @@ def _get_structured_outputs_response_format(
     schema cannot be generated since all properties must be explicitly declared. In that case, an exception
     is raised so that the caller can fall back to using a plain "json_object" response_format.
     """
-    # Although we've already performed an early check, we keep this here as a final guard.
+    # Keep this guard because callers may invoke the schema builder directly, bypassing _json_adapter_call_common().
     for name, field in signature.output_fields.items():
         annotation = field.annotation
         if get_origin(annotation) is dict:
@@ -259,7 +271,7 @@ def _get_structured_outputs_response_format(
         fields[name] = (annotation, default)
 
     # Build the model with extra fields forbidden.
-    pydantic_model = pydantic.create_model(
+    pydantic_model = pydantic.create_model(  # ty: ignore[no-matching-overload]
         "DSPyProgramOutputs",
         __config__=pydantic.ConfigDict(extra="forbid"),
         **fields,
@@ -272,7 +284,7 @@ def _get_structured_outputs_response_format(
     for prop in schema.get("properties", {}).values():
         prop.pop("json_schema_extra", None)
 
-    def enforce_required(schema_part: dict):
+    def enforce_required(schema_part: dict[str, Any]) -> None:
         """
         Recursively ensure that:
             - for any object schema, a "required" key is added with all property names (or [] if no properties)
@@ -304,6 +316,9 @@ def _get_structured_outputs_response_format(
     enforce_required(schema)
 
     # Override the model's JSON schema generation to return our precomputed schema.
-    pydantic_model.model_json_schema = lambda *args, **kwargs: schema
+    def model_json_schema(*_args: object, **_kwargs: object) -> dict[str, Any]:
+        return schema
+
+    pydantic_model.model_json_schema = model_json_schema
 
     return pydantic_model

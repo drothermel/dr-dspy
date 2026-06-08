@@ -1,11 +1,23 @@
-import os
+from __future__ import annotations
+
+import contextlib
 import queue
 import random
+from pathlib import Path
+from typing import TYPE_CHECKING, Protocol
 
 from dspy.primitives.example import Example
 
+if TYPE_CHECKING:
+    from types import TracebackType
 
-def env_worker(inq, outq):
+
+class MessageQueue(Protocol):
+    def get(self) -> object: ...
+    def put(self, item: object) -> None: ...
+
+
+def env_worker(inq: MessageQueue, outq: MessageQueue) -> None:
     """
     Worker process: creates a single AlfredTWEnv instance,
     handles 'init' (with task idx) and 'step' (with action).
@@ -17,17 +29,16 @@ def env_worker(inq, outq):
 
         import alfworld.agents.environment as environment
         import yaml
-    except ImportError:
+    except ImportError as err:
         raise ImportError(
             "alfworld is not installed. "
             "Please install it via `pip install alfworld==0.3.5` then run `alfworld-download`."
-        )
+        ) from err
 
     buf = io.StringIO()
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(base_dir, "base_config.yml")
+    config_path = Path(__file__).resolve().parent / "base_config.yml"
 
-    with open(config_path) as f:
+    with config_path.open() as f:
         config = yaml.safe_load(f)
 
     with redirect_stdout(buf), redirect_stderr(buf):
@@ -42,6 +53,9 @@ def env_worker(inq, outq):
             task_def, info = env.reset()
             outq.put((task_def[0], info))
         elif cmd == "step":
+            if env is None:
+                outq.put("ENV_NOT_INITIALIZED")
+                continue
             obs, rew, done, info = env.step([data])
             outq.put((obs, rew, done, info))
         elif cmd == "close":
@@ -61,22 +75,19 @@ class EnvPool:
             ...
     """
 
-    def __init__(self, size=2):
+    def __init__(self, size: int = 2) -> None:
         self.size = size
         self.workers = []
         self.available = queue.Queue()
 
         try:
             import multiprocess as mp
-        except ImportError:
-            raise ImportError("multiprocess is not installed. " "Please install it via `pip install multiprocess`.")
+        except ImportError as err:
+            raise ImportError("multiprocess is not installed. " "Please install it via `pip install multiprocess`.") from err
 
         # Must call set_start_method('spawn') here, before creating any processes
-        try:
+        with contextlib.suppress(RuntimeError):
             mp.set_start_method("spawn", force=True)
-        except RuntimeError:
-            # If it's already set, ignore
-            pass
 
         ctx = mp.get_context("spawn")
         for i in range(size):
@@ -87,14 +98,14 @@ class EnvPool:
             self.workers.append((inq, outq, p))
             self.available.put(i)
 
-    def _acquire(self):
+    def _acquire(self) -> tuple[int, MessageQueue, MessageQueue]:
         wid = self.available.get()
         return wid, self.workers[wid][0], self.workers[wid][1]
 
-    def _release(self, wid):
+    def _release(self, wid: int) -> None:
         self.available.put(wid)
 
-    def close_all(self):
+    def close_all(self) -> None:
         """Close all processes in the pool."""
         while not self.available.empty():
             wid = self.available.get()
@@ -105,7 +116,7 @@ class EnvPool:
             outq.close()
             proc.join()
 
-    def session(self):
+    def session(self) -> _EnvSession:
         """Context manager that acquires/releases a single worker."""
         return _EnvSession(self)
 
@@ -116,30 +127,40 @@ class _EnvSession:
     provides .init(idx) and .step(action), then releases the worker.
     """
 
-    def __init__(self, pool: EnvPool):
+    def __init__(self, pool: EnvPool) -> None:
         self.pool = pool
-        self.wid = None
-        self.inq = None
-        self.outq = None
+        self.wid: int | None = None
+        self.inq: MessageQueue | None = None
+        self.outq: MessageQueue | None = None
 
-    def __enter__(self):
+    def __enter__(self) -> _EnvSession:
         self.wid, self.inq, self.outq = self.pool._acquire()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.pool._release(self.wid)
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        if self.wid is not None:
+            self.pool._release(self.wid)
 
-    def init(self, idx):
+    def init(self, idx: int) -> object:
+        if self.inq is None or self.outq is None:
+            raise RuntimeError("Session must be entered before calling init.")
         self.inq.put(("init", idx))
         return self.outq.get()  # (task_def, info)
 
-    def step(self, action):
+    def step(self, action: str) -> object:
+        if self.inq is None or self.outq is None:
+            raise RuntimeError("Session must be entered before calling step.")
         self.inq.put(("step", action))
         return self.outq.get()  # (obs, rew, done, info)
 
 
 class AlfWorld:
-    def __init__(self, max_threads=20):
+    def __init__(self, max_threads: int = 20) -> None:
         self.POOL = EnvPool(size=max_threads)
 
 
@@ -147,10 +168,11 @@ class AlfWorld:
         random.Random(0).shuffle(dataset)
 
         trainset, devset = dataset[:3000], dataset[-500:]
-        assert len(trainset) + len(devset) <= len(dataset)
+        if len(trainset) + len(devset) > len(dataset):
+            raise ValueError("Train and dev split sizes cannot exceed dataset size.")
 
         self.trainset = trainset
         self.devset = devset
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.POOL.close_all()

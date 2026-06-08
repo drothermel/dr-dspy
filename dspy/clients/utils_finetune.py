@@ -48,11 +48,11 @@ class GRPOGroup(TypedDict):
 
 class GRPOStatus(TypedDict):
     job_id: str
-    status: str | None = None
+    status: str | None = None  # ty:ignore[invalid-typed-dict-statement]
     current_model: str
     checkpoints: dict[str, str]
-    last_checkpoint: str | None = None
-    pending_batch_ids: list[int] = []
+    last_checkpoint: str | None = None  # ty:ignore[invalid-typed-dict-statement]
+    pending_batch_ids: list[int] = []  # ty:ignore[invalid-typed-dict-statement]  # noqa: RUF012 dynamic typing/lint migration for scoped ty adoption
 
 
 def infer_data_format(adapter: "Adapter") -> str:
@@ -69,7 +69,7 @@ def get_finetune_directory() -> str:
     return finetune_dir
 
 
-def write_lines(file_path, data):
+def write_lines(file_path, data) -> None:
     with open(file_path, "wb") as f:
         for item in data:
             f.write(orjson.dumps(item) + b"\n")
@@ -96,7 +96,7 @@ def save_data(
 def validate_data_format(
     data: list[dict[str, Any]],
     data_format: TrainDataFormat,
-):
+) -> None:
     find_err_funcs = {
         TrainDataFormat.CHAT: find_data_error_chat,
         TrainDataFormat.COMPLETION: find_data_errors_completion,
@@ -140,6 +140,7 @@ def find_data_errors_completion(data_dict: dict[str, str]) -> str | None:
     for key in keys:
         if not isinstance(data_dict[key], str):
             return f"Expected `{key}` to be of type `str`. Found: {type(data_dict[key])}"
+    return None
 
 
 # Following functions are modified from the OpenAI cookbook:
@@ -156,9 +157,10 @@ def find_data_error_chat(messages: dict[str, Any]) -> str | None:
         return f"The value of the `messages` key should be a list instance. Found: {type(messages['messages'])}"
 
     for ind, message in enumerate(messages["messages"]):
-        err = find_data_error_chat_message(message)
+        err = find_data_error_chat_message(message)  # ty:ignore[invalid-argument-type]
         if err:
             return f"Error in message at index {ind}: {err}"
+    return None
 
 
 def find_data_error_chat_message(message: dict[str, Any]) -> str | None:
@@ -176,3 +178,4 @@ def find_data_error_chat_message(message: dict[str, Any]) -> str | None:
 
     if not isinstance(message["content"], str):
         return f"Expected Content Type: `str`; Found Content Type: {type(message['content'])}"
+    return None

@@ -132,7 +132,7 @@ def test_callable_numpy_embedding_persists_to_disk(cache, tmp_path):
 
 def test_invalid_model_type():
     # Test that invalid model type raises ValueError
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011, PT012
         embedding = Embedder(123)  # Invalid model type
         embedding(["test"])
 

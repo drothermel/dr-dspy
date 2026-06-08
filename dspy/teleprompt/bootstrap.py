@@ -45,7 +45,7 @@ class BootstrapFewShot(Teleprompter):
         max_labeled_demos=16,
         max_rounds=1,
         max_errors=None,
-    ):
+    ) -> None:
         """A Teleprompter class that composes a set of demos/examples to go into a predictor's prompt.
         These demos come from a combination of labeled examples in the training set, and bootstrapped demos.
 
@@ -95,7 +95,7 @@ class BootstrapFewShot(Teleprompter):
 
         return self.student
 
-    def _prepare_student_and_teacher(self, student, teacher):
+    def _prepare_student_and_teacher(self, student, teacher) -> None:
         self.student = student.reset_copy()
 
         # NOTE: behavior change on Oct 28, 2024. Deep copy instead of reset copy for the student-as-teacher.
@@ -107,7 +107,7 @@ class BootstrapFewShot(Teleprompter):
             teleprompter = LabeledFewShot(k=self.max_labeled_demos)
             self.teacher = teleprompter.compile(self.teacher.reset_copy(), trainset=self.trainset)
 
-    def _prepare_predictor_mappings(self):
+    def _prepare_predictor_mappings(self) -> None:
         name2predictor, predictor2name = {}, {}
         student, teacher = self.student, self.teacher
 
@@ -147,7 +147,7 @@ class BootstrapFewShot(Teleprompter):
         self.name2predictor = name2predictor
         self.predictor2name = predictor2name
 
-    def _bootstrap(self, *, max_bootstraps=None):
+    def _bootstrap(self, *, max_bootstraps=None) -> None:
         max_bootstraps = max_bootstraps or self.max_bootstrapped_demos
         bootstrap_attempts = 0
 
@@ -165,10 +165,6 @@ class BootstrapFewShot(Teleprompter):
                     bootstrapped[example_idx] = True
                     break
 
-        print(
-            f"Bootstrapped {len(bootstrapped)} full traces after {example_idx} examples "
-            f"for up to {self.max_rounds} rounds, amounting to {bootstrap_attempts} attempts."
-        )
 
         # Unbootstrapped training examples
 
@@ -206,10 +202,7 @@ class BootstrapFewShot(Teleprompter):
 
                 if self.metric:
                     metric_val = self.metric(example, prediction, trace)
-                    if self.metric_threshold:
-                        success = metric_val >= self.metric_threshold
-                    else:
-                        success = metric_val
+                    success = metric_val >= self.metric_threshold if self.metric_threshold else metric_val
                 else:
                     success = True
         except Exception as e:
@@ -219,8 +212,8 @@ class BootstrapFewShot(Teleprompter):
                 current_error_count = self.error_count
             effective_max_errors = self.max_errors if self.max_errors is not None else settings.max_errors
             if current_error_count >= effective_max_errors:
-                raise e
-            logger.error(f"Failed to run or to evaluate example {example} with {self.metric} due to {e}.")
+                raise
+            logger.exception(f"Failed to run or to evaluate example {example} with {self.metric} due to {e}.")
 
         if success:
             for step in trace:

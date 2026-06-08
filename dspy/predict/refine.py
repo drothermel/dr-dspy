@@ -1,6 +1,6 @@
 import inspect
 import textwrap
-from typing import Callable
+from collections.abc import Callable
 
 import orjson
 
@@ -8,8 +8,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.utils import get_field_description_string
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict, Prediction
-from dspy.signatures.field import InputField
-from dspy.signatures.field import OutputField
+from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
 
 from .predict import Module
@@ -49,7 +48,7 @@ class Refine(Module):
         reward_fn: Callable[[dict, Prediction], float],
         threshold: float,
         fail_count: int | None = None,
-    ):
+    ) -> None:
         """
         Refines a module by running it up to N times with different rollout IDs at `temperature=1.0`
         and returns the best prediction.
@@ -94,7 +93,7 @@ class Refine(Module):
         self.reward_fn = lambda *args: reward_fn(*args)  # to prevent this from becoming a parameter
         self.threshold = threshold
         self.N = N
-        self.fail_count = fail_count or N  # default to N if fail_count is not provided
+        self.fail_count = fail_count or N  # Defaults to N when fail_count is falsy.
         self.module_code = inspect.getsource(module.__class__)
         try:
             self.reward_fn_code = inspect.getsource(reward_fn)
@@ -165,7 +164,7 @@ class Refine(Module):
                 }
 
                 advise_kwargs = dict(**modules, **trajectory, **reward, module_names=module_names)
-                # only dumps if it's a list or dict
+                # Serialize non-string advice inputs for the feedback predictor.
                 advise_kwargs = {
                     k: v if isinstance(v, str) else orjson.dumps(recursive_mask(v), option=orjson.OPT_INDENT_2).decode()
                     for k, v in advise_kwargs.items()
@@ -173,10 +172,9 @@ class Refine(Module):
                 advice = Predict(OfferFeedback)(**advise_kwargs).advice
                 # print(f"Advice for each module: {advice}")
 
-            except Exception as e:
-                print(f"Refine: Attempt failed with rollout id {rid}: {e}")
+            except Exception:
                 if idx > self.fail_count:
-                    raise e
+                    raise
                 self.fail_count -= 1
         if best_trace:
             settings.trace.extend(best_trace)
@@ -204,22 +202,16 @@ def inspect_modules(program):
 
 
 def recursive_mask(o):
-    # If the object is already serializable, return it.
     try:
         orjson.dumps(o)
         return o
     except TypeError:
         pass
 
-    # If it's a dictionary, apply recursively to its values.
     if isinstance(o, dict):
         return {k: recursive_mask(v) for k, v in o.items()}
-    # If it's a list, apply recursively.
-    elif isinstance(o, list):
+    if isinstance(o, list):
         return [recursive_mask(v) for v in o]
-    # If it's a tuple, apply recursively.
-    elif isinstance(o, tuple):
+    if isinstance(o, tuple):
         return tuple(recursive_mask(v) for v in o)
-    # Otherwise, replace it with a placeholder string (or use repr(o)).
-    else:
-        return f"<non-serializable: {type(o).__name__}>"
+    return f"<non-serializable: {type(o).__name__}>"

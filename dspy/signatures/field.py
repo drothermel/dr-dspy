@@ -4,9 +4,7 @@ import pydantic
 
 from dspy.utils.constants import IS_TYPE_UNDEFINED
 
-# The following arguments can be used in DSPy InputField and OutputField in addition
-# to the standard pydantic.Field arguments. We just hope pydanitc doesn't add these,
-# as it would give a name clash.
+# DSPy-specific field arguments are stored separately from Pydantic Field arguments. If Pydantic adds one of these names, this list will need explicit conflict handling.
 DSPY_FIELD_ARG_NAMES = ["desc", "prefix", "format", "parser", "__dspy_field_type", IS_TYPE_UNDEFINED]
 
 _DEPRECATED_FIELD_ARGS = {
@@ -70,7 +68,7 @@ def _translate_pydantic_field_constraints(**kwargs):
     return ", ".join(constraints)
 
 
-def _warn_deprecated_field_args(**kwargs):
+def _warn_deprecated_field_args(**kwargs) -> None:
     for arg, message in _DEPRECATED_FIELD_ARGS.items():
         if arg in kwargs:
             warnings.warn(message, DeprecationWarning, stacklevel=3)
@@ -97,12 +95,12 @@ def new_to_old_field(field):
 class OldField:
     """A more ergonomic datatype that infers prefix and desc if omitted."""
 
-    def __init__(self, *, prefix=None, desc=None, input, format=None):
+    def __init__(self, *, prefix=None, desc=None, input, format=None) -> None:
         self.prefix = prefix  # This can be None initially and set later
         self.desc = desc
         self.format = format
 
-    def finalize(self, key, inferred_prefix):
+    def finalize(self, key, inferred_prefix) -> None:
         """Set the prefix if it's not provided explicitly."""
         if self.prefix is None:
             self.prefix = inferred_prefix + ":"
@@ -110,7 +108,7 @@ class OldField:
         if self.desc is None:
             self.desc = f"${{{key}}}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}(prefix={self.prefix}, desc={self.desc})"
 
     def __eq__(self, __value: object) -> bool:
@@ -118,10 +116,10 @@ class OldField:
 
 
 class OldInputField(OldField):
-    def __init__(self, *, prefix=None, desc=None, format=None):
+    def __init__(self, *, prefix=None, desc=None, format=None) -> None:
         super().__init__(prefix=prefix, desc=desc, input=True, format=format)
 
 
 class OldOutputField(OldField):
-    def __init__(self, *, prefix=None, desc=None, format=None):
+    def __init__(self, *, prefix=None, desc=None, format=None) -> None:
         super().__init__(prefix=prefix, desc=desc, input=False, format=format)

@@ -1,5 +1,7 @@
-from dspy.utils.dummies import DummyLM
+import contextlib
+
 from dspy.clients.base_lm import BaseLM
+from dspy.utils.dummies import DummyLM
 
 
 class StopAdapterCallCapture(BaseException):
@@ -39,17 +41,15 @@ class CapturingLM(BaseLM):
     def supported_params(self):
         return self.source_lm.supported_params
 
-    def __call__(self, messages=None, **kwargs):
+    def __call__(self, messages=None, **kwargs: object):
         self.calls.append({"messages": messages, "kwargs": kwargs})
         raise StopAdapterCallCapture
 
 
 def format_messages_and_lm_kwargs(adapter, signature, demos, inputs, lm_kwargs=None, lm=None):
     capturing_lm = CapturingLM(lm)
-    try:
+    with contextlib.suppress(StopAdapterCallCapture):
         adapter(capturing_lm, dict(lm_kwargs or {}), signature, demos, inputs)
-    except StopAdapterCallCapture:
-        pass
 
     assert len(capturing_lm.calls) == 1
     call = capturing_lm.calls[0]

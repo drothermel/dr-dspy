@@ -12,7 +12,7 @@ class DummyModule(Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, **kwargs):
+    def forward(self, **kwargs: object):
         pass
 
 
@@ -79,7 +79,7 @@ def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled():
             trainset=trainset,
             max_labeled_demos=1,
             max_bootstrapped_demos=1,
-            metric=lambda ex, pred, trace=None: 1.0,
+            metric=lambda ex, pred, trace=None: 1.0,  # noqa: ARG005
             teacher_settings={},
             metric_threshold=0.9,
         )

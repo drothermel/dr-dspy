@@ -89,7 +89,7 @@ class Example:
     # TODO: Add a `dspy.datasets.DataLoader` API link once the datasets API
     # pages exist.
 
-    def __init__(self, base=None, **kwargs):
+    def __init__(self, base=None, **kwargs) -> None:
         """Create an `Example` from fields or from an existing record.
 
         In the common case, pass fields as keyword arguments, like
@@ -104,20 +104,16 @@ class Example:
                 appears in both `base` and `**kwargs`, the value from
                 `**kwargs` wins.
         """
-        # Internal storage and other attributes
         self._store = {}
         self._demos = []
         self._input_keys = None
 
-        # Initialize from a base Example if provided
         if base and isinstance(base, type(self)):
             self._store = base._store.copy()
 
-        # Initialize from a dict if provided
         elif base and isinstance(base, dict):
             self._store = base.copy()
 
-        # Update with provided kwargs
         self._store.update(kwargs)
 
     def __getattr__(self, key):
@@ -127,7 +123,7 @@ class Example:
             return self._store[key]
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key, value) -> None:
         if key.startswith("_") or key in dir(self.__class__):
             super().__setattr__(key, value)
         else:
@@ -136,24 +132,23 @@ class Example:
     def __getitem__(self, key):
         return self._store[key]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value) -> None:
         self._store[key] = value
 
-    def __delitem__(self, key):
+    def __delitem__(self, key) -> None:
         del self._store[key]
 
-    def __contains__(self, key):
+    def __contains__(self, key) -> bool:
         return key in self._store
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len([k for k in self._store if not k.startswith("dspy_")])
 
-    def __repr__(self):
-        # return f"Example({self._store})" + f" (input_keys={self._input_keys}, demos={self._demos})"
+    def __repr__(self) -> str:
         d = {k: v for k, v in self._store.items() if not k.startswith("dspy_")}
         return f"Example({d})" + f" (input_keys={self._input_keys})"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__repr__()
 
     def __eq__(self, other):
@@ -174,7 +169,7 @@ class Example:
             >>> Example(question="Why?", answer="Because.").keys()
             ['question', 'answer']
         """
-        return [k for k in self._store.keys() if not k.startswith("dspy_") or include_dspy]
+        return [k for k in self._store if not k.startswith("dspy_") or include_dspy]
 
     def values(self, include_dspy=False):
         """Return field values, like `dict.values()`.
@@ -264,9 +259,7 @@ class Example:
         if self._input_keys is None:
             raise ValueError("Inputs have not been set for this example. Use `example.with_inputs()` to set them.")
 
-        # return items that are in input_keys
         d = {key: self._store[key] for key in self._store if key in self._input_keys}
-        # return type(self)(d)
         new_instance = type(self)(base=d)
         new_instance._input_keys = self._input_keys  # Preserve input_keys in new instance
         return new_instance
@@ -283,7 +276,6 @@ class Example:
             >>> ex.labels()
             Example({'answer': 'Because.'}) (input_keys=None)
         """
-        # return items that are NOT in input_keys
         input_keys = self.inputs().keys()
         d = {key: self._store[key] for key in self._store if key not in input_keys}
         return type(self)(d)
@@ -336,15 +328,14 @@ class Example:
         def convert_to_serializable(value):
             if hasattr(value, "toDict"):
                 return value.toDict()
-            elif isinstance(value, BaseModel):
+            if isinstance(value, BaseModel):
                 # Handle Pydantic models (e.g., History)
                 return value.model_dump()
-            elif isinstance(value, list):
+            if isinstance(value, list):
                 return [convert_to_serializable(item) for item in value]
-            elif isinstance(value, dict):
+            if isinstance(value, dict):
                 return {k: convert_to_serializable(v) for k, v in value.items()}
-            else:
-                return value
+            return value
 
         serializable_store = {}
         for k, v in self._store.items():

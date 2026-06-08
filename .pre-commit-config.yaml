@@ -10,7 +10,15 @@ repos:
         types_or: [python, pyi]
         files: ^(dspy|tests)/.*\.py$
         exclude: ^(dspy/__metadata__\.py|tests/reliability/.*\.py)$
-        args: [--fix-only]
+        args: [--fix]
+
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty (type check)
+        entry: uv run --all-extras ty check dspy tests --warn all
+        language: system
+        pass_filenames: false
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

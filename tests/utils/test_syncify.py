@@ -1,4 +1,3 @@
-from dspy.utils.dummies import DummyLM
 import asyncio
 
 from dspy.dsp.utils.settings import settings
@@ -6,6 +5,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.teleprompt.bootstrap import BootstrapFewShot
+from dspy.utils.dummies import DummyLM
 from dspy.utils.syncify import syncify
 
 

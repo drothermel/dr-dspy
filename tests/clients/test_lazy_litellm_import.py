@@ -13,7 +13,7 @@ from dspy.streaming.streamify import streamify
 def _hide_litellm(monkeypatch):
     real_find_spec = importlib.util.find_spec
 
-    def find_spec(name, *args, **kwargs):
+    def find_spec(name, *args: object, **kwargs: object):
         if name == "litellm" or name.startswith("litellm."):
             return None
         return real_find_spec(name, *args, **kwargs)

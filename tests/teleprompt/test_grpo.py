@@ -65,4 +65,3 @@ if __name__ == "__main__":
     test_grpo_dataset_shuffler()
     test_grpo_dataset_shuffler_with_num_ex_per_step_less_dataset()
     test_grpo_dataset_shuffler_with_num_ex_per_step_greater_dataset()
-    print("All tests passed!")

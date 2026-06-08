@@ -1,11 +1,16 @@
 import random
 import re
+from typing import Protocol
 
 from dspy.primitives.example import Example
 
 
+class HasAnswer(Protocol):
+    answer: object
+
+
 class MATH:
-    def __init__(self, subset):
+    def __init__(self, subset: str) -> None:
         from datasets import load_dataset
 
 
@@ -25,16 +30,16 @@ class MATH:
         random.Random(0).shuffle(dataset)
         self.train, self.dev, self.test = dataset[:size], dataset[size : 2 * size], dataset[2 * size :]
 
-    def metric(self, example, pred, trace=None):
+    def metric(self, example: HasAnswer, pred: HasAnswer, _trace: object | None = None) -> bool:
         try:
             import math_equivalence
-        except ImportError:
-            raise ImportError("MATH's metric requires `pip install git+https://github.com/hendrycks/math.git`")
+        except ImportError as err:
+            raise ImportError("MATH's metric requires `pip install git+https://github.com/hendrycks/math.git`") from err
 
         return math_equivalence.is_equiv(example.answer, pred.answer)
 
 
-def extract_answer(s):
+def extract_answer(s: str) -> str | None:
     start = s.find("\\boxed{")
     if start == -1:
         return None

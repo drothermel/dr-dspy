@@ -1,6 +1,6 @@
 import inspect
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from dspy.adapters.types.tool import Tool
 from dspy.predict.chain_of_thought import ChainOfThought
@@ -19,7 +19,7 @@ class CodeAct(ReAct, ProgramOfThought):
     CodeAct is a module that utilizes the Code Interpreter and predefined tools to solve the problem.
     """
 
-    def __init__(self, signature: str | type[Signature], tools: list[Callable], max_iters: int = 5, interpreter: PythonInterpreter | None = None):
+    def __init__(self, signature: str | type[Signature], tools: list[Callable], max_iters: int = 5, interpreter: PythonInterpreter | None = None) -> None:
         """
         Initializes the CodeAct class with the specified model, temperature, and max tokens.
 
@@ -68,13 +68,13 @@ class CodeAct(ReAct, ProgramOfThought):
         self.tools: dict[str, Tool] = tools
         self.codeact = Predict(codeact_signature)
         self.extractor = ChainOfThought(extract_signature)
-        # It will raises exception when dspy cannot find available deno instance by now.
+        # PythonInterpreter may raise if the Deno-backed sandbox is unavailable; construct it here so failures surface during module initialization.
         self.interpreter = interpreter or PythonInterpreter()
 
     def _build_instructions(self, signature, tools):
         instructions = [f"{signature.instructions}\n"] if signature.instructions else []
-        inputs = ", ".join([f"`{k}`" for k in signature.input_fields.keys()])
-        outputs = ", ".join([f"`{k}`" for k in signature.output_fields.keys()])
+        inputs = ", ".join([f"`{k}`" for k in signature.input_fields])
+        outputs = ", ".join([f"`{k}`" for k in signature.output_fields])
 
         instructions.append(
             f"You are an intelligent agent. For each episode, you will receive the fields {inputs} as input.\n"
@@ -91,7 +91,6 @@ class CodeAct(ReAct, ProgramOfThought):
         return instructions
 
     def forward(self, **kwargs):
-        # Define the tool functions in the interpreter
         for tool in self.tools.values():
             self.interpreter(inspect.getsource(tool.func))
 

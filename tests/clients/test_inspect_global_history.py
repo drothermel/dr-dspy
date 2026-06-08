@@ -12,7 +12,7 @@ from dspy.utils.inspect_history import pretty_print_history
 @pytest.fixture(autouse=True)
 def clear_history():
     GLOBAL_HISTORY.clear()
-    yield
+    return
 
 
 def test_inspect_history_basic(capsys):
@@ -27,7 +27,6 @@ def test_inspect_history_basic(capsys):
 
     # Test inspecting all history
     history = GLOBAL_HISTORY
-    print(capsys)
     assert len(history) > 0
     assert isinstance(history, list)
     assert all(isinstance(entry, dict) for entry in history)

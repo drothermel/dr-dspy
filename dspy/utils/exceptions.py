@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dspy.signatures.signature import Signature
+if TYPE_CHECKING:
+    from dspy.signatures.signature import Signature
 
 
 class DSPyError(Exception):
@@ -32,7 +33,7 @@ class DSPyError(Exception):
         status: int | None = None,
         request_id: str | None = None,
         retry_after: float | None = None,
-    ):
+    ) -> None:
         self.message = message
         self.code = code or self.default_code
         self.model = model
@@ -101,7 +102,7 @@ class LMUnsupportedFeatureError(LMError):
         features: list[str] | None = None,
         issues: list[str] | None = None,
         **kwargs: Any,
-    ):
+    ) -> None:
         self.features = list(features or [])
         self.issues = list(issues or [])
         super().__init__(message, **kwargs)
@@ -182,7 +183,7 @@ class ContextWindowExceededError(LMInvalidRequestError):
         model: str | None = None,
         message: str = "Context window exceeded",
         **kwargs: Any,
-    ):
+    ) -> None:
         super().__init__(message, model=model, **kwargs)
 
 
@@ -241,7 +242,7 @@ class AdapterParseError(DSPyError):
         lm_response: str,
         message: str | None = None,
         parsed_result: str | None = None,
-    ):
+    ) -> None:
         self.adapter_name = adapter_name
         self.signature = signature
         self.lm_response = lm_response
@@ -252,10 +253,10 @@ class AdapterParseError(DSPyError):
             f"{message}"
             f"Adapter {adapter_name} failed to parse the LM response. \n\n"
             f"LM Response: {lm_response} \n\n"
-            f"Expected to find output fields in the LM response: [{', '.join(signature.output_fields.keys())}] \n\n"
+            f"Expected to find output fields in the LM response: [{', '.join(signature.output_fields.keys())}] \n\n"  # ty:ignore[unresolved-attribute]
         )
 
         if parsed_result is not None:
-            message += f"Actual output fields parsed from the LM response: [{', '.join(parsed_result.keys())}] \n\n"
+            message += f"Actual output fields parsed from the LM response: [{', '.join(parsed_result.keys())}] \n\n"  # ty:ignore[unresolved-attribute]
 
         super().__init__(message)

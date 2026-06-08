@@ -4,7 +4,7 @@ import inspect
 import re
 from collections import defaultdict
 from queue import Queue
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
@@ -32,7 +32,7 @@ class StreamListener:
         predict: Any = None,
         predict_name: str | None = None,
         allow_reuse: bool = False,
-    ):
+    ) -> None:
         """
         Args:
             signature_field_name: The name of the field to listen to.
@@ -47,16 +47,16 @@ class StreamListener:
         self.predict = predict
         self.predict_name = predict_name
 
-        self.field_start_queue = []
-        self.field_end_queue = Queue()
+        self.field_start_queue: list[str] = []
+        self.field_end_queue: Queue[str] = Queue[str]()
         self.stream_start = False
         self.stream_end = False
         self.cache_hit = False
         self.allow_reuse = allow_reuse
 
-        self.json_adapter_state = {"field_accumulated_messages": ""}
+        self.json_adapter_state: dict[str, str] = {"field_accumulated_messages": ""}
 
-        self.adapter_identifiers = {
+        self.adapter_identifiers: dict[str, dict[str, Any]] = {
             "ChatAdapter": {
                 "start_identifier": f"[[ ## {self.signature_field_name} ## ]]",
                 "end_identifier": re.compile(r"\[\[ ## (\w+) ## \]\]"),
@@ -80,7 +80,7 @@ class StreamListener:
             },
         }
 
-    def _buffered_message_end_with_start_identifier(self, concat_message: str, start_identifier: str) -> str:
+    def _buffered_message_end_with_start_identifier(self, concat_message: str, start_identifier: str) -> bool:
         for i in range(len(concat_message)):
             if start_identifier.startswith(concat_message[len(concat_message) - i - 1 :]):
                 return True
@@ -110,21 +110,18 @@ class StreamListener:
 
         # Second check: if there's a pattern marker, check if message contains it
         # This handles cases like "[[ ## com" where we have partial field name
-        if end_pattern_contains and end_pattern_contains in concat_message:
-            return True
+        return bool(end_pattern_contains and end_pattern_contains in concat_message)
 
-        return False
-
-    def receive(self, chunk: ModelResponseStream):
+    def receive(self, chunk: ModelResponseStream) -> StreamResponse | None:
         adapter_name = settings.adapter.__class__.__name__ if settings.adapter else "ChatAdapter"
         if adapter_name not in self.adapter_identifiers:
             raise ValueError(
                 f"Unsupported adapter for streaming: {adapter_name}, please use one of the following adapters: "
                 f"{', '.join([a.__name__ for a in ADAPTER_SUPPORT_STREAMING])}"
             )
-        start_identifier = self.adapter_identifiers[adapter_name]["start_identifier"]
-        end_identifier = self.adapter_identifiers[adapter_name]["end_identifier"]
-        start_indicator = self.adapter_identifiers[adapter_name]["start_indicator"]
+        start_identifier = cast("str", self.adapter_identifiers[adapter_name]["start_identifier"])
+        end_identifier = cast("re.Pattern[str]", self.adapter_identifiers[adapter_name]["end_identifier"])
+        start_indicator = cast("str", self.adapter_identifiers[adapter_name]["start_indicator"])
 
         if self.stream_end:
             if self.allow_reuse:
@@ -132,11 +129,11 @@ class StreamListener:
                 self.stream_end = False
                 self.cache_hit = False
                 self.field_start_queue = []
-                self.field_end_queue = Queue()
+                self.field_end_queue = Queue[str]()
                 self.json_adapter_state["field_accumulated_messages"] = ""
                 self.stream_start = False
             else:
-                return
+                return None
 
         # Handle custom streamable types
         if (
@@ -144,22 +141,21 @@ class StreamListener:
             and inspect.isclass(self._output_type)
             and issubclass(self._output_type, Type)
             and self._output_type.is_streamable()
-        ):
-            if parsed_chunk := self._output_type.parse_stream_chunk(chunk):
-                return StreamResponse(
-                    self.predict_name,
-                    self.signature_field_name,
-                    parsed_chunk,
-                    is_last_chunk=self.stream_end,
-                )
+        ) and (parsed_chunk := self._output_type.parse_stream_chunk(chunk)):
+            return StreamResponse(
+                self.predict_name,
+                self.signature_field_name,
+                parsed_chunk,
+                is_last_chunk=self.stream_end,
+            )
 
         # For non-custom streamable types, the streaming chunks come from the content field of the ModelResponseStream.
         try:
             chunk_message = chunk.choices[0].delta.content
             if chunk_message is None:
-                return
-        except Exception:
-            return
+                return None
+        except (AttributeError, IndexError):
+            return None
 
         if chunk_message and start_identifier in chunk_message and not isinstance(settings.adapter, JSONAdapter):
             # If the cache is hit, the chunk_message could be the full response. When it happens we can
@@ -172,14 +168,14 @@ class StreamListener:
                 self.cache_hit = True
                 self.stream_start = True
                 self.stream_end = True
-                return
+                return None
 
         if len(self.field_start_queue) == 0 and not self.stream_start and start_indicator in chunk_message:
             # We look for the pattern of start_identifier, i.e., "[[ ## {self.signature_field_name} ## ]]" for
             # ChatAdapter to identify the start of the stream of our target field. Once the start_indicator, i.e., "[["
             # for ChatAdapter, is found, we start checking the next tokens
             self.field_start_queue.append(chunk_message)
-            return
+            return None
 
         if len(self.field_start_queue) > 0 and not self.stream_start:
             # We keep appending the tokens to the queue until we have a full identifier or the concanated
@@ -205,17 +201,17 @@ class StreamListener:
             elif self._buffered_message_end_with_start_identifier(concat_message.strip(), start_identifier):
                 # If the buffered message ends with part of the start_identifier, we keep looking for the
                 # start_identifier from the token stream.
-                return
+                return None
             else:
                 # Doesn't match the expected identifier, reset the queue.
                 self.field_start_queue = []
-                return
+                return None
 
         if self.stream_start and chunk_message:
             # The stream is started, we keep returning the token until we see the start of the next field.
             self.field_end_queue.put(chunk_message)
 
-            token = None
+            token: str | None = None
             concat_message = "".join(self.field_end_queue.queue).strip()
 
             if not self._could_form_end_identifier(concat_message, adapter_name):
@@ -227,18 +223,16 @@ class StreamListener:
                 # the end_identifier for all LMs.
                 token = self.field_end_queue.get()
 
-            # TODO: Put adapter streaming handling into individial classes, e.g., `JSONAdapterStreamListener`,
-            # `ChatAdapterStreamListener`, `XMLAdapterStreamListener` instead of having many adhoc code in the
-            # `StreamListener` class.
+            # TODO: Split adapter-specific stream parsing into JSONAdapterStreamListener, ChatAdapterStreamListener, and XMLAdapterStreamListener so StreamListener only coordinates buffering.
             if isinstance(settings.adapter, JSONAdapter):
                 # JSONAdapter uses partial json parsing to detect the end of the field we are listening to, instead of
                 # relying on the end_identifier.
                 return self._json_adapter_handle_stream_chunk(token, chunk_message)
-            else:
-                # Other adapters rely on the end_identifier to detect the end of the field we are listening to.
-                return self._default_handle_stream_chunk(token, end_identifier)
+            # Other adapters rely on the end_identifier to detect the end of the field we are listening to.
+            return self._default_handle_stream_chunk(token, end_identifier)
+        return None
 
-    def _json_adapter_handle_stream_chunk(self, token: str, chunk_message: str) -> StreamResponse | None:
+    def _json_adapter_handle_stream_chunk(self, token: str | None, chunk_message: str) -> StreamResponse | None:
         self.json_adapter_state["field_accumulated_messages"] += chunk_message
         if self.json_adapter_state["field_accumulated_messages"].rstrip().endswith("}"):
             # When the accumulated tokens end with a curly bracket, that means the streaming for the `Predict` we
@@ -265,7 +259,7 @@ class StreamListener:
                 self.json_adapter_state["field_accumulated_messages"].encode("utf-8"),
                 partial_mode="trailing-strings",
             )
-            if len(parsed) > 1:
+            if isinstance(parsed, dict) and len(parsed) > 1:
                 # If partial json parsing finds a second key, that means the streaming for the field we are listening to
                 # is finished.
                 self.stream_end = True
@@ -278,8 +272,9 @@ class StreamListener:
                         next_field_name = key
                         break
 
-                last_token_index = last_token.find(next_field_name)
-                token = token + last_token[:last_token_index] if token else last_token[:last_token_index]
+                if next_field_name is not None:
+                    last_token_index = last_token.find(next_field_name)
+                    token = token + last_token[:last_token_index] if token else last_token[:last_token_index]
         except ValueError:
             pass
 
@@ -290,8 +285,11 @@ class StreamListener:
                 token,
                 is_last_chunk=self.stream_end,
             )
+        return None
 
-    def _default_handle_stream_chunk(self, token: str, end_identifier: str) -> StreamResponse | None:
+    def _default_handle_stream_chunk(
+        self, token: str | None, end_identifier: re.Pattern[str]
+    ) -> StreamResponse | None:
         concat_message = "".join(self.field_end_queue.queue).strip()
 
         if re.search(end_identifier, concat_message):
@@ -308,6 +306,7 @@ class StreamListener:
                 token,
                 is_last_chunk=self.stream_end,
             )
+        return None
 
     def flush(self) -> str:
         """Flush all tokens in the field end queue.
@@ -317,24 +316,23 @@ class StreamListener:
         with the purpose to not yield the end_identifier tokens, e.g., "[[ ## ... ## ]]" for ChatAdapter.
         """
         last_tokens = "".join(self.field_end_queue.queue)
-        self.field_end_queue = Queue()
+        self.field_end_queue = Queue[str]()
         if isinstance(settings.adapter, JSONAdapter):
             return last_tokens
-        elif isinstance(settings.adapter, XMLAdapter):
+        if isinstance(settings.adapter, XMLAdapter):
             boundary_index = last_tokens.find(f"</{self.signature_field_name}>")
             if boundary_index == -1:
                 boundary_index = len(last_tokens)
             return last_tokens[:boundary_index]
-        elif isinstance(settings.adapter, ChatAdapter) or settings.adapter is None:
+        if isinstance(settings.adapter, ChatAdapter) or settings.adapter is None:
             boundary_index = last_tokens.find("[[")
             if boundary_index == -1:
                 boundary_index = len(last_tokens)
             return last_tokens[:boundary_index]
-        else:
-            raise ValueError(
-                f"Unsupported adapter for streaming: {settings.adapter}, please use one of the following adapters: "
-                f"{', '.join([a.__name__ for a in ADAPTER_SUPPORT_STREAMING])}"
-            )
+        raise ValueError(
+            f"Unsupported adapter for streaming: {settings.adapter}, please use one of the following adapters: "
+            f"{', '.join([a.__name__ for a in ADAPTER_SUPPORT_STREAMING])}"
+        )
 
     def finalize(self) -> StreamResponse | None:
         """Finalize the stream and flush any remaining buffered tokens.
@@ -366,7 +364,7 @@ class StreamListener:
     def _output_type(self) -> type | None:
         try:
             return self.predict.signature.output_fields[self.signature_field_name].annotation
-        except Exception:
+        except (AttributeError, KeyError, TypeError):
             return None
 
 

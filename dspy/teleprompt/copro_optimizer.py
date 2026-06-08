@@ -69,7 +69,7 @@ class COPRO(Teleprompter):
         init_temperature=1.4,
         track_stats=False,
         **_kwargs,
-    ):
+    ) -> None:
         if breadth <= 1:
             raise ValueError("Breadth must be greater than 1")
         self.metric = metric
@@ -79,7 +79,7 @@ class COPRO(Teleprompter):
         self.prompt_model = prompt_model
         self.track_stats = track_stats
 
-    def _check_candidates_equal(self, candidate1, candidate2):
+    def _check_candidates_equal(self, candidate1, candidate2) -> bool:
         for p1, p2 in zip(candidate1["program"].predictors(), candidate2["program"].predictors(), strict=False):
             if self._get_signature(p1).instructions != self._get_signature(p2).instructions:
                 return False
@@ -109,7 +109,7 @@ class COPRO(Teleprompter):
                 final_candidates.append(c)
         return final_candidates
 
-    def _print_signature(self, predictor):
+    def _print_signature(self, predictor) -> None:
         signature = self._get_signature(predictor)
 
         logger.debug(f"i: {signature.instructions}")
@@ -119,7 +119,7 @@ class COPRO(Teleprompter):
         assert hasattr(predictor, "signature")
         return predictor.signature
 
-    def _set_signature(self, predictor, updated_signature):
+    def _set_signature(self, predictor, updated_signature) -> None:
         assert hasattr(predictor, "signature")
         predictor.signature = updated_signature
 

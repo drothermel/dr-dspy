@@ -4,7 +4,7 @@ from dspy.teleprompt.teleprompt import Teleprompter
 
 
 class LabeledFewShot(Teleprompter):
-    def __init__(self, k=16):
+    def __init__(self, k=16) -> None:
         self.k = k
 
     def compile(self, student, *, trainset, sample=True):

@@ -27,10 +27,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
-from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
 if TYPE_CHECKING:
+    from pydantic import GetCoreSchemaHandler
     from pydantic.fields import FieldInfo
 
     from dspy.primitives.repl_types import REPLVariable

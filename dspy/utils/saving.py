@@ -1,7 +1,7 @@
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import cloudpickle
 import orjson
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def get_dependency_versions():
+def get_dependency_versions() -> dict[str, str]:
     cloudpickle_version = ".".join(cloudpickle.__version__.split(".")[:2])
 
     return {
@@ -37,13 +37,15 @@ def load(path: str, allow_pickle: bool = False) -> "Module":
         The loaded model, a `dspy.primitives.module.Module` instance.
     """
     if not allow_pickle:
-        raise ValueError("Loading with pickle is not allowed. Please set `allow_pickle=True` if you are sure you trust the source of the model.")
+        raise ValueError(
+            "Loading with pickle is not allowed. Please set `allow_pickle=True` if you are sure you trust the source of the model."
+        )
 
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"The path '{path}' does not exist.")
+    save_path = Path(path)
+    if not save_path.exists():
+        raise FileNotFoundError(f"The path '{save_path}' does not exist.")
 
-    with open(path / "metadata.json") as f:
+    with (save_path / "metadata.json").open() as f:
         metadata = orjson.loads(f.read())
 
     dependency_versions = get_dependency_versions()
@@ -57,5 +59,6 @@ def load(path: str, allow_pickle: bool = False) -> "Module":
                 "environment as the saving environment."
             )
 
-    with open(path / "program.pkl", "rb") as f:
-        return cloudpickle.load(f)
+    with (save_path / "program.pkl").open("rb") as f:
+        loaded_program: Any = cloudpickle.load(f)
+    return loaded_program

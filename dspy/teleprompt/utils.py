@@ -39,9 +39,8 @@ def create_minibatch(trainset, batch_size=50, rng=None):
     sampled_indices = rng.sample(range(len(trainset)), batch_size)
 
     # Create the mini-batch using the sampled indices
-    minibatch = [trainset[i] for i in sampled_indices]
+    return [trainset[i] for i in sampled_indices]
 
-    return minibatch
 
 
 def eval_candidate_program(batch_size, trainset, candidate_program, evaluate, rng=None):
@@ -52,12 +51,11 @@ def eval_candidate_program(batch_size, trainset, candidate_program, evaluate, rn
         if batch_size >= len(trainset):
             return evaluate(candidate_program, devset=trainset, callback_metadata={"metric_key": "eval_full"})
         # Or evaluate on a minibatch
-        else:
-            return evaluate(
-                candidate_program,
-                devset=create_minibatch(trainset, batch_size, rng),
-                callback_metadata={"metric_key": "eval_minibatch"}
-            )
+        return evaluate(
+            candidate_program,
+            devset=create_minibatch(trainset, batch_size, rng),
+            callback_metadata={"metric_key": "eval_minibatch"}
+        )
     except Exception:
         logger.error("An exception occurred during evaluation", exc_info=True)
         # TODO: Handle this better, as -ve scores are possible
@@ -89,24 +87,20 @@ def eval_candidate_program_with_pruning(
             devset=split_trainset,
             display_table=0,
         )
-        print(f"{i}st split score: {split_score}")
         total_eval_size += len(split_trainset)
 
         total_score += split_score * len(split_trainset)
         curr_weighted_avg_score = total_score / min((i + 1) * batch_size, len(trainset))
-        print(f"curr average score: {curr_weighted_avg_score}")
 
         trial.report(curr_weighted_avg_score, i)
 
         # Handle pruning based on the intermediate value.
         if trial.should_prune():
-            print("Trial pruned.")
             trial_logs[trial_num]["score"] = curr_weighted_avg_score
             trial_logs[trial_num]["num_eval_calls"] = total_eval_size
             trial_logs[trial_num]["pruned"] = True
             return curr_weighted_avg_score, trial_logs, total_eval_size, True
 
-    print(f"Fully evaled score: {curr_weighted_avg_score}")
     score = curr_weighted_avg_score
 
     trial_logs[trial_num]["full_eval"] = False
@@ -200,14 +194,10 @@ def get_task_model_history_for_full_example(
     return task_model.inspect_history(n=len(candidate_program.predictors()))
 
 
-def print_full_program(program):
+def print_full_program(program) -> None:
     """Print out the program's instructions & prefixes for each module."""
-    for i, predictor in enumerate(program.predictors()):
-        print(f"Predictor {i}")
-        print(f"i: {get_signature(predictor).instructions}")
-        *_, last_field = get_signature(predictor).fields.values()
-        print(f"p: {last_field.json_schema_extra['prefix']}")
-    print("\n")
+    for _i, predictor in enumerate(program.predictors()):
+        *_, _last_field = get_signature(predictor).fields.values()
 
 
 def save_candidate_program(program, log_dir, trial_num, note=None):
@@ -232,7 +222,7 @@ def save_candidate_program(program, log_dir, trial_num, note=None):
     return save_path
 
 
-def save_file_to_log_dir(source_file_path, log_dir):
+def save_file_to_log_dir(source_file_path, log_dir) -> None:
     if log_dir is None:
         return
     """Save a file to our log directory"""
@@ -244,7 +234,7 @@ def save_file_to_log_dir(source_file_path, log_dir):
     shutil.copy(source_file_path, destination_file_path)
 
 
-def setup_logging(log_dir):
+def setup_logging(log_dir) -> None:
     """Setup logger, which will log our print statements to a txt file at our log_dir for later viewing"""
     if log_dir is None:
         return
@@ -289,7 +279,7 @@ def get_token_usage(model) -> tuple[int, int]:
     return total_input_tokens, total_output_tokens
 
 
-def log_token_usage(trial_logs, trial_num, model_dict):
+def log_token_usage(trial_logs, trial_num, model_dict) -> None:
     """
     Extract total input and output tokens used by each model and log to trial_logs[trial_num]["token_usage"].
     """
@@ -310,8 +300,7 @@ def log_token_usage(trial_logs, trial_num, model_dict):
 def get_prompt_model(prompt_model):
     if prompt_model:
         return prompt_model
-    else:
-        return settings.lm
+    return settings.lm
 
 
 def get_signature(predictor):
@@ -319,7 +308,7 @@ def get_signature(predictor):
     return predictor.signature
 
 
-def set_signature(predictor, updated_signature):
+def set_signature(predictor, updated_signature) -> None:
     assert hasattr(predictor, "signature")
     predictor.signature = updated_signature
 
@@ -360,7 +349,6 @@ def create_n_fewshot_demo_sets(
 
     # Go through and create each candidate set
     for seed in range(-3, num_candidate_sets):
-        print(f"Bootstrapping set {seed + 4}/{num_candidate_sets + 3}")
 
         trainset_copy = list(trainset)
 

@@ -21,7 +21,6 @@ from dspy.teleprompt.utils import eval_candidate_program
 
 logger = logging.getLogger(__name__)
 
-# ANSI color codes for terminal output
 YELLOW = "\033[93m"
 GREEN = "\033[92m"
 BLUE = "\033[94m"
@@ -143,7 +142,7 @@ class BetterTogether(Teleprompter):
         self,
         metric: Callable,
         **optimizers: Teleprompter,
-    ):
+    ) -> None:
         """Initialize BetterTogether with a metric and custom optimizers.
 
         Args:
@@ -197,12 +196,10 @@ class BetterTogether(Teleprompter):
         trainset: list[Example],
         teacher: Module | list[Module] | None = None,
         valset: list[Example] | None = None,
-        # often specified in init in other optimizers
         num_threads: int | None = None,
         max_errors: int | None = None,
         provide_traceback: bool | None = None,
         seed: int | None = None,
-        # specific to BetterTogether
         valset_ratio: float = 0.1,
         shuffle_trainset_between_steps: bool = True,
         strategy: str = "p -> w -> p",
@@ -215,7 +212,7 @@ class BetterTogether(Teleprompter):
 
         Args:
             student: DSPy program to optimize. All predictors must have language models assigned.
-                program.set_lm(lm) can be used to assign a language model to all modules of a 
+                program.set_lm(lm) can be used to assign a language model to all modules of a
                 program.
             trainset: Training examples for optimization. Each optimizer receives the full trainset
                 (or a shuffled version if ``shuffle_trainset_between_steps=True``).
@@ -366,7 +363,6 @@ class BetterTogether(Teleprompter):
     ) -> dict[str, dict[str, Any]]:
         logger.info(f"{BLUE}Validating optimizer compile arguments...{ENDC}")
 
-        # Validate user-provided compile args
         if not optimizer_compile_args:
             return {}
 
@@ -379,7 +375,6 @@ class BetterTogether(Teleprompter):
             optimizer = self.optimizers[optimizer_key]
             self._validate_compile_args(optimizer, optimizer_key, compile_args)
 
-            # Special checks
             if optimizer.__class__.__name__ == "GEPA":
                 # GEPA accepts a teacher argument, but raises an error if it's set.
                 if teacher is not None:
@@ -425,7 +420,6 @@ class BetterTogether(Teleprompter):
         flag_lms_launched = False
         flag_compilation_error_occurred = False
 
-        # Evaluate original program
         logger.info(f"\n{BOLD}==> BASELINE EVALUATION <=={ENDC}")
         logger.info("Evaluating original program (no optimization applied)")
 
@@ -436,7 +430,6 @@ class BetterTogether(Teleprompter):
         self._add_candidate(candidate_programs, student, strategy="", score=score)
         logger.info(f"{YELLOW}Baseline score:{ENDC} {score}")
 
-        # Apply each optimization step
         for ind, step_code in enumerate(parsed_strategy):
             current_strategy = self.STRAT_SEP.join(parsed_strategy[:ind + 1])
             optimizer = self.optimizers[step_code]
@@ -450,7 +443,6 @@ class BetterTogether(Teleprompter):
                     logger.info(f"{BLUE}Shuffling trainset...{ENDC}")
                     rng.shuffle(trainset)
 
-                # Run optimizer, evaluate, and record results
                 compile_args = optimizer_args.get(step_code, {})
                 student, score, is_new_best, lms_relaunched = self._run_and_evaluate_step(
                     optimizer, student, teacher, trainset, valset, compile_args,
@@ -461,7 +453,6 @@ class BetterTogether(Teleprompter):
                 if lms_relaunched:
                     flag_lms_launched = True
 
-                # Log score
                 if is_new_best:
                     logger.info(f"{GREEN}New best score!{ENDC} {score} (strategy: '{current_strategy}')")
                 else:
@@ -469,20 +460,18 @@ class BetterTogether(Teleprompter):
 
             except Exception as e:
                 flag_compilation_error_occurred = True
-                logger.error(
+                logger.exception(
                     f"{YELLOW}Step {ind + 1}/{len(parsed_strategy)} failed with error: {type(e).__name__}: {e}{ENDC}"
                 )
-                logger.error(
+                logger.exception(
                     f"{YELLOW}Stopping optimization early. Returning best program found so far from {len(candidate_programs)} candidate(s).{ENDC}"
                 )
                 logger.error(f"{YELLOW}Traceback:{ENDC}", exc_info=True)
                 break
 
-        # Cleanup and finalize
         if flag_lms_launched:
             kill_lms(student)
 
-        # Sort candidates by score (best first), with earlier programs winning ties
         candidate_programs_with_idx = [(i, cp) for i, cp in enumerate(candidate_programs)]
         candidate_programs_with_idx.sort(
             key=lambda x: (x[1]["score"] if x[1]["score"] is not None else float("-inf"), -x[0]),
@@ -490,15 +479,11 @@ class BetterTogether(Teleprompter):
         )
         candidate_programs = [cp for _, cp in candidate_programs_with_idx]
 
-        # Select best program based on valset availability
         if valset is None or len(valset) == 0:
-            # No valset: return the latest program (last in original order)
             best_program = candidate_programs_with_idx[-1][1]
         else:
-            # Valset provided: return highest score (first after sorting)
             best_program = candidate_programs[0]
 
-        # Attach sorted candidate programs and error flag to the best program
         best_student = best_program["program"]
         best_student.candidate_programs = candidate_programs
         best_student.flag_compilation_error_occurred = flag_compilation_error_occurred
@@ -534,14 +519,11 @@ class BetterTogether(Teleprompter):
             is_new_best: Whether this score is the best so far
             lms_relaunched: Whether LMs were relaunched (for flag tracking)
         """
-        # Save LMs before optimization
         pred_lms_before = [pred.lm for pred in student.predictors()]
 
-        # Run optimizer
         student._compiled = False
         logger.info(f"{BLUE}Running {optimizer.__class__.__name__} with {len(trainset)} training examples...{ENDC}")
 
-        # Build compile args with standard parameters, filtering to only what the optimizer accepts
         potential_args = {"trainset": trainset, "teacher": teacher, "valset": valset, **compile_args}
         sig = inspect.signature(optimizer.compile)
         accepted_params = set(sig.parameters.keys())
@@ -572,11 +554,9 @@ class BetterTogether(Teleprompter):
             launch_lms(student)
             lms_relaunched = True
 
-        # Evaluate optimized program
         score = self._evaluate_on_valset(student, valset, rng, num_threads, effective_max_errors, provide_traceback)
         self._add_candidate(candidate_programs, student, current_strategy, score)
 
-        # Check if this is the best score so far
         valid_scores = [cp["score"] for cp in candidate_programs if cp["score"] is not None]
         best_score_so_far = max(valid_scores) if valid_scores else float("-inf")
         is_new_best = score is not None and score >= best_score_so_far

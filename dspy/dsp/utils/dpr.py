@@ -23,12 +23,12 @@ class Tokens:
     LEMMA = 4
     NER = 5
 
-    def __init__(self, data, annotators, opts=None):
+    def __init__(self, data, annotators, opts=None) -> None:
         self.data = data
         self.annotators = annotators
         self.opts = opts or {}
 
-    def __len__(self):
+    def __len__(self) -> int:
         """The number of tokens."""
         return len(self.data)
 
@@ -50,8 +50,7 @@ class Tokens:
         """
         if uncased:
             return [t[self.TEXT].lower() for t in self.data]
-        else:
-            return [t[self.TEXT] for t in self.data]
+        return [t[self.TEXT] for t in self.data]
 
     def offsets(self):
         """Returns a list of [start, end) character offsets of each token."""
@@ -105,7 +104,6 @@ class Tokens:
             if not _skip(words[s : e + 1])
         ]
 
-        # Concatenate into strings
         if as_strings:
             ngrams = ["{}".format(" ".join(words[s:e])) for (s, e) in ngrams]
 
@@ -121,9 +119,7 @@ class Tokens:
         idx = 0
         while idx < len(entities):
             ner_tag = entities[idx]
-            # Check for entity tag
             if ner_tag != non_ent:
-                # Chomp the sequence
                 start = idx
                 while idx < len(entities) and entities[idx] == ner_tag:
                     idx += 1
@@ -141,10 +137,10 @@ class Tokenizer:
     def tokenize(self, text):
         raise NotImplementedError
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         pass
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.shutdown()
 
 
@@ -152,13 +148,13 @@ class SimpleTokenizer(Tokenizer):
     ALPHA_NUM = r"[\p{L}\p{N}\p{M}]+"
     NON_WS = r"[^\p{Z}\p{C}]"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         """
         Args:
             annotators: None or empty set (only tokenizes).
         """
         self._regexp = regex.compile(
-            "(%s)|(%s)" % (self.ALPHA_NUM, self.NON_WS),
+            f"({self.ALPHA_NUM})|({self.NON_WS})",
             flags=regex.IGNORECASE + regex.UNICODE + regex.MULTILINE,
         )
         if len(kwargs.get("annotators", {})) > 0:
@@ -173,18 +169,12 @@ class SimpleTokenizer(Tokenizer):
         data = []
         matches = list(self._regexp.finditer(text))
         for i in range(len(matches)):
-            # Get text
             token = matches[i].group()
 
-            # Get whitespace
             span = matches[i].span()
             start_ws = span[0]
-            if i + 1 < len(matches):
-                end_ws = matches[i + 1].span()[0]
-            else:
-                end_ws = span[1]
+            end_ws = matches[i + 1].span()[0] if i + 1 < len(matches) else span[1]
 
-            # Format data
             data.append(
                 (
                     token,
@@ -195,11 +185,11 @@ class SimpleTokenizer(Tokenizer):
         return Tokens(data, self.annotators)
 
 
-def has_answer(tokenized_answers, text):
+def has_answer(tokenized_answers, text) -> bool:
     text = DPR_normalize(text)
 
     for single_answer in tokenized_answers:
-        for i in range(0, len(text) - len(single_answer) + 1):
+        for i in range(len(text) - len(single_answer) + 1):
             if single_answer == text[i : i + len(single_answer)]:
                 return True
 
@@ -217,7 +207,7 @@ def locate_answers(tokenized_answers, text):
     answers_words = [ans.words(uncased=True) for ans in tokenized_answers]
 
     for single_answer in answers_words:
-        for i in range(0, len(text_words) - len(single_answer) + 1):
+        for i in range(len(text_words) - len(single_answer) + 1):
             if single_answer == text_words[i : i + len(single_answer)]:
                 (offset, _), (_, endpos) = text_word_positions[i], text_word_positions[i + len(single_answer) - 1]
                 occurrences.append((offset, endpos))

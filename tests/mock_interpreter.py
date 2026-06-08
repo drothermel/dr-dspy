@@ -22,7 +22,6 @@ class MockInterpreter:
 
     Example usage:
         ```python
-        # Script specific responses
         mock = MockInterpreter(responses=[
             "data explored",
             FinalOutput("42"),
@@ -30,7 +29,6 @@ class MockInterpreter:
         result1 = mock.execute("print(len(context))")  # Returns "data explored"
         result2 = mock.execute("SUBMIT('42')")  # Returns FinalOutput("42")
 
-        # Use custom execution function
         def custom_exec(code, variables):
             if "SUBMIT" in code:
                 return FinalOutput("done")
@@ -92,11 +90,9 @@ class MockInterpreter:
         self.call_history.append((code, variables))
         self.call_count += 1
 
-        # Custom function takes precedence
         if self.execute_fn is not None:
             return self.execute_fn(code, variables)
 
-        # Return scripted responses
         if not self.responses:
             return ""
 
@@ -116,7 +112,6 @@ class MockInterpreter:
         self.call_history = []
         self._shutdown = False
 
-    # Context manager support
     def __enter__(self) -> "MockInterpreter":
         return self
 

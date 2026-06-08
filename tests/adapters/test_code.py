@@ -11,7 +11,7 @@ def test_code_validate_input():
     code = Code["python"](code="print('Hello, world!')")
     assert code.code == "print('Hello, world!')"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         # Try to create a `Code` instance with invalid type.
         Code["python"](code=123)
 

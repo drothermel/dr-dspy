@@ -1,4 +1,5 @@
 import random
+from collections.abc import Mapping, Sequence
 
 from dspy.dsp.utils.settings import settings
 from dspy.predict.parameter import Parameter
@@ -6,7 +7,7 @@ from dspy.primitives.prediction import Prediction
 from dspy.utils.callback import with_callbacks
 
 
-def single_query_passage(passages):
+def single_query_passage(passages: Sequence[Mapping[str, object]]) -> Prediction:
     passages_dict = {key: [] for key in list(passages[0].keys())}
     for docs in passages:
         for key, value in docs.items():
@@ -21,31 +22,31 @@ class Retrieve(Parameter):
     input_variable = "query"
     desc = "takes a search query and returns one or more potentially relevant passages from a corpus"
 
-    def __init__(self, k=3, callbacks=None):
+    def __init__(self, k: int = 3, callbacks: list[object] | None = None) -> None:
         self.stage = random.randbytes(8).hex()
         self.k = k
         self.callbacks = callbacks or []
 
-    def reset(self):
+    def reset(self) -> None:
         pass
 
-    def dump_state(self):
+    def dump_state(self) -> dict[str, object]:
         state_keys = ["k"]
         return {k: getattr(self, k) for k in state_keys}
 
-    def load_state(self, state):
+    def load_state(self, state: Mapping[str, object]) -> None:
         for name, value in state.items():
             setattr(self, name, value)
 
     @with_callbacks
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: object, **kwargs: object) -> list[str] | Prediction | list[Prediction]:
         return self.forward(*args, **kwargs)
 
     def forward(
         self,
         query: str,
         k: int | None = None,
-        **kwargs,
+        **kwargs: object,
     ) -> list[str] | Prediction | list[Prediction]:
         k = k if k is not None else self.k
 
@@ -57,11 +58,10 @@ class Retrieve(Parameter):
 
         from collections.abc import Iterable
         if not isinstance(passages, Iterable):
-            # it's not an iterable yet; make it one.
-            # TODO: we should unify the type signatures of dspy.Retriever
+            # TODO: Normalize retriever return types so single-document results do not need wrapping here.
             passages = [passages]
         passages = [psg.long_text for psg in passages]
 
         return Prediction(passages=passages)
 
-# TODO: Consider doing Prediction.from_completions with the individual sets of passages (per query) too.
+# TODO: Preserve per-query passage groups when constructing Predictions for batched retrieval.

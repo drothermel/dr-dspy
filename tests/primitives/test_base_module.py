@@ -294,8 +294,7 @@ def test_multi_module_call_with_usage_tracker(lm_for_test):
 
         def __call__(self, question: str) -> Prediction:
             answer = self.predict1(question=question)
-            score = self.predict2(question=question, answer=answer)
-            return score
+            return self.predict2(question=question, answer=answer)
 
     program = MyProgram()
     output = program(question="What is the capital of France?")
@@ -308,7 +307,7 @@ def test_multi_module_call_with_usage_tracker(lm_for_test):
     assert lm_usage[lm_for_test]["total_tokens"] > 0
 
 
-# TODO: prepare second model for testing this unit test in ci
+# TODO: Replace the live OpenAI dependency with a deterministic two-LM fixture before enabling this in CI.
 @pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="Skip the test if OPENAI_API_KEY is not set.")
 def test_usage_tracker_in_parallel():
     class MyProgram(Module):
@@ -320,8 +319,7 @@ def test_usage_tracker_in_parallel():
         def __call__(self, question: str) -> Prediction:
             with settings.context(lm=self.lm):
                 answer = self.predict1(question=question)
-                score = self.predict2(question=question, answer=answer)
-                return score
+                return self.predict2(question=question, answer=answer)
 
     settings.configure(track_usage=True)
     program1 = MyProgram(lm=LM("openai/gpt-4o-mini", cache=False))
@@ -339,8 +337,8 @@ def test_usage_tracker_in_parallel():
     assert results[0].get_lm_usage() is not None
     assert results[1].get_lm_usage() is not None
 
-    assert results[0].get_lm_usage().keys() == set(["openai/gpt-4o-mini"])
-    assert results[1].get_lm_usage().keys() == set(["openai/gpt-3.5-turbo"])
+    assert results[0].get_lm_usage().keys() == {"openai/gpt-4o-mini"}
+    assert results[1].get_lm_usage().keys() == {"openai/gpt-3.5-turbo"}
 
 
 @pytest.mark.asyncio
@@ -351,18 +349,12 @@ async def test_usage_tracker_async_parallel():
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="{'answer': 'Paris'}"))],
             usage=Usage(
-                **{
-                    "prompt_tokens": 1117,
-                    "completion_tokens": 46,
-                    "total_tokens": 1163,
-                    "prompt_tokens_details": {"cached_tokens": 0, "audio_tokens": 0},
-                    "completion_tokens_details": {
+                prompt_tokens=1117, completion_tokens=46, total_tokens=1163, prompt_tokens_details={"cached_tokens": 0, "audio_tokens": 0}, completion_tokens_details={
                         "reasoning_tokens": 0,
                         "audio_tokens": 0,
                         "accepted_prediction_tokens": 0,
                         "rejected_prediction_tokens": 0,
                     },
-                },
             ),
             model="openai/gpt-4o-mini",
         )
@@ -396,7 +388,7 @@ def test_usage_tracker_no_side_effect():
         def __init__(self):
             self.predict = Predict("question -> answer")
 
-        def forward(self, question: str, **kwargs) -> str:
+        def forward(self, question: str, **kwargs: object) -> str:
             return self.predict(question=question).answer
 
     program = MyProgram()
@@ -407,11 +399,11 @@ def test_usage_tracker_no_side_effect():
 
 def test_module_history():
     class MyProgram(Module):
-        def __init__(self, **kwargs):
+        def __init__(self, **kwargs: object):
             super().__init__(**kwargs)
             self.cot = ChainOfThought("question -> answer")
 
-        def forward(self, question: str, **kwargs) -> Prediction:
+        def forward(self, question: str, **kwargs: object) -> Prediction:
             return self.cot(question=question)
 
     with patch("litellm.completion") as mock_completion:
@@ -461,7 +453,7 @@ def test_module_history_with_concurrency():
             super().__init__()
             self.cot = ChainOfThought("question -> answer")
 
-        def forward(self, question: str, **kwargs) -> Prediction:
+        def forward(self, question: str, **kwargs: object) -> Prediction:
             return self.cot(question=question)
 
     with patch("litellm.completion") as mock_completion:
@@ -488,11 +480,11 @@ def test_module_history_with_concurrency():
 @pytest.mark.asyncio
 async def test_module_history_async():
     class MyProgram(Module):
-        def __init__(self, **kwargs):
+        def __init__(self, **kwargs: object):
             super().__init__(**kwargs)
             self.cot = ChainOfThought("question -> answer")
 
-        async def aforward(self, question: str, **kwargs) -> Prediction:
+        async def aforward(self, question: str, **kwargs: object) -> Prediction:
             return await self.cot.acall(question=question)
 
     with patch("litellm.acompletion") as mock_completion:
@@ -539,15 +531,15 @@ async def test_module_history_async():
         assert len(program.cot.predict.history) == 3
 
 
-def test_forward_direct_call_warning(capsys):
+def test_forward_direct_call_warning(caplog):
     class TestModule(Module):
         def forward(self, x):
             return x
 
     module = TestModule()
-    module.forward("test")
-    captured = capsys.readouterr()
-    assert "directly is discouraged" in captured.err
+    with caplog.at_level(logging.WARNING, logger="dspy.primitives.module"):
+        module.forward("test")
+    assert "directly is discouraged" in caplog.text
 
 
 def test_forward_through_call_no_warning(capsys):

@@ -220,7 +220,7 @@ def test_tool_with_pydantic_callable():
 @requires_jsonschema
 def test_invalid_function_call():
     tool = Tool(dummy_function)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         tool(x="not an integer", y="hello")
 
 
@@ -276,7 +276,7 @@ def test_tool_call_parses_nested_list_of_pydantic_model():
 
 @requires_jsonschema
 def test_tool_call_kwarg():
-    def fn(x: int, **kwargs):
+    def fn(x: int, **kwargs: object):
         return kwargs
 
     tool = Tool(fn)
@@ -364,14 +364,14 @@ async def test_async_tool_with_complex_pydantic():
 @pytest.mark.asyncio
 async def test_async_tool_invalid_call():
     tool = Tool(async_dummy_function)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         await tool.acall(x="not an integer", y="hello")
 
 
 @requires_jsonschema
 @pytest.mark.asyncio
 async def test_async_tool_with_kwargs():
-    async def fn(x: int, **kwargs):
+    async def fn(x: int, **kwargs: object):
         return kwargs
 
     tool = Tool(fn)
@@ -406,7 +406,7 @@ async def test_async_concurrent_calls():
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_async_tool_call_in_sync_mode():
     tool = Tool(async_dummy_function)
-    with settings.context(allow_tool_async_sync_conversion=False):
+    with settings.context(allow_tool_async_sync_conversion=False):  # noqa: SIM117
         with pytest.raises(ValueError, match=r".*acall.*allow_tool_async_sync_conversion.*"):
             result = tool(x=1, y="hello")
 
@@ -444,7 +444,7 @@ TOOL_CALL_TEST_CASES = [
 ]
 
 
-@pytest.mark.parametrize("tool_calls_data,expected", TOOL_CALL_TEST_CASES)
+@pytest.mark.parametrize(("tool_calls_data", "expected"), TOOL_CALL_TEST_CASES)
 def test_tool_calls_format_basic(tool_calls_data, expected):
     """Test ToolCalls.format with various basic scenarios."""
     tool_calls_list = [ToolCalls.ToolCall(**data) for data in tool_calls_data]
@@ -654,9 +654,9 @@ def test_toolcalls_vague_match():
     assert tc.tool_calls[0].args == {"query": "hello"}
 
     # Invalid input should raise ValueError
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         ToolCalls.model_validate({"foo": "bar"})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         ToolCalls.model_validate([{"foo": "bar"}])
     with pytest.raises(ValueError, match="function value"):
         ToolCalls.from_dict_list([{"function": "bad"}])
@@ -741,7 +741,7 @@ def test_tool_call_execute():
 
     # Test error case
     tool_call4 = ToolCalls.ToolCall(name="nonexistent", args={})
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(ValueError) as exc_info:  # noqa: PT011
         tool_call4.execute(functions=tools)
     assert "not found" in str(exc_info.value)
 

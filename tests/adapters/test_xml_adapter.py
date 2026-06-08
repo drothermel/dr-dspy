@@ -1,9 +1,10 @@
-from dspy.utils.exceptions import AdapterParseError
 import sys
 from unittest import mock
 
 import pydantic
 import pytest
+
+from dspy.utils.exceptions import AdapterParseError
 
 try:
     from litellm import Choices, Message, ModelResponse

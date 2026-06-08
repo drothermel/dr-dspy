@@ -56,14 +56,14 @@ class Predict(Module, Parameter):
                 predict(q="What is 1 + 52?", config={"rollout_id": 2, "temperature": 1.0})
     """
 
-    def __init__(self, signature: str | type[Signature], callbacks: list[BaseCallback] | None = None, **config):
+    def __init__(self, signature: str | type[Signature], callbacks: list[BaseCallback] | None = None, **config) -> None:
         super().__init__(callbacks=callbacks)
         self.stage = random.randbytes(8).hex()
         self.signature = ensure_signature(signature)
         self.config = config
         self.reset()
 
-    def reset(self):
+    def reset(self) -> None:
         self.lm = None
         self.traces = []
         self.train = []
@@ -78,7 +78,7 @@ class Predict(Module, Parameter):
             demo = demo.copy()
 
             for field in demo:
-                # FIXME: Saving BaseModels as strings in examples doesn't matter because you never re-access as an object
+                # Demos are serialized for state round-trips; nested model object types are not preserved after load.
                 demo[field] = serialize_object(demo[field])
 
             if isinstance(demo, dict) or not json_mode:
@@ -103,7 +103,6 @@ class Predict(Module, Parameter):
         """
         excluded_keys = ["signature", "extended_signature", "lm"]
         for name, value in state.items():
-            # `excluded_keys` are fields that go through special handling.
             if name not in excluded_keys:
                 setattr(self, name, value)
 
@@ -120,7 +119,7 @@ class Predict(Module, Parameter):
 
         return self
 
-    def _get_positional_args_error_message(self):
+    def _get_positional_args_error_message(self) -> str:
         input_fields = list(self.signature.input_fields.keys())
         return (
             "Positional arguments are not allowed when calling `dspy.predict.predict.Predict`, must use keyword "
@@ -142,13 +141,11 @@ class Predict(Module, Parameter):
         return await super().acall(**kwargs)
 
     def _forward_preprocess(self, **kwargs):
-        # Extract the three privileged keyword arguments.
         assert "new_signature" not in kwargs, "new_signature is no longer a valid keyword argument."
         signature = ensure_signature(kwargs.pop("signature", self.signature))
         demos = kwargs.pop("demos", self.demos)
         config = {**self.config, **kwargs.pop("config", {})}
 
-        # Get the right LM to use.
         lm = kwargs.pop("lm", self.lm) or settings.lm
 
         if lm is None:
@@ -168,7 +165,7 @@ class Predict(Module, Parameter):
                 f"'settings.configure(lm=LM(\"{lm}\"))' after importing "
                 "`LM` from `dspy.clients.lm` and `settings` from `dspy.dsp.utils.settings`."
             )
-        elif not isinstance(lm, BaseLM):
+        if not isinstance(lm, BaseLM):
             raise ValueError(
                 f"LM must be an instance of `dspy.clients.base_lm.BaseLM`, not {type(lm)}. Received `lm={lm}`."
             )
@@ -180,23 +177,20 @@ class Predict(Module, Parameter):
         if (temperature is None or temperature <= 0.15) and num_generations > 1:
             config["temperature"] = 0.7
 
-        if "prediction" in kwargs:
-            if (
-                isinstance(kwargs["prediction"], dict)
-                and kwargs["prediction"].get("type") == "content"
-                and "content" in kwargs["prediction"]
-            ):
-                # If the `prediction` is the standard predicted outputs format
-                # (https://platform.openai.com/docs/guides/predicted-outputs), we remove it from input kwargs and add it
-                # to the lm kwargs.
-                config["prediction"] = kwargs.pop("prediction")
+        if "prediction" in kwargs and (
+            isinstance(kwargs["prediction"], dict)
+            and kwargs["prediction"].get("type") == "content"
+            and "content" in kwargs["prediction"]
+        ):
+            # If the `prediction` is the standard predicted outputs format
+            # (https://platform.openai.com/docs/guides/predicted-outputs), we remove it from input kwargs and add it
+            # to the lm kwargs.
+            config["prediction"] = kwargs.pop("prediction")
 
-        # Populate default values for missing input fields.
         for k, v in signature.input_fields.items():
             if k not in kwargs and v.default is not PydanticUndefined:
                 kwargs[k] = v.default
 
-        # Check and warn for extra fields not in signature
         extra_fields = [k for k in kwargs if k not in signature.input_fields]
         if extra_fields:
             logger.warning(
@@ -206,7 +200,6 @@ class Predict(Module, Parameter):
                 list(signature.input_fields.keys()),
             )
 
-        # Validate input field types match signature
         if settings.warn_on_type_mismatch:
             for field_name, field_info in signature.input_fields.items():
                 if field_name in kwargs:
@@ -283,13 +276,13 @@ class Predict(Module, Parameter):
 
         return self._forward_postprocess(completions, signature, **kwargs)
 
-    def update_config(self, **kwargs):
+    def update_config(self, **kwargs) -> None:
         self.config = {**self.config, **kwargs}
 
     def get_config(self):
         return self.config
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.signature})"
 
 def _get_type_name(type_annotation) -> str:
@@ -338,9 +331,8 @@ def _annotation_allows_none(annotation: Any) -> bool:
 def _is_value_compatible_with_type(value: Any, expected: type) -> bool:
     """Return True if the value matches the expected type hint."""
     # Special handle list[str] because we allow setting input type to str, however, invoking with a list thereof.
-    if expected is str and isinstance(value, list):
-        if all(isinstance(item, str) for item in value):
-            return True
+    if expected is str and isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return True
 
     return _check_type(value, expected)
 
@@ -353,15 +345,12 @@ def _check_type(value: Any, expected: type) -> bool:
     origin = get_origin(expected)
     args = get_args(expected)
 
-    # Union / Optional (X | None)
     if origin is Union or origin is types.UnionType:
         return any(_check_type(value, arg) for arg in args)
 
-    # Literal
     if origin is Literal:
         return value in args
 
-    # list
     if origin is list:
         if not isinstance(value, list):
             return False
@@ -369,7 +358,6 @@ def _check_type(value: Any, expected: type) -> bool:
             return all(_check_type(item, args[0]) for item in value)
         return True
 
-    # dict
     if origin is dict:
         if not isinstance(value, dict):
             return False
@@ -378,7 +366,6 @@ def _check_type(value: Any, expected: type) -> bool:
             return all(_check_type(k, key_type) and _check_type(v, val_type) for k, v in value.items())
         return True
 
-    # tuple
     if origin is tuple:
         if not isinstance(value, tuple):
             return False
@@ -390,7 +377,6 @@ def _check_type(value: Any, expected: type) -> bool:
             return all(_check_type(item, arg) for item, arg in zip(value, args, strict=False))
         return True
 
-    # set / frozenset
     if origin is set or origin is frozenset:
         if not isinstance(value, origin):
             return False
@@ -398,7 +384,6 @@ def _check_type(value: Any, expected: type) -> bool:
             return all(_check_type(item, args[0]) for item in value)
         return True
 
-    # Plain type (int, str, BaseModel subclass, etc.)
     if isinstance(expected, type):
         return isinstance(value, expected)
 
@@ -413,17 +398,10 @@ def serialize_object(obj):
         # Use model_dump with mode="json" to ensure all fields (including HttpUrl, datetime, etc.)
         # are converted to JSON-serializable types (strings)
         return obj.model_dump(mode="json")
-    elif isinstance(obj, list):
+    if isinstance(obj, list):
         return [serialize_object(item) for item in obj]
-    elif isinstance(obj, tuple):
+    if isinstance(obj, tuple):
         return tuple(serialize_object(item) for item in obj)
-    elif isinstance(obj, dict):
+    if isinstance(obj, dict):
         return {key: serialize_object(value) for key, value in obj.items()}
-    else:
-        return obj
-
-
-# # TODO: FIXME: Hmm, I guess expected behavior is that contexts can
-# affect execution. Well, we need to determine whether context dominates, __init__ demoninates, or forward dominates.
-# Generally, unless overwritten, we'd see n=None, temperature=None.
-# That will eventually mean we have to learn them.
+    return obj

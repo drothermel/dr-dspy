@@ -37,7 +37,7 @@ def pretty_print_history(history: list[dict[str, Any]], n: int = 1, file: TextIO
     out = file or sys.stdout
     use_colors = file is None
 
-    def print_tool_calls(tool_calls):
+    def print_tool_calls(tool_calls) -> None:
         if tool_calls:
             print(_red("Tool calls:", use_colors=use_colors), file=out)
         for tool_call in tool_calls or []:

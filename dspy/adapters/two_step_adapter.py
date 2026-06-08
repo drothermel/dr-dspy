@@ -44,7 +44,7 @@ class TwoStepAdapter(Adapter):
     ```
     """
 
-    def __init__(self, extraction_model: BaseLM, **kwargs):
+    def __init__(self, extraction_model: BaseLM, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         if not isinstance(extraction_model, BaseLM):
             raise ValueError("extraction_model must be an instance of dspy.clients.base_lm.BaseLM")
@@ -68,18 +68,16 @@ class TwoStepAdapter(Adapter):
         """
         messages = []
 
-        # Create a task description for the main LM
         task_description = self.format_task_description(signature)
         messages.append({"role": "system", "content": task_description})
 
         messages.extend(self.format_demos(signature, demos))
 
-        # Format the current input
         messages.append({"role": "user", "content": self.format_user_message_content(signature, inputs)})
 
         return messages
 
-    def parse(self, signature: Signature, completion: str) -> dict[str, Any]:
+    def parse(self, signature: type[Signature], completion: str) -> dict[str, Any]:
         """
         Use a smaller LM (extraction_model) with chat adapter to extract structured data
         from the raw completion text of the main LM.
@@ -91,11 +89,9 @@ class TwoStepAdapter(Adapter):
         Returns:
             A dictionary containing the extracted structured data.
         """
-        # The signature is supposed to be "text -> {original output fields}"
         extractor_signature = self._create_extractor_signature(signature)
 
         try:
-            # Call the smaller LM to extract structured data from the raw completion text with ChatAdapter
             parsed_result = ChatAdapter()(
                 lm=self.extraction_model,
                 lm_kwargs={},
@@ -110,7 +106,7 @@ class TwoStepAdapter(Adapter):
         except Exception as e:
             raise AdapterParseError(
                 adapter_name="TwoStepAdapter",
-                signature=signature,
+                signature=signature,  # ty: ignore[invalid-argument-type]
                 lm_response=completion,
                 message=f"Failed to parse response from the original completion: {e}",
             ) from e
@@ -123,10 +119,9 @@ class TwoStepAdapter(Adapter):
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        inputs = self.format(signature, demos, inputs)
+        messages = self.format(signature, demos, inputs)
 
-        outputs = await lm.acall(messages=inputs, **lm_kwargs)
-        # The signature is supposed to be "text -> {original output fields}"
+        outputs = await lm.acall(messages=messages, **lm_kwargs)
         extractor_signature = self._create_extractor_signature(signature)
 
         values = []
@@ -143,7 +138,6 @@ class TwoStepAdapter(Adapter):
                 tool_calls = output.get("tool_calls")
 
             try:
-                # Call the smaller LM to extract structured data from the raw completion text with ChatAdapter
                 value = await ChatAdapter().acall(
                     lm=self.extraction_model,
                     lm_kwargs={},
@@ -158,7 +152,7 @@ class TwoStepAdapter(Adapter):
             except Exception as e:
                 raise AdapterParseError(
                     adapter_name="TwoStepAdapter",
-                    signature=signature,
+                    signature=signature,  # ty: ignore[invalid-argument-type]
                     lm_response=str(output),
                     message=f"Failed to parse response from the original completion: {e}",
                 ) from e
@@ -179,7 +173,7 @@ class TwoStepAdapter(Adapter):
             values.append(value)
         return values
 
-    def format_task_description(self, signature: Signature) -> str:
+    def format_task_description(self, signature: type[Signature]) -> str:
         """Create a description of the task based on the signature"""
         parts = []
 
@@ -199,12 +193,12 @@ class TwoStepAdapter(Adapter):
         inputs: dict[str, Any],
         prefix: str = "",
         suffix: str = "",
+        main_request: bool = False,
     ) -> str:
+        _ = main_request
         parts = [prefix]
 
-        for name in signature.input_fields.keys():
-            if name in inputs:
-                parts.append(f"{name}: {inputs.get(name, '')}")
+        parts.extend(f"{name}: {inputs.get(name, '')}" for name in signature.input_fields if name in inputs)
 
         parts.append(suffix)
         return "\n\n".join(parts).strip()
@@ -215,11 +209,9 @@ class TwoStepAdapter(Adapter):
         outputs: dict[str, Any],
         missing_field_message: str | None = None,
     ) -> str:
-        parts = []
-
-        for name in signature.output_fields.keys():
-            if name in outputs:
-                parts.append(f"{name}: {outputs.get(name, missing_field_message)}")
+        parts = [
+            f"{name}: {outputs.get(name, missing_field_message)}" for name in signature.output_fields if name in outputs
+        ]
 
         return "\n\n".join(parts).strip()
 
@@ -235,7 +227,6 @@ class TwoStepAdapter(Adapter):
         Returns:
             A new Signature type with a text input field and all output fields
         """
-        # Create new fields dict with 'text' input field and all output fields
         new_fields = {
             "text": (str, InputField()),
             **{name: (field.annotation, field) for name, field in original_signature.output_fields.items()},
@@ -245,4 +236,4 @@ class TwoStepAdapter(Adapter):
         instructions = f"The input is a text that should contain all the necessary information to produce the fields {outputs_str}. \
             Your job is to extract the fields from the text verbatim. Extract precisely the appropriate value (content) for each field."
 
-        return make_signature(new_fields, instructions)
+        return make_signature(new_fields, instructions)  # ty: ignore[invalid-argument-type]

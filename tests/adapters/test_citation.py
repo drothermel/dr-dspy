@@ -1,8 +1,8 @@
 import pydantic
 import pytest
 
-from dspy.clients.lm import LM
 from dspy.adapters.types.citation import Citations
+from dspy.clients.lm import LM
 from dspy.signatures.field import InputField, OutputField
 
 

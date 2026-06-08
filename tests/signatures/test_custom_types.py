@@ -30,6 +30,7 @@ def test_type_alias_for_nested_types():
             value: str
 
     NestedType = Container.NestedType
+    assert NestedType is Container.NestedType
     alias_sig = Signature("input: str -> output: NestedType")
     assert alias_sig.output_fields["output"].annotation == Container.NestedType
 
@@ -92,7 +93,7 @@ def test_recommended_patterns():
 
 def test_expected_failure():
     # InnerType DNE when not OuterContainer.InnerTypes, so this type shouldnt be resolved
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         Signature("input: str -> output: InnerType")
 
 def test_module_type_resolution():
@@ -108,7 +109,7 @@ def test_module_type_resolution():
     sig = module.predict.signature
     assert sig.output_fields["output"].annotation == OuterContainer.InnerType
 
-def test_basic_custom_type_resolution():
+def test_basic_custom_type_resolution():  # noqa: F811
     class CustomType(pydantic.BaseModel):
         value: str
 

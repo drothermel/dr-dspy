@@ -3,19 +3,19 @@ from dspy.primitives.example import Example
 
 class Prediction(Example):
     """A prediction object that contains the output of a DSPy module.
-    
+
     Prediction inherits from Example.
-    
+
     To allow feedback-augmented scores, Prediction supports comparison operations
     (<, >, <=, >=) for Predictions with a `score` field. The comparison operations
     compare the 'score' values as floats. For equality comparison, Predictions are equal
     if their underlying data stores are equal (inherited from Example).
-    
+
     Arithmetic operations (+, /, etc.) are also supported for Predictions with a 'score'
     field, operating on the score value.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
         del self._demos
@@ -27,7 +27,7 @@ class Prediction(Example):
     def get_lm_usage(self):
         return self._lm_usage
 
-    def set_lm_usage(self, value):
+    def set_lm_usage(self, value) -> None:
         self._lm_usage = value
 
     @classmethod
@@ -38,7 +38,7 @@ class Prediction(Example):
 
         return obj
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         store_repr = ",\n    ".join(f"{k}={v!r}" for k, v in self._store.items())
 
         if self._completions is None or len(self._completions) == 1:
@@ -47,10 +47,10 @@ class Prediction(Example):
         num_completions = len(self._completions)
         return f"Prediction(\n    {store_repr},\n    completions=Completions(...)\n) ({num_completions-1} completions omitted)"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__repr__()
 
-    def __float__(self):
+    def __float__(self) -> float:
         if "score" not in self._store:
             raise ValueError("Prediction object does not have a 'score' field to convert to float.")
         return float(self._store["score"])
@@ -58,56 +58,56 @@ class Prediction(Example):
     def __add__(self, other):
         if isinstance(other, (float, int)):
             return self.__float__() + other
-        elif isinstance(other, Prediction):
+        if isinstance(other, Prediction):
             return self.__float__() + float(other)
         raise TypeError(f"Unsupported type for addition: {type(other)}")
 
     def __radd__(self, other):
         if isinstance(other, (float, int)):
             return other + self.__float__()
-        elif isinstance(other, Prediction):
+        if isinstance(other, Prediction):
             return float(other) + self.__float__()
         raise TypeError(f"Unsupported type for addition: {type(other)}")
 
     def __truediv__(self, other):
         if isinstance(other, (float, int)):
             return self.__float__() / other
-        elif isinstance(other, Prediction):
+        if isinstance(other, Prediction):
             return self.__float__() / float(other)
         raise TypeError(f"Unsupported type for division: {type(other)}")
 
     def __rtruediv__(self, other):
         if isinstance(other, (float, int)):
             return other / self.__float__()
-        elif isinstance(other, Prediction):
+        if isinstance(other, Prediction):
             return float(other) / self.__float__()
         raise TypeError(f"Unsupported type for division: {type(other)}")
 
     def __lt__(self, other):
         if isinstance(other, (float, int)):
             return self.__float__() < other
-        elif isinstance(other, Prediction):
+        if isinstance(other, Prediction):
             return self.__float__() < float(other)
         raise TypeError(f"Unsupported type for comparison: {type(other)}")
 
     def __le__(self, other):
         if isinstance(other, (float, int)):
             return self.__float__() <= other
-        elif isinstance(other, Prediction):
+        if isinstance(other, Prediction):
             return self.__float__() <= float(other)
         raise TypeError(f"Unsupported type for comparison: {type(other)}")
 
     def __gt__(self, other):
         if isinstance(other, (float, int)):
             return self.__float__() > other
-        elif isinstance(other, Prediction):
+        if isinstance(other, Prediction):
             return self.__float__() > float(other)
         raise TypeError(f"Unsupported type for comparison: {type(other)}")
 
     def __ge__(self, other):
         if isinstance(other, (float, int)):
             return self.__float__() >= other
-        elif isinstance(other, Prediction):
+        if isinstance(other, Prediction):
             return self.__float__() >= float(other)
         raise TypeError(f"Unsupported type for comparison: {type(other)}")
 
@@ -117,7 +117,7 @@ class Prediction(Example):
 
 
 class Completions:
-    def __init__(self, list_or_dict, signature=None):
+    def __init__(self, list_or_dict, signature=None) -> None:
         self.signature = signature
 
         if isinstance(list_or_dict, list):
@@ -156,18 +156,15 @@ class Completions:
 
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
-    def __len__(self):
-        # Return the length of the list for one of the keys
-        # It assumes all lists have the same length
+    def __len__(self) -> int:
         return len(next(iter(self._completions.values())))
 
-    def __contains__(self, key):
+    def __contains__(self, key) -> bool:
         return key in self._completions
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         items_repr = ",\n    ".join(f"{k}={v!r}" for k, v in self._completions.items())
         return f"Completions(\n    {items_repr}\n)"
 
-    def __str__(self):
-        # return str(self._completions)
+    def __str__(self) -> str:
         return self.__repr__()

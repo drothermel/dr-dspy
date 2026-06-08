@@ -77,19 +77,19 @@ def test_with_updated_field():
     assert signature2.input_fields["input1"].json_schema_extra["prefix"] == "Modified:"
     assert signature1.input_fields["input1"].json_schema_extra["prefix"] == "Input 1:"
     assert signature1 is not signature2, "The type should be immutable"
-    for key in signature1.fields.keys():
+    for key in signature1.fields:
         if key != "input1":
             assert signature1.fields[key].json_schema_extra == signature2.fields[key].json_schema_extra
     assert signature1.instructions == signature2.instructions
 
 
 def test_empty_signature():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         Signature("")
 
 
 def test_instructions_signature():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         Signature("")
 
 
@@ -145,13 +145,13 @@ def test_insert_field_at_various_positions():
 
     s1 = InitialSignature.prepend("new_input_start", InputField(), str)
     s2 = InitialSignature.append("new_input_end", InputField(), str)
-    assert "new_input_start" == list(s1.input_fields.keys())[0]  # noqa: RUF015
-    assert "new_input_end" == list(s2.input_fields.keys())[-1]
+    assert list(s1.input_fields.keys())[0] == "new_input_start"  # noqa: RUF015
+    assert list(s2.input_fields.keys())[-1] == "new_input_end"
 
     s3 = InitialSignature.prepend("new_output_start", OutputField(), str)
     s4 = InitialSignature.append("new_output_end", OutputField(), str)
-    assert "new_output_start" == list(s3.output_fields.keys())[0]  # noqa: RUF015
-    assert "new_output_end" == list(s4.output_fields.keys())[-1]
+    assert list(s3.output_fields.keys())[0] == "new_output_start"  # noqa: RUF015
+    assert list(s4.output_fields.keys())[-1] == "new_output_end"
 
 
 def test_order_preserved_with_mixed_annotations():
@@ -291,16 +291,24 @@ def test_typed_signatures_unions_and_optionals():
     input_union_annotation = sig.input_fields["input_union"].annotation
     assert (
         getattr(input_union_annotation, "__origin__", None) is Union
-        and int in input_union_annotation.__args__
-        and type(None) in input_union_annotation.__args__
+    )
+    assert (
+        int in input_union_annotation.__args__
+    )
+    assert (
+        type(None) in input_union_annotation.__args__
     )
 
     assert "output_union" in sig.output_fields
     output_union_annotation = sig.output_fields["output_union"].annotation
     assert (
         getattr(output_union_annotation, "__origin__", None) is Union
-        and int in output_union_annotation.__args__
-        and str in output_union_annotation.__args__
+    )
+    assert (
+        int in output_union_annotation.__args__
+    )
+    assert (
+        str in output_union_annotation.__args__
     )
 
 
@@ -320,7 +328,8 @@ def test_typed_signatures_nested():
     assert len(input_nested_ann.__args__) == 1
     union_arg = input_nested_ann.__args__[0]
     assert getattr(union_arg, "__origin__", None) is Union
-    assert str in union_arg.__args__ and int in union_arg.__args__
+    assert str in union_arg.__args__
+    assert int in union_arg.__args__
 
     output_nested_ann = sig.output_fields["output_nested"].annotation
     assert getattr(output_nested_ann, "__origin__", None) is tuple
@@ -328,7 +337,8 @@ def test_typed_signatures_nested():
     # The second arg is Optional[float], which is Union[float, None]
     second_arg = output_nested_ann.__args__[1]
     assert getattr(second_arg, "__origin__", None) is Union
-    assert float in second_arg.__args__ and type(None) in second_arg.__args__
+    assert float in second_arg.__args__
+    assert type(None) in second_arg.__args__
     # The third arg is list[str]
     third_arg = output_nested_ann.__args__[2]
     assert getattr(third_arg, "__origin__", None) is list
@@ -381,7 +391,8 @@ def test_typed_signatures_complex_combinations():
         a, "__origin__", None) is dict)
     assert list_arg.__args__ == (str,)
     k, v = dict_arg.__args__
-    assert k == str and v == Any
+    assert k == str
+    assert v == Any
 
 
 def test_make_signature_from_string():
@@ -475,8 +486,12 @@ def test_pep604_union_type_inline():
     output_union_annotation = sig.output_fields["output_union"].annotation
     assert (
         getattr(output_union_annotation, "__origin__", None) is Union
-        and int in output_union_annotation.__args__
-        and str in output_union_annotation.__args__
+    )
+    assert (
+        int in output_union_annotation.__args__
+    )
+    assert (
+        str in output_union_annotation.__args__
     )
 
 
@@ -524,7 +539,7 @@ def test_pep604_union_type_class_equivalence():
 
     class Sig2(Signature):
         input: str | None = InputField()
-        output: Union[int, str] = OutputField()  # noqa: UP007
+        output: Union[int, str] = OutputField()
 
     # PEP 604 union types in class signatures should be equivalent to Optional and Union types
     assert Sig1.equals(Sig2)
@@ -558,7 +573,8 @@ def test_pep604_union_type_insert():
     output_annotation = NewSig.output_fields["output"].annotation
 
     assert isinstance(input_annotation, UnionType)
-    assert str in input_annotation.__args__ and type(None) in input_annotation.__args__
+    assert str in input_annotation.__args__
+    assert type(None) in input_annotation.__args__
 
     assert isinstance(output_annotation, UnionType)
     assert set(output_annotation.__args__) == {int, str}
@@ -592,7 +608,7 @@ def test_signature_cloudpickle_roundtrip():
         answer: str = OutputField()
 
     data = cloudpickle.dumps(MySignature)
-    loaded = pickle.loads(data)
+    loaded = pickle.loads(data)  # noqa: S301
 
     assert loaded.__name__ == "MySignature"
     assert list(loaded.input_fields.keys()) == ["context", "question"]
@@ -608,6 +624,6 @@ def test_predict_cloudpickle_roundtrip():
 
     predict = Predict(QA)
     data = cloudpickle.dumps(predict)
-    loaded = pickle.loads(data)
+    loaded = pickle.loads(data)  # noqa: S301
 
     assert list(loaded.signature.fields.keys()) == ["question", "answer"]

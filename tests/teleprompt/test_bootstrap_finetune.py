@@ -24,7 +24,7 @@ def test_bootstrap_finetune_initialization():
     """Test BootstrapFinetune initialization with various parameters."""
     bootstrap = BootstrapFinetune(metric=simple_metric)
     assert bootstrap.metric == simple_metric, "Metric not correctly initialized"
-    assert bootstrap.multitask == True, "Multitask should default to True"
+    assert bootstrap.multitask, "Multitask should default to True"
 
 
 class SimpleModule(Module):
@@ -32,7 +32,7 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    def forward(self, **kwargs):
+    def forward(self, **kwargs: object):
         return self.predictor(**kwargs)
 
 
@@ -76,7 +76,7 @@ def test_error_handling_missing_lm():
     # This should raise ValueError about missing LM and hint to use set_lm
     try:
         bootstrap.compile(student, trainset=trainset)
-        assert False, "Should have raised ValueError for missing LM"
+        raise AssertionError("Should have raised ValueError for missing LM")
     except ValueError as e:
         assert "does not have an LM assigned" in str(e)
         assert "set_lm" in str(e)

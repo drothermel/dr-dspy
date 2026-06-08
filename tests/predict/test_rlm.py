@@ -45,10 +45,10 @@ def make_mock_predictor(responses: list[dict], async_mode: bool = False):
             self.idx += 1
             return Prediction(**result)
 
-        def __call__(self, **kwargs):
+        def __call__(self, **kwargs: object):
             return self._next_response()
 
-        async def acall(self, **kwargs):
+        async def acall(self, **kwargs: object):
             return self._next_response()
 
     return MockPredictor()
@@ -214,7 +214,7 @@ class TestRLMInitialization:
 
         # Multiple missing inputs - all should be reported
         rlm = RLM("a, b, c -> answer", max_iterations=3, interpreter=mock)
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError) as exc_info:  # noqa: PT011
             rlm.forward(a="only a")  # Missing 'b' and 'c'
         assert "b" in str(exc_info.value)
         assert "c" in str(exc_info.value)
@@ -804,15 +804,13 @@ print(f"Count: {info['count']}")
 
     def test_syntax_error(self):
         """Test syntax error handling."""
-        with PythonInterpreter(tools={}) as interp:
-            with pytest.raises(SyntaxError):
-                interp.execute("def incomplete(")
+        with PythonInterpreter(tools={}) as interp, pytest.raises(SyntaxError):
+            interp.execute("def incomplete(")
 
     def test_runtime_error(self):
         """Test runtime error handling."""
-        with PythonInterpreter(tools={}) as interp:
-            with pytest.raises(CodeInterpreterError):
-                interp.execute("undefined_variable")
+        with PythonInterpreter(tools={}) as interp, pytest.raises(CodeInterpreterError):
+            interp.execute("undefined_variable")
 
 
 @pytest.mark.deno
@@ -896,7 +894,7 @@ class TestRLMAsyncMock:
 class TestRLMTypeCoercionMock:
     """Unit tests for RLM type coercion using MockInterpreter (no Deno required)."""
 
-    @pytest.mark.parametrize("output_field,output_type,final_value,code,expected", [
+    @pytest.mark.parametrize(("output_field", "output_type", "final_value", "code", "expected"), [
         ("count", "int", 42, "SUBMIT(42)", 42),
         ("score", "float", 3.14, "SUBMIT(3.14)", 3.14),
         ("valid", "bool", True, "SUBMIT(True)", True),
@@ -943,7 +941,7 @@ class TestRLMTypeCoercion:
     typed output_fields for SUBMIT based on the signature.
     """
 
-    @pytest.mark.parametrize("output_field,output_type,code,expected,expected_type", [
+    @pytest.mark.parametrize(("output_field", "output_type", "code", "expected", "expected_type"), [
         ("count", "int", "SUBMIT(42)", 42, int),
         ("score", "float", "SUBMIT(3.14)", 3.14, float),
         ("valid", "bool", "SUBMIT(True)", True, bool),

@@ -3,19 +3,21 @@ import logging
 import math
 import random
 from dataclasses import dataclass
-from typing import Any, Literal, Optional, Protocol, Union
-
-from gepa import GEPAResult
-from gepa.core.adapter import ProposalFn
-from gepa.proposer.reflective_mutation.base import ReflectionComponentSelector
+from typing import TYPE_CHECKING, Any, Literal, Optional, Protocol, Union
 
 from dspy.clients.lm import LM
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.teleprompt.gepa.gepa_utils import DspyAdapter, DSPyTrace, PredictorFeedbackFn, ScoreWithFeedback
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.annotation import experimental
+
+if TYPE_CHECKING:
+    from gepa import GEPAResult
+    from gepa.core.adapter import ProposalFn
+    from gepa.proposer.reflective_mutation.base import ReflectionComponentSelector
+
+    from dspy.teleprompt.gepa.gepa_utils import DspyAdapter, DSPyTrace, PredictorFeedbackFn, ScoreWithFeedback
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +112,7 @@ class DspyGEPAResult:
     @property
     def highest_score_achieved_per_val_task(self) -> dict[Any, float]:
         return {
-            val_id: self.val_subscores[list(self.per_val_instance_best_candidates[val_id])[0]][val_id]
+            val_id: self.val_subscores[next(iter(self.per_val_instance_best_candidates[val_id]))][val_id]
             for val_id in self.per_val_instance_best_candidates
         }
 
@@ -120,22 +122,22 @@ class DspyGEPAResult:
             for cand in self.candidates
         ]
 
-        return dict(
-            candidates=cands,
-            parents=self.parents,
-            val_aggregate_scores=self.val_aggregate_scores,
-            best_outputs_valset=self.best_outputs_valset,
-            val_subscores=self.val_subscores,
-            per_val_instance_best_candidates={
+        return {
+            "candidates": cands,
+            "parents": self.parents,
+            "val_aggregate_scores": self.val_aggregate_scores,
+            "best_outputs_valset": self.best_outputs_valset,
+            "val_subscores": self.val_subscores,
+            "per_val_instance_best_candidates": {
                 val_id: list(s) for val_id, s in self.per_val_instance_best_candidates.items()
             },
-            discovery_eval_counts=self.discovery_eval_counts,
-            total_metric_calls=self.total_metric_calls,
-            num_full_val_evals=self.num_full_val_evals,
-            log_dir=self.log_dir,
-            seed=self.seed,
-            best_idx=self.best_idx,
-        )
+            "discovery_eval_counts": self.discovery_eval_counts,
+            "total_metric_calls": self.total_metric_calls,
+            "num_full_val_evals": self.num_full_val_evals,
+            "log_dir": self.log_dir,
+            "seed": self.seed,
+            "best_idx": self.best_idx,
+        }
 
     @staticmethod
     def from_gepa_result(gepa_result: "GEPAResult", adapter: "DspyAdapter") -> "DspyGEPAResult":
@@ -373,7 +375,7 @@ class GEPA(Teleprompter):
         seed: int | None = 0,
         # GEPA passthrough kwargs
         gepa_kwargs: dict | None = None,
-    ):
+    ) -> None:
         try:
             inspect.signature(metric).bind(None, None, None, None, None)
         except TypeError as e:
@@ -473,7 +475,7 @@ class GEPA(Teleprompter):
         # Periodic full evals occur when trial_num % (m+1) == 0, where trial_num runs 2..N+1
         periodic_fulls = (N + 1) // (m) + 1
         # If 1 <= N < m, the code triggers one final full eval at the end
-        extra_final = 1 if N < m else 0
+        extra_final = 1 if m > N else 0
 
         total += (periodic_fulls + extra_final) * V
         return total
@@ -554,8 +556,7 @@ class GEPA(Teleprompter):
                     if o["feedback"] is None:
                         o["feedback"] = f"This trajectory got a score of {o['score']}."
                     return o
-                else:
-                    return dict(score=o, feedback=f"This trajectory got a score of {o}.")
+                return {"score": o, "feedback": f"This trajectory got a score of {o}."}
 
             return feedback_fn
 

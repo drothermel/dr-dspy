@@ -4,7 +4,7 @@ import inspect
 import json
 import types
 from collections.abc import Mapping
-from typing import Any, Literal, Union, get_args, get_origin
+from typing import Any, Literal, Union, cast, get_args, get_origin
 
 import json_repair
 import pydantic
@@ -17,14 +17,14 @@ from dspy.adapters.types.reasoning import Reasoning
 from dspy.signatures.utils import get_dspy_field_type
 
 
-def _annotation_is_subclass(annotation: Any, expected_base: type) -> bool:
+def _annotation_is_subclass(annotation: object, expected_base: type) -> bool:
     try:
         return inspect.isclass(annotation) and issubclass(annotation, expected_base)
     except TypeError:
         return False
 
 
-def serialize_for_json(value: Any) -> Any:
+def serialize_for_json(value: object) -> object:
     """
     Formats the specified value so that it can be serialized as a JSON string.
 
@@ -42,7 +42,7 @@ def serialize_for_json(value: Any) -> Any:
         return str(value)
 
 
-def format_field_value(field_info: FieldInfo, value: Any, assume_text=True) -> str | dict:
+def format_field_value(field_info: FieldInfo, value: object, assume_text: bool = True) -> str | dict[str, str]:
     """
     Formats the value of the specified field according to the field's DSPy type (input or output),
     annotation (e.g. str, int, etc.), and the type of the value itself.
@@ -59,7 +59,7 @@ def format_field_value(field_info: FieldInfo, value: Any, assume_text=True) -> s
         string_value = _format_input_list_field_value(value)
     else:
         jsonable_value = serialize_for_json(value)
-        if isinstance(jsonable_value, dict) or isinstance(jsonable_value, list):
+        if isinstance(jsonable_value, (dict, list)):
             string_value = json.dumps(jsonable_value, ensure_ascii=False)
         else:
             # If the value is not a Python representation of a JSON object or Array
@@ -70,27 +70,25 @@ def format_field_value(field_info: FieldInfo, value: Any, assume_text=True) -> s
 
     if assume_text:
         return string_value
-    else:
-        return {"type": "text", "text": string_value}
+    return {"type": "text", "text": string_value}
 
 
-def _get_json_schema(field_type):
-    def move_type_to_front(d):
+def _get_json_schema(field_type: object) -> object:
+    def move_type_to_front(d: object) -> object:
         # Move the 'type' key to the front of the dictionary, recursively, for LLM readability/adherence.
         if isinstance(d, Mapping):
             return {
                 k: move_type_to_front(v) for k, v in sorted(d.items(), key=lambda item: (item[0] != "type", item[0]))
             }
-        elif isinstance(d, list):
+        if isinstance(d, list):
             return [move_type_to_front(item) for item in d]
         return d
 
     schema = pydantic.TypeAdapter(field_type).json_schema()
-    schema = move_type_to_front(schema)
-    return schema
+    return move_type_to_front(schema)
 
 
-def translate_field_type(field_name, field_info):
+def translate_field_type(field_name: str, field_info: FieldInfo) -> str:
     field_type = field_info.annotation
 
     if get_dspy_field_type(field_info) == "input" or field_type is str or field_type is Reasoning:
@@ -100,7 +98,8 @@ def translate_field_type(field_name, field_info):
     elif field_type in (int, float):
         desc = f"must be a single {field_type.__name__} value"
     elif _annotation_is_subclass(field_type, enum.Enum):
-        enum_vals = "; ".join(str(member.value) for member in field_type)
+        enum_type = cast("type[enum.Enum]", field_type)
+        enum_vals = "; ".join(str(member.value) for member in enum_type)
         desc = f"must be one of: {enum_vals}"
     elif hasattr(field_type, "__origin__") and field_type.__origin__ is Literal:
         desc = (
@@ -108,7 +107,7 @@ def translate_field_type(field_name, field_info):
             # literal or returning a value of the form 'Literal[<selected_value>]'
             f"must exactly match (no extra characters) one of: {'; '.join([str(x) for x in field_type.__args__])}"
         )
-    elif _annotation_is_subclass(field_type, Code) and field_type.description():
+    elif _annotation_is_subclass(field_type, Code) and cast("type[Code]", field_type).description():
         # Code has a rich type description already; avoid duplicating its large schema block.
         desc = ""
     else:
@@ -118,7 +117,7 @@ def translate_field_type(field_name, field_info):
     return f"{{{field_name}}}{desc}"
 
 
-def find_enum_member(enum, identifier):
+def find_enum_member(enum_type: enum.EnumMeta, identifier: object) -> enum.Enum:
     """
     Finds the enum member corresponding to the specified identifier, which may be the
     enum member's name or value.
@@ -134,19 +133,20 @@ def find_enum_member(enum, identifier):
     # member name, since the identifier will be a value for explicitly-valued enums. This handles
     # the (rare) case where an enum member value is the same as another enum member's name in
     # an explicitly-valued enum
-    for member in enum:
+    for member in enum_type:
+        member = cast("enum.Enum", member)
         if member.value == identifier:
             return member
 
     # If the identifier is not a valid enum member value, check if it's a valid enum member name,
     # since the identifier will be a member name for auto-valued enums
-    if identifier in enum.__members__:
-        return enum[identifier]
+    if isinstance(identifier, str) and identifier in enum_type.__members__:
+        return cast("enum.Enum", enum_type[identifier])
 
-    raise ValueError(f"{identifier} is not a valid name or value for the enum {enum.__name__}")
+    raise ValueError(f"{identifier} is not a valid name or value for the enum {enum_type.__name__}")
 
 
-def parse_value(value, annotation):
+def parse_value(value: object, annotation: object) -> object:
     if annotation is str:
         return str(value)
 
@@ -198,7 +198,7 @@ def parse_value(value, annotation):
         raise
 
 
-def get_annotation_name(annotation):
+def get_annotation_name(annotation: object) -> str:
     origin = get_origin(annotation)
     args = get_args(annotation)
     if origin is None:
@@ -207,9 +207,8 @@ def get_annotation_name(annotation):
             # field type is treated as a string.
             return "str"
         if hasattr(annotation, "__name__"):
-            return annotation.__name__
-        else:
-            return str(annotation)
+            return cast("str", annotation.__name__)
+        return str(annotation)
 
     if origin is Literal:
         args_str = ", ".join(
@@ -217,17 +216,17 @@ def get_annotation_name(annotation):
             for a in args
         )
         return f"{get_annotation_name(origin)}[{args_str}]"
-    else:
-        args_str = ", ".join(get_annotation_name(a) for a in args)
-        return f"{get_annotation_name(origin)}[{args_str}]"
+    args_str = ", ".join(get_annotation_name(a) for a in args)
+    return f"{get_annotation_name(origin)}[{args_str}]"
 
 
-def get_field_description_string(fields: dict) -> str:
+def get_field_description_string(fields: dict[str, FieldInfo]) -> str:
     field_descriptions = []
     for idx, (k, v) in enumerate(fields.items()):
+        extra = cast("dict[str, Any]", v.json_schema_extra or {})
         field_message = f"{idx + 1}. `{k}`"
         field_message += f" ({get_annotation_name(v.annotation)})"
-        desc = v.json_schema_extra["desc"] if v.json_schema_extra["desc"] != f"${{{k}}}" else ""
+        desc = extra["desc"] if extra.get("desc") != f"${{{k}}}" else ""
 
         custom_types = DspyType.extract_custom_type_from_annotation(v.annotation)
         for custom_type in custom_types:
@@ -235,9 +234,7 @@ def get_field_description_string(fields: dict) -> str:
                 desc += f"\n    Type description of {get_annotation_name(custom_type)}: {custom_type.description()}"
 
         field_message += f": {desc}"
-        field_message += (
-            f"\nConstraints: {v.json_schema_extra['constraints']}" if v.json_schema_extra.get("constraints") else ""
-        )
+        field_message += f"\nConstraints: {extra['constraints']}" if extra.get("constraints") else ""
         field_descriptions.append(field_message)
     return "\n".join(field_descriptions).strip()
 
@@ -254,9 +251,9 @@ def _format_input_list_field_value(value: list[Any]) -> str:
     if len(value) == 0:
         return "N/A"
     if len(value) == 1:
-        return _format_blob(value[0])
+        return _format_blob(str(value[0]))
 
-    return "\n".join([f"[{idx + 1}] {_format_blob(txt)}" for idx, txt in enumerate(value)])
+    return "\n".join([f"[{idx + 1}] {_format_blob(str(txt))}" for idx, txt in enumerate(value)])
 
 
 def _format_blob(blob: str) -> str:
@@ -286,13 +283,12 @@ def _quoted_string_for_literal_type_annotation(s: str) -> str:
     if has_single and not has_double:
         # Only single quotes => enclose in double quotes
         return f'"{s}"'
-    elif has_double and not has_single:
+    if has_double and not has_single:
         # Only double quotes => enclose in single quotes
         return f"'{s}'"
-    elif has_single and has_double:
+    if has_single and has_double:
         # Both => enclose in single quotes; escape each single quote with \'
         escaped = s.replace("'", "\\'")
         return f"'{escaped}'"
-    else:
-        # Neither => enclose in single quotes
-        return f"'{s}'"
+    # Neither => enclose in single quotes
+    return f"'{s}'"

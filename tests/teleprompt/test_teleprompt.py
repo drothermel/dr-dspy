@@ -7,7 +7,7 @@ class DummyTeleprompter(Teleprompter):
         self.param1 = param1
         self.param2 = param2
 
-    def compile(self, student, *, trainset, teacher=None, valset=None, **kwargs):
+    def compile(self, student, *, trainset, teacher=None, valset=None, **kwargs: object):
         return student
 
 

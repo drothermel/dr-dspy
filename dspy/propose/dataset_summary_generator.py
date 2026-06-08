@@ -31,26 +31,20 @@ class DatasetDescriptorWithPriorObservations(Signature):
     observations = OutputField(desc="Somethings that holds true for most or all of the data you observed or COMPLETE if you have nothing to add")
 
 def order_input_keys_in_string(unordered_repr):
-    # Regex pattern to match the input keys structure
+    """Sort input_keys={...} repr fragments for deterministic dataset summaries."""
     pattern = r"input_keys=\{([^\}]+)\}"
 
-    # Function to reorder keys
-    def reorder_keys(match):
-        # Extracting the keys from the match
+    def reorder_keys(match) -> str:
         keys_str = match.group(1)
-        # Splitting the keys, stripping extra spaces, and sorting them
         keys = sorted(key.strip() for key in keys_str.split(","))
-        # Formatting the sorted keys back into the expected structure
         return f"input_keys={{{', '.join(keys)}}}"
 
-    # Using re.sub to find all matches of the pattern and replace them using the reorder_keys function
-    ordered_repr = re.sub(pattern, reorder_keys, unordered_repr)
+    return re.sub(pattern, reorder_keys, unordered_repr)
 
-    return ordered_repr
 
 def create_dataset_summary(trainset, view_data_batch_size, prompt_model, log_file=None, verbose=False):
     if verbose:
-        print("\nBootstrapping dataset summary (this will be used to generate instructions)...")
+        pass
     upper_lim = min(len(trainset), view_data_batch_size)
     prompt_model = prompt_model if prompt_model else settings.lm
     with settings.context(lm=prompt_model):
@@ -69,7 +63,7 @@ def create_dataset_summary(trainset, view_data_batch_size, prompt_model, log_fil
             if calls >= max_calls:
                 break
             if verbose:
-                print(f"b: {b}")
+                pass
             upper_lim = min(len(trainset), b+view_data_batch_size)
             with settings.context(lm=prompt_model):
                 output = Predict(DatasetDescriptorWithPriorObservations, n=1, temperature=1.0)(prior_observations=observations, examples=order_input_keys_in_string(trainset[b:upper_lim].__repr__()))
@@ -82,9 +76,9 @@ def create_dataset_summary(trainset, view_data_batch_size, prompt_model, log_fil
 
             if log_file:
                 log_file.write(f"observations {observations}\n")
-    except Exception as e:
+    except Exception:
         if verbose:
-            print(f"e {e}. using observations from past round for a summary.")
+            pass
 
     if prompt_model:
         with settings.context(lm=prompt_model):
@@ -92,11 +86,11 @@ def create_dataset_summary(trainset, view_data_batch_size, prompt_model, log_fil
     else:
         summary = Predict(ObservationSummarizer, n=1, temperature=1.0)(observations=observations)
     if verbose:
-        print(f"summary: {summary}")
+        pass
     if log_file:
         log_file.write(f"summary: {summary}\n")
 
     if verbose:
-        print(f"\nGenerated summary: {strip_prefix(summary.summary)}\n")
+        pass
 
     return strip_prefix(summary.summary)

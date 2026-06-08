@@ -29,11 +29,10 @@ def experimental(
         A decorator that adds a note to the docstring of the decorated API.
     """
     if f:
+        return _experimental(f, version)  # ty:ignore[invalid-return-type]
+    def decorator(f: Callable[P, R]) -> Callable[P, R]:
         return _experimental(f, version)
-    else:
-        def decorator(f: Callable[P, R]) -> Callable[P, R]:
-            return _experimental(f, version)
-        return decorator
+    return decorator
 
 
 def _experimental(api: Callable[P, R], version: str | None = None) -> Callable[P, R]:

@@ -1,4 +1,4 @@
-from dspy.teleprompt.vanilla import LabeledFewShot
+import contextlib
 import os
 import tempfile
 
@@ -11,6 +11,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
+from dspy.teleprompt.vanilla import LabeledFewShot
 from dspy.utils.dummies import DummyLM
 
 
@@ -20,10 +21,8 @@ def sample_text_file():
         tmp_file.write("This is a test file.")
         tmp_file_path = tmp_file.name
     yield tmp_file_path
-    try:
+    with contextlib.suppress(Exception):
         os.unlink(tmp_file_path)
-    except Exception:
-        pass
 
 
 def count_messages_with_file_pattern(messages):

@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import json
 import re
-from typing import TYPE_CHECKING, Any, Optional, get_args, get_origin
+from typing import TYPE_CHECKING, Any, get_args, get_origin
 
 import json_repair
 import pydantic
 
 if TYPE_CHECKING:
-    from dspy.clients.base_lm import BaseLM
     from litellm import ModelResponseStream
 
+    from dspy.clients.base_lm import BaseLM
     from dspy.signatures.signature import Signature
 
 CUSTOM_TYPE_START_IDENTIFIER = "<<CUSTOM-TYPE-START-IDENTIFIER>>"
@@ -34,7 +34,7 @@ class Type(pydantic.BaseModel):
         ```
     """
 
-    def format(self) -> list[dict[str, Any]] | str:
+    def format(self) -> list[dict[str, Any]] | dict[str, Any] | str:
         raise NotImplementedError
 
     @classmethod
@@ -43,7 +43,7 @@ class Type(pydantic.BaseModel):
         return ""
 
     @classmethod
-    def extract_custom_type_from_annotation(cls, annotation):
+    def extract_custom_type_from_annotation(cls, annotation: object) -> list[type[Type]]:
         """Extract all custom types from the annotation.
 
         This is used to extract all custom types from the annotation of a field, while the annotation can
@@ -61,7 +61,7 @@ class Type(pydantic.BaseModel):
         if origin is None:
             return []
 
-        result = []
+        result: list[type[Type]] = []
         # Recurse into all type args
         for arg in get_args(annotation):
             result.extend(cls.extract_custom_type_from_annotation(arg))
@@ -69,7 +69,7 @@ class Type(pydantic.BaseModel):
         return result
 
     @pydantic.model_serializer()
-    def serialize_model(self):
+    def serialize_model(self) -> object:
         formatted = self.format()
         if isinstance(formatted, list):
             return (
@@ -80,11 +80,11 @@ class Type(pydantic.BaseModel):
     @classmethod
     def adapt_to_native_lm_feature(
         cls,
-        signature: type["Signature"],
+        signature: type[Signature],
         field_name: str,
         lm: BaseLM,
         lm_kwargs: dict[str, Any],
-    ) -> type["Signature"]:
+    ) -> type[Signature]:
         """Adapt the custom type to the native LM feature if possible.
 
         When the LM and configuration supports the related native LM feature, e.g., native tool calling, native
@@ -100,6 +100,7 @@ class Type(pydantic.BaseModel):
             The adapted signature. If the custom type is not natively supported by the LM, return the original
             signature.
         """
+        _ = (field_name, lm, lm_kwargs)
         return signature
 
     @classmethod
@@ -108,7 +109,7 @@ class Type(pydantic.BaseModel):
         return False
 
     @classmethod
-    def parse_stream_chunk(cls, chunk: "ModelResponseStream") -> Optional["Type"]:
+    def parse_stream_chunk(cls, chunk: ModelResponseStream) -> Type | str | None:
         """
         Parse a stream chunk into the custom type.
 
@@ -118,10 +119,11 @@ class Type(pydantic.BaseModel):
         Returns:
             A custom type object or None if the chunk is not for this custom type.
         """
+        _ = chunk
         return None
 
     @classmethod
-    def parse_lm_response(cls, response: str | dict[str, Any]) -> Optional["Type"]:
+    def parse_lm_response(cls, response: str | dict[str, Any]) -> Type | None:
         """Parse a LM response into the custom type.
 
         Args:
@@ -130,6 +132,7 @@ class Type(pydantic.BaseModel):
         Returns:
             A custom type object.
         """
+        _ = response
         return None
 
 
@@ -188,9 +191,8 @@ def split_message_content_for_custom_types(messages: list[dict[str, Any]]) -> li
                 except json.JSONDecodeError:
                     continue
 
-            if parsed:
-                for custom_type_content in parsed:
-                    result.append(custom_type_content)
+            if isinstance(parsed, list):
+                result.extend(parsed)
             else:
                 # fallback to raw string if it's not valid JSON
                 result.append({"type": "text", "text": custom_type_content})
@@ -210,7 +212,7 @@ def split_message_content_for_custom_types(messages: list[dict[str, Any]]) -> li
     return messages
 
 
-def _parse_doubly_quoted_json(json_str: str) -> Any:
+def _parse_doubly_quoted_json(json_str: str) -> object:
     """
     Parse a doubly quoted JSON string into a Python dict.
     `dspy.Type` can be json-encoded twice if included in either list or dict, e.g., `list[dspy.experimental.Document]`

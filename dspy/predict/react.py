@@ -1,5 +1,6 @@
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Literal
+from collections.abc import Callable
+from typing import Any, Literal
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool
@@ -9,17 +10,15 @@ from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import ensure_signature
+from dspy.signatures.signature import Signature, ensure_signature
 from dspy.utils.exceptions import ContextWindowExceededError
 
 logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    from dspy.signatures.signature import Signature
 
 
 class ReAct(Module):
-    def __init__(self, signature: type["Signature"], tools: list[Callable], max_iters: int = 20):
+    def __init__(self, signature: type["Signature"], tools: list[Callable], max_iters: int = 20) -> None:
         """
         ReAct stands for "Reasoning and Acting," a popular paradigm for building tool-using agents.
         In this approach, the language model is iteratively provided with a list of tools and has
@@ -52,8 +51,8 @@ class ReAct(Module):
         tools = [t if isinstance(t, Tool) else Tool(t) for t in tools]
         tools = {tool.name: tool for tool in tools}
 
-        inputs = ", ".join([f"`{k}`" for k in signature.input_fields.keys()])
-        outputs = ", ".join([f"`{k}`" for k in signature.output_fields.keys()])
+        inputs = ", ".join([f"`{k}`" for k in signature.input_fields])
+        outputs = ", ".join([f"`{k}`" for k in signature.output_fields])
         instr = [f"{signature.instructions}\n"] if signature.instructions else []
 
         instr.extend(

@@ -362,7 +362,7 @@ def tool_choice_to_openai(choice: LMToolChoice) -> dict[str, Any]:
     else:
         data = {"tool_choice": choice.mode}
     if choice.parallel is not None:
-        data["parallel_tool_calls"] = choice.parallel
+        data["parallel_tool_calls"] = choice.parallel  # ty:ignore[invalid-assignment]
     return data
 
 
@@ -558,7 +558,7 @@ def choice_to_lm_output(choice: Any) -> LMOutput:
         if content:
             parts.extend(message_content_to_parts(content))
         for tool_call in get_value(message, "tool_calls") or []:
-            parts.append(provider_tool_call_to_part(tool_call))
+            parts.append(provider_tool_call_to_part(tool_call))  # noqa: PERF401 dynamic typing/lint migration for scoped ty adoption
         parts.extend(extract_citations_from_choice(choice))
     else:
         text = get_value(choice, "text")
@@ -729,10 +729,10 @@ def output_image_to_part(value: Any) -> LMImagePart:
 def output_audio_to_part(value: Any) -> LMAudioPart:
     data = model_dump(value)
     audio = data.get("audio") if isinstance(data.get("audio"), dict) else data
-    source = audio.get("url")
-    b64_data = audio.get("data") or audio.get("b64_json")
-    file_id = audio.get("file_id")
-    media_type = audio.get("media_type") or audio.get("mime_type") or "audio/wav"
+    source = audio.get("url")  # ty:ignore[unresolved-attribute]
+    b64_data = audio.get("data") or audio.get("b64_json")  # ty:ignore[unresolved-attribute]
+    file_id = audio.get("file_id")  # ty:ignore[unresolved-attribute]
+    media_type = audio.get("media_type") or audio.get("mime_type") or "audio/wav"  # ty:ignore[unresolved-attribute]
     if b64_data is not None:
         if isinstance(b64_data, str) and b64_data.startswith("data:"):
             media_type, b64_data = split_data_uri(b64_data)
@@ -747,11 +747,11 @@ def output_audio_to_part(value: Any) -> LMAudioPart:
 def output_file_to_part(value: Any) -> LMBinaryPart:
     data = model_dump(value)
     file = data.get("file") if isinstance(data.get("file"), dict) else data
-    source = file.get("url")
-    b64_data = file.get("file_data") or file.get("data")
-    file_id = file.get("file_id") or file.get("id")
-    filename = file.get("filename")
-    media_type = file.get("media_type") or file.get("mime_type") or "application/octet-stream"
+    source = file.get("url")  # ty:ignore[unresolved-attribute]
+    b64_data = file.get("file_data") or file.get("data")  # ty:ignore[unresolved-attribute]
+    file_id = file.get("file_id") or file.get("id")  # ty:ignore[unresolved-attribute]
+    filename = file.get("filename")  # ty:ignore[unresolved-attribute]
+    media_type = file.get("media_type") or file.get("mime_type") or "application/octet-stream"  # ty:ignore[unresolved-attribute]
     if b64_data is not None:
         if isinstance(b64_data, str) and b64_data.startswith("data:"):
             media_type, b64_data = split_data_uri(b64_data)
@@ -787,7 +787,7 @@ def usage_from_response(response: Any) -> LMUsage | None:
                 continue
             try:
                 value = getattr(usage, key)
-            except Exception:
+            except Exception:  # noqa: S112 dynamic typing/lint migration for scoped ty adoption
                 continue
             if value is not None and not callable(value):
                 data[key] = value
@@ -937,7 +937,7 @@ def lm_output_from_legacy_output(output: dict[str, Any] | str | None) -> LMOutpu
     if reasoning:
         parts.append(LMThinkingPart(text=str(reasoning)))
     for tool_call in output.get("tool_calls") or []:
-        parts.append(provider_tool_call_to_part(tool_call))
+        parts.append(provider_tool_call_to_part(tool_call))  # noqa: PERF401 dynamic typing/lint migration for scoped ty adoption
     for citation in output.get("citations") or []:
-        parts.append(citation_to_part(citation))
+        parts.append(citation_to_part(citation))  # noqa: PERF401 dynamic typing/lint migration for scoped ty adoption
     return LMOutput(parts=parts, logprobs=output.get("logprobs"), provider_output=output)

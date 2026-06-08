@@ -4,11 +4,10 @@ import os
 import re
 import threading
 import warnings
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import anyio.from_thread
 import pydantic
-from anyio.streams.memory import MemoryObjectSendStream
 
 from dspy.__metadata__ import __version__
 from dspy.clients._litellm import get_litellm, is_litellm_context_window_error
@@ -37,6 +36,9 @@ from dspy.utils.exceptions import (
 )
 
 from .base_lm import BaseLM
+
+if TYPE_CHECKING:
+    from anyio.streams.memory import MemoryObjectSendStream
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +77,7 @@ class LM(BaseLM):
         train_kwargs: dict[str, Any] | None = None,
         use_developer_role: bool = False,
         **kwargs,
-    ):
+    ) -> None:
         """Create a new language model instance for use with DSPy modules and programs.
 
         Args:
@@ -163,7 +165,7 @@ class LM(BaseLM):
         params = _get_litellm().get_supported_openai_params(model=self.model, custom_llm_provider=self._provider_name)
         return set(params) if params else set()
 
-    def _warn_zero_temp_rollout(self, temperature: float | None, rollout_id):
+    def _warn_zero_temp_rollout(self, temperature: float | None, rollout_id) -> None:
         if not self._warned_zero_temp_rollout and rollout_id is not None and temperature == 0:
             warnings.warn(
                 "rollout_id has no effect when temperature=0; set temperature>0 to bypass the cache.",
@@ -205,7 +207,7 @@ class LM(BaseLM):
             return ContextWindowExceededError(message=message or "Context window exceeded", **metadata)
 
         exc_cls = _lm_error_class_from_litellm_exception(exc) or _lm_error_class_from_status(status)
-        return exc_cls(message, **metadata)
+        return exc_cls(message, **metadata)  # ty:ignore[invalid-argument-type]
 
     def forward(
         self,
@@ -230,7 +232,6 @@ class LM(BaseLM):
                 failures, which adapters use to avoid inappropriate fallback
                 retries when the prompt is too long.
         """
-        # Build the request.
         kwargs = dict(kwargs)
         cache = kwargs.pop("cache", self.cache)
 
@@ -288,7 +289,6 @@ class LM(BaseLM):
                 failures, which adapters use to avoid inappropriate fallback
                 retries when the prompt is too long.
         """
-        # Build the request.
         kwargs = dict(kwargs)
         cache = kwargs.pop("cache", self.cache)
 
@@ -323,10 +323,10 @@ class LM(BaseLM):
 
         return results
 
-    def launch(self, launch_kwargs: dict[str, Any] | None = None):
+    def launch(self, launch_kwargs: dict[str, Any] | None = None) -> None:
         self.provider.launch(self, launch_kwargs)
 
-    def kill(self, launch_kwargs: dict[str, Any] | None = None):
+    def kill(self, launch_kwargs: dict[str, Any] | None = None) -> None:
         self.provider.kill(self, launch_kwargs)
 
     def finetune(
@@ -379,21 +379,21 @@ class LM(BaseLM):
         job.initialize()
         return job
 
-    def _run_finetune_job(self, job: TrainingJob):
+    def _run_finetune_job(self, job: TrainingJob) -> None:
         # TODO(enhance): We should listen for keyboard interrupts somewhere.
         # Requires TrainingJob.cancel() to be implemented for each provider.
         try:
             model = self.provider.finetune(
                 job=job,
-                model=job.model,
-                train_data=job.train_data,
+                model=job.model,  # ty:ignore[invalid-argument-type]
+                train_data=job.train_data,  # ty:ignore[invalid-argument-type]
                 train_data_format=job.train_data_format,
                 train_kwargs=job.train_kwargs,
             )
             lm = self.copy(model=model)
             job.set_result(lm)
         except Exception as err:
-            logger.error(err)
+            logger.exception(err)
             job.set_result(err)
 
     def infer_provider(self) -> Provider:
@@ -434,7 +434,7 @@ class LM(BaseLM):
 
         return super().load_state(state, allow_custom_lm_class=allow_custom_lm_class)
 
-    def _check_truncation(self, results):
+    def _check_truncation(self, results) -> None:
         if self.model_type != "responses" and any(c.finish_reason == "length" for c in results["choices"]):
             logger.warning(
                 f"LM response was truncated due to exceeding max_tokens={self.kwargs['max_tokens']}. "
@@ -459,7 +459,7 @@ def _get_stream_completion_fn(
         return None
 
     # The stream is already opened, and will be closed by the caller.
-    stream = cast(MemoryObjectSendStream, stream)
+    stream = cast("MemoryObjectSendStream", stream)
     caller_predict_id = id(caller_predict) if caller_predict else None
 
     if settings.track_usage:
@@ -489,8 +489,7 @@ def _get_stream_completion_fn(
 
     if sync:
         return sync_stream_completion
-    else:
-        return async_stream_completion
+    return async_stream_completion
 
 
 def litellm_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
@@ -516,16 +515,13 @@ def litellm_text_completion(request: dict[str, Any], num_retries: int, cache: di
     request = dict(request)
     request.pop("rollout_id", None)
     headers = request.pop("headers", None)
-    # Extract the provider and model from the model string.
     # TODO: Not all the models are in the format of "provider/model"
     model = request.pop("model").split("/", 1)
     provider, model = model[0] if len(model) > 1 else "openai", model[-1]
 
-    # Use the API key and base from the request, or from the environment.
     api_key = request.pop("api_key", None) or os.getenv(f"{provider}_API_KEY")
     api_base = request.pop("api_base", None) or os.getenv(f"{provider}_API_BASE")
 
-    # Build the prompt from the messages.
     prompt = "\n\n".join([x["content"] for x in request.pop("messages")] + ["BEGIN RESPONSE:"])
 
     return _get_litellm().text_completion(
@@ -567,11 +563,9 @@ async def alitellm_text_completion(request: dict[str, Any], num_retries: int, ca
     headers = request.pop("headers", None)
     provider, model = model[0] if len(model) > 1 else "openai", model[-1]
 
-    # Use the API key and base from the request, or from the environment.
     api_key = request.pop("api_key", None) or os.getenv(f"{provider}_API_KEY")
     api_base = request.pop("api_base", None) or os.getenv(f"{provider}_API_BASE")
 
-    # Build the prompt from the messages.
     prompt = "\n\n".join([x["content"] for x in request.pop("messages")] + ["BEGIN RESPONSE:"])
 
     return await _get_litellm().atext_completion(
@@ -634,9 +628,8 @@ def _convert_chat_request_to_responses_request(request: dict[str, Any]):
             if isinstance(c, str):
                 content_blocks.append({"type": "input_text", "text": c})
             elif isinstance(c, list):
-                # Convert each content item from Chat API format to Responses API format
                 for item in c:
-                    content_blocks.append(_convert_content_item_to_responses_format(item))
+                    content_blocks.append(_convert_content_item_to_responses_format(item))  # noqa: PERF401 dynamic typing/lint migration for scoped ty adoption
             input_items.append({"role": msg.get("role", "user"), "content": content_blocks})
         request["input"] = input_items
     # Convert `reasoning_effort` to reasoning format supported by the Responses API
@@ -681,12 +674,12 @@ def _convert_content_item_to_responses_format(item: dict[str, Any]) -> dict[str,
             "type": "input_image",
             "image_url": image_url,
         }
-    elif item.get("type") == "text":
+    if item.get("type") == "text":
         return {
             "type": "input_text",
             "text": item.get("text", ""),
         }
-    elif item.get("type") == "file":
+    if item.get("type") == "file":
         file = item.get("file", {})
         return {
             "type": "input_file",
@@ -695,7 +688,6 @@ def _convert_content_item_to_responses_format(item: dict[str, Any]) -> dict[str,
             "file_id": file.get("file_id"),
         }
 
-    # For other items, return as-is
     return item
 
 

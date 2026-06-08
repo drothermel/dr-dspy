@@ -176,7 +176,7 @@ def test_interpreter_security_filesystem_access(tmp_path):
     """
     # 1. Create a "secret" file on the host
     secret_file = tmp_path / "secret.txt"
-    secret_content = "This is a secret content"
+    secret_content = "This is a secret content"  # noqa: S105
     secret_file.write_text(secret_content)
     secret_path_str = str(secret_file.absolute())
 

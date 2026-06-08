@@ -1,28 +1,30 @@
 import logging
 import random
-from typing import Any, Callable, Protocol, TypedDict
+from typing import TYPE_CHECKING, Any, Callable, Protocol, TypedDict
 
 from gepa import EvaluationBatch, GEPAAdapter
-from gepa.core.adapter import ProposalFn
 from gepa.strategies.instruction_proposal import InstructionProposalSignature
 
 from dspy.adapters.chat_adapter import ChatAdapter
-from dspy.adapters.types.history import History
 from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.history import History
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, TraceData
 
+if TYPE_CHECKING:
+    from gepa.core.adapter import ProposalFn
+
 logger = logging.getLogger(__name__)
 
 
 class LoggerAdapter:
-    def __init__(self, logger: logging.Logger):
+    def __init__(self, logger: logging.Logger) -> None:
         self.logger = logger
 
-    def log(self, x: str):
+    def log(self, x: str) -> None:
         self.logger.info(x)
 
 
@@ -89,7 +91,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         custom_instruction_proposer: "ProposalFn | None" = None,
         warn_on_score_mismatch: bool = True,
         reflection_minibatch_size: int | None = None,
-    ):
+    ) -> None:
         self.student = student_module
         self.metric_fn = metric_fn
         self.feedback_map = feedback_map
@@ -179,22 +181,21 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                     scores.append(score)
 
             return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajs)
-        else:
-            evaluator = Evaluate(
-                devset=batch,
-                metric=self.metric_fn,
-                num_threads=self.num_threads,
-                return_all_scores=True,
-                failure_score=self.failure_score,
-                provide_traceback=True,
-                max_errors=len(batch) * 100,
-                callback_metadata=callback_metadata,
-            )
-            res = evaluator(program)
-            outputs = [r[1] for r in res.results]
-            scores = [r[2] for r in res.results]
-            scores = [s["score"] if hasattr(s, "score") else s for s in scores]
-            return EvaluationBatch(outputs=outputs, scores=scores, trajectories=None)
+        evaluator = Evaluate(
+            devset=batch,
+            metric=self.metric_fn,
+            num_threads=self.num_threads,
+            return_all_scores=True,
+            failure_score=self.failure_score,
+            provide_traceback=True,
+            max_errors=len(batch) * 100,
+            callback_metadata=callback_metadata,
+        )
+        res = evaluator(program)
+        outputs = [r[1] for r in res.results]
+        scores = [r[2] for r in res.results]
+        scores = [s["score"] if hasattr(s, "score") else s for s in scores]
+        return EvaluationBatch(outputs=outputs, scores=scores, trajectories=None)
 
     def make_reflective_dataset(
         self, candidate, eval_batch, components_to_update

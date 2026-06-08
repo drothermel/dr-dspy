@@ -1,4 +1,4 @@
-# TODO: This should move internally. Same for passage_match. dspy.metrics.answer_exact_match, dspy.metrics.answer_passage_match
+# TODO: Decide whether EM/F1 helper aliases should remain public here or move behind dspy.metrics.
 
 import re
 import string
@@ -175,9 +175,8 @@ def f1_score(prediction, ground_truth):
 
     precision = 1.0 * num_same / len(prediction_tokens)
     recall = 1.0 * num_same / len(ground_truth_tokens)
-    f1 = (2 * precision * recall) / (precision + recall)
+    return (2 * precision * recall) / (precision + recall)
 
-    return f1
 
 
 def hotpot_f1_score(prediction, ground_truth):
@@ -214,8 +213,7 @@ def hotpot_f1_score(prediction, ground_truth):
         return 0
     precision = 1.0 * num_same / len(prediction_tokens)
     recall = 1.0 * num_same / len(ground_truth_tokens)
-    f1 = (2 * precision * recall) / (precision + recall)
-    return f1
+    return (2 * precision * recall) / (precision + recall)
 
 
 def precision_score(prediction, ground_truth):
@@ -252,8 +250,7 @@ def precision_score(prediction, ground_truth):
     if num_same == 0:
         return 0
 
-    precision = 1.0 * num_same / len(prediction_tokens)
-    return precision
+    return 1.0 * num_same / len(prediction_tokens)
 
 
 def _passage_match(passages: list[str], answers: list[str]) -> bool:
@@ -312,7 +309,7 @@ def answer_exact_match(example, pred, trace=None, frac=1.0):
     """
     if isinstance(example.answer, str):
         return _answer_match(pred.answer, [example.answer], frac=frac)
-    elif isinstance(example.answer, list):
+    if isinstance(example.answer, list):
         return _answer_match(pred.answer, example.answer, frac=frac)
 
     raise ValueError(f"Invalid answer type: {type(example.answer)}")
@@ -344,7 +341,7 @@ def answer_passage_match(example, pred, trace=None):
     """
     if isinstance(example.answer, str):
         return _passage_match(pred.context, [example.answer])
-    elif isinstance(example.answer, list):
+    if isinstance(example.answer, list):
         return _passage_match(pred.context, example.answer)
 
     raise ValueError(f"Invalid answer type: {type(example.answer)}")

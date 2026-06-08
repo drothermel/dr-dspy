@@ -1,7 +1,8 @@
 import asyncio
 import inspect
+from collections.abc import Coroutine
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, get_origin, get_type_hints
+from typing import TYPE_CHECKING, Any, Callable, Protocol, cast, get_origin, get_type_hints
 
 import json_repair
 import pydantic
@@ -13,17 +14,21 @@ from dspy.utils.lazy_import import require
 
 if TYPE_CHECKING:
     import mcp
-    from langchain.tools import BaseTool
+    from langchain.tools import BaseTool  # ty: ignore[unresolved-import]
 
 _TYPE_MAPPING = {"string": str, "integer": int, "number": float, "boolean": bool, "array": list, "object": dict}
 jsonschema = require("jsonschema", extra="tools", feature="dspy.adapters.types.tool.Tool argument validation")
 
 
-def _with_callbacks(fn: Callable) -> Callable:
+class PydanticJsonSchemaHandler(Protocol):
+    def resolve_ref_schema(self, schema: dict[str, Any]) -> dict[str, Any]: ...
+
+
+def _with_callbacks(fn: Callable[..., object]) -> Callable[..., object]:
     if inspect.iscoroutinefunction(fn):
 
         @wraps(fn)
-        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+        async def async_wrapper(*args: object, **kwargs: object) -> object:
             from dspy.utils.callback import with_callbacks
 
             return await with_callbacks(fn)(*args, **kwargs)
@@ -31,7 +36,7 @@ def _with_callbacks(fn: Callable) -> Callable:
         return async_wrapper
 
     @wraps(fn)
-    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+    def sync_wrapper(*args: object, **kwargs: object) -> object:
         from dspy.utils.callback import with_callbacks
 
         return with_callbacks(fn)(*args, **kwargs)
@@ -39,13 +44,13 @@ def _with_callbacks(fn: Callable) -> Callable:
     return sync_wrapper
 
 
-def _validate_json_schema(instance: Any, schema: dict[str, Any], arg_name: str) -> None:
+def _validate_json_schema(instance: object, schema: dict[str, Any], arg_name: str) -> None:
     validation_error_cls = jsonschema.ValidationError
     validate = jsonschema.validate
     try:
         validate(instance=instance, schema=schema)
     except validation_error_cls as e:
-        raise ValueError(f"Arg {arg_name} is invalid: {e.message}")
+        raise ValueError(f"Arg {arg_name} is invalid: {e.message}") from e
 
 
 class Tool(Type):
@@ -55,7 +60,7 @@ class Tool(Type):
     functions for now.
     """
 
-    func: Callable
+    func: Callable[..., object]
     name: str | None = None
     desc: str | None = None
     args: dict[str, Any] | None = None
@@ -65,13 +70,13 @@ class Tool(Type):
 
     def __init__(
         self,
-        func: Callable,
+        func: Callable[..., object],
         name: str | None = None,
         desc: str | None = None,
         args: dict[str, Any] | None = None,
         arg_types: dict[str, Any] | None = None,
         arg_desc: dict[str, str] | None = None,
-    ):
+    ) -> None:
         """Initialize the Tool class.
 
         Users can choose to specify the `name`, `desc`, `args`, and `arg_types`, or let the `Tool`
@@ -100,10 +105,10 @@ class Tool(Type):
         # Expected output: {'x': {'type': 'integer'}, 'y': {'type': 'string', 'default': 'hello'}}
         ```
         """
-        super().__init__(func=func, name=name, desc=desc, args=args, arg_types=arg_types, arg_desc=arg_desc)
+        super().__init__(func=func, name=name, desc=desc, args=args, arg_types=arg_types, arg_desc=arg_desc)  # ty: ignore[unknown-argument]
         self._parse_function(func, arg_desc)
 
-    def _parse_function(self, func: Callable, arg_desc: dict[str, str] | None = None):
+    def _parse_function(self, func: Callable, arg_desc: dict[str, str] | None = None) -> None:
         """Helper method that parses a function to extract the name, description, and args.
 
         This is a helper function that automatically infers the name, description, and args of the tool from the
@@ -115,23 +120,17 @@ class Tool(Type):
         args = {}
         arg_types = {}
 
-        # Use inspect.signature to get all arg names
         sig = inspect.signature(annotations_func)
-        # Get available type hints
         available_hints = get_type_hints(annotations_func)
-        # Build a dictionary of arg name -> type (defaulting to Any when missing)
-        hints = {param_name: available_hints.get(param_name, Any) for param_name in sig.parameters.keys()}
-        default_values = {param_name: sig.parameters[param_name].default for param_name in sig.parameters.keys()}
+        hints = {param_name: available_hints.get(param_name, Any) for param_name in sig.parameters}
+        default_values = {param_name: sig.parameters[param_name].default for param_name in sig.parameters}
 
-        # Process each argument's type to generate its JSON schema.
         for k, v in hints.items():
             arg_types[k] = v
             if k == "return":
                 continue
-            # Check if the type (or its origin) is a subclass of Pydantic's BaseModel
             origin = get_origin(v) or v
             if isinstance(origin, type) and issubclass(origin, BaseModel):
-                # Get json schema, and replace $ref with the actual schema
                 v_json_schema = _resolve_json_schema_reference(v.model_json_schema())
                 args[k] = v_json_schema
             else:
@@ -147,36 +146,37 @@ class Tool(Type):
         self.arg_types = self.arg_types if self.arg_types is not None else arg_types
         self.has_kwargs = any(param.kind == param.VAR_KEYWORD for param in sig.parameters.values())
 
-    def _validate_and_parse_args(self, **kwargs):
-        # Validate the args value comply to the json schema.
+    def _validate_and_parse_args(self, **kwargs: object) -> dict[str, object]:
+        args_schema = self.args or {}
+        arg_types = self.arg_types or {}
+
         for k, v in kwargs.items():
-            if k not in self.args:
+            if k not in args_schema:
                 if self.has_kwargs:
                     continue
-                else:
-                    raise ValueError(f"Arg {k} is not in the tool's args.")
-            instance = v.model_dump() if hasattr(v, "model_dump") else v
-            type_str = self.args[k].get("type")
+                raise ValueError(f"Arg {k} is not in the tool's args.")
+            instance = v.model_dump() if isinstance(v, BaseModel) else v
+            type_str = args_schema[k].get("type")
             if type_str is not None and type_str != "Any":
-                _validate_json_schema(instance=instance, schema=self.args[k], arg_name=k)
+                _validate_json_schema(instance=instance, schema=args_schema[k], arg_name=k)
 
-        # Parse the args to the correct type.
-        parsed_kwargs = {}
+        parsed_kwargs: dict[str, object] = {}
         for k, v in kwargs.items():
-            if k in self.arg_types and self.arg_types[k] != Any:
+            if k in arg_types and arg_types[k] != Any:
                 # Create a pydantic model wrapper with a dummy field `value` to parse the arg to the correct type.
                 # This is specifically useful for handling nested Pydantic models like `list[list[MyPydanticModel]]`
-                pydantic_wrapper = create_model("Wrapper", value=(self.arg_types[k], ...))
+                pydantic_wrapper = create_model("Wrapper", value=(arg_types[k], ...))
                 parsed = pydantic_wrapper.model_validate({"value": v})
-                parsed_kwargs[k] = parsed.value
+                parsed_kwargs[k] = parsed.value  # ty: ignore[unresolved-attribute]
             else:
                 parsed_kwargs[k] = v
         return parsed_kwargs
 
-    def format(self):
+    def format(self) -> str:
         return str(self)
 
-    def format_as_litellm_function_call(self):
+    def format_as_litellm_function_call(self) -> dict[str, object]:
+        args_schema = self.args or {}
         return {
             "type": "function",
             "function": {
@@ -184,13 +184,13 @@ class Tool(Type):
                 "description": self.desc,
                 "parameters": {
                     "type": "object",
-                    "properties": self.args,
-                    "required": list(self.args.keys()),
+                    "properties": args_schema,
+                    "required": list(args_schema.keys()),
                 },
             },
         }
 
-    def _run_async_in_sync(self, coroutine):
+    def _run_async_in_sync(self, coroutine: Coroutine[object, Any, object]) -> object:
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -202,30 +202,28 @@ class Tool(Type):
         return loop.run_until_complete(coroutine)
 
     @_with_callbacks
-    def __call__(self, **kwargs):
+    def __call__(self, **kwargs: object) -> object:
         parsed_kwargs = self._validate_and_parse_args(**kwargs)
         result = self.func(**parsed_kwargs)
         if asyncio.iscoroutine(result):
             if settings.allow_tool_async_sync_conversion:
                 return self._run_async_in_sync(result)
-            else:
-                raise ValueError(
-                    "You are calling `__call__` on an async tool, please use `acall` instead or enable "
-                    "async-to-sync conversion with `settings.configure(allow_tool_async_sync_conversion=True)` "
-                    "or `with settings.context(allow_tool_async_sync_conversion=True):` from "
-                    "`dspy.dsp.utils.settings`."
-                )
+            raise ValueError(
+                "You are calling `__call__` on an async tool, please use `acall` instead or enable "
+                "async-to-sync conversion with `settings.configure(allow_tool_async_sync_conversion=True)` "
+                "or `with settings.context(allow_tool_async_sync_conversion=True):` from "
+                "`dspy.dsp.utils.settings`."
+            )
         return result
 
     @_with_callbacks
-    async def acall(self, **kwargs):
+    async def acall(self, **kwargs: object) -> object:
         parsed_kwargs = self._validate_and_parse_args(**kwargs)
         result = self.func(**parsed_kwargs)
         if asyncio.iscoroutine(result):
             return await result
-        else:
-            # We should allow calling a sync tool in the async path.
-            return result
+        # We should allow calling a sync tool in the async path.
+        return result
 
     @classmethod
     def from_mcp_tool(cls, session: "mcp.ClientSession", tool: "mcp.types.Tool") -> "Tool":
@@ -279,10 +277,10 @@ class Tool(Type):
 
         return convert_langchain_tool(tool)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Tool(name={self.name}, desc={self.desc}, args={self.args})"
 
-    def __str__(self):
+    def __str__(self) -> str:
         desc = f", whose description is <desc>{self.desc}</desc>.".replace("\n", "  ") if self.desc else "."
         arg_desc = f"It takes arguments {self.args}."
         return f"{self.name}{desc} {arg_desc}"
@@ -295,8 +293,12 @@ class ToolCalls(Type):
         args: dict[str, Any]
 
         @classmethod
-        def __get_pydantic_json_schema__(cls, core_schema: Any, handler: Any) -> dict[str, Any]:
-            schema = super().__get_pydantic_json_schema__(core_schema, handler)
+        def __get_pydantic_json_schema__(  # ty: ignore[invalid-method-override]
+            cls,
+            core_schema: object,
+            handler: PydanticJsonSchemaHandler,
+        ) -> dict[str, Any]:
+            schema = super().__get_pydantic_json_schema__(core_schema, handler)  # ty: ignore[invalid-argument-type]
             schema = handler.resolve_ref_schema(schema)
             properties = schema.get("properties")
             if isinstance(properties, dict):
@@ -306,10 +308,10 @@ class ToolCalls(Type):
                 schema["required"] = [field for field in required if field != "id"]
             return schema
 
-        def format(self):
+        def format(self) -> dict[str, Any]:
             return {"name": self.name, "args": self.args}
 
-        def execute(self, functions: dict[str, Any] | list[Tool] | None = None) -> Any:
+        def execute(self, functions: dict[str, Callable[..., object]] | list[Tool] | None = None) -> object:
             """Execute this individual tool call and return its result.
 
             Args:
@@ -329,11 +331,13 @@ class ToolCalls(Type):
 
             if functions is None:
                 # Automatic lookup in caller's globals and locals
-                frame = inspect.currentframe().f_back
+                current_frame = inspect.currentframe()
+                frame = current_frame.f_back if current_frame is not None else None
                 try:
-                    caller_globals = frame.f_globals
-                    caller_locals = frame.f_locals
-                    func = caller_locals.get(self.name) or caller_globals.get(self.name)
+                    if frame is not None:
+                        caller_globals = frame.f_globals
+                        caller_locals = frame.f_locals
+                        func = caller_locals.get(self.name) or caller_globals.get(self.name)
                 finally:
                     del frame
 
@@ -346,7 +350,9 @@ class ToolCalls(Type):
                         break
 
             if func is None:
-                raise ValueError(f"Tool function '{self.name}' not found. Please pass the tool functions to the `execute` method.")
+                raise ValueError(
+                    f"Tool function '{self.name}' not found. Please pass the tool functions to the `execute` method."
+                )
 
             try:
                 args = self.args or {}
@@ -358,8 +364,12 @@ class ToolCalls(Type):
     tool_call_results: Any | None = None
 
     @classmethod
-    def __get_pydantic_json_schema__(cls, core_schema: Any, handler: Any) -> dict[str, Any]:
-        schema = super().__get_pydantic_json_schema__(core_schema, handler)
+    def __get_pydantic_json_schema__(  # ty: ignore[invalid-method-override]
+        cls,
+        core_schema: object,
+        handler: PydanticJsonSchemaHandler,
+    ) -> dict[str, Any]:
+        schema = super().__get_pydantic_json_schema__(core_schema, handler)  # ty: ignore[invalid-argument-type]
         schema = handler.resolve_ref_schema(schema)
         properties = schema.get("properties")
         if isinstance(properties, dict):
@@ -406,7 +416,7 @@ class ToolCalls(Type):
         }
 
     @pydantic.model_serializer()
-    def serialize_model(self):
+    def serialize_model(self) -> dict[str, Any]:
         data = self.format()
         if self.tool_call_results is not None:
             data["tool_call_results"] = TypeAdapter(type(self.tool_call_results)).dump_python(
@@ -417,22 +427,24 @@ class ToolCalls(Type):
 
     @pydantic.model_validator(mode="before")
     @classmethod
-    def validate_input(cls, data: Any):
+    def validate_input(cls, data: object) -> object:
         if isinstance(data, cls):
             return data
 
-        # Handle case where data is a list of dicts with either DSPy or provider-shaped tool call keys.
-        if isinstance(data, list) and all(isinstance(item, dict) and _is_tool_call_dict(item) for item in data):
-            return {"tool_calls": [cls.ToolCall(**_normalize_tool_call_dict(item)) for item in data]}
-        # Handle case where data is a dict
-        elif isinstance(data, dict):
+        if isinstance(data, list) and all(
+            isinstance(item, dict) and _is_tool_call_dict(cast("dict[str, Any]", item)) for item in data
+        ):
+            return {"tool_calls": [cls.ToolCall(**_normalize_tool_call_dict(cast("dict[str, Any]", item))) for item in data]}
+        if isinstance(data, dict):
+            data = cast("dict[str, Any]", data)
             if "tool_calls" in data:
-                # Handle case where data is a dict with "tool_calls" key
                 tool_calls_data = data["tool_calls"]
                 if isinstance(tool_calls_data, list):
                     normalized = {
                         "tool_calls": [
-                            cls.ToolCall(**_normalize_tool_call_dict(item)) if isinstance(item, dict) else item
+                            cls.ToolCall(**_normalize_tool_call_dict(cast("dict[str, Any]", item)))
+                            if isinstance(item, dict)
+                            else item
                             for item in tool_calls_data
                         ]
                     }
@@ -440,7 +452,6 @@ class ToolCalls(Type):
                         normalized["tool_call_results"] = data["tool_call_results"]
                     return normalized
             elif _is_tool_call_dict(data):
-                # Handle case where data is a dict with "name" and "args" keys
                 return {"tool_calls": [cls.ToolCall(**_normalize_tool_call_dict(data))]}
 
         raise ValueError(f"Received invalid value for `dspy.adapters.types.tool.ToolCalls`: {data}")
@@ -482,7 +493,7 @@ class ToolCallResults(pydantic.BaseModel):
 
     @pydantic.model_validator(mode="before")
     @classmethod
-    def validate_input(cls, data: Any):
+    def validate_input(cls, data: object) -> object:
         if isinstance(data, cls):
             return data
 
@@ -504,12 +515,16 @@ def _is_tool_call_dict(data: dict[str, Any]) -> bool:
 
 def _normalize_tool_call_dict(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
-        raise ValueError(f"Received invalid tool call value for `dspy.adapters.types.tool.ToolCalls`: {data}")
+        raise ValueError(
+            f"Received invalid tool call value for `dspy.adapters.types.tool.ToolCalls`: {data}"
+        )
 
     if "function" in data:
         function = data.get("function") or {}
         if not isinstance(function, dict):
-            raise ValueError(f"Received invalid function value for `dspy.adapters.types.tool.ToolCalls`: {function}")
+            raise ValueError(
+                f"Received invalid function value for `dspy.adapters.types.tool.ToolCalls`: {function}"
+            )
 
         arguments = function.get("arguments", {})
         name = function.get("name") or data.get("name")
@@ -529,28 +544,26 @@ def _normalize_tool_call_dict(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _resolve_json_schema_reference(schema: dict) -> dict:
+def _resolve_json_schema_reference(schema: dict[str, Any]) -> dict[str, Any]:
     """Recursively resolve json model schema, expanding all references."""
 
-    # If there are no definitions to resolve, return the main schema
     if "$defs" not in schema and "definitions" not in schema:
         return schema
 
-    def resolve_refs(obj: Any) -> Any:
+    def resolve_refs(obj: object) -> object:
         if not isinstance(obj, dict | list):
             return obj
         if isinstance(obj, dict):
+            obj = cast("dict[str, Any]", obj)
             if "$ref" in obj:
-                ref_path = obj["$ref"].split("/")[-1]
+                ref_value = obj["$ref"]
+                ref_path = ref_value.split("/")[-1] if isinstance(ref_value, str) else str(ref_value).split("/")[-1]
                 return resolve_refs(schema["$defs"][ref_path])
             return {k: resolve_refs(v) for k, v in obj.items()}
 
-        # Must be a list
         return [resolve_refs(item) for item in obj]
 
-    # Resolve all references in the main schema
-    resolved_schema = resolve_refs(schema)
-    # Remove the $defs key as it's no longer needed
+    resolved_schema = cast("dict[str, Any]", resolve_refs(schema))
     resolved_schema.pop("$defs", None)
     return resolved_schema
 
@@ -567,7 +580,7 @@ def convert_input_schema_to_tool_args(
         A tuple of (args, arg_types, arg_desc) for DSPy Tool definition.
     """
     args, arg_types, arg_desc = {}, {}, {}
-    properties = schema.get("properties", None)
+    properties = schema.get("properties")
     if properties is None:
         return args, arg_types, arg_desc
 
@@ -576,10 +589,12 @@ def convert_input_schema_to_tool_args(
     defs = schema.get("$defs", {})
 
     for name, prop in properties.items():
+        prop = cast("dict[str, Any]", prop)
         if len(defs) > 0:
             prop = _resolve_json_schema_reference({"$defs": defs, **prop})
         args[name] = prop
-        arg_types[name] = _TYPE_MAPPING.get(prop.get("type"), Any)
+        prop_type = prop.get("type")
+        arg_types[name] = _TYPE_MAPPING.get(prop_type, Any) if isinstance(prop_type, str) else Any
         arg_desc[name] = prop.get("description", "No description provided.")
         if name in required:
             arg_desc[name] += " (Required)"

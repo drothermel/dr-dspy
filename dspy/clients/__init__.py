@@ -7,7 +7,7 @@ from dspy.clients.cache import Cache
 
 logger = logging.getLogger(__name__)
 
-DISK_CACHE_DIR = os.environ.get("DSPY_CACHEDIR") or os.path.join(Path.home(), ".dspy_cache")
+DISK_CACHE_DIR = os.environ.get("DSPY_CACHEDIR") or str(Path.home() / ".dspy_cache")
 DISK_CACHE_LIMIT = int(os.environ.get("DSPY_CACHE_LIMIT", 3e10))  # 30 GB default
 
 
@@ -19,7 +19,7 @@ def configure_cache(
     memory_max_entries: int = 1000000,
     restrict_pickle: bool = False,
     safe_types: list[type[Any]] | None = None,
-):
+) -> None:
     """Configure the cache for DSPy.
 
     Args:
@@ -37,8 +37,8 @@ def configure_cache(
     global DSPY_CACHE
 
     DSPY_CACHE = Cache(
-        enable_disk_cache,
-        enable_memory_cache,
+        bool(enable_disk_cache),
+        bool(enable_memory_cache),
         disk_cache_dir,
         disk_size_limit_bytes,
         memory_max_entries,
@@ -46,10 +46,8 @@ def configure_cache(
         safe_types=safe_types,
     )
 
-
-
-def _get_dspy_cache():
-    disk_cache_dir = os.environ.get("DSPY_CACHEDIR") or os.path.join(Path.home(), ".dspy_cache")
+def _get_dspy_cache() -> Cache:
+    disk_cache_dir = os.environ.get("DSPY_CACHEDIR") or str(Path.home() / ".dspy_cache")
     disk_cache_limit = int(os.environ.get("DSPY_CACHE_LIMIT", 3e10))
 
     try:
@@ -76,7 +74,7 @@ def _get_dspy_cache():
 DSPY_CACHE = _get_dspy_cache()
 
 
-def configure_litellm_logging(level: str = "ERROR"):
+def configure_litellm_logging(level: str = "ERROR") -> None:
     """Configure LiteLLM logging to the specified level."""
     # Litellm uses a global logger called `verbose_logger` to control all loggings.
     from dspy.clients._litellm import get_litellm
@@ -91,7 +89,7 @@ def configure_litellm_logging(level: str = "ERROR"):
         h.setLevel(numeric_logging_level)
 
 
-def enable_litellm_logging():
+def enable_litellm_logging() -> None:
     from dspy.clients._litellm import get_litellm
 
     litellm = get_litellm(feature="LiteLLM logging")
@@ -100,7 +98,7 @@ def enable_litellm_logging():
     configure_litellm_logging("DEBUG")
 
 
-def disable_litellm_logging():
+def disable_litellm_logging() -> None:
     from dspy.clients._litellm import get_litellm
 
     litellm = get_litellm(feature="LiteLLM logging")

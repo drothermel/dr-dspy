@@ -4,14 +4,14 @@ from dspy.utils import magicattr
 
 
 class Test:
-    l = [1, 2]
-    a = [0, [1, 2, [3, 4]]]
-    b = {"x": {"y": "y"}, "z": [1, 2]}
+    l = [1, 2]  # noqa: E741, RUF012
+    a = [0, [1, 2, [3, 4]]]  # noqa: RUF012
+    b = {"x": {"y": "y"}, "z": [1, 2]}  # noqa: RUF012
     z = "z"
 
 
 class Person:
-    settings = {
+    settings = {  # noqa: RUF012
         "autosave": True,
         "style": {"height": 30, "width": 200},
         "themes": ["light", "dark"],
@@ -24,7 +24,7 @@ class Person:
 
 
 @pytest.mark.parametrize(
-    "key, value",
+    ("key", "value"),
     [
         ("l", Test.l),
         ("t.t.t.t.z", "z"),
@@ -93,10 +93,10 @@ def test_person_example():
     with pytest.raises(NotImplementedError):
         magicattr.get(bob, "friends[0+1]")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         magicattr.get(bob, "friends.pop(0)")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         magicattr.get(bob, "friends = []")
 
     with pytest.raises(SyntaxError):
@@ -111,10 +111,10 @@ def test_person_example():
 
 def test_empty():
     obj = Test()
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         magicattr.get(obj, "   ")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         magicattr.get(obj, "")
 
     with pytest.raises(TypeError):

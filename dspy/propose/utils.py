@@ -41,11 +41,9 @@ def create_instruction_set_history_string(base_program, trial_logs, top_n):
             seen_programs.add(instruction_set)
             unique_program_history.append(entry)
 
-    # Get the top n programs from program history
     top_n_program_history = sorted(unique_program_history, key=lambda x: x["score"], reverse=True)[:top_n]
     top_n_program_history.reverse()
 
-    # Create formatted string
     instruction_set_history_string = ""
     for entry in top_n_program_history:
         program = entry["program"]
@@ -56,18 +54,15 @@ def create_instruction_set_history_string(base_program, trial_logs, top_n):
     return instruction_set_history_string
 
 def parse_list_of_instructions(instruction_string):
-    # Try to convert the string representation of a list to an actual list using JSON
+    # Instruction proposals may arrive as JSON list strings or quoted text; accept both shapes.
     try:
-        instructions = json.loads(instruction_string)
-        return instructions
+        return json.loads(instruction_string)
     except json.JSONDecodeError:
         pass
 
-    # If JSON decoding fails, extract strings within quotes
-    instructions = re.findall(r'"([^"]*)"', instruction_string)
-    return instructions
+    return re.findall(r'"([^"]*)"', instruction_string)
 
-def get_program_instruction_set_string(program):
+def get_program_instruction_set_string(program) -> str:
     instruction_list = []
     for _, pred in enumerate(program.predictors()):
         pred_instructions = get_signature(pred).instructions
@@ -79,7 +74,6 @@ def create_predictor_level_history_string(base_program, predictor_i, trial_logs,
     instruction_aggregate = {}
     instruction_history = []
 
-    # Load trial programs
     for trial_num in trial_logs:
         trial = trial_logs[trial_num]
         if "program_path" in trial:
@@ -90,7 +84,6 @@ def create_predictor_level_history_string(base_program, predictor_i, trial_logs,
                 "score": trial["score"],
             })
 
-    # Aggregate scores for each instruction
     for history_item in instruction_history:
         predictor = history_item["program"].predictors()[predictor_i]
         instruction = get_signature(predictor).instructions
@@ -102,13 +95,11 @@ def create_predictor_level_history_string(base_program, predictor_i, trial_logs,
         else:
             instruction_aggregate[instruction] = {"total_score": score, "count": 1}
 
-    # Calculate average score for each instruction and prepare for sorting
     predictor_history = []
     for instruction, data in instruction_aggregate.items():
         average_score = data["total_score"] / data["count"]
         predictor_history.append((instruction, average_score))
 
-    # Deduplicate and sort by average score, then select top N
     seen_instructions = set()
     unique_predictor_history = []
     for instruction, score in predictor_history:
@@ -119,7 +110,6 @@ def create_predictor_level_history_string(base_program, predictor_i, trial_logs,
     top_instructions = sorted(unique_predictor_history, key=lambda x: x[1], reverse=True)[:top_n]
     top_instructions.reverse()
 
-    # Create formatted history string
     predictor_history_string = ""
     for instruction, score in top_instructions:
         predictor_history_string += instruction + f" | Score: {score}\n\n"
@@ -128,28 +118,23 @@ def create_predictor_level_history_string(base_program, predictor_i, trial_logs,
 
 def create_example_string(fields, example):
 
-    # Building the output string
     output = []
     for field_name, field_values in fields.items():
         name = field_values.json_schema_extra["prefix"]
 
-        # Determine the value from input_data or prediction_data
         value = example.get(field_name)
 
-        # Construct the string for the current field
         field_str = f"{name} {value}"
         output.append(field_str)
 
-    # Joining all the field strings
     return "\n".join(output)
 
 def get_dspy_source_code(module):
     header = []
     base_code = ""
 
-    # Don't get source code for Predict or ChainOfThought modules (NOTE we will need to extend this list as more DSPy.modules are added)
-    # TODO: if type(module).__name__ not in ["Predict", "ChainOfThought", "ReAct"]:
-    if not type(module).__name__ == "Predict" and not type(module).__name__ == "ChainOfThought":
+    # Skip source for built-in Predict and ChainOfThought modules; add other built-ins explicitly when they should be omitted.
+    if type(module).__name__ != "Predict" and type(module).__name__ != "ChainOfThought":
         try:
             base_code = inspect.getsource(type(module))
         except TypeError:
@@ -159,7 +144,7 @@ def get_dspy_source_code(module):
             base_code = str(class_code)
 
     completed_set = set()
-    for attribute in module.__dict__.keys():
+    for attribute in module.__dict__:
         try:
             iterable = iter(getattr(module, attribute))
         except TypeError:
@@ -175,7 +160,6 @@ def get_dspy_source_code(module):
                 if hasattr(item, "signature") and item.signature is not None and item.signature.__pydantic_parent_namespace__["signature_name"] + "_sig" not in completed_set:
                     try:
                         header.append(inspect.getsource(item.signature))
-                        print(inspect.getsource(item.signature))
                     except (TypeError, OSError):
                         header.append(str(item.signature))
                     completed_set.add(item.signature.__pydantic_parent_namespace__["signature_name"] + "_sig")

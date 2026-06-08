@@ -26,7 +26,7 @@ class XMLAdapter(ChatAdapter):
         parts = []
         parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
 
-        def format_signature_fields_for_instructions(fields: dict[str, FieldInfo]):
+        def format_signature_fields_for_instructions(fields: dict[str, FieldInfo]) -> str:
             return self.format_field_with_value(
                 fields_with_values={
                     FieldInfoWithName(name=field_name, info=field_info): translate_field_type(field_name, field_info)
@@ -48,12 +48,15 @@ class XMLAdapter(ChatAdapter):
     ) -> str:
         messages = [prefix]
 
-        messages.append(self.format_field_with_value(
-            {
-                FieldInfoWithName(name=k, info=v): inputs.get(k)
-                for k, v in signature.input_fields.items() if k in inputs
-            },
-        ))
+        messages.append(
+            self.format_field_with_value(
+                {
+                    FieldInfoWithName(name=k, info=v): inputs.get(k)
+                    for k, v in signature.input_fields.items()
+                    if k in inputs
+                },
+            )
+        )
 
         if main_request:
             output_requirements = self.user_message_output_requirements(signature)
@@ -67,7 +70,7 @@ class XMLAdapter(ChatAdapter):
         self,
         signature: type[Signature],
         outputs: dict[str, Any],
-        missing_field_message=None,
+        missing_field_message: str | None = None,
     ) -> str:
         return self.format_field_with_value(
             {
@@ -83,27 +86,34 @@ class XMLAdapter(ChatAdapter):
         return message
 
     def parse(self, signature: type[Signature], completion: str) -> dict[str, Any]:
-        fields = {}
+        raw_fields: dict[str, str] = {}
         for match in self.field_pattern.finditer(completion):
             name = match.group("name")
             content = match.group("content").strip()
-            if name in signature.output_fields and name not in fields:
-                fields[name] = content
-        # Cast values using base class parse_value helper
-        for k, v in fields.items():
-            fields[k] = self._parse_field_value(signature.output_fields[k], v, completion, signature)
+            if name in signature.output_fields and name not in raw_fields:
+                raw_fields[name] = content
+        fields = {
+            k: self._parse_field_value(signature.output_fields[k], v, completion, signature)
+            for k, v in raw_fields.items()
+        }
         if fields.keys() != signature.output_fields.keys():
             from dspy.utils.exceptions import AdapterParseError
 
             raise AdapterParseError(
                 adapter_name="XMLAdapter",
-                signature=signature,
+                signature=signature,  # ty: ignore[invalid-argument-type]
                 lm_response=completion,
-                parsed_result=fields,
+                parsed_result=fields,  # ty: ignore[invalid-argument-type]
             )
         return fields
 
-    def _parse_field_value(self, field_info, raw, completion, signature):
+    def _parse_field_value(
+        self,
+        field_info: FieldInfo,
+        raw: str,
+        completion: str,
+        signature: type[Signature],
+    ) -> object:
         from dspy.adapters.utils import parse_value
 
         try:
@@ -113,7 +123,7 @@ class XMLAdapter(ChatAdapter):
 
             raise AdapterParseError(
                 adapter_name="XMLAdapter",
-                signature=signature,
+                signature=signature,  # ty: ignore[invalid-argument-type]
                 lm_response=completion,
                 message=f"Failed to parse field {field_info} with value {raw}: {e}",
             )

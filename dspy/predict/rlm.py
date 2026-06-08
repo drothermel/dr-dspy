@@ -15,13 +15,12 @@ import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any
 
 import pydantic
 
 from dspy.adapters.types.tool import Tool
 from dspy.adapters.utils import parse_value, translate_field_type
-from dspy.clients.lm import LM
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.code_interpreter import SIMPLE_TYPES, CodeInterpreter, CodeInterpreterError, FinalOutput
@@ -31,12 +30,14 @@ from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
 from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
 from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import ensure_signature
+from dspy.signatures.signature import Signature, ensure_signature
 from dspy.utils.annotation import experimental
 
 if TYPE_CHECKING:
 
-    from dspy.signatures.signature import Signature
+    from collections.abc import Callable, Iterator
+
+    from dspy.clients.lm import LM
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,7 @@ class RLM(Module):
         tools: list[Callable] | None = None,
         sub_lm: LM | None = None,
         interpreter: CodeInterpreter | None = None,
-    ):
+    ) -> None:
         """
         Args:
             signature: Defines inputs and outputs. String like "context, query -> answer"
@@ -200,7 +201,7 @@ class RLM(Module):
 
     def _validate_tools(self, tools: dict[str, Tool]) -> None:
         """Validate user-provided tools have valid names."""
-        for name, tool in tools.items():
+        for name in tools:
             if not name.isidentifier():
                 raise ValueError(f"Invalid tool name '{name}': must be a valid Python identifier")
             if name in self._RESERVED_TOOL_NAMES:
@@ -570,10 +571,7 @@ class RLM(Module):
             )
 
         # Format non-final result as output
-        if isinstance(result, list):
-            output = "\n".join(map(str, result))
-        else:
-            output = str(result) if result else ""
+        output = "\n".join(map(str, result)) if isinstance(result, list) else str(result) if result else ""
 
         output = self._format_output(output)
         if self.verbose:

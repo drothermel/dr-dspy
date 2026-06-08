@@ -71,7 +71,7 @@ def test_bootstrap_trace_data():
     ]
 
     # Create a side effect that will trigger AdapterParseError on the 3rd call (index 2)
-    def completion_side_effect(*args, **kwargs):
+    def completion_side_effect(*args: object, **kwargs: object):
         call_count = completion_side_effect.call_count
         completion_side_effect.call_count += 1
 
@@ -137,16 +137,16 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch):
     from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
 
     class DummyProgram(Module):
-        def forward(self, **kwargs):  # pragma: no cover - stub forward
+        def forward(self, **kwargs: object):  # pragma: no cover - stub forward
             return Prediction()
 
     captured_metadata: dict[str, Any] = {}
 
     class DummyEvaluate:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args: object, **kwargs: object):
             pass
 
-        def __call__(self, *args, callback_metadata=None, **kwargs):
+        def __call__(self, *args: object, callback_metadata=None, **kwargs: object):
             captured_metadata["value"] = callback_metadata
 
             class _Result:

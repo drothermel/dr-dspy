@@ -43,7 +43,6 @@ def test_experimental_decorator_on_class_with_version():
     @experimental(version="2.5.0")
     class TestClass:
         """A test class with version."""
-        pass
 
     assert "introduced in v2.5.0" in TestClass.__doc__
     assert "Experimental: This class may change or be removed in a future release without warning (introduced in v2.5.0)." in TestClass.__doc__

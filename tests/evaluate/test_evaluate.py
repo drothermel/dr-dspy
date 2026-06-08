@@ -69,7 +69,7 @@ def test_evaluate_single_thread_runs_in_main_thread():
 
     original_metric = answer_exact_match
 
-    def tracking_metric(example, prediction, **kwargs):
+    def tracking_metric(example, prediction, **kwargs: object):
         execution_threads.append(threading.current_thread())
         return original_metric(example, prediction, **kwargs)
 
@@ -134,7 +134,7 @@ def test_multithread_evaluate_call():
 def test_multi_thread_evaluate_call_cancelled(monkeypatch):
     # slow LM that sleeps for 1 second before returning the answer
     class SlowLM(DummyLM):
-        def __call__(self, *args, **kwargs):
+        def __call__(self, *args: object, **kwargs: object):
             import time
 
             time.sleep(1)
@@ -158,7 +158,7 @@ def test_multi_thread_evaluate_call_cancelled(monkeypatch):
     input_thread = threading.Thread(target=sleep_then_interrupt)
     input_thread.start()
 
-    with pytest.raises(KeyboardInterrupt):
+    with pytest.raises(KeyboardInterrupt):  # noqa: PT012
         ev = Evaluate(
             devset=devset,
             metric=answer_exact_match,
@@ -221,7 +221,7 @@ def test_evaluate_display_table(program_with_example, display_table, is_in_ipyth
 
     ev = Evaluate(
         devset=[example],
-        metric=lambda example, pred, **kwargs: example == pred,
+        metric=lambda example, pred, **kwargs: example == pred,  # noqa: ARG005
         display_table=display_table,
     )
     assert ev.display_table == display_table

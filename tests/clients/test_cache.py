@@ -239,7 +239,7 @@ def test_save_and_load_memory_cache(cache, tmp_path):
     )
 
     # Load the memory cache without allowing pickle (default)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         new_cache.load_memory_cache(str(temp_cache_file))
 
     # Load the memory cache with allow_pickle=True
@@ -258,23 +258,19 @@ def test_request_cache_decorator(cache):
 
     # Mock the package-owned cache singleton.
     with patch("dspy.clients.DSPY_CACHE", cache):
-        # Define a test function
         @request_cache()
         def test_function(prompt, model):
             return f"Response for {prompt} with {model}"
 
-        # First call should compute the result
         result1 = test_function(prompt="Hello", model="openai/gpt-4o-mini")
         assert result1 == "Response for Hello with openai/gpt-4o-mini"
 
-        # Second call with same arguments should use cache
         with patch.object(cache, "get") as mock_get:
             mock_get.return_value = "Cached response"
             result2 = test_function(prompt="Hello", model="openai/gpt-4o-mini")
             assert result2 == "Cached response"
             mock_get.assert_called_once()
 
-        # Call with different arguments should compute again
         result3 = test_function(prompt="Different", model="openai/gpt-4o-mini")
         assert result3 == "Response for Different with openai/gpt-4o-mini"
 
@@ -285,7 +281,6 @@ def test_request_cache_decorator_with_ignored_args_for_cache_key(cache):
 
     # Mock the package-owned cache singleton.
     with patch("dspy.clients.DSPY_CACHE", cache):
-        # Define a test function
         @request_cache(ignored_args_for_cache_key=["model"])
         def test_function1(prompt, model):
             return f"Response for {prompt} with {model}"
@@ -294,17 +289,14 @@ def test_request_cache_decorator_with_ignored_args_for_cache_key(cache):
         def test_function2(prompt, model):
             return f"Response for {prompt} with {model}"
 
-        # First call should compute the result
         result1 = test_function1(prompt="Hello", model="openai/gpt-4o-mini")
         result2 = test_function1(prompt="Hello", model="openai/gpt-4o")
 
-        # Because model arg is ignored, the second call should return the same result as the first
         assert result1 == result2
 
         result3 = test_function2(prompt="Hello", model="openai/gpt-4o-mini")
         result4 = test_function2(prompt="Hello", model="openai/gpt-4o")
 
-        # Because model arg is not ignored, the second call should return a different result
         assert result3 != result4
 
 
@@ -315,23 +307,19 @@ async def test_request_cache_decorator_async(cache):
 
     # Mock the package-owned cache singleton.
     with patch("dspy.clients.DSPY_CACHE", cache):
-        # Define a test function
         @request_cache()
         async def test_function(prompt, model):
             return f"Response for {prompt} with {model}"
 
-        # First call should compute the result
         result1 = await test_function(prompt="Hello", model="openai/gpt-4o-mini")
         assert result1 == "Response for Hello with openai/gpt-4o-mini"
 
-        # Second call with same arguments should use cache
         with patch.object(cache, "get") as mock_get:
             mock_get.return_value = "Cached response"
             result2 = await test_function(prompt="Hello", model="openai/gpt-4o-mini")
             assert result2 == "Cached response"
             mock_get.assert_called_once()
 
-        # Call with different arguments should compute again
         result3 = await test_function(prompt="Different", model="openai/gpt-4o-mini")
         assert result3 == "Response for Different with openai/gpt-4o-mini"
 
@@ -342,16 +330,13 @@ def test_cache_consistency_with_lm_call_modifies_the_request(cache):
 
     # Mock the package-owned cache singleton.
     with patch("dspy.clients.DSPY_CACHE", cache):
-        # Define a test function
         @request_cache()
-        def test_function(**kwargs):
+        def test_function(**kwargs: object):
             del kwargs["field_to_delete"]
             return kwargs
 
-        # First call should compute the result
         test_function(field_to_delete="delete", field_to_keep="keep")
 
-        # The cache key should use the original request, not the modified one
         assert (
             cache.get(
                 {

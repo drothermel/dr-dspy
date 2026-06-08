@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import random
 import uuid
-from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING
 
 from dspy.dsp.utils.utils import dotdict
 from dspy.primitives.example import Example
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 class Dataset:
@@ -77,11 +79,10 @@ class Dataset:
         return self._test_
 
     def _shuffle_and_sample(
-        self, split: str, data: Iterable[dict[str, Any]], size: int | None, seed: int = 0
+        self, split: str, data: Iterable[dict[str, object]], size: int | None, seed: int = 0
     ) -> list[Example]:
         data_list = list(data)
 
-        # Shuffle the data irrespective of the requested size.
         base_rng = random.Random(seed)
 
         if self.do_shuffle:
@@ -110,8 +111,8 @@ class Dataset:
         dev_size: int = 1000,
         divide_eval_per_seed: bool = True,
         eval_seed: int = 2023,
-        **kwargs: Any,
-    ) -> Any:
+        **kwargs: object,
+    ) -> dotdict:
         train_seeds = train_seeds or [1, 2, 3, 4, 5]
         data_args = dotdict(train_size=train_size, eval_seed=eval_seed, dev_size=dev_size, test_size=0, **kwargs)
         dataset = cls(**data_args)
@@ -130,8 +131,10 @@ class Dataset:
             eval_sets.append(eval_set[eval_offset : eval_offset + examples_per_seed])
             train_sets.append(dataset.train)
 
-            assert len(eval_sets[-1]) == examples_per_seed, len(eval_sets[-1])
-            assert len(train_sets[-1]) == train_size, len(train_sets[-1])
+            if len(eval_sets[-1]) != examples_per_seed:
+                raise ValueError(len(eval_sets[-1]))
+            if len(train_sets[-1]) != train_size:
+                raise ValueError(len(train_sets[-1]))
 
             if divide_eval_per_seed:
                 eval_offset += examples_per_seed

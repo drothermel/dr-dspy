@@ -136,9 +136,9 @@ class SignatureMeta(type(BaseModel)):
         return found_types or None
 
     def __new__(mcs, signature_name, bases, namespace, **kwargs):
-        # At this point, the orders have been swapped already.
+        # Capture FieldInfo declaration order before rebuilding annotations so Pydantic preserves DSPy field order.
         field_order = [name for name, value in namespace.items() if isinstance(value, FieldInfo)]
-        # Set `str` as the default type for all fields
+        # Load raw annotations; unannotated DSPy fields default to str below.
         if sys.version_info >= (3, 14):
             try:
                 import annotationlib
@@ -159,7 +159,6 @@ class SignatureMeta(type(BaseModel)):
                 raw_annotations = namespace.get("__annotations__", {})
         else:
             # Python 3.13 and earlier
-            # Set `str` as the default type for all fields
             raw_annotations = namespace.get("__annotations__", {})
         for name, field in namespace.items():
             if not isinstance(field, FieldInfo):
@@ -167,9 +166,7 @@ class SignatureMeta(type(BaseModel)):
             if not name.startswith("__") and name not in raw_annotations:
                 raw_annotations[name] = str
                 field.json_schema_extra[IS_TYPE_UNDEFINED] = True  # Mark that the type was originally undefined in the signature
-        # Create ordered annotations dictionary that preserves field order
         ordered_annotations = {name: raw_annotations[name] for name in field_order if name in raw_annotations}
-        # Add any remaining annotations that weren't in field_order
         ordered_annotations.update({k: v for k, v in raw_annotations.items() if k not in ordered_annotations})
         namespace["__annotations__"] = ordered_annotations
 
@@ -181,7 +178,6 @@ class SignatureMeta(type(BaseModel)):
         if sys.version_info >= (3, 14):
             kwargs["__pydantic_reset_parent_namespace__"] = False
 
-        # Let Pydantic do its thing
         cls = super().__new__(mcs, signature_name, bases, namespace, **kwargs)
 
         # If we don't have instructions, it might be because we are a derived generic type.
@@ -193,15 +189,12 @@ class SignatureMeta(type(BaseModel)):
                     if doc != "":
                         cls.__doc__ = doc
 
-        # The more likely case is that the user has just not given us a type.
-        # In that case, we should default to the input/output format.
+        # If no instructions were provided, derive default instructions from the input/output fields.
         if cls.__doc__ is None:
             cls.__doc__ = _default_instructions(cls)
 
-        # Ensure all fields are declared with InputField or OutputField
         cls._validate_fields()
 
-        # Ensure all fields have a prefix
         for name, field in cls.model_fields.items():
             if "prefix" not in field.json_schema_extra:
                 field.json_schema_extra["prefix"] = infer_prefix(name) + ":"
@@ -210,7 +203,7 @@ class SignatureMeta(type(BaseModel)):
 
         return cls
 
-    def _validate_fields(cls):
+    def _validate_fields(cls) -> None:
         for name, field in cls.model_fields.items():
             extra = field.json_schema_extra or {}
             field_type = extra.get("__dspy_field_type")
@@ -251,7 +244,7 @@ class SignatureMeta(type(BaseModel)):
     def _get_fields_with_type(cls, field_type) -> dict[str, FieldInfo]:
         return {k: v for k, v in cls.model_fields.items() if v.json_schema_extra["__dspy_field_type"] == field_type}
 
-    def __repr__(cls):
+    def __repr__(cls) -> str:
         """Output a representation of the signature.
 
         Uses the form:
@@ -654,7 +647,7 @@ def _parse_field_string(field_string: str, names=None) -> Iterator[tuple[str, ty
     args = ast.parse(f"def f({field_string}): pass").body[0].args.args
     field_names: list[str] = [arg.arg for arg in args]
     types_list: list[type] = [str if arg.annotation is None else _parse_type_node(arg.annotation, names) for arg in args]
-    is_type_undefined: list[bool] = [True if arg.annotation is None else False for arg in args]
+    is_type_undefined: list[bool] = [arg.annotation is None for arg in args]
     return zip(field_names, types_list, is_type_undefined, strict=False)
 
 
@@ -821,39 +814,27 @@ def infer_prefix(attribute_name: str) -> str:
         "text2number" -> "Text 2 Number"
         "HTMLParser" -> "HTML Parser"
     """
-    # Step 1: Convert camelCase to snake_case
-    # Example: "camelCase" -> "camel_Case"
     s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", attribute_name)
 
-    # Handle consecutive capitals
-    # Example: "camel_Case" -> "camel_case"
     intermediate_name = re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1)
 
-    # Step 2: Handle numbers by adding underscores around them
-    # Example: "text2number" -> "text_2_number"
     with_underscores_around_numbers = re.sub(
         r"([a-zA-Z])(\d)",  # Match letter followed by number
         r"\1_\2",  # Add underscore between them
         intermediate_name,
     )
-    # Example: "2text" -> "2_text"
     with_underscores_around_numbers = re.sub(
         r"(\d)([a-zA-Z])",  # Match number followed by letter
         r"\1_\2",  # Add underscore between them
         with_underscores_around_numbers,
     )
 
-    # Step 3: Convert to Title Case while preserving acronyms
     words = with_underscores_around_numbers.split("_")
     title_cased_words = []
     for word in words:
         if word.isupper():
-            # Preserve acronyms like 'HTML', 'API' as-is
             title_cased_words.append(word)
         else:
-            # Capitalize first letter: 'text' -> 'Text'
             title_cased_words.append(word.capitalize())
 
-    # Join words with spaces
-    # Example: ["Text", "2", "Number"] -> "Text 2 Number"
     return " ".join(title_cased_words)

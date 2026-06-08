@@ -42,10 +42,7 @@ class SignatureOptimizer(COPRO):
         init_temperature=1.4,
         verbose=False,
         track_stats=False,
-    ):
-        print(
-            "\u001b[31m[WARNING] SignatureOptimizer has been deprecated and replaced with COPRO.  SignatureOptimizer will be removed in a future release. \u001b[31m",
-        )
+    ) -> None:
         super().__init__(prompt_model, metric, breadth, depth, init_temperature, verbose, track_stats)
 
     def compile(self, student, *, devset, eval_kwargs):

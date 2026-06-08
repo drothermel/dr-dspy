@@ -30,7 +30,7 @@ def test_create_directory_in_databricks_unity_catalog():
     with pytest.raises(
         ValueError,
         match=(
-            "Databricks Unity Catalog path must be in the format '/Volumes/<catalog>/<schema>/<volume>/...', "
+            "Databricks Unity Catalog path must be in the format '/Volumes/<catalog>/<schema>/<volume>/...', "  # noqa: RUF043
             "but received: /badstring/whatever"
         ),
     ):

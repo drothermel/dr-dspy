@@ -16,8 +16,8 @@ from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
 from dspy.teleprompt.utils import get_prompt_model, get_signature
 
-# Hardcoded variables (TODO: update)
-MAX_INSTRUCT_IN_HISTORY = 5  # 10
+# Maximum prior instructions included in proposer history.
+MAX_INSTRUCT_IN_HISTORY = 5
 
 TIPS = {
         "none": "",
@@ -28,7 +28,6 @@ TIPS = {
         "persona": 'Include a persona that is relevant to the task in the instruction (ie. "You are a ...")',
     }
 
-### SIGNATURES USED TO HELP WITH INSTRUCTION GENERATION ###
 
 class DescribeProgram(Signature):
     (
@@ -114,7 +113,6 @@ def generate_instruction_class(
 
     return Predict(GenerateSingleModuleInstruction)
 
-### CLASS RESPONSIBLE FOR GENERATING A NEW INSTRUCTION, USING THE HELPER SIGNATURES ABOVE ###
 
 class GenerateModuleInstruction(Module):
     def __init__(
@@ -126,7 +124,7 @@ class GenerateModuleInstruction(Module):
         use_instruct_history=True,
         use_tip=True,
         verbose=False,
-    ):
+    ) -> None:
         super().__init__()
         self.use_dataset_summary = use_dataset_summary
         self.program_aware = program_aware
@@ -162,34 +160,30 @@ class GenerateModuleInstruction(Module):
             count = 0
             for candidate_set in candidate_sets:
                 for example in candidate_set:
-                    if "augmented" in example.keys():
+                    if "augmented" in example:
                         fields_to_use = get_signature(program.predictors()[pred_i]).fields
                         yield create_example_string(fields_to_use, example)
                         count += 1
                         if count >= max_examples:
                             return
 
-        # Construct full program demo or single module demo depending on settings
         basic_instruction = get_signature(program.predictors()[pred_i]).instructions
         task_demos = ""
 
         if self.use_task_demos:
-            # Combine current and adjacent sets
             adjacent_sets = (
                 [demo_candidates[pred_i][demo_set_i]] +
                 demo_candidates[pred_i][demo_set_i + 1:] +
                 demo_candidates[pred_i][:demo_set_i]
             )
 
-            # Gather examples up to the required count
             example_strings = gather_examples_from_sets(adjacent_sets, num_demos_in_context)
             task_demos = "\n\n".join(example_strings) + "\n\n"
 
-        # Default to no demos provided if no examples were gathered, or if we're using the first demo set
+        # demo_set_i == 0 is the no-demo baseline candidate.
         if not task_demos.strip() or demo_set_i == 0:
             task_demos = "No task demos provided."
 
-        # Summarize the program
         program_description = "Not available"
         module_code = "Not provided"
         module_description = "Not provided"
@@ -201,15 +195,13 @@ class GenerateModuleInstruction(Module):
                     ).program_description,
                 )
                 if self.verbose:
-                    print(f"PROGRAM DESCRIPTION: {program_description}")
+                    pass
 
                 inputs = []
                 outputs = []
                 for field_name, field in get_signature(program.predictors()[pred_i]).fields.items():
-                    # Access the '__dspy_field_type' from the extra metadata
                     dspy_field_type = field.json_schema_extra.get("__dspy_field_type")
 
-                    # Based on the '__dspy_field_type', append to the respective list
                     if dspy_field_type == "input":
                         inputs.append(field_name)
                     else:
@@ -224,14 +216,13 @@ class GenerateModuleInstruction(Module):
                     module=module_code,
                     max_depth=10,
                 ).module_description
-            except Exception as e:
+            except Exception:
                 if self.verbose:
-                    print(f"Error getting program description. Running without program aware proposer. Error: {e}")
+                    pass
                 self.program_aware = False
 
-        # Generate an instruction for our chosen module
         if self.verbose:
-            print(f"task_demos {task_demos}")
+            pass
 
         instruct = self.generate_module_instruction(
             dataset_description=data_summary,
@@ -249,7 +240,6 @@ class GenerateModuleInstruction(Module):
 
         return Prediction(proposed_instruction=proposed_instruction)
 
-### CLASS USED TO GENERATE THE FULL SET OF INSTRUCTIONS GIVEN THE SPECIFIED CRITERIA ###
 
 class GroundedProposer(Proposer):
     def __init__(
@@ -269,7 +259,7 @@ class GroundedProposer(Proposer):
         verbose=False,
         rng=None,
         init_temperature: float = 1.0,
-    ):
+    ) -> None:
         super().__init__()
         self.program_aware = program_aware
         self.use_dataset_summary = use_dataset_summary
@@ -290,9 +280,8 @@ class GroundedProposer(Proposer):
             try:
                 self.program_code_string = get_dspy_source_code(program)
                 if self.verbose:
-                    print("SOURCE CODE:",self.program_code_string)
-            except Exception as e:
-                print(f"Error getting source code: {e}.\n\nRunning without program aware proposer.")
+                    pass
+            except Exception:
                 self.program_aware = False
 
         self.data_summary  = None
@@ -302,11 +291,9 @@ class GroundedProposer(Proposer):
                     trainset=trainset, view_data_batch_size=view_data_batch_size, prompt_model=prompt_model,
                 )
                 if self.verbose:
-                    print(f"DATA SUMMARY: {self.data_summary}")
-            except Exception as e:
-                print(f"Error getting data summary: {e}.\n\nRunning without data aware proposer.")
+                    pass
+            except Exception:
                 self.use_dataset_summary = False
-                print("")
 
     def propose_instructions_for_program(
         self,
@@ -321,22 +308,19 @@ class GroundedProposer(Proposer):
         proposed_instructions = {}
 
         if self.set_history_randomly:
-            # Randomly select whether or not we're using instruction history
             use_history = self.rng.random() < 0.5
             self.use_instruct_history = use_history
             if self.verbose:
-                print(f"Use history T/F: {self.use_instruct_history}")
+                pass
 
         if not demo_candidates:
             if self.verbose:
-                print("No demo candidates provided. Running without task demos.")
+                pass
             self.use_task_demos = False
-            # When no demo candidates are provided, default to N
             num_demos = N
         else:
             num_demos = max(len(demo_candidates[0]), 1)
 
-        # Create an instruction for each predictor
         for pred_i, predictor in enumerate(program.predictors()):
             for demo_set_i in range(num_demos)[:min(N, num_demos)]:
                 if pred_i not in proposed_instructions:
@@ -344,15 +328,14 @@ class GroundedProposer(Proposer):
                 selected_tip = None
                 if self.set_tip_randomly:
                     if self.verbose:
-                        print("Using a randomly generated configuration for our grounded proposer.")
-                    # Randomly select the tip
+                        pass
                     selected_tip_key = self.rng.choice(list(TIPS.keys()))
                     selected_tip = TIPS[selected_tip_key]
                     self.use_tip = bool(
                         selected_tip,
                     )
                     if self.verbose:
-                        print(f"Selected tip: {selected_tip_key}")
+                        pass
 
                 proposed_instructions[pred_i].append(
                     self.propose_instruction_for_predictor(
@@ -380,12 +363,10 @@ class GroundedProposer(Proposer):
     ) -> str:
         """This method is responsible for returning a single instruction for a given predictor, using the specified criteria."""
 
-        # Create an instruction history string for our predictor
         instruction_history = create_predictor_level_history_string(
             program, pred_i, trial_logs, MAX_INSTRUCT_IN_HISTORY,
         )
 
-        # Create our instruction generator class (given specific criteria for this round of proposal)
         instruction_generator = GenerateModuleInstruction(
             program_code_string=self.program_code_string,
             use_dataset_summary=self.use_dataset_summary,
@@ -396,7 +377,6 @@ class GroundedProposer(Proposer):
             verbose=self.verbose
         )
 
-        # Generate a new instruction for our predictor using a unique rollout id to bypass cache
         rollout_lm = self.prompt_model.copy(
             rollout_id=self.rng.randint(0, 10**9),
             temperature=self.init_temperature,
@@ -414,9 +394,7 @@ class GroundedProposer(Proposer):
                 tip=tip,
             ).proposed_instruction
 
-        # Log the trace used to generate the new instruction, along with the new instruction itself
         if self.verbose:
             self.prompt_model.inspect_history(n=1)
-            print(f"PROPOSED INSTRUCTION: {proposed_instruction}")
 
         return strip_prefix(proposed_instruction)

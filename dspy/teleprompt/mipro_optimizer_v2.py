@@ -38,7 +38,6 @@ def _import_optuna():
     return optuna
 
 
-# Constants
 BOOTSTRAPPED_FEWSHOT_EXAMPLES_IN_CONTEXT = 3
 LABELED_FEWSHOT_EXAMPLES_IN_CONTEXT = 0
 MIN_MINIBATCH_SIZE = 50
@@ -49,7 +48,6 @@ AUTO_RUN_SETTINGS = {
     "heavy": {"n": 18, "val_size": 1000},
 }
 
-# ANSI escape codes for colors
 YELLOW = "\033[93m"
 GREEN = "\033[92m"
 BLUE = "\033[94m"
@@ -76,8 +74,7 @@ class MIPROv2(Teleprompter):
         track_stats: bool = True,
         log_dir: str | None = None,
         metric_threshold: float | None = None,
-    ):
-        # Validate 'auto' parameter
+    ) -> None:
         allowed_modes = {None, "light", "medium", "heavy"}
         if auto not in allowed_modes:
             raise ValueError(f"Invalid value for auto: {auto}. Must be one of {allowed_modes}.")
@@ -131,11 +128,11 @@ class MIPROv2(Teleprompter):
         requires_permission_to_run: bool | None = None, # deprecated
         provide_traceback: bool | None = None,
     ) -> Any:
-        if requires_permission_to_run == False:
+        if not requires_permission_to_run:
             logger.warning(
                 "'requires_permission_to_run' is deprecated and will be removed in a future version."
             )
-        elif requires_permission_to_run == True:
+        elif requires_permission_to_run:
             raise ValueError("User confirmation is removed from MIPROv2. Please remove the 'requires_permission_to_run' argument.")
 
         effective_max_errors = (
@@ -169,12 +166,10 @@ class MIPROv2(Teleprompter):
                 "If auto is not None, num_candidates and num_trials cannot be set, since they would be overridden by the auto settings. Please either set auto to None, or do not specify num_candidates and num_trials."
             )
 
-        # Set random seeds
         seed = seed or self.seed
         self._set_random_seeds(seed)
 
 
-        # Set training & validation sets
         trainset, valset = self._set_and_validate_datasets(trainset, valset)
 
         num_instruct_candidates = (
@@ -217,7 +212,6 @@ class MIPROv2(Teleprompter):
         if minibatch and minibatch_size > len(valset):
             raise ValueError(f"Minibatch size cannot exceed the size of the valset. Valset size: {len(valset)}.")
 
-        # Initialize program and evaluator
         program = student.deepcopy()
         evaluate = Evaluate(
             devset=valset,
@@ -262,7 +256,7 @@ class MIPROv2(Teleprompter):
 
         with settings.context(lm=self.task_model):
             # Step 3: Find optimal prompt parameters
-            best_program = self._optimize_prompt_parameters(
+            return self._optimize_prompt_parameters(
                 program,
                 instruction_candidates,
                 demo_candidates,
@@ -275,9 +269,8 @@ class MIPROv2(Teleprompter):
                 seed,
             )
 
-        return best_program
 
-    def _set_random_seeds(self, seed):
+    def _set_random_seeds(self, seed) -> None:
         self.rng = random.Random(seed)
 
     def _set_num_trials_from_num_candidates(self, program, zeroshot_opt, num_candidates):
@@ -285,9 +278,8 @@ class MIPROv2(Teleprompter):
         if not zeroshot_opt:
             num_vars *= 2  # Account for few-shot examples + instruction variables
         # Trials = MAX(c*M*log(N), c=2, 3/2*N)
-        num_trials = int(max(2 * num_vars * math.log2(num_candidates), 1.5 * num_candidates))
+        return int(max(2 * num_vars * math.log2(num_candidates), 1.5 * num_candidates))
 
-        return num_trials
 
     def _set_hyperparams_from_run_mode(
         self,
@@ -343,7 +335,7 @@ class MIPROv2(Teleprompter):
         valset: list,
         num_fewshot_candidates: int,
         num_instruct_candidates: int,
-    ):
+    ) -> None:
         logger.info(
             f"\nRUNNING WITH THE FOLLOWING {self.auto.upper()} AUTO RUN SETTINGS:"
             f"\nnum_trials: {num_trials}"
@@ -429,7 +421,7 @@ class MIPROv2(Teleprompter):
         if max_errors is None:
             max_errors = settings.max_errors
 
-        demo_candidates = create_n_fewshot_demo_sets(
+        return create_n_fewshot_demo_sets(
             student=program,
             num_candidate_sets=num_fewshot_candidates,
             trainset=trainset,
@@ -445,14 +437,8 @@ class MIPROv2(Teleprompter):
             metric_threshold=metric_threshold,
             rng=self.rng,
         )
-        # NOTE: Bootstrapping is essential to MIPRO!
-        # Failing silently here makes the rest of the optimization far weaker as a result!
-        # except Exception as e:
-        #     logger.info(f"!!!!\n\n\n\n\nError generating few-shot examples: {e}")
-        #     logger.info("Running without few-shot examples.!!!!\n\n\n\n\n")
-        #     demo_candidates = None
+        # Bootstrapping failures intentionally propagate because running MIPRO without few-shot candidates weakens the optimization substantially.
 
-        return demo_candidates
 
     def _propose_instructions(
         self,
@@ -522,14 +508,12 @@ class MIPROv2(Teleprompter):
     ) -> Any | None:
         optuna = _import_optuna()
 
-        # Run optimization
         optuna.logging.set_verbosity(optuna.logging.WARNING)
         logger.info("==> STEP 3: FINDING OPTIMAL PROMPT PARAMETERS <==")
         logger.info(
             "We will evaluate the program over a series of trials with different combinations of instructions and few-shot examples to find the optimal combination using Bayesian Optimization.\n"
         )
 
-        # Compute the adjusted total trials that we will run (including full evals)
         run_additional_full_eval_at_end = 1 if num_trials % minibatch_full_eval_steps != 0 else 0
         adjusted_num_trials = int(
             (num_trials + num_trials // minibatch_full_eval_steps + 1 + run_additional_full_eval_at_end)
@@ -548,7 +532,6 @@ class MIPROv2(Teleprompter):
         trial_logs[1]["total_eval_calls_so_far"] = len(valset)
         trial_logs[1]["full_eval_program"] = program.deepcopy()
 
-        # Initialize optimization variables
         best_score = default_score
         best_program = program.deepcopy()
         total_eval_calls = len(valset)
@@ -556,7 +539,6 @@ class MIPROv2(Teleprompter):
         param_score_dict = defaultdict(list)
         fully_evaled_param_combos = {}
 
-        # Define the objective function
         def objective(trial):
             nonlocal program, best_program, best_score, trial_logs, total_eval_calls, score_data
 
@@ -568,10 +550,8 @@ class MIPROv2(Teleprompter):
 
             trial_logs[trial_num] = {}
 
-            # Create a new candidate program
             candidate_program = program.deepcopy()
 
-            # Choose instructions and demos, insert them into the program
             chosen_params, raw_chosen_params = self._select_and_insert_instructions_and_demos(
                 candidate_program,
                 instruction_candidates,
@@ -581,23 +561,19 @@ class MIPROv2(Teleprompter):
                 trial_num,
             )
 
-            # Log assembled program
             if self.verbose:
                 logger.info("Evaluating the following candidate program...\n")
                 print_full_program(candidate_program)
 
-            # Evaluate the candidate program (on minibatch if minibatch=True)
             batch_size = minibatch_size if minibatch else len(valset)
             score = eval_candidate_program(batch_size, valset, candidate_program, evaluate, self.rng).score
             total_eval_calls += batch_size
 
-            # Update best score and program
             if not minibatch and score > best_score:
                 best_score = score
                 best_program = candidate_program.deepcopy()
                 logger.info(f"{GREEN}Best full score so far!{ENDC} Score: {score}")
 
-            # Log evaluation results
             score_data.append(
                 {"score": score, "program": candidate_program, "full_eval": batch_size >= len(valset)}
             )  # score, prog, full_eval
@@ -665,7 +641,7 @@ class MIPROv2(Teleprompter):
         if demo_candidates:
             default_params.update({f"{i}_predictor_demos": 0 for i in range(len(program.predictors()))})
 
-        # Add default run as a baseline in optuna (TODO: figure out how to weight this by # of samples evaluated on)
+        # TODO: Account for the default program being evaluated on a different sample count before adding it as an Optuna baseline trial.
         trial = optuna.trial.create_trial(
             params=default_params,
             distributions=self._get_param_distributions(program, instruction_candidates, demo_candidates),
@@ -707,7 +683,7 @@ class MIPROv2(Teleprompter):
         trial_num,
         candidate_program,
         total_eval_calls,
-    ):
+    ) -> None:
         trial_logs[trial_num]["mb_program_path"] = save_candidate_program(candidate_program, self.log_dir, trial_num)
         trial_logs[trial_num]["mb_score"] = score
         trial_logs[trial_num]["total_eval_calls_so_far"] = total_eval_calls
@@ -738,7 +714,7 @@ class MIPROv2(Teleprompter):
         batch_size,
         candidate_program,
         total_eval_calls,
-    ):
+    ) -> None:
         trial_logs[trial_num]["full_eval_program_path"] = save_candidate_program(
             candidate_program, self.log_dir, trial_num
         )
@@ -765,7 +741,6 @@ class MIPROv2(Teleprompter):
         raw_chosen_params = {}
 
         for i, predictor in enumerate(candidate_program.predictors()):
-            # Select instruction
             instruction_idx = trial.suggest_categorical(
                 f"{i}_predictor_instruction", range(len(instruction_candidates[i]))
             )
@@ -775,7 +750,6 @@ class MIPROv2(Teleprompter):
             trial_logs[trial_num][f"{i}_predictor_instruction"] = instruction_idx
             chosen_params.append(f"Predictor {i}: Instruction {instruction_idx}")
             raw_chosen_params[f"{i}_predictor_instruction"] = instruction_idx
-            # Select demos if available
             if demo_candidates:
                 demos_idx = trial.suggest_categorical(f"{i}_predictor_demos", range(len(demo_candidates[i])))
                 predictor.demos = demo_candidates[i][demos_idx]
@@ -821,7 +795,6 @@ class MIPROv2(Teleprompter):
 
         logger.info(f"===== Trial {trial_num + 1} / {adjusted_num_trials} - Full Evaluation =====")
 
-        # Identify best program to evaluate fully
         highest_mean_program, mean_score, combo_key, params = get_program_with_highest_avg_score(
             param_score_dict, fully_evaled_param_combos
         )
@@ -829,7 +802,6 @@ class MIPROv2(Teleprompter):
         full_eval_score = eval_candidate_program(len(valset), valset, highest_mean_program, evaluate, self.rng).score
         score_data.append({"score": full_eval_score, "program": highest_mean_program, "full_eval": True})
 
-        # Log full eval as a trial so that optuna can learn from the new results
         trial = optuna.trial.create_trial(
             params=params,
             distributions=self._get_param_distributions(best_program, instruction_candidates, demo_candidates),

@@ -10,6 +10,10 @@ from dspy.retrievers.retrieve import Retrieve
 _databricks_sdk_installed = find_spec("databricks.sdk") is not None
 
 
+class DatabricksRMError(Exception):
+    """Error raised for Databricks retriever configuration or response failures."""
+
+
 @dataclass
 class Document:
     page_content: str
@@ -93,7 +97,7 @@ class DatabricksRM(Retrieve):
         docs_uri_column_name: str | None = None,
         text_column_name: str = "text",
         use_with_databricks_agent_framework: bool = False,
-    ):
+    ) -> None:
         """
         Args:
             databricks_index_name (str): The name of the Databricks Vector Search Index to query.
@@ -199,7 +203,7 @@ class DatabricksRM(Retrieve):
         if self.docs_id_column_name == "metadata":
             extra_columns = {
                 **extra_columns,
-                **{"metadata": {k: v for k, v in json.loads(item["metadata"]).items() if k != "document_id"}},
+                "metadata": {k: v for k, v in json.loads(item["metadata"]).items() if k != "document_id"},
             }
         return extra_columns
 
@@ -246,7 +250,7 @@ class DatabricksRM(Retrieve):
             query_vector = query
             query_text = None
         else:
-            raise ValueError("Query must be a string or a list of floats.")
+            raise TypeError("Query must be a string or a list of floats.")
 
         if _databricks_sdk_installed:
             results = self._query_via_databricks_sdk(
@@ -263,6 +267,8 @@ class DatabricksRM(Retrieve):
                 filters_json=filters_json or self.filters_json,
             )
         else:
+            if self.databricks_token is None or self.databricks_endpoint is None:
+                raise DatabricksRMError("Databricks token and endpoint are required for request-based querying.")
             results = self._query_via_requests(
                 index_name=self.databricks_index_name,
                 k=self.k,
@@ -275,27 +281,22 @@ class DatabricksRM(Retrieve):
                 filters_json=filters_json or self.filters_json,
             )
 
-        # Checking if defined columns are present in the index columns
         col_names = [column["name"] for column in results["manifest"]["columns"]]
 
         if self.docs_id_column_name not in col_names:
-            raise Exception(
+            raise DatabricksRMError(
                 f"docs_id_column_name: '{self.docs_id_column_name}' is not in the index columns: \n {col_names}"
             )
 
         if self.text_column_name not in col_names:
-            raise Exception(f"text_column_name: '{self.text_column_name}' is not in the index columns: \n {col_names}")
+            raise DatabricksRMError(f"text_column_name: '{self.text_column_name}' is not in the index columns: \n {col_names}")
 
-        # Extracting the results
         items = []
         if "data_array" in results["result"]:
-            for _, data_row in enumerate(results["result"]["data_array"]):
-                item = {}
-                for col_name, val in zip(col_names, data_row, strict=False):
-                    item[col_name] = val
+            for data_row in results["result"]["data_array"]:
+                item = dict(zip(col_names, data_row, strict=False))
                 items += [item]
 
-        # Sorting results by score in descending order
         sorted_docs = sorted(items, key=lambda x: x["score"], reverse=True)[: self.k]
 
         if self.use_with_databricks_agent_framework:
@@ -311,14 +312,12 @@ class DatabricksRM(Retrieve):
                 ).to_dict()
                 for doc in sorted_docs
             ]
-        else:
-            # Returning the prediction
-            return Prediction(
-                docs=[doc[self.text_column_name] for doc in sorted_docs],
-                doc_ids=[self._extract_doc_ids(doc) for doc in sorted_docs],
-                doc_uris=[doc[self.docs_uri_column_name] for doc in sorted_docs] if self.docs_uri_column_name else None,
-                extra_columns=[self._get_extra_columns(item) for item in sorted_docs],
-            )
+        return Prediction(
+            docs=[doc[self.text_column_name] for doc in sorted_docs],
+            doc_ids=[self._extract_doc_ids(doc) for doc in sorted_docs],
+            doc_uris=[doc[self.docs_uri_column_name] for doc in sorted_docs] if self.docs_uri_column_name else None,
+            extra_columns=[self._get_extra_columns(item) for item in sorted_docs],
+        )
 
     @staticmethod
     def _query_via_databricks_sdk(
@@ -371,7 +370,6 @@ class DatabricksRM(Retrieve):
                 client_id=databricks_client_id,
                 client_secret=databricks_client_secret,
             )
-            print("Creating Databricks workspace client using service principal authentication.")
 
         else:
             # Fallback for token-based authentication
@@ -379,7 +377,6 @@ class DatabricksRM(Retrieve):
                 host=databricks_endpoint,
                 token=databricks_token,
             )
-            print("Creating Databricks workspace client using token authentication.")
 
         return databricks_client.vector_search_indexes.query_index(
             index_name=index_name,
@@ -430,7 +427,7 @@ class DatabricksRM(Retrieve):
             "Authorization": f"Bearer {databricks_token}",
             "Content-Type": "application/json",
         }
-        payload = {
+        payload: dict[str, object] = {
             "columns": columns,
             "num_results": k,
             "query_type": query_type,
@@ -445,8 +442,9 @@ class DatabricksRM(Retrieve):
             f"{databricks_endpoint}/api/2.0/vector-search/indexes/{index_name}/query",
             json=payload,
             headers=headers,
+            timeout=60,
         )
         results = response.json()
         if "error_code" in results:
-            raise Exception(f"ERROR: {results['error_code']} -- {results['message']}")
+            raise DatabricksRMError(f"ERROR: {results['error_code']} -- {results['message']}")
         return results

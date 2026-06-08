@@ -17,7 +17,7 @@ class Parallel:
         disable_progress_bar: bool = False,
         timeout: int = 120,
         straggler_limit: int = 3,
-    ):
+    ) -> None:
         """
         A utility class for parallel, multi-threaded execution of (module, example) pairs.
         Supports various example formats (e.g., `Example`, dict, tuple, list), robust error handling,
@@ -94,10 +94,7 @@ class Parallel:
             module, example = pair
 
             if isinstance(example, Example):
-                if self.access_examples:
-                    result = module(**example.inputs())
-                else:
-                    result = module(example)
+                result = module(**example.inputs()) if self.access_examples else module(example)
             elif isinstance(example, dict):
                 result = module(**example)
             elif isinstance(example, list) and module.__class__.__name__ == "Parallel":
@@ -110,10 +107,8 @@ class Parallel:
                 )
             return result
 
-        # Execute the processing function over the execution pairs
         results = executor.execute(process_pair, exec_pairs)
 
-        # Populate failed examples and exceptions from the executor
         if self.return_failed_examples:
             for failed_idx in executor.failed_indices:
                 if failed_idx < len(exec_pairs):
@@ -123,8 +118,7 @@ class Parallel:
                         self.exceptions.append(exception)
 
             return results, self.failed_examples, self.exceptions
-        else:
-            return results
+        return results
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return self.forward(*args, **kwargs)

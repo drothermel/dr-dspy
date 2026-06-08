@@ -17,7 +17,7 @@ class ChainOfThought(Module):
         rationale_field: FieldInfo | None = None,
         rationale_field_type: type = str,
         **config: dict[str, Any],
-    ):
+    ) -> None:
         """
         A module that reasons step by step in order to predict the output of a task.
 

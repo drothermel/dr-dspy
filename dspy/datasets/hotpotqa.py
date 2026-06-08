@@ -6,17 +6,18 @@ from dspy.datasets.dataset import Dataset
 class HotPotQA(Dataset):
     def __init__(
         self,
-        *args,
-        only_hard_examples=True,
-        keep_details="dev_titles",
-        unofficial_dev=True,
-        **kwargs,
+        *args: object,
+        only_hard_examples: bool = True,
+        keep_details: bool | str = "dev_titles",
+        unofficial_dev: bool = True,
+        **kwargs: object,
     ) -> None:
         super().__init__(*args, **kwargs)
-        assert only_hard_examples, (
-            "Care must be taken when adding support for easy examples."
-            "Dev must be all hard to match official dev, but training can be flexible."
-        )
+        if not only_hard_examples:
+            raise ValueError(
+                "Care must be taken when adding support for easy examples."
+                "Dev must be all hard to match official dev, but training can be flexible."
+            )
 
         from datasets import load_dataset
 
@@ -57,7 +58,8 @@ class HotPotQA(Dataset):
 
         test = []
         for raw_example in hf_official_dev:
-            assert raw_example["level"] == "hard"
+            if raw_example["level"] != "hard":
+                raise ValueError("HotPotQA validation split must contain hard examples only.")
             example = {k: raw_example[k] for k in ["id", "question", "answer", "type", "supporting_facts"]}
             if "supporting_facts" in example:
                 example["gold_titles"] = set(example["supporting_facts"]["title"])
@@ -73,15 +75,8 @@ if __name__ == "__main__":
     data_args = dotdict(train_seed=1, train_size=16, eval_seed=2023, dev_size=200 * 5, test_size=0)
     dataset = HotPotQA(**data_args)
 
-    print(dataset)
-    print(dataset.train[0].question)
-    print(dataset.train[15].question)
 
-    print(len(dataset.train), len(dataset.dev), len(dataset.test))
 
-    print(dataset.dev[0].question)
-    print(dataset.dev[340].question)
-    print(dataset.dev[937].question)
 
 """
 What was the population of the city where Woodward Avenue ends in 2010?

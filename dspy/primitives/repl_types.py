@@ -10,7 +10,7 @@ These types represent the state and history of REPL-based execution:
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any
 
 import pydantic
 from pydantic import Field
@@ -18,6 +18,8 @@ from pydantic import Field
 from dspy.adapters.utils import serialize_for_json
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from pydantic.fields import FieldInfo
 
 __all__ = ["REPLVariable", "REPLEntry", "REPLHistory"]
@@ -52,10 +54,7 @@ class REPLVariable(pydantic.BaseModel):
             preview_chars: Max characters for preview
         """
         jsonable = serialize_for_json(value)
-        if isinstance(jsonable, (dict, list)):
-            value_str = json.dumps(jsonable, indent=2)
-        else:
-            value_str = str(jsonable)
+        value_str = json.dumps(jsonable, indent=2) if isinstance(jsonable, (dict, list)) else str(jsonable)
         is_truncated = len(value_str) > preview_chars
         if is_truncated:
             half = preview_chars // 2

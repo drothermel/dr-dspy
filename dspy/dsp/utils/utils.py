@@ -1,21 +1,21 @@
 import copy
 import datetime
 import itertools
-import os
 from collections import defaultdict
+from pathlib import Path
 
 import tqdm
 
 
 def print_message(*s, condition=True, pad=False, sep=None):
     """Print a timestamped message to stdout.
-    
+
     Args:
         *s: Values to print.
         condition: If False, don't print (default: True).
         pad: If True, add newlines around the message (default: False).
         sep: Separator between values (default: None, uses space).
-    
+
     Returns:
         The printed message string.
     """
@@ -24,32 +24,29 @@ def print_message(*s, condition=True, pad=False, sep=None):
 
     if condition:
         msg = msg if not pad else f"\n{msg}\n"
-        print(msg, flush=True, sep=sep)
 
     return msg
 
 
 def timestamp(daydir=False):
     """Generate a timestamp string for file/directory naming.
-    
+
     Args:
         daydir: If True, use '/' as separator and include date as directory
                (e.g., "2026/03/03_10.30.00"). If False, use '-' and '_'
                (e.g., "2026-03-03_10.30.00").
-    
+
     Returns:
         Formatted timestamp string.
     """
     format_str = f"%Y-%m{'/' if daydir else '-'}%d{'/' if daydir else '_'}%H.%M.%S"
-    result = datetime.datetime.now().strftime(format_str)
-    return result
+    return datetime.datetime.now().strftime(format_str)
 
 
 def file_tqdm(file):
-    print(f"#> Reading {file.name}")
 
     with tqdm.tqdm(
-        total=os.path.getsize(file.name) / 1024.0 / 1024.0,
+        total=Path(file.name).stat().st_size / 1024.0 / 1024.0,
         unit="MiB",
     ) as pbar:
         for line in file:
@@ -59,14 +56,13 @@ def file_tqdm(file):
         pbar.close()
 
 
-def create_directory(path):
-    if os.path.exists(path):
-        print("\n")
+def create_directory(path) -> None:
+    path = Path(path)
+    if path.exists():
         print_message("#> Note: Output directory", path, "already exists\n\n")
     else:
-        print("\n")
         print_message("#> Creating directory", path, "\n\n")
-        os.makedirs(path)
+        path.mkdir(parents=True)
 
 
 def deduplicate(seq: list[str]) -> list[str]:
@@ -80,13 +76,13 @@ def deduplicate(seq: list[str]) -> list[str]:
 
 def batch(group, bsize, provide_offset=False):
     """Split a list into batches of specified size.
-    
+
     Args:
         group: List to batch.
         bsize: Maximum size of each batch.
         provide_offset: If True, yield (offset, batch) tuples. If False,
                       yield just the batch (default: False).
-    
+
     Yields:
         Batches of the input list, each up to bsize elements.
     """
@@ -107,13 +103,13 @@ class dotdict(dict):  # noqa: N801
         except KeyError:
             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key, value) -> None:
         if key.startswith("__") and key.endswith("__"):
             super().__setattr__(key, value)
         else:
             self[key] = value
 
-    def __delattr__(self, key):
+    def __delattr__(self, key) -> None:
         if key.startswith("__") and key.endswith("__"):
             super().__delattr__(key)
         else:
@@ -232,7 +228,7 @@ def lengths2offsets(lengths):
 
 # see https://stackoverflow.com/a/45187287
 class NullContextManager:
-    def __init__(self, dummy_resource=None):
+    def __init__(self, dummy_resource=None) -> None:
         self.dummy_resource = dummy_resource
 
     def __enter__(self):

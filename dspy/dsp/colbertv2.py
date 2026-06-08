@@ -1,9 +1,12 @@
+from contextlib import suppress
 from typing import Any
+
+import requests
 
 from dspy.clients.cache import request_cache
 from dspy.dsp.utils.utils import dotdict
 
-# TODO: Ideally, this takes the name of the index and looks up its port.
+# TODO: Support resolving hosted ColBERT index names to service URLs instead of requiring callers to pass url/port.
 
 
 class ColBERTv2:
@@ -14,7 +17,7 @@ class ColBERTv2:
         url: str = "http://0.0.0.0",
         port: str | int | None = None,
         post_requests: bool = False,
-    ):
+    ) -> None:
         self.post_requests = post_requests
         self.url = f"{url}:{port}" if port else url
 
@@ -37,8 +40,6 @@ class ColBERTv2:
 
 @request_cache()
 def colbertv2_get_request_v2(url: str, query: str, k: int):
-    import requests
-
     assert k <= 100, "Only k <= 100 is supported for the hosted ColBERTv2 server at the moment."
 
     payload = {"query": query, "k": k}
@@ -67,8 +68,6 @@ colbertv2_get_request = colbertv2_get_request_v2_wrapped
 
 @request_cache()
 def colbertv2_post_request_v2(url: str, query: str, k: int):
-    import requests
-
     headers = {"Content-Type": "application/json; charset=utf-8"}
     payload = {"query": query, "k": k}
     res = requests.post(url, json=payload, headers=headers, timeout=10)
@@ -93,7 +92,7 @@ colbertv2_post_request = colbertv2_post_request_v2_wrapped
 
 
 class ColBERTv2RetrieverLocal:
-    def __init__(self, passages: list[str], colbert_config=None, load_only: bool = False):
+    def __init__(self, passages: list[str], colbert_config=None, load_only: bool = False) -> None:
         """Colbertv2 retriever module
 
         Args:
@@ -117,26 +116,13 @@ class ColBERTv2RetrieverLocal:
         self.passages = passages
 
         if not load_only:
-            print(
-                f"Building the index for experiment {self.colbert_config.experiment} with index name "
-                f"{self.colbert_config.index_name}"
-            )
             self.build_index()
 
-        print(
-            f"Loading the index for experiment {self.colbert_config.experiment} with index name "
-            f"{self.colbert_config.index_name}"
-        )
         self.searcher = self.get_index()
 
-    def build_index(self):
-        try:
+    def build_index(self) -> None:
+        with suppress(ImportError):
             import colbert  # noqa: F401
-        except ImportError:
-            print(
-                "Colbert not found. Please check your installation or install the module using pip install "
-                "colbert-ai[faiss-gpu,torch]."
-            )
 
         from colbert import Indexer
         from colbert.infra import Run, RunConfig
@@ -146,20 +132,14 @@ class ColBERTv2RetrieverLocal:
             indexer.index(name=self.colbert_config.index_name, collection=self.passages, overwrite=True)
 
     def get_index(self):
-        try:
+        with suppress(ImportError):
             import colbert  # noqa: F401
-        except ImportError:
-            print(
-                "Colbert not found. Please check your installation or install the module using pip install "
-                "colbert-ai[faiss-gpu,torch]."
-            )
 
         from colbert import Searcher
         from colbert.infra import Run, RunConfig
 
         with Run().context(RunConfig(experiment=self.colbert_config.experiment)):
-            searcher = Searcher(index=self.colbert_config.index_name, collection=self.passages)
-        return searcher
+            return Searcher(index=self.colbert_config.index_name, collection=self.passages)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return self.forward(*args, **kwargs)
@@ -173,9 +153,7 @@ class ColBERTv2RetrieverLocal:
             device = "cuda" if torch.cuda.is_available() else "cpu"
             searcher_results = self.searcher.search(
                 query,
-                # Number of passages to receive
                 k=k,
-                # Passing the filter function of relevant
                 filter_fn=lambda pids: torch.tensor(
                     [pid for pid in pids if pid in filtered_pids], dtype=torch.int32
                 ).to(device),
@@ -189,14 +167,9 @@ class ColBERTv2RetrieverLocal:
 
 
 class ColBERTv2RerankerLocal:
-    def __init__(self, colbert_config=None, checkpoint: str = "bert-base-uncased"):
-        try:
+    def __init__(self, colbert_config=None, checkpoint: str = "bert-base-uncased") -> None:
+        with suppress(ImportError):
             import colbert  # noqa: F401
-        except ImportError:
-            print(
-                "Colbert not found. Please check your installation or install the module using pip install "
-                "colbert-ai[faiss-gpu,torch]."
-            )
         """_summary_
 
         Args:
@@ -230,5 +203,4 @@ class ColBERTv2RerankerLocal:
         doc_ids, doc_masks = col.doc(doc_ids, doc_masks, keep_dims="return_mask")
         q_duplicated = q.repeat_interleave(len(passages), dim=0).contiguous()
         tensor_scores = col.score(q_duplicated, doc_ids, doc_masks)
-        passage_score_arr = np.array([score.cpu().detach().numpy().tolist() for score in tensor_scores])
-        return passage_score_arr
+        return np.array([score.cpu().detach().numpy().tolist() for score in tensor_scores])

@@ -23,7 +23,7 @@ def test_tool_observation_preserves_custom_type():
     captured_calls = []
 
     class SpyChatAdapter(ChatAdapter):
-        def format_user_message_content(self, signature, inputs, *args, **kwargs):
+        def format_user_message_content(self, signature, inputs, *args: object, **kwargs: object):
             captured_calls.append((signature, dict(inputs)))
             return super().format_user_message_content(signature, inputs, *args, **kwargs)
 
@@ -227,7 +227,7 @@ def test_trajectory_truncation():
     # Mock react.react to simulate multiple tool calls
     call_count = 0
 
-    def mock_react(**kwargs):
+    def mock_react(**kwargs: object):
         nonlocal call_count
         call_count += 1
 
@@ -238,15 +238,14 @@ def test_trajectory_truncation():
                 next_tool_name="echo",
                 next_tool_args={"text": f"Text {call_count}"},
             )
-        elif call_count == 3:
+        if call_count == 3:
             # The 3rd call raises context window exceeded error
-            raise ContextWindowExceededError()
-        else:
-            # The 4th call finishes
-            return Prediction(next_thought="Final thought", next_tool_name="finish", next_tool_args={})
+            raise ContextWindowExceededError
+        # The 4th call finishes
+        return Prediction(next_thought="Final thought", next_tool_name="finish", next_tool_args={})
 
     react.react = mock_react
-    react.extract = lambda **kwargs: Prediction(output_text="Final output")
+    react.extract = lambda **kwargs: Prediction(output_text="Final output")  # noqa: ARG005
 
     # Call forward and get the result
     result = react(input_text="test input")
@@ -264,13 +263,13 @@ async def test_context_window_exceeded_after_retries():
 
     react = ReAct("input_text -> output_text", tools=[echo])
 
-    def mock_react(**kwargs):
-        raise ContextWindowExceededError()
+    def mock_react(**kwargs: object):
+        raise ContextWindowExceededError
 
     # Test sync version
     extract_calls = []
 
-    def mock_extract(**kwargs):
+    def mock_extract(**kwargs: object):
         extract_calls.append(kwargs)
         return Prediction(output_text="Fallback output")
 
@@ -287,10 +286,10 @@ async def test_context_window_exceeded_after_retries():
     # Test async version
     async_extract_calls = []
 
-    async def mock_react_async(**kwargs):
-        raise ContextWindowExceededError()
+    async def mock_react_async(**kwargs: object):
+        raise ContextWindowExceededError
 
-    async def mock_extract_async(**kwargs):
+    async def mock_extract_async(**kwargs: object):
         async_extract_calls.append(kwargs)
         return Prediction(output_text="Fallback output")
 

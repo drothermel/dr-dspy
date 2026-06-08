@@ -1,2 +1,2 @@
-#  Used to indicate whether the type of a field in a signature is originally not defined.
+# Marks signature fields whose type was omitted and defaulted by DSPy.
 IS_TYPE_UNDEFINED = "IS_TYPE_UNDEFINED"

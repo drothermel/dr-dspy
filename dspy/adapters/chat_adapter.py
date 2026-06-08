@@ -1,8 +1,8 @@
+from __future__ import annotations
+
 import re
 import textwrap
-from typing import Any, NamedTuple
-
-from pydantic.fields import FieldInfo
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from dspy.adapters.base import Adapter
 from dspy.adapters.types.tool import ToolCalls
@@ -13,10 +13,16 @@ from dspy.adapters.utils import (
     parse_value,
     translate_field_type,
 )
-from dspy.clients.base_lm import BaseLM
-from dspy.signatures.signature import Signature
-from dspy.utils.callback import BaseCallback
 from dspy.utils.exceptions import AdapterParseError, LMError
+
+if TYPE_CHECKING:
+    from pydantic.fields import FieldInfo
+
+    from dspy.adapters.json_adapter import JSONAdapter
+    from dspy.adapters.types.base_type import Type
+    from dspy.clients.base_lm import BaseLM
+    from dspy.signatures.signature import Signature
+    from dspy.utils.callback import BaseCallback
 
 field_header_pattern = re.compile(r"\[\[ ## (\w+) ## \]\]")
 
@@ -42,10 +48,10 @@ class ChatAdapter(Adapter):
         self,
         callbacks: list[BaseCallback] | None = None,
         use_native_function_calling: bool = False,
-        native_response_types: list[type[type]] | None = None,
+        native_response_types: list[type[Type]] | None = None,
         use_json_adapter_fallback: bool = True,
         parallel_tool_calls: bool | None = None,
-    ):
+    ) -> None:
         """
         Args:
             callbacks: List of callback functions to execute during adapter methods.
@@ -65,7 +71,7 @@ class ChatAdapter(Adapter):
         )
         self.use_json_adapter_fallback = use_json_adapter_fallback
 
-    def _make_json_adapter_fallback(self):
+    def _make_json_adapter_fallback(self) -> JSONAdapter:
         from dspy.adapters.json_adapter import JSONAdapter
 
         return JSONAdapter(
@@ -84,7 +90,6 @@ class ChatAdapter(Adapter):
         try:
             return super().__call__(lm, lm_kwargs, signature, demos, inputs)
         except Exception as e:
-            # fallback to JSONAdapter
             from dspy.adapters.json_adapter import JSONAdapter
 
             if isinstance(e, LMError) or isinstance(self, JSONAdapter) or not self.use_json_adapter_fallback:
@@ -104,7 +109,6 @@ class ChatAdapter(Adapter):
         try:
             return await super().acall(lm, lm_kwargs, signature, demos, inputs)
         except Exception as e:
-            # fallback to JSONAdapter
             from dspy.adapters.json_adapter import JSONAdapter
 
             if isinstance(e, LMError) or isinstance(self, JSONAdapter) or not self.use_json_adapter_fallback:
@@ -128,7 +132,7 @@ class ChatAdapter(Adapter):
         parts = []
         parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
 
-        def format_signature_fields_for_instructions(fields: dict[str, FieldInfo]):
+        def format_signature_fields_for_instructions(fields: dict[str, FieldInfo]) -> str:
             return self.format_field_with_value(
                 fields_with_values={
                     FieldInfoWithName(name=field_name, info=field_info): translate_field_type(field_name, field_info)
@@ -187,13 +191,12 @@ class ChatAdapter(Adapter):
             for inline reminders within chat messages.
         """
 
-        def type_info(v):
+        def type_info(v: FieldInfo) -> str:
             if v.annotation == ToolCalls:
                 return ' (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]})'
             if v.annotation is not str:
                 return f" (must be formatted as a valid Python {get_annotation_name(v.annotation)})"
-            else:
-                return ""
+            return ""
 
         message = "Respond with the corresponding output fields, starting with the field "
         message += ", then ".join(f"`[[ ## {f} ## ]]`{type_info(v)}" for f, v in signature.output_fields.items())
@@ -204,7 +207,7 @@ class ChatAdapter(Adapter):
         self,
         signature: type[Signature],
         outputs: dict[str, Any],
-        missing_field_message=None,
+        missing_field_message: str | None = None,
     ) -> str:
         assistant_message_content = self.format_field_with_value(
             {
@@ -238,16 +241,16 @@ class ChatAdapter(Adapter):
                 except Exception as e:
                     raise AdapterParseError(
                         adapter_name="ChatAdapter",
-                        signature=signature,
+                        signature=signature,  # ty: ignore[invalid-argument-type]
                         lm_response=completion,
                         message=f"Failed to parse field {k} with value {v} from the LM response. Error message: {e}",
                     )
         if fields.keys() != signature.output_fields.keys():
             raise AdapterParseError(
                 adapter_name="ChatAdapter",
-                signature=signature,
+                signature=signature,  # ty: ignore[invalid-argument-type]
                 lm_response=completion,
-                parsed_result=fields,
+                parsed_result=fields,  # ty: ignore[invalid-argument-type]
             )
 
         return fields

@@ -45,8 +45,8 @@ def bootstrap_trace_data(
         devset=dataset,
         num_threads=num_threads,
         display_progress=True,
-        provide_traceback=False,  # TODO(check with team)
-        max_errors=len(dataset) * 10,  # TODO(check with team)
+        provide_traceback=False,  # TODO: Confirm traceback policy for bootstrap trace evaluation.
+        max_errors=len(dataset) * 10,  # TODO: Confirm max_errors policy for bootstrap trace evaluation.
         failure_score=failure_score,
     )
 
@@ -123,7 +123,7 @@ def bootstrap_trace_data(
     for example_ind, (example, prediction, score) in enumerate(results):
         try:
             prediction, trace = prediction
-        except ValueError as ve:
+        except ValueError:
             # TODO(GRPO Team): Often during GRPO bootstrapping, the LLM response does not follow dspy formatting. This
             # leads to a value error. To reproduce this issue, try Qwen/Qwen2.5-Coder-0.5B-Instruct with MATH dataset.
             # Proposal(Lakshya): We should capture the incorrectly-formatted LLM response, and store it in the trace,
@@ -133,9 +133,8 @@ def bootstrap_trace_data(
                 "dspy formatting."
             )
             if raise_on_error:
-                raise ve
-            else:
-                continue
+                raise
+            continue
         data_dict = {"example": example, "prediction": prediction, "trace": trace, "example_ind": example_ind}
         if metric:
             data_dict["score"] = score

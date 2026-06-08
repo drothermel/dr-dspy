@@ -94,7 +94,7 @@ class BaseCallback:
         call_id: str,
         instance: Any,
         inputs: dict[str, Any],
-    ):
+    ) -> None:
         """A handler triggered when forward() method of a module (subclass of Module) is called.
 
         Args:
@@ -103,14 +103,13 @@ class BaseCallback:
             inputs: The inputs to the module's forward() method. Each arguments is stored as
                 a key-value pair in a dictionary.
         """
-        pass
 
     def on_module_end(
         self,
         call_id: str,
         outputs: Any | None,
         exception: Exception | None = None,
-    ):
+    ) -> None:
         """A handler triggered after forward() method of a module (subclass of Module) is executed.
 
         Args:
@@ -119,14 +118,13 @@ class BaseCallback:
                 an exception, this will be None.
             exception: If an exception is raised during the execution, it will be stored here.
         """
-        pass
 
     def on_lm_start(
         self,
         call_id: str,
         instance: Any,
         inputs: dict[str, Any],
-    ):
+    ) -> None:
         """A handler triggered when __call__ method of LM instance is called.
 
         Args:
@@ -135,14 +133,13 @@ class BaseCallback:
             inputs: The inputs to the LM's __call__ method. Each arguments is stored as
                 a key-value pair in a dictionary.
         """
-        pass
 
     def on_lm_end(
         self,
         call_id: str,
         outputs: dict[str, Any] | None,
         exception: Exception | None = None,
-    ):
+    ) -> None:
         """A handler triggered after __call__ method of LM instance is executed.
 
         Args:
@@ -151,14 +148,13 @@ class BaseCallback:
                 an exception, this will be None.
             exception: If an exception is raised during the execution, it will be stored here.
         """
-        pass
 
     def on_adapter_format_start(
         self,
         call_id: str,
         instance: Any,
         inputs: dict[str, Any],
-    ):
+    ) -> None:
         """A handler triggered when format() method of an adapter (subclass of dspy.Adapter) is called.
 
         Args:
@@ -167,14 +163,13 @@ class BaseCallback:
             inputs: The inputs to the Adapter's format() method. Each arguments is stored as
                 a key-value pair in a dictionary.
         """
-        pass
 
     def on_adapter_format_end(
         self,
         call_id: str,
         outputs: dict[str, Any] | None,
         exception: Exception | None = None,
-    ):
+    ) -> None:
         """A handler triggered after format() method of an adapter (subclass of dspy.Adapter) is called..
 
         Args:
@@ -183,14 +178,13 @@ class BaseCallback:
                 by an exception, this will be None.
             exception: If an exception is raised during the execution, it will be stored here.
         """
-        pass
 
     def on_adapter_parse_start(
         self,
         call_id: str,
         instance: Any,
         inputs: dict[str, Any],
-    ):
+    ) -> None:
         """A handler triggered when parse() method of an adapter (subclass of dspy.Adapter) is called.
 
         Args:
@@ -199,14 +193,13 @@ class BaseCallback:
             inputs: The inputs to the Adapter's parse() method. Each arguments is stored as
                 a key-value pair in a dictionary.
         """
-        pass
 
     def on_adapter_parse_end(
         self,
         call_id: str,
         outputs: dict[str, Any] | None,
         exception: Exception | None = None,
-    ):
+    ) -> None:
         """A handler triggered after parse() method of an adapter (subclass of dspy.Adapter) is called.
 
         Args:
@@ -215,14 +208,13 @@ class BaseCallback:
                 by an exception, this will be None.
             exception: If an exception is raised during the execution, it will be stored here.
         """
-        pass
 
     def on_tool_start(
         self,
         call_id: str,
         instance: Any,
         inputs: dict[str, Any],
-    ):
+    ) -> None:
         """A handler triggered when a tool is called.
 
         Args:
@@ -231,14 +223,13 @@ class BaseCallback:
             inputs: The inputs to the Tool's __call__ method. Each arguments is stored as
                 a key-value pair in a dictionary.
         """
-        pass
 
     def on_tool_end(
         self,
         call_id: str,
         outputs: dict[str, Any] | None,
         exception: Exception | None = None,
-    ):
+    ) -> None:
         """A handler triggered after a tool is executed.
 
         Args:
@@ -247,14 +238,13 @@ class BaseCallback:
                 an exception, this will be None.
             exception: If an exception is raised during the execution, it will be stored here.
         """
-        pass
 
     def on_evaluate_start(
         self,
         call_id: str,
         instance: Any,
         inputs: dict[str, Any],
-    ):
+    ) -> None:
         """A handler triggered when evaluation is started.
 
         Args:
@@ -263,14 +253,13 @@ class BaseCallback:
             inputs: The inputs to the Evaluate's __call__ method. Each arguments is stored as
                 a key-value pair in a dictionary.
         """
-        pass
 
     def on_evaluate_end(
         self,
         call_id: str,
         outputs: Any | None,
         exception: Exception | None = None,
-    ):
+    ) -> None:
         """A handler triggered after evaluation is executed.
 
         Args:
@@ -279,15 +268,14 @@ class BaseCallback:
                 an exception, this will be None.
             exception: If an exception is raised during the execution, it will be stored here.
         """
-        pass
 
 
 def with_callbacks(fn):
     """Decorator to add callback functionality to instance methods."""
 
-    def _execute_start_callbacks(instance, fn, call_id, callbacks, args, kwargs):
+    def _execute_start_callbacks(instance, fn, call_id, callbacks, args, kwargs) -> None:
         """Execute all start callbacks for a function call."""
-        inputs = inspect.getcallargs(fn, instance, *args, **kwargs)
+        inputs = inspect.getcallargs(fn, instance, *args, **kwargs)  # ty:ignore[deprecated]
         if "self" in inputs:
             inputs.pop("self")
         elif "instance" in inputs:
@@ -298,7 +286,7 @@ def with_callbacks(fn):
             except Exception as e:
                 logger.warning(f"Error when calling callback {callback}: {e}")
 
-    def _execute_end_callbacks(instance, fn, call_id, results, exception, callbacks):
+    def _execute_end_callbacks(instance, fn, call_id, results, exception, callbacks) -> None:
         """Execute all end callbacks for a function call."""
         for callback in callbacks:
             try:
@@ -328,67 +316,67 @@ def with_callbacks(fn):
 
             # Active ID must be set right before the function is called, not before calling the callbacks.
             parent_call_id = ACTIVE_CALL_ID.get()
-            ACTIVE_CALL_ID.set(call_id)
+            ACTIVE_CALL_ID.set(call_id)  # ty:ignore[invalid-argument-type]
 
             results = None
             exception = None
             try:
                 results = await fn(instance, *args, **kwargs)
-                return results
             except Exception as e:
                 exception = e
                 raise exception
+            else:
+                return results
             finally:
                 ACTIVE_CALL_ID.set(parent_call_id)
                 _execute_end_callbacks(instance, fn, call_id, results, exception, callbacks)
 
         return async_wrapper
 
-    else:
 
-        @functools.wraps(fn)
-        def sync_wrapper(instance, *args, **kwargs):
-            callbacks = _get_active_callbacks(instance)
-            if not callbacks:
-                return fn(instance, *args, **kwargs)
+    @functools.wraps(fn)
+    def sync_wrapper(instance, *args, **kwargs):
+        callbacks = _get_active_callbacks(instance)
+        if not callbacks:
+            return fn(instance, *args, **kwargs)
 
-            call_id = uuid.uuid4().hex
+        call_id = uuid.uuid4().hex
 
-            _execute_start_callbacks(instance, fn, call_id, callbacks, args, kwargs)
+        _execute_start_callbacks(instance, fn, call_id, callbacks, args, kwargs)
 
-            # Active ID must be set right before the function is called, not before calling the callbacks.
-            parent_call_id = ACTIVE_CALL_ID.get()
-            ACTIVE_CALL_ID.set(call_id)
+        # Active ID must be set right before the function is called, not before calling the callbacks.
+        parent_call_id = ACTIVE_CALL_ID.get()
+        ACTIVE_CALL_ID.set(call_id)  # ty:ignore[invalid-argument-type]
 
-            results = None
-            exception = None
-            try:
-                results = fn(instance, *args, **kwargs)
-                return results
-            except Exception as e:
-                exception = e
-                raise exception
-            finally:
-                ACTIVE_CALL_ID.set(parent_call_id)
-                _execute_end_callbacks(instance, fn, call_id, results, exception, callbacks)
+        results = None
+        exception = None
+        try:
+            results = fn(instance, *args, **kwargs)
+        except Exception as e:
+            exception = e
+            raise exception
+        else:
+            return results
+        finally:
+            ACTIVE_CALL_ID.set(parent_call_id)
+            _execute_end_callbacks(instance, fn, call_id, results, exception, callbacks)
 
-        return sync_wrapper
+    return sync_wrapper
 
 
 def _get_on_start_handler(callback: BaseCallback, instance: Any, fn: Callable) -> Callable:
     """Selects the appropriate on_start handler of the callback based on the instance and function name."""
     if _is_lm(instance):
         return callback.on_lm_start
-    elif _is_evaluate(instance):
+    if _is_evaluate(instance):
         return callback.on_evaluate_start
 
     if _is_adapter(instance):
-        if fn.__name__ == "format":
+        if fn.__name__ == "format":  # ty:ignore[unresolved-attribute]
             return callback.on_adapter_format_start
-        elif fn.__name__ == "parse":
+        if fn.__name__ == "parse":  # ty:ignore[unresolved-attribute]
             return callback.on_adapter_parse_start
-        else:
-            raise ValueError(f"Unsupported adapter method for using callback: {fn.__name__}.")
+        raise ValueError(f"Unsupported adapter method for using callback: {fn.__name__}.")  # ty:ignore[unresolved-attribute]
 
     if _is_tool(instance):
         return callback.on_tool_start
@@ -401,16 +389,15 @@ def _get_on_end_handler(callback: BaseCallback, instance: Any, fn: Callable) -> 
     """Selects the appropriate on_end handler of the callback based on the instance and function name."""
     if _is_lm(instance):
         return callback.on_lm_end
-    elif _is_evaluate(instance):
+    if _is_evaluate(instance):
         return callback.on_evaluate_end
 
     if _is_adapter(instance):
-        if fn.__name__ == "format":
+        if fn.__name__ == "format":  # ty:ignore[unresolved-attribute]
             return callback.on_adapter_format_end
-        elif fn.__name__ == "parse":
+        if fn.__name__ == "parse":  # ty:ignore[unresolved-attribute]
             return callback.on_adapter_parse_end
-        else:
-            raise ValueError(f"Unsupported adapter method for using callback: {fn.__name__}.")
+        raise ValueError(f"Unsupported adapter method for using callback: {fn.__name__}.")  # ty:ignore[unresolved-attribute]
 
     if _is_tool(instance):
         return callback.on_tool_end

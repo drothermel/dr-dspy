@@ -1,6 +1,3 @@
-from dspy.streaming.streamify import apply_sync_streaming
-from dspy.streaming.streaming_listener import StreamListener
-from dspy.utils.dummies import DummyLM
 import asyncio
 import time
 from dataclasses import dataclass
@@ -11,6 +8,10 @@ import anyio.from_thread
 import pydantic
 import pytest
 
+from dspy.streaming.streamify import apply_sync_streaming
+from dspy.streaming.streaming_listener import StreamListener
+from dspy.utils.dummies import DummyLM
+
 try:
     from litellm.types.utils import Delta, ModelResponseStream, StreamingChoices
 except ImportError:
@@ -19,23 +20,20 @@ except ImportError:
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.citation import Citations
+from dspy.adapters.types.document import Document
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
 from dspy.dsp.utils.settings import settings
-from dspy.adapters.types.citation import Citations
-from dspy.adapters.types.document import Document
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
-from dspy.streaming.messages import StatusMessage
-from dspy.streaming.messages import StatusMessageProvider
-from dspy.streaming.messages import StreamResponse
-from dspy.streaming.streamify import streaming_response
-from dspy.streaming.streamify import streamify
+from dspy.streaming.messages import StatusMessage, StatusMessageProvider, StreamResponse
+from dspy.streaming.streamify import streamify, streaming_response
 
 
 @pytest.mark.anyio
@@ -113,7 +111,7 @@ async def test_default_status_streaming():
         status_messages = []
         async for value in output:
             if isinstance(value, StatusMessage):
-                status_messages.append(value)
+                status_messages.append(value)  # noqa: PERF401
 
     assert len(status_messages) == 2
     assert status_messages[0].message == "Calling tool generate_question..."
@@ -141,6 +139,7 @@ async def test_custom_status_streaming():
         def module_start_status_message(self, instance, inputs):
             if isinstance(instance, Predict):
                 return "Predict starting!"
+            return None
 
     lm = DummyLM([{"answer": "red"}, {"answer": "blue"}])
     with settings.context(lm=lm):
@@ -150,7 +149,7 @@ async def test_custom_status_streaming():
         status_messages = []
         async for value in output:
             if isinstance(value, StatusMessage):
-                status_messages.append(value)
+                status_messages.append(value)  # noqa: PERF401
 
         assert len(status_messages) == 3
         assert status_messages[0].message == "Tool starting!"
@@ -179,6 +178,7 @@ async def test_concurrent_status_message_providers():
         def module_start_status_message(self, instance, inputs):
             if isinstance(instance, Predict):
                 return "Provider1: Predict starting!"
+            return None
 
     class MyStatusMessageProvider2(StatusMessageProvider):
         def tool_start_status_message(self, instance, inputs):
@@ -190,6 +190,7 @@ async def test_concurrent_status_message_providers():
         def module_start_status_message(self, instance, inputs):
             if isinstance(instance, Predict):
                 return "Provider2: Predict starting!"
+            return None
 
     # Store the original callbacks to verify they're not modified
     original_callbacks = list(settings.callbacks)
@@ -207,7 +208,7 @@ async def test_concurrent_status_message_providers():
             status_messages = []
             async for value in output:
                 if isinstance(value, StatusMessage):
-                    status_messages.append(value.message)
+                    status_messages.append(value.message)  # noqa: PERF401
 
             results["provider1"] = status_messages
 
@@ -219,7 +220,7 @@ async def test_concurrent_status_message_providers():
             status_messages = []
             async for value in output:
                 if isinstance(value, StatusMessage):
-                    status_messages.append(value.message)
+                    status_messages.append(value.message)  # noqa: PERF401
 
             results["provider2"] = status_messages
 
@@ -250,10 +251,9 @@ async def test_stream_listener_chat_adapter(lm_for_test):
             self.predict1 = Predict("question->answer")
             self.predict2 = Predict("question, answer->judgement")
 
-        def __call__(self, x: str, **kwargs):
+        def __call__(self, x: str, **kwargs: object):
             answer = self.predict1(question=x, **kwargs)
-            judgement = self.predict2(question=x, answer=answer, **kwargs)
-            return judgement
+            return self.predict2(question=x, answer=answer, **kwargs)
 
     my_program = MyProgram()
     program = streamify(
@@ -270,7 +270,7 @@ async def test_stream_listener_chat_adapter(lm_for_test):
         all_chunks = []
         async for value in output:
             if isinstance(value, StreamResponse):
-                all_chunks.append(value)
+                all_chunks.append(value)  # noqa: PERF401
 
     assert all_chunks[0].predict_name == "predict1"
     assert all_chunks[0].signature_field_name == "answer"
@@ -299,7 +299,7 @@ async def test_default_status_streaming_in_async_program():
         status_messages = []
         async for value in output:
             if isinstance(value, StatusMessage):
-                status_messages.append(value)
+                status_messages.append(value)  # noqa: PERF401
 
     assert len(status_messages) == 2
     assert status_messages[0].message == "Calling tool generate_question..."
@@ -314,10 +314,9 @@ async def test_stream_listener_json_adapter(lm_for_test):
             self.predict1 = Predict("question->answer")
             self.predict2 = Predict("question, answer->judgement")
 
-        def __call__(self, x: str, **kwargs):
+        def __call__(self, x: str, **kwargs: object):
             answer = self.predict1(question=x, **kwargs)
-            judgement = self.predict2(question=x, answer=answer, **kwargs)
-            return judgement
+            return self.predict2(question=x, answer=answer, **kwargs)
 
     my_program = MyProgram()
     program = streamify(
@@ -334,7 +333,7 @@ async def test_stream_listener_json_adapter(lm_for_test):
         all_chunks = []
         async for value in output:
             if isinstance(value, StreamResponse):
-                all_chunks.append(value)
+                all_chunks.append(value)  # noqa: PERF401
 
     assert all_chunks[0].predict_name == "predict1"
     assert all_chunks[0].signature_field_name == "answer"
@@ -351,7 +350,7 @@ async def test_streaming_handles_space_correctly():
         my_program, stream_listeners=[StreamListener(signature_field_name="answer")]
     )
 
-    async def gpt_4o_mini_stream(*args, **kwargs):
+    async def gpt_4o_mini_stream(*args: object, **kwargs: object):
         yield ModelResponseStream(
             model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="[[ ## answer ## ]]\n"))]
         )
@@ -363,13 +362,13 @@ async def test_streaming_handles_space_correctly():
             model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="\n\n[[ ## completed ## ]]"))]
         )
 
-    with mock.patch("litellm.acompletion", side_effect=gpt_4o_mini_stream):
+    with mock.patch("litellm.acompletion", side_effect=gpt_4o_mini_stream):  # noqa: SIM117
         with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), adapter=ChatAdapter()):
             output = program(question="What is the capital of France?")
             all_chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    all_chunks.append(value)
+                    all_chunks.append(value)  # noqa: PERF401
 
     assert "".join([chunk.chunk for chunk in all_chunks]) == "How are you doing?"
 
@@ -381,10 +380,9 @@ def test_sync_streaming(lm_for_test):
             self.predict1 = Predict("question->answer")
             self.predict2 = Predict("question, answer->judgement")
 
-        def __call__(self, x: str, **kwargs):
+        def __call__(self, x: str, **kwargs: object):
             answer = self.predict1(question=x, **kwargs)
-            judgement = self.predict2(question=x, answer=answer, **kwargs)
-            return judgement
+            return self.predict2(question=x, answer=answer, **kwargs)
 
     my_program = MyProgram()
     program = streamify(
@@ -402,7 +400,7 @@ def test_sync_streaming(lm_for_test):
         all_chunks = []
         for value in output:
             if isinstance(value, StreamResponse):
-                all_chunks.append(value)
+                all_chunks.append(value)  # noqa: PERF401
 
     assert all_chunks[0].predict_name == "predict1"
     assert all_chunks[0].signature_field_name == "answer"
@@ -431,7 +429,7 @@ def test_sync_status_streaming():
         status_messages = []
         for value in sync_output:
             if isinstance(value, StatusMessage):
-                status_messages.append(value)
+                status_messages.append(value)  # noqa: PERF401
 
     assert len(status_messages) == 2
     assert status_messages[0].message == "Calling tool generate_question..."
@@ -446,12 +444,11 @@ async def test_stream_listener_returns_correct_chunk_chat_adapter():
             self.predict1 = Predict("question->answer")
             self.predict2 = Predict("question, answer->judgement")
 
-        def forward(self, question, **kwargs):
+        def forward(self, question, **kwargs: object):
             answer = self.predict1(question=question, **kwargs).answer
-            judgement = self.predict2(question=question, answer=answer, **kwargs)
-            return judgement
+            return self.predict2(question=question, answer=answer, **kwargs)
 
-    async def gpt_4o_mini_stream_1(*args, **kwargs):
+    async def gpt_4o_mini_stream_1(*args: object, **kwargs: object):
         # Recorded streaming from openai/gpt-4o-mini
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="[["))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=" ##"))])
@@ -496,7 +493,7 @@ async def test_stream_listener_returns_correct_chunk_chat_adapter():
 
     stream_generators = [gpt_4o_mini_stream_1, gpt_4o_mini_stream_2]
 
-    async def completion_side_effect(*args, **kwargs):
+    async def completion_side_effect(*args: object, **kwargs: object):
         return stream_generators.pop(0)()  # return new async generator instance
 
     with mock.patch("litellm.acompletion", side_effect=completion_side_effect):
@@ -512,7 +509,7 @@ async def test_stream_listener_returns_correct_chunk_chat_adapter():
             all_chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    all_chunks.append(value)
+                    all_chunks.append(value)  # noqa: PERF401
 
         assert all_chunks[0].predict_name == "predict1"
         assert all_chunks[0].signature_field_name == "answer"
@@ -554,12 +551,11 @@ async def test_stream_listener_returns_correct_chunk_json_adapter():
             self.predict1 = Predict("question->answer")
             self.predict2 = Predict("question,answer->judgement")
 
-        def forward(self, question, **kwargs):
+        def forward(self, question, **kwargs: object):
             answer = self.predict1(question=question, **kwargs).answer
-            judgement = self.predict2(question=question, answer=answer, **kwargs)
-            return judgement
+            return self.predict2(question=question, answer=answer, **kwargs)
 
-    async def gpt_4o_mini_stream_1(*args, **kwargs):
+    async def gpt_4o_mini_stream_1(*args: object, **kwargs: object):
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content='{"'))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="answer"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content='":'))])
@@ -579,7 +575,7 @@ async def test_stream_listener_returns_correct_chunk_json_adapter():
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="None"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="None"))])
 
-    async def gpt_4o_mini_stream_2(*args, **kwargs):
+    async def gpt_4o_mini_stream_2(*args: object, **kwargs: object):
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content='{"'))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="jud"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="gement"))])
@@ -619,7 +615,7 @@ async def test_stream_listener_returns_correct_chunk_json_adapter():
             all_chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    all_chunks.append(value)
+                    all_chunks.append(value)  # noqa: PERF401
 
         assert all_chunks[0].predict_name == "predict1"
         assert all_chunks[0].signature_field_name == "answer"
@@ -664,12 +660,11 @@ async def test_stream_listener_returns_correct_chunk_chat_adapter_untokenized_st
             self.predict1 = Predict("question->answer")
             self.predict2 = Predict("question,answer->judgement")
 
-        def forward(self, question, **kwargs):
+        def forward(self, question, **kwargs: object):
             answer = self.predict1(question=question, **kwargs).answer
-            judgement = self.predict2(question=question, answer=answer, **kwargs)
-            return judgement
+            return self.predict2(question=question, answer=answer, **kwargs)
 
-    async def gemini_stream_1(*args, **kwargs):
+    async def gemini_stream_1(*args: object, **kwargs: object):
         yield ModelResponseStream(model="gemini", choices=[StreamingChoices(delta=Delta(content="[[ ##"))])
         yield ModelResponseStream(model="gemini", choices=[StreamingChoices(delta=Delta(content=" answer ## ]]"))])
         yield ModelResponseStream(
@@ -679,7 +674,7 @@ async def test_stream_listener_returns_correct_chunk_chat_adapter_untokenized_st
             model="gemini", choices=[StreamingChoices(delta=Delta(content="\n\n[[ ## completed ## ]]"))]
         )
 
-    async def gemini_stream_2(*args, **kwargs):
+    async def gemini_stream_2(*args: object, **kwargs: object):
         yield ModelResponseStream(
             model="gemini", choices=[StreamingChoices(delta=Delta(content="[[ ## judgement ## ]]\n\n"))]
         )
@@ -715,7 +710,7 @@ async def test_stream_listener_returns_correct_chunk_chat_adapter_untokenized_st
             all_chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    all_chunks.append(value)
+                    all_chunks.append(value)  # noqa: PERF401
 
         assert all_chunks[0].predict_name == "predict1"
         assert all_chunks[0].signature_field_name == "answer"
@@ -745,10 +740,10 @@ async def test_stream_listener_missing_completion_marker_chat_adapter():
             super().__init__()
             self.predict = Predict("question->answer")
 
-        def forward(self, question, **kwargs):
+        def forward(self, question, **kwargs: object):
             return self.predict(question=question, **kwargs)
 
-    async def incomplete_stream(*args, **kwargs):
+    async def incomplete_stream(*args: object, **kwargs: object):
         """Stream that includes start marker but MISSING completion marker"""
         # Start marker
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="[[ ##"))])
@@ -803,12 +798,11 @@ async def test_stream_listener_returns_correct_chunk_json_adapter_untokenized_st
             self.predict1 = Predict("question->answer")
             self.predict2 = Predict("question,answer->judgement")
 
-        def forward(self, question, **kwargs):
+        def forward(self, question, **kwargs: object):
             answer = self.predict1(question=question, **kwargs).answer
-            judgement = self.predict2(question=question, answer=answer, **kwargs)
-            return judgement
+            return self.predict2(question=question, answer=answer, **kwargs)
 
-    async def gemini_stream_1(*args, **kwargs):
+    async def gemini_stream_1(*args: object, **kwargs: object):
         yield ModelResponseStream(model="gemini", choices=[StreamingChoices(delta=Delta(content="{\n"))])
         yield ModelResponseStream(
             model="gemini", choices=[StreamingChoices(delta=Delta(content='  "answer": "To get to'))]
@@ -818,7 +812,7 @@ async def test_stream_listener_returns_correct_chunk_json_adapter_untokenized_st
         )
         yield ModelResponseStream(model="gemini", choices=[StreamingChoices(delta=Delta(content="}\n"))])
 
-    async def gemini_stream_2(*args, **kwargs):
+    async def gemini_stream_2(*args: object, **kwargs: object):
         yield ModelResponseStream(model="gemini", choices=[StreamingChoices(delta=Delta(content="{\n"))])
         yield ModelResponseStream(
             model="gemini", choices=[StreamingChoices(delta=Delta(content='  "judgement": "The'))]
@@ -848,7 +842,7 @@ async def test_stream_listener_returns_correct_chunk_json_adapter_untokenized_st
             all_chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    all_chunks.append(value)
+                    all_chunks.append(value)  # noqa: PERF401
 
         assert all_chunks[0].predict_name == "predict1"
         assert all_chunks[0].signature_field_name == "answer"
@@ -869,19 +863,19 @@ async def test_status_message_non_blocking():
         return "dummy_tool_output"
 
     class MyProgram(Module):
-        def forward(self, question, **kwargs):
+        def forward(self, question, **kwargs: object):
             Tool(dummy_tool)()
             return Prediction(answer="dummy_tool_output")
 
     program = streamify(MyProgram(), status_message_provider=StatusMessageProvider())
 
-    with mock.patch("litellm.acompletion", new_callable=AsyncMock, side_effect=[dummy_tool]):
+    with mock.patch("litellm.acompletion", new_callable=AsyncMock, side_effect=[dummy_tool]):  # noqa: SIM117
         with settings.context(lm=LM("openai/gpt-4o-mini", cache=False)):
             output = program(question="why did a chicken cross the kitchen?")
             timestamps = []
             async for value in output:
                 if isinstance(value, StatusMessage):
-                    timestamps.append(time.time())
+                    timestamps.append(time.time())  # noqa: PERF401
 
     # timestamps[0]: tool start message
     # timestamps[1]: tool end message
@@ -897,19 +891,19 @@ async def test_status_message_non_blocking_async_program():
         return "dummy_tool_output"
 
     class MyProgram(Module):
-        async def aforward(self, question, **kwargs):
+        async def aforward(self, question, **kwargs: object):
             await Tool(dummy_tool).acall()
             return Prediction(answer="dummy_tool_output")
 
     program = streamify(MyProgram(), status_message_provider=StatusMessageProvider(), is_async_program=True)
 
-    with mock.patch("litellm.acompletion", new_callable=AsyncMock, side_effect=[dummy_tool]):
+    with mock.patch("litellm.acompletion", new_callable=AsyncMock, side_effect=[dummy_tool]):  # noqa: SIM117
         with settings.context(lm=LM("openai/gpt-4o-mini", cache=False)):
             output = program(question="why did a chicken cross the kitchen?")
             timestamps = []
             async for value in output:
                 if isinstance(value, StatusMessage):
-                    timestamps.append(time.time())
+                    timestamps.append(time.time())  # noqa: PERF401
 
     # timestamps[0]: tool start message
     # timestamps[1]: tool end message
@@ -925,7 +919,7 @@ async def test_stream_listener_allow_reuse():
             super().__init__()
             self.predict = Predict("question->answer")
 
-        def forward(self, question, **kwargs):
+        def forward(self, question, **kwargs: object):
             self.predict(question=question, **kwargs)
             return self.predict(question=question, **kwargs)
 
@@ -936,7 +930,7 @@ async def test_stream_listener_allow_reuse():
         ],
     )
 
-    async def gpt_4o_mini_stream(*args, **kwargs):
+    async def gpt_4o_mini_stream(*args: object, **kwargs: object):
         # Recorded streaming from openai/gpt-4o-mini
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="[["))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=" ##"))])
@@ -956,19 +950,19 @@ async def test_stream_listener_allow_reuse():
 
     stream_generators = [gpt_4o_mini_stream, gpt_4o_mini_stream]
 
-    async def completion_side_effect(*args, **kwargs):
+    async def completion_side_effect(*args: object, **kwargs: object):
         return stream_generators.pop(0)()  # return new async generator instance
 
-    with mock.patch("litellm.acompletion", side_effect=completion_side_effect):
+    with mock.patch("litellm.acompletion", side_effect=completion_side_effect):  # noqa: SIM117
         with settings.context(lm=LM("openai/gpt-4o-mini", cache=False)):
             output = program(question="why did a chicken cross the kitchen?")
             all_chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    all_chunks.append(value)
+                    all_chunks.append(value)  # noqa: PERF401
 
     concat_message = "".join([chunk.chunk for chunk in all_chunks])
-    # The listener functions twice.
+    # Both matching predicts stream the same answer text, so the listener emits it twice.
     assert concat_message == "To get to the other side!To get to the other side!"
 
 
@@ -980,12 +974,11 @@ async def test_stream_listener_returns_correct_chunk_xml_adapter():
             self.predict1 = Predict("question->answer")
             self.predict2 = Predict("question,answer->judgement")
 
-        def forward(self, question, **kwargs):
+        def forward(self, question, **kwargs: object):
             answer = self.predict1(question=question, **kwargs).answer
-            judgement = self.predict2(question=question, answer=answer, **kwargs)
-            return judgement
+            return self.predict2(question=question, answer=answer, **kwargs)
 
-    async def xml_stream_1(*args, **kwargs):
+    async def xml_stream_1(*args: object, **kwargs: object):
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="<"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="answer"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=">"))])
@@ -1000,7 +993,7 @@ async def test_stream_listener_returns_correct_chunk_xml_adapter():
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="/answer"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=">"))])
 
-    async def xml_stream_2(*args, **kwargs):
+    async def xml_stream_2(*args: object, **kwargs: object):
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="<"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="judgement"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=">"))])
@@ -1015,7 +1008,7 @@ async def test_stream_listener_returns_correct_chunk_xml_adapter():
 
     stream_generators = [xml_stream_1, xml_stream_2]
 
-    async def completion_side_effect(*args, **kwargs):
+    async def completion_side_effect(*args: object, **kwargs: object):
         return stream_generators.pop(0)()
 
     with mock.patch("litellm.acompletion", side_effect=completion_side_effect):
@@ -1031,7 +1024,7 @@ async def test_stream_listener_returns_correct_chunk_xml_adapter():
             all_chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    all_chunks.append(value)
+                    all_chunks.append(value)  # noqa: PERF401
 
     # Verify answer chunks
     answer_chunks = [chunk for chunk in all_chunks if chunk.signature_field_name == "answer"]
@@ -1053,7 +1046,7 @@ async def test_streaming_allows_custom_chunk_types():
         text: str
 
     class MyProgram(Module):
-        def forward(self, question, **kwargs):
+        def forward(self, question, **kwargs: object):
             async def send_to_stream():
                 chunk = CustomChunk(text="hello")
                 await settings.send_stream.send(chunk)
@@ -1066,7 +1059,7 @@ async def test_streaming_allows_custom_chunk_types():
     output = program(question="why did a chicken cross the kitchen?")
     all_chunks = []
     async for value in output:
-        all_chunks.append(value)
+        all_chunks.append(value)  # noqa: PERF401
 
     assert isinstance(all_chunks[0], CustomChunk)
     assert isinstance(all_chunks[1], Prediction)
@@ -1082,7 +1075,7 @@ async def test_streaming_allows_custom_streamable_type():
             return True
 
         @classmethod
-        def adapt_to_native_lm_feature(cls, signature, field_name, lm, lm_kwargs):
+        def adapt_to_native_lm_feature(cls, signature, field_name, lm, lm_kwargs):  # noqa: ARG003
             return signature.delete(field_name)
 
         @classmethod
@@ -1104,7 +1097,7 @@ async def test_streaming_allows_custom_streamable_type():
         ],
     )
 
-    async def stream(*args, **kwargs):
+    async def stream(*args: object, **kwargs: object):
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="Hello"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="World"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="\n\n"))])
@@ -1113,18 +1106,17 @@ async def test_streaming_allows_custom_streamable_type():
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=" ##"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=" ]]"))])
 
-    with mock.patch("litellm.acompletion", side_effect=stream):
-        with settings.context(
-            lm=LM("openai/gpt-4o-mini", cache=False), adapter=ChatAdapter(native_response_types=[CustomType])
-        ):
-            output = program(question="why did a chicken cross the kitchen?")
-            all_chunks = []
-            async for value in output:
-                if isinstance(value, StreamResponse):
-                    all_chunks.append(value)
-                elif isinstance(value, Prediction):
-                    assert isinstance(value.answer, CustomType)
-                    assert value.answer.message == "HelloWorld"
+    with mock.patch("litellm.acompletion", side_effect=stream), settings.context(
+        lm=LM("openai/gpt-4o-mini", cache=False), adapter=ChatAdapter(native_response_types=[CustomType])
+    ):
+        output = program(question="why did a chicken cross the kitchen?")
+        all_chunks = []
+        async for value in output:
+            if isinstance(value, StreamResponse):
+                all_chunks.append(value)
+            elif isinstance(value, Prediction):
+                assert isinstance(value.answer, CustomType)
+                assert value.answer.message == "HelloWorld"
 
     assert all(isinstance(chunk.chunk, CustomType) for chunk in all_chunks)
 
@@ -1144,10 +1136,10 @@ async def test_streaming_with_citations():
             super().__init__()
             self.predict = Predict(AnswerWithSources)
 
-        def forward(self, documents, question, **kwargs):
+        def forward(self, documents, question, **kwargs: object):
             return self.predict(documents=documents, question=question, **kwargs)
 
-    async def citation_stream(*args, **kwargs):
+    async def citation_stream(*args: object, **kwargs: object):
         # Stream chunks with citation data in provider_specific_fields
         # To verify the realistic scenario with more than 10 chunks in the stream, include more than 10 chunks before the citation.
         yield ModelResponseStream(model="claude", choices=[StreamingChoices(delta=Delta(content="[[ ##"))])
@@ -1268,10 +1260,10 @@ async def test_chat_adapter_simple_pydantic_streaming():
         def __init__(self):
             self.predict = Predict(TestSignature)
 
-        def forward(self, question, **kwargs):
+        def forward(self, question, **kwargs: object):
             return self.predict(question=question, **kwargs)
 
-    async def chat_stream(*args, **kwargs):
+    async def chat_stream(*args: object, **kwargs: object):
         # Simulate streaming of a pydantic model via ChatAdapter format
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="[[ ##"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=" response"))])
@@ -1293,13 +1285,13 @@ async def test_chat_adapter_simple_pydantic_streaming():
         ],
     )
 
-    with mock.patch("litellm.acompletion", side_effect=chat_stream):
+    with mock.patch("litellm.acompletion", side_effect=chat_stream):  # noqa: SIM117
         with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), adapter=ChatAdapter()):
             output = program(question="Say hello")
             chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    chunks.append(value)
+                    chunks.append(value)  # noqa: PERF401
 
     # Verify we got chunks for the pydantic field
     assert len(chunks) > 0
@@ -1321,10 +1313,10 @@ async def test_chat_adapter_with_generic_type_annotation():
         def __init__(self):
             self.predict = Predict(TestSignature)
 
-        def forward(self, question, **kwargs):
+        def forward(self, question, **kwargs: object):
             return self.predict(question=question, **kwargs)
 
-    async def chat_stream(*args, **kwargs):
+    async def chat_stream(*args: object, **kwargs: object):
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="[[ ##"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=" response"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=" ## ]]\n\n"))])
@@ -1342,13 +1334,13 @@ async def test_chat_adapter_with_generic_type_annotation():
         ],
     )
 
-    with mock.patch("litellm.acompletion", side_effect=chat_stream):
+    with mock.patch("litellm.acompletion", side_effect=chat_stream):  # noqa: SIM117
         with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), adapter=ChatAdapter()):
             output = program(question="Say hello")
             chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    chunks.append(value)
+                    chunks.append(value)  # noqa: PERF401
 
     assert len(chunks) > 0
     assert chunks[0].signature_field_name == "response"
@@ -1365,7 +1357,7 @@ async def test_chat_adapter_nested_pydantic_streaming():
         question: str = InputField()
         response: NestedResponse = OutputField()
 
-    async def nested_stream(*args, **kwargs):
+    async def nested_stream(*args: object, **kwargs: object):
         yield ModelResponseStream(
             model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="[[ ## response ## ]]\n\n"))]
         )
@@ -1392,13 +1384,13 @@ async def test_chat_adapter_nested_pydantic_streaming():
         ],
     )
 
-    with mock.patch("litellm.acompletion", side_effect=nested_stream):
+    with mock.patch("litellm.acompletion", side_effect=nested_stream):  # noqa: SIM117
         with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), adapter=ChatAdapter()):
             output = program(question="Generate nested response")
             chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    chunks.append(value)
+                    chunks.append(value)  # noqa: PERF401
 
     assert len(chunks) > 0
     full_content = "".join(chunk.chunk for chunk in chunks)
@@ -1415,7 +1407,7 @@ async def test_chat_adapter_mixed_fields_streaming():
         summary: str = OutputField()
         details: SimpleResponse = OutputField()
 
-    async def mixed_stream(*args, **kwargs):
+    async def mixed_stream(*args: object, **kwargs: object):
         # First output field (summary - string)
         yield ModelResponseStream(
             model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="[[ ## summary ## ]]\n\n"))]
@@ -1448,7 +1440,7 @@ async def test_chat_adapter_mixed_fields_streaming():
         ],
     )
 
-    with mock.patch("litellm.acompletion", side_effect=mixed_stream):
+    with mock.patch("litellm.acompletion", side_effect=mixed_stream):  # noqa: SIM117
         with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), adapter=ChatAdapter()):
             output = program(question="Generate mixed response")
             summary_chunks = []
@@ -1479,7 +1471,7 @@ async def test_json_adapter_simple_pydantic_streaming():
         question: str = InputField()
         response: SimpleResponse = OutputField()
 
-    async def json_stream(*args, **kwargs):
+    async def json_stream(*args: object, **kwargs: object):
         # Simulate JSON streaming with proper bracket balance tracking
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content='{"'))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content='response"'))])
@@ -1500,13 +1492,13 @@ async def test_json_adapter_simple_pydantic_streaming():
         ],
     )
 
-    with mock.patch("litellm.acompletion", side_effect=json_stream):
+    with mock.patch("litellm.acompletion", side_effect=json_stream):  # noqa: SIM117
         with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()):
             output = program(question="Say hello in JSON")
             chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    chunks.append(value)
+                    chunks.append(value)  # noqa: PERF401
 
     assert len(chunks) > 0
     assert chunks[0].signature_field_name == "response"
@@ -1523,7 +1515,7 @@ async def test_json_adapter_bracket_balance_detection():
         question: str = InputField()
         response: ComplexResponse = OutputField()
 
-    async def complex_json_stream(*args, **kwargs):
+    async def complex_json_stream(*args: object, **kwargs: object):
         # Test nested objects and arrays for bracket counting
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content='{"'))])
         yield ModelResponseStream(
@@ -1551,13 +1543,13 @@ async def test_json_adapter_bracket_balance_detection():
         ],
     )
 
-    with mock.patch("litellm.acompletion", side_effect=complex_json_stream):
+    with mock.patch("litellm.acompletion", side_effect=complex_json_stream):  # noqa: SIM117
         with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()):
             output = program(question="Generate complex JSON")
             chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    chunks.append(value)
+                    chunks.append(value)  # noqa: PERF401
 
     assert len(chunks) > 0
     # Check that the last chunk is marked as the last
@@ -1578,7 +1570,7 @@ async def test_json_adapter_multiple_fields_detection():
         first: SimpleResponse = OutputField()
         second: SimpleResponse = OutputField()
 
-    async def multi_field_stream(*args, **kwargs):
+    async def multi_field_stream(*args: object, **kwargs: object):
         # First field
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content='{"first": {'))])
         yield ModelResponseStream(
@@ -1604,7 +1596,7 @@ async def test_json_adapter_multiple_fields_detection():
         ],
     )
 
-    with mock.patch("litellm.acompletion", side_effect=multi_field_stream):
+    with mock.patch("litellm.acompletion", side_effect=multi_field_stream):  # noqa: SIM117
         with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()):
             output = program(question="Generate two responses")
             first_chunks = []
@@ -1616,7 +1608,6 @@ async def test_json_adapter_multiple_fields_detection():
                     elif value.signature_field_name == "second":
                         second_chunks.append(value)
 
-    # Verify both fields were detected and streamed
     assert len(first_chunks) > 0
     assert len(second_chunks) > 0
 
@@ -1630,18 +1621,15 @@ async def test_json_adapter_multiple_fields_detection():
 def test_stream_listener_could_form_end_identifier_chat_adapter():
     listener = StreamListener(signature_field_name="answer")
 
-    # Should return True for partial bracket sequences
     assert listener._could_form_end_identifier("some text [", "ChatAdapter") is True
     assert listener._could_form_end_identifier("some text [[", "ChatAdapter") is True
     assert listener._could_form_end_identifier("some text [[ ", "ChatAdapter") is True
     assert listener._could_form_end_identifier("some text [[ #", "ChatAdapter") is True
     assert listener._could_form_end_identifier("some text [[ ##", "ChatAdapter") is True
 
-    # Should return True for partial field names after "[[ ##"
     assert listener._could_form_end_identifier("some text [[ ## com", "ChatAdapter") is True
     assert listener._could_form_end_identifier("some text [[ ## completed", "ChatAdapter") is True
 
-    # Should return False for text that clearly cannot form the pattern
     assert listener._could_form_end_identifier("hello world", "ChatAdapter") is False
     assert listener._could_form_end_identifier("some text", "ChatAdapter") is False
     assert listener._could_form_end_identifier("answer: hello", "ChatAdapter") is False
@@ -1650,13 +1638,11 @@ def test_stream_listener_could_form_end_identifier_chat_adapter():
 def test_stream_listener_could_form_end_identifier_json_adapter():
     listener = StreamListener(signature_field_name="output")
 
-    # Should return True for partial quote/brace sequences
     assert listener._could_form_end_identifier('some text "', "JSONAdapter") is True
     assert listener._could_form_end_identifier('some text ",', "JSONAdapter") is True
     assert listener._could_form_end_identifier('some text " ', "JSONAdapter") is True
     assert listener._could_form_end_identifier('some text "}', "JSONAdapter") is True
 
-    # Should return False for text that cannot form the pattern
     assert listener._could_form_end_identifier("hello world", "JSONAdapter") is False
     assert listener._could_form_end_identifier("some text", "JSONAdapter") is False
 
@@ -1664,12 +1650,10 @@ def test_stream_listener_could_form_end_identifier_json_adapter():
 def test_stream_listener_could_form_end_identifier_xml_adapter():
     listener = StreamListener(signature_field_name="result")
 
-    # Should return True for partial closing tag
     assert listener._could_form_end_identifier("some text <", "XMLAdapter") is True
     assert listener._could_form_end_identifier("some text </", "XMLAdapter") is True
     assert listener._could_form_end_identifier("some text </result", "XMLAdapter") is True
 
-    # Should return False for text that cannot form the pattern
     assert listener._could_form_end_identifier("hello world", "XMLAdapter") is False
     assert listener._could_form_end_identifier("some text", "XMLAdapter") is False
 
@@ -1694,10 +1678,10 @@ async def test_streaming_reasoning_model():
             super().__init__()
             self.predict = Predict(ReasoningSignature)
 
-        def forward(self, question, **kwargs):
+        def forward(self, question, **kwargs: object):
             return self.predict(question=question, **kwargs)
 
-    async def reasoning_stream(*args, **kwargs):
+    async def reasoning_stream(*args: object, **kwargs: object):
         """Simulate streaming from a reasoning model like Claude 3.7 Sonnet"""
         # Reasoning content comes through delta.reasoning_content
         yield ModelResponseStream(
@@ -1752,7 +1736,7 @@ async def test_streaming_reasoning_model():
             choices=[StreamingChoices(delta=Delta(content="!\n\n[[ ## completed ## ]]"))],
         )
 
-    with mock.patch("litellm.acompletion", side_effect=reasoning_stream):
+    with mock.patch("litellm.acompletion", side_effect=reasoning_stream):  # noqa: SIM117
         with mock.patch("litellm.supports_reasoning", return_value=True):
             program = streamify(
                 MyProgram(),
@@ -1814,7 +1798,7 @@ async def test_stream_listener_empty_last_chunk_chat_adapter():
 
     predict = Predict("question->reasoning, answer")
 
-    async def mock_stream(*args, **kwargs):
+    async def mock_stream(*args: object, **kwargs: object):
         yield ModelResponseStream(
             model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="[[ ## reasoning ## ]]\n"))]
         )
@@ -1857,7 +1841,7 @@ async def test_stream_listener_empty_last_chunk_chat_adapter():
             all_chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    all_chunks.append(value)
+                    all_chunks.append(value)  # noqa: PERF401
 
             # Find answer and judgement chunks
             reasoning_chunks = [c for c in all_chunks if c.signature_field_name == "reasoning"]
@@ -1872,7 +1856,7 @@ async def test_stream_listener_empty_last_chunk_chat_adapter():
 async def test_stream_listener_empty_last_chunk_json_adapter():
     predict = Predict("question->reasoning, answer")
 
-    async def mock_stream(*args, **kwargs):
+    async def mock_stream(*args: object, **kwargs: object):
         yield ModelResponseStream(
             model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content='{"reasoning": "'))]
         )
@@ -1912,7 +1896,7 @@ async def test_stream_listener_empty_last_chunk_json_adapter():
             all_chunks = []
             async for value in output:
                 if isinstance(value, StreamResponse):
-                    all_chunks.append(value)
+                    all_chunks.append(value)  # noqa: PERF401
 
             # Find answer and judgement chunks
             reasoning_chunks = [c for c in all_chunks if c.signature_field_name == "reasoning"]
@@ -1944,10 +1928,10 @@ async def test_streaming_reasoning_fallback():
             super().__init__()
             self.predict = Predict(ReasoningSignature)
 
-        def forward(self, question, **kwargs):
+        def forward(self, question, **kwargs: object):
             return self.predict(question=question, **kwargs)
 
-    async def non_reasoning_stream(*args, **kwargs):
+    async def non_reasoning_stream(*args: object, **kwargs: object):
         """Simulate streaming from a non-reasoning model like GPT-4o-mini.
 
         The reasoning field is formatted by the adapter as a regular field,
@@ -2038,7 +2022,7 @@ async def test_streaming_reasoning_fallback():
             choices=[StreamingChoices(delta=Delta(content="\n\n[[ ## completed ## ]]"))],
         )
 
-    with mock.patch("litellm.acompletion", side_effect=non_reasoning_stream):
+    with mock.patch("litellm.acompletion", side_effect=non_reasoning_stream):  # noqa: SIM117
         with mock.patch("litellm.supports_reasoning", return_value=False):
             program = streamify(
                 MyProgram(),

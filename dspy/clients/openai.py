@@ -13,14 +13,14 @@ def _openai() -> Any:
 
 
 class TrainingJobOpenAI(TrainingJob):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.provider_file_id = None
         self.provider_job_id = None
 
-    def cancel(self):
+    def cancel(self) -> None:  # ty:ignore[invalid-method-override]
         # Cancel the provider job
-        if OpenAIProvider.does_job_exist(self.provider_job_id):
+        if OpenAIProvider.does_job_exist(self.provider_job_id):  # ty:ignore[invalid-argument-type]
             status = self.status()
             if OpenAIProvider.is_terminal_training_status(status):
                 err_msg = "Jobs that are complete cannot be canceled."
@@ -39,20 +39,19 @@ class TrainingJobOpenAI(TrainingJob):
         super().cancel()
 
     def status(self) -> TrainingStatus:
-        status = OpenAIProvider.get_training_status(self.provider_job_id)
-        return status
+        return OpenAIProvider.get_training_status(self.provider_job_id)  # ty:ignore[invalid-argument-type]
 
 
 class OpenAIProvider(Provider):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.finetunable = True
         self.TrainingJob = TrainingJobOpenAI
 
     @staticmethod
     def is_provider_model(model: str) -> bool:
-        if model.startswith("openai/") or model.startswith("ft:"):
-            # Althought it looks strange, `ft:` is a unique identifer for openai finetuned models in litellm context:
+        if model.startswith(("openai/", "ft:")):  # noqa: SIM103 dynamic typing/lint migration for scoped ty adoption
+            # In LiteLLM, ft: uniquely identifies OpenAI fine-tuned models:
             # https://github.com/BerriAI/litellm/blob/cd893134b7974d9f21477049a373b469fff747a5/litellm/utils.py#L4495
             return True
 
@@ -70,38 +69,28 @@ class OpenAIProvider(Provider):
         train_data: list[dict[str, Any]],
         train_data_format: TrainDataFormat | None,
         train_kwargs: dict[str, Any] | None = None,
-    ) -> str:
+    ) -> str:  # ty:ignore[invalid-method-override]
         model = OpenAIProvider._remove_provider_prefix(model)
 
-        print("[OpenAI Provider] Validating the data format")
-        OpenAIProvider.validate_data_format(train_data_format)
+        OpenAIProvider.validate_data_format(train_data_format)  # ty:ignore[invalid-argument-type]
 
-        print("[OpenAI Provider] Saving the data to a file")
         data_path = save_data(train_data)
-        print(f"[OpenAI Provider] Data saved to {data_path}")
 
-        print("[OpenAI Provider] Uploading the data to the provider")
         provider_file_id = OpenAIProvider.upload_data(data_path)
         job.provider_file_id = provider_file_id
 
-        print("[OpenAI Provider] Starting remote training")
         provider_job_id = OpenAIProvider._start_remote_training(
             train_file_id=job.provider_file_id,
             model=model,
             train_kwargs=train_kwargs,
         )
         job.provider_job_id = provider_job_id
-        print(f"[OpenAI Provider] Job started with the OpenAI Job ID {provider_job_id}")
 
-        print("[OpenAI Provider] Waiting for training to complete")
         # TODO(feature): Could we stream OAI logs?
         OpenAIProvider.wait_for_job(job)
 
-        print("[OpenAI Provider] Attempting to retrieve the trained model")
-        model = OpenAIProvider.get_trained_model(job)
-        print(f"[OpenAI Provider] Model retrieved: {model}")
+        return OpenAIProvider.get_trained_model(job)
 
-        return model
 
     @staticmethod
     def does_job_exist(job_id: str) -> bool:
@@ -144,7 +133,6 @@ class OpenAIProvider(Provider):
 
         # Check if there is an active job
         if job_id is None:
-            print("There is no active job.")
             return TrainingStatus.not_started
 
         err_msg = f"Job with ID {job_id} does not exist."
@@ -153,12 +141,11 @@ class OpenAIProvider(Provider):
         # Retrieve the provider's job and report the status
         provider_job = _openai().fine_tuning.jobs.retrieve(job_id)
         provider_status = provider_job.status
-        status = provider_status_to_training_status[provider_status]
+        return provider_status_to_training_status[provider_status]
 
-        return status
 
     @staticmethod
-    def validate_data_format(data_format: TrainDataFormat):
+    def validate_data_format(data_format: TrainDataFormat) -> None:
         supported_data_formats = [
             TrainDataFormat.CHAT,
             TrainDataFormat.COMPLETION,
@@ -171,7 +158,7 @@ class OpenAIProvider(Provider):
     def upload_data(data_path: str) -> str:
         # Upload the data to the provider
         provider_file = _openai().files.create(
-            file=open(data_path, "rb"),
+            file=open(data_path, "rb"),  # noqa: SIM115 dynamic typing/lint migration for scoped ty adoption
             purpose="fine-tune",
         )
         return provider_file.id
@@ -190,7 +177,7 @@ class OpenAIProvider(Provider):
     def wait_for_job(
         job: TrainingJobOpenAI,
         poll_frequency: int = 20,
-    ):
+    ) -> None:
         # Poll for the job until it is done
         done = False
         cur_event_id = None
@@ -202,16 +189,14 @@ class OpenAIProvider(Provider):
                 timestamp = remote_job.estimated_finish
                 if timestamp:
                     estimated_finish_dt = datetime.fromtimestamp(timestamp)
-                    delta_dt = estimated_finish_dt - datetime.now()
-                    print(f"[OpenAI Provider] The OpenAI estimated time remaining is: {delta_dt}")
+                    estimated_finish_dt - datetime.now()
                     reported_estimated_time = True
 
             # Get new events
             page = _openai().fine_tuning.jobs.list_events(fine_tuning_job_id=job.provider_job_id, limit=1)
             new_event = page.data[0] if page.data else None
             if new_event and new_event.id != cur_event_id:
-                dt = datetime.fromtimestamp(new_event.created_at)
-                print(f"[OpenAI Provider] {dt} {new_event.message}")
+                datetime.fromtimestamp(new_event.created_at)
                 cur_event_id = new_event.id
 
             # Sleep and update the flag
@@ -227,5 +212,4 @@ class OpenAIProvider(Provider):
             raise Exception(err_msg)
 
         provider_job = _openai().fine_tuning.jobs.retrieve(job.provider_job_id)
-        finetuned_model = provider_job.fine_tuned_model
-        return finetuned_model
+        return provider_job.fine_tuned_model

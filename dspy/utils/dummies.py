@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
-from typing import Any
+from typing import Any, NoReturn
 
 from dspy.adapters.chat_adapter import FieldInfoWithName, field_header_pattern
 from dspy.clients.base_lm import BaseLM
@@ -84,7 +84,7 @@ class DummyLM(BaseLM):
         follow_examples: bool = False,
         reasoning: bool = False,
         adapter=None,
-    ):
+    ) -> None:
         super().__init__("dummy", "chat", 0.0, 1000, True)
         self.answers = answers
         if isinstance(answers, list):
@@ -102,9 +102,8 @@ class DummyLM(BaseLM):
         # find all field names
         fields = defaultdict(int)
         for message in messages:
-            if "content" in message:
-                if ma := field_header_pattern.match(message["content"]):
-                    fields[message["content"][ma.start() : ma.end()]] += 1
+            if "content" in message and (ma := field_header_pattern.match(message["content"])):
+                fields[message["content"][ma.start() : ma.end()]] += 1
         # find the fields which are missing from the final turns
         max_count = max(fields.values())
         output_fields = [field for field, count in fields.items() if count != max_count]
@@ -114,6 +113,7 @@ class DummyLM(BaseLM):
         for input, output in zip(reversed(messages[:-1]), reversed(messages), strict=False):
             if any(field in output["content"] for field in output_fields) and final_input in input["content"]:
                 return output["content"]
+        return None
 
     def _format_answer_fields(self, field_names_and_values: dict[str, Any]):
         fields_with_values = {
@@ -126,7 +126,7 @@ class DummyLM(BaseLM):
 
         # Try to use role="assistant" if the adapter supports it (like JSONAdapter)
         try:
-            return adapter.format_field_with_value(fields_with_values, role="assistant")
+            return adapter.format_field_with_value(fields_with_values, role="assistant")  # ty:ignore[unknown-argument]
         except TypeError:
             # Fallback for adapters that don't support role parameter (like ChatAdapter)
             return adapter.format_field_with_value(fields_with_values)
@@ -141,11 +141,11 @@ class DummyLM(BaseLM):
                 current_output = self._use_example(messages)
             elif isinstance(self.answers, dict):
                 current_output = next(
-                    (self._format_answer_fields(v) for k, v in self.answers.items() if k in messages[-1]["content"]),
+                    (self._format_answer_fields(v) for k, v in self.answers.items() if k in messages[-1]["content"]),  # ty:ignore[invalid-argument-type, unsupported-operator]
                     "No more responses",
                 )
             else:
-                current_output = self._format_answer_fields(next(self.answers, {"answer": "No more responses"}))
+                current_output = self._format_answer_fields(next(self.answers, {"answer": "No more responses"}))  # ty:ignore[invalid-argument-type]
 
             message = dotdict(content=current_output, tool_calls=None)
             if self.reasoning:
@@ -166,10 +166,10 @@ class DummyLM(BaseLM):
         return self.history[index]["messages"], self.history[index]["outputs"]
 
 
-def dummy_rm(passages=()) -> callable:
+def dummy_rm(passages=()) -> callable:  # ty:ignore[invalid-type-form]
     if not passages:
 
-        def inner(query: str, *, k: int, **kwargs):
+        def inner(query: str, *, k: int, **kwargs) -> NoReturn:
             raise ValueError("No passages defined")
 
         return inner
@@ -191,7 +191,7 @@ def dummy_rm(passages=()) -> callable:
 class DummyVectorizer:
     """Simple vectorizer based on n-grams."""
 
-    def __init__(self, max_length=100, n_gram=2):
+    def __init__(self, max_length=100, n_gram=2) -> None:
         self.max_length = max_length
         self.n_gram = n_gram
         self.P = 10**9 + 7  # A large prime number
@@ -217,5 +217,5 @@ class DummyVectorizer:
 
         vecs = np.array(vecs, dtype=np.float32)
         vecs -= np.mean(vecs, axis=1, keepdims=True)
-        vecs /= np.linalg.norm(vecs, axis=1, keepdims=True) + 1e-10  # Added epsilon to avoid division by zero
+        vecs /= np.linalg.norm(vecs, axis=1, keepdims=True) + 1e-10  # Epsilon avoids division by zero for empty or constant vectors.
         return vecs

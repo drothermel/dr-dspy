@@ -3,13 +3,13 @@ from typing import TYPE_CHECKING, Any
 from dspy.adapters.types.tool import Tool, convert_input_schema_to_tool_args
 
 if TYPE_CHECKING:
-    from langchain.tools import BaseTool
+    from langchain.tools import BaseTool  # ty:ignore[unresolved-import]
 
 
 
 def convert_langchain_tool(tool: "BaseTool") -> Tool:
     """Build a DSPy tool from a LangChain tool.
-    
+
     This function converts a LangChain tool (either created with @tool decorator
     or by subclassing BaseTool) into a DSPy Tool.
 
@@ -21,8 +21,7 @@ def convert_langchain_tool(tool: "BaseTool") -> Tool:
     """
     async def func(**kwargs):
         try:
-            result = await tool.ainvoke(kwargs)
-            return result
+            return await tool.ainvoke(kwargs)
         except Exception as e:
             raise RuntimeError(f"Failed to call LangChain tool {tool.name}: {e!s}")
 

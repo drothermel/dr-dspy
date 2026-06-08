@@ -14,12 +14,11 @@ from dspy.signatures.signature import ensure_signature
 def get_number_with_suffix(number: int) -> str:
     if number == 1:
         return "1st"
-    elif number == 2:
+    if number == 2:
         return "2nd"
-    elif number == 3:
+    if number == 3:
         return "3rd"
-    else:
-        return f"{number}th"
+    return f"{number}th"
 
 
 class Avatar(Module):
@@ -29,7 +28,7 @@ class Avatar(Module):
         tools,
         max_iters=3,
         verbose=False,
-    ):
+    ) -> None:
         self.signature = ensure_signature(signature)
         self.input_fields = self.signature.input_fields
         self.output_fields = self.signature.output_fields
@@ -61,14 +60,13 @@ class Avatar(Module):
             return InputField(
                 desc=field_info.json_schema_extra["desc"],
             )
-        elif field_info.json_schema_extra["__dspy_field_type"] == "output":
+        if field_info.json_schema_extra["__dspy_field_type"] == "output":
             return OutputField(
                 desc=field_info.json_schema_extra["desc"],
             )
-        else:
-            raise ValueError(f"Unknown field type: {field_info.json_schema_extra['__dspy_field_type']}")
+        raise ValueError(f"Unknown field type: {field_info.json_schema_extra['__dspy_field_type']}")
 
-    def _update_signature(self, idx: int, omit_action: bool = False):
+    def _update_signature(self, idx: int, omit_action: bool = False) -> None:
         self.actor.signature = self.actor.signature.with_updated_fields(
             f"action_{idx}", Action, __dspy_field_type="input"
         )
@@ -106,24 +104,25 @@ class Avatar(Module):
         for tool in self.tools:
             if tool.name == tool_name:
                 return tool.tool.run(tool_input_query)
+        return None
 
     def forward(self, **kwargs):
         if self.verbose:
-            print("Starting the task...")
+            pass
 
         args = {
             "goal": self.signature.__doc__,
             "tools": [tool.name for tool in self.tools],
         }
 
-        for key in self.input_fields.keys():
+        for key in self.input_fields:
             if key in kwargs:
                 args[key] = kwargs[key]
 
         idx = 1
         tool_name = None
         action_results: list[ActionOutput] = []
-        max_iters = None if "max_iters" not in kwargs else kwargs["max_iters"]
+        max_iters = kwargs.get("max_iters")
 
         while tool_name != "Finish" and (max_iters > 0 if max_iters else True):
             actor_output = self.actor(**args)
@@ -133,7 +132,7 @@ class Avatar(Module):
             tool_input_query = action.tool_input_query
 
             if self.verbose:
-                print(f"Action {idx}: {tool_name} ({tool_input_query})")
+                pass
 
             if tool_name != "Finish":
                 tool_output = self._call_tool(tool_name, tool_input_query)
@@ -161,6 +160,6 @@ class Avatar(Module):
         self.actor = deepcopy(self.actor_clone)
 
         return Prediction(
-            **{key: getattr(final_answer, key) for key in self.output_fields.keys()},
+            **{key: getattr(final_answer, key) for key in self.output_fields},
             actions=action_results,
         )

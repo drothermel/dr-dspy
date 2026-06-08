@@ -30,7 +30,7 @@ class ProgramOfThought(Module):
     ```
     """
 
-    def __init__(self, signature: str | type[Signature], max_iters: int = 3, interpreter: PythonInterpreter | None = None):
+    def __init__(self, signature: str | type[Signature], max_iters: int = 3, interpreter: PythonInterpreter | None = None) -> None:
         """
         Args:
             signature: The signature of the module.
@@ -62,7 +62,7 @@ class ProgramOfThought(Module):
                 self._generate_instruction("answer"),
             ),
         )
-        # It will raises exception when dspy cannot find available deno instance by now.
+        # PythonInterpreter may raise if the Deno-backed sandbox is unavailable; construct it here so failures surface during module initialization.
         self.interpreter = interpreter or PythonInterpreter()
 
     def _generate_signature(self, mode):
@@ -151,7 +151,7 @@ class ProgramOfThought(Module):
             result = self.interpreter.execute(code)
             if isinstance(result, FinalOutput):
                 result = result.output
-            # Since it's more complex structure now, just blindly use json to represents all.
+            # Serialize interpreter results before passing them back through the answer signature.
             output = json.dumps(result)
             return output, None
         except Exception as e:
@@ -165,7 +165,6 @@ class ProgramOfThought(Module):
         if not error:
             output, error = self._execute_code(code)
         hop = 1
-        # Retying code generation and execution until no error or reach max_iters
         while error is not None:
             logger.error(f"Error in code execution: {error}")
             if hop == self.max_iters:

@@ -57,7 +57,7 @@ class SingleComponentMultiModalProposer(Module):
     Module for proposing improved instructions based on feedback.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.propose_instruction = Predict(GenerateEnhancedMultimodalInstructionFromFeedback)
 
@@ -201,7 +201,7 @@ class SingleComponentMultiModalProposer(Module):
                 image_idx = len(example_images) + 1
                 example_images.append(value)
                 return f"[IMAGE-{image_idx} - see visual content]\n\n"
-            elif isinstance(value, dict):
+            if isinstance(value, dict):
                 s = ""
                 for k, v in value.items():
                     s += f"{'#' * level} {k}\n"
@@ -209,7 +209,7 @@ class SingleComponentMultiModalProposer(Module):
                 if not value:
                     s += "\n"
                 return s
-            elif isinstance(value, (list, tuple)):
+            if isinstance(value, (list, tuple)):
                 s = ""
                 for i, item in enumerate(value):
                     s += f"{'#' * level} Item {i + 1}\n"
@@ -217,8 +217,7 @@ class SingleComponentMultiModalProposer(Module):
                 if not value:
                     s += "\n"
                 return s
-            else:
-                return f"{str(value).strip()}\n\n"
+            return f"{str(value).strip()}\n\n"
 
         def convert_sample_to_markdown_with_images(sample, example_num):
             example_images = []
@@ -279,7 +278,7 @@ class MultiModalInstructionProposer(ProposalFn):
     a single-component proposer for each component that needs to be updated.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.single_proposer = SingleComponentMultiModalProposer()
 
     def __call__(

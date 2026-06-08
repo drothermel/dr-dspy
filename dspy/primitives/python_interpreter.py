@@ -15,8 +15,10 @@ import logging
 import os
 import subprocess
 import threading
+from collections.abc import Callable
 from os import PathLike
-from typing import Any, Callable
+from pathlib import Path
+from typing import Any
 
 from dspy.primitives.code_interpreter import SIMPLE_TYPES, CodeInterpreterError, FinalOutput
 
@@ -54,7 +56,7 @@ def _canonicalize_path(path: PathLike | str) -> str:
     (denoland/deno#9607), so --allow-read / --allow-write entries must be
     realpath'd or reads through a symlink (including DENO_DIR) are denied.
     """
-    return os.path.realpath(os.path.expanduser(os.fspath(path)))
+    return str(Path(os.fspath(path)).expanduser().resolve())
 
 
 def _jsonrpc_request(method: str, params: dict, id: int | str) -> str:
@@ -156,7 +158,7 @@ class PythonInterpreter:
         self.tools = dict(tools) if tools else {}
         self.output_fields = output_fields
         self._tools_registered = False
-        # TODO later on add enable_run (--allow-run) by proxying subprocess.run through Deno.run() to fix 'emscripten does not support processes' error
+        # TODO: If sandbox subprocess support is needed, expose Deno run permission and proxy subprocess.run through Deno.run(); Pyodide itself raises "emscripten does not support processes".
 
         if deno_command:
             self.deno_command = list(deno_command)
@@ -230,10 +232,9 @@ class PythonInterpreter:
         return None
 
     def _get_runner_path(self) -> str:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        return os.path.join(current_dir, "runner.js")
+        return str(Path(__file__).resolve().parent / "runner.js")
 
-    def _mount_files(self):
+    def _mount_files(self) -> None:
         if self._mounted_files:
             return
         paths_to_mount = []
@@ -246,24 +247,25 @@ class PythonInterpreter:
         for path in paths_to_mount:
             if not path:
                 continue
-            if not os.path.exists(path):
+            path_obj = Path(path)
+            if not path_obj.exists():
                 if self.enable_write_paths and path in self.enable_write_paths:
-                    open(path, "a").close()
+                    path_obj.open("a").close()
                 else:
                     raise FileNotFoundError(f"Cannot mount non-existent file: {path}")
             # Virtual path keeps the user's basename so sandbox code refers to the
             # file by the name passed in; host_path is realpath'd so Deno's
             # permission check matches the canonical entries in --allow-read.
-            virtual_path = f"/sandbox/{os.path.basename(str(path))}"
+            virtual_path = f"/sandbox/{path_obj.name}"
             host_path = _canonicalize_path(path)
             self._send_request("mount_file", {"host_path": host_path, "virtual_path": virtual_path}, f"mounting {path}")
         self._mounted_files = True
 
-    def _sync_files(self):
+    def _sync_files(self) -> None:
         if not self.enable_write_paths or not self.sync_files:
             return
         for path in self.enable_write_paths:
-            virtual_path = f"/sandbox/{os.path.basename(str(path))}"
+            virtual_path = f"/sandbox/{Path(path).name}"
             host_path = _canonicalize_path(path)
             sync_msg = _jsonrpc_notification("sync_file", {"virtual_path": virtual_path, "host_path": host_path})
             self.deno_process.stdin.write(sync_msg + "\n")
@@ -277,9 +279,8 @@ class PythonInterpreter:
             p = {"name": name}
             # Only include type for simple types that work in function signatures
             # Complex types like Union, Optional, etc. are not included
-            if param.annotation != inspect.Parameter.empty:
-                if param.annotation in SIMPLE_TYPES:
-                    p["type"] = param.annotation.__name__
+            if param.annotation != inspect.Parameter.empty and param.annotation in SIMPLE_TYPES:
+                p["type"] = param.annotation.__name__
             if param.default != inspect.Parameter.empty:
                 p["default"] = param.default
             params.append(p)
@@ -430,11 +431,11 @@ class PythonInterpreter:
         """Recursively convert Python values to JSON-compatible types."""
         if value is None or isinstance(value, (str, int, float, bool)):
             return value
-        elif isinstance(value, dict):
+        if isinstance(value, dict):
             return {k: self._to_json_compatible(v) for k, v in value.items()}
-        elif isinstance(value, (list, tuple)):
+        if isinstance(value, (list, tuple)):
             return [self._to_json_compatible(v) for v in value]
-        elif isinstance(value, set):
+        if isinstance(value, set):
             try:
                 return sorted(self._to_json_compatible(v) for v in value)
             except TypeError:
@@ -475,24 +476,24 @@ class PythonInterpreter:
         """
         if value is None:
             return "None"
-        elif isinstance(value, str):
+        if isinstance(value, str):
             return repr(value)
-        elif isinstance(value, bool):
+        if isinstance(value, bool):
             # Must check bool before int since bool is a subclass of int
             return "True" if value else "False"
-        elif isinstance(value, (int, float)):
+        if isinstance(value, (int, float)):
             return str(value)
-        elif isinstance(value, (list, tuple)):
+        if isinstance(value, (list, tuple)):
             # Tuples become lists for JSON compatibility
             items = ", ".join(self._serialize_value(item) for item in value)
             return f"[{items}]"
-        elif isinstance(value, dict):
+        if isinstance(value, dict):
             items = ", ".join(
                 f"{self._serialize_value(k)}: {self._serialize_value(v)}"
                 for k, v in value.items()
             )
             return f"{{{items}}}"
-        elif isinstance(value, set):
+        if isinstance(value, set):
             # Sets become sorted lists (or unsorted if mixed types) for JSON compatibility
             try:
                 sorted_items = sorted(value)
@@ -500,8 +501,7 @@ class PythonInterpreter:
                 sorted_items = list(value)
             items = ", ".join(self._serialize_value(item) for item in sorted_items)
             return f"[{items}]"
-        else:
-            raise CodeInterpreterError(f"Unsupported value type: {type(value).__name__}")
+        raise CodeInterpreterError(f"Unsupported value type: {type(value).__name__}")
 
     def _inject_large_var(self, name: str, value: str) -> None:
         """Inject a large variable via the virtual filesystem."""
@@ -550,10 +550,9 @@ class PythonInterpreter:
                 continue
 
             # Handle incoming requests (tool calls from sandbox)
-            if "method" in msg:
-                if msg["method"] == "tool_call":
-                    self._handle_tool_call(msg)
-                    continue
+            if "method" in msg and msg["method"] == "tool_call":
+                self._handle_tool_call(msg)
+                continue
 
             # Handle success response
             if "result" in msg:
@@ -580,8 +579,7 @@ class PythonInterpreter:
 
                 if error_code == JSONRPC_APP_ERRORS["SyntaxError"]:
                     raise SyntaxError(f"Invalid Python syntax. message: {error_message}")
-                else:
-                    raise CodeInterpreterError(f"{error_type}: {error_data.get('args') or error_message}")
+                raise CodeInterpreterError(f"{error_type}: {error_data.get('args') or error_message}")
 
             # Unexpected message format - neither a recognized method nor a response
             raise CodeInterpreterError(f"Unexpected message format from sandbox: {msg}")

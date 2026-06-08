@@ -1,4 +1,3 @@
-# FILEPATH: /Users/ahle/repos/dspy/tests/evaluate/test_metrics.py
 from dspy.evaluate.metrics import answer_exact_match
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example

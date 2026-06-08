@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, get_args
+from typing import TYPE_CHECKING, Any, get_args
 
 import pydantic
 
@@ -12,19 +12,19 @@ from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import ensure_signature
+from dspy.signatures.signature import Signature, ensure_signature
 from dspy.utils.annotation import experimental
 from dspy.utils.exceptions import AdapterParseError, ContextWindowExceededError
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from dspy.signatures.signature import Signature
+    from collections.abc import Callable
 
 
 @experimental
 class ReActV2(Module):
-    def __init__(self, signature: type[Signature], tools: list[Callable | Tool], max_iters: int = 20):
+    def __init__(self, signature: type[Signature], tools: list[Callable | Tool], max_iters: int = 20) -> None:
         super().__init__()
         self.signature = ensure_signature(signature)
         self.max_iters = max_iters

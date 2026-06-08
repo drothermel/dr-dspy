@@ -38,7 +38,7 @@ def test_propose_instructions_for_program(demo_candidates):
 )
 def test_propose_instruction_for_predictor(demo_candidates):
     class TrackingDummyLM(DummyLM):
-        def copy(self, **kwargs):
+        def copy(self, **kwargs: object):
             self.last_copy_kwargs = kwargs
             return super().copy(**kwargs)
 

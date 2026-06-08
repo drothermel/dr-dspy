@@ -1,10 +1,10 @@
-from dspy.utils.dummies import DummyLM
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import ToolCalls
 from dspy.clients.base_lm import BaseLM
 from dspy.dsp.utils.settings import settings
 from dspy.dsp.utils.utils import dotdict
 from dspy.predict.react_v2 import ReActV2
+from dspy.utils.dummies import DummyLM
 
 
 class ReasoningDummyLM(DummyLM):
@@ -208,7 +208,7 @@ class NativeToolLM(BaseLM):
     def supports_function_calling(self):
         return True
 
-    def forward(self, prompt=None, messages=None, **kwargs):
+    def forward(self, prompt=None, messages=None, **kwargs: object):
         self.calls.append({"messages": messages, "kwargs": kwargs})
         if len(self.calls) == 1:
             tool_call = dotdict(
@@ -244,7 +244,7 @@ class ParallelNativeToolLM(BaseLM):
     def supports_function_calling(self):
         return True
 
-    def forward(self, prompt=None, messages=None, **kwargs):
+    def forward(self, prompt=None, messages=None, **kwargs: object):
         self.calls.append({"messages": messages, "kwargs": kwargs})
         if len(self.calls) == 1:
             tool_calls = [

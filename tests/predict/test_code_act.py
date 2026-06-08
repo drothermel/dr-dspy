@@ -134,5 +134,5 @@ class CustomTool:
         return a + b
 
 def test_codeact_tool_validation():
-    with pytest.raises(ValueError, match="CodeAct only accepts functions and not callable objects."):
+    with pytest.raises(ValueError, match="CodeAct only accepts functions and not callable objects."):  # noqa: RUF043
         CodeAct(BasicQA, tools=[CustomTool()])

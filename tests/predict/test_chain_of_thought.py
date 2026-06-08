@@ -60,7 +60,7 @@ def test_chain_of_thought_with_native_reasoning():
         assert isinstance(result.reasoning, str)
         assert result.reasoning == "Step-by-step thinking about the capital of France"
 
-        args, kwargs = mock_completion.call_args
+        _args, _kwargs = mock_completion.call_args
 
 
 def test_chain_of_thought_with_manual_reasoning():

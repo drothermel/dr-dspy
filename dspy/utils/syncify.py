@@ -1,12 +1,15 @@
 import asyncio
+from collections.abc import Awaitable
 from types import MethodType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
     from dspy.primitives.module import Module
 
+T = TypeVar("T")
 
-def run_async(coro):
+
+def run_async(coro: Awaitable[T]) -> T:
     """Run an async coroutine from a synchronous context."""
     try:
         loop = asyncio.get_running_loop()
@@ -14,13 +17,12 @@ def run_async(coro):
         loop = None
 
     if loop and loop.is_running():
-        # If we're in a running event loop (e.g., Jupyter), use asyncio.create_task and run until done
-        import nest_asyncio
+        # In notebooks/Jupyter, patch nested event loops so run_until_complete can drive the coroutine from sync code.
+        import nest_asyncio  # ty:ignore[unresolved-import]
 
         nest_asyncio.apply()
         return asyncio.get_event_loop().run_until_complete(coro)
-    else:
-        return asyncio.run(coro)
+    return asyncio.run(coro)  # ty:ignore[invalid-argument-type]
 
 
 def syncify(program: "Module", in_place: bool = True) -> "Module":
@@ -41,20 +43,19 @@ def syncify(program: "Module", in_place: bool = True) -> "Module":
     """
     if in_place:
 
-        def forward(self, *args, **kwargs):
+        def forward(self: "Module", *args: object, **kwargs: object) -> object:
             return run_async(self.aforward(*args, **kwargs))
 
         # Create the `forward` method in place.
-        program.forward = MethodType(forward, program)
+        program.forward = MethodType(forward, program)  # ty:ignore[unresolved-attribute]
         return program
-    else:
-        from dspy.primitives.module import Module
+    from dspy.primitives.module import Module
 
-        class SyncWrapper(Module):
-            def __init__(self, program: "Module"):
-                self.program = program
+    class SyncWrapper(Module):
+        def __init__(self, program: "Module") -> None:
+            self.program = program
 
-            def forward(self, *args, **kwargs):
-                return run_async(self.program.aforward(*args, **kwargs))
+        def forward(self, *args: Any, **kwargs: Any) -> Any:
+            return run_async(self.program.aforward(*args, **kwargs))
 
-        return SyncWrapper(program)
+    return SyncWrapper(program)

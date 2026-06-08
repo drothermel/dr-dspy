@@ -11,8 +11,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.signatures.field import InputField
-from dspy.signatures.field import OutputField
+from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
 
 logger = logging.getLogger(__name__)
@@ -80,7 +79,7 @@ def wrap_program(program: Module, metric: Callable):
     return wrapped_program
 
 def append_a_demo(demo_input_field_maxlen):
-    def append_a_demo_(bucket, system, **kwargs):
+    def append_a_demo_(bucket, system, **kwargs) -> bool:
         predictor2name, name2predictor = kwargs["predictor2name"], kwargs["name2predictor"]
         batch_10p_score = kwargs["batch_10p_score"]
 
@@ -112,7 +111,7 @@ def append_a_demo(demo_input_field_maxlen):
     return append_a_demo_
 
 
-def append_a_rule(bucket, system, **kwargs):
+def append_a_rule(bucket, system, **kwargs) -> bool:
     predictor2name = kwargs["predictor2name"]
     batch_10p_score, batch_90p_score = kwargs["batch_10p_score"], kwargs["batch_90p_score"]
     prompt_model = kwargs["prompt_model"] or settings.lm
@@ -248,11 +247,10 @@ def recursive_mask(o):
     if isinstance(o, dict):
         return {k: recursive_mask(v) for k, v in o.items()}
     # If it's a list, apply recursively.
-    elif isinstance(o, list):
+    if isinstance(o, list):
         return [recursive_mask(v) for v in o]
     # If it's a tuple, apply recursively.
-    elif isinstance(o, tuple):
+    if isinstance(o, tuple):
         return tuple(recursive_mask(v) for v in o)
     # Otherwise, replace it with a placeholder string (or use repr(o)).
-    else:
-        return f"<non-serializable: {type(o).__name__}>"
+    return f"<non-serializable: {type(o).__name__}>"

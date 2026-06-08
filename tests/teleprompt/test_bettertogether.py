@@ -11,8 +11,8 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.teleprompt.bettertogether import BetterTogether
-from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.teleprompt.bootstrap_finetune import BootstrapFinetune
+from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.dummies import DummyLM
 
@@ -36,7 +36,7 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    def forward(self, **kwargs):
+    def forward(self, **kwargs: object):
         return self.predictor(**kwargs)
 
 
@@ -46,7 +46,7 @@ class SimpleModule(Module):
 
 class SimpleOptimizer(Teleprompter):
     """A simple optimizer that returns the student unchanged."""
-    def compile(self, student, **kwargs):
+    def compile(self, student, **kwargs: object):
         return student
 
 
@@ -55,7 +55,7 @@ class MarkedOptimizer(Teleprompter):
     def __init__(self, marker):
         self.marker = marker
 
-    def compile(self, student, **kwargs):
+    def compile(self, student, **kwargs: object):
         prog = SimpleModule("input -> output")
         prog.marker = self.marker
         return prog
@@ -142,11 +142,11 @@ def test_bettertogether_initialization_custom():
 def test_bettertogether_initialization_invalid_optimizer():
     """Test that BetterTogether rejects non-Teleprompter optimizers."""
     try:
-        optimizer = BetterTogether(
+        BetterTogether(
             metric=simple_metric,
             p="not_a_teleprompter"  # Invalid type
         )
-        assert False, "Should have raised TypeError for invalid optimizer"
+        raise AssertionError("Should have raised TypeError for invalid optimizer")
     except TypeError as e:
         assert "must be a Teleprompter" in str(e)
 
@@ -155,13 +155,11 @@ def test_strategy_validation():
     """Test strategy validation: valid, invalid, and empty strategies."""
     optimizer = BetterTogether(metric=simple_metric)
 
-    # Valid strategies should parse without errors
     valid_strategies = ["p", "w", "p -> w", "w -> p", "p -> w -> p"]
     for strategy in valid_strategies:
         parsed = optimizer._prepare_strategy(strategy)
         assert parsed is not None, f"Failed to parse valid strategy: {strategy}"
 
-    # Invalid strategies should raise ValueError
     with pytest.raises(ValueError, match="invalid optimizer keys"):
         optimizer._prepare_strategy("p -> x -> w")
 
@@ -183,7 +181,7 @@ def test_compile_basic():
         def __init__(self):
             self.compile_called = False
 
-        def compile(self, student, **kwargs):
+        def compile(self, student, **kwargs: object):
             self.compile_called = True
             return student
 
@@ -194,7 +192,7 @@ def test_compile_basic():
     with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
         mock_eval.return_value = Mock(score=0.8)
 
-        with patch("dspy.teleprompt.bettertogether.launch_lms"):
+        with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 compiled = optimizer.compile(
                     student,
@@ -219,7 +217,7 @@ def test_trainset_validation():
 
     try:
         optimizer.compile(student, trainset=[], valset=valset)
-        assert False, "Should have raised ValueError for empty trainset"
+        raise AssertionError("Should have raised ValueError for empty trainset")
     except ValueError as e:
         assert "cannot be empty" in str(e).lower()
 
@@ -235,14 +233,14 @@ def test_valset_ratio_validation():
     # Test valset_ratio >= 1
     try:
         optimizer.compile(student, trainset=trainset, valset_ratio=1.0)
-        assert False, "Should have raised ValueError for valset_ratio >= 1"
+        raise AssertionError("Should have raised ValueError for valset_ratio >= 1")
     except ValueError as e:
         assert "must be in range [0, 1)" in str(e)
 
     # Test valset_ratio < 0
     try:
         optimizer.compile(student, trainset=trainset, valset_ratio=-0.1)
-        assert False, "Should have raised ValueError for valset_ratio < 0"
+        raise AssertionError("Should have raised ValueError for valset_ratio < 0")
     except ValueError as e:
         assert "must be in range [0, 1)" in str(e)
 
@@ -257,7 +255,7 @@ def test_optimizer_compile_args_validation():
             {"invalid_key": {"num_trials": 10}},
             teacher=None
         )
-        assert False, "Should have raised ValueError for invalid optimizer key"
+        raise AssertionError("Should have raised ValueError for invalid optimizer key")
     except ValueError as e:
         assert "invalid optimizer key" in str(e).lower()
 
@@ -272,7 +270,7 @@ def test_student_in_optimizer_compile_args():
             "p",
             {"student": SimpleModule("input -> output")}
         )
-        assert False, "Should have raised ValueError for 'student' in compile_args"
+        raise AssertionError("Should have raised ValueError for 'student' in compile_args")
     except ValueError as e:
         assert "student" in str(e).lower()
         assert "not allowed" in str(e).lower()
@@ -318,7 +316,7 @@ def test_compile_args_multi_optimizer_strategy():
         def __init__(self):
             self.received_kwargs = {}
 
-        def compile(self, student, trainset=None, num_trials=None, **kwargs):
+        def compile(self, student, trainset=None, num_trials=None, **kwargs: object):
             self.received_kwargs = {
                 "trainset": trainset,
                 "num_trials": num_trials,
@@ -330,7 +328,7 @@ def test_compile_args_multi_optimizer_strategy():
         def __init__(self):
             self.received_kwargs = {}
 
-        def compile(self, student, trainset=None, num_batches=None, **kwargs):
+        def compile(self, student, trainset=None, num_batches=None, **kwargs: object):
             self.received_kwargs = {
                 "trainset": trainset,
                 "num_batches": num_batches,
@@ -350,7 +348,7 @@ def test_compile_args_multi_optimizer_strategy():
 
     with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
         mock_eval.return_value = Mock(score=0.85)
-        with patch("dspy.teleprompt.bettertogether.launch_lms"):
+        with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
                     optimizer.compile(
@@ -386,7 +384,7 @@ def test_compile_args_override_global_params():
         def __init__(self):
             self.received_kwargs = {}
 
-        def compile(self, student, trainset=None, valset=None, teacher=None, **kwargs):
+        def compile(self, student, trainset=None, valset=None, teacher=None, **kwargs: object):
             self.received_kwargs = {
                 "trainset": trainset,
                 "valset": valset,
@@ -414,7 +412,7 @@ def test_compile_args_override_global_params():
 
     with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
         mock_eval.return_value = Mock(score=0.9)
-        with patch("dspy.teleprompt.bettertogether.launch_lms"):
+        with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 optimizer.compile(
                     student,
@@ -452,7 +450,7 @@ def test_trainset_shuffling_between_steps():
     trainsets_received = []
 
     class TrainsetCapturingOptimizer(Teleprompter):
-        def compile(self, student, trainset=None, **kwargs):
+        def compile(self, student, trainset=None, **kwargs: object):
             trainsets_received.append(trainset)
             return student
 
@@ -462,7 +460,7 @@ def test_trainset_shuffling_between_steps():
 
     with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
         mock_eval.return_value = Mock(score=0.8)
-        with patch("dspy.teleprompt.bettertogether.launch_lms"):
+        with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
                     optimizer.compile(
@@ -482,7 +480,7 @@ def test_trainset_shuffling_between_steps():
     assert len(trainset_p) == len(trainset_w), "Trainsets should have same length"
     # With shuffling enabled and only 2 examples, there's a 50% chance they're in different order
     # We can't reliably test order difference with small dataset, but we can verify they contain same examples
-    assert set(id(ex) for ex in trainset_p) == set(id(ex) for ex in trainset_w), \
+    assert {id(ex) for ex in trainset_p} == {id(ex) for ex in trainset_w}, \
         "Trainsets should contain the same example objects"
 
 
@@ -501,7 +499,7 @@ def test_strategy_execution_order():
         def __init__(self, name):
             self.name = name
 
-        def compile(self, student, **kwargs):
+        def compile(self, student, **kwargs: object):
             # Create a new student with a marker to track the optimization path
             optimized = SimpleModule("input -> output")
             if not hasattr(student, "optimization_path"):
@@ -517,10 +515,10 @@ def test_strategy_execution_order():
 
     with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
         mock_eval.return_value = Mock(score=0.85)
-        with patch("dspy.teleprompt.bettertogether.launch_lms"):
+        with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
-                    result = optimizer.compile(
+                    optimizer.compile(
                         student,
                         trainset=trainset,
                         valset=valset,
@@ -543,7 +541,7 @@ def test_lm_lifecycle_management():
     student.set_lm(lm)
 
     class SimpleOptimizer(Teleprompter):
-        def compile(self, student, **kwargs):
+        def compile(self, student, **kwargs: object):
             return student
 
     mock_p = SimpleOptimizer()
@@ -552,7 +550,7 @@ def test_lm_lifecycle_management():
 
     with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
         mock_eval.return_value = Mock(score=0.8)
-        with patch("dspy.teleprompt.bettertogether.launch_lms") as mock_launch:
+        with patch("dspy.teleprompt.bettertogether.launch_lms") as mock_launch:  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms") as mock_kill:
                 with patch.object(optimizer, "_models_changed", return_value=True):
                     optimizer.compile(
@@ -578,13 +576,13 @@ def test_error_handling_returns_best_program():
 
     # Create optimizers where the second one will fail
     class SuccessfulOptimizer(Teleprompter):
-        def compile(self, student, **kwargs):
+        def compile(self, student, **kwargs: object):
             optimized = SimpleModule("input -> output")
             optimized.step_name = "p_success"
             return optimized
 
     class FailingOptimizer(Teleprompter):
-        def compile(self, student, **kwargs):
+        def compile(self, student, **kwargs: object):
             raise RuntimeError("Intentional failure for testing")
 
     mock_p = SuccessfulOptimizer()
@@ -597,7 +595,7 @@ def test_error_handling_returns_best_program():
             Mock(score=0.5),  # Baseline
             Mock(score=0.7),  # After p (success)
         ]
-        with patch("dspy.teleprompt.bettertogether.launch_lms"):
+        with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
                     result = optimizer.compile(
@@ -615,7 +613,7 @@ def test_error_handling_returns_best_program():
     assert len(result.candidate_programs) > 0, "Should have at least one candidate program"
 
 
-@pytest.mark.parametrize("test_valset,expected_marker,test_description", [
+@pytest.mark.parametrize(("test_valset", "expected_marker", "test_description"), [
     (valset, "p_optimized", "With valset: returns best score (p), not latest (w)"),
     (None, "w_optimized", "Without valset: returns latest program (w)"),
 ])
@@ -634,7 +632,7 @@ def test_program_selection(student_with_lm, test_valset, expected_marker, test_d
                 Mock(score=0.9),  # After p (best score)
                 Mock(score=0.7),  # After w (lower than p)
             ]
-        with patch("dspy.teleprompt.bettertogether.launch_lms"):
+        with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
                     result = optimizer.compile(
@@ -662,7 +660,7 @@ def test_candidate_programs_structure(student_with_lm):
             Mock(score=0.8),  # After p
             Mock(score=0.9),  # After w (best)
         ]
-        with patch("dspy.teleprompt.bettertogether.launch_lms"):
+        with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
                     result = optimizer.compile(
@@ -672,14 +670,11 @@ def test_candidate_programs_structure(student_with_lm):
                         strategy="p -> w"
                     )
 
-    # Verify candidate_programs exists and has correct structure
     assert hasattr(result, "candidate_programs"), "Result should have candidate_programs attribute"
     candidates = result.candidate_programs
 
-    # Should have 3 candidates: baseline, p, w
     assert len(candidates) == 3, f"Should have 3 candidates, got {len(candidates)}"
 
-    # Each candidate should have the required keys
     for i, candidate in enumerate(candidates):
         assert "score" in candidate, f"Candidate {i} missing 'score' key"
         assert "program" in candidate, f"Candidate {i} missing 'program' key"
@@ -688,15 +683,12 @@ def test_candidate_programs_structure(student_with_lm):
         assert isinstance(candidate["program"], Module), f"Candidate {i} program should be a Module"
         assert isinstance(candidate["strategy"], (str, type(None))), f"Candidate {i} strategy should be str or None"
 
-    # Candidates should be sorted by score (best first)
     scores = [c["score"] for c in candidates]
     assert scores == sorted(scores, reverse=True), "Candidates should be sorted by score (descending)"
 
-    # Verify the best candidate is first
     assert candidates[0]["score"] == 0.9, "Best candidate should have score 0.9"
     assert candidates[0]["program"].marker == "w", "Best candidate should be from optimizer 'w'"
 
-    # Verify baseline candidate
     baseline = [c for c in candidates if c["strategy"] is None or c["strategy"] == ""]
     assert len(baseline) == 1, "Should have exactly one baseline candidate"
     assert baseline[0]["score"] == 0.5, "Baseline should have score 0.5"
@@ -704,26 +696,22 @@ def test_candidate_programs_structure(student_with_lm):
 
 def test_empty_valset_handling(student_with_lm):
     """Test behavior when valset is an empty list vs None."""
-    # Test with empty list []
     mock_p = MarkedOptimizer("optimized")
     optimizer = BetterTogether(metric=simple_metric, p=mock_p)
 
-    with patch("dspy.teleprompt.bettertogether.launch_lms"):
-        with patch("dspy.teleprompt.bettertogether.kill_lms"):
-            with patch.object(optimizer, "_models_changed", return_value=False):
-                result = optimizer.compile(
-                    student_with_lm,
-                    trainset=trainset,
-                    valset=[],  # Empty list (not None)
-                    strategy="p"
-                )
+    with patch("dspy.teleprompt.bettertogether.launch_lms"), patch("dspy.teleprompt.bettertogether.kill_lms"):  # noqa: SIM117
+        with patch.object(optimizer, "_models_changed", return_value=False):
+            result = optimizer.compile(
+                student_with_lm,
+                trainset=trainset,
+                valset=[],
+                strategy="p"
+            )
 
-    # With empty valset, should return latest program (same behavior as valset=None)
     assert hasattr(result, "marker"), "Result should have marker"
     assert result.marker == "optimized", "Should return the latest program when valset is empty list"
     assert hasattr(result, "candidate_programs"), "Should have candidate_programs"
 
-    # Test with None - create fresh student and optimizer
     student2 = SimpleModule("input -> output")
     lm = DummyLM([{"output": "test"}])
     student2.set_lm(lm)
@@ -731,16 +719,14 @@ def test_empty_valset_handling(student_with_lm):
     mock_p2 = MarkedOptimizer("optimized")
     optimizer2 = BetterTogether(metric=simple_metric, p=mock_p2)
 
-    with patch("dspy.teleprompt.bettertogether.launch_lms"):
-        with patch("dspy.teleprompt.bettertogether.kill_lms"):
-            with patch.object(optimizer2, "_models_changed", return_value=False):
-                result2 = optimizer2.compile(
-                    student2,
-                    trainset=trainset,
-                    valset=None,  # Explicit None
-                    strategy="p"
-                )
+    with patch("dspy.teleprompt.bettertogether.launch_lms"), patch("dspy.teleprompt.bettertogether.kill_lms"):  # noqa: SIM117
+        with patch.object(optimizer2, "_models_changed", return_value=False):
+            result2 = optimizer2.compile(
+                student2,
+                trainset=trainset,
+                valset=None,
+                strategy="p"
+            )
 
-    # Both should behave the same way
     assert hasattr(result2, "marker"), "Result2 should have marker"
     assert result2.marker == "optimized", "Should return the latest program when valset is None"

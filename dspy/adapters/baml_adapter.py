@@ -5,7 +5,7 @@ Based on the format used by BAML: https://github.com/BoundaryML/baml
 
 import inspect
 import types
-from typing import Any, Literal, Union, get_args, get_origin
+from typing import Any, Literal, Union, cast, get_args, get_origin
 
 from pydantic import BaseModel
 
@@ -13,13 +13,13 @@ from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.utils import format_field_value as original_format_field_value
 from dspy.signatures.signature import Signature
 
-# Changing the comment symbol to Python's # rather than other languages' // seems to help
+# BAML schema comments are prompt text; this adapter uses Python-style # comments because they have produced better model adherence than //.
 COMMENT_SYMBOL = "#"
 INDENTATION = "  "
 
 
 def _render_type_str(
-    annotation: Any,
+    annotation: object,
     depth: int = 0,
     indent: int = 0,
     seen_models: set[type] | None = None,
@@ -31,7 +31,6 @@ def _render_type_str(
         depth: Current recursion depth (prevents infinite recursion)
         indent: Current indentation level for nested structures
     """
-    # Non-nested types
     if annotation is str:
         return "string"
     if annotation is int:
@@ -49,40 +48,29 @@ def _render_type_str(
     except Exception:
         return str(annotation)
 
-    # Optional[T] or T | None
     if origin in (types.UnionType, Union):
         non_none_args = [arg for arg in args if arg is not type(None)]
-        # Render the non-None part of the union
         type_render = " or ".join([_render_type_str(arg, depth + 1, indent, seen_models) for arg in non_none_args])
-        # Add "or null" if None was part of the union
         if len(non_none_args) < len(args):
             return f"{type_render} or null"
         return type_render
 
-    # Literal[T1, T2, ...]
     if origin is Literal:
         return " or ".join(f'"{arg}"' for arg in args)
 
-    # list[T]
     if origin is list:
-        # For Pydantic models in lists, use bracket notation
         inner_type = args[0]
         if inspect.isclass(inner_type) and issubclass(inner_type, BaseModel):
-            # Build inner schema - the Pydantic model inside should use indent level for array contents
             inner_schema = _build_simplified_schema(inner_type, indent + 1, seen_models)
-            # Format with proper bracket notation and indentation
             current_indent = INDENTATION * indent
             return f"[\n{inner_schema}\n{current_indent}]"
-        else:
-            return f"{_render_type_str(inner_type, depth + 1, indent, seen_models)}[]"
+        return f"{_render_type_str(inner_type, depth + 1, indent, seen_models)}[]"
 
-    # dict[T1, T2]
     if origin is dict:
         return f"dict[{_render_type_str(args[0], depth + 1, indent, seen_models)}, {_render_type_str(args[1], depth + 1, indent, seen_models)}]"
 
-    # fallback
     if hasattr(annotation, "__name__"):
-        return annotation.__name__
+        return cast("str", annotation.__name__)
     return str(annotation)
 
 
@@ -110,9 +98,6 @@ def _build_simplified_schema(
     current_indent = INDENTATION * indent
     next_indent = INDENTATION * (indent + 1)
 
-    # Add model docstring as a comment above the object if it exists
-    # Only do this for top-level schemas (indent=0), since nested field docstrings
-    # are already added before the field name in the parent schema
     if indent == 0 and pydantic_model.__doc__:
         docstring = pydantic_model.__doc__.strip()
         # Handle multiline docstrings by prefixing each line with the comment symbol
@@ -143,13 +128,12 @@ def _build_simplified_schema(
             if len(non_none_args) == 1:
                 field_annotation = non_none_args[0]
 
-        if inspect.isclass(field_annotation) and issubclass(field_annotation, BaseModel):
-            if field_annotation.__doc__:
-                docstring = field_annotation.__doc__.strip()
-                for line in docstring.split("\n"):
-                    line = line.strip()
-                    if line:
-                        lines.append(f"{next_indent}{COMMENT_SYMBOL} {line}")
+        if inspect.isclass(field_annotation) and issubclass(field_annotation, BaseModel) and field_annotation.__doc__:
+            docstring = field_annotation.__doc__.strip()
+            for line in docstring.split("\n"):
+                line = line.strip()
+                if line:
+                    lines.append(f"{next_indent}{COMMENT_SYMBOL} {line}")
 
         rendered_type = _render_type_str(field.annotation, indent=indent + 1, seen_models=seen_models)
         line = f"{next_indent}{name}: {rendered_type},"
@@ -220,26 +204,22 @@ class BAMLAdapter(JSONAdapter):
 
         sections = []
 
-        # Add structural explanation
         sections.append(
             "All interactions will be structured in the following way, with the appropriate values filled in.\n"
         )
 
-        # Add input structure section
         if signature.input_fields:
-            for name in signature.input_fields.keys():
+            for name in signature.input_fields:
                 sections.append(f"[[ ## {name} ## ]]")
                 sections.append(f"{{{name}}}")
                 sections.append("")  # Empty line after each input
 
-        # Add output structure section
         if signature.output_fields:
             for name, field in signature.output_fields.items():
                 field_type = field.annotation
                 sections.append(f"[[ ## {name} ## ]]")
                 sections.append(f"Output field `{name}` should be of type: {_render_type_str(field_type, indent=0)}\n")
 
-        # Add completed section
         sections.append("[[ ## completed ## ]]")
 
         return "\n".join(sections)
@@ -259,10 +239,8 @@ class BAMLAdapter(JSONAdapter):
                 value = inputs.get(key)
                 formatted_value = ""
                 if isinstance(value, BaseModel):
-                    # Use clean, indented JSON for Pydantic instances
                     formatted_value = value.model_dump_json(indent=2, by_alias=True)
                 else:
-                    # Fallback to the original dspy formatter for other types
                     formatted_value = original_format_field_value(field_info=field_info, value=value)
 
                 messages.append(f"[[ ## {key} ## ]]\n{formatted_value}")

@@ -1,4 +1,4 @@
-from typing import Callable
+from collections.abc import Callable
 
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Module, Prediction
@@ -12,7 +12,7 @@ class BestOfN(Module):
         reward_fn: Callable[[dict, Prediction], float],
         threshold: float,
         fail_count: int | None = None,
-    ):
+    ) -> None:
         """
         Runs a module up to `N` times with different rollout IDs at `temperature=1.0` and
         returns the best prediction out of `N` attempts or the first prediction that passes the
@@ -53,7 +53,7 @@ class BestOfN(Module):
         self.reward_fn = lambda *args: reward_fn(*args)  # to prevent this from becoming a parameter
         self.threshold = threshold
         self.N = N
-        self.fail_count = fail_count or N  # default to N if fail_count is not provided
+        self.fail_count = fail_count or N  # Defaults to N when fail_count is falsy.
 
     def forward(self, **kwargs):
         lm = self.module.get_lm() or settings.lm
@@ -80,10 +80,9 @@ class BestOfN(Module):
                 if reward >= self.threshold:
                     break
 
-            except Exception as e:
-                print(f"BestOfN: Attempt {idx + 1} failed with rollout id {rid}: {e}")
+            except Exception:
                 if idx > self.fail_count:
-                    raise e
+                    raise
                 self.fail_count -= 1
 
         if best_trace:

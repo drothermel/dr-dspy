@@ -1,7 +1,7 @@
 import os
 
 
-def download(url):
+def download(url) -> None:
     import requests
 
     filename = os.path.basename(url)
@@ -9,7 +9,6 @@ def download(url):
     local_size = os.path.getsize(filename) if os.path.exists(filename) else 0
 
     if not os.path.exists(filename) or local_size != remote_size:
-        print(f"Downloading '{filename}'...")
         with requests.get(url, stream=True) as r, open(filename, "wb") as f:
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)

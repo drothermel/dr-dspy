@@ -12,7 +12,7 @@ from dspy.dsp.utils.settings import settings
 class UsageTracker:
     """Tracks LM usage data within a context."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Map of LM name to list of usage entries. For example:
         # {
         #     "openai/gpt-4o-mini": [
@@ -36,7 +36,7 @@ class UsageTracker:
         self, usage_entry1: dict[str, Any] | None, usage_entry2: dict[str, Any] | None
     ) -> dict[str, Any]:
         if usage_entry1 is None or len(usage_entry1) == 0:
-            return dict(usage_entry2)
+            return dict(usage_entry2)  # ty:ignore[no-matching-overload]
         if usage_entry2 is None or len(usage_entry2) == 0:
             return dict(usage_entry1)
 

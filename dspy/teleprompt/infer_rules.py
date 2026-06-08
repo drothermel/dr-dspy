@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class InferRules(BootstrapFewShot):
-    def __init__(self, num_candidates=10, num_rules=10, num_threads=None, teacher_settings=None, **kwargs):
+    def __init__(self, num_candidates=10, num_rules=10, num_threads=None, teacher_settings=None, **kwargs) -> None:
         super().__init__(teacher_settings=teacher_settings, **kwargs)
 
         self.num_candidates = num_candidates
@@ -83,7 +83,7 @@ class InferRules(BootstrapFewShot):
                         "context window."
                     ) from e
 
-    def update_program_instructions(self, predictor, natural_language_rules):
+    def update_program_instructions(self, predictor, natural_language_rules) -> None:
         predictor.signature.instructions = (
             f"{predictor.signature.instructions}\n\n"
             f"Please adhere to the following rules when making your prediction:\n{natural_language_rules}"
@@ -123,12 +123,11 @@ class InferRules(BootstrapFewShot):
             display_table=False,
             display_progress=True,
         )
-        score = evaluate(program, metric=self.metric).score
-        return score
+        return evaluate(program, metric=self.metric).score
 
 
 class RulesInductionProgram(Module):
-    def __init__(self, num_rules, teacher_settings=None):
+    def __init__(self, num_rules, teacher_settings=None) -> None:
         super().__init__()
 
         class CustomRulesInduction(Signature):

@@ -37,7 +37,7 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         max_errors=None,
         stop_at_score=None,
         metric_threshold=None,
-    ):
+    ) -> None:
         self.metric = metric
         self.teacher_settings = teacher_settings or {}
         self.max_rounds = max_rounds
@@ -51,8 +51,6 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         self.num_candidate_sets = num_candidate_programs
         self.max_labeled_demos = max_labeled_demos
 
-        print(f"Going to sample between {self.min_num_samples} and {self.max_num_samples} traces per predictor.")
-        print(f"Will attempt to bootstrap {self.num_candidate_sets} candidate sets.")
 
     def compile(self, student, *, teacher=None, trainset, valset=None, restrict=None, labeled_sample=True):
         self.trainset = trainset
@@ -126,17 +124,13 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
             all_subscores.append(subscores)
 
             if len(scores) == 0 or score > max(scores):
-                print("New best score:", score, "for seed", seed)
                 best_program = program
 
             scores.append(score)
-            print(f"Scores so far: {scores}")
-            print(f"Best score so far: {max(scores)}")
 
             score_data.append({"score": score, "subscores": subscores, "seed": seed, "program": program})
 
             if self.stop_at_score is not None and score >= self.stop_at_score:
-                print(f"Stopping early because score {score} is >= stop_at_score {self.stop_at_score}")
                 break
 
         # To best program, attach all program candidates in decreasing average score
@@ -145,7 +139,6 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
             best_program.candidate_programs, key=lambda x: x["score"], reverse=True
         )
 
-        print(f"{len(best_program.candidate_programs)} candidate programs found.")
 
         return best_program
 

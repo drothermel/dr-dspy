@@ -1,4 +1,3 @@
-# ruff: noqa: UP007
 
 from typing import Literal, Optional, Union
 
@@ -38,7 +37,7 @@ def test_parse_value_pydantic_types():
     assert result.age == 25
 
     # Test with invalid pydantic data
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017, PT011
         parse_value('{"name": "John"}', Profile)  # missing required age field
 
 
@@ -73,7 +72,7 @@ def test_parse_value_literal():
     assert parse_value("str[option1]", Literal["option1", "option2"]) == "option1"
 
     # Test invalid literal
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         parse_value("invalid", Literal["option1", "option2"])
 
 
@@ -103,5 +102,5 @@ def test_parse_value_json_repair():
 
     # Test fallback to original value when parsing fails
     malformed = "not json or literal"
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017, PT011
         parse_value(malformed, dict)

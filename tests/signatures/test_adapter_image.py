@@ -1,4 +1,4 @@
-from dspy.teleprompt.vanilla import LabeledFewShot
+import contextlib
 import os
 import tempfile
 from io import BytesIO
@@ -14,6 +14,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
+from dspy.teleprompt.vanilla import LabeledFewShot
 from dspy.utils.dummies import DummyLM
 
 
@@ -132,7 +133,7 @@ def test_basic_image_operations(test_case):
 
 
 @pytest.mark.parametrize(
-    "image_input,description",
+    ("image_input", "description"),
     [
         ("pil_image", "PIL Image"),
         ("encoded_pil_image", "encoded PIL image string"),
@@ -156,7 +157,7 @@ def test_image_input_formats(
     }
 
     actual_input = input_map[image_input]
-    # TODO(isaacbmiller): Support the cases without direct Image coercion
+    # TODO: Support PIL/base64 inputs without requiring callers to pre-coerce them to Image, then remove this xfail.
     if image_input in ["pil_image", "encoded_pil_image"]:
         pytest.xfail(f"{description} not fully supported without Image coercion")
 
@@ -445,10 +446,8 @@ def test_pdf_from_file():
         assert count_messages_with_image_url_pattern(lm.history[-1]["messages"]) == 1
     finally:
         # Clean up the temporary file
-        try:
+        with contextlib.suppress(Exception):
             os.unlink(tmp_file_path)
-        except Exception:
-            pass
 
 
 def test_image_repr():
@@ -473,12 +472,12 @@ def test_from_methods_warn(tmp_path):
     tmp_file = tmp_path / "test.png"
     tmp_file.write_bytes(b"pngdata")
 
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(DeprecationWarning):  # noqa: PT030
         Image.from_url("https://example.com/dog.jpg")
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(DeprecationWarning):  # noqa: PT030
         Image.from_file(str(tmp_file))
     sample_pil = PILImage.new("RGB", (10, 10), color="blue")
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(DeprecationWarning):  # noqa: PT030
         Image.from_PIL(sample_pil)
 
 
@@ -487,8 +486,8 @@ def test_invalid_string_format():
     invalid_string = "this_is_not_a_url_or_file"
 
     # Should raise a ValueError and not pass the string through
-    with pytest.raises(ValueError, match="Unrecognized") as warning_info:
-        image = Image(invalid_string)
+    with pytest.raises(ValueError, match="Unrecognized"):
+        Image(invalid_string)
 
 def test_pil_image_with_download_parameter():
     """Test behavior when PIL image is passed with download=True"""

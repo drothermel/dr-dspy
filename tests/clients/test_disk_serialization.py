@@ -52,7 +52,7 @@ class _Outer:
         value: int
 
 
-def _allowed_for(*types):
+def _allowed_for(*types: object):
     return frozenset((cls.__module__, cls.__qualname__) for cls in types)
 
 

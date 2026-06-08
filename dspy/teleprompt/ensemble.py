@@ -9,7 +9,7 @@ TODO: The EnsembledProgram should actually imitate the structure of the individu
 
 
 class Ensemble(Teleprompter):
-    def __init__(self, *, reduce_fn=None, size=None, deterministic=False):
+    def __init__(self, *, reduce_fn=None, size=None, deterministic=False) -> None:
         """A common reduce_fn is dspy.majority."""
 
         assert deterministic is False, "TODO: Implement example hashing for deterministic ensemble."
@@ -24,7 +24,7 @@ class Ensemble(Teleprompter):
 
 
         class EnsembledProgram(Module):
-            def __init__(self):
+            def __init__(self) -> None:
                 super().__init__()
                 self.programs = programs
 

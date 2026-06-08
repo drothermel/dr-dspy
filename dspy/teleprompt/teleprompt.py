@@ -1,14 +1,11 @@
 from typing import Any
 
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
-
 
 class Teleprompter:
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
-    def compile(self, student: Module, *, trainset: list[Example], teacher: Module | None = None, valset: list[Example] | None = None, **kwargs) -> Module:
+    def compile(self, *args: Any, **kwargs: Any) -> Any:
         """
         Optimize the student program.
 

@@ -97,7 +97,7 @@ class Document(Type):
 
     @pydantic.model_validator(mode="before")
     @classmethod
-    def validate_input(cls, data: Any):
+    def validate_input(cls, data: object) -> object:
         if isinstance(data, cls):
             return data
 
@@ -106,7 +106,7 @@ class Document(Type):
             return {"data": data}
 
         # Handle case where data is a dict
-        elif isinstance(data, dict):
+        if isinstance(data, dict):
             return data
 
         raise ValueError(f"Received invalid value for `Document`: {data}")

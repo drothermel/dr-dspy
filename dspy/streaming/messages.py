@@ -27,7 +27,7 @@ class StatusMessage:
 def sync_send_to_stream(stream, message):
     """Send message to stream in a sync context, regardless of event loop state."""
 
-    async def _send():
+    async def _send() -> None:
         await stream.send(message)
 
     try:
@@ -73,33 +73,29 @@ class StatusMessageProvider:
     ```
     """
 
-    def tool_start_status_message(self, instance: Any, inputs: dict[str, Any]):
+    def tool_start_status_message(self, instance: Any, inputs: dict[str, Any]) -> str:
         """Status message before a `dspy.adapters.types.tool.Tool` is called."""
         return f"Calling tool {instance.name}..."
 
-    def tool_end_status_message(self, outputs: Any):
+    def tool_end_status_message(self, outputs: Any) -> str:
         """Status message after a `dspy.adapters.types.tool.Tool` is called."""
         return "Tool calling finished! Querying the LLM with tool calling results..."
 
-    def module_start_status_message(self, instance: Any, inputs: dict[str, Any]):
+    def module_start_status_message(self, instance: Any, inputs: dict[str, Any]) -> None:
         """Status message before a `dspy.primitives.module.Module` or `dspy.predict.predict.Predict` is called."""
-        pass
 
-    def module_end_status_message(self, outputs: Any):
+    def module_end_status_message(self, outputs: Any) -> None:
         """Status message after a `dspy.primitives.module.Module` or `dspy.predict.predict.Predict` is called."""
-        pass
 
-    def lm_start_status_message(self, instance: Any, inputs: dict[str, Any]):
+    def lm_start_status_message(self, instance: Any, inputs: dict[str, Any]) -> None:
         """Status message before a `dspy.clients.lm.LM` is called."""
-        pass
 
-    def lm_end_status_message(self, outputs: Any):
+    def lm_end_status_message(self, outputs: Any) -> None:
         """Status message after a `dspy.clients.lm.LM` is called."""
-        pass
 
 
 class StatusStreamingCallback(BaseCallback):
-    def __init__(self, status_message_provider: StatusMessageProvider | None = None):
+    def __init__(self, status_message_provider: StatusMessageProvider | None = None) -> None:
         self.status_message_provider = status_message_provider or StatusMessageProvider()
 
     def on_tool_start(
@@ -107,7 +103,7 @@ class StatusStreamingCallback(BaseCallback):
         call_id: str,
         instance: Any,
         inputs: dict[str, Any],
-    ):
+    ) -> None:
         stream = settings.send_stream
         if stream is None or instance.name == "finish":
             return
@@ -121,7 +117,7 @@ class StatusStreamingCallback(BaseCallback):
         call_id: str,
         outputs: dict[str, Any] | None,
         exception: Exception | None = None,
-    ):
+    ) -> None:
         stream = settings.send_stream
         if stream is None or outputs == "Completed.":
             return
@@ -135,7 +131,7 @@ class StatusStreamingCallback(BaseCallback):
         call_id: str,
         instance: Any,
         inputs: dict[str, Any],
-    ):
+    ) -> None:
         stream = settings.send_stream
         if stream is None:
             return
@@ -149,7 +145,7 @@ class StatusStreamingCallback(BaseCallback):
         call_id: str,
         outputs: dict[str, Any] | None,
         exception: Exception | None = None,
-    ):
+    ) -> None:
         stream = settings.send_stream
         if stream is None:
             return
@@ -163,7 +159,7 @@ class StatusStreamingCallback(BaseCallback):
         call_id: str,
         instance: Any,
         inputs: dict[str, Any],
-    ):
+    ) -> None:
         stream = settings.send_stream
         if stream is None:
             return
@@ -177,7 +173,7 @@ class StatusStreamingCallback(BaseCallback):
         call_id: str,
         outputs: dict[str, Any] | None,
         exception: Exception | None = None,
-    ):
+    ) -> None:
         stream = settings.send_stream
         if stream is None:
             return

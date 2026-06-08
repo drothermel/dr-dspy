@@ -1,6 +1,6 @@
 import random
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from dspy.datasets.dataset import Dataset
 from dspy.dsp.utils.settings import settings
@@ -11,22 +11,22 @@ if TYPE_CHECKING:
 
 
 class DataLoader(Dataset):
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     def from_huggingface(
         self,
         dataset_name: str,
-        *args,
-        input_keys: tuple[str] = (),
-        fields: tuple[str] | None = None,
-        **kwargs,
+        *args: object,
+        input_keys: tuple[str, ...] = (),
+        fields: tuple[str, ...] | None = None,
+        **kwargs: object,
     ) -> Mapping[str, list[Example]] | list[Example]:
         if fields and not isinstance(fields, tuple):
             raise ValueError("Invalid fields provided. Please provide a tuple of fields.")
 
         if not isinstance(input_keys, tuple):
-            raise ValueError("Invalid input keys provided. Please provide a tuple of input keys.")
+            raise TypeError("Invalid input keys provided. Please provide a tuple of input keys.")
 
         from datasets import load_dataset
 
@@ -36,8 +36,9 @@ class DataLoader(Dataset):
             dataset = {split_name: dataset[idx] for idx, split_name in enumerate(kwargs["split"])}
 
         try:
-            returned_split = {}
-            for split_name in dataset.keys():
+            returned_split: dict[str, list[Example]] = {}
+            for split_name in dataset:
+                split_name = cast("str", split_name)
                 if fields:
                     returned_split[split_name] = [
                         Example({field: row[field] for field in fields}).with_inputs(*input_keys)
@@ -45,7 +46,7 @@ class DataLoader(Dataset):
                     ]
                 else:
                     returned_split[split_name] = [
-                        Example({field: row[field] for field in row.keys()}).with_inputs(*input_keys)
+                        Example({field: row[field] for field in row}).with_inputs(*input_keys)
                         for row in dataset[split_name]
                     ]
 
@@ -55,17 +56,16 @@ class DataLoader(Dataset):
                 return [
                     Example({field: row[field] for field in fields}).with_inputs(*input_keys) for row in dataset
                 ]
-            else:
-                return [
-                    Example({field: row[field] for field in row.keys()}).with_inputs(*input_keys)
-                    for row in dataset
-                ]
+            return [
+                Example({field: row[field] for field in row}).with_inputs(*input_keys)
+                for row in dataset
+            ]
 
     def from_csv(
         self,
         file_path: str,
         fields: list[str] | None = None,
-        input_keys: tuple[str] = (),
+        input_keys: tuple[str, ...] = (),
     ) -> list[Example]:
         from datasets import load_dataset
 
@@ -80,7 +80,7 @@ class DataLoader(Dataset):
         self,
         df: "pd.DataFrame",
         fields: list[str] | None = None,
-        input_keys: tuple[str] = (),
+        input_keys: tuple[str, ...] = (),
     ) -> list[Example]:
         if fields is None:
             fields = list(df.columns)
@@ -93,7 +93,7 @@ class DataLoader(Dataset):
         self,
         file_path: str,
         fields: list[str] | None = None,
-        input_keys: tuple[str] = (),
+        input_keys: tuple[str, ...] = (),
     ) -> list[Example]:
         from datasets import load_dataset
 
@@ -108,7 +108,7 @@ class DataLoader(Dataset):
         self,
         file_path: str,
         fields: list[str] | None = None,
-        input_keys: tuple[str] = (),
+        input_keys: tuple[str, ...] = (),
     ) -> list[Example]:
         from datasets import load_dataset
 
@@ -141,11 +141,11 @@ class DataLoader(Dataset):
         self,
         dataset: list[Example],
         n: int,
-        *args,
-        **kwargs,
+        *args: object,
+        **kwargs: object,
     ) -> list[Example]:
         if not isinstance(dataset, list):
-            raise ValueError(
+            raise TypeError(
                 f"Invalid dataset provided of type {type(dataset)}. Please provide a list of "
                 "`dspy.primitives.example.Example`s."
             )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
+from typing import Any, cast
 
 import json_repair
 
@@ -68,7 +68,7 @@ def _split_legacy_custom_type_text_to_parts(text: str) -> list[LMPart]:
 def _legacy_custom_type_payload_to_blocks(payload: str) -> list[dict[str, Any]]:
     parsed = _parse_legacy_payload(payload)
     if isinstance(parsed, list):
-        return [block if isinstance(block, dict) else {"type": "text", "text": str(block)} for block in parsed]
+        return [cast("dict[str, Any]", block) if isinstance(block, dict) else {"type": "text", "text": str(block)} for block in parsed]
     return [{"type": "text", "text": payload}]
 
 
@@ -79,24 +79,34 @@ def _legacy_custom_type_payload_to_parts(payload: str) -> list[LMPart]:
     return [_legacy_content_block_to_lm_part(block) for block in parsed]
 
 
-def _parse_legacy_payload(payload: str) -> Any:
-    for parse_fn in (json.loads, _parse_doubly_quoted_json, json_repair.loads):
-        try:
-            return parse_fn(payload)
-        except Exception:
-            continue
+def _parse_legacy_payload(payload: str) -> object | None:
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError:
+        pass
+
+    try:
+        return _parse_doubly_quoted_json(payload)
+    except json.JSONDecodeError:
+        pass
+
+    try:
+        return json_repair.loads(payload)
+    except Exception:
+        return None
     return None
 
 
-def _parse_doubly_quoted_json(value: str) -> Any:
+def _parse_doubly_quoted_json(value: str) -> object:
     # Legacy `Type` payloads can be JSON-encoded twice when the serialized
     # marker string is nested inside a larger JSON value, e.g. list[Image].
     return json.loads(json.loads(f'"{value}"'))
 
 
-def _legacy_content_block_to_lm_part(block: Any) -> LMPart:
+def _legacy_content_block_to_lm_part(block: object) -> LMPart:
     if not isinstance(block, dict):
         return LMTextPart(text=str(block))
+    block = cast("dict[str, Any]", block)
 
     block_type = block.get("type")
     if block_type == "text":

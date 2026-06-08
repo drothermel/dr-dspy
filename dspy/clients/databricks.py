@@ -10,13 +10,13 @@ from dspy.clients.provider import Provider, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat, get_finetune_directory
 
 if TYPE_CHECKING:
-    from databricks.sdk import WorkspaceClient
+    from databricks.sdk import WorkspaceClient  # ty:ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 
 
 class TrainingJobDatabricks(TrainingJob):
-    def __init__(self, finetuning_run=None, *args, **kwargs):
+    def __init__(self, finetuning_run=None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.finetuning_run = finetuning_run
         self.launch_started = False
@@ -27,7 +27,7 @@ class TrainingJobDatabricks(TrainingJob):
         if not self.finetuning_run:
             return None
         try:
-            from databricks.model_training import foundation_model as fm
+            from databricks.model_training import foundation_model as fm  # ty:ignore[unresolved-import]
         except ImportError:
             raise ImportError(
                 "To use Databricks finetuning, please install the databricks_genai package via "
@@ -42,7 +42,7 @@ class DatabricksProvider(Provider):
     TrainingJob = TrainingJobDatabricks
 
     @staticmethod
-    def is_provider_model(model: str) -> bool:
+    def is_provider_model(model: str) -> bool:  # noqa: ARG004 dynamic typing/lint migration for scoped ty adoption
         # We don't automatically infer Databricks models because Databricks is not a proprietary model provider.
         return False
 
@@ -53,7 +53,7 @@ class DatabricksProvider(Provider):
         databricks_host: str | None = None,
         databricks_token: str | None = None,
         deploy_timeout: int = 900,
-    ):
+    ) -> None:
         import requests
 
         workspace_client = _get_workspace_client()
@@ -75,10 +75,8 @@ class DatabricksProvider(Provider):
 
         chunk_size = optimizable_info["throughput_chunk_size"]
 
-        # Minimum desired provisioned throughput
         min_provisioned_throughput = 0
 
-        # Maximum desired provisioned throughput
         max_provisioned_throughput = chunk_size
 
         # Databricks serving endpoint names cannot contain ".".
@@ -90,7 +88,6 @@ class DatabricksProvider(Provider):
 
         if get_endpoint_response.status_code == 200:
             logger.info(f"Serving endpoint {model_name} already exists, updating it instead of creating a new one.")
-            # The serving endpoint already exists, we will update it instead of creating a new one.
             data = {
                 "served_entities": [
                     {
@@ -110,7 +107,6 @@ class DatabricksProvider(Provider):
             )
         else:
             logger.info(f"Creating serving endpoint {model_name} on Databricks model serving!")
-            # Send the POST request to create the serving endpoint.
             data = {
                 "name": model_name,
                 "config": {
@@ -145,7 +141,6 @@ class DatabricksProvider(Provider):
             api_key=databricks_token,
             base_url=f"{databricks_host}/serving-endpoints",
         )
-        # Wait for the deployment to be ready.
         num_retries = deploy_timeout // 60
         for _ in range(num_retries):
             try:
@@ -172,7 +167,7 @@ class DatabricksProvider(Provider):
         train_data: list[dict[str, Any]],
         train_data_format: TrainDataFormat | str | None = "chat",
         train_kwargs: dict[str, Any] | None = None,
-    ) -> str:
+    ) -> str:  # ty:ignore[invalid-method-override]
         if isinstance(train_data_format, str):
             if train_data_format == "chat":
                 train_data_format = TrainDataFormat.CHAT
@@ -183,61 +178,58 @@ class DatabricksProvider(Provider):
                     f"String `train_data_format` must be one of 'chat' or 'completion', but received: {train_data_format}."
                 )
 
-        if "train_data_path" not in train_kwargs:
+        if "train_data_path" not in train_kwargs:  # ty:ignore[unsupported-operator]
             raise ValueError("The `train_data_path` must be provided to finetune on Databricks.")
-        # Add the file name to the directory path.
-        train_kwargs["train_data_path"] = DatabricksProvider.upload_data(
-            train_data, train_kwargs["train_data_path"], train_data_format
+        train_kwargs["train_data_path"] = DatabricksProvider.upload_data(  # ty:ignore[invalid-assignment]
+            train_data, train_kwargs["train_data_path"], train_data_format  # ty:ignore[invalid-argument-type, not-subscriptable]
         )
 
         try:
-            from databricks.model_training import foundation_model as fm
+            from databricks.model_training import foundation_model as fm  # ty:ignore[unresolved-import]
         except ImportError:
             raise ImportError(
                 "To use Databricks finetuning, please install the databricks_genai package via "
                 "`pip install databricks_genai`."
             )
 
-        if "register_to" not in train_kwargs:
+        if "register_to" not in train_kwargs:  # ty:ignore[unsupported-operator]
             raise ValueError("The `register_to` must be provided to finetune on Databricks.")
 
         # Allow users to override the host and token. This is useful on Databricks hosted runtime.
-        databricks_host = train_kwargs.pop("databricks_host", None)
-        databricks_token = train_kwargs.pop("databricks_token", None)
+        databricks_host = train_kwargs.pop("databricks_host", None)  # ty:ignore[unresolved-attribute]
+        databricks_token = train_kwargs.pop("databricks_token", None)  # ty:ignore[unresolved-attribute]
 
-        skip_deploy = train_kwargs.pop("skip_deploy", False)
-        deploy_timeout = train_kwargs.pop("deploy_timeout", 900)
+        skip_deploy = train_kwargs.pop("skip_deploy", False)  # ty:ignore[unresolved-attribute]
+        deploy_timeout = train_kwargs.pop("deploy_timeout", 900)  # ty:ignore[unresolved-attribute]
 
         logger.info("Starting finetuning on Databricks... this might take a few minutes to finish.")
         finetuning_run = fm.create(
             model=model,
-            **train_kwargs,
+            **train_kwargs,  # ty:ignore[invalid-argument-type]
         )
 
-        job.run = finetuning_run
+        job.run = finetuning_run  # ty:ignore[unresolved-attribute]
 
-        # Wait for the finetuning run to be ready.
         while True:
-            job.run = fm.get(job.run)
-            if job.run.status.display_name == "Completed":
+            job.run = fm.get(job.run)  # ty:ignore[unresolved-attribute]
+            if job.run.status.display_name == "Completed":  # ty:ignore[unresolved-attribute]
                 logger.info("Finetuning run completed successfully!")
                 break
-            elif job.run.status.display_name == "Failed":
+            if job.run.status.display_name == "Failed":  # ty:ignore[unresolved-attribute]
                 raise ValueError(
-                    f"Finetuning run failed with status: {job.run.status.display_name}. Please check the Databricks "
-                    f"workspace for more details. Finetuning job's metadata: {job.run}."
+                    f"Finetuning run failed with status: {job.run.status.display_name}. Please check the Databricks "  # ty:ignore[unresolved-attribute]
+                    f"workspace for more details. Finetuning job's metadata: {job.run}."  # ty:ignore[unresolved-attribute]
                 )
-            else:
-                time.sleep(60)
+            time.sleep(60)
 
         if skip_deploy:
-            return None
+            return None  # ty:ignore[invalid-return-type]
 
         job.launch_started = True
-        model_to_deploy = train_kwargs.get("register_to")
-        job.endpoint_name = model_to_deploy.replace(".", "_")
+        model_to_deploy = train_kwargs.get("register_to")  # ty:ignore[unresolved-attribute]
+        job.endpoint_name = model_to_deploy.replace(".", "_")  # ty:ignore[unresolved-attribute]
         DatabricksProvider.deploy_finetuned_model(
-            model_to_deploy, train_data_format, databricks_host, databricks_token, deploy_timeout
+            model_to_deploy, train_data_format, databricks_host, databricks_token, deploy_timeout  # ty:ignore[invalid-argument-type]
         )
         job.launch_completed = True
         # The finetuned model name should be in the format: "databricks/<endpoint_name>".
@@ -263,7 +255,7 @@ class DatabricksProvider(Provider):
 
 def _get_workspace_client() -> "WorkspaceClient":
     try:
-        from databricks.sdk import WorkspaceClient
+        from databricks.sdk import WorkspaceClient  # ty:ignore[unresolved-import]
     except ImportError:
         raise ImportError(
             "To use Databricks finetuning, please install the databricks-sdk package via `pip install databricks-sdk`."
@@ -271,7 +263,7 @@ def _get_workspace_client() -> "WorkspaceClient":
     return WorkspaceClient()
 
 
-def _create_directory_in_databricks_unity_catalog(w: "WorkspaceClient", databricks_unity_catalog_path: str):
+def _create_directory_in_databricks_unity_catalog(w: "WorkspaceClient", databricks_unity_catalog_path: str) -> None:
     pattern = r"^/Volumes/(?P<catalog>[^/]+)/(?P<schema>[^/]+)/(?P<volume>[^/]+)(/[^/]+)+$"
     match = re.match(pattern, databricks_unity_catalog_path)
     if not match:
@@ -297,7 +289,6 @@ def _create_directory_in_databricks_unity_catalog(w: "WorkspaceClient", databric
         w.files.get_directory_metadata(databricks_unity_catalog_path)
         logger.info(f"Directory {databricks_unity_catalog_path} already exists, skip creating it.")
     except Exception:
-        # Create the directory if it doesn't exist, we don't raise an error because this is a common case.
         logger.info(f"Creating directory {databricks_unity_catalog_path} in Databricks Unity Catalog...")
         w.files.create_directory(databricks_unity_catalog_path)
         logger.info(f"Successfully created directory {databricks_unity_catalog_path} in Databricks Unity Catalog!")
@@ -322,7 +313,7 @@ def _save_data_to_local_file(train_data: list[dict[str, Any]], data_format: Trai
     return file_path
 
 
-def _validate_chat_data(data: dict[str, Any]):
+def _validate_chat_data(data: dict[str, Any]) -> None:
     if "messages" not in data:
         raise ValueError(
             "Each finetuning data must be a dict with a 'messages' key when `task=CHAT_COMPLETION`, but "
@@ -344,7 +335,7 @@ def _validate_chat_data(data: dict[str, Any]):
             )
 
 
-def _validate_completion_data(data: dict[str, Any]):
+def _validate_completion_data(data: dict[str, Any]) -> None:
     if "prompt" not in data:
         raise ValueError(
             "Each finetuning data must be a dict with a 'prompt' key when `task=INSTRUCTION_FINETUNE`, but "

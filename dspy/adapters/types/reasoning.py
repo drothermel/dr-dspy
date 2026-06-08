@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, cast
 
 import pydantic
 
 from dspy.adapters.types.base_type import Type
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dspy.clients.base_lm import BaseLM
     from dspy.signatures.signature import Signature
 
@@ -23,12 +25,12 @@ class Reasoning(Type):
 
     content: str
 
-    def format(self):
+    def format(self) -> str:
         return f"{self.content}"
 
     @pydantic.model_validator(mode="before")
     @classmethod
-    def validate_input(cls, data: Any):
+    def validate_input(cls, data: object) -> object:
         if isinstance(data, cls):
             return data
 
@@ -36,6 +38,7 @@ class Reasoning(Type):
             return {"content": data}
 
         if isinstance(data, dict):
+            data = cast("dict[str, object]", data)
             if "content" not in data:
                 raise ValueError("`content` field is required for `dspy.Reasoning`")
             if not isinstance(data["content"], str):
@@ -47,11 +50,11 @@ class Reasoning(Type):
     @classmethod
     def adapt_to_native_lm_feature(
         cls,
-        signature: type["Signature"],
+        signature: type[Signature],
         field_name: str,
         lm: BaseLM,
         lm_kwargs: dict[str, Any],
-    ) -> type["Signature"]:
+    ) -> type[Signature]:
         if "reasoning_effort" in lm_kwargs:
             # `lm_kwargs` overrides `lm.kwargs`.
             reasoning_effort = lm_kwargs["reasoning_effort"]
@@ -79,14 +82,14 @@ class Reasoning(Type):
         return signature.delete(field_name)
 
     @classmethod
-    def parse_lm_response(cls, response: str | dict[str, Any]) -> Optional["Reasoning"]:
+    def parse_lm_response(cls, response: str | dict[str, Any]) -> Reasoning | None:
         """Parse the LM response into a Reasoning object."""
-        if "reasoning_content" in response:
+        if isinstance(response, dict) and "reasoning_content" in response:
             return Reasoning(content=response["reasoning_content"])
         return None
 
     @classmethod
-    def parse_stream_chunk(cls, chunk) -> str | None:
+    def parse_stream_chunk(cls, chunk: object) -> str | None:
         """
         Parse a stream chunk into reasoning content if available.
 
@@ -125,30 +128,32 @@ class Reasoning(Type):
     def __len__(self) -> int:
         return len(self.content)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: int | slice) -> str:
         return self.content[key]
 
-    def __contains__(self, item) -> bool:
+    def __contains__(self, item: object) -> bool:
+        if not isinstance(item, str):
+            return False
         return item in self.content
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:  # ty: ignore[invalid-method-override]
         return iter(self.content)
 
-    def __add__(self, other):
+    def __add__(self, other: object) -> object:
         if isinstance(other, Reasoning):
             return Reasoning(content=self.content + other.content)
         if isinstance(other, str):
             return self.content + other
         return NotImplemented
 
-    def __radd__(self, other):
+    def __radd__(self, other: object) -> object:
         if isinstance(other, str):
             return other + self.content
         if isinstance(other, Reasoning):
             return Reasoning(content=other.content + self.content)
         return NotImplemented
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> object:
         """
         Delegate string methods to the underlying content.
 

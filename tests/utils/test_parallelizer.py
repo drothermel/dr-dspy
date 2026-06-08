@@ -42,7 +42,7 @@ def test_max_errors_handling():
     data = [1, 2, 3, 4, 5]
     executor = ParallelExecutor(num_threads=3, max_errors=1)
 
-    with pytest.raises(Exception, match="Execution cancelled due to errors or interruption."):
+    with pytest.raises(Exception, match="Execution cancelled due to errors or interruption."):  # noqa: RUF043
         executor.execute(task, data)
 
 
@@ -127,7 +127,7 @@ def test_sequential_max_errors_exceeded():
     data = [1, 2, 3, 4, 5]
     executor = ParallelExecutor(num_threads=1, max_errors=1)
 
-    with pytest.raises(Exception, match="Execution cancelled due to errors or interruption."):
+    with pytest.raises(Exception, match="Execution cancelled due to errors or interruption."):  # noqa: RUF043
         executor.execute(task, data)
 
 

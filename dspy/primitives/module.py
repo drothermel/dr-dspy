@@ -67,12 +67,12 @@ class Module(BaseModule, metaclass=ProgramMeta):
         ...         return self.predictor(question=question)
     """
 
-    def _base_init(self):
+    def _base_init(self) -> None:
         self._compiled = False
         self.callbacks = []
         self.history = []
 
-    def __init__(self, callbacks=None):
+    def __init__(self, callbacks=None) -> None:
         self.callbacks = callbacks or []
         self._compiled = False
         # LM calling history of the module.
@@ -179,7 +179,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
         """
         return [param for _, param in self.named_predictors()]
 
-    def set_lm(self, lm):
+    def set_lm(self, lm) -> None:
         """Set the language model for all predictors in this module.
 
         This method recursively sets the language model for all Predict
@@ -218,7 +218,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
 
         raise ValueError("Multiple LMs are being used in the module. There's no unique LM to return.")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         s = []
 
         for name, param in self.named_predictors():
@@ -299,10 +299,8 @@ class Module(BaseModule, metaclass=ProgramMeta):
         Returns:
             List of results, and optionally failed examples and exceptions.
         """
-        # Create a list of execution pairs (self, example)
         exec_pairs = [(self, example.inputs()) for example in examples]
 
-        # Create an instance of Parallel
         parallel_executor = Parallel(
             num_threads=num_threads,
             max_errors=max_errors,
@@ -313,15 +311,12 @@ class Module(BaseModule, metaclass=ProgramMeta):
             straggler_limit=straggler_limit,
         )
 
-        # Execute the forward method of Parallel
         if return_failed_examples:
             results, failed_examples, exceptions = parallel_executor.forward(exec_pairs)
             return results, failed_examples, exceptions
-        else:
-            results = parallel_executor.forward(exec_pairs)
-            return results
+        return parallel_executor.forward(exec_pairs)
 
-    def _set_lm_usage(self, tokens: dict[str, Any], output: Any):
+    def _set_lm_usage(self, tokens: dict[str, Any], output: Any) -> None:
         # Some optimizers (e.g., GEPA bootstrap tracing) temporarily patch
         # module.forward to return a tuple: (prediction, trace).
         # When usage tracking is enabled, ensure we attach usage to the
@@ -357,5 +352,5 @@ class Module(BaseModule, metaclass=ProgramMeta):
         return attr
 
 
-def set_attribute_by_name(obj, name, value):
+def set_attribute_by_name(obj, name, value) -> None:
     magicattr.set(obj, name, value)

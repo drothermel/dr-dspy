@@ -34,7 +34,7 @@ from dspy.utils.dummies import DummyLM
 
 
 class CustomStateLM(BaseLM):
-    def __init__(self, model, *, deployment: str, **kwargs):
+    def __init__(self, model, *, deployment: str, **kwargs: object):
         super().__init__(model=model, **kwargs)
         self.deployment = deployment
 
@@ -425,7 +425,7 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
 
     class FakeResp(dict):
         cache_hit = False
-        usage = {}
+        usage = {}  # noqa: RUF012
 
         def __init__(self):
             super().__init__({"choices": []})
@@ -460,14 +460,14 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
 
     class FakeResp(dict):
         cache_hit = False
-        usage = {}
+        usage = {}  # noqa: RUF012
 
         def __init__(self):
             super().__init__({"choices": []})
 
     safe_loaded_predict = Predict("q->a")
     safe_loaded_predict.load(file_path)
-    with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:
+    with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:  # noqa: SIM117
         with patch("litellm.completion", return_value=FakeResp()) as completion_mock:
             safe_loaded_predict.lm.forward(prompt="hello", cache=False)
 
@@ -503,7 +503,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
 
     class FakeResp(dict):
         cache_hit = False
-        usage = {}
+        usage = {}  # noqa: RUF012
 
         def __init__(self):
             super().__init__({"choices": []})
@@ -546,7 +546,8 @@ def test_config_management():
     predict_instance = Predict("input -> output")
     predict_instance.update_config(new_key="value")
     config = predict_instance.get_config()
-    assert "new_key" in config and config["new_key"] == "value"
+    assert "new_key" in config
+    assert config["new_key"] == "value"
 
 
 def test_multi_output():
@@ -662,7 +663,7 @@ def test_enum_inputs_and_outputs_with_shared_names_and_values():
 
 
 def test_auto_valued_enum_inputs_and_outputs():
-    Status = enum.Enum("Status", ["PENDING", "IN_PROGRESS", "COMPLETED"])  # noqa: N806
+    Status = enum.Enum("Status", ["PENDING", "IN_PROGRESS", "COMPLETED"])
 
     class StatusSignature(Signature):
         current_status: Status = InputField()
@@ -723,12 +724,12 @@ def test_load_state_chaining():
 @pytest.mark.parametrize("adapter_type", ["chat", "json"])
 def test_call_predict_with_chat_history(adapter_type):
     class SpyLM(LM):
-        def __init__(self, *args, return_json=False, **kwargs):
+        def __init__(self, *args: object, return_json=False, **kwargs: object):
             super().__init__(*args, **kwargs)
             self.calls = []
             self.return_json = return_json
 
-        def __call__(self, prompt=None, messages=None, **kwargs):
+        def __call__(self, prompt=None, messages=None, **kwargs: object):
             self.calls.append({"prompt": prompt, "messages": messages, "kwargs": kwargs})
             if self.return_json:
                 return ["{'answer':'100%'}"]
@@ -813,38 +814,37 @@ async def test_lm_usage_with_async():
 
     original_aforward = program.aforward
 
-    async def patched_aforward(self, **kwargs):
+    async def patched_aforward(self, **kwargs: object):
         await asyncio.sleep(1)
         return await original_aforward(**kwargs)
 
     program.aforward = types.MethodType(patched_aforward, program)
 
-    with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True):
-        with patch(
-            "litellm.acompletion",
-            return_value=ModelResponse(
-                choices=[{"message": {"content": "[[ ## answer ## ]]\nParis"}}],
-                usage={"total_tokens": 10},
-            ),
-        ):
-            coroutines = [
-                program.acall(question="What is the capital of France?"),
-                program.acall(question="What is the capital of France?"),
-                program.acall(question="What is the capital of France?"),
-                program.acall(question="What is the capital of France?"),
-            ]
-            results = await asyncio.gather(*coroutines)
-            assert results[0].answer == "Paris"
-            assert results[1].answer == "Paris"
-            assert results[0].get_lm_usage()["openai/gpt-4o-mini"]["total_tokens"] == 10
-            assert results[1].get_lm_usage()["openai/gpt-4o-mini"]["total_tokens"] == 10
-            assert results[2].get_lm_usage()["openai/gpt-4o-mini"]["total_tokens"] == 10
-            assert results[3].get_lm_usage()["openai/gpt-4o-mini"]["total_tokens"] == 10
+    with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True), patch(
+        "litellm.acompletion",
+        return_value=ModelResponse(
+            choices=[{"message": {"content": "[[ ## answer ## ]]\nParis"}}],
+            usage={"total_tokens": 10},
+        ),
+    ):
+        coroutines = [
+            program.acall(question="What is the capital of France?"),
+            program.acall(question="What is the capital of France?"),
+            program.acall(question="What is the capital of France?"),
+            program.acall(question="What is the capital of France?"),
+        ]
+        results = await asyncio.gather(*coroutines)
+        assert results[0].answer == "Paris"
+        assert results[1].answer == "Paris"
+        assert results[0].get_lm_usage()["openai/gpt-4o-mini"]["total_tokens"] == 10
+        assert results[1].get_lm_usage()["openai/gpt-4o-mini"]["total_tokens"] == 10
+        assert results[2].get_lm_usage()["openai/gpt-4o-mini"]["total_tokens"] == 10
+        assert results[3].get_lm_usage()["openai/gpt-4o-mini"]["total_tokens"] == 10
 
 
 def test_positional_arguments():
     program = Predict("question -> answer")
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError) as e:  # noqa: PT011
         program("What is the capital of France?")
     assert str(e.value) == (
         "Positional arguments are not allowed when calling `dspy.predict.predict.Predict`, must use keyword arguments "
@@ -860,7 +860,7 @@ def test_error_message_on_invalid_lm_setup():
 
     # LM is a string.
     settings.configure(lm="openai/gpt-4o-mini")
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError) as e:  # noqa: PT011
         Predict("question -> answer")(question="Why did a chicken cross the kitchen?")
 
     assert "LM must be an instance of `dspy.clients.base_lm.BaseLM`, not a string." in str(e.value)
@@ -870,7 +870,7 @@ def test_error_message_on_invalid_lm_setup():
 
     # LM is not an instance of BaseLM.
     settings.configure(lm=dummy_lm)
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError) as e:  # noqa: PT011
         Predict("question -> answer")(question="Why did a chicken cross the kitchen?")
     assert "LM must be an instance of `dspy.clients.base_lm.BaseLM`, not <class 'function'>." in str(e.value)
 
@@ -878,12 +878,12 @@ def test_error_message_on_invalid_lm_setup():
 @pytest.mark.parametrize("adapter_type", ["chat", "json"])
 def test_field_constraints(adapter_type):
     class SpyLM(LM):
-        def __init__(self, *args, return_json=False, **kwargs):
+        def __init__(self, *args: object, return_json=False, **kwargs: object):
             super().__init__(*args, **kwargs)
             self.calls = []
             self.return_json = return_json
 
-        def __call__(self, prompt=None, messages=None, **kwargs):
+        def __call__(self, prompt=None, messages=None, **kwargs: object):
             self.calls.append({"prompt": prompt, "messages": messages, "kwargs": kwargs})
             if self.return_json:
                 return ["{'score':'0.5', 'count':'2'}"]
@@ -1040,7 +1040,7 @@ def test_input_field_default_value():
             super().__init__("dummy")
             self.calls = []
 
-        def __call__(self, prompt=None, messages=None, **kwargs):
+        def __call__(self, prompt=None, messages=None, **kwargs: object):
             self.calls.append({"messages": messages})
             return ["[[ ## answer ## ]]\ntest"]
 
@@ -1283,7 +1283,7 @@ def test_list_string(caplog):
     log_test_helper()
 
     class TypedSignature(Signature):
-        nameList: list[str] = InputField()
+        nameList: list[str] = InputField()  # noqa: N815
         result: str = OutputField()
 
     predict_instance = Predict(TypedSignature)

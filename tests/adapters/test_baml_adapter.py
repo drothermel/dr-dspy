@@ -1,9 +1,10 @@
-from dspy.utils.exceptions import AdapterParseError
 from typing import Literal
 from unittest import mock
 
 import pydantic
 import pytest
+
+from dspy.utils.exceptions import AdapterParseError
 
 try:
     from litellm import Choices, Message
@@ -152,7 +153,6 @@ def test_baml_adapter_basic_schema_generation():
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
 
-    # Should contain simplified schema with comments
     assert f"{COMMENT_SYMBOL} Full name of the patient" in schema
     assert "name: string," in schema
     assert "age: int," in schema
@@ -171,7 +171,6 @@ def test_baml_adapter_handles_optional_fields():
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
 
-    # Optional address field should show 'or null'
     assert "address:" in schema
     assert "or null" in schema
 
@@ -208,7 +207,6 @@ def test_baml_adapter_handles_lists_with_bracket_notation():
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
 
-    # Should use bracket notation for lists and include comments
     assert "items: [" in schema
     assert f"{COMMENT_SYMBOL} List of patient addresses" in schema
     assert "street: string," in schema
@@ -233,7 +231,6 @@ def test_baml_adapter_handles_complex_nested_models():
         f"{INDENTATION}details:",
     ])
 
-    # Should include nested structure with comments
     assert f"{COMMENT_SYMBOL} Unique identifier" in schema
     assert expected_patient_details in schema
     assert f"{COMMENT_SYMBOL} Full name of the patient" in schema
@@ -251,7 +248,7 @@ def test_baml_adapter_raise_error_on_circular_references():
         circular: CircularModel = OutputField()
 
     adapter = BAMLAdapter()
-    with pytest.raises(ValueError) as error:
+    with pytest.raises(ValueError) as error:  # noqa: PT011
         adapter.format_field_structure(TestSignature)
 
     assert "BAMLAdapter cannot handle recursive pydantic models" in str(error.value)
@@ -272,7 +269,6 @@ def test_baml_adapter_formats_pydantic_inputs_as_clean_json():
 
     messages = adapter.format(TestSignature, [], {"patient": patient, "question": "What is the diagnosis?"})
 
-    # Should have clean, indented JSON for Pydantic input
     user_message = messages[-1]["content"]
     assert '"name": "John Doe"' in user_message
     assert '"age": 45' in user_message
@@ -295,9 +291,7 @@ def test_baml_adapter_handles_mixed_input_types():
     messages = adapter.format(TestSignature, [], {"patient": patient, "priority": 1, "notes": "Urgent case"})
 
     user_message = messages[-1]["content"]
-    # Pydantic should be JSON formatted
     assert '"name": "Jane Doe"' in user_message
-    # Primitives should be formatted normally
     assert "priority ## ]]\n1" in user_message
     assert "notes ## ]]\nUrgent case" in user_message
 
@@ -315,13 +309,10 @@ def test_baml_adapter_handles_schema_generation_errors_gracefully():
 
     adapter = BAMLAdapter()
 
-    # Should not raise an exception
     try:
         schema = adapter.format_field_structure(TestSignature)
-        # If no exception, schema should at least contain some basic structure
         assert "schema" in schema.lower()
     except Exception:
-        # If exception occurs, test passes as we're testing graceful handling
         pass
 
 
@@ -357,7 +348,6 @@ def test_baml_adapter_handles_type_casting_errors():
     # Invalid age type
     completion = '{"patient": {"name": "John", "age": "not_a_number"}}'
 
-    # Should raise ValidationError from Pydantic (which is the expected behavior)
     with pytest.raises((AdapterParseError, pydantic.ValidationError)):
         adapter.parse(TestSignature, completion)
 
@@ -378,7 +368,6 @@ def test_baml_adapter_with_images():
 
     messages = adapter.format(TestSignature, [], {"image_data": image_wrapper})
 
-    # Should contain image URLs in the message content
     user_message = messages[-1]["content"]
     image_contents = [
         content for content in user_message if isinstance(content, dict) and content.get("type") == "image_url"
@@ -472,7 +461,6 @@ def test_baml_adapter_with_conversation_history():
     adapter = BAMLAdapter()
     messages = adapter.format(TestSignature, [], {"history": history, "question": "What medications should we avoid?"})
 
-    # Should format history as separate messages
     assert len(messages) == 6  # system + 2 history pairs + user
     assert "What is the patient's age?" in messages[1]["content"]
     assert '"answer": "45 years old"' in messages[2]["content"]
@@ -518,7 +506,6 @@ def test_baml_vs_json_adapter_functional_compatibility():
     baml_result = baml_adapter.parse(TestSignature, completion)
     json_result = json_adapter.parse(TestSignature, completion)
 
-    # Results should be functionally equivalent
     assert baml_result["patient"].name == json_result["patient"].name
     assert baml_result["patient"].age == json_result["patient"].age
     assert baml_result["patient"].address.street == json_result["patient"].address.street
@@ -560,10 +547,9 @@ def test_baml_adapter_with_field_aliases():
 
     adapter = BAMLAdapter()
 
-    # Schema should show aliases in the output structure
     schema = adapter.format_field_structure(TestSignature)
-    assert "name:" in schema  # Should use alias, not field name
-    assert "age:" in schema  # Should use alias, not field name
+    assert "name:" in schema
+    assert "age:" in schema
 
 
 def test_baml_adapter_field_alias_without_description():
@@ -581,13 +567,9 @@ def test_baml_adapter_field_alias_without_description():
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
 
-    # Should show alias as comment when description is absent
     assert f"{COMMENT_SYMBOL} alias: public_name" in schema
-    # Should show description comment when present
     assert f"{COMMENT_SYMBOL} This field has a description" in schema
-    # Regular field (without alias) should appear in schema but without alias comment
     assert "regular_field: int," in schema
-    # Check that regular_field section doesn't have an alias comment
     regular_field_section = schema.split("regular_field: int,")[0].split("\n")[-1]
     assert f"{COMMENT_SYMBOL} alias:" not in regular_field_section
 
@@ -612,18 +594,16 @@ def test_baml_adapter_multiple_pydantic_input_fields():
 
     adapter = BAMLAdapter()
 
-    # Test schema generation includes headers for ALL input fields
     schema = adapter.format_field_structure(TestSignature)
-    assert "[[ ## input_1 ## ]]" in schema  # Should include first input field header
-    assert "[[ ## input_2 ## ]]" in schema  # Should include second input field header
-    assert "[[ ## result ## ]]" in schema  # Should include output field header
-    assert "[[ ## completed ## ]]" in schema  # Should include completed section
+    assert "[[ ## input_1 ## ]]" in schema
+    assert "[[ ## input_2 ## ]]" in schema
+    assert "[[ ## result ## ]]" in schema
+    assert "[[ ## completed ## ]]" in schema
     assert "All interactions will be structured in the following way" in schema
     assert "{input_1}" in schema
     assert "{input_2}" in schema
     assert "Output field `result` should be of type: string" in schema
 
-    # Test field descriptions are in the correct method
     field_desc = adapter.format_field_description(TestSignature)
     assert "Your input fields are:" in field_desc
     assert "1. `input_1` (UserProfile): User profile information" in field_desc
@@ -631,7 +611,6 @@ def test_baml_adapter_multiple_pydantic_input_fields():
     assert "Your output fields are:" in field_desc
     assert "1. `result` (str): Resulting output after processing" in field_desc
 
-    # Test message formatting with actual Pydantic instances
     user_profile = UserProfile(name="John Doe", email="john@example.com", age=30)
     system_config = SystemConfig(timeout=300, debug=True, endpoints=["api1", "api2"])
 
@@ -639,11 +618,9 @@ def test_baml_adapter_multiple_pydantic_input_fields():
 
     user_message = messages[-1]["content"]
 
-    # Verify both inputs are rendered with the correct bracket notation
     assert "[[ ## input_1 ## ]]" in user_message
     assert "[[ ## input_2 ## ]]" in user_message
 
-    # Verify JSON content for both inputs
     assert '"name": "John Doe"' in user_message
     assert '"email": "john@example.com"' in user_message
     assert '"age": 30' in user_message

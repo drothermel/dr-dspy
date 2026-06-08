@@ -9,7 +9,7 @@ class MockProgram(Module):
         super().__init__()
         self.output = output
 
-    def forward(self, *args, **kwargs):
+    def forward(self, *args: object, **kwargs: object):
         return self.output
 
 
@@ -54,6 +54,6 @@ def test_ensemble_deterministic_behavior():
     """Verify that the Ensemble class raises an assertion for deterministic behavior."""
     with pytest.raises(
         AssertionError,
-        match="TODO: Implement example hashing for deterministic ensemble.",
+        match="TODO: Implement example hashing for deterministic ensemble.",  # noqa: RUF043
     ):
         Ensemble(deterministic=True)

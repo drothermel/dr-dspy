@@ -1,12 +1,13 @@
-from dspy.adapters.types.document import Document
-from dspy.utils.dummies import DummyLM
-from dspy.utils.exceptions import AdapterParseError
 import enum
 from typing import Literal
 from unittest import mock
 
 import pydantic
 import pytest
+
+from dspy.adapters.types.document import Document
+from dspy.utils.dummies import DummyLM
+from dspy.utils.exceptions import AdapterParseError
 
 try:
     from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
@@ -1428,7 +1429,7 @@ async def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_
     with mock.patch("litellm.acompletion") as mock_acompletion:
         mock_acompletion.side_effect = RuntimeError("Structured output failed!")
 
-        with settings.context(lm=LM(model="openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()):
+        with settings.context(lm=LM(model="openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()):  # noqa: SIM117
             with pytest.raises(LMUnexpectedError, match="Structured output failed"):
                 await program.acall(question="Dummy question!")
 
@@ -1469,7 +1470,7 @@ async def test_error_message_on_json_adapter_failure_async():
 
     program = Predict(TestSignature)
 
-    with mock.patch("litellm.acompletion") as mock_acompletion:
+    with mock.patch("litellm.acompletion") as mock_acompletion:  # noqa: SIM117
         with settings.context(lm=LM(model="openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()):
             mock_acompletion.side_effect = RuntimeError("RuntimeError!")
             with pytest.raises(LMUnexpectedError) as error:
@@ -1642,13 +1643,7 @@ def test_json_adapter_with_responses_api():
         object="response",
         output=[
             ResponseOutputMessage(
-                **{
-                    "id": "msg_1",
-                    "type": "message",
-                    "role": "assistant",
-                    "status": "completed",
-                    "content": [{"type": "output_text", "text": '{"answer": "Washington, D.C."}', "annotations": []}],
-                },
+                id="msg_1", type="message", role="assistant", status="completed", content=[{"type": "output_text", "text": '{"answer": "Washington, D.C."}', "annotations": []}],
             ),
         ],
         metadata={},

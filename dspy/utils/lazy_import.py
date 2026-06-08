@@ -65,12 +65,12 @@ class _MissingModule(types.ModuleType):
     Records the original call site so the traceback is actionable.
     """
 
-    def __init__(self, module: str, message: str, frame_data: dict):
+    def __init__(self, module: str, message: str, frame_data: dict) -> None:
         super().__init__(module)
         self._message = message
         self._frame_data = frame_data
 
-    def __getattr__(self, attr: str):
+    def __getattr__(self, attr: str):  # ty:ignore[invalid-method-override]
         fd = self._frame_data
         raise ImportError(
             f"{self._message}\n\n"
@@ -86,7 +86,7 @@ class _LazyModule(types.ModuleType):
     Attribute assignment also materializes the real module so configuration writes apply to the real dependency.
     """
 
-    def __init__(self, module: str, spec: importlib.machinery.ModuleSpec, lock: threading.RLock):
+    def __init__(self, module: str, spec: importlib.machinery.ModuleSpec, lock: threading.RLock) -> None:
         super().__init__(module)
         self.__spec__ = spec
         self.__loader__ = spec.loader
@@ -110,13 +110,13 @@ class _LazyModule(types.ModuleType):
             module = importlib.util.module_from_spec(spec)
             sys.modules[module_name] = module
             try:
-                spec.loader.exec_module(module)
+                spec.loader.exec_module(module)  # ty:ignore[unresolved-attribute]
             except Exception:
                 sys.modules[module_name] = self
                 raise
             return sys.modules.get(module_name, module)
 
-    def __getattr__(self, attr: str) -> Any:
+    def __getattr__(self, attr: str) -> Any:  # ty:ignore[invalid-method-override]
         return getattr(self._load(), attr)
 
     def __setattr__(self, attr: str, value: Any) -> None:

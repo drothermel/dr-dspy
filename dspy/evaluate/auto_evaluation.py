@@ -1,8 +1,7 @@
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.signatures.field import InputField
-from dspy.signatures.field import OutputField
+from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
 
 
@@ -49,7 +48,7 @@ class SemanticF1(Module):
         decompositional: If True, uses DecompositionalSemanticRecallPrecision. Defaults to False.
     """
 
-    def __init__(self, threshold=0.66, decompositional=False):
+    def __init__(self, threshold=0.66, decompositional=False) -> None:
         self.threshold = threshold
 
         if decompositional:
@@ -108,7 +107,7 @@ class CompleteAndGrounded(Module):
         threshold: Minimum score to accept during optimization. Defaults to 0.66.
     """
 
-    def __init__(self, threshold=0.66):
+    def __init__(self, threshold=0.66) -> None:
         self.threshold = threshold
         self.completeness_module = ChainOfThought(AnswerCompleteness)
         self.groundedness_module = ChainOfThought(AnswerGroundedness)

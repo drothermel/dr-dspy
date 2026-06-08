@@ -1,6 +1,6 @@
 import base64
 import mimetypes
-import os
+from pathlib import Path
 from typing import Any
 
 import pydantic
@@ -45,7 +45,7 @@ class File(Type):
 
     @pydantic.model_validator(mode="before")
     @classmethod
-    def validate_input(cls, values: Any) -> Any:
+    def validate_input(cls, values: object) -> object:
         if isinstance(values, cls):
             return {
                 "file_data": values.file_data,
@@ -64,23 +64,20 @@ class File(Type):
         return encode_file_to_dict(values)
 
     def format(self) -> list[dict[str, Any]]:
-        try:
-            file_dict = {}
-            if self.file_data:
-                file_dict["file_data"] = self.file_data
-            if self.file_id:
-                file_dict["file_id"] = self.file_id
-            if self.filename:
-                file_dict["filename"] = self.filename
+        file_dict = {}
+        if self.file_data:
+            file_dict["file_data"] = self.file_data
+        if self.file_id:
+            file_dict["file_id"] = self.file_id
+        if self.filename:
+            file_dict["filename"] = self.filename
 
-            return [{"type": "file", "file": file_dict}]
-        except Exception as e:
-            raise ValueError(f"Failed to format file for DSPy: {e}")
+        return [{"type": "file", "file": file_dict}]
 
-    def __str__(self):
-        return self.serialize_model()
+    def __str__(self) -> str:
+        return str(self.serialize_model())
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         parts = []
         if self.file_data is not None:
             if self.file_data.startswith("data:"):
@@ -106,14 +103,15 @@ class File(Type):
             filename: Optional filename to use (defaults to basename of path)
             mime_type: Optional MIME type (defaults to auto-detection from file extension)
         """
-        if not os.path.isfile(file_path):
+        path = Path(file_path)
+        if not path.is_file():
             raise ValueError(f"File not found: {file_path}")
 
-        with open(file_path, "rb") as f:
+        with path.open("rb") as f:
             file_bytes = f.read()
 
         if filename is None:
-            filename = os.path.basename(file_path)
+            filename = path.name
 
         if mime_type is None:
             mime_type, _ = mimetypes.guess_type(file_path)
@@ -146,7 +144,7 @@ class File(Type):
         return cls(file_id=file_id, filename=filename)
 
 
-def encode_file_to_dict(file_input: Any) -> dict:
+def encode_file_to_dict(file_input: object) -> dict[str, str | None]:
     """
     Encode various file inputs to a dict with file_data, file_id, and/or filename.
 
@@ -166,8 +164,8 @@ def encode_file_to_dict(file_input: Any) -> dict:
             result["filename"] = file_input.filename
         return result
 
-    elif isinstance(file_input, str):
-        if os.path.isfile(file_input):
+    if isinstance(file_input, str):
+        if Path(file_input).is_file():
             file_obj = File.from_path(file_input)
         else:
             raise ValueError(f"Unrecognized file string: {file_input}; must be a valid file path")
@@ -177,9 +175,8 @@ def encode_file_to_dict(file_input: Any) -> dict:
             "filename": file_obj.filename,
         }
 
-    elif isinstance(file_input, bytes):
+    if isinstance(file_input, bytes):
         file_obj = File.from_bytes(file_input)
         return {"file_data": file_obj.file_data}
 
-    else:
-        raise ValueError(f"Unsupported file input type: {type(file_input)}")
+    raise ValueError(f"Unsupported file input type: {type(file_input)}")

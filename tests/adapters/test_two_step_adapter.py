@@ -1,4 +1,3 @@
-from dspy.utils.dummies import DummyLM
 from unittest import mock
 
 import pytest
@@ -9,6 +8,7 @@ from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
+from dspy.utils.dummies import DummyLM
 from dspy.utils.exceptions import AdapterParseError
 from tests.adapters.conftest import format_messages_and_lm_kwargs
 

@@ -35,7 +35,7 @@ class SimpleModule(Module):
         # COPRO doesn't work with Predict.
         self.predictor = ChainOfThought(signature)
 
-    def forward(self, **kwargs):
+    def forward(self, **kwargs: object):
         return self.predictor(**kwargs)
 
 
@@ -121,7 +121,6 @@ def test_optimization_and_output_verification():
     test_input = "What is the capital of France?"
     prediction = optimized_student(input=test_input)
 
-    print(lm.get_convo(-1))
 
     assert prediction.output == "Paris"
 

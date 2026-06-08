@@ -163,7 +163,7 @@ def test_pkl_file_loading_requires_explicit_permission(tmp_path):
 
     # Should fail without allow_pickle
     new_predict = Predict("question->answer")
-    with pytest.raises(ValueError, match="Loading .pkl files can run arbitrary code"):
+    with pytest.raises(ValueError, match="Loading .pkl files can run arbitrary code"):  # noqa: RUF043
         new_predict.load(pkl_path)
 
     # Should succeed with allow_pickle

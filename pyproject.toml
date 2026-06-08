@@ -28,10 +28,11 @@ dependencies = [
     "litellm>=1.64.0",
     "diskcache>=5.6.0",
     "json-repair>=0.54.2",
-    "tenacity>=8.2.3",  # undeclared runtime dep of litellm, needed for exponential_backoff_retry
+    "tenacity>=8.2.3", # undeclared runtime dep of litellm, needed for exponential_backoff_retry
     "anyio",
     "cachetools>=5.5.0",
     "cloudpickle>=3.1.2",
+    "srsly>=2.5.3",
 ]
 
 [project.optional-dependencies]
@@ -73,7 +74,7 @@ include = ["dspy", "dspy.*"]
 exclude = ["tests", "tests.*"]
 
 [tool.setuptools.package-data]
-dspy = ["primitives/*.js"]
+dspy = ["primitives/*.js", "py.typed"]
 
 [project.urls]
 homepage = "https://github.com/stanfordnlp/dspy"
@@ -141,6 +142,21 @@ select = [
     "N",   # pep8-naming
     "RUF", # ruff-specific rules
     "Q",   # flake8-quotes
+    "ANN", # flake8-annotations
+    "ASYNC", # flake8-async
+    "BLE", # flake8-blind-except
+    "PT",  # flake8-pytest-style
+    "RET", # flake8-return
+    "SIM", # flake8-simplify
+    "TC",  # flake8-type-checking
+    "ARG", # flake8-unused-arguments
+    "PTH", # flake8-use-pathlib
+    "PIE", # flake8-pie
+    "PERF", # Perflint
+    "TRY", # tryceratops
+    "RSE", # flake8-raise
+    "T20", # flake8-print
+    "S",   # flake8-bandit
 ]
 
 ignore = [
@@ -155,6 +171,35 @@ ignore = [
     "E721", # Allow using == to compare with type
     "UP031", # Allow percent format
     "RUF022", # Allow unsorted __all__ value
+    "ANN", # Defer full annotation linting to the ty rollout
+    "ARG001", # Allow unused callback/metric/interface parameters
+    "ARG002", # Allow unused interface/override arguments
+    "BLE001", # Allow broad catches around user/tool/provider boundaries
+    "B039", # Preserve existing ContextVar default behavior during lint rollout
+    "N806", # Allow mathematical/third-party alias names
+    "PERF203", # Allow try/except in loops where control flow is clearer
+    "PERF403", # Allow incremental dictionary construction in legacy code
+    "PT017", # Pytest-specific rule is noisy in non-test production helpers
+    "PT018", # Allow composite assertions in production validation
+    "PTH", # Defer pathlib migration to a focused compatibility pass
+    "S101", # Allow runtime asserts in library code
+    "S110", # Allow intentional best-effort exception suppression
+    "S113", # Defer timeout policy changes to network-boundary work
+    "S311", # Allow non-cryptographic randomness in ML/search utilities
+    "S603", # Allow subprocess usage after existing validation
+    "S607", # Allow PATH-based subprocess resolution
+    "SIM102", # Preserve nested condition readability in legacy code
+    "SIM105", # Preserve explicit try/except flow in legacy code
+    "SIM113", # Preserve existing loop counters where return shape is coupled
+    "SIM401", # Preserve explicit fallback branches with comments
+    "TRY002", # Allow project exception style while ty rollout is in progress
+    "TRY003", # Allow long exception messages at call sites
+    "TRY004", # Preserve ValueError/RuntimeError compatibility
+    "TRY300", # Allow returns inside try blocks
+    "TRY301", # Allow explicit raises inside try blocks
+    "TRY401", # Allow explicit exception objects in log messages
+    "UP007", # Preserve runtime typing expressions
+    "UP045", # Preserve runtime Optional construction
 ]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -168,6 +213,11 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
+[dependency-groups]
+dev = [
+    "ty>=0.0.44",
+]
+
 [tool.ruff.lint.isort]
 known-first-party = ["dspy"]
 
@@ -179,6 +229,10 @@ ban-relative-imports = "all"
     "S101",    # Allow assert statements in tests
     "TID252",  # Allow relative imports in tests
     "ARG001",  # Allow unused arguments in tests (like pytest fixtures)
+    "ANN001",  # Allow unannotated pytest fixture parameters
+    "ANN201",  # Allow unannotated test function returns
+    "ANN202",  # Allow unannotated local test helpers
+    "ANN204",  # Allow unannotated test class special methods
 ]
 "__init__.py" = ["F401"]  # Init files can be empty
 "dspy/__init__.py" = [
@@ -186,3 +240,6 @@ ban-relative-imports = "all"
     "E402",  # Allow imports not at the top of the file (needed for certain __init__ patterns)
     "F405",  # Allow undefined names from wildcard imports (common in __init__ files)
 ]
+
+[tool.ty.environment]
+python-version = "3.10"

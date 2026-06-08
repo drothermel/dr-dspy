@@ -184,7 +184,7 @@ def streamify(
     if not any(isinstance(c, StatusStreamingCallback) for c in callbacks):
         callbacks.append(status_streaming_callback)
 
-    async def generator(args, kwargs, stream: MemoryObjectSendStream):
+    async def generator(args, kwargs, stream: MemoryObjectSendStream) -> None:
         with settings.context(send_stream=stream, callbacks=callbacks, stream_listeners=stream_listeners):
             prediction = await program(*args, **kwargs)
 
@@ -216,9 +216,7 @@ def streamify(
                         if final_chunk := listener.finalize():
                             yield final_chunk
 
-                    if include_final_prediction_in_output_stream:
-                        yield value
-                    elif (
+                    if include_final_prediction_in_output_stream or (
                         len(stream_listeners) == 0
                         or any(listener.cache_hit for listener in stream_listeners)
                         or not any(listener.stream_start for listener in stream_listeners)
@@ -233,13 +231,12 @@ def streamify(
 
     if async_streaming:
         return async_streamer
-    else:
 
-        def sync_streamer(*args, **kwargs):
-            output = async_streamer(*args, **kwargs)
-            return apply_sync_streaming(output)
+    def sync_streamer(*args, **kwargs):
+        output = async_streamer(*args, **kwargs)
+        return apply_sync_streaming(output)
 
-        return sync_streamer
+    return sync_streamer
 
 
 def apply_sync_streaming(async_generator: AsyncGenerator) -> Generator:
@@ -250,24 +247,21 @@ def apply_sync_streaming(async_generator: AsyncGenerator) -> Generator:
     # To propagate prediction request ID context to the child thread
     context = contextvars.copy_context()
 
-    def producer():
+    def producer() -> None:
         """Runs in a background thread to fetch items asynchronously."""
 
-        async def runner():
+        async def runner() -> None:
             try:
                 async for item in async_generator:
                     queue.put(item)
             finally:
-                # Signal completion
                 queue.put(stop_sentinel)
 
         context.run(asyncio.run, runner())
 
-    # Start the producer in a background thread
     thread = threading.Thread(target=producer, daemon=True)
     thread.start()
 
-    # Consume items from the queue
     while True:
         item = queue.get()  # Block until an item is available
         if item is stop_sentinel:

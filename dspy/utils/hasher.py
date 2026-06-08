@@ -16,9 +16,9 @@ Changes: 2025-08-10 - Ran ruff to format the code to DSPy styles.
 class Hasher:
     """Hasher that accepts python objects as inputs."""
 
-    dispatch: dict = {}
+    dispatch: dict = {}  # noqa: RUF012 dynamic typing/lint migration for scoped ty adoption
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.m = hashlib.sha256()
 
     @classmethod

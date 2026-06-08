@@ -6,7 +6,7 @@ np = require("numpy")
 
 
 class KNN:
-    def __init__(self, k: int, trainset: list[Example], vectorizer: Embedder):
+    def __init__(self, k: int, trainset: list[Example], vectorizer: Embedder) -> None:
         """
         A k-nearest neighbors retriever that finds similar examples from a training set.
 

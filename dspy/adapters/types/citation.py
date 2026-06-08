@@ -1,9 +1,19 @@
-from typing import Any, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, cast
 
 import pydantic
 
 from dspy.adapters.types.base_type import Type
 from dspy.utils.annotation import experimental
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from litellm import ModelResponseStream
+
+    from dspy.clients.base_lm import BaseLM
+    from dspy.signatures.signature import Signature
 
 
 @experimental(version="3.0.4")
@@ -92,7 +102,7 @@ class Citations(Type):
     citations: list[Citation]
 
     @classmethod
-    def from_dict_list(cls, citations_dicts: list[dict[str, Any]]) -> "Citations":
+    def from_dict_list(cls, citations_dicts: list[dict[str, Any]]) -> Citations:  # ty: ignore[invalid-type-form]
         """Convert a list of dictionaries to a Citations instance.
 
         Args:
@@ -134,23 +144,25 @@ class Citations(Type):
 
     @pydantic.model_validator(mode="before")
     @classmethod
-    def validate_input(cls, data: Any):
+    def validate_input(cls, data: object) -> object:
         if isinstance(data, cls):
             return data
 
         # Handle case where data is a list of dicts with citation info
         if isinstance(data, list) and all(isinstance(item, dict) and "cited_text" in item for item in data):
-            return {"citations": [cls.Citation(**item) for item in data]}
+            return {"citations": [cls.Citation(**cast("dict[str, Any]", item)) for item in data]}
 
         # Handle case where data is a dict
-        elif isinstance(data, dict):
+        if isinstance(data, dict):
+            data = cast("dict[str, Any]", data)
             if "citations" in data:
                 # Handle case where data is a dict with "citations" key
                 citations_data = data["citations"]
                 if isinstance(citations_data, list):
                     return {
                         "citations": [
-                            cls.Citation(**item) if isinstance(item, dict) else item for item in citations_data
+                            cls.Citation(**cast("dict[str, Any]", item)) if isinstance(item, dict) else item
+                            for item in citations_data
                         ]
                     }
             elif "cited_text" in data:
@@ -159,20 +171,27 @@ class Citations(Type):
 
         raise ValueError(f"Received invalid value for `Citations`: {data}")
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Citation]:  # ty: ignore[invalid-method-override]
         """Allow iteration over citations."""
         return iter(self.citations)
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Return the number of citations."""
         return len(self.citations)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> Citation:
         """Allow indexing into citations."""
         return self.citations[index]
 
     @classmethod
-    def adapt_to_native_lm_feature(cls, signature, field_name, lm, lm_kwargs) -> bool:
+    def adapt_to_native_lm_feature(
+        cls,
+        signature: type[Signature],
+        field_name: str,
+        lm: BaseLM,
+        lm_kwargs: dict[str, Any],
+    ) -> type[Signature]:
+        _ = lm_kwargs
         if lm.model.startswith("anthropic/"):
             return signature.delete(field_name)
         return signature
@@ -183,7 +202,7 @@ class Citations(Type):
         return True
 
     @classmethod
-    def parse_stream_chunk(cls, chunk) -> Optional["Citations"]:
+    def parse_stream_chunk(cls, chunk: ModelResponseStream) -> Type | str | None:
         """
         Parse a stream chunk into Citations.
 
@@ -206,7 +225,7 @@ class Citations(Type):
         return None
 
     @classmethod
-    def parse_lm_response(cls, response: str | dict[str, Any]) -> Optional["Citations"]:
+    def parse_lm_response(cls, response: str | dict[str, Any]) -> Type | None:
         """Parse a LM response into Citations.
 
         Args:
@@ -215,11 +234,9 @@ class Citations(Type):
         Returns:
             A Citations object if citation data is found, None otherwise.
         """
-        if isinstance(response, dict):
-            # Check if the response contains citations in the expected format
-            if "citations" in response:
-                citations_data = response["citations"]
-                if isinstance(citations_data, list):
-                    return cls.from_dict_list(citations_data)
+        if isinstance(response, dict) and "citations" in response:
+            citations_data = response["citations"]
+            if isinstance(citations_data, list):
+                return cls.from_dict_list(citations_data)
 
         return None

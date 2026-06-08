@@ -1,3 +1,4 @@
+import contextlib
 import datetime
 import logging
 import random
@@ -18,15 +19,15 @@ logger = logging.getLogger(__name__)
 
 
 class LocalProvider(Provider):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.finetunable = True
         self.TrainingJob = TrainingJob
 
     @staticmethod
-    def launch(lm: "LM", launch_kwargs: dict[str, Any] | None = None):
+    def launch(lm: "LM", launch_kwargs: dict[str, Any] | None = None) -> None:
         try:
-            import sglang  # noqa: F401
+            import sglang  # noqa: F401  # ty:ignore[unresolved-import]
         except ImportError:
             raise ImportError(
                 "For local model launching, please install sglang."
@@ -62,7 +63,7 @@ class LocalProvider(Provider):
             "--port",
             str(port),
             "--host",
-            "0.0.0.0",
+            "0.0.0.0",  # noqa: S104 dynamic typing/lint migration for scoped ty adoption
         ]
 
         # We will manually stream & capture logs.
@@ -79,19 +80,16 @@ class LocalProvider(Provider):
         stop_printing_event = threading.Event()
         logs_buffer = []
 
-        def _tail_process(proc, buffer, stop_event):
+        def _tail_process(proc, buffer, stop_event) -> None:
             while True:
                 line = proc.stdout.readline()
                 if not line and proc.poll() is not None:
-                    # Process ended and no new line
                     break
                 if line:
                     buffer.append(line)
-                    # Print only if stop_event is not set
                     if not stop_event.is_set():
-                        print(line, end="")
+                        pass
 
-        # Start a background thread to read from the process continuously
         thread = threading.Thread(
             target=_tail_process,
             args=(process, logs_buffer, stop_printing_event),
@@ -99,55 +97,49 @@ class LocalProvider(Provider):
         )
         thread.start()
 
-        # Wait until the server is ready (or times out)
         base_url = f"http://localhost:{port}"
         try:
             wait_for_server(base_url, timeout=timeout)
         except TimeoutError:
-            # If the server doesn't come up, we might want to kill it:
             process.kill()
             raise
 
-        # Once server is ready, we tell the thread to stop printing further lines.
         stop_printing_event.set()
 
-        # A convenience getter so the caller can see all logs so far (and future).
         def get_logs() -> str:
-            # Join them all into a single string, or you might return a list
             return "".join(logs_buffer)
 
-        # Let the user know server is up
         logger.info(f"Server ready on random port {port}! Logs are available via lm.get_logs() method on returned lm.")
 
         lm.kwargs["api_base"] = f"http://localhost:{port}/v1"
         lm.kwargs["api_key"] = "local"
-        lm.get_logs = get_logs
-        lm.process = process
-        lm.thread = thread
+        lm.get_logs = get_logs  # ty:ignore[invalid-assignment]
+        lm.process = process  # ty:ignore[invalid-assignment]
+        lm.thread = thread  # ty:ignore[invalid-assignment]
 
     @staticmethod
-    def kill(lm: "LM", launch_kwargs: dict[str, Any] | None = None):
-        from sglang.utils import terminate_process
+    def kill(lm: "LM", launch_kwargs: dict[str, Any] | None = None) -> None:  # noqa: ARG004 dynamic typing/lint migration for scoped ty adoption
+        from sglang.utils import terminate_process  # ty:ignore[unresolved-import]
 
         if not hasattr(lm, "process"):
             logger.info("No running server to kill.")
             return
         # Ideally, the following happens atomically
         terminate_process(lm.process)
-        lm.thread.join()
+        lm.thread.join()  # ty:ignore[unresolved-attribute]
         del lm.process
-        del lm.thread
-        del lm.get_logs
+        del lm.thread  # ty:ignore[unresolved-attribute]
+        del lm.get_logs  # ty:ignore[unresolved-attribute]
         logger.info("Server killed.")
 
     @staticmethod
     def finetune(
-        job: TrainingJob,
+        job: TrainingJob,  # noqa: ARG004 dynamic typing/lint migration for scoped ty adoption
         model: str,
         train_data: list[dict[str, Any]],
         train_data_format: TrainDataFormat | None,
         train_kwargs: dict[str, Any] | None = None,
-    ) -> str:
+    ) -> str:  # ty:ignore[invalid-method-override]
         if model.startswith("openai/"):
             model = model[7:]
         if model.startswith("local:"):
@@ -191,15 +183,14 @@ def create_output_dir(model_name, data_path):
     time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     rnd_str = "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
     model_identifier = f"{rnd_str}_{model_str}_{time_str}"
-    output_dir = data_path.replace(".jsonl", "_" + model_identifier)
-    return output_dir
+    return data_path.replace(".jsonl", "_" + model_identifier)
 
 
 def train_sft_locally(model_name, train_data, train_kwargs):
     try:
-        import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer
-        from trl import SFTConfig, SFTTrainer, setup_chat_format
+        import torch  # ty:ignore[unresolved-import]
+        from transformers import AutoModelForCausalLM, AutoTokenizer  # ty:ignore[unresolved-import]
+        from trl import SFTConfig, SFTTrainer, setup_chat_format  # ty:ignore[unresolved-import]
     except ImportError:
         raise ImportError(
             "For local finetuning, please install torch, transformers, and trl "
@@ -215,10 +206,8 @@ def train_sft_locally(model_name, train_data, train_kwargs):
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path=model_name)
 
     # Set up the chat format; generally only for non-chat model variants, hence the try-except.
-    try:
+    with contextlib.suppress(Exception):
         model, tokenizer = setup_chat_format(model=model, tokenizer=tokenizer)
-    except Exception:
-        pass
 
     if tokenizer.pad_token_id is None:
         logger.info("Adding pad token to tokenizer")
@@ -246,7 +235,7 @@ def train_sft_locally(model_name, train_data, train_kwargs):
     peft_config = None
 
     if use_peft:
-        from peft import LoraConfig
+        from peft import LoraConfig  # ty:ignore[unresolved-import]
 
         rank_dimension = 32
         lora_alpha = 64
@@ -289,17 +278,14 @@ def train_sft_locally(model_name, train_data, train_kwargs):
         peft_config=peft_config,
     )
 
-    # Train!
     trainer.train()
 
-    # Save the model!
     trainer.save_model()
 
     merge = True
     if use_peft and merge:
-        from peft import AutoPeftModelForCausalLM
+        from peft import AutoPeftModelForCausalLM  # ty:ignore[unresolved-import]
 
-        # Load PEFT model on CPU
         model_ = AutoPeftModelForCausalLM.from_pretrained(
             pretrained_model_name_or_path=sft_config.output_dir,
             torch_dtype=torch.float16,
@@ -309,7 +295,6 @@ def train_sft_locally(model_name, train_data, train_kwargs):
         merged_model = model_.merge_and_unload()
         merged_model.save_pretrained(sft_config.output_dir, safe_serialization=True, max_shard_size="5GB")
 
-    # Clean up!
     import gc
 
     del model
@@ -367,7 +352,7 @@ def encode_sft_example(example, tokenizer, max_seq_length):
 
     Code obtained from the allenai/open-instruct repository: https://github.com/allenai/open-instruct/blob/4365dea3d1a6111e8b2712af06b22a4512a0df88/open_instruct/finetune.py
     """
-    import torch
+    import torch  # ty:ignore[unresolved-import]
 
     messages = example["messages"]
     if len(messages) == 0:

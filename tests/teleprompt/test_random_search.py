@@ -11,7 +11,7 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    def forward(self, **kwargs):
+    def forward(self, **kwargs: object):
         return self.predictor(**kwargs)
 
 

@@ -344,7 +344,7 @@ while (true) {
       // We have an error => check if it's a SyntaxError or something else
       // The Python error class name is stored in error.type: https://pyodide.org/en/stable/usage/api/js-api.html#pyodide.ffi.PythonError
       const errorType = error.type || "Error";
-      // error.message is mostly blank.
+      // Pyodide often leaves error.message blank for Python exceptions; use last_exception_args below for details.
       const errorMessage = (error.message || "").trim();
 
       // Handle FinalOutput as a success result, not an error
@@ -362,7 +362,7 @@ while (true) {
         // Only python exceptions have args.
         const last_exception_args = pyodide.globals.get("last_exception_args");
         // Regarding https://pyodide.org/en/stable/usage/type-conversions.html#type-translations-errors,
-        // we do a additional `json.dumps` and `JSON.parse` on the values, to avoid the possible memory leak.
+        // Round-trip through json.dumps/JSON.parse to avoid the Pyodide type-conversion leak documented above.
         errorArgs = JSON.parse(last_exception_args()) || [];
       }
 

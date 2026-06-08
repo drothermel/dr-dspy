@@ -185,7 +185,7 @@ class BaseLM:
         callbacks: list[BaseCallback] | None = None,
         num_retries: int = 3,
         **kwargs,
-    ):
+    ) -> None:
         """Initialize a base language model.
 
         Args:
@@ -372,7 +372,7 @@ class BaseLM:
             return self._legacy_call_direct(*items, prompt=prompt, messages=messages, **kwargs)
 
         if forward_contract == "typed_lm":
-            response = self.forward(normalized_request)
+            response = self.forward(normalized_request)  # ty:ignore[invalid-argument-type]
             response = self._finalize_lm_response(normalized_request, self._validate_typed_lm_response(response))
         else:
             response = self._legacy_forward_as_lm_response(normalized_request)
@@ -405,7 +405,7 @@ class BaseLM:
             return await self._legacy_acall_direct(*items, prompt=prompt, messages=messages, **kwargs)
 
         if forward_contract == "typed_lm":
-            response = await self.aforward(normalized_request)
+            response = await self.aforward(normalized_request)  # ty:ignore[invalid-argument-type]
             response = self._finalize_lm_response(normalized_request, self._validate_typed_lm_response(response))
         else:
             response = await self._legacy_aforward_as_lm_response(normalized_request)
@@ -511,7 +511,7 @@ class BaseLM:
             model=self.model,
             items=items,
             prompt=prompt,
-            messages=messages,
+            messages=messages,  # ty:ignore[invalid-argument-type]
             **merged_kwargs,
         )
 
@@ -591,7 +591,7 @@ class BaseLM:
         if message.role != "user" or len(message.parts) != 1:
             return None
         part = message.parts[0]
-        return part.text if getattr(part, "type", None) == "text" else None
+        return part.text if getattr(part, "type", None) == "text" else None  # ty:ignore[unresolved-attribute]
 
     def _finalize_lm_response(self, request: LMRequest, response: LMResponse) -> LMResponse:
         """Record usage and typed history for a normalized LM response."""
@@ -785,7 +785,7 @@ class BaseLM:
     def inspect_history(self, n: int = 1, file: "TextIO | None" = None) -> None:
         pretty_print_history(self.history, n, file=file)
 
-    def update_history(self, entry):
+    def update_history(self, entry) -> None:
         if settings.disable_history:
             return
 
@@ -843,7 +843,7 @@ class BaseLM:
             outputs.append(output)
 
         if all(len(output) == 1 for output in outputs):
-            # Return a list if every output only has "text" key
+            # Preserve the legacy output shape: plain text generations return list[str].
             outputs = [output["text"] for output in outputs]
         return outputs
 
@@ -883,16 +883,16 @@ class BaseLM:
             output_item_type = output_item.type
             if output_item_type == "message":
                 for content_item in output_item.content:
-                    text_outputs.append(content_item.text)
+                    text_outputs.append(content_item.text)  # noqa: PERF401 dynamic typing/lint migration for scoped ty adoption
             elif output_item_type == "function_call":
                 tool_calls.append(output_item.model_dump())
             elif output_item_type == "reasoning":
                 if getattr(output_item, "content", None) and len(output_item.content) > 0:
                     for content_item in output_item.content:
-                        reasoning_contents.append(content_item.text)
+                        reasoning_contents.append(content_item.text)  # noqa: PERF401 dynamic typing/lint migration for scoped ty adoption
                 elif getattr(output_item, "summary", None) and len(output_item.summary) > 0:
                     for summary_item in output_item.summary:
-                        reasoning_contents.append(summary_item.text)
+                        reasoning_contents.append(summary_item.text)  # noqa: PERF401 dynamic typing/lint migration for scoped ty adoption
 
         result = {}
         if len(text_outputs) > 0:

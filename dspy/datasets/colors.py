@@ -145,7 +145,7 @@ all_colors = [
 
 
 class Colors(Dataset):
-    def __init__(self, sort_by_suffix=True, *args, **kwargs) -> None:
+    def __init__(self, sort_by_suffix: bool = True, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
 
         self.sort_by_suffix = sort_by_suffix
@@ -162,7 +162,7 @@ class Colors(Dataset):
         random.Random(0).shuffle(self._train)
         random.Random(0).shuffle(self._dev)
 
-    def sorted_by_suffix(self, colors):
+    def sorted_by_suffix(self, colors: list[str] | list[dict[str, str]]) -> list[str] | list[dict[str, str]]:
         if not self.sort_by_suffix:
             return colors
 

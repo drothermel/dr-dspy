@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
-from dspy.clients.lm import LM
 from dspy.dsp.utils.settings import settings
 from dspy.predict.parallel import Parallel
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
 from dspy.teleprompt.simba_utils import append_a_demo, append_a_rule, prepare_models_for_resampling, wrap_program
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.lazy_import import require
+
+if TYPE_CHECKING:
+    from dspy.clients.lm import LM
+    from dspy.primitives.example import Example
+    from dspy.primitives.module import Module
 
 np = require("numpy")
 
@@ -21,12 +23,12 @@ logger = logging.getLogger(__name__)
 class SIMBA(Teleprompter):
     """
     SIMBA (Stochastic Introspective Mini-Batch Ascent) optimizer for DSPy.
-    
-    SIMBA is a DSPy optimizer that uses the LLM to analyze its own performance and 
-    generate improvement rules. It samples mini-batches, identifies challenging examples 
-    with high output variability, then either creates self-reflective rules or adds 
+
+    SIMBA is a DSPy optimizer that uses the LLM to analyze its own performance and
+    generate improvement rules. It samples mini-batches, identifies challenging examples
+    with high output variability, then either creates self-reflective rules or adds
     successful examples as demonstrations.
-    
+
     For more details, see: https://dspy.ai/api/optimizers/SIMBA/
     """
 
@@ -96,12 +98,12 @@ class SIMBA(Teleprompter):
     ) -> Module:
         """
         Compile and optimize the student module using SIMBA.
-        
+
         Args:
             student: The module to optimize
             trainset: Training examples for optimization
             seed: Random seed for reproducibility
-            
+
         Returns:
             The optimized module with candidate_programs and trial_logs attached
         """
@@ -274,7 +276,7 @@ class SIMBA(Teleprompter):
                 num_demos_to_drop = min(num_demos_to_drop, num_demos)
                 demos_to_drop = [rng.randrange(num_demos) for _ in range(num_demos_to_drop)]
 
-                for _, predictor in name2predictor.items():
+                for predictor in name2predictor.values():
                     predictor.demos = [demo for idxd, demo in enumerate(predictor.demos) if idxd not in demos_to_drop]
 
                 # Pick a strategy
@@ -295,7 +297,7 @@ class SIMBA(Teleprompter):
                         prompt_model=self.prompt_model,
                     )
                 except Exception as e:
-                    logger.error(f"Strategy failed with error: {e}")
+                    logger.exception(f"Strategy failed with error: {e}")
                     continue
 
                 system_candidates.append(system_candidate)
@@ -338,12 +340,9 @@ class SIMBA(Teleprompter):
                 sys_scores = [outputs[i]["score"] for i in range(start, end)]
                 register_new_program(cand_sys, sys_scores)
 
-        M = len(winning_programs) - 1  # noqa: N806
-        N = self.num_candidates + 1  # noqa: N806
-        if M < 1:
-            program_idxs = [0] * N
-        else:
-            program_idxs = [round(i * M / (N - 1)) for i in range(N)]
+        M = len(winning_programs) - 1
+        N = self.num_candidates + 1
+        program_idxs = [0] * N if M < 1 else [round(i * M / (N - 1)) for i in range(N)]
 
         program_idxs = list(dict.fromkeys(program_idxs))
 

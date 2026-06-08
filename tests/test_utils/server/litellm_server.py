@@ -10,15 +10,15 @@ LITELLM_TEST_SERVER_LOG_FILE_PATH_ENV_VAR = "LITELLM_TEST_SERVER_LOG_FILE_PATH"
 
 
 class DSPyTestModel(CustomLLM):
-    def completion(self, *args, **kwargs) -> litellm.ModelResponse:
+    def completion(self, *args: object, **kwargs: object) -> litellm.ModelResponse:
         _append_request_to_log_file(kwargs)
         return _get_mock_llm_response(kwargs)
 
-    async def acompletion(self, *args, **kwargs) -> litellm.ModelResponse:
+    async def acompletion(self, *args: object, **kwargs: object) -> litellm.ModelResponse:
         _append_request_to_log_file(kwargs)
         return _get_mock_llm_response(kwargs)
 
-    def streaming(self, *args, **kwargs) -> Iterator[GenericStreamingChunk]:
+    def streaming(self, *args: object, **kwargs: object) -> Iterator[GenericStreamingChunk]:
         generic_streaming_chunk: GenericStreamingChunk = {
             "finish_reason": "stop",
             "index": 0,
@@ -29,7 +29,7 @@ class DSPyTestModel(CustomLLM):
         }
         return generic_streaming_chunk  # type: ignore
 
-    async def astreaming(self, *args, **kwargs) -> AsyncIterator[GenericStreamingChunk]:
+    async def astreaming(self, *args: object, **kwargs: object) -> AsyncIterator[GenericStreamingChunk]:
         generic_streaming_chunk: GenericStreamingChunk = {
             "finish_reason": "stop",
             "index": 0,
@@ -59,11 +59,11 @@ def _throw_exception_based_on_content_if_applicable(request_kwargs):
     content = request_kwargs["messages"][0]["content"]
     if "429" in content:
         raise litellm.RateLimitError(message="Rate limit exceeded", llm_provider=None, model=model)
-    elif "504" in content:
+    if "504" in content:
         raise litellm.Timeout("Request timed out!", llm_provider=None, model=model)
-    elif "400" in content:
+    if "400" in content:
         raise litellm.BadRequestError(message="Bad request", llm_provider=None, model=model)
-    elif "401" in content:
+    if "401" in content:
         raise litellm.AuthenticationError(message="Authentication error", llm_provider=None, model=model)
 
 

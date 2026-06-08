@@ -4,6 +4,7 @@ import copy
 import logging
 import threading
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
 import cloudpickle
@@ -37,12 +38,10 @@ DEFAULT_CONFIG = dotdict(
     warn_on_type_mismatch=True,  # Whether to log warnings when a module's input type doesn't match the signature type.
 )
 
-# Global base configuration and owner tracking
 main_thread_config = copy.deepcopy(DEFAULT_CONFIG)
 config_owner_thread_id = None
 config_owner_async_task = None
 
-# Global lock for settings configuration
 global_lock = threading.Lock()
 
 thread_local_overrides = contextvars.ContextVar("context_overrides", default=dotdict())
@@ -80,12 +79,11 @@ class Settings:
         overrides = thread_local_overrides.get()
         if name in overrides:
             return overrides[name]
-        elif name in main_thread_config:
+        if name in main_thread_config:
             return main_thread_config[name]
-        else:
-            raise AttributeError(f"'Settings' object has no attribute '{name}'")
+        raise AttributeError(f"'Settings' object has no attribute '{name}'")
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name, value) -> None:
         if name in ("_instance",):
             super().__setattr__(name, value)
         else:
@@ -94,10 +92,10 @@ class Settings:
     def __getitem__(self, key):
         return self.__getattr__(key)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value) -> None:
         self.__setattr__(key, value)
 
-    def __contains__(self, key):
+    def __contains__(self, key) -> bool:
         overrides = thread_local_overrides.get()
         return key in overrides or key in main_thread_config
 
@@ -115,7 +113,7 @@ class Settings:
     def config(self):
         return self.copy()
 
-    def _ensure_configure_allowed(self):
+    def _ensure_configure_allowed(self) -> None:
         global main_thread_config, config_owner_thread_id, config_owner_async_task
         current_thread_id = threading.get_ident()
 
@@ -163,7 +161,7 @@ class Settings:
                 "use `settings.context(...)` in other async tasks instead."
             )
 
-    def configure(self, **kwargs):
+    def configure(self, **kwargs) -> None:
         """Set the default language model, adapter, and other settings for DSPy.
 
         Call `settings.configure(...)` once near the top of your script. Every
@@ -207,10 +205,8 @@ class Settings:
             `dspy.clients.lm.LM`: create the language model you pass as `lm`.
             `settings.context`: temporary overrides inside one block.
         """
-        # If no exception is raised, the `configure` call is allowed.
         self._ensure_configure_allowed()
 
-        # Update global config
         for k, v in kwargs.items():
             main_thread_config[k] = v
 
@@ -258,7 +254,7 @@ class Settings:
         finally:
             thread_local_overrides.reset(token)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         overrides = thread_local_overrides.get()
         combined_config = {**main_thread_config, **overrides}
         return repr(combined_config)
@@ -267,7 +263,7 @@ class Settings:
         self, path: str,
         modules_to_serialize: list[str] | None = None,
         exclude_keys: list[str] | None = None,
-    ):
+    ) -> None:
         """
         Save the settings to a file using cloudpickle.
 
@@ -289,7 +285,7 @@ class Settings:
 
             exclude_keys = exclude_keys or []
             data = {key: value for key, value in self.config.items() if key not in exclude_keys}
-            with open(path, "wb") as f:
+            with Path(path).open("wb") as f:
                 cloudpickle.dump(data, f)
         except Exception as e:
             raise RuntimeError(
@@ -316,10 +312,9 @@ class Settings:
                 "Set `allow_pickle=True` if you trust the source of the file."
             )
 
-        with open(path, "rb") as f:
-            configs = cloudpickle.load(f)
+        with Path(path).open("rb") as f:
+            return cloudpickle.load(f)
 
-        return configs
 
 
 settings = Settings()

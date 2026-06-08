@@ -45,7 +45,7 @@ class TrainingJob(Future):
         train_data: list[dict[str, Any]] | None = None,
         train_data_format: TrainDataFormat | None = None,
         train_kwargs: dict[str, Any] | None = None,
-    ):
+    ) -> None:
         self.thread = thread
         self.model = model
         self.train_data = train_data
@@ -53,7 +53,7 @@ class TrainingJob(Future):
         self.train_kwargs = train_kwargs or {}
         super().__init__()
 
-    def cancel(self) -> bool:
+    def cancel(self) -> bool:  # ty:ignore[invalid-return-type]
         """Cancel the training job.
 
         Subclasses should override this method to cancel the job with the provider;
@@ -103,7 +103,7 @@ class ReinforceJob:
         ```
     """
 
-    def __init__(self, lm: "LM", train_kwargs: dict[str, Any] | None = None):
+    def __init__(self, lm: "LM", train_kwargs: dict[str, Any] | None = None) -> None:
         self.lm = lm
         self.train_kwargs = train_kwargs or {}
         self.checkpoints = {}
@@ -210,14 +210,14 @@ class Provider:
         ```
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.finetunable = False
         self.reinforceable = False
         self.TrainingJob = TrainingJob
         self.ReinforceJob = ReinforceJob
 
     @staticmethod
-    def is_provider_model(model: str) -> bool:
+    def is_provider_model(model: str) -> bool:  # noqa: ARG004 dynamic typing/lint migration for scoped ty adoption
         """Check if a model identifier is supported by this provider.
 
         Subclasses should override this method to check whether a model is
@@ -232,7 +232,7 @@ class Provider:
         return False
 
     @staticmethod
-    def launch(lm: "LM", launch_kwargs: dict[str, Any] | None = None):
+    def launch(lm: "LM", launch_kwargs: dict[str, Any] | None = None) -> None:
         """Launch a language model instance.
 
         This method should be implemented by subclasses to start a language model
@@ -245,10 +245,9 @@ class Provider:
                 The `lm.launch_kwargs` dictionary will contain the necessary
                 information for the provider to launch the LM.
         """
-        pass
 
     @staticmethod
-    def kill(lm: "LM", launch_kwargs: dict[str, Any] | None = None):
+    def kill(lm: "LM", launch_kwargs: dict[str, Any] | None = None) -> None:
         """Kill a running language model instance.
 
         This method should be implemented by subclasses to stop a running language
@@ -263,7 +262,6 @@ class Provider:
                 `launch_kwargs` (not `kill_kwargs`) because it contains the same
                 information used for launching.
         """
-        pass
 
     @staticmethod
     def finetune(

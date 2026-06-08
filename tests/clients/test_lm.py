@@ -128,7 +128,7 @@ def test_disabled_cache_skips_cache_key(monkeypatch):
             mock.patch.object(cache, "put", wraps=cache.put) as cache_put_spy,
         ):
 
-            def fake_completion(*, cache, num_retries, retry_strategy, **request):
+            def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
                 return ModelResponse(
                     choices=[Choices(message=Message(role="assistant", content="Hi!"))],
                     usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
@@ -150,7 +150,7 @@ def test_disabled_cache_skips_cache_key(monkeypatch):
 def test_rollout_id_bypasses_cache(monkeypatch, tmp_path):
     calls: list[dict] = []
 
-    def fake_completion(*, cache, num_retries, retry_strategy, **request):
+    def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
         calls.append(request)
         return ModelResponse(
             choices=[Choices(message=Message(role="assistant", content="Hi!"))],
@@ -195,7 +195,7 @@ def test_rollout_id_bypasses_cache(monkeypatch, tmp_path):
 
 
 def test_zero_temperature_rollout_warns_once(monkeypatch):
-    def fake_completion(*, cache, num_retries, retry_strategy, **request):
+    def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
         return ModelResponse(
             choices=[Choices(message=Message(role="assistant", content="Hi!"))],
             usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
@@ -214,7 +214,7 @@ def test_zero_temperature_rollout_warns_once(monkeypatch):
 
 
 def test_rollout_id_with_default_temperature_does_not_warn(monkeypatch):
-    def fake_completion(*, cache, num_retries, retry_strategy, **request):
+    def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
         return ModelResponse(
             choices=[Choices(message=Message(role="assistant", content="Hi!"))],
             usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
@@ -256,7 +256,7 @@ def test_lm_calls_support_callables(litellm_test_server):
 
     with mock.patch("litellm.completion", autospec=True, wraps=litellm.completion) as spy_completion:
 
-        def azure_ad_token_provider(*args, **kwargs):
+        def azure_ad_token_provider(*args: object, **kwargs: object):
             return None
 
         lm_with_callable = LM(
@@ -333,7 +333,7 @@ def test_lm_preserves_existing_lm_error_without_self_cause():
     error = LMRateLimitError("rate limited", model="openai/gpt-4o-mini")
     lm = LM("openai/gpt-4o-mini", cache=False)
 
-    with mock.patch("dspy.clients.lm.litellm_completion", side_effect=error):
+    with mock.patch("dspy.clients.lm.litellm_completion", side_effect=error):  # noqa: SIM117
         with pytest.raises(LMRateLimitError) as exc_info:
             lm("question")
 
@@ -346,7 +346,7 @@ async def test_lm_preserves_existing_lm_error_without_self_cause_async():
     error = LMRateLimitError("rate limited", model="openai/gpt-4o-mini")
     lm = LM("openai/gpt-4o-mini", cache=False)
 
-    with mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error):
+    with mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error):  # noqa: SIM117
         with pytest.raises(LMRateLimitError) as exc_info:
             await lm.acall("question")
 
@@ -365,16 +365,16 @@ def test_retry_number_set_correctly():
 def test_retry_made_on_system_errors():
     retry_tracking = [0]  # Using a list to track retries
 
-    def mock_create(*args, **kwargs):
+    def mock_create(*args: object, **kwargs: object):
         retry_tracking[0] += 1
-        # These fields are called during the error handling
+        # LiteLLM RateLimitError handling expects response.status_code and response.headers.
         mock_response = mock.Mock()
         mock_response.headers = {}
         mock_response.status_code = 429
         raise RateLimitError(response=mock_response, message="message", body="error")
 
     lm = LM(model="openai/gpt-4o-mini", max_tokens=250, num_retries=3)
-    with mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create):
+    with mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create):  # noqa: SIM117
         with pytest.raises(LMRateLimitError):
             lm("question")
 
@@ -414,18 +414,17 @@ def test_reasoning_model_token_parameter():
 
 @pytest.mark.parametrize("model_name", ["openai/o1", "openai/gpt-5-nano", "openai/gpt-5-mini"])
 def test_reasoning_model_requirements(model_name):
-    # Should raise assertion error if temperature or max_tokens requirements not met
+    # Should raise LMConfigurationError when reasoning-model temperature or max_tokens constraints are violated.
     with pytest.raises(
         LMConfigurationError,
         match=r"reasoning models require passing temperature=1\.0 or None and max_tokens >= 16000 or None",
     ):
         LM(
             model=model_name,
-            temperature=0.7,  # Should be 1.0
-            max_tokens=1000,  # Should be >= 16_000
+            temperature=0.7,
+            max_tokens=1000,
         )
 
-    # Should pass with correct parameters
     lm = LM(
         model=model_name,
         temperature=1.0,
@@ -433,7 +432,6 @@ def test_reasoning_model_requirements(model_name):
     )
     assert lm.kwargs["max_completion_tokens"] == 16_000
 
-    # Should pass with no parameters
     lm = LM(
         model=model_name,
     )
@@ -443,13 +441,11 @@ def test_reasoning_model_requirements(model_name):
 
 def test_gpt_5_chat_not_reasoning_model():
     """Test that gpt-5-chat is NOT treated as a reasoning model."""
-    # Should NOT raise validation error - gpt-5-chat is not a reasoning model
     lm = LM(
         model="openai/gpt-5-chat",
-        temperature=0.7,  # Can be any value
-        max_tokens=1000,  # Can be any value
+        temperature=0.7,
+        max_tokens=1000,
     )
-    # Should use max_tokens, not max_completion_tokens
     assert "max_completion_tokens" not in lm.kwargs
     assert "max_tokens" in lm.kwargs
     assert lm.kwargs["max_tokens"] == 1000
@@ -533,7 +529,7 @@ def test_base_lm_errors_when_explicit_legacy_forward_returns_lm_response():
 
 def test_base_lm_inherited_legacy_forward_returning_lm_response_errors_on_direct_call():
     class CustomLM(BaseLM):
-        def forward(self, prompt=None, messages=None, **kwargs):
+        def forward(self, prompt=None, messages=None, **kwargs: object):
             return LMResponse.from_text(
                 "ok",
                 model="custom-model",
@@ -556,7 +552,7 @@ def test_base_lm_inherited_legacy_forward_returning_lm_response_errors_on_direct
 
 def test_base_lm_default_call_keeps_legacy_outputs():
     class CustomLM(BaseLM):
-        def forward(self, prompt=None, messages=None, **kwargs):
+        def forward(self, prompt=None, messages=None, **kwargs: object):
             assert prompt == "Query"
             assert messages is None
             return ModelResponse(
@@ -570,11 +566,11 @@ def test_base_lm_default_call_keeps_legacy_outputs():
 
 def test_base_lm_experimental_call_returns_lm_response_through_legacy_bridge():
     class CustomLM(BaseLM):
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args: object, **kwargs: object):
             super().__init__(*args, **kwargs)
             self.seen = None
 
-        def forward(self, prompt=None, messages=None, **kwargs):
+        def forward(self, prompt=None, messages=None, **kwargs: object):
             self.seen = {"prompt": prompt, "messages": messages, "kwargs": kwargs}
             return ModelResponse(
                 choices=[Choices(message=Message(role="assistant", content="Hi!"), finish_reason="stop")],
@@ -598,7 +594,7 @@ def test_base_lm_experimental_call_returns_lm_response_through_legacy_bridge():
 
 def test_base_lm_explicit_lm_request_returns_lm_response_without_experimental():
     class CustomLM(BaseLM):
-        def forward(self, prompt=None, messages=None, **kwargs):
+        def forward(self, prompt=None, messages=None, **kwargs: object):
             return ModelResponse(
                 choices=[Choices(message=Message(role="assistant", content="Hi!"))],
                 usage={},
@@ -614,7 +610,7 @@ def test_base_lm_explicit_lm_request_returns_lm_response_without_experimental():
 
 def test_base_lm_legacy_bridge_records_typed_history_and_usage_once():
     class CustomLM(BaseLM):
-        def forward(self, prompt=None, messages=None, **kwargs):
+        def forward(self, prompt=None, messages=None, **kwargs: object):
             return ModelResponse(
                 choices=[Choices(message=Message(role="assistant", content="Hi!"))],
                 usage={"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
@@ -668,7 +664,7 @@ def test_base_lm_typed_forward_contract_rejects_non_lm_response_at_call_time():
 
 def test_base_lm_request_call_rejects_mixed_inputs():
     class CustomLM(BaseLM):
-        def forward(self, prompt=None, messages=None, **kwargs):
+        def forward(self, prompt=None, messages=None, **kwargs: object):
             raise AssertionError("forward should not be called")
 
     request = LMRequest.from_call(model="custom-model", prompt="Query")
@@ -689,7 +685,7 @@ class _TypedContractLM(BaseLM):
 
     forward_contract = "typed_lm"
 
-    def __init__(self, *args, outputs: list[str], **kwargs):
+    def __init__(self, *args: object, outputs: list[str], **kwargs: object):
         super().__init__(*args, **kwargs)
         self.outputs = outputs
         self.requests = []
@@ -831,7 +827,7 @@ def test_base_lm_experimental_direct_messages_can_reuse_lm_response_as_assistant
 @pytest.mark.asyncio
 async def test_base_lm_async_explicit_lm_request_returns_lm_response():
     class CustomLM(BaseLM):
-        async def aforward(self, prompt=None, messages=None, **kwargs):
+        async def aforward(self, prompt=None, messages=None, **kwargs: object):
             return ModelResponse(
                 choices=[Choices(message=Message(role="assistant", content="Hi async!"))],
                 usage={},
@@ -847,7 +843,7 @@ async def test_base_lm_async_explicit_lm_request_returns_lm_response():
 
 def test_base_lm_tracks_usage_for_custom_subclasses():
     class CustomLM(BaseLM):
-        def forward(self, prompt=None, messages=None, **kwargs):
+        def forward(self, prompt=None, messages=None, **kwargs: object):
             return ModelResponse(
                 choices=[Choices(message=Message(role="assistant", content="Hi!"))],
                 usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
@@ -940,7 +936,7 @@ def test_dump_state_preserves_enabled_developer_role():
 def test_dump_state_ignores_internal_class_marker_kwarg():
     lm = LM(
         model="openai/gpt-4o-mini",
-        **{"_dspy_lm_class": "malicious.module.LM"},
+        _dspy_lm_class="malicious.module.LM",
     )
 
     dumped_state = lm.dump_state()
@@ -1022,16 +1018,16 @@ def test_lm_load_state_forwards_allow_custom_lm_class(monkeypatch):
 def test_exponential_backoff_retry():
     time_counter = []
 
-    def mock_create(*args, **kwargs):
+    def mock_create(*args: object, **kwargs: object):
         time_counter.append(time.time())
-        # These fields are called during the error handling
+        # LiteLLM RateLimitError handling expects response.status_code and response.headers.
         mock_response = mock.Mock()
         mock_response.headers = {}
         mock_response.status_code = 429
         raise RateLimitError(response=mock_response, message="message", body="error")
 
     lm = LM(model="openai/gpt-3.5-turbo", max_tokens=250, num_retries=3)
-    with mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create):
+    with mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create):  # noqa: SIM117
         with pytest.raises(LMRateLimitError):
             lm("question")
 
@@ -1120,10 +1116,8 @@ async def test_async_lm_call_with_cache(tmp_path):
         assert mock_alitellm_completion.call_count == 1
 
         await lm.acall("Query")
-        # Second call should hit the cache, so no new call to LiteLLM is made.
         assert mock_alitellm_completion.call_count == 1
 
-        # A new query should result in a new LiteLLM call and a new cache entry.
         await lm.acall("New query")
 
         assert len(cache.memory_cache) == 2
@@ -1134,60 +1128,47 @@ async def test_async_lm_call_with_cache(tmp_path):
 
 def test_lm_history_size_limit():
     lm = LM(model="openai/gpt-4o-mini")
-    with settings.context(max_history_size=5):
-        with mock.patch("litellm.completion") as mock_completion:
-            mock_completion.return_value = ModelResponse(
-                choices=[Choices(message=Message(content="test answer"))],
-                model="openai/gpt-4o-mini",
-            )
+    with settings.context(max_history_size=5), mock.patch("litellm.completion") as mock_completion:
+        mock_completion.return_value = ModelResponse(
+            choices=[Choices(message=Message(content="test answer"))],
+            model="openai/gpt-4o-mini",
+        )
 
-            for _ in range(10):
-                lm("query")
+        for _ in range(10):
+            lm("query")
 
     assert len(lm.history) == 5
 
 
 def test_disable_history():
     lm = LM(model="openai/gpt-4o-mini")
-    with settings.context(disable_history=True):
-        with mock.patch("litellm.completion") as mock_completion:
-            mock_completion.return_value = ModelResponse(
-                choices=[Choices(message=Message(content="test answer"))],
-                model="openai/gpt-4o-mini",
-            )
-            for _ in range(10):
-                lm("query")
+    with settings.context(disable_history=True), mock.patch("litellm.completion") as mock_completion:
+        mock_completion.return_value = ModelResponse(
+            choices=[Choices(message=Message(content="test answer"))],
+            model="openai/gpt-4o-mini",
+        )
+        for _ in range(10):
+            lm("query")
 
     assert len(lm.history) == 0
 
-    with settings.context(disable_history=False):
-        with mock.patch("litellm.completion") as mock_completion:
-            mock_completion.return_value = ModelResponse(
-                choices=[Choices(message=Message(content="test answer"))],
-                model="openai/gpt-4o-mini",
-            )
+    with settings.context(disable_history=False), mock.patch("litellm.completion") as mock_completion:
+        mock_completion.return_value = ModelResponse(
+            choices=[Choices(message=Message(content="test answer"))],
+            model="openai/gpt-4o-mini",
+        )
 
 
 def test_responses_api():
     api_response = make_response(
         output_blocks=[
             ResponseOutputMessage(
-                **{
-                    "id": "msg_1",
-                    "type": "message",
-                    "role": "assistant",
-                    "status": "completed",
-                    "content": [
+                id="msg_1", type="message", role="assistant", status="completed", content=[
                         {"type": "output_text", "text": "This is a test answer from responses API.", "annotations": []}
                     ],
-                },
             ),
             ResponseReasoningItem(
-                **{
-                    "id": "reasoning_1",
-                    "type": "reasoning",
-                    "summary": [Summary(**{"type": "summary_text", "text": "This is a dummy reasoning."})],
-                },
+                id="reasoning_1", type="reasoning", summary=[Summary(type="summary_text", text="This is a dummy reasoning.")],
             ),
         ]
     )
@@ -1285,7 +1266,7 @@ def test_call_reasoning_model_with_chat_api():
         usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
     )
 
-    with mock.patch("litellm.completion", return_value=mock_response) as mock_completion:
+    with mock.patch("litellm.completion", return_value=mock_response) as mock_completion:  # noqa: SIM117
         with mock.patch("litellm.supports_reasoning", return_value=True):
             # Create reasoning model with chat API
             lm = LM(
@@ -1375,18 +1356,15 @@ def test_responses_api_converts_images_correctly():
     content = result["input"][0]["content"]
     assert len(content) == 2
 
-    # First item should be text converted to input_text format
     assert content[0]["type"] == "input_text"
     assert content[0]["text"] == "What's in this image?"
 
-    # Second item should be converted to input_image format
     assert content[1]["type"] == "input_image"
     assert (
         content[1]["image_url"]
         == "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
     )
 
-    # Test with URL image
     request_with_url_image = {
         "model": "openai/gpt-5-mini",
         "messages": [
@@ -1405,7 +1383,6 @@ def test_responses_api_converts_images_correctly():
 def test_responses_api_converts_files_correctly():
     from dspy.clients.lm import _convert_chat_request_to_responses_request
 
-    # Test with file data (base64 encoded)
     request_with_file = {
         "model": "openai/gpt-5-mini",
         "messages": [
@@ -1434,16 +1411,13 @@ def test_responses_api_converts_files_correctly():
     content = result["input"][0]["content"]
     assert len(content) == 2
 
-    # First item should be text converted to input_text format
     assert content[0]["type"] == "input_text"
     assert content[0]["text"] == "Analyze this file"
 
-    # Second item should be converted to input_file format
     assert content[1]["type"] == "input_file"
     assert content[1]["file_data"] == "data:text/plain;base64,SGVsbG8gV29ybGQ="
     assert content[1]["filename"] == "test.txt"
 
-    # Test with file_id
     request_with_file_id = {
         "model": "openai/gpt-5-mini",
         "messages": [
@@ -1534,15 +1508,9 @@ def test_responses_api_with_image_input():
     api_response = make_response(
         output_blocks=[
             ResponseOutputMessage(
-                **{
-                    "id": "msg_1",
-                    "type": "message",
-                    "role": "assistant",
-                    "status": "completed",
-                    "content": [
+                id="msg_1", type="message", role="assistant", status="completed", content=[
                         {"type": "output_text", "text": "This is a test answer with image input.", "annotations": []}
                     ],
-                },
             ),
         ]
     )
@@ -1596,19 +1564,13 @@ def test_responses_api_with_pydantic_model_input():
     api_response = make_response(
         output_blocks=[
             ResponseOutputMessage(
-                **{
-                    "id": "msg_1",
-                    "type": "message",
-                    "role": "assistant",
-                    "status": "completed",
-                    "content": [
+                id="msg_1", type="message", role="assistant", status="completed", content=[
                         {
                             "type": "output_text",
                             "text": '{"answer" : "This is a good test answer", "number" : 42}',
                             "annotations": [],
                         }
                     ],
-                },
             ),
         ]
     )
@@ -1658,15 +1620,9 @@ def test_responses_api_with_none_usage():
         object="response",
         output=[
             ResponseOutputMessage(
-                **{
-                    "id": "msg_1",
-                    "type": "message",
-                    "role": "assistant",
-                    "status": "incomplete",
-                    "content": [
+                id="msg_1", type="message", role="assistant", status="incomplete", content=[
                         {"type": "output_text", "text": "Partial response that was truncated", "annotations": []}
                     ],
-                },
             ),
         ],
         metadata={},
@@ -1715,15 +1671,9 @@ async def test_responses_api_with_none_usage_async():
         object="response",
         output=[
             ResponseOutputMessage(
-                **{
-                    "id": "msg_1",
-                    "type": "message",
-                    "role": "assistant",
-                    "status": "incomplete",
-                    "content": [
+                id="msg_1", type="message", role="assistant", status="incomplete", content=[
                         {"type": "output_text", "text": "Partial async response", "annotations": []}
                     ],
-                },
             ),
         ],
         metadata={},
@@ -1776,7 +1726,7 @@ async def test_streaming_passes_headers_correctly():
         return
         yield  # Make it a generator
 
-    with mock.patch("dspy.settings") as mock_settings:
+    with mock.patch("dspy.clients.lm.settings") as mock_settings:
         mock_settings.send_stream = mock_stream
         mock_settings.caller_predict = None
         mock_settings.track_usage = False

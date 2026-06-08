@@ -342,7 +342,7 @@ class LMToolChoice(BaseModel):
         if "parallel_tool_calls" in data and "parallel" not in data:
             data["parallel"] = data.pop("parallel_tool_calls")
         data.update({key: value for key, value in overrides.items() if value is not _MISSING})
-        return cls(**data)
+        return cls(**data)  # ty:ignore[invalid-argument-type]
 
 
 class LMCacheConfig(BaseModel):
@@ -986,7 +986,7 @@ class LMHistoryEntry(BaseModel, Mapping[str, Any]):
     def __getitem__(self, key: str) -> Any:
         return self._mapping()[key]
 
-    def __iter__(self) -> Iterator[str]:
+    def __iter__(self) -> Iterator[str]:  # ty:ignore[invalid-method-override]
         return iter(self._mapping())
 
     def __len__(self) -> int:
@@ -1125,7 +1125,7 @@ class LMStreamErrorEvent(LMStreamEvent):
 class LMOutputBuilder:
     """Assemble streamed LM events into a final `LMResponse`."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.model: str | None = None
         self._parts: dict[int, list[LMPart | None]] = {}
         self._finish_reasons: dict[int, str | None] = {}
@@ -1169,7 +1169,7 @@ class LMOutputBuilder:
                     f"Stream part indices for output {output_index} must be contiguous; "
                     f"missing indices: {missing_part_indices}."
                 )
-            parts = [_finalize_stream_part(part) for part in part_buffer]
+            parts = [_finalize_stream_part(part) for part in part_buffer]  # ty:ignore[invalid-argument-type]
             outputs.append(
                 LMOutput(
                     parts=parts,
@@ -1233,7 +1233,7 @@ class LMStream:
         request: LMRequest,
         events: Iterator[LMStreamEvent],
         finalize: Callable[[LMRequest, LMResponse], LMResponse],
-    ):
+    ) -> None:
         self.request = request
         self._events = events
         self._finalize = finalize
@@ -1262,7 +1262,7 @@ class AsyncLMStream:
         request: LMRequest,
         events: AsyncIterator[LMStreamEvent],
         finalize: Callable[[LMRequest, LMResponse], LMResponse],
-    ):
+    ) -> None:
         self.request = request
         self._events = events
         self._finalize = finalize
@@ -1282,7 +1282,7 @@ class AsyncLMStream:
         return self._result
 
 
-def System(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None = None) -> LMMessage:  # noqa: N802
+def System(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None = None) -> LMMessage:  # noqa: N802 dynamic typing/lint migration for scoped ty adoption
     """Create a system message for a direct LM call.
 
     A system message gives model-level instructions, such as tone, scope, or
@@ -1320,7 +1320,7 @@ def System(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None
     return LMMessage(role="system", parts=[_coerce_part(part) for part in parts], name=name, metadata=metadata or {})
 
 
-def Developer(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None = None) -> LMMessage:  # noqa: N802
+def Developer(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None = None) -> LMMessage:  # noqa: N802 dynamic typing/lint migration for scoped ty adoption
     """Create a developer message for a direct LM call.
 
     A developer message carries instructions that sit between system guidance
@@ -1358,7 +1358,7 @@ def Developer(*parts: Any, name: str | None = None, metadata: dict[str, Any] | N
     return LMMessage(role="developer", parts=[_coerce_part(part) for part in parts], name=name, metadata=metadata or {})
 
 
-def User(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None = None) -> LMMessage:  # noqa: N802
+def User(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None = None) -> LMMessage:  # noqa: N802 dynamic typing/lint migration for scoped ty adoption
     """Create a user message for a direct LM call.
 
     A user message contains the request or data you want the model to answer.
@@ -1445,7 +1445,7 @@ def User(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None =
     return LMMessage(role="user", parts=[_coerce_part(part) for part in parts], name=name, metadata=metadata or {})
 
 
-def Assistant(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None = None) -> LMMessage:  # noqa: N802
+def Assistant(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None = None) -> LMMessage:  # noqa: N802 dynamic typing/lint migration for scoped ty adoption
     """Create an assistant message for a direct LM call.
 
     An assistant message represents a previous model response. Use it when you
@@ -1584,7 +1584,7 @@ def _history_request_messages_as_openai(request: LMRequest) -> list[dict[str, An
             content_parts = [part for part in message.parts if not isinstance(part, LMToolCallPart)]
             item: dict[str, Any] = {
                 "role": "assistant",
-                "content": _history_message_parts_as_openai_content(content_parts) if content_parts else None,
+                "content": _history_message_parts_as_openai_content(content_parts) if content_parts else None,  # ty:ignore[invalid-argument-type]
             }
             if tool_calls:
                 item["tool_calls"] = [_history_tool_call_as_openai(call) for call in tool_calls]
@@ -1662,7 +1662,7 @@ def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
     if isinstance(part, LMVideoPart):
         video = {"media_type": part.media_type}
         if part.data is not None:
-            video["data"] = _history_part_source(part)
+            video["data"] = _history_part_source(part)  # ty:ignore[invalid-assignment]
         elif part.url is not None:
             video["url"] = part.url
         elif part.file_id is not None:
@@ -1673,12 +1673,12 @@ def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
     if isinstance(part, LMDocumentPart):
         data = {"type": "document"}
         if part.source is not None:
-            data["source"] = part.source
+            data["source"] = part.source  # ty:ignore[invalid-assignment]
         else:
-            data["source"] = _history_part_source(part)
+            data["source"] = _history_part_source(part)  # ty:ignore[invalid-assignment]
             data["media_type"] = part.media_type
         if part.citations:
-            data["citations"] = part.citations
+            data["citations"] = part.citations  # ty:ignore[invalid-assignment]
         if part.title is not None:
             data["title"] = part.title
         if part.context is not None:
@@ -1743,13 +1743,13 @@ def _messages_from_items(items: tuple[Any, ...], *, prompt: str | None = None) -
     if len(items) == 1 and _is_message_sequence(items[0]):
         items = tuple(items[0])
 
-    if all(isinstance(item, LMMessage) or isinstance(item, LMResponse) for item in items):
+    if all(isinstance(item, (LMMessage, LMResponse)) for item in items):
         messages: list[LMMessage] = []
         for item in items:
             if isinstance(item, LMMessage):
                 messages.append(item)
             else:
-                messages.extend(_messages_from_response(item))
+                messages.extend(_messages_from_response(item))  # ty:ignore[invalid-argument-type]
         return messages, []
 
     parts = [_coerce_part(item) for item in items]
@@ -1762,7 +1762,7 @@ def _messages_from_response(response: LMResponse) -> list[LMMessage]:
 
 def _is_message_sequence(value: Any) -> bool:
     return isinstance(value, (list, tuple)) and all(
-        isinstance(item, LMMessage) or isinstance(item, LMResponse) for item in value
+        isinstance(item, (LMMessage, LMResponse)) for item in value
     )
 
 
@@ -1914,11 +1914,11 @@ def _document_dict_to_part(item: dict[str, Any]) -> LMDocumentPart:
         return LMDocumentPart(
             source=source,
             citations=item.get("citations") or {},
-            **common,
+            **common,  # ty:ignore[invalid-argument-type]
         )
     if isinstance(source, str):
         kwargs = _media_source_kwargs(source, default_media_type=media_type)
-        return LMDocumentPart(**kwargs, **common)
+        return LMDocumentPart(**kwargs, **common)  # ty:ignore[invalid-argument-type]
     raise ValueError("Document content block requires source.")
 
 

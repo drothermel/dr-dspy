@@ -9,7 +9,7 @@ def test_get_request_raises_on_server_error():
     mock_response = MagicMock()
     mock_response.json.return_value = {"error": True, "message": "connection failed"}
 
-    with patch("dspy.dsp.colbertv2.requests.get", return_value=mock_response):
+    with patch("dspy.dsp.colbertv2.requests.get", return_value=mock_response):  # noqa: SIM117
         with pytest.raises(ValueError, match="connection failed"):
             colbertv2_get_request_v2("http://test", "query", k=3)
 
@@ -18,7 +18,7 @@ def test_post_request_raises_on_server_error():
     mock_response = MagicMock()
     mock_response.json.return_value = {"error": True, "message": "server error"}
 
-    with patch("dspy.dsp.colbertv2.requests.post", return_value=mock_response):
+    with patch("dspy.dsp.colbertv2.requests.post", return_value=mock_response):  # noqa: SIM117
         with pytest.raises(ValueError, match="server error"):
             colbertv2_post_request_v2("http://test2", "query", k=3)
 

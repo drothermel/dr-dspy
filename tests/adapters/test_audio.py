@@ -4,7 +4,7 @@ from dspy.adapters.types.audio import _normalize_audio_format
 
 
 @pytest.mark.parametrize(
-    "input_format, expected_format",
+    ("input_format", "expected_format"),
     [
         # Case 1: Standard format (no change)
         ("wav", "wav"),

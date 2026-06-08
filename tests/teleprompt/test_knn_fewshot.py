@@ -37,7 +37,7 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    def forward(self, *args, **kwargs):
+    def forward(self, *args: object, **kwargs: object):
         return self.predictor(**kwargs)
 
     def reset_copy(self):
@@ -45,7 +45,7 @@ class SimpleModule(Module):
         return SimpleModule(self.predictor.signature)
 
 
-# TODO: Test not working yet
+# Disabled from pytest collection by leading underscore; restore once KNNFewShot compile behavior is fixed.
 def _test_knn_few_shot_compile(setup_knn_few_shot):
     """Tests the compile method of KNNFewShot with SimpleModule as student."""
     student = SimpleModule("input -> output")

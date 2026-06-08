@@ -3,7 +3,9 @@ import importlib
 import json
 import logging
 import types
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from dspy.dsp.utils.settings import settings
 
@@ -25,13 +27,13 @@ try:
 
 except ImportError:
 
-    def display(obj: Any):
+    def display(obj: Any) -> None:
         """
         Display the specified Python object in the console.
 
         :param obj: The Python object to display.
         """
-        print(obj)
+        print(obj)  # noqa: T201
 
     def HTML(x: str) -> str:  # noqa: N802
         """
@@ -43,8 +45,6 @@ except ImportError:
         return x
 
 
-# TODO: Counting failures and having a max_failure count. When that is exceeded (also just at the end),
-# we print the number of failures, the first N examples that failed, and the first N exceptions raised.
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +58,10 @@ class EvaluationResult(Prediction):
     - results: a list of (example, prediction, score) tuples for each example in devset
     """
 
-    def __init__(self, score: float, results: list[tuple["Example", "Example", Any]]):
+    def __init__(self, score: float, results: list[tuple["Example", "Example", Any]]) -> None:
         super().__init__(score=score, results=results)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"EvaluationResult(score={self.score}, results=<list of {len(self.results)} results>)"
 
 
@@ -86,7 +86,7 @@ class Evaluate:
         save_as_csv: str | None = None,
         save_as_json: str | None = None,
         **kwargs,
-    ):
+    ) -> None:
         """
         Args:
             devset (list[dspy.primitives.example.Example]): the evaluation dataset.
@@ -187,9 +187,7 @@ class Evaluate:
 
         if display_table:
             if importlib.util.find_spec("pandas") is not None:
-                # Rename the 'correct' column to the name of the metric object
                 metric_name = metric.__name__ if isinstance(metric, types.FunctionType) else metric.__class__.__name__
-                # Construct a pandas DataFrame from the results
                 result_df = self._construct_result_table(results, metric_name)
 
                 self._display_result_table(result_df, display_table, metric_name)
@@ -204,7 +202,7 @@ class Evaluate:
             )
             data = self._prepare_results_output(results, metric_name)
 
-            with open(save_as_csv, "w", newline="") as csvfile:
+            with Path(save_as_csv).open("w", newline="") as csvfile:
                 fieldnames = data[0].keys()
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
@@ -218,9 +216,8 @@ class Evaluate:
                 else metric.__class__.__name__
             )
             data = self._prepare_results_output(results, metric_name)
-            with open(
-                    save_as_json,
-                    "w",
+            with Path(save_as_json).open(
+                "w",
             ) as f:
                 json.dump(data, f)
 
@@ -266,7 +263,7 @@ class Evaluate:
 
         return result_df.rename(columns={"correct": metric_name})
 
-    def _display_result_table(self, result_df: "pd.DataFrame", display_table: bool | int, metric_name: str):
+    def _display_result_table(self, result_df: "pd.DataFrame", display_table: bool | int, metric_name: str) -> None:
         """
         Display the specified result DataFrame in a table format.
 
@@ -288,7 +285,6 @@ class Evaluate:
         display_dataframe(df_to_display)
 
         if truncated_rows > 0:
-            # Simplified message about the truncated rows
             message = f"""
             <div style='
                 text-align: center;
@@ -309,7 +305,6 @@ def prediction_is_dictlike(prediction):
 
 
 def merge_dicts(d1, d2) -> dict:
-    # Convert to dict if objects have toDict method (e.g., Example objects)
     if hasattr(d1, "toDict"):
         d1 = d1.toDict()
     if hasattr(d2, "toDict"):
@@ -346,18 +341,17 @@ def stylize_metric_name(df: "pd.DataFrame", metric_name: str) -> "pd.DataFrame":
     :param df: The pandas DataFrame for which to stylize cell contents.
     :param metric_name: The name of the metric for which to stylize DataFrame cell contents.
     """
-    def format_metric(x):
+    def format_metric(x) -> str:
         if isinstance(x, float):
             return f"✔️ [{x:.3f}]"
-        elif x is not None:
+        if x is not None:
             return f"✔️ [{x}]"
-        else:
-            return ""
+        return ""
     df[metric_name] = df[metric_name].apply(format_metric)
     return df
 
 
-def display_dataframe(df: "pd.DataFrame"):
+def display_dataframe(df: "pd.DataFrame") -> None:
     """
     Display the specified Pandas DataFrame in the console.
 
@@ -368,11 +362,10 @@ def display_dataframe(df: "pd.DataFrame"):
     if is_in_ipython_notebook_environment():
         display(configure_dataframe_for_ipython_notebook_display(df))
     else:
-        # Pretty print the DataFrame to the console
         with pd.option_context(
             "display.max_rows", None, "display.max_columns", None
         ):  # more options can be specified also
-            print(df)
+            print(df)  # noqa: T201
 
 
 def configure_dataframe_for_ipython_notebook_display(df: "pd.DataFrame") -> "pd.DataFrame":
@@ -396,8 +389,3 @@ def is_in_ipython_notebook_environment():
         return "IPKernelApp" in getattr(get_ipython(), "config", {})
     except ImportError:
         return False
-
-
-# FIXME: TODO: The merge_dicts stuff above is way too quick and dirty.
-# TODO: the display_table can't handle False but can handle 0!
-# Not sure how it works with True exactly, probably fails too.

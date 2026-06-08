@@ -1,4 +1,3 @@
-from dspy.utils.dummies import DummyLM
 import json
 import re
 from typing import Literal
@@ -6,6 +5,8 @@ from unittest import mock
 
 import pydantic
 import pytest
+
+from dspy.utils.dummies import DummyLM
 
 try:
     from litellm.utils import ChatCompletionMessageToolCall, Choices, Function, Message, ModelResponse
@@ -16,7 +17,9 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types.audio import Audio
 from dspy.adapters.types.base_type import Type as DSPyType
+from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.code import Code
+from dspy.adapters.types.document import Document
 from dspy.adapters.types.file import File
 from dspy.adapters.types.history import History
 from dspy.adapters.types.image import Image
@@ -25,8 +28,6 @@ from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
 from dspy.dsp.utils.settings import settings
-from dspy.adapters.types.citation import Citations
-from dspy.adapters.types.document import Document
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
@@ -37,7 +38,7 @@ from tests.adapters.conftest import format_messages_and_lm_kwargs
 
 
 @pytest.mark.parametrize(
-    "input_literal, output_literal, input_value, expected_input_str, expected_output_str",
+    ("input_literal", "output_literal", "input_value", "expected_input_str", "expected_output_str"),
     [
         # Scenario 1: double quotes escaped within strings
         (
@@ -732,7 +733,7 @@ def test_chat_adapter_format_exact_messages_with_base_custom_type_input():
             return [{"type": "event", "event": {"label": self.label}}]
 
         @classmethod
-        def description(cls):
+        def description(cls) -> str:
             return "An event block."
 
     class EventSignature(Signature):
@@ -1416,7 +1417,7 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
 
 
 @pytest.mark.parametrize(
-    "tool_call_id, tool_call_results",
+    ("tool_call_id", "tool_call_results"),
     [
         ("call_1", None),
         (
@@ -1719,7 +1720,7 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
             return [{"type": "event", "event": {"label": self.label}}]
 
         @classmethod
-        def description(cls):
+        def description(cls) -> str:
             return "An event block."
 
     class Location(pydantic.BaseModel):
@@ -2420,7 +2421,7 @@ def test_chat_adapter_respects_use_json_adapter_fallback_flag():
 
         lm = LM("openai/gpt-4o-mini", cache=False)
 
-        with mock.patch("dspy.adapters.json_adapter.JSONAdapter.__call__") as mock_json_adapter_call:
+        with mock.patch("dspy.adapters.json_adapter.JSONAdapter.__call__") as mock_json_adapter_call:  # noqa: SIM117
             with pytest.raises(AdapterParseError):
                 adapter(lm, {}, signature, [], {"question": "What is the capital of France?"})
         mock_json_adapter_call.assert_not_called()
@@ -2718,11 +2719,10 @@ def test_null_content_raises_adapter_parse_error():
         model="openai/gpt-4o-mini",
     )
 
-    with settings.context(lm=lm):
-        with mock.patch("litellm.completion", return_value=response):
-            cot = ChainOfThought("question -> answer")
-            with pytest.raises(AdapterParseError):
-                cot(question="test")
+    with settings.context(lm=lm), mock.patch("litellm.completion", return_value=response):
+        cot = ChainOfThought("question -> answer")
+        with pytest.raises(AdapterParseError):
+            cot(question="test")
 
 
 def test_empty_string_content_raises_adapter_parse_error():
@@ -2735,11 +2735,10 @@ def test_empty_string_content_raises_adapter_parse_error():
         model="openai/gpt-4o-mini",
     )
 
-    with settings.context(lm=lm):
-        with mock.patch("litellm.completion", return_value=response):
-            cot = ChainOfThought("question -> answer")
-            with pytest.raises(AdapterParseError):
-                cot(question="test")
+    with settings.context(lm=lm), mock.patch("litellm.completion", return_value=response):
+        cot = ChainOfThought("question -> answer")
+        with pytest.raises(AdapterParseError):
+            cot(question="test")
 
 
 def test_tool_call_with_null_content_does_not_raise():

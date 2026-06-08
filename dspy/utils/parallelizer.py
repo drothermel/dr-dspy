@@ -7,8 +7,12 @@ import threading
 import time
 import traceback
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from types import FrameType
+from typing import Any, Callable
 
 import tqdm
+
+from dspy.dsp.utils.utils import dotdict
 
 logger = logging.getLogger(__name__)
 
@@ -16,14 +20,14 @@ logger = logging.getLogger(__name__)
 class ParallelExecutor:
     def __init__(
         self,
-        num_threads=None,
-        max_errors=None,
-        disable_progress_bar=False,
-        provide_traceback=None,
-        compare_results=False,
-        timeout=120,
-        straggler_limit=3,
-    ):
+        num_threads: int | None = None,
+        max_errors: int | None = None,
+        disable_progress_bar: bool = False,
+        provide_traceback: bool | None = None,
+        compare_results: bool = False,
+        timeout: int = 120,
+        straggler_limit: int = 3,
+    ) -> None:
         """
         Offers isolation between the tasks (dspy.settings) irrespective of whether num_threads == 1 or > 1.
         Handles also straggler timeouts.
@@ -44,15 +48,15 @@ class ParallelExecutor:
         self.failed_indices = []
         self.exceptions_map = {}
 
-    def execute(self, function, data):
+    def execute(self, function: Callable[[Any], Any], data: list[Any]) -> list[Any]:
         tqdm.tqdm._instances.clear()
         wrapped = self._wrap_function(function)
         if self.num_threads == 1:
             return self._execute_sequential(wrapped, data)
         return self._execute_parallel(wrapped, data)
 
-    def _wrap_function(self, user_function):
-        def safe_func(item):
+    def _wrap_function(self, user_function: Callable[[Any], Any]) -> Callable[[Any], Any]:
+        def safe_func(item: Any) -> Any:
             if self.cancel_jobs.is_set():
                 return None
             try:
@@ -63,14 +67,14 @@ class ParallelExecutor:
                     if self.error_count >= self.max_errors:
                         self.cancel_jobs.set()
                 if self.provide_traceback:
-                    logger.error(f"Error for {item}: {e}\n{traceback.format_exc()}")
+                    logger.error(f"Error for {item}: {e}\n{traceback.format_exc()}")  # noqa: TRY400 dynamic typing/lint migration for scoped ty adoption
                 else:
-                    logger.error(f"Error for {item}: {e}. Set `provide_traceback=True` for traceback.")
+                    logger.error(f"Error for {item}: {e}. Set `provide_traceback=True` for traceback.")  # noqa: TRY400 dynamic typing/lint migration for scoped ty adoption
                 return e
 
         return safe_func
 
-    def _execute_sequential(self, function, data):
+    def _execute_sequential(self, function: Callable[[Any], Any], data: list[Any]) -> list[Any]:
         """Execute items sequentially on the main thread."""
         results = [None] * len(data)
 
@@ -102,7 +106,7 @@ class ParallelExecutor:
 
         return results
 
-    def _execute_parallel(self, function, data):
+    def _execute_parallel(self, function: Callable[[Any], Any], data: list[Any]) -> list[Any]:
         results = [None] * len(data)
         job_cancelled = "cancelled"
 
@@ -112,7 +116,7 @@ class ParallelExecutor:
         resubmitted = set()
 
         # This is the worker function each thread will run.
-        def worker(parent_overrides, submission_id, index, item):
+        def worker(parent_overrides: dotdict, submission_id: int, index: int, item: Any) -> tuple[int, Any]:
             if self.cancel_jobs.is_set():
                 return index, job_cancelled
             # Record actual start time
@@ -123,7 +127,7 @@ class ParallelExecutor:
             from dspy.dsp.utils.settings import thread_local_overrides
 
             original = thread_local_overrides.get()
-            new_overrides = {**original, **parent_overrides.copy()}
+            new_overrides = dotdict({**original, **parent_overrides.copy()})
             if new_overrides.get("usage_tracker"):
                 # Usage tracker needs to be deep copied across threads so that each thread tracks its own usage
                 new_overrides["usage_tracker"] = copy.deepcopy(new_overrides["usage_tracker"])
@@ -140,10 +144,11 @@ class ParallelExecutor:
             if threading.current_thread() is threading.main_thread():
                 orig_handler = signal.getsignal(signal.SIGINT)
 
-                def handler(sig, frame):
+                def handler(sig: int, frame: FrameType | None) -> None:
                     self.cancel_jobs.set()
                     logger.warning("SIGINT received. Cancelling.")
-                    orig_handler(sig, frame)
+                    if callable(orig_handler):
+                        orig_handler(sig, frame)  # ty:ignore[call-top-callable]
 
                 signal.signal(signal.SIGINT, handler)
                 try:
@@ -158,7 +163,7 @@ class ParallelExecutor:
             with interrupt_manager():
                 from dspy.dsp.utils.settings import thread_local_overrides
 
-                parent_overrides = thread_local_overrides.get().copy()
+                parent_overrides = dotdict(thread_local_overrides.get().copy())
 
                 futures_map = {}
                 futures_set = set()
@@ -177,7 +182,7 @@ class ParallelExecutor:
                     file=sys.stdout,
                 )
 
-                def all_done():
+                def all_done() -> bool:
                     return all(r is not None for r in results)
 
                 while futures_set and not self.cancel_jobs.is_set():
@@ -188,8 +193,8 @@ class ParallelExecutor:
                         futures_set.remove(f)
                         try:
                             index, outcome = f.result()
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            logger.debug("Ignoring completed future after cancellation: %s", exc)
                         else:
                             if outcome != job_cancelled and results[index] is None:
                                 self._process_outcome(results, index, outcome)
@@ -200,13 +205,13 @@ class ParallelExecutor:
                         break
 
                     # Check stragglers if few remain
-                    if 0 < self.timeout and len(not_done) <= self.straggler_limit:
+                    if self.timeout > 0 and len(not_done) <= self.straggler_limit:
                         now = time.time()
                         for f in list(not_done):
                             if f not in resubmitted:
                                 sid, idx, item = futures_map[f]
                                 with start_time_lock:
-                                    st = start_time_map.get(sid, None)
+                                    st = start_time_map.get(sid)
                                 if st and (now - st) >= self.timeout:
                                     resubmitted.add(f)
                                     nf = executor.submit(
@@ -232,7 +237,7 @@ class ParallelExecutor:
 
         return results
 
-    def _process_outcome(self, results, idx, outcome):
+    def _process_outcome(self, results: list[Any], idx: int, outcome: Any) -> None:
         """Store a single outcome and track errors."""
         if isinstance(outcome, Exception):
             with self.error_lock:
@@ -241,7 +246,7 @@ class ParallelExecutor:
         else:
             results[idx] = outcome
 
-    def _report_progress(self, pbar, results, total):
+    def _report_progress(self, pbar: tqdm.tqdm, results: list[Any], total: int) -> None:
         """Compute metrics and update the progress bar."""
         if self.compare_results:
             vals = [r[-1] for r in results if r is not None]
@@ -253,7 +258,7 @@ class ParallelExecutor:
                 total,
             )
 
-    def _update_progress(self, pbar, nresults, ntotal):
+    def _update_progress(self, pbar: tqdm.tqdm, nresults: int | float, ntotal: int) -> None:
         if self.compare_results:
             pct = round(100 * nresults / ntotal, 1) if ntotal else 0
             pbar.set_description(f"Average Metric: {nresults:.2f} / {ntotal} ({pct}%)")
