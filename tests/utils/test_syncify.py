@@ -1,5 +1,7 @@
 import asyncio
 
+import pytest
+
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
@@ -7,6 +9,18 @@ from dspy.primitives.module import Module
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.utils.dummies import DummyLM
 from dspy.utils.syncify import syncify
+
+
+@pytest.mark.asyncio
+async def test_syncify_raises_when_loop_running():
+    class MyProgram(Module):
+        async def aforward(self, x: int) -> int:
+            return x + 1
+
+    sync_program = syncify(MyProgram())
+
+    with pytest.raises(RuntimeError, match="event loop is already running"):
+        sync_program(1)
 
 
 def test_syncify_in_place():

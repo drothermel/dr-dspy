@@ -55,9 +55,6 @@ class BootstrapFinetune(FinetuneTeleprompter):
 
     @override
     def compile(self, student: Module, trainset: list[Example], teacher: Module | list[Module] | None = None) -> Module:
-        # TODO: Print statements can be converted to logger.info if we ensure
-        # that the default DSPy logger logs info level messages in notebook
-        # environments.
         logger.info("Preparing the student and teacher programs...")
         all_predictors_have_lms(student)
 

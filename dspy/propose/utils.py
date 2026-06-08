@@ -1,18 +1,10 @@
 import inspect
 import json
-import linecache
 import re
 
-from dspy.primitives.module import Module
-
-try:
-    from IPython.core.magics.code import extract_symbols  # ty: ignore[unresolved-import]
-except ImportError:
-    # Won't be able to read code from jupyter notebooks
-    extract_symbols = None
-
 from dspy.predict.parameter import Parameter
-from dspy.teleprompt.utils import get_signature, new_getfile
+from dspy.primitives.module import Module
+from dspy.teleprompt.utils import get_signature
 
 
 def strip_prefix(text):
@@ -146,16 +138,7 @@ def get_dspy_source_code(module):
 
     # Skip source for built-in Predict and ChainOfThought modules; add other built-ins explicitly when they should be omitted.
     if type(module).__name__ != "Predict" and type(module).__name__ != "ChainOfThought":
-        try:
-            base_code = inspect.getsource(type(module))
-        except TypeError:
-            obj = type(module)
-            cell_code = "".join(linecache.getlines(new_getfile(obj)))
-            if extract_symbols is None:
-                base_code = cell_code
-            else:
-                class_code = extract_symbols(cell_code, obj.__name__)[0][0]
-                base_code = str(class_code)
+        base_code = inspect.getsource(type(module))
 
     completed_set = set()
     for attribute in module.__dict__:

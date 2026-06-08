@@ -2,7 +2,6 @@ import json
 import signal
 import tempfile
 import threading
-from unittest.mock import patch
 
 import pytest
 from typing_extensions import override
@@ -204,8 +203,7 @@ def test_evaluate_call_wrong_answer():
     ],
 )
 @pytest.mark.parametrize("display_table", [True, False, 1])
-@pytest.mark.parametrize("is_in_ipython_notebook_environment", [True, False])
-def test_evaluate_display_table(program_with_example, display_table, is_in_ipython_notebook_environment, capfd):
+def test_evaluate_display_table(program_with_example, display_table, capfd):
     program, example = program_with_example
     example_input = next(iter(example.inputs().values()))
     example_output = {key: value for key, value in example.toDict().items() if key not in example.inputs()}
@@ -225,16 +223,11 @@ def test_evaluate_display_table(program_with_example, display_table, is_in_ipyth
     )
     assert ev.display_table == display_table
 
-    with patch(
-        "dspy.evaluate.evaluate.is_in_ipython_notebook_environment", return_value=is_in_ipython_notebook_environment
-    ):
-        ev(program)
-        out, _ = capfd.readouterr()
-        if not is_in_ipython_notebook_environment and display_table:
-            # In console environments where IPython is not available, the table should be printed
-            # to the console
-            example_input = next(iter(example.inputs().values()))
-            assert example_input in out
+    ev(program)
+    out, _ = capfd.readouterr()
+    if display_table:
+        example_input = next(iter(example.inputs().values()))
+        assert example_input in out
 
 
 def test_evaluate_callback():

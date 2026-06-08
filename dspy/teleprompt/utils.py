@@ -1,21 +1,11 @@
-import inspect
 import logging
 import math
 import os
 import random
 import shutil
-import sys
-from typing import Any, cast
 
 from dspy.dsp.utils.settings import settings
 from dspy.primitives.prediction import Prediction
-
-try:
-    from IPython.core.magics.code import extract_symbols  # ty: ignore[unresolved-import]
-except ImportError:
-    # Won't be able to read code from jupyter notebooks
-    extract_symbols = None
-
 from dspy.teleprompt.bootstrap import BootstrapFewShot, LabeledFewShot
 
 """
@@ -402,54 +392,3 @@ def create_n_fewshot_demo_sets(
             demo_candidates[i].append(program2.predictors()[i].demos)
 
     return demo_candidates
-
-
-def old_getfile(object):
-    """Work out which source or compiled file an object was defined in."""
-    if inspect.ismodule(object):
-        if getattr(object, "__file__", None):
-            return object.__file__
-        raise TypeError(f"{object!r} is a built-in module")
-    if inspect.isclass(object):
-        if hasattr(object, "__module__"):
-            module = sys.modules.get(object.__module__)
-            module_file = getattr(cast("Any", module), "__file__", None) if module is not None else None
-            if module_file:
-                return module_file
-            if object.__module__ == "__main__":
-                raise OSError("source code not available")
-        raise TypeError(f"{object!r} is a built-in class")
-    if inspect.ismethod(object):
-        object = object.__func__
-    if inspect.isfunction(object):
-        object = object.__code__
-    if inspect.istraceback(object):
-        object = object.tb_frame
-    if inspect.isframe(object):
-        object = object.f_code
-    if inspect.iscode(object):
-        return object.co_filename
-    raise TypeError(
-        f"module, class, method, function, traceback, frame, or code object was expected, got {type(object).__name__}"
-    )
-
-
-def new_getfile(object):
-    if not inspect.isclass(object):
-        return old_getfile(object)
-
-    # Lookup by parent module (as in current inspect)
-    if hasattr(object, "__module__"):
-        object_ = sys.modules.get(object.__module__)
-        module_file = getattr(object_, "__file__", None)
-        if module_file:
-            return module_file
-
-    # If parent module is __main__, lookup by methods (NEW)
-    for _, member in inspect.getmembers(object):
-        if inspect.isfunction(member) and object.__qualname__ + "." + member.__name__ == member.__qualname__:
-            return inspect.getfile(member)
-    raise TypeError(f"Source for {object!r} not found")
-
-
-inspect.getfile = cast("Any", new_getfile)

@@ -1,7 +1,6 @@
 import asyncio
 import contextvars
 import copy
-import importlib
 import logging
 import threading
 from contextlib import contextmanager
@@ -146,18 +145,7 @@ class Settings:
             config_owner_async_task = asyncio.current_task()
             return
 
-        # We are in an async task. Now check for IPython and allow calling `configure` from IPython.
-        in_ipython = False
-        try:
-            ipython = importlib.import_module("IPython")
-            # get_ipython is a global injected by IPython environments.
-            # We check its existence and type to be more robust.
-            in_ipython = ipython.get_ipython() is not None
-        except Exception:
-            # If `IPython` is not installed or `get_ipython` failed, we are not in an IPython environment.
-            in_ipython = False
-
-        if not in_ipython and config_owner_async_task != asyncio.current_task():
+        if config_owner_async_task != asyncio.current_task():
             raise RuntimeError(
                 "settings.configure(...) can only be called from the same async task that called it first. Please "
                 "use `settings.context(...)` in other async tasks instead."

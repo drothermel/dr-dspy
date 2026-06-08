@@ -24,14 +24,6 @@ from dspy.primitives.prediction import Prediction
 from dspy.utils.callback import with_callbacks
 from dspy.utils.parallelizer import ParallelExecutor
 
-try:
-    from IPython.display import HTML as IPYTHON_HTML  # ty: ignore[unresolved-import]
-    from IPython.display import display as ipython_display  # ty: ignore[unresolved-import]
-except ImportError:
-    IPYTHON_HTML = None
-    ipython_display = None
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -267,20 +259,7 @@ class Evaluate:
         display_dataframe(df_to_display)
 
         if truncated_rows > 0:
-            if ipython_display is not None and IPYTHON_HTML is not None:
-                message = f"""
-            <div style='
-                text-align: center;
-                font-size: 16px;
-                font-weight: bold;
-                color: #555;
-                margin: 10px 0;'>
-                ... {truncated_rows} more rows not displayed ...
-            </div>
-            """
-                ipython_display(IPYTHON_HTML(message))
-            else:
-                logger.info("%s more rows not displayed", truncated_rows)
+            logger.info("%s more rows not displayed", truncated_rows)
 
 
 def prediction_is_dictlike(prediction):
@@ -346,32 +325,5 @@ def display_dataframe(df: "pd.DataFrame") -> None:
     """
     import pandas as pd
 
-    if is_in_ipython_notebook_environment() and ipython_display is not None:
-        ipython_display(configure_dataframe_for_ipython_notebook_display(df))
-    else:
-        with pd.option_context(
-            "display.max_rows", None, "display.max_columns", None
-        ):  # more options can be specified also
-            print(df)  # noqa: T201
-
-
-def configure_dataframe_for_ipython_notebook_display(df: "pd.DataFrame") -> "pd.DataFrame":
-    """Set various pandas display options for DataFrame in an IPython notebook environment."""
-    import pandas as pd
-
-    pd.options.display.max_colwidth = 70
-    return df
-
-
-def is_in_ipython_notebook_environment():
-    """
-    Check if the current environment is an IPython notebook environment.
-
-    :return: True if the current environment is an IPython notebook environment, False otherwise.
-    """
-    try:
-        ipython = importlib.import_module("IPython")
-        # This is a best-effort check to see if we are in an IPython notebook environment
-        return "IPKernelApp" in getattr(ipython.get_ipython(), "config", {})
-    except ImportError:
-        return False
+    with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.max_colwidth", 70):
+        print(df)  # noqa: T201

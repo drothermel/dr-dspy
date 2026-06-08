@@ -17,16 +17,15 @@ def run_async(coro: Awaitable[T]) -> T:
         loop = None
 
     if loop and loop.is_running():
-        # In notebooks/Jupyter, patch nested event loops so run_until_complete can drive the coroutine from sync code.
-        import nest_asyncio  # ty:ignore[unresolved-import]
-
-        nest_asyncio.apply()
-        return asyncio.get_event_loop().run_until_complete(coro)
+        raise RuntimeError(
+            "Cannot run async DSPy code synchronously while an event loop is already running. "
+            "Use `await program.acall(...)` or `await program.aforward(...)` instead of syncify()."
+        )
     return asyncio.run(coro)  # ty:ignore[invalid-argument-type]
 
 
 def syncify(program: "Module", in_place: bool = True) -> "Module":
-    """Convert an async DSPy module to a sync program.
+    """Convert an async DSPy module to a sync program for scripts and CLIs.
 
     There are two modes of this function:
 

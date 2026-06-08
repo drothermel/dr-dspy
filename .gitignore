@@ -8,14 +8,11 @@
 /docs/downloads/
 /docs/experiments/
 
-/examples/qa/hotpot/MIPRO_notebook_cache/
-/examples/nli/scone/MIPRO_notebook_cache/
 /examples/nli/scone/ScoNe/
 /examples/nli/scone/compiled_program.dspy
 /examples/qa/hotpot/compiled_program.dspy
 /ScoNe/
 testing/outputs/
-testing/playbook.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -24,10 +21,6 @@ __pycache__/
 
 # Vim
 *.swp
-
-# Jupyter Notebook
-.ipynb_checkpoints
-# notebooks/
 
 # mac
 .DS_Store

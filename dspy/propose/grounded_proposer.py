@@ -1,3 +1,4 @@
+import logging
 import random
 
 from typing_extensions import override
@@ -17,6 +18,8 @@ from dspy.propose.utils import (
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
 from dspy.teleprompt.utils import get_prompt_model, get_signature
+
+logger = logging.getLogger(__name__)
 
 # Maximum prior instructions included in proposer history.
 MAX_INSTRUCT_IN_HISTORY = 5
@@ -281,9 +284,12 @@ class GroundedProposer(Proposer):
         if self.program_aware:
             try:
                 self.program_code_string = get_dspy_source_code(program)
-                if self.verbose:
-                    pass
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "Could not extract source code for program-aware instruction proposal; "
+                    "disabling program_aware. Define DSPy programs in .py files. %s",
+                    exc,
+                )
                 self.program_aware = False
 
         self.data_summary = None
