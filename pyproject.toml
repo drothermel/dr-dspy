@@ -242,6 +242,10 @@ ban-relative-imports = "all"
 "dspy/utils/transparency.py" = [
     "TC001",  # TaskSpec validation inspects field metadata at runtime.
 ]
+"dspy/adapters/base/**/*.py" = [
+    "TC001",  # Mixin modules use cross-module types at runtime in adapter call/format paths.
+    "TC003",  # Mapping/Sequence appear in adapter preprocess/postprocess signatures and bodies.
+]
 "tests/**/*.py" = [
     "S101",    # Allow assert statements in tests
     "TID252",  # Allow relative imports in tests
