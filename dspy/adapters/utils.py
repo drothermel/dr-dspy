@@ -176,7 +176,7 @@ def parse_value(value: object, annotation: object) -> object:
         return TypeAdapter(annotation).validate_python(value)
 
     if origin in (Union, types.UnionType) and type(None) in get_args(annotation) and str in get_args(annotation):
-        # Handle union annotations, e.g., `str | None`, `Optional[str]`, `Union[str, int, None]`, etc.
+        # Handle union annotations such as `str | None`.
         return TypeAdapter(annotation).validate_python(value)
 
     candidate = json_repair.loads(value)  # json_repair.loads returns "" on failure.

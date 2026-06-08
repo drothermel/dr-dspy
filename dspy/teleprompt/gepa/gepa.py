@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import inspect
 import logging
 import math
 import random
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, Optional, Protocol, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
 from dspy.clients.lm import LM
 from dspy.primitives.example import Example
@@ -34,10 +36,10 @@ class GEPAFeedbackMetric(Protocol):
         self,
         gold: Example,
         pred: Prediction,
-        trace: Optional["DSPyTrace"],
+        trace: DSPyTrace | None,
         pred_name: str | None,
-        pred_trace: Optional["DSPyTrace"],
-    ) -> Union[float, "ScoreWithFeedback"]:
+        pred_trace: DSPyTrace | None,
+    ) -> float | ScoreWithFeedback:
         """
         This function is called with the following arguments:
         - gold: The gold example.
@@ -139,7 +141,7 @@ class DspyGEPAResult:
         }
 
     @staticmethod
-    def from_gepa_result(gepa_result: "GEPAResult", adapter: "DspyAdapter") -> "DspyGEPAResult":
+    def from_gepa_result(gepa_result: GEPAResult, adapter: DspyAdapter) -> DspyGEPAResult:
         return DspyGEPAResult(
             candidates=[adapter.build_program(c) for c in gepa_result.candidates],
             parents=gepa_result.parents,
@@ -174,9 +176,9 @@ class GEPA(Teleprompter):
     def metric(
         gold: Example,
         pred: Prediction,
-        trace: Optional[DSPyTrace] = None,
-        pred_name: Optional[str] = None,
-        pred_trace: Optional[DSPyTrace] = None,
+        trace: DSPyTrace | None = None,
+        pred_name: str | None = None,
+        pred_trace: DSPyTrace | None = None,
     ) -> float | ScoreWithFeedback:
         \"""
         This function is called with the following arguments:
@@ -352,8 +354,8 @@ class GEPA(Teleprompter):
         reflection_lm: LM | None = None,
         skip_perfect_score: bool = True,
         add_format_failure_as_feedback: bool = False,
-        instruction_proposer: "ProposalFn | None" = None,
-        component_selector: "ReflectionComponentSelector | str" = "round_robin",
+        instruction_proposer: ProposalFn | None = None,
+        component_selector: ReflectionComponentSelector | str = "round_robin",
         # Merge-based configuration
         use_merge: bool = True,
         max_merge_invocations: int | None = 5,
@@ -496,9 +498,9 @@ class GEPA(Teleprompter):
         - trainset: The training set to use for reflective updates.
         - valset: The validation set to use for tracking Pareto scores. If not provided, GEPA will use the trainset for both.
         """
-        from gepa import GEPAResult, optimize
+        from gepa import optimize
 
-        from dspy.teleprompt.gepa.gepa_utils import DspyAdapter, DSPyTrace, LoggerAdapter, ScoreWithFeedback
+        from dspy.teleprompt.gepa.gepa_utils import DspyAdapter, LoggerAdapter, ScoreWithFeedback
 
         assert trainset is not None and len(trainset) > 0, "Trainset must be provided and non-empty"
         assert teacher is None, "Teacher is not supported in DspyGEPA yet."
@@ -535,13 +537,13 @@ class GEPA(Teleprompter):
 
         rng = random.Random(self.seed)
 
-        def feedback_fn_creator(pred_name: str, predictor) -> "PredictorFeedbackFn":
+        def feedback_fn_creator(pred_name: str, predictor) -> PredictorFeedbackFn:
             def feedback_fn(
                 predictor_output: dict[str, Any],
                 predictor_inputs: dict[str, Any],
                 module_inputs: Example,
                 module_outputs: Prediction,
-                captured_trace: "DSPyTrace",
+                captured_trace: DSPyTrace,
             ) -> ScoreWithFeedback:
                 pred_output = Prediction(**predictor_output) if isinstance(predictor_output, dict) else predictor_output
                 trace_for_pred: DSPyTrace = [(predictor, predictor_inputs, pred_output)]

@@ -253,10 +253,10 @@ class AdapterParseError(DSPyError):
             f"{message}"
             f"Adapter {adapter_name} failed to parse the LM response. \n\n"
             f"LM Response: {lm_response} \n\n"
-            f"Expected to find output fields in the LM response: [{', '.join(signature.output_fields.keys())}] \n\n"  # ty:ignore[unresolved-attribute]
+            f"Expected to find output fields in the LM response: [{', '.join(signature.output_fields.keys())}] \n\n"
         )
 
         if parsed_result is not None:
-            message += f"Actual output fields parsed from the LM response: [{', '.join(parsed_result.keys())}] \n\n"  # ty:ignore[unresolved-attribute]
+            message += f"Actual output fields parsed from the LM response: [{', '.join(parsed_result.keys())}] \n\n"
 
         super().__init__(message)

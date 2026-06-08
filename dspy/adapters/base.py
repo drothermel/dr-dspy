@@ -166,7 +166,7 @@ class Adapter:
             else:
                 raise AdapterParseError(
                     adapter_name=type(self).__name__,
-                    signature=original_signature,  # ty: ignore[invalid-argument-type]
+                    signature=original_signature,
                     lm_response=str(output),
                     message="The LM returned an empty or null response.",
                 )

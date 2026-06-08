@@ -108,11 +108,11 @@ class DatabricksRM:
         """
         Args:
             databricks_index_name (str): The name of the Databricks Vector Search Index to query.
-            databricks_endpoint (Optional[str]): The URL of the Databricks Workspace containing
+            databricks_endpoint (str | None): The URL of the Databricks Workspace containing
                 the Vector Search Index. Defaults to the value of the ``DATABRICKS_HOST``
                 environment variable. If unspecified, the Databricks SDK is used to identify the
                 endpoint based on the current environment.
-            databricks_token (Optional[str]): The Databricks Workspace authentication token to use
+            databricks_token (str | None): The Databricks Workspace authentication token to use
                 when querying the Vector Search Index. Defaults to the value of the
                 ``DATABRICKS_TOKEN`` environment variable. If unspecified, the Databricks SDK is
                 used to identify the token based on the current environment.
@@ -120,17 +120,17 @@ class DatabricksRM:
                 the token is resolved from the current environment (DATABRICKS_CLIENT_ID).
             databricks_client_secret (str): Databricks service principal secret. If not specified,
                 the endpoint is resolved from the current environment (DATABRICKS_CLIENT_SECRET).
-            columns (Optional[list[str]]): Extra column names to include in response,
+            columns (list[str] | None): Extra column names to include in response,
                 in addition to the document id and text columns specified by
                 ``docs_id_column_name`` and ``text_column_name``.
-            filters_json (Optional[str]): A JSON string specifying additional query filters.
+            filters_json (str | None): A JSON string specifying additional query filters.
                 Example filters: ``{"id <": 5}`` selects records that have an ``id`` column value
                 less than 5, and ``{"id >=": 5, "id <": 10}`` selects records that have an ``id``
                 column value greater than or equal to 5 and less than 10.
             k (int): The number of documents to retrieve.
             docs_id_column_name (str): The name of the column in the Databricks Vector Search Index
                 containing document IDs.
-            docs_uri_column_name (Optional[str]): The name of the column in the Databricks Vector Search Index
+            docs_uri_column_name (str | None): The name of the column in the Databricks Vector Search Index
                 containing document URI.
             text_column_name (str): The name of the column in the Databricks Vector Search Index
                 containing document text to retrieve.
@@ -232,12 +232,12 @@ class DatabricksRM:
         specified query.
 
         Args:
-            query (Union[str, list[float]]): The query text or numeric query vector for which to
+            query (str | list[float]): The query text or numeric query vector for which to
                 retrieve relevant documents.
             query_type (str): The type of search query to perform against the Databricks Vector
                 Search Index. Must be either 'ANN' (approximate nearest neighbor) or 'HYBRID'
                 (hybrid search).
-            filters_json (Optional[str]): A JSON string specifying additional query filters.
+            filters_json (str | None): A JSON string specifying additional query filters.
                 Example filters: ``{"id <": 5}`` selects records that have an ``id`` column value
                 less than 5, and ``{"id >=": 5, "id <": 10}`` selects records that have an ``id``
                 column value greater than or equal to 5 and less than 10. If specified, this
@@ -357,11 +357,11 @@ class DatabricksRM:
             index_name (str): Name of the Databricks vector search index to query
             k (int): Number of relevant documents to retrieve.
             columns (list[str]): Column names to include in response.
-            query_text (Optional[str]): Text query for which to find relevant documents. Exactly
+            query_text (str | None): Text query for which to find relevant documents. Exactly
                 one of query_text or query_vector must be specified.
-            query_vector (Optional[list[float]]): Numeric query vector for which to find relevant
+            query_vector (list[float] | None): Numeric query vector for which to find relevant
                 documents. Exactly one of query_text or query_vector must be specified.
-            filters_json (Optional[str]): JSON string representing additional query filters.
+            filters_json (str | None): JSON string representing additional query filters.
             databricks_token (str): Databricks authentication token. If not specified,
                 the token is resolved from the current environment.
             databricks_endpoint (str): Databricks index endpoint url. If not specified,
@@ -425,11 +425,11 @@ class DatabricksRM:
             columns (list[str]): Column names to include in response.
             databricks_token (str): Databricks authentication token.
             databricks_endpoint (str): Databricks index endpoint url.
-            query_text (Optional[str]): Text query for which to find relevant documents. Exactly
+            query_text (str | None): Text query for which to find relevant documents. Exactly
                 one of query_text or query_vector must be specified.
-            query_vector (Optional[list[float]]): Numeric query vector for which to find relevant
+            query_vector (list[float] | None): Numeric query vector for which to find relevant
                 documents. Exactly one of query_text or query_vector must be specified.
-            filters_json (Optional[str]): JSON string representing additional query filters.
+            filters_json (str | None): JSON string representing additional query filters.
 
         Returns:
             dict[str, Any]: Parsed JSON response from the Databricks Vector Search Index query.

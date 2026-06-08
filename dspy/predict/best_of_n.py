@@ -23,7 +23,7 @@ class BestOfN(Module):
             N (int): The number of times to run the module.
             reward_fn (Callable[[dict, Prediction], float]): The reward function which takes in the args passed to the module, the resulting prediction, and returns a scalar reward.
             threshold (float): The threshold for the reward function.
-            fail_count (Optional[int], optional): The number of times the module can fail before raising an error. Defaults to N if not provided.
+            fail_count (int | None, optional): The number of times the module can fail before raising an error. Defaults to N if not provided.
 
         Examples:
             ```python

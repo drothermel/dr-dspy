@@ -66,7 +66,7 @@ def bootstrap_trace_data(
                 return original_forward(**kwargs), settings.trace.copy()
             except AdapterParseError as e:
                 completion_str = e.lm_response
-                parsed_result = cast("dict[str, Any] | None", e.parsed_result)
+                parsed_result = e.parsed_result
                 failed_signature = cast("Any", e.signature)
                 failed_inputs = kwargs
 

@@ -85,13 +85,13 @@ class Tool(Type):
 
         Args:
             func (Callable): The actual function that is being wrapped by the tool.
-            name (Optional[str], optional): The name of the tool. Defaults to None.
-            desc (Optional[str], optional): The description of the tool. Defaults to None.
-            args (Optional[dict[str, Any]], optional): The args and their schema of the tool, represented as a
+            name (str | None, optional): The name of the tool. Defaults to None.
+            desc (str | None, optional): The description of the tool. Defaults to None.
+            args (dict[str, Any] | None, optional): The args and their schema of the tool, represented as a
                 dictionary from arg name to arg's json schema. Defaults to None.
-            arg_types (Optional[dict[str, Any]], optional): The argument types of the tool, represented as a dictionary
+            arg_types (dict[str, Any] | None, optional): The argument types of the tool, represented as a dictionary
                 from arg name to the type of the argument. Defaults to None.
-            arg_desc (Optional[dict[str, str]], optional): Descriptions for each arg, represented as a
+            arg_desc (dict[str, str] | None, optional): Descriptions for each arg, represented as a
                 dictionary from arg name to description string. Defaults to None.
 
         Examples:

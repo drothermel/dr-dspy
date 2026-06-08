@@ -1,6 +1,6 @@
 import pickle
 from types import UnionType
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 import cloudpickle
 import pydantic
@@ -11,6 +11,10 @@ from dspy.predict.predict import Predict
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature, infer_prefix
 from dspy.utils.dummies import DummyLM
+
+
+def _is_union(annotation: object) -> bool:
+    return isinstance(annotation, UnionType)
 
 
 def test_field_types_and_custom_attributes():
@@ -271,27 +275,22 @@ def test_typed_signatures_generics():
 
 
 def test_typed_signatures_unions_and_optionals():
-    sig = Signature("input_opt: Optional[str], input_union: Union[int, None] -> output_union: Union[int, str]")  # ty:ignore[too-many-positional-arguments]
+    sig = Signature("input_opt: str | None, input_union: int | None -> output_union: int | str")  # ty:ignore[too-many-positional-arguments]
     assert "input_opt" in sig.input_fields  # ty:ignore[unresolved-attribute]
-    # Optional[str] is actually Union[str, None]
-    # Depending on the environment, it might resolve to Union[str, None] or Optional[str], either is correct.
-    # We'll just check for a Union containing str and NoneType:
     input_opt_annotation = sig.input_fields["input_opt"].annotation  # ty:ignore[unresolved-attribute]
-    assert input_opt_annotation == Optional[str] or (
-        getattr(input_opt_annotation, "__origin__", None) is Union
-        and str in input_opt_annotation.__args__
-        and type(None) in input_opt_annotation.__args__
-    )
+    assert _is_union(input_opt_annotation)
+    assert str in input_opt_annotation.__args__
+    assert type(None) in input_opt_annotation.__args__
 
     assert "input_union" in sig.input_fields  # ty:ignore[unresolved-attribute]
     input_union_annotation = sig.input_fields["input_union"].annotation  # ty:ignore[unresolved-attribute]
-    assert getattr(input_union_annotation, "__origin__", None) is Union
+    assert _is_union(input_union_annotation)
     assert int in input_union_annotation.__args__
     assert type(None) in input_union_annotation.__args__
 
     assert "output_union" in sig.output_fields  # ty:ignore[unresolved-attribute]
     output_union_annotation = sig.output_fields["output_union"].annotation  # ty:ignore[unresolved-attribute]
-    assert getattr(output_union_annotation, "__origin__", None) is Union
+    assert _is_union(output_union_annotation)
     assert int in output_union_annotation.__args__
     assert str in output_union_annotation.__args__
 
@@ -305,21 +304,20 @@ def test_typed_signatures_any():
 
 
 def test_typed_signatures_nested():
-    sig = Signature("input_nested: list[Union[str, int]] -> output_nested: Tuple[int, Optional[float], list[str]]")  # ty:ignore[too-many-positional-arguments]
+    sig = Signature("input_nested: list[str | int] -> output_nested: tuple[int, float | None, list[str]]")  # ty:ignore[too-many-positional-arguments]
     input_nested_ann = sig.input_fields["input_nested"].annotation  # ty:ignore[unresolved-attribute]
     assert getattr(input_nested_ann, "__origin__", None) is list
     assert len(input_nested_ann.__args__) == 1
     union_arg = input_nested_ann.__args__[0]
-    assert getattr(union_arg, "__origin__", None) is Union
+    assert _is_union(union_arg)
     assert str in union_arg.__args__
     assert int in union_arg.__args__
 
     output_nested_ann = sig.output_fields["output_nested"].annotation  # ty:ignore[unresolved-attribute]
     assert getattr(output_nested_ann, "__origin__", None) is tuple
     assert output_nested_ann.__args__[0] == int
-    # The second arg is Optional[float], which is Union[float, None]
     second_arg = output_nested_ann.__args__[1]
-    assert getattr(second_arg, "__origin__", None) is Union
+    assert _is_union(second_arg)
     assert float in second_arg.__args__
     assert type(None) in second_arg.__args__
     # The third arg is list[str]
@@ -345,24 +343,21 @@ def test_typed_signatures_from_dict():
 
 def test_typed_signatures_complex_combinations():
     sig = Signature(
-        "input_complex: dict[str, list[Optional[Tuple[int, str]]]] -> output_complex: Union[list[str], dict[str, Any]]"  # ty:ignore[too-many-positional-arguments]
+        "input_complex: dict[str, list[tuple[int, str] | None]] -> output_complex: list[str] | dict[str, Any]"  # ty:ignore[too-many-positional-arguments]
     )
     input_complex_ann = sig.input_fields["input_complex"].annotation  # ty:ignore[unresolved-attribute]
     assert getattr(input_complex_ann, "__origin__", None) is dict
     key_arg, value_arg = input_complex_ann.__args__
     assert key_arg == str
-    # value_arg: list[Optional[Tuple[int, str]]]
     assert getattr(value_arg, "__origin__", None) is list
     inner_union = value_arg.__args__[0]
-    # inner_union should be Optional[Tuple[int, str]]
-    # which is Union[Tuple[int, str], None]
-    assert getattr(inner_union, "__origin__", None) is Union
+    assert _is_union(inner_union)
     tuple_type = [t for t in inner_union.__args__ if t != type(None)][0]  # noqa: RUF015
     assert getattr(tuple_type, "__origin__", None) is tuple
     assert tuple_type.__args__ == (int, str)
 
     output_complex_ann = sig.output_fields["output_complex"].annotation  # ty:ignore[unresolved-attribute]
-    assert getattr(output_complex_ann, "__origin__", None) is Union
+    assert _is_union(output_complex_ann)
     assert len(output_complex_ann.__args__) == 2
     possible_args = set(output_complex_ann.__args__)
     # Expecting list[str] and dict[str, Any]
@@ -377,7 +372,7 @@ def test_typed_signatures_complex_combinations():
 
 
 def test_make_signature_from_string():
-    sig = Signature("input1: int, input2: dict[str, int] -> output1: list[str], output2: Union[int, str]")  # ty:ignore[too-many-positional-arguments]
+    sig = Signature("input1: int, input2: dict[str, int] -> output1: list[str], output2: int | str")  # ty:ignore[too-many-positional-arguments]
     assert "input1" in sig.input_fields  # ty:ignore[unresolved-attribute]
     assert sig.input_fields["input1"].annotation == int  # ty:ignore[unresolved-attribute]
     assert "input2" in sig.input_fields  # ty:ignore[unresolved-attribute]
@@ -385,7 +380,8 @@ def test_make_signature_from_string():
     assert "output1" in sig.output_fields  # ty:ignore[unresolved-attribute]
     assert sig.output_fields["output1"].annotation == list[str]  # ty:ignore[unresolved-attribute]
     assert "output2" in sig.output_fields  # ty:ignore[unresolved-attribute]
-    assert sig.output_fields["output2"].annotation == Union[int, str]  # ty:ignore[unresolved-attribute]
+    assert _is_union(sig.output_fields["output2"].annotation)  # ty:ignore[unresolved-attribute]
+    assert set(sig.output_fields["output2"].annotation.__args__) == {int, str}  # ty:ignore[unresolved-attribute]
 
 
 def test_signature_field_with_constraints():
@@ -444,42 +440,39 @@ def test_pep604_union_type_inline():
         "input1: str | None, input2: None | int -> output_union: int | str"  # ty:ignore[too-many-positional-arguments]
     )
 
-    # input1 and input2 test that both 'T | None' and 'None | T' are interpreted as Optional types,
-    # regardless of the order of None in the union expression.
-
     assert "input1" in sig.input_fields  # ty:ignore[unresolved-attribute]
     input1_annotation = sig.input_fields["input1"].annotation  # ty:ignore[unresolved-attribute]
-    assert input1_annotation == Optional[str] or (
-        getattr(input1_annotation, "__origin__", None) is Union
-        and str in input1_annotation.__args__
-        and type(None) in input1_annotation.__args__
-    )
+    assert _is_union(input1_annotation)
+    assert str in input1_annotation.__args__
+    assert type(None) in input1_annotation.__args__
 
     assert "input2" in sig.input_fields  # ty:ignore[unresolved-attribute]
     input2_annotation = sig.input_fields["input2"].annotation  # ty:ignore[unresolved-attribute]
-    assert input2_annotation == Optional[int] or (
-        getattr(input2_annotation, "__origin__", None) is Union
-        and int in input2_annotation.__args__
-        and type(None) in input2_annotation.__args__
-    )
+    assert _is_union(input2_annotation)
+    assert int in input2_annotation.__args__
+    assert type(None) in input2_annotation.__args__
 
     assert "output_union" in sig.output_fields  # ty:ignore[unresolved-attribute]
     output_union_annotation = sig.output_fields["output_union"].annotation  # ty:ignore[unresolved-attribute]
-    assert getattr(output_union_annotation, "__origin__", None) is Union
+    assert _is_union(output_union_annotation)
     assert int in output_union_annotation.__args__
     assert str in output_union_annotation.__args__
 
 
-def test_pep604_union_type_inline_equivalence():
-    sig1 = Signature("input: str | None -> output: int | str")  # ty:ignore[too-many-positional-arguments]
-    sig2 = Signature("input: Optional[str] -> output: Union[int, str]")  # ty:ignore[too-many-positional-arguments]
+def test_reject_legacy_union_string_signatures():
+    with pytest.raises(ValueError, match=r"typing\.Optional"):
+        Signature("input: Optional[str] -> output: str")  # ty:ignore[too-many-positional-arguments]
 
-    # PEP 604 union types in inline signatures should be equivalent to Optional and Union types
-    assert sig1.equals(sig2)
+    with pytest.raises(ValueError, match=r"typing\.Union"):
+        Signature("input: int -> output: Union[int, str]")  # ty:ignore[too-many-positional-arguments]
 
-    # Check that the annotations are equivalent
-    assert sig1.input_fields["input"].annotation == sig2.input_fields["input"].annotation  # ty:ignore[unresolved-attribute]
-    assert sig1.output_fields["output"].annotation == sig2.output_fields["output"].annotation  # ty:ignore[unresolved-attribute]
+
+def test_reject_legacy_union_class_signatures():
+    with pytest.raises(ValueError, match="typing.Union"):
+
+        class LegacyUnionSignature(Signature):
+            input: str = InputField()
+            output: Union[int, str] = OutputField()
 
 
 def test_pep604_union_type_inline_nested():
@@ -489,8 +482,7 @@ def test_pep604_union_type_inline_nested():
     assert "input" in sig.input_fields  # ty:ignore[unresolved-attribute]
     input_annotation = sig.input_fields["input"].annotation  # ty:ignore[unresolved-attribute]
 
-    # Check for the correct union: Union[str, int, float, NoneType]
-    assert getattr(input_annotation, "__origin__", None) is Union
+    assert _is_union(input_annotation)
     assert set(input_annotation.__args__) == {str, int, float, type(None)}
 
 
@@ -502,30 +494,8 @@ def test_pep604_union_type_class_nested():
     assert "input" in Sig1.input_fields
     input_annotation = Sig1.input_fields["input"].annotation
 
-    # Check for the correct union: UnionType[str, int, float, NoneType]
     assert isinstance(input_annotation, UnionType)
     assert set(input_annotation.__args__) == {str, int, float, type(None)}
-
-
-def test_pep604_union_type_class_equivalence():
-    class Sig1(Signature):
-        input: str | None = InputField()
-        output: int | str = OutputField()
-
-    class Sig2(Signature):
-        input: str | None = InputField()
-        output: Union[int, str] = OutputField()
-
-    # PEP 604 union types in class signatures should be equivalent to Optional and Union types
-    assert Sig1.equals(Sig2)
-
-    # Check that the annotations are equivalent
-    assert Sig1.input_fields["input"].annotation == Sig2.input_fields["input"].annotation
-    assert Sig1.output_fields["output"].annotation == Sig2.output_fields["output"].annotation
-
-    # Check that the pep604 annotations are of type UnionType
-    assert isinstance(Sig1.input_fields["input"].annotation, UnionType)
-    assert isinstance(Sig1.output_fields["output"].annotation, UnionType)
 
 
 def test_pep604_union_type_insert():
@@ -564,8 +534,14 @@ def test_pep604_union_type_with_custom_types():
         custom_types={"CustomType": CustomType},  # ty:ignore[unknown-argument]
     )
 
-    assert sig.input_fields["input"].annotation == Union[CustomType, None]  # ty:ignore[unresolved-attribute]
-    assert sig.output_fields["output"].annotation == Union[int, str]  # ty:ignore[unresolved-attribute]
+    input_annotation = sig.input_fields["input"].annotation  # ty:ignore[unresolved-attribute]
+    assert _is_union(input_annotation)
+    assert CustomType in input_annotation.__args__
+    assert type(None) in input_annotation.__args__
+
+    output_annotation = sig.output_fields["output"].annotation  # ty:ignore[unresolved-attribute]
+    assert _is_union(output_annotation)
+    assert set(output_annotation.__args__) == {int, str}
 
     lm = DummyLM([{"output": "processed"}])
     settings.configure(lm=lm)

@@ -2966,7 +2966,7 @@ def test_tool_call_with_unstructured_content_does_not_raise():
     ]
 
     result = adapter._call_postprocess(
-        cast("type[Signature]", processed_sig),
+        processed_sig,
         cast("type[Signature]", original_sig),
         legacy_outputs_to_lm_response(outputs),
         DummyLM([{}]),
@@ -2991,7 +2991,7 @@ def test_tool_call_with_structured_content_preserves_other_outputs():
     ]
 
     result = adapter._call_postprocess(
-        cast("type[Signature]", processed_sig),
+        processed_sig,
         cast("type[Signature]", original_sig),
         legacy_outputs_to_lm_response(outputs),
         DummyLM([{}]),

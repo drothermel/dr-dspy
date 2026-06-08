@@ -52,12 +52,12 @@ def test_experimental_decorator_on_class_with_version():
         """A test class with version."""
 
     assert TestClass.__doc__ is not None
-    assert "introduced in v2.5.0" in TestClass.__doc__  # ty:ignore[unsupported-operator]
+    assert "introduced in v2.5.0" in TestClass.__doc__
     assert (
         "Experimental: This class may change or be removed in a future release without warning (introduced in v2.5.0)."
         in TestClass.__doc__
     )
-    assert "A test class with version." in TestClass.__doc__  # ty:ignore[unsupported-operator]
+    assert "A test class with version." in TestClass.__doc__
 
 
 def test_experimental_decorator_without_docstring():

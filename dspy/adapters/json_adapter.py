@@ -194,7 +194,7 @@ class JSONAdapter(ChatAdapter):
         if not isinstance(fields, dict):
             raise AdapterParseError(
                 adapter_name="JSONAdapter",
-                signature=signature,  # ty: ignore[invalid-argument-type]
+                signature=signature,
                 lm_response=completion,
                 message="LM response cannot be serialized to a JSON object.",
             )
@@ -209,9 +209,9 @@ class JSONAdapter(ChatAdapter):
         if fields.keys() != signature.output_fields.keys():
             raise AdapterParseError(
                 adapter_name="JSONAdapter",
-                signature=signature,  # ty: ignore[invalid-argument-type]
+                signature=signature,
                 lm_response=completion,
-                parsed_result=fields,  # ty: ignore[invalid-argument-type]
+                parsed_result=fields,
             )
 
         return fields

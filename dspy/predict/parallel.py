@@ -24,11 +24,11 @@ class Parallel:
         optional progress tracking, and can optionally return failed examples and exceptions.
 
         Args:
-            num_threads (Optional[int]): The number of threads to use. Defaults to `settings.num_threads`.
-            max_errors (Optional[int]): The maximum number of errors allowed before raising an exception. Defaults to `settings.max_errors`.
+            num_threads (int | None): The number of threads to use. Defaults to `settings.num_threads`.
+            max_errors (int | None): The maximum number of errors allowed before raising an exception. Defaults to `settings.max_errors`.
             access_examples (bool): Whether to unpack `Example` objects via `.inputs()`. Defaults to True.
             return_failed_examples (bool): Whether to return failed examples. Defaults to False.
-            provide_traceback (Optional[bool]): Whether to provide traceback. Defaults to None.
+            provide_traceback (bool | None): Whether to provide traceback. Defaults to None.
             disable_progress_bar (bool): Whether to disable progress bar. Defaults to False.
 
         Example:

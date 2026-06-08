@@ -179,9 +179,9 @@ class DatabricksProvider(Provider):
                     f"String `train_data_format` must be one of 'chat' or 'completion', but received: {train_data_format}."
                 )
 
-        if "train_data_path" not in train_kwargs:  # ty:ignore[unsupported-operator]
+        if "train_data_path" not in train_kwargs:
             raise ValueError("The `train_data_path` must be provided to finetune on Databricks.")
-        train_kwargs["train_data_path"] = DatabricksProvider.upload_data(  # ty:ignore[invalid-assignment]
+        train_kwargs["train_data_path"] = DatabricksProvider.upload_data(
             train_data,
             train_kwargs["train_data_path"],
             train_data_format,  # ty:ignore[invalid-argument-type]
@@ -195,20 +195,20 @@ class DatabricksProvider(Provider):
                 "`pip install databricks_genai`."
             )
 
-        if "register_to" not in train_kwargs:  # ty:ignore[unsupported-operator]
+        if "register_to" not in train_kwargs:
             raise ValueError("The `register_to` must be provided to finetune on Databricks.")
 
         # Allow users to override the host and token. This is useful on Databricks hosted runtime.
-        databricks_host = train_kwargs.pop("databricks_host", None)  # ty:ignore[unresolved-attribute]
-        databricks_token = train_kwargs.pop("databricks_token", None)  # ty:ignore[unresolved-attribute]
+        databricks_host = train_kwargs.pop("databricks_host", None)
+        databricks_token = train_kwargs.pop("databricks_token", None)
 
-        skip_deploy = train_kwargs.pop("skip_deploy", False)  # ty:ignore[unresolved-attribute]
-        deploy_timeout = train_kwargs.pop("deploy_timeout", 900)  # ty:ignore[unresolved-attribute]
+        skip_deploy = train_kwargs.pop("skip_deploy", False)
+        deploy_timeout = train_kwargs.pop("deploy_timeout", 900)
 
         logger.info("Starting finetuning on Databricks... this might take a few minutes to finish.")
         finetuning_run = fm.create(
             model=model,
-            **train_kwargs,  # ty:ignore[invalid-argument-type]
+            **train_kwargs,
         )
 
         job.run = finetuning_run  # ty:ignore[unresolved-attribute]
@@ -230,7 +230,7 @@ class DatabricksProvider(Provider):
 
         job.launch_started = True
         model_to_deploy = train_kwargs["register_to"]
-        job.endpoint_name = model_to_deploy.replace(".", "_")  # ty:ignore[unresolved-attribute]
+        job.endpoint_name = model_to_deploy.replace(".", "_")
         DatabricksProvider.deploy_finetuned_model(
             model_to_deploy,
             train_data_format,

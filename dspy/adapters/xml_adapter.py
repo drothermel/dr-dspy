@@ -101,9 +101,9 @@ class XMLAdapter(ChatAdapter):
 
             raise AdapterParseError(
                 adapter_name="XMLAdapter",
-                signature=signature,  # ty: ignore[invalid-argument-type]
+                signature=signature,
                 lm_response=completion,
-                parsed_result=fields,  # ty: ignore[invalid-argument-type]
+                parsed_result=fields,
             )
         return fields
 
@@ -123,7 +123,7 @@ class XMLAdapter(ChatAdapter):
 
             raise AdapterParseError(
                 adapter_name="XMLAdapter",
-                signature=signature,  # ty: ignore[invalid-argument-type]
+                signature=signature,
                 lm_response=completion,
                 message=f"Failed to parse field {field_info} with value {raw}: {e}",
             )

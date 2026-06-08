@@ -69,7 +69,7 @@ class BootstrapFewShot(Teleprompter):
                 to bypass caches and gather diverse traces. If a successful bootstrap is
                 found on any round, the example is accepted and the optimizer moves to the
                 next one. Defaults to 1.
-            max_errors (Optional[int]): Maximum number of errors until program ends.
+            max_errors (int | None): Maximum number of errors until program ends.
                 If ``None``, inherits from ``dspy.settings.max_errors``.
         """
         self.metric = metric

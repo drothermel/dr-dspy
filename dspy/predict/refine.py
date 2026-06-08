@@ -64,7 +64,7 @@ class Refine(Module):
             N (int): The number of times to run the module. must
             reward_fn (Callable): The reward function.
             threshold (float): The threshold for the reward function.
-            fail_count (Optional[int], optional): The number of times the module can fail before raising an error
+            fail_count (int | None, optional): The number of times the module can fail before raising an error
 
         Examples:
             ```python

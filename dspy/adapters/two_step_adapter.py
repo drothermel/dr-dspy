@@ -107,7 +107,7 @@ class TwoStepAdapter(Adapter):
         except Exception as e:
             raise AdapterParseError(
                 adapter_name="TwoStepAdapter",
-                signature=signature,  # ty: ignore[invalid-argument-type]
+                signature=signature,
                 lm_response=completion,
                 message=f"Failed to parse response from the original completion: {e}",
             ) from e
@@ -152,7 +152,7 @@ class TwoStepAdapter(Adapter):
             except Exception as e:
                 raise AdapterParseError(
                     adapter_name="TwoStepAdapter",
-                    signature=signature,  # ty: ignore[invalid-argument-type]
+                    signature=signature,
                     lm_response=str(output),
                     message=f"Failed to parse response from the original completion: {e}",
                 ) from e

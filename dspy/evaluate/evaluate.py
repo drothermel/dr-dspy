@@ -92,16 +92,16 @@ class Evaluate:
         Args:
             devset (list[dspy.primitives.example.Example]): the evaluation dataset.
             metric (Callable): The metric function to use for evaluation.
-            num_threads (Optional[int]): The number of threads to use for parallel evaluation.
+            num_threads (int | None): The number of threads to use for parallel evaluation.
             display_progress (bool): Whether to display progress during evaluation.
-            display_table (Union[bool, int]): Whether to display the evaluation results in a table.
+            display_table (bool | int): Whether to display the evaluation results in a table.
                 If a number is passed, the evaluation results will be truncated to that number before displayed.
-            max_errors (Optional[int]): The maximum number of errors to allow before
+            max_errors (int | None): The maximum number of errors to allow before
                 stopping evaluation. If ``None``, inherits from ``dspy.settings.max_errors``.
-            provide_traceback (Optional[bool]): Whether to provide traceback information during evaluation.
+            provide_traceback (bool | None): Whether to provide traceback information during evaluation.
             failure_score (float): The default score to use if evaluation fails due to an exception.
-            save_as_csv (Optional[str]): The file name where the csv will be saved.
-            save_as_json (Optional[str]): The file name where the json will be saved.
+            save_as_csv (str | None): The file name where the csv will be saved.
+            save_as_json (str | None): The file name where the json will be saved.
 
         """
         self.devset = devset
@@ -138,11 +138,11 @@ class Evaluate:
             program (dspy.primitives.module.Module): The DSPy program to evaluate.
             metric (Callable): The metric function to use for evaluation. if not provided, use `self.metric`.
             devset (list[dspy.primitives.example.Example]): the evaluation dataset. if not provided, use `self.devset`.
-            num_threads (Optional[int]): The number of threads to use for parallel evaluation. if not provided, use
+            num_threads (int | None): The number of threads to use for parallel evaluation. if not provided, use
                 `self.num_threads`.
             display_progress (bool): Whether to display progress during evaluation. if not provided, use
                 `self.display_progress`.
-            display_table (Union[bool, int]): Whether to display the evaluation results in a table. if not provided, use
+            display_table (bool | int): Whether to display the evaluation results in a table. if not provided, use
                 `self.display_table`. If a number is passed, the evaluation results will be truncated to that number before displayed.
             callback_metadata (dict): Metadata to be used for evaluate callback handlers.
 

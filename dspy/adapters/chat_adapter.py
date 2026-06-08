@@ -241,16 +241,16 @@ class ChatAdapter(Adapter):
                 except Exception as e:
                     raise AdapterParseError(
                         adapter_name="ChatAdapter",
-                        signature=signature,  # ty: ignore[invalid-argument-type]
+                        signature=signature,
                         lm_response=completion,
                         message=f"Failed to parse field {k} with value {v} from the LM response. Error message: {e}",
                     )
         if fields.keys() != signature.output_fields.keys():
             raise AdapterParseError(
                 adapter_name="ChatAdapter",
-                signature=signature,  # ty: ignore[invalid-argument-type]
+                signature=signature,
                 lm_response=completion,
-                parsed_result=fields,  # ty: ignore[invalid-argument-type]
+                parsed_result=fields,
             )
 
         return fields

@@ -23,7 +23,7 @@ import sys
 import types
 import typing
 from copy import deepcopy
-from typing import Any, Iterator, cast, get_origin, overload
+from typing import Any, Iterator, cast, get_args, get_origin, overload
 
 from pydantic import BaseModel, Field, create_model
 from pydantic.fields import FieldInfo
@@ -223,6 +223,7 @@ class SignatureMeta(type(BaseModel)):
                     f"Field `{name}` in `{cls.__name__}` must be declared with InputField or OutputField, but "
                     f"field `{name}` has `field.json_schema_extra={field.json_schema_extra}`",
                 )
+            _reject_legacy_union_type(field.annotation, field_name=name)
 
     @property
     def instructions(cls) -> str:
@@ -598,7 +599,7 @@ def make_signature(
     if custom_types is None and isinstance(signature, str):
         custom_types = SignatureMeta._detect_custom_types_from_caller(signature)
     if custom_types:
-        names = dict(typing.__dict__)
+        names = _typing_names_for_signature_parse()
         names.update(custom_types)
 
     fields = _parse_signature(signature, names) if isinstance(signature, str) else signature
@@ -625,6 +626,7 @@ def make_signature(
             or get_origin(type_) is not None
         ):
             raise ValueError(f"Field types must be types, but received: {type_} of type {type(type_)}.")
+        _reject_legacy_union_type(type_, field_name=name)
         if not isinstance(field, FieldInfo):
             raise ValueError(f"Field values must be Field instances, but received: {field}.")
         fixed_fields[name] = (type_, field)
@@ -690,6 +692,29 @@ def _parse_field_string(field_string: str, names=None) -> Iterator[tuple[str, ty
     return zip(field_names, types_list, is_type_undefined, strict=False)
 
 
+def _reject_legacy_union_type(type_: object, *, field_name: str | None = None) -> None:
+    if isinstance(type_, types.UnionType):
+        return
+    if get_origin(type_) is typing.Union:
+        args = get_args(type_)
+        if len(args) == 2 and type(None) in args:
+            non_none = next(arg for arg in args if arg is not type(None))
+            if get_origin(non_none) is typing.Literal:
+                return
+        field_prefix = f"Field {field_name!r} " if field_name is not None else ""
+        raise ValueError(
+            f"{field_prefix}uses typing.Union[...]. Use PEP 604 union syntax (e.g. int | str) instead."
+        )
+
+
+def _typing_names_for_signature_parse() -> dict[str, Any]:
+    names = dict(typing.__dict__)
+    names.pop("Union", None)
+    names.pop("Optional", None)
+    names["NoneType"] = type(None)
+    return names
+
+
 def _parse_type_node(node, names=None) -> Any:
     """Recursively parse an AST node representing a type annotation.
 
@@ -699,7 +724,7 @@ def _parse_type_node(node, names=None) -> Any:
     Examples:
         - For "x: int", the AST node represents 'int' and returns the int type
         - For "x: list[str]", it processes a subscript node to return typing.list[str]
-        - For "x: Optional[int]", it handles the Union type to return Optional[int]
+        - For "x: int | None", it handles PEP 604 union syntax
         - For "x: MyModule.CustomType", it processes attribute access to return the actual type
 
     Args:
@@ -719,8 +744,7 @@ def _parse_type_node(node, names=None) -> Any:
     """
 
     if names is None:
-        names = dict(typing.__dict__)
-        names["NoneType"] = type(None)
+        names = _typing_names_for_signature_parse()
 
     dspy_type_modules = {
         "Audio": "dspy.adapters.types.audio",
@@ -735,6 +759,10 @@ def _parse_type_node(node, names=None) -> Any:
     }
 
     def resolve_name(type_name: str):
+        if type_name in {"Union", "Optional"}:
+            raise ValueError(
+                f"Use PEP 604 union syntax (e.g. int | str) instead of typing.{type_name}[...]."
+            )
         # Check if it's a built-in known type or in the provided names
         if type_name in names:
             return names[type_name]
@@ -801,27 +829,17 @@ def _parse_type_node(node, names=None) -> Any:
         else:
             arg_types = (_parse_type_node(slice_node, names),)
 
-        # Special handling for Union, Optional
         if base_type is typing.Union:
-            return typing.Union[arg_types]
+            raise ValueError("Use PEP 604 union syntax (e.g. int | str) instead of typing.Union[...].")
         if base_type is typing.Optional:
-            if len(arg_types) != 1:
-                raise ValueError("Optional must have exactly one type argument")
-            return typing.Optional[arg_types[0]]
+            raise ValueError("Use PEP 604 union syntax (e.g. int | None) instead of typing.Optional[...].")
 
         return base_type[arg_types]
 
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        # Handle PEP 604: int | None, str | float, etc.
         left = _parse_type_node(node.left, names)
         right = _parse_type_node(node.right, names)
-
-        # Optional[X] is Union[X, NoneType]
-        if right is type(None):
-            return typing.Optional[left]
-        if left is type(None):
-            return typing.Optional[right]
-        return typing.Union[left, right]
+        return left | right
 
     if isinstance(node, ast.Tuple):
         return tuple(_parse_type_node(elt, names) for elt in node.elts)

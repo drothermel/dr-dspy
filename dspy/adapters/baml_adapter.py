@@ -120,7 +120,7 @@ def _build_simplified_schema(
 
         # If the field type is a BaseModel, add its docstring as a comment before the field
         field_annotation = field.annotation
-        # Handle Optional types
+        # Handle union types
         origin = get_origin(field_annotation)
         if origin in (types.UnionType, Union):
             args = get_args(field_annotation)
