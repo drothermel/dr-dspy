@@ -16,7 +16,7 @@ from dspy.utils.dummies import DummyLM
 try:
     from litellm.types.utils import Delta, ModelResponseStream, StreamingChoices
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
@@ -788,6 +788,7 @@ async def test_stream_listener_missing_completion_marker_chat_adapter():
     full_content = "".join([chunk.chunk for chunk in all_chunks])
     expected_content = "This is a test response with many tokens to ensure buffering works correctly."
     assert full_content == expected_content
+    assert final_prediction is not None
     assert final_prediction.answer == expected_content
 
 
@@ -1084,7 +1085,9 @@ async def test_streaming_allows_custom_streamable_type():
             return CustomType(message=chunk.choices[0].delta.content)
 
         @classmethod
-        def parse_lm_response(cls, response: dict) -> "CustomType":
+        def parse_lm_response(cls, response: str | dict[str, Any]) -> "CustomType":
+            if isinstance(response, dict):
+                response = response.get("message", "")
             return CustomType(message=response.split("\n\n")[0])
 
     class CustomSignature(Signature):
@@ -1127,10 +1130,10 @@ async def test_streaming_with_citations():
     class AnswerWithSources(Signature):
         """Answer questions using provided documents with citations."""
 
-        documents: list[Document] = InputField()
+        documents: list["Document"] = InputField()
         question: str = InputField()
         answer: str = OutputField()
-        citations: Citations = OutputField()
+        citations: "Citations" = OutputField()
 
     class MyProgram(Module):
         def __init__(self):

@@ -38,6 +38,10 @@ def _default_instructions(cls) -> str:
     return f"Given the fields {inputs_}, produce the fields {outputs_}."
 
 
+def _field_infos_to_signature_fields(fields: dict[str, FieldInfo]) -> dict[str, tuple[type, FieldInfo]]:
+    return {name: (field.annotation or str, field) for name, field in fields.items()}
+
+
 class SignatureMeta(type(BaseModel)):
     def __call__(cls, *args, **kwargs):
         if cls is Signature:
@@ -295,7 +299,7 @@ class Signature(BaseModel, metaclass=SignatureMeta):
             assert NewSig.instructions == "Translate to French."
             ```
         """
-        return Signature(cls.fields, instructions)
+        return make_signature(_field_infos_to_signature_fields(cls.fields), instructions)
 
     @classmethod
     def with_updated_fields(cls, name: str, type_: type | None = None, **kwargs: dict[str, Any]) -> type["Signature"]:
@@ -321,7 +325,7 @@ class Signature(BaseModel, metaclass=SignatureMeta):
         }
         if type_ is not None:
             fields_copy[name].annotation = type_
-        return Signature(fields_copy, cls.instructions)
+        return make_signature(_field_infos_to_signature_fields(fields_copy), cls.instructions)
 
     @classmethod
     def prepend(cls, name, field, type_=None) -> type["Signature"]:
@@ -413,7 +417,7 @@ class Signature(BaseModel, metaclass=SignatureMeta):
 
         fields.pop(name, None)
 
-        return Signature(fields, cls.instructions)
+        return make_signature(_field_infos_to_signature_fields(fields), cls.instructions)
 
     @classmethod
     def insert(cls, index: int, name: str, field, type_: type | None = None) -> type["Signature"]:
@@ -473,7 +477,7 @@ class Signature(BaseModel, metaclass=SignatureMeta):
         lst.insert(index, (name, (type_, field)))
 
         new_fields = dict(input_fields + output_fields)
-        return Signature(new_fields, cls.instructions)
+        return make_signature(_field_infos_to_signature_fields(new_fields), cls.instructions)
 
     @classmethod
     def equals(cls, other) -> bool:
@@ -504,7 +508,7 @@ class Signature(BaseModel, metaclass=SignatureMeta):
 
     @classmethod
     def load_state(cls, state):
-        signature_copy = Signature(deepcopy(cls.fields), cls.instructions)
+        signature_copy = make_signature(_field_infos_to_signature_fields(deepcopy(cls.fields)), cls.instructions)
 
         signature_copy.instructions = state["instructions"]
         for field, saved_field in zip(signature_copy.fields.values(), state["fields"], strict=False):
@@ -518,7 +522,7 @@ def ensure_signature(signature: str | type[Signature], instructions=None) -> Non
     if signature is None:
         return None
     if isinstance(signature, str):
-        return Signature(signature, instructions)
+        return make_signature(signature, instructions)
     if instructions is not None:
         raise ValueError("Don't specify instructions when initializing with a Signature")
     return signature
@@ -599,7 +603,7 @@ def make_signature(
 
     # Default prompt when no instructions are provided
     if instructions is None:
-        sig = Signature(signature, "")  # Simple way to parse input/output fields
+        sig = make_signature(signature, "")  # Simple way to parse input/output fields
         instructions = _default_instructions(sig)
 
     return create_model(

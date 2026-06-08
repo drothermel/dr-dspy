@@ -1,22 +1,28 @@
 import inspect
 import re
 import types
-from typing import Callable, ParamSpec, TypeVar, overload
+from typing import Any, Callable, ParamSpec, TypeVar, overload
 
 P = ParamSpec("P")
 R = TypeVar("R")
+T = TypeVar("T")
+
+@overload
+def experimental(f: type[T], version: str | None = None) -> type[T]: ...
 
 @overload
 def experimental(f: Callable[P, R], version: str | None = None) -> Callable[P, R]: ...
 
 @overload
+def experimental(f: None = None, version: str | None = None) -> Callable[[type[T]], type[T]]: ...
+
+@overload
 def experimental(f: None = None, version: str | None = None) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
 
-
 def experimental(
-    f: Callable[P, R] | None = None,
+    f: type[T] | Callable[P, R] | None = None,
     version: str | None = None,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
+) -> Any:
     """Decorator / decorator creator for marking APIs experimental in the docstring.
 
     Args:
@@ -29,7 +35,7 @@ def experimental(
         A decorator that adds a note to the docstring of the decorated API.
     """
     if f:
-        return _experimental(f, version)  # ty:ignore[invalid-return-type]
+        return _experimental(f, version)
     def decorator(f: Callable[P, R]) -> Callable[P, R]:
         return _experimental(f, version)
     return decorator
