@@ -4,11 +4,20 @@ import re
 import threading
 from typing import Any, Literal
 
-import pydantic
 from typing_extensions import override
 
-from dspy.__metadata__ import __version__
 from dspy.clients._litellm import get_litellm, is_litellm_context_window_error
+from dspy.clients.lm.errors import (
+    _exception_message,
+    _exception_provider_code,
+    _exception_request_id,
+    _exception_retry_after,
+    _exception_status,
+    _lm_error_class_from_litellm_exception,
+    _lm_error_class_from_status,
+)
+from dspy.clients.lm.headers import _add_dspy_identifier_to_headers
+from dspy.clients.lm.responses_compat import _convert_chat_request_to_responses_request
 from dspy.clients.openai import OpenAIProvider
 from dspy.clients.openai_format import (
     completion_to_lm_response,
@@ -25,23 +34,12 @@ from dspy.core.types import LMRequest, LMResponse
 from dspy.utils.callback import BaseCallback
 from dspy.utils.exceptions import (
     ContextWindowExceededError,
-    LMAuthError,
-    LMBillingError,
     LMConfigurationError,
     LMError,
-    LMInvalidRequestError,
-    LMNotConfiguredError,
-    LMProviderError,
-    LMRateLimitError,
-    LMServerError,
-    LMTimeoutError,
-    LMTransportError,
-    LMUnexpectedError,
     LMUnsupportedFeatureError,
-    LMUnsupportedModelError,
 )
 
-from .base_lm import BaseLM
+from ..base_lm import BaseLM
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +63,8 @@ class LM(BaseLM):
     """
     A language model supporting chat or text completion requests for use with DSPy modules.
     """
+
+    __module__ = "dspy.clients.lm"
 
     def __init__(
         self,
@@ -187,15 +187,17 @@ class LM(BaseLM):
 
     async def aforward(self, request: LMRequest) -> LMResponse:
         """Call the configured LM asynchronously."""
+        import dspy.clients.lm as lm_package
+
         provider_request = self._provider_request(request)
         litellm_cache_args = {"no-cache": True, "no-store": True}
 
         if self.model_type == "chat":
-            completion = alitellm_completion
+            completion = lm_package.alitellm_completion
         elif self.model_type == "text":
-            completion = alitellm_text_completion
+            completion = lm_package.alitellm_text_completion
         elif self.model_type == "responses":
-            completion = alitellm_responses_completion
+            completion = lm_package.alitellm_responses_completion
         else:
             raise LMConfigurationError(
                 f"Unsupported model_type {self.model_type!r} for `dspy.clients.lm.LM`.",
@@ -443,218 +445,3 @@ async def alitellm_responses_completion(request: dict[str, Any], num_retries: in
         headers=_add_dspy_identifier_to_headers(headers),
         **request,
     )
-
-
-def _convert_chat_request_to_responses_request(request: dict[str, Any]):
-    """
-    Convert a chat request to a responses request
-    See https://platform.openai.com/docs/api-reference/responses/create for the responses API specification.
-    Also see https://platform.openai.com/docs/api-reference/chat/create for the chat API specification.
-    """
-    request = dict(request)
-    if "messages" in request:
-        input_items = []
-        for msg in request.pop("messages"):
-            content_blocks = []
-            c = msg.get("content")
-            if isinstance(c, str):
-                content_blocks.append({"type": "input_text", "text": c})
-            elif isinstance(c, list):
-                for item in c:
-                    content_blocks.append(_convert_content_item_to_responses_format(item))  # noqa: PERF401 dynamic typing/lint migration for scoped ty adoption
-            input_items.append({"role": msg.get("role", "user"), "content": content_blocks})
-        request["input"] = input_items
-    # Convert `reasoning_effort` to reasoning format supported by the Responses API
-    if "reasoning_effort" in request:
-        effort = request.pop("reasoning_effort")
-        request["reasoning"] = {"effort": effort, "summary": "auto"}
-
-    # Convert `response_format` to `text.format` for Responses API
-    if "response_format" in request:
-        response_format = request.pop("response_format")
-        if isinstance(response_format, type) and issubclass(response_format, pydantic.BaseModel):
-            response_format = {
-                "name": response_format.__name__,
-                "type": "json_schema",
-                "schema": response_format.model_json_schema(),
-            }
-        text = request.pop("text", {})
-        request["text"] = {**text, "format": response_format}
-
-    return request
-
-
-def _convert_content_item_to_responses_format(item: dict[str, Any]) -> dict[str, Any]:
-    """
-    Convert a content item from Chat API format to Responses API format.
-
-    For images, converts from:
-        {"type": "image_url", "image_url": {"url": "..."}}
-    To:
-        {"type": "input_image", "image_url": "..."}
-
-    For text, converts from:
-        {"type": "text", "text": "..."}
-    To:
-        {"type": "input_text", "text": "..."}
-
-    For other types, passes through as-is.
-    """
-    if item.get("type") == "image_url":
-        image_url = item.get("image_url", {}).get("url", "")
-        return {
-            "type": "input_image",
-            "image_url": image_url,
-        }
-    if item.get("type") == "text":
-        return {
-            "type": "input_text",
-            "text": item.get("text", ""),
-        }
-    if item.get("type") == "file":
-        file = item.get("file", {})
-        return {
-            "type": "input_file",
-            "file_data": file.get("file_data"),
-            "filename": file.get("filename"),
-            "file_id": file.get("file_id"),
-        }
-
-    return item
-
-
-def _add_dspy_identifier_to_headers(headers: dict[str, Any] | None = None):
-    headers = headers or {}
-    return {
-        "User-Agent": f"DSPy/{__version__}",
-        **headers,
-    }
-
-
-# --------
-# Errors
-# --------
-
-
-def _safe_litellm_exception_class(name: str) -> type[Exception] | None:
-    cls = getattr(_get_litellm(), name, None)
-    return cls if isinstance(cls, type) and issubclass(cls, Exception) else None
-
-
-def _lm_error_class_from_litellm_exception(exc: Exception) -> type[LMError] | None:
-    message = _exception_message(exc).lower()
-    class_name = type(exc).__name__.lower()
-    if _exception_status(exc) is None and any(
-        phrase in message for phrase in ("api key", "apikey", "credentials", "environment variable")
-    ):
-        return LMNotConfiguredError
-    if "timeout" in class_name or "timed out" in message or "timeout" in message:
-        return LMTimeoutError
-    if "connection" in class_name or "network" in message or "connection" in message:
-        return LMTransportError
-
-    mappings = [
-        ("AuthenticationError", LMAuthError),
-        ("RateLimitError", LMRateLimitError),
-        ("NotFoundError", LMUnsupportedModelError),
-        ("UnsupportedParamsError", LMUnsupportedFeatureError),
-        ("UnprocessableEntityError", LMInvalidRequestError),
-        ("ContentPolicyViolationError", LMInvalidRequestError),
-        ("BadRequestError", LMInvalidRequestError),
-        ("InvalidRequestError", LMInvalidRequestError),
-        ("InternalServerError", LMServerError),
-        ("ServiceUnavailableError", LMServerError),
-        ("APIConnectionError", LMTransportError),
-        ("APIResponseValidationError", LMProviderError),
-        ("BudgetExceededError", LMBillingError),
-        ("RouterRateLimitError", LMRateLimitError),
-    ]
-    for litellm_name, dspy_cls in mappings:
-        litellm_cls = _safe_litellm_exception_class(litellm_name)
-        if litellm_cls is not None and isinstance(exc, litellm_cls):
-            return dspy_cls
-    return None
-
-
-def _lm_error_class_from_status(status: int | None) -> type[LMError]:
-    if status in (401, 403):
-        return LMAuthError
-    if status == 402:
-        return LMBillingError
-    if status == 404:
-        return LMUnsupportedModelError
-    if status == 408:
-        return LMTimeoutError
-    if status == 429:
-        return LMRateLimitError
-    if status is not None and 400 <= status < 500:
-        return LMInvalidRequestError
-    if status is not None and status >= 500:
-        return LMServerError
-    return LMUnexpectedError if status is None else LMProviderError
-
-
-# Best-effort LiteLLM/provider exception metadata extraction.
-#
-# LiteLLM exception metadata is not exposed as a single stable typed shape across providers, exception classes, and
-# LiteLLM versions. Keep the defensive getattr-based extraction localized here so the rest of DSPy sees structured
-# DSPyError metadata.
-def _exception_status(exc: Exception) -> int | None:
-    status = getattr(exc, "status_code", None)
-    if status is None:
-        response = getattr(exc, "response", None)
-        status = getattr(response, "status_code", None)
-    try:
-        return int(status) if status is not None else None
-    except (TypeError, ValueError):
-        return None
-
-
-def _exception_message(exc: Exception) -> str:
-    message = getattr(exc, "message", None)
-    if message is None:
-        message = str(exc)
-    return str(message)
-
-
-def _exception_headers(exc: Exception):
-    response = getattr(exc, "response", None)
-    return getattr(response, "headers", None) or getattr(exc, "headers", None) or {}
-
-
-def _exception_header(exc: Exception, name: str) -> str | None:
-    headers = _exception_headers(exc)
-    if not headers:
-        return None
-    try:
-        return headers.get(name) or headers.get(name.lower())
-    except AttributeError:
-        return None
-
-
-def _exception_request_id(exc: Exception) -> str | None:
-    return (
-        _exception_header(exc, "x-request-id")
-        or _exception_header(exc, "request-id")
-        or _exception_header(exc, "x-amzn-requestid")
-        or _exception_header(exc, "x-ms-request-id")
-    )
-
-
-def _exception_retry_after(exc: Exception) -> float | None:
-    retry_after = _exception_header(exc, "retry-after")
-    try:
-        return float(retry_after) if retry_after is not None else None
-    except (TypeError, ValueError):
-        return None
-
-
-def _exception_provider_code(exc: Exception) -> str | None:
-    body = getattr(exc, "body", None)
-    if isinstance(body, dict):
-        error = body.get("error")
-        if isinstance(error, dict) and error.get("code") is not None:
-            return str(error["code"])
-        if body.get("code") is not None:
-            return str(body["code"])
-    return None
