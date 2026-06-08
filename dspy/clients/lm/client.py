@@ -30,7 +30,7 @@ from dspy.clients.openai_format import (
 )
 from dspy.clients.provider import Provider, ReinforceJob, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat
-from dspy.core.types import LMRequest, LMResponse
+from dspy.core.types import LMRequest, LMResponse, merge_lm_request_config
 from dspy.utils.callback import BaseCallback
 from dspy.utils.exceptions import (
     ContextWindowExceededError,
@@ -230,6 +230,10 @@ class LM(BaseLM):
                 }
             )
 
+        request = request.model_copy(
+            update={"config": merge_lm_request_config(lm=self, config=request.config)},
+        )
+
         if self.model_type == "chat":
             provider_request = to_openai_chat_request(request)
         elif self.model_type == "text":
@@ -246,7 +250,7 @@ class LM(BaseLM):
         lm_defaults = {
             key: value
             for key, value in self.kwargs.items()
-            if value is not None and key not in {"cache", "reasoning_effort"}
+            if value is not None and key not in {"cache", "reasoning_effort", "reasoning"}
         }
         return {**lm_defaults, **provider_request}
 

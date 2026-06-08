@@ -99,7 +99,7 @@ def test_reasoning_effort_responses_api():
     """Test that reasoning_effort gets normalized to reasoning format for Responses API."""
     with mock.patch("litellm.aresponses", mock.AsyncMock(return_value={"choices": []})) as mock_responses:
         # OpenAI model with Responses API - should normalize
-        lm = LM(model="openai/gpt-5", model_type="responses", reasoning_effort="low", max_tokens=16000, temperature=1.0)
+        lm = LM(model="openai/gpt-5", model_type="responses", reasoning={"effort": "low"}, max_tokens=16000, temperature=1.0)
         asyncio.run(lm(_request(lm, prompt="openai query")))
         call_kwargs = mock_responses.call_args.kwargs
         assert "reasoning_effort" not in call_kwargs

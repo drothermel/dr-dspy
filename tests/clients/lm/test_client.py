@@ -110,7 +110,6 @@ def test_lm_calls_support_pydantic_models(litellm_test_server):
     asyncio.run(lm(_request(lm, prompt="Query")))
 
 
-@pytest.mark.asyncio
 def test_reasoning_model_token_parameter():
     test_cases = [
         ("openai/o1", True),
@@ -641,7 +640,7 @@ def test_call_reasoning_model_with_chat_api():
                 model_type="chat",
                 temperature=1.0,
                 max_tokens=16000,
-                reasoning_effort="low",
+                reasoning={"effort": "low"},
             )
 
             # Test the call

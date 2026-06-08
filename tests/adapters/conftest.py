@@ -53,6 +53,9 @@ class CapturingLM(BaseLM):
         )
         self.source_lm = source_lm
         self.calls = []
+        for key in ("reasoning", "reasoning_effort"):
+            if key in source_lm.kwargs:
+                self.kwargs[key] = source_lm.kwargs[key]
 
     @property
     @override

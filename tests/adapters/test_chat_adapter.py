@@ -1161,6 +1161,10 @@ def test_chat_adapter_format_exact_messages_preserves_passthrough_lm_kwargs():
 
 def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_reasoning():
     class ReasoningLM(DummyLM):
+        def __init__(self, answers):
+            super().__init__(answers)
+            self.kwargs["reasoning"] = {"effort": "low"}
+
         @property
         @override
         def supports_reasoning(self):
@@ -1218,6 +1222,10 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_reasoning(
 
 def test_chat_adapter_native_tool_calling_still_enables_native_reasoning():
     class NativeToolReasoningLM(DummyLM):
+        def __init__(self, answers):
+            super().__init__(answers)
+            self.kwargs["reasoning"] = {"effort": "low"}
+
         @property
         @override
         def supports_function_calling(self):
