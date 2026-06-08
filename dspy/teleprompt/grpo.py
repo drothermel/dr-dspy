@@ -9,7 +9,6 @@ from typing import Any, Callable, Literal, cast
 from typing_extensions import override
 
 from dspy.adapters.base import Adapter
-from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.clients.lm import LM
 from dspy.clients.utils_finetune import GRPOChatData, GRPOGroup, GRPORolloutGroup, GRPOStatus, TrainDataFormat
 from dspy.dsp.utils.settings import settings
@@ -459,9 +458,11 @@ class GRPO(FinetuneTeleprompter):
                                 configured_adapter or settings.adapter,
                                 transparency=settings.get("transparency", "strict"),
                             )
-                            assert isinstance(adapter, ChatAdapter), (
-                                f"Adapter {adapter} is not a ChatAdapter. GRPO training is not supported for this adapter."
-                            )
+                            if not adapter.capabilities.supports_finetune:
+                                raise TypeError(
+                                    f"Adapter {adapter} does not support finetune data formatting. "
+                                    "GRPO training requires an adapter with capabilities.supports_finetune=True."
+                                )
                             from dspy.clients.openai_format import message_to_openai_chat
 
                             inp_messages = [

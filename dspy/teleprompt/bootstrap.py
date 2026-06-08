@@ -8,8 +8,8 @@ from typing_extensions import override
 from dspy.dsp.utils.settings import settings
 from dspy.primitives.example import Example
 from dspy.teleprompt.task_spec_context import get_task_spec
-from dspy.utils.hasher import Hasher
 from dspy.teleprompt.teleprompt import Teleprompter
+from dspy.utils.hasher import Hasher
 
 from .vanilla import LabeledFewShot
 

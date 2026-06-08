@@ -1,17 +1,27 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.base.call import AdapterCallMixin
 from dspy.adapters.base.conversation import AdapterConversationMixin
 from dspy.adapters.base.format import AdapterFormatMixin
 from dspy.adapters.base.native import _DEFAULT_NATIVE_RESPONSE_TYPES
+from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.types.base_type import Type
 from dspy.task_spec import TaskSpec
 from dspy.utils.callback import BaseCallback, with_callbacks
 
+if TYPE_CHECKING:
+    from dspy.adapters.call.policies.parse_fallback import ParseFallbackPolicy
+    from dspy.adapters.call.policies.response_format import ResponseFormatPolicy
+
 
 class Adapter(AdapterCallMixin, AdapterFormatMixin, AdapterConversationMixin):
+    response_format_policy: ResponseFormatPolicy | None = None
+    parse_fallback_policy: ParseFallbackPolicy | None = None
+    call_mode: str | None = None
+    capabilities: AdapterCapabilities = AdapterCapabilities()
+
     def __init__(
         self,
         callbacks: list[BaseCallback] | None = None,
@@ -31,3 +41,15 @@ class Adapter(AdapterCallMixin, AdapterFormatMixin, AdapterConversationMixin):
 
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
         raise NotImplementedError
+
+    def format_finetune_data(
+        self,
+        task_spec: TaskSpec,
+        demos: list[dict[str, Any]],
+        inputs: dict[str, Any],
+        outputs: dict[str, Any],
+    ) -> dict[str, list[Any]]:
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support finetune data formatting. "
+            "Use an adapter with capabilities.supports_finetune=True."
+        )

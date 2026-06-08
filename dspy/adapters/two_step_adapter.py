@@ -1,27 +1,17 @@
-from collections.abc import Mapping
 from typing import Any
 
-import json_repair
 from typing_extensions import override
 
 from dspy.adapters.base import Adapter
-from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import build_lm_message
 from dspy.clients.base_lm import BaseLM
-from dspy.compile.resolve import resolve_adapter, resolve_call, resolve_lm_config
-from dspy.core.types import LMMessage, LMRequest, LMToolCallPart
-from dspy.core.types.config import LMConfig, coerce_lm_config, merge_lm_request_config
-from dspy.core.types.history import _history_request_messages_as_openai
+from dspy.compile.resolve import resolve_adapter, resolve_lm_config
+from dspy.core.types import LMMessage
+from dspy.core.types.config import LMConfig
 from dspy.dsp.utils.settings import settings
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec
 from dspy.task_spec.formatting import get_field_spec_description_string
-from dspy.utils.exceptions import AdapterParseError, LMError
-from dspy.utils.transparency import (
-    ACTIVE_COMPILED_CALL,
-    reset_active_call_metadata,
-    set_active_call_metadata,
-    validate_compiled_call,
-)
+from dspy.utils.transparency import reset_active_call_metadata, set_active_call_metadata
 
 
 class FrameworkTwoStepExtractorTaskSpec(TaskSpec):
@@ -36,6 +26,8 @@ class FrameworkTwoStepExtractorTaskSpec(TaskSpec):
 
 
 class TwoStepAdapter(Adapter):
+    call_mode = "two_step"
+
     def __init__(self, extraction_model: BaseLM, extraction_adapter: Adapter | None = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         if not isinstance(extraction_model, BaseLM):
@@ -61,6 +53,8 @@ class TwoStepAdapter(Adapter):
         )
 
     async def _run_extraction(self, *, original_task_spec: TaskSpec, text: str) -> dict[str, Any]:
+        from dspy.adapters.call.pipeline import AdapterCallPipeline
+
         transparency = settings.get("transparency", "strict")
         extraction_adapter, _adapter_notes = resolve_adapter(
             self.extraction_adapter or settings.adapter, transparency=transparency
@@ -71,85 +65,17 @@ class TwoStepAdapter(Adapter):
             module="TwoStepAdapter", phase="two_step.extraction", lm_role="extraction_model"
         )
         try:
-            results = await extraction_adapter.acall(
-                lm=self.extraction_model, config=config, task_spec=extractor_task_spec, demos=[], inputs={"text": text}
+            results = await AdapterCallPipeline.execute(
+                extraction_adapter,
+                lm=self.extraction_model,
+                config=config,
+                task_spec=extractor_task_spec,
+                demos=[],
+                inputs={"text": text},
             )
         finally:
             reset_active_call_metadata(metadata_token)
         return results[0]
-
-    @override
-    async def acall(
-        self,
-        lm: BaseLM,
-        config: LMConfig | Mapping[str, Any] | None,
-        task_spec: TaskSpec,
-        demos: list[dict[str, Any]],
-        inputs: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        resolved_config = coerce_lm_config(config)
-        messages = self.format(task_spec=task_spec, demos=demos, inputs=inputs)
-        merged_config, provenance = resolve_lm_config(lm, resolved_config)
-        request = LMRequest(
-            model=lm.model, messages=messages, config=merge_lm_request_config(lm=lm, config=merged_config)
-        )
-        transparency = settings.get("transparency", "strict")
-        main_compiled = resolve_call(
-            lm=lm,
-            adapter=self,
-            task_spec=task_spec,
-            config=merged_config,
-            config_provenance=provenance,
-            messages=_history_request_messages_as_openai(request),
-            module="TwoStepAdapter",
-            phase="two_step.main",
-            lm_role="default",
-        )
-        validate_compiled_call(main_compiled, transparency)
-        main_token = ACTIVE_COMPILED_CALL.set(main_compiled)
-        metadata_token = set_active_call_metadata(module="TwoStepAdapter", phase="two_step.main", lm_role="default")
-        try:
-            response = await lm.acall(request)
-        finally:
-            ACTIVE_COMPILED_CALL.reset(main_token)
-            reset_active_call_metadata(metadata_token)
-        extractor_task_spec = self._create_extractor_task_spec(task_spec)
-        values = []
-        tool_call_output_field_name = self._get_tool_call_output_field_name(task_spec)
-        for output in response.outputs:
-            output_logprobs = output.logprobs
-            tool_calls = output.tool_calls
-            text = output.text
-            try:
-                value = await self._run_extraction(original_task_spec=task_spec, text=text or "")
-            except LMError:
-                raise
-            except Exception as e:
-                raise AdapterParseError(
-                    adapter_name="TwoStepAdapter",
-                    task_spec=extractor_task_spec,
-                    lm_response=str(output),
-                    message=f"Failed to parse response from the original completion: {e}",
-                ) from e
-            if tool_calls and tool_call_output_field_name:
-                normalized_tool_calls = []
-                for tool_call in tool_calls:
-                    if isinstance(tool_call, LMToolCallPart):
-                        normalized_tool_calls.append(
-                            {"name": tool_call.name, "args": dict(tool_call.args), "id": tool_call.id}
-                        )
-                    else:
-                        normalized_tool_calls.append(
-                            {
-                                "name": tool_call["function"]["name"],
-                                "args": json_repair.loads(tool_call["function"]["arguments"]),
-                            }
-                        )
-                value[tool_call_output_field_name] = ToolCalls.from_dict_list(normalized_tool_calls)
-            if output_logprobs is not None:
-                value["logprobs"] = output_logprobs
-            values.append(value)
-        return values
 
     @override
     def format_task_description(self, task_spec: TaskSpec) -> str:

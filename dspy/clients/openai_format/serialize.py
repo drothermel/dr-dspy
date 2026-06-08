@@ -7,7 +7,6 @@ from typing import Any
 import pydantic
 
 from dspy.clients.openai_binary import binary_to_openai
-from dspy.utils.exceptions import LMUnsupportedFeatureError
 from dspy.clients.openai_format.media import (
     media_format,
     media_source,
@@ -31,6 +30,7 @@ from dspy.core.types import (
     LMToolSpec,
     LMVideoPart,
 )
+from dspy.utils.exceptions import LMUnsupportedFeatureError
 
 
 def parts_to_openai_content(parts: list[Any]) -> str | list[dict[str, Any]]:
@@ -114,6 +114,7 @@ def video_to_openai(video: LMVideoPart) -> dict[str, Any]:
             filename=filename,
         )
     )
+
 
 def tool_to_openai(tool: LMToolSpec) -> dict[str, Any]:
     data = {"type": "function", "function": {"name": tool.name, "parameters": tool.parameters}}

@@ -433,13 +433,15 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
 
     safe_loaded_predict = Predict(pspec("q->a"))
     safe_loaded_predict.load(file_path)
-    with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:
-        with patch(
+    with (
+        patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock,
+        patch(
             "dspy.clients.lm.alitellm_completion", new_callable=AsyncMock, return_value=FakeResp()
-        ) as completion_mock:
-            lm = safe_loaded_predict.lm
-            assert lm is not None
-            asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello")))
+        ) as completion_mock,
+    ):
+        lm = safe_loaded_predict.lm
+        assert lm is not None
+        asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello")))
     assert completion_mock.called
     assert not batch_completion_mock.called
     opt_in_loaded_predict = Predict(pspec("q->a"))

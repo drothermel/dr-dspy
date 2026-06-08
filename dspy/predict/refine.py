@@ -1,9 +1,9 @@
 import textwrap
 from collections.abc import Callable
-from typing import Any, cast
 
 import orjson
 
+from dspy.adapters.call.wrappers import HintInjectingAdapter
 from dspy.adapters.utils import get_field_description_string
 from dspy.compile.resolve import resolve_adapter
 from dspy.dsp.utils.settings import settings
@@ -80,18 +80,12 @@ class Refine(Module):
                     if not advice:
                         outputs = await mod(**kwargs)
                     else:
-
-                        class WrapperAdapter(cast("Any", adapter.__class__)):
-                            async def acall(self, *, lm, config, task_spec, demos, inputs):
-                                inputs["hint_"] = advice.get(task_spec2name[task_spec], "N/A")
-                                task_spec = task_spec.append(
-                                    input_field("hint_", str, desc="A hint to the module from an earlier run")
-                                )
-                                return await adapter.acall(
-                                    lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs
-                                )
-
-                        with settings.context(adapter=WrapperAdapter()):
+                        hint_adapter = HintInjectingAdapter(
+                            inner=adapter,
+                            hint_map=advice,
+                            task_spec_to_name=task_spec2name,
+                        )
+                        with settings.context(adapter=hint_adapter):
                             outputs = await mod(**kwargs)
                     trace = settings.trace.copy()
                     reward = self.reward_fn(kwargs, outputs)

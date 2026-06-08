@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import logging
-from collections.abc import Awaitable, Callable, Mapping
 from typing import Any, get_origin
 
 import json_repair
@@ -12,6 +10,8 @@ from pydantic.fields import FieldInfo
 from typing_extensions import override
 
 from dspy.adapters.base import Adapter
+from dspy.adapters.call.capabilities import AdapterCapabilities
+from dspy.adapters.call.policies.response_format import StructuredOutputPolicy
 from dspy.adapters.format_shared import ChatFormatMixin, FieldInfoWithName
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import (
@@ -21,14 +21,10 @@ from dspy.adapters.utils import (
     serialize_for_json,
     translate_field_type,
 )
-from dspy.clients.base_lm import BaseLM
-from dspy.core.types.config import LMConfig, coerce_lm_config
 from dspy.task_spec import TaskSpec
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
 from dspy.utils.callback import BaseCallback
-from dspy.utils.exceptions import AdapterParseError, LMError
-
-logger = logging.getLogger(__name__)
+from dspy.utils.exceptions import AdapterParseError
 
 
 def _has_open_ended_mapping(task_spec: TaskSpec) -> bool:
@@ -36,84 +32,22 @@ def _has_open_ended_mapping(task_spec: TaskSpec) -> bool:
 
 
 class JSONAdapter(ChatFormatMixin, Adapter):
+    capabilities = AdapterCapabilities(supports_finetune=False, field_value_role="assistant")
+
     def __init__(
         self,
         callbacks: list[BaseCallback] | None = None,
         use_native_function_calling: bool = True,
         parallel_tool_calls: bool | None = None,
+        native_response_types: list[type] | None = None,
     ) -> None:
         super().__init__(
             callbacks=callbacks,
             use_native_function_calling=use_native_function_calling,
             parallel_tool_calls=parallel_tool_calls,
+            native_response_types=native_response_types,
         )
-
-    async def _call_chat_adapter(
-        self, lm: BaseLM, config: LMConfig, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any]
-    ) -> list[dict[str, Any]]:
-        # Preserve legacy `super().acall(...)` behavior: ChatAdapter formatting pipeline with JSONAdapter.parse.
-        return await Adapter.acall(self, lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs)
-
-    async def _json_adapter_call_common(
-        self,
-        lm: BaseLM,
-        config: LMConfig,
-        task_spec: TaskSpec,
-        demos: list[dict[str, Any]],
-        inputs: dict[str, Any],
-        call_fn: Callable[
-            [BaseLM, LMConfig, TaskSpec, list[dict[str, Any]], dict[str, Any]], Awaitable[list[dict[str, Any]]]
-        ],
-    ) -> list[dict[str, Any]] | None:
-        if "response_format" not in lm.supported_params:
-            return await call_fn(lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs)
-        has_tool_calls = any(field.type_ == ToolCalls for field in task_spec.output_fields.values())
-        if (
-            _has_open_ended_mapping(task_spec)
-            or (not self.use_native_function_calling and has_tool_calls)
-            or (not lm.supports_response_schema)
-        ):
-            config = config.model_copy(update={"response_format": {"type": "json_object"}})
-            return await call_fn(lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs)
-        return None
-
-    @override
-    async def acall(
-        self,
-        *,
-        lm: BaseLM,
-        config: LMConfig | Mapping[str, Any] | None,
-        task_spec: TaskSpec,
-        demos: list[dict[str, Any]],
-        inputs: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        resolved_config = coerce_lm_config(config)
-        result = await self._json_adapter_call_common(
-            lm=lm,
-            config=resolved_config,
-            task_spec=task_spec,
-            demos=demos,
-            inputs=inputs,
-            call_fn=self._call_chat_adapter,
-        )
-        if result is not None:
-            return result
-        try:
-            structured_output_model = _get_structured_outputs_response_format(
-                task_spec=task_spec, use_native_function_calling=self.use_native_function_calling
-            )
-            resolved_config = resolved_config.model_copy(update={"response_format": structured_output_model})
-            return await Adapter.acall(
-                self, lm=lm, config=resolved_config, task_spec=task_spec, demos=demos, inputs=inputs
-            )
-        except LMError:
-            raise
-        except Exception:
-            logger.warning("Failed to use structured output format, falling back to JSON mode.")
-            resolved_config = resolved_config.model_copy(update={"response_format": {"type": "json_object"}})
-            return await Adapter.acall(
-                self, lm=lm, config=resolved_config, task_spec=task_spec, demos=demos, inputs=inputs
-            )
+        self.response_format_policy = StructuredOutputPolicy()
 
     @override
     def format_field_structure(self, task_spec: TaskSpec) -> str:
@@ -202,12 +136,6 @@ class JSONAdapter(ChatFormatMixin, Adapter):
             return "\n\n".join(output).strip()
         d = {k.name: v for k, v in fields_with_values.items()}
         return json.dumps(serialize_for_json(d), indent=2, ensure_ascii=False)
-
-    @override
-    def format_finetune_data(
-        self, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any], outputs: dict[str, Any]
-    ) -> dict[str, list[Any]]:
-        raise NotImplementedError
 
 
 def _get_structured_outputs_response_format(

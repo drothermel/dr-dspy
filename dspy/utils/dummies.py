@@ -75,10 +75,10 @@ class DummyLM(BaseLM):
             for field_name, value in field_names_and_values.items()
         }
         adapter = self.adapter
-        try:
+        role = adapter.capabilities.field_value_role
+        if role == "assistant":
             return adapter.format_field_with_value(fields_with_values=fields_with_values, role="assistant")
-        except TypeError:
-            return adapter.format_field_with_value(fields_with_values=fields_with_values)
+        return adapter.format_field_with_value(fields_with_values=fields_with_values)
 
     @override
     async def aforward(self, request: LMRequest) -> LMResponse:

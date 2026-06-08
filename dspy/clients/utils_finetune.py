@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 import orjson
 
-from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.utils.caching import DSPY_CACHEDIR
 from dspy.utils.hasher import Hasher
 
@@ -61,7 +60,7 @@ class GRPOStatus(TypedDict):
 
 
 def infer_data_format(adapter: "Adapter") -> str:
-    if isinstance(adapter, ChatAdapter):
+    if adapter.capabilities.supports_finetune:
         return TrainDataFormat.CHAT
     raise ValueError(f"Could not infer the data format for: {adapter}")
 

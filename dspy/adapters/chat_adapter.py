@@ -5,26 +5,31 @@ from typing import Any
 from typing_extensions import override
 
 from dspy.adapters.base import Adapter
+from dspy.adapters.call.capabilities import AdapterCapabilities
+from dspy.adapters.call.policies.parse_fallback import JSONParseFallbackPolicy, NoOpParseFallbackPolicy
 from dspy.adapters.format_shared import FIELD_HEADER_PATTERN, ChatFormatMixin, FieldInfoWithName
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.utils import parse_value
-from dspy.clients.base_lm import BaseLM
 from dspy.task_spec import TaskSpec
 from dspy.utils.callback import BaseCallback
-from dspy.utils.exceptions import AdapterParseError, LMError
+from dspy.utils.exceptions import AdapterParseError
 
 __all__ = ["ChatAdapter", "FieldInfoWithName"]
 
+_DEFAULT_PARSE_FALLBACK = object()
+
 
 class ChatAdapter(ChatFormatMixin, Adapter):
+    capabilities = AdapterCapabilities(supports_finetune=True, field_value_role="none")
+
     def __init__(
         self,
         callbacks: list[BaseCallback] | None = None,
         use_native_function_calling: bool = False,
         native_response_types: list[type] | None = None,
-        use_json_adapter_fallback: bool = True,
         parallel_tool_calls: bool | None = None,
         json_fallback: JSONAdapter | None = None,
+        parse_fallback_policy: JSONParseFallbackPolicy | NoOpParseFallbackPolicy | None = _DEFAULT_PARSE_FALLBACK,
     ) -> None:
         super().__init__(
             callbacks=callbacks,
@@ -32,8 +37,11 @@ class ChatAdapter(ChatFormatMixin, Adapter):
             parallel_tool_calls=parallel_tool_calls,
             native_response_types=native_response_types,
         )
-        self.use_json_adapter_fallback = use_json_adapter_fallback
         self._json_fallback = json_fallback
+        if parse_fallback_policy is _DEFAULT_PARSE_FALLBACK:
+            self.parse_fallback_policy = JSONParseFallbackPolicy(fallback_factory=self._json_adapter_fallback)
+        else:
+            self.parse_fallback_policy = parse_fallback_policy
 
     def _json_adapter_fallback(self) -> JSONAdapter:
         if self._json_fallback is not None:
@@ -42,28 +50,8 @@ class ChatAdapter(ChatFormatMixin, Adapter):
             callbacks=self.callbacks,
             use_native_function_calling=self.use_native_function_calling,
             parallel_tool_calls=self.parallel_tool_calls,
+            native_response_types=self.native_response_types,
         )
-
-    @override
-    async def acall(
-        self,
-        *,
-        lm: BaseLM,
-        config: Any,
-        task_spec: TaskSpec,
-        demos: list[dict[str, Any]],
-        inputs: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        try:
-            return await super().acall(lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs)
-        except TypeError:
-            raise
-        except Exception as e:
-            if isinstance(e, LMError) or not self.use_json_adapter_fallback:
-                raise
-            return await self._json_adapter_fallback().acall(
-                lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs
-            )
 
     @override
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:

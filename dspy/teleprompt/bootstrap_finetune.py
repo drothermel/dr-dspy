@@ -157,11 +157,9 @@ def build_call_data_from_trace(
 ) -> dict[str, list[dict[str, Any]]]:
     pred, inputs, outputs = trace[pred_ind]
     demos = [] if exclude_demos else pred.demos
-    if not hasattr(adapter, "format_finetune_data"):
-        raise TypeError(f"Adapter {type(adapter).__name__} does not support format_finetune_data")
-    return cast("Any", adapter).format_finetune_data(
-        task_spec=pred.task_spec, demos=demos, inputs=inputs, outputs=outputs
-    )
+    if not adapter.capabilities.supports_finetune:
+        raise TypeError(f"Adapter {type(adapter).__name__} does not support finetune data formatting")
+    return adapter.format_finetune_data(task_spec=pred.task_spec, demos=demos, inputs=inputs, outputs=outputs)
 
 
 def all_predictors_have_lms(program: Module) -> bool:
