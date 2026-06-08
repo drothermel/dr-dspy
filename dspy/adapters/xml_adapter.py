@@ -37,7 +37,9 @@ class XMLAdapter(ChatAdapter):
         def format_signature_fields_for_instructions(fields: dict[str, FieldInfo]) -> str:
             return self.format_field_with_value(
                 fields_with_values={
-                    FieldInfoWithName(name=field_name, info=field_info): translate_field_type(field_name, field_info)
+                    FieldInfoWithName(name=field_name, info=field_info): translate_field_type(
+                        field_name=field_name, field_info=field_info
+                    )
                     for field_name, field_info in fields.items()
                 },
             )
@@ -55,11 +57,11 @@ class XMLAdapter(ChatAdapter):
         suffix: str = "",
         main_request: bool = False,
     ) -> str | list[dict[str, Any]]:
-        if inputs_include_multimodal_custom_type_values(signature, inputs):
+        if inputs_include_multimodal_custom_type_values(signature=signature, inputs=inputs):
             output_requirements = self.user_message_output_requirements(signature) if main_request else None
             return build_multimodal_user_message_content(
-                signature,
-                inputs,
+                signature=signature,
+                inputs=inputs,
                 prefix=prefix,
                 suffix=suffix,
                 main_request=main_request,
@@ -117,7 +119,12 @@ class XMLAdapter(ChatAdapter):
             if name in signature.output_fields and name not in raw_fields:
                 raw_fields[name] = content
         fields = {
-            k: self._parse_field_value(signature.output_fields[k], v, completion, signature)
+            k: self._parse_field_value(
+                field_info=signature.output_fields[k],
+                raw=v,
+                completion=completion,
+                signature=signature,
+            )
             for k, v in raw_fields.items()
         }
         if fields.keys() != signature.output_fields.keys():
@@ -141,7 +148,7 @@ class XMLAdapter(ChatAdapter):
         from dspy.adapters.utils import parse_value
 
         try:
-            return parse_value(raw, field_info.annotation)
+            return parse_value(value=raw, annotation=field_info.annotation)
         except Exception as e:
             from dspy.utils.exceptions import AdapterParseError
 

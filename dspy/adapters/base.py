@@ -148,9 +148,9 @@ class Adapter:
                 continue
             self._ensure_native_response_type_parses_output(field.annotation)
             if field.annotation is Reasoning:
-                signature = self._adapt_reasoning_native(signature, name, lm, config)
+                signature = self._adapt_reasoning_native(signature=signature, field_name=name, lm=lm, config=config)
             elif field.annotation is Citations:
-                signature = self._adapt_citations_native(signature, name, lm)
+                signature = self._adapt_citations_native(signature=signature, field_name=name, lm=lm)
             else:
                 signature = signature.delete(name)
 
@@ -220,10 +220,14 @@ class Adapter:
             text = output.text
 
             if text is not None and not (tool_calls and tool_call_output_field_name):
-                value = self.parse(processed_signature, text)
+                value = self.parse(signature=processed_signature, completion=text)
             elif tool_calls and tool_call_output_field_name:
                 try:
-                    value = self.parse(processed_signature, text) if text and processed_signature.output_fields else {}
+                    value = (
+                        self.parse(signature=processed_signature, completion=text)
+                        if text and processed_signature.output_fields
+                        else {}
+                    )
                 except AdapterParseError:
                     value = {}
             elif text is None and not processed_signature.output_fields:
@@ -289,11 +293,19 @@ class Adapter:
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
         resolved_config = coerce_lm_config(config)
-        processed_signature, tools, resolved_config = self._call_preprocess(lm, resolved_config, signature, inputs)
-        messages = self.format(processed_signature, demos, inputs)
-        request = self._render_request(lm, resolved_config, tools, messages)
-        response = await self._call_lm(lm, request)
-        return self._call_postprocess(processed_signature, signature, response, lm, resolved_config)
+        processed_signature, tools, resolved_config = self._call_preprocess(
+            lm=lm, config=resolved_config, signature=signature, inputs=inputs
+        )
+        messages = self.format(signature=processed_signature, demos=demos, inputs=inputs)
+        request = self._render_request(lm=lm, config=resolved_config, tools=tools, messages=messages)
+        response = await self._call_lm(lm=lm, request=request)
+        return self._call_postprocess(
+            processed_signature=processed_signature,
+            original_signature=signature,
+            response=response,
+            _lm=lm,
+            _config=resolved_config,
+        )
 
     def format(
         self,
@@ -349,24 +361,26 @@ class Adapter:
         if history_field_name:
             signature_without_history = signature.delete(history_field_name)
             conversation_history = self.format_conversation_history(
-                signature_without_history,
-                history_field_name,
-                inputs_copy,
+                signature=signature,
+                history_field_name=history_field_name,
+                inputs=inputs_copy,
             )
 
         messages: list[LMMessage] = []
         system_message = self.format_system_message(signature)
-        messages.append(build_lm_message("system", system_message))
-        messages.extend(self.format_demos(signature, demos))
+        messages.append(build_lm_message(role="system", content=system_message))
+        messages.extend(self.format_demos(signature=signature, demos=demos))
         if history_field_name:
-            content = self.format_user_message_content(signature_without_history, inputs_copy, main_request=True)
+            content = self.format_user_message_content(
+                signature=signature_without_history, inputs=inputs_copy, main_request=True
+            )
             messages.extend(conversation_history)
             if content:
-                messages.append(build_lm_message("user", content))
+                messages.append(build_lm_message(role="user", content=content))
         else:
-            content = self.format_user_message_content(signature, inputs_copy, main_request=True)
+            content = self.format_user_message_content(signature=signature, inputs=inputs_copy, main_request=True)
             if content:
-                messages.append(build_lm_message("user", content))
+                messages.append(build_lm_message(role="user", content=content))
 
         return messages
 
@@ -502,26 +516,37 @@ class Adapter:
         for demo in incomplete_demos:
             messages.append(
                 build_lm_message(
-                    "user",
-                    self.format_user_message_content(signature, demo, prefix=incomplete_demo_prefix),
+                    role="user",
+                    content=self.format_user_message_content(
+                        signature=signature, inputs=demo, prefix=incomplete_demo_prefix
+                    ),
                 )
             )
             messages.append(
                 build_lm_message(
-                    "assistant",
-                    self.format_assistant_message_content(
-                        signature, demo, missing_field_message="Not supplied for this particular example. "
+                    role="assistant",
+                    content=self.format_assistant_message_content(
+                        signature=signature,
+                        outputs=demo,
+                        missing_field_message="Not supplied for this particular example. ",
                     ),
                 )
             )
 
         for demo in complete_demos:
-            messages.append(build_lm_message("user", self.format_user_message_content(signature, demo)))
             messages.append(
                 build_lm_message(
-                    "assistant",
-                    self.format_assistant_message_content(
-                        signature, demo, missing_field_message="Not supplied for this conversation history message. "
+                    role="user",
+                    content=self.format_user_message_content(signature=signature, inputs=demo),
+                )
+            )
+            messages.append(
+                build_lm_message(
+                    role="assistant",
+                    content=self.format_assistant_message_content(
+                        signature=signature,
+                        outputs=demo,
+                        missing_field_message="Not supplied for this conversation history message. ",
                     ),
                 )
             )
@@ -581,9 +606,9 @@ class Adapter:
                 else None
             )
 
-            user_content = self.format_user_message_content(signature, message)
+            user_content = self.format_user_message_content(signature=signature, inputs=message)
             if user_content:
-                messages.append(build_lm_message("user", user_content))
+                messages.append(build_lm_message(role="user", content=user_content))
 
             if self.use_native_function_calling and tool_calls is not None:
                 content_signature = signature
@@ -592,7 +617,7 @@ class Adapter:
                         content_signature = content_signature.delete(name)
 
                 content = (
-                    self.format_assistant_message_content(content_signature, message)
+                    self.format_assistant_message_content(signature=content_signature, outputs=message)
                     if content_signature.output_fields
                     else ""
                 )
@@ -616,8 +641,8 @@ class Adapter:
                         content = _tool_result_content(result.value)
                         messages.append(
                             build_lm_message(
-                                "tool",
-                                content,
+                                role="tool",
+                                content=content,
                                 tool_call_id=result.call_id,
                                 name=result.name,
                             )
@@ -629,13 +654,13 @@ class Adapter:
                 assistant_values = dict(message)
                 assistant_values[tool_call_field_name] = tool_calls.model_copy(update={"tool_call_results": None})
 
-            assistant_content = self.format_assistant_message_content(signature, assistant_values)
+            assistant_content = self.format_assistant_message_content(signature=signature, outputs=assistant_values)
             if assistant_content:
-                messages.append(build_lm_message("assistant", assistant_content))
+                messages.append(build_lm_message(role="assistant", content=assistant_content))
             if tool_call_results is not None:
                 result_input = {"tool_call_results": tool_call_results}
-                content = self.format_user_message_content(_TOOL_CALL_RESULTS_SIGNATURE, result_input)
-                messages.append(build_lm_message("user", content))
+                content = self.format_user_message_content(signature=_TOOL_CALL_RESULTS_SIGNATURE, inputs=result_input)
+                messages.append(build_lm_message(role="user", content=content))
 
         del inputs[history_field_name]
 
@@ -672,8 +697,8 @@ def _provider_tool_call_to_tool_call_dict(tool_call: object) -> dict[str, Any]:
                 args = json_repair.loads(raw_arguments)
         return {"id": tool_call.id, "name": tool_call.name, "args": args}
 
-    function = _provider_value(tool_call, "function", {}) or {}
-    arguments = _provider_value(function, "arguments", {})
+    function = _provider_value(value=tool_call, key="function", default={}) or {}
+    arguments = _provider_value(value=function, key="arguments", default={})
     if isinstance(arguments, str):
         parsed_arguments = json_repair.loads(arguments)
     elif isinstance(arguments, dict):
@@ -682,8 +707,8 @@ def _provider_tool_call_to_tool_call_dict(tool_call: object) -> dict[str, Any]:
         parsed_arguments = {}
 
     return {
-        "id": _provider_value(tool_call, "id") or _provider_value(tool_call, "call_id"),
-        "name": _provider_value(function, "name") or _provider_value(tool_call, "name"),
+        "id": _provider_value(value=tool_call, key="id") or _provider_value(value=tool_call, key="call_id"),
+        "name": _provider_value(value=function, key="name") or _provider_value(value=tool_call, key="name"),
         "args": parsed_arguments,
     }
 

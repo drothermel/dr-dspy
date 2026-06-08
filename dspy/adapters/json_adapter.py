@@ -78,7 +78,7 @@ class JSONAdapter(ChatAdapter):
     ) -> list[dict[str, Any]] | None:
         """Common call logic for async adapter calls."""
         if "response_format" not in lm.supported_params:
-            return await call_fn(lm, config, signature, demos, inputs)
+            return await call_fn(lm=lm, config=config, signature=signature, demos=demos, inputs=inputs)
 
         has_tool_calls = any(field.annotation == ToolCalls for field in signature.output_fields.values())
 
@@ -90,7 +90,7 @@ class JSONAdapter(ChatAdapter):
             # We found that structured output mode doesn't work well with dspy.ToolCalls as output field.
             # So we fall back to json mode if native function calling is disabled and ToolCalls is present.
             config = config.model_copy(update={"response_format": {"type": "json_object"}})
-            return await call_fn(lm, config, signature, demos, inputs)
+            return await call_fn(lm=lm, config=config, signature=signature, demos=demos, inputs=inputs)
         return None
 
     @override
@@ -105,14 +105,19 @@ class JSONAdapter(ChatAdapter):
     ) -> list[dict[str, Any]]:
         resolved_config = coerce_lm_config(config)
         result = await self._json_adapter_call_common(
-            lm, resolved_config, signature, demos, inputs, self._call_chat_adapter
+            lm=lm,
+            config=resolved_config,
+            signature=signature,
+            demos=demos,
+            inputs=inputs,
+            call_fn=self._call_chat_adapter,
         )
         if result is not None:
             return result
 
         try:
             structured_output_model = _get_structured_outputs_response_format(
-                signature, self.use_native_function_calling
+                signature=signature, use_native_function_calling=self.use_native_function_calling
             )
             resolved_config = resolved_config.model_copy(update={"response_format": structured_output_model})
             return await super().acall(lm=lm, config=resolved_config, signature=signature, demos=demos, inputs=inputs)
@@ -133,16 +138,18 @@ class JSONAdapter(ChatAdapter):
         def format_signature_fields_for_instructions(fields: dict[str, FieldInfo], role: str) -> str:
             return self.format_field_with_value(
                 fields_with_values={
-                    FieldInfoWithName(name=field_name, info=field_info): translate_field_type(field_name, field_info)
+                    FieldInfoWithName(name=field_name, info=field_info): translate_field_type(
+                        field_name=field_name, field_info=field_info
+                    )
                     for field_name, field_info in fields.items()
                 },
                 role=role,
             )
 
         parts.append("Inputs will have the following structure:")
-        parts.append(format_signature_fields_for_instructions(signature.input_fields, role="user"))
+        parts.append(format_signature_fields_for_instructions(fields=signature.input_fields, role="user"))
         parts.append("Outputs will be a JSON object with the following fields.")
-        parts.append(format_signature_fields_for_instructions(signature.output_fields, role="assistant"))
+        parts.append(format_signature_fields_for_instructions(fields=signature.output_fields, role="assistant"))
         return "\n\n".join(parts).strip()
 
     @override
@@ -172,7 +179,7 @@ class JSONAdapter(ChatAdapter):
             FieldInfoWithName(name=k, info=v): outputs.get(k, missing_field_message)
             for k, v in signature.output_fields.items()
         }
-        return self.format_field_with_value(fields_with_values, role="assistant")
+        return self.format_field_with_value(fields_with_values=fields_with_values, role="assistant")
 
     @override
     def parse(self, signature: type[Signature], completion: str) -> dict[str, Any]:
@@ -198,7 +205,7 @@ class JSONAdapter(ChatAdapter):
         # Attempt to cast each value to type signature.output_fields[k].annotation.
         for k, v in fields.items():
             if k in signature.output_fields:
-                fields[k] = parse_value(v, signature.output_fields[k].annotation)
+                fields[k] = parse_value(value=v, annotation=signature.output_fields[k].annotation)
 
         if fields.keys() != signature.output_fields.keys():
             raise AdapterParseError(

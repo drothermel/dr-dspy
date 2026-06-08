@@ -42,7 +42,7 @@ def _render_type_str(
     if annotation is bool:
         return "boolean"
     if inspect.isclass(annotation) and issubclass(annotation, BaseModel):
-        return _build_simplified_schema(annotation, indent, seen_models)
+        return _build_simplified_schema(pydantic_model=annotation, indent=indent, seen_models=seen_models)
 
     try:
         origin = get_origin(annotation)
@@ -52,7 +52,12 @@ def _render_type_str(
 
     if origin in (types.UnionType, Union):
         non_none_args = [arg for arg in args if arg is not type(None)]
-        type_render = " or ".join([_render_type_str(arg, depth + 1, indent, seen_models) for arg in non_none_args])
+        type_render = " or ".join(
+            [
+                _render_type_str(annotation=arg, depth=depth + 1, indent=indent, seen_models=seen_models)
+                for arg in non_none_args
+            ]
+        )
         if len(non_none_args) < len(args):
             return f"{type_render} or null"
         return type_render
@@ -63,13 +68,15 @@ def _render_type_str(
     if origin is list:
         inner_type = args[0]
         if inspect.isclass(inner_type) and issubclass(inner_type, BaseModel):
-            inner_schema = _build_simplified_schema(inner_type, indent + 1, seen_models)
+            inner_schema = _build_simplified_schema(
+                pydantic_model=inner_type, indent=indent + 1, seen_models=seen_models
+            )
             current_indent = INDENTATION * indent
             return f"[\n{inner_schema}\n{current_indent}]"
-        return f"{_render_type_str(inner_type, depth + 1, indent, seen_models)}[]"
+        return f"{_render_type_str(annotation=inner_type, depth=depth + 1, indent=indent, seen_models=seen_models)}[]"
 
     if origin is dict:
-        return f"dict[{_render_type_str(args[0], depth + 1, indent, seen_models)}, {_render_type_str(args[1], depth + 1, indent, seen_models)}]"
+        return f"dict[{_render_type_str(annotation=args[0], depth=depth + 1, indent=indent, seen_models=seen_models)}, {_render_type_str(annotation=args[1], depth=depth + 1, indent=indent, seen_models=seen_models)}]"
 
     if hasattr(annotation, "__name__"):
         return cast("str", annotation.__name__)
@@ -137,7 +144,7 @@ def _build_simplified_schema(
                 if line:
                     lines.append(f"{next_indent}{COMMENT_SYMBOL} {line}")
 
-        rendered_type = _render_type_str(field.annotation, indent=indent + 1, seen_models=seen_models)
+        rendered_type = _render_type_str(annotation=field.annotation, indent=indent + 1, seen_models=seen_models)
         line = f"{next_indent}{name}: {rendered_type},"
 
         lines.append(line)
@@ -221,7 +228,9 @@ class BAMLAdapter(JSONAdapter):
             for name, field in signature.output_fields.items():
                 field_type = field.annotation
                 sections.append(f"[[ ## {name} ## ]]")
-                sections.append(f"Output field `{name}` should be of type: {_render_type_str(field_type, indent=0)}\n")
+                sections.append(
+                    f"Output field `{name}` should be of type: {_render_type_str(annotation=field_type, indent=0)}\n"
+                )
 
         sections.append("[[ ## completed ## ]]")
 
@@ -237,11 +246,11 @@ class BAMLAdapter(JSONAdapter):
         main_request: bool = False,
     ) -> str | list[dict[str, Any]]:
         """Overrides the base method to render Pydantic input instances as clean JSON."""
-        if inputs_include_multimodal_custom_type_values(signature, inputs):
+        if inputs_include_multimodal_custom_type_values(signature=signature, inputs=inputs):
             output_requirements = self.user_message_output_requirements(signature) if main_request else None
             return build_multimodal_user_message_content(
-                signature,
-                inputs,
+                signature=signature,
+                inputs=inputs,
                 prefix=prefix,
                 suffix=suffix,
                 main_request=main_request,

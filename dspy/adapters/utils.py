@@ -168,9 +168,9 @@ def build_multimodal_user_message_content(
         field_blocks_added = True
         blocks.extend(
             field_value_to_content_blocks(
-                field_info,
-                field_name,
-                inputs[field_name],
+                field_info=field_info,
+                field_name=field_name,
+                value=inputs[field_name],
                 prefix=field_prefix,
                 field_wrapper=field_wrapper,
             )
@@ -239,7 +239,7 @@ def translate_field_type(field_name: str, field_info: FieldInfo) -> str:
         desc = "must be True or False"
     elif field_type in (int, float):
         desc = f"must be a single {field_type.__name__} value"
-    elif _annotation_is_subclass(field_type, enum.Enum):
+    elif _annotation_is_subclass(annotation=field_type, expected_base=enum.Enum):
         enum_type = cast("type[enum.Enum]", field_type)
         enum_vals = "; ".join(str(member.value) for member in enum_type)
         desc = f"must be one of: {enum_vals}"
@@ -249,7 +249,10 @@ def translate_field_type(field_name: str, field_info: FieldInfo) -> str:
             # literal or returning a value of the form 'Literal[<selected_value>]'
             f"must exactly match (no extra characters) one of: {'; '.join([str(x) for x in field_type.__args__])}"
         )
-    elif _annotation_is_subclass(field_type, Code) and cast("type[Code]", field_type).description():
+    elif (
+        _annotation_is_subclass(annotation=field_type, expected_base=Code)
+        and cast("type[Code]", field_type).description()
+    ):
         # Code has a rich type description already; avoid duplicating its large schema block.
         desc = ""
     else:
@@ -293,7 +296,7 @@ def parse_value(value: object, annotation: object) -> object:
         return str(value)
 
     if isinstance(annotation, enum.EnumMeta):
-        return find_enum_member(annotation, value)
+        return find_enum_member(enum_type=annotation, identifier=value)
 
     origin = get_origin(annotation)
 
@@ -331,7 +334,7 @@ def parse_value(value: object, annotation: object) -> object:
     try:
         return TypeAdapter(annotation).validate_python(candidate)
     except pydantic.ValidationError as e:
-        if _annotation_is_subclass(annotation, DspyType):
+        if _annotation_is_subclass(annotation=annotation, expected_base=DspyType):
             try:
                 # For dspy.Type, try parsing from the original value in case it has a custom parser
                 return TypeAdapter(annotation).validate_python(value)

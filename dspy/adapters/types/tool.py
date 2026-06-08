@@ -108,7 +108,7 @@ class Tool(Type):
         ```
         """
         super().__init__(func=func, name=name, desc=desc, args=args, arg_types=arg_types, arg_desc=arg_desc)  # ty: ignore[unknown-argument]
-        self._parse_function(func, arg_desc)
+        self._parse_function(func=func, arg_desc=arg_desc)
 
     def _parse_function(self, func: Callable, arg_desc: dict[str, str] | None = None) -> None:
         """Helper method that parses a function to extract the name, description, and args.
@@ -241,7 +241,7 @@ class Tool(Type):
         """
         from dspy.utils.mcp import convert_mcp_tool
 
-        return convert_mcp_tool(session, tool)
+        return convert_mcp_tool(session=session, tool=tool)
 
     @classmethod
     def from_langchain(cls, tool: "BaseTool") -> "Tool":

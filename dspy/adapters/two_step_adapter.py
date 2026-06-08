@@ -74,11 +74,16 @@ class TwoStepAdapter(Adapter):
         messages: list[LMMessage] = []
 
         task_description = self.format_task_description(signature)
-        messages.append(build_lm_message("system", task_description))
+        messages.append(build_lm_message(role="system", content=task_description))
 
-        messages.extend(self.format_demos(signature, demos))
+        messages.extend(self.format_demos(signature=signature, demos=demos))
 
-        messages.append(build_lm_message("user", self.format_user_message_content(signature, inputs)))
+        messages.append(
+            build_lm_message(
+                role="user",
+                content=self.format_user_message_content(signature=signature, inputs=inputs),
+            )
+        )
 
         return messages
 
@@ -130,7 +135,7 @@ class TwoStepAdapter(Adapter):
     ) -> list[dict[str, Any]]:
         from dspy.core.types import coerce_lm_config
 
-        messages = self.format(signature, demos, inputs)
+        messages = self.format(signature=signature, demos=demos, inputs=inputs)
         request = LMRequest(
             model=lm.model,
             messages=messages,

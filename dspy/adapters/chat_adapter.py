@@ -128,7 +128,9 @@ class ChatAdapter(Adapter):
         def format_signature_fields_for_instructions(fields: dict[str, FieldInfo]) -> str:
             return self.format_field_with_value(
                 fields_with_values={
-                    FieldInfoWithName(name=field_name, info=field_info): translate_field_type(field_name, field_info)
+                    FieldInfoWithName(name=field_name, info=field_info): translate_field_type(
+                        field_name=field_name, field_info=field_info
+                    )
                     for field_name, field_info in fields.items()
                 },
             )
@@ -153,11 +155,11 @@ class ChatAdapter(Adapter):
         suffix: str = "",
         main_request: bool = False,
     ) -> str | list[dict[str, Any]]:
-        if inputs_include_multimodal_custom_type_values(signature, inputs):
+        if inputs_include_multimodal_custom_type_values(signature=signature, inputs=inputs):
             output_requirements = self.user_message_output_requirements(signature) if main_request else None
             return build_multimodal_user_message_content(
-                signature,
-                inputs,
+                signature=signature,
+                inputs=inputs,
                 prefix=prefix,
                 suffix=suffix,
                 main_request=main_request,
@@ -245,7 +247,7 @@ class ChatAdapter(Adapter):
         for k, v in sections:
             if (k not in fields) and (k in signature.output_fields):
                 try:
-                    fields[k] = parse_value(v, signature.output_fields[k].annotation)
+                    fields[k] = parse_value(value=v, annotation=signature.output_fields[k].annotation)
                 except Exception as e:
                     raise AdapterParseError(
                         adapter_name="ChatAdapter",
