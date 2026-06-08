@@ -13,7 +13,6 @@ from typing_extensions import override
 
 from dspy.adapters.base import Adapter
 from dspy.adapters.format_shared import ChatFormatMixin, FieldInfoWithName
-
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import (
     format_field_value,
@@ -23,7 +22,7 @@ from dspy.adapters.utils import (
     translate_field_type,
 )
 from dspy.clients.base_lm import BaseLM
-from dspy.core.types import LMConfig, coerce_lm_config
+from dspy.core.types.config import LMConfig, coerce_lm_config
 from dspy.task_spec import TaskSpec
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
 from dspy.utils.callback import BaseCallback
@@ -53,9 +52,7 @@ class JSONAdapter(ChatFormatMixin, Adapter):
         self, lm: BaseLM, config: LMConfig, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any]
     ) -> list[dict[str, Any]]:
         # Preserve legacy `super().acall(...)` behavior: ChatAdapter formatting pipeline with JSONAdapter.parse.
-        return await Adapter.acall(
-            self, lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs
-        )
+        return await Adapter.acall(self, lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs)
 
     async def _json_adapter_call_common(
         self,

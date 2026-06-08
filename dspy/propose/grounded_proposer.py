@@ -15,6 +15,7 @@ from dspy.propose.utils import (
     strip_prefix,
 )
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
+from dspy.teleprompt.optimizer_context import optimizer_lm_context
 from dspy.teleprompt.task_spec_context import get_prompt_model, get_task_spec
 
 logger = logging.getLogger(__name__)
@@ -356,8 +357,6 @@ class GroundedProposer(Proposer):
             verbose=self.verbose,
         )
         rollout_lm = self.prompt_model.copy(temperature=self.init_temperature)
-        from dspy.teleprompt.optimizer_context import optimizer_lm_context
-
         with optimizer_lm_context(lm=rollout_lm, phase="propose.grounded", lm_role="prompt_model"):
             proposed_instruction = (
                 await instruction_generator(

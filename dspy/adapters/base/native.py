@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.reasoning import Reasoning
-from dspy.core.types import LMConfig, LMReasoningConfig
+from dspy.core.types.config import LMConfig, LMReasoningConfig
 from dspy.task_spec import TaskSpec
 
 if TYPE_CHECKING:

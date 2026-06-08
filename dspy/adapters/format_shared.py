@@ -14,6 +14,7 @@ from dspy.adapters.utils import (
     inputs_include_multimodal_custom_type_values,
     translate_field_type,
 )
+from dspy.clients.openai_format import message_to_openai_chat
 from dspy.task_spec import TaskSpec
 from dspy.task_spec.formatting import get_field_spec_description_string
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
@@ -42,9 +43,7 @@ class ChatFormatMixin:
         )
 
     def format_field_structure(self, task_spec: TaskSpec) -> str:
-        parts = [
-            "All interactions will be structured in the following way, with the appropriate values filled in."
-        ]
+        parts = ["All interactions will be structured in the following way, with the appropriate values filled in."]
         input_field_infos = task_spec_input_field_infos(task_spec)
         output_field_infos = task_spec_output_field_infos(task_spec)
 
@@ -141,8 +140,6 @@ class ChatFormatMixin:
         inputs: dict[str, Any],
         outputs: dict[str, Any],
     ) -> dict[str, list[Any]]:
-        from dspy.clients.openai_format import message_to_openai_chat
-
         system_user_messages = [
             message_to_openai_chat(message) for message in self.format(task_spec=task_spec, demos=demos, inputs=inputs)
         ]

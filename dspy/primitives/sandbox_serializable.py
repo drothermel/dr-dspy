@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic_core import core_schema
 
+from dspy.primitives.repl_types import REPLVariable
+
 if TYPE_CHECKING:
     from pydantic import GetCoreSchemaHandler
     from pydantic.fields import FieldInfo
@@ -37,8 +39,6 @@ class SandboxSerializable(ABC):
 
 
 def build_repl_variable(obj: SandboxSerializable, name: str, field_info: FieldInfo | None = None) -> REPLVariable:
-    from dspy.primitives.repl_types import REPLVariable
-
     preview = obj.rlm_preview()
     var = REPLVariable.from_value(name, obj, field_info=field_info)
     setup = obj.sandbox_setup().strip()

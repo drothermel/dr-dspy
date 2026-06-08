@@ -7,6 +7,7 @@ from pathlib import Path
 import cloudpickle
 import orjson
 
+from dspy.predict.parameter import Parameter
 from dspy.predict.protocol import Predictor
 from dspy.utils.saving import get_dependency_versions
 
@@ -18,8 +19,6 @@ class BaseModule:
         pass
 
     def named_parameters(self):
-        from dspy.predict.parameter import Parameter
-
         named_parameters = []
         visited_parameters = set()
         queue: deque[tuple[str, object]] = deque([("self", self)])

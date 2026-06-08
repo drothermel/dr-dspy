@@ -5,7 +5,8 @@ from typing_extensions import override
 
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import message_to_openai_chat, to_openai_chat_request
-from dspy.core.types import LMRequest, coerce_lm_config
+from dspy.core.types import LMRequest
+from dspy.core.types.config import coerce_lm_config
 from dspy.utils.dummies import DummyLM
 
 try:

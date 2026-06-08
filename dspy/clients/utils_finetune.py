@@ -6,6 +6,7 @@ import orjson
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.utils.caching import DSPY_CACHEDIR
+from dspy.utils.hasher import Hasher
 
 if TYPE_CHECKING:
     from dspy.adapters.base import Adapter
@@ -80,8 +81,6 @@ def write_lines(file_path, data) -> None:
 
 
 def save_data(data: list[dict[str, Any]]) -> str:
-    from dspy.utils.hasher import Hasher
-
     hash = Hasher.hash(data)
     file_name = f"{hash}.jsonl"
     finetune_dir = get_finetune_directory()

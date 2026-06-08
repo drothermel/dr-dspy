@@ -5,7 +5,7 @@ import mimetypes
 import os
 from typing import Any
 
-from dspy.core.types.parts.models import LMBinaryPart
+from dspy.core.types.parts import LMBinaryPart
 
 
 def _data_uri(media_type: str, data: str) -> str:

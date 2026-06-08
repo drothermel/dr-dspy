@@ -9,17 +9,9 @@ from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import ToolCalls
-from dspy.core.types import (
-    LMConfig,
-    LMMessage,
-    LMRequest,
-    LMResponse,
-    LMToolChoice,
-    LMToolSpec,
-    _coerce_tool_spec,
-    coerce_lm_config,
-    merge_lm_request_config,
-)
+from dspy.core.types import LMMessage, LMRequest, LMResponse
+from dspy.core.types.coercion import _coerce_tool_spec
+from dspy.core.types.config import LMConfig, LMToolChoice, LMToolSpec, coerce_lm_config, merge_lm_request_config
 from dspy.task_spec import TaskSpec
 from dspy.utils.exceptions import AdapterParseError
 

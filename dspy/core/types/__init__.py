@@ -1,16 +1,5 @@
 from dspy.core.types.builders import Assistant, Developer, System, ToolCall, ToolResult, User
-from dspy.core.types.coercion import _coerce_tool_spec
-from dspy.core.types.config import (
-    LMConfig,
-    LMPromptCacheConfig,
-    LMReasoningConfig,
-    LMToolChoice,
-    LMToolSpec,
-    _merge_lm_config,
-    coerce_lm_config,
-    lm_defaults_config,
-    merge_lm_request_config,
-)
+from dspy.core.types.config import LMConfig, LMPromptCacheConfig, LMReasoningConfig, LMToolChoice, LMToolSpec
 from dspy.core.types.messages import LMMessage
 from dspy.core.types.parts import (
     LMAudioPart,
@@ -26,7 +15,6 @@ from dspy.core.types.parts import (
     LMToolCallPart,
     LMToolResultPart,
     LMVideoPart,
-    _parts_from_openai_content,
 )
 from dspy.core.types.request import LMRequest, LMRequestPatch
 from dspy.core.types.response import LMHistoryEntry, LMOutput, LMResponse, LMUsage
@@ -97,10 +85,4 @@ __all__ = [
     "ToolCall",
     "ToolResult",
     "User",
-    "_coerce_tool_spec",
-    "_merge_lm_config",
-    "_parts_from_openai_content",
-    "coerce_lm_config",
-    "lm_defaults_config",
-    "merge_lm_request_config",
 ]

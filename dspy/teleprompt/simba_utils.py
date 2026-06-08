@@ -11,6 +11,7 @@ from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.formatting import get_field_spec_description_string
+from dspy.teleprompt.optimizer_context import optimizer_lm_context
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.utils.source_format import get_formatted_source
 
@@ -142,8 +143,6 @@ async def append_a_rule(bucket, system, **kwargs) -> bool:
         k: v if isinstance(v, str) else orjson.dumps(recursive_mask(v), option=orjson.OPT_INDENT_2).decode()
         for k, v in kwargs.items()
     }
-    from dspy.teleprompt.optimizer_context import optimizer_lm_context
-
     with optimizer_lm_context(lm=prompt_model, phase="simba.offer_feedback", lm_role="prompt_model", trace=[]):
         advice_program = Predict(SimbaOfferFeedbackTaskSpec())
         advice = (await advice_program(**kwargs)).module_advice

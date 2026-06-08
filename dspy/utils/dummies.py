@@ -7,6 +7,7 @@ from typing import Any, NoReturn, cast
 from pydantic.fields import FieldInfo
 from typing_extensions import override
 
+from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.format_shared import FIELD_HEADER_PATTERN, FieldInfoWithName
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import provider_tool_call_to_part
@@ -33,8 +34,6 @@ class DummyLM(BaseLM):
         self.follow_examples = follow_examples
         self.reasoning = reasoning
         if adapter is None:
-            from dspy.adapters.chat_adapter import ChatAdapter
-
             adapter = ChatAdapter()
         self.adapter = adapter
 

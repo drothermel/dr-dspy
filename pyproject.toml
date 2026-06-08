@@ -261,6 +261,7 @@ ban-relative-imports = "all"
     "E402",  # Allow imports not at the top of the file (needed for certain __init__ patterns)
     "F405",  # Allow undefined names from wildcard imports (common in __init__ files)
 ]
+"scripts/*.py" = ["T201"]  # CLI scripts may print status to stdout/stderr
 
 [tool.ty.environment]
 python-version = "3.10"

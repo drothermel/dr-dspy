@@ -7,6 +7,7 @@ from typing import Any
 import pydantic
 
 from dspy.clients.openai_binary import binary_to_openai
+from dspy.utils.exceptions import LMUnsupportedFeatureError
 from dspy.clients.openai_format.media import (
     media_format,
     media_source,
@@ -237,8 +238,6 @@ def _validate_openai_reasoning_temperature(config: LMConfig, *, model: str | Non
         return
     if config.temperature in {None, 1}:
         return
-    from dspy.utils.exceptions import LMUnsupportedFeatureError
-
     raise LMUnsupportedFeatureError(
         "OpenAI reasoning models only support the default temperature when reasoning effort is active. Use temperature=None or temperature=1, or set reasoning_effort='none'.",
         model=model,

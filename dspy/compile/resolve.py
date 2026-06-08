@@ -5,7 +5,7 @@ from typing import Any
 
 from dspy.adapters.base import Adapter
 from dspy.clients.base_lm import BaseLM
-from dspy.core.types import LMConfig, _merge_lm_config, coerce_lm_config, lm_defaults_config
+from dspy.core.types.config import LMConfig, _merge_lm_config, coerce_lm_config, lm_defaults_config
 from dspy.task_spec import TaskSpec
 from dspy.utils.transparency import CompiledCall, TransparencyMode
 

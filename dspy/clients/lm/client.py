@@ -30,7 +30,8 @@ from dspy.clients.openai_format import (
 )
 from dspy.clients.provider import Provider, ReinforceJob, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat
-from dspy.core.types import LMRequest, LMResponse, merge_lm_request_config
+from dspy.core.types import LMRequest, LMResponse
+from dspy.core.types.config import merge_lm_request_config
 from dspy.utils.callback import BaseCallback
 from dspy.utils.exceptions import ContextWindowExceededError, LMConfigurationError, LMError, LMUnsupportedFeatureError
 

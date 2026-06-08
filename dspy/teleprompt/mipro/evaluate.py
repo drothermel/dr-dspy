@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 from dspy.evaluate.evaluate import Evaluate
 from dspy.teleprompt.eval_batch import eval_candidate_program, get_program_with_highest_avg_score
 from dspy.teleprompt.log_utils import save_candidate_program
+from dspy.teleprompt.mipro.optuna_helpers import get_param_distributions, import_optuna
 from dspy.teleprompt.mipro.settings import ENDC, GREEN
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 
@@ -116,8 +117,6 @@ async def perform_full_evaluation(
     instruction_candidates: dict[int, list[str]],
     demo_candidates: list | None,
 ):
-    from dspy.teleprompt.mipro.search import get_param_distributions, import_optuna
-
     optuna = import_optuna()
     logger.info(f"===== Trial {trial_num + 1} / {adjusted_num_trials} - Full Evaluation =====")
     highest_mean_program, mean_score, combo_key, params = get_program_with_highest_avg_score(

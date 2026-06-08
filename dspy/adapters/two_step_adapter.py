@@ -9,7 +9,8 @@ from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import build_lm_message
 from dspy.clients.base_lm import BaseLM
 from dspy.compile.resolve import resolve_adapter, resolve_call, resolve_lm_config
-from dspy.core.types import LMConfig, LMMessage, LMRequest, LMToolCallPart, coerce_lm_config, merge_lm_request_config
+from dspy.core.types import LMMessage, LMRequest, LMToolCallPart
+from dspy.core.types.config import LMConfig, coerce_lm_config, merge_lm_request_config
 from dspy.core.types.history import _history_request_messages_as_openai
 from dspy.dsp.utils.settings import settings
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec

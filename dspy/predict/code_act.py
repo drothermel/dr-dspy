@@ -11,6 +11,7 @@ from dspy.predict.react import ReAct
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
+from dspy.utils.source_format import get_formatted_source
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +71,6 @@ class CodeAct(ReAct, ProgramOfThought):
     @override
     async def aforward(self, **kwargs):
         for tool in self.tools.values():
-            from dspy.utils.source_format import get_formatted_source
-
             self.interpreter(get_formatted_source(tool.func))
         trajectory = {}
         max_iters = kwargs.pop("max_iters", self.max_iters)

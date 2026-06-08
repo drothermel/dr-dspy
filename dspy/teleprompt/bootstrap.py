@@ -8,6 +8,7 @@ from typing_extensions import override
 from dspy.dsp.utils.settings import settings
 from dspy.primitives.example import Example
 from dspy.teleprompt.task_spec_context import get_task_spec
+from dspy.utils.hasher import Hasher
 from dspy.teleprompt.teleprompt import Teleprompter
 
 from .vanilla import LabeledFewShot
@@ -135,8 +136,6 @@ class BootstrapFewShot(Teleprompter):
                 name2traces[predictor_name].append(demo)
             for name, demos in name2traces.items():
                 if len(demos) > 1:
-                    from dspy.utils.hasher import Hasher
-
                     rng = random.Random(Hasher.hash(tuple(demos)))
                     demos = [rng.choice(demos[:-1]) if rng.random() < 0.5 else demos[-1]]
                 self.name2traces[name].extend(demos)

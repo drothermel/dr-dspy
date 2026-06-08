@@ -10,10 +10,12 @@ from dspy.adapters.utils import (
     build_multimodal_user_message_content,
     format_field_value,
     inputs_include_multimodal_custom_type_values,
+    parse_value,
     translate_field_type,
 )
 from dspy.task_spec import TaskSpec
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
+from dspy.utils.exceptions import AdapterParseError
 
 
 class XMLAdapter(ChatAdapter):
@@ -120,21 +122,15 @@ class XMLAdapter(ChatAdapter):
             for k, v in raw_fields.items()
         }
         if fields.keys() != task_spec.output_fields.keys():
-            from dspy.utils.exceptions import AdapterParseError
-
             raise AdapterParseError(
                 adapter_name="XMLAdapter", task_spec=task_spec, lm_response=completion, parsed_result=fields
             )
         return fields
 
     def _parse_field_value(self, field_type: object, raw: str, completion: str, task_spec: TaskSpec) -> object:
-        from dspy.adapters.utils import parse_value
-
         try:
             return parse_value(value=raw, annotation=field_type)
         except Exception as e:
-            from dspy.utils.exceptions import AdapterParseError
-
             raise AdapterParseError(
                 adapter_name="XMLAdapter",
                 task_spec=task_spec,

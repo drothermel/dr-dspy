@@ -9,7 +9,7 @@ from typing_extensions import override
 
 from dspy.clients.base_lm import BaseLM
 from dspy.compile.resolve import resolve_adapter, resolve_lm_config
-from dspy.core.types import _merge_lm_config, coerce_lm_config
+from dspy.core.types.config import _merge_lm_config, coerce_lm_config
 from dspy.dsp.utils.settings import settings
 from dspy.predict.parameter import Parameter
 from dspy.primitives.module import Module
