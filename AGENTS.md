@@ -32,28 +32,29 @@ compiled = await teleprompter.compile(student, trainset=trainset)
 
 ## TaskSpec (not Signature)
 
-Define tasks with `make_task_spec` and pass the resulting `TaskSpec` to predictors. Do not pass strings or legacy `Signature` classes to `Predict`.
+Define tasks as `TaskSpec` subclasses (or with `make_task_spec` for dynamic cases) and pass an instance to predictors. Do not pass strings or legacy `Signature` classes to `Predict`.
 
 ```python
 import asyncio
 
 from dspy.predict import ChainOfThought, Predict
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 
-qa = make_task_spec(
-    {
-        "question": FieldSpec.input("question"),
-        "answer": FieldSpec.output("answer"),
-    },
-    instructions="Answer the question.",
-)
+class QATaskSpec(TaskSpec):
+    name: str = "QA"
+    instructions: str = "Answer the question."
+    inputs: tuple[FieldSpec, ...] = (input_field("question"),)
+    outputs: tuple[FieldSpec, ...] = (output_field("answer"),)
 
+qa = QATaskSpec()
 predict = Predict(qa)
 result = asyncio.run(predict(question="What is DSPy?"))
 
 cot = ChainOfThought(qa)
 result = asyncio.run(cot(question="What is DSPy?"))
 ```
+
+For runtime-composed specs, use `make_task_spec` with `input_field` / `output_field` (or a spec string when field names are derived at runtime).
 
 Tools require an explicit description:
 

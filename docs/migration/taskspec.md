@@ -1,36 +1,57 @@
 # TaskSpec migration guide
 
-DSPy no longer exposes the legacy `Signature` API. Use `TaskSpec` and `make_task_spec` instead.
+DSPy no longer exposes the legacy `Signature` API. Use `TaskSpec` subclasses and `input_field` / `output_field` instead.
 
 ## Quick translation
 
 | Legacy | TaskSpec |
 | --- | --- |
-| `class QA(Signature): ...` | `make_task_spec({...}, instructions="...")` |
-| `Signature("q -> a")` | `make_task_spec("q -> a", instructions="...")` |
+| `class QA(Signature): ...` | `class QATaskSpec(TaskSpec): ...` |
+| `Signature("q -> a")` | `make_task_spec("q -> a", instructions="...")` (dynamic only) |
 | `make_signature("q -> a")` | `make_task_spec("q -> a", instructions="...")` |
 | `ensure_signature("q -> a")` | `make_task_spec("q -> a", instructions="...")` |
-| `InputField(desc="...")` | `FieldSpec.input("name", desc="...")` |
-| `OutputField(desc="...")` | `FieldSpec.output("name", desc="...")` |
-| `Predict("q -> a")` | `Predict(make_task_spec("q -> a", instructions="..."))` |
+| `InputField(desc="...")` | `input_field("name", desc="...")` |
+| `OutputField(desc="...")` | `output_field("name", desc="...")` |
+| `Predict("q -> a")` | `Predict(QATaskSpec())` |
 | `predictor.signature` | `predictor.task_spec` |
 | `Tool(func)` | `Tool(func, description="...")` or `tool_from_callable(func)` |
 
 ## Defining a task
 
-```python
-from dspy.task_spec import FieldSpec, make_task_spec
+Preferred style for named, static specs:
 
-qa = make_task_spec(
-    {
-        "question": FieldSpec.input("question", desc="The user question"),
-        "answer": FieldSpec.output("answer", desc="A concise answer"),
-    },
+```python
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
+
+class QATaskSpec(TaskSpec):
+    name: str = "QA"
+    instructions: str = "Answer the question accurately."
+    inputs: tuple[FieldSpec, ...] = (
+        input_field("question", desc="The user question"),
+    )
+    outputs: tuple[FieldSpec, ...] = (
+        output_field("answer", desc="A concise answer"),
+    )
+
+qa = QATaskSpec()
+```
+
+Dynamic composition (runtime-built fields):
+
+```python
+from dspy.task_spec import input_field, make_task_spec, output_field
+
+spec = make_task_spec(
+    inputs=[input_field("question", desc="The user question")],
+    outputs=[output_field("answer", desc="A concise answer")],
     instructions="Answer the question accurately.",
     name="QA",
 )
+```
 
-# String form also works
+String form is reserved for truly dynamic field names:
+
+```python
 qa = make_task_spec("question -> answer", instructions="Answer the question.")
 ```
 
@@ -43,7 +64,7 @@ import asyncio
 
 from dspy.predict import Predict
 
-predict = Predict(qa)
+predict = Predict(QATaskSpec())
 result = asyncio.run(predict(question="What is DSPy?"))
 # or inside async code:
 # result = await predict(question="What is DSPy?")
@@ -67,8 +88,8 @@ tool = Tool(search, description="Search documents by query.")
 
 | Legacy Signature method | TaskSpec method |
 | --- | --- |
-| `sig.append("field", OutputField(...))` | `spec.append(FieldSpec.output("field", ...))` |
-| `sig.prepend("field", InputField(...))` | `spec.prepend(FieldSpec.input("field", ...))` |
+| `sig.append("field", OutputField(...))` | `spec.append(output_field("field", ...))` |
+| `sig.prepend("field", InputField(...))` | `spec.prepend(input_field("field", ...))` |
 | `sig.delete("field")` | `spec.delete("field")` |
 | `sig.with_instructions("...")` | `spec.with_instructions("...")` |
 
