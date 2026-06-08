@@ -5,9 +5,16 @@ from importlib.util import find_spec
 from typing import Any
 
 from dspy.primitives.prediction import Prediction
-from dspy.retrievers.retrieve import Retrieve
 
-_databricks_sdk_installed = find_spec("databricks.sdk") is not None
+
+def _is_databricks_sdk_installed() -> bool:
+    try:
+        return find_spec("databricks.sdk") is not None
+    except ModuleNotFoundError:
+        return False
+
+
+_databricks_sdk_installed = _is_databricks_sdk_installed()
 
 
 class DatabricksRMError(Exception):
@@ -28,7 +35,7 @@ class Document:
         }
 
 
-class DatabricksRM(Retrieve):
+class DatabricksRM:
     """
     A retriever module that uses a Databricks Mosaic AI Vector Search Index to return the top-k
     embeddings for a given query.
@@ -130,7 +137,6 @@ class DatabricksRM(Retrieve):
             use_with_databricks_agent_framework (bool): Whether to use the `DatabricksRM` in a way that is
                 compatible with the Databricks Mosaic Agent Framework.
         """
-        super().__init__(k=k)
         self.databricks_token = databricks_token if databricks_token is not None else os.environ.get("DATABRICKS_TOKEN")
         self.databricks_endpoint = (
             databricks_endpoint if databricks_endpoint is not None else os.environ.get("DATABRICKS_HOST")
@@ -173,6 +179,14 @@ class DatabricksRM(Retrieve):
                     "To use the `DatabricksRM` retriever module with the Databricks Mosaic Agent Framework, "
                     "you must install the mlflow Python library. Please install mlflow via `pip install mlflow`."
                 )
+
+    def __call__(
+        self,
+        query: str | list[float],
+        query_type: str = "ANN",
+        filters_json: str | None = None,
+    ) -> Prediction | list[dict[str, Any]]:
+        return self.forward(query=query, query_type=query_type, filters_json=filters_json)
 
     def _extract_doc_ids(self, item: dict[str, Any]) -> str:
         """Extracts the document id from a search result

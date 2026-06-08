@@ -1,5 +1,4 @@
 from dspy.dsp.utils.utils import dotdict
-from dspy.retrievers.retrieve import Retrieve
 
 try:
     from uuid import uuid4
@@ -12,7 +11,7 @@ except ImportError as err:
     ) from err
 
 
-class WeaviateRM(Retrieve):
+class WeaviateRM:
     """A retrieval module that uses Weaviate to return the top passages for a given query.
 
     Assumes that a Weaviate collection has been created and populated with the following payload:
@@ -25,20 +24,16 @@ class WeaviateRM(Retrieve):
         tenant_id (str, optional): The tenant to retrieve objects from.
 
     Examples:
-        Below is a code snippet that shows how to use Weaviate as the default retriever:
+        Below is a code snippet that shows how to query Weaviate directly:
         ```python
         import weaviate
 
-        llm = dspy.Cohere(model="command-r-plus", api_key=api_key)
         weaviate_client = weaviate.connect_to_[local, wcs, custom, embedded]("your-path-here")
-        retriever_model = WeaviateRM("my_collection_name", weaviate_client=weaviate_client)
-        from dspy.dsp.utils.settings import settings
-        from dspy.retrievers.retrieve import Retrieve
-
-        settings.configure(lm=llm, rm=retriever_model)
-
-        retrieve = Retrieve(k=1)
-        topK_passages = retrieve("what are the stages in planning, sanctioning and execution of public works").passages
+        retriever_model = WeaviateRM("my_collection_name", weaviate_client=weaviate_client, k=1)
+        topK_passages = [
+            passage.long_text
+            for passage in retriever_model("what are the stages in planning, sanctioning and execution of public works")
+        ]
         ```
 
         Below is a code snippet that shows how to use Weaviate in the forward() function of a module
@@ -69,7 +64,10 @@ class WeaviateRM(Retrieve):
         else:
             raise ValueError("Unsupported Weaviate client type")
 
-        super().__init__(k=k)
+        self.k = k
+
+    def __call__(self, query_or_queries: str | list[str], k: int | None = None, **kwargs: object) -> list[dotdict]:
+        return self.forward(query_or_queries=query_or_queries, k=k, **kwargs)
 
     def forward(self, query_or_queries: str | list[str], k: int | None = None, **kwargs: object) -> list[dotdict]:
         """Search with Weaviate for self.k top passages for query or queries.
