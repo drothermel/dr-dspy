@@ -5,7 +5,6 @@ from typing import Any, Callable, cast
 from typing_extensions import override
 
 from dspy.adapters.base import Adapter
-from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.clients.lm import LM
 from dspy.clients.utils_finetune import infer_data_format
 from dspy.dsp.utils.settings import settings
@@ -170,7 +169,13 @@ class BootstrapFinetune(FinetuneTeleprompter):
             logger.info(f"After filtering with the metric, {len(trace_data)} examples remain")
 
         data = []
-        adapter = self.adapter[lm] or settings.adapter or ChatAdapter()
+        from dspy.compile.resolve import resolve_adapter
+
+        configured_adapter = self.adapter[lm] if isinstance(self.adapter, dict) else self.adapter
+        adapter, _ = resolve_adapter(
+            configured_adapter or settings.adapter,
+            transparency=settings.get("transparency", "strict"),
+        )
         data_format = infer_data_format(adapter)
         for item in trace_data:
             for pred_ind, _ in enumerate(item["trace"]):

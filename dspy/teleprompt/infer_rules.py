@@ -10,7 +10,7 @@ from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.module import Module
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
-from dspy.teleprompt.utils import get_task_spec, set_task_spec
+from dspy.teleprompt.utils import get_task_spec, optimizer_lm_context, set_task_spec
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +152,7 @@ def _rules_induction_task_spec(num_rules):
             "rules that provide clear guidance for performing the task. All rules should be actionable for a "
             "well-specified scope of examples of this general kind of task."
         ),
-        name="CustomRulesInduction",
+        name="framework.infer_rules.induction",
     )
 
 
@@ -167,7 +167,7 @@ class RulesInductionProgram(Module):
         with settings.context(**self.teacher_settings):
             # Generate rules with a fresh rollout and non-zero temperature.
             lm = settings.lm.copy(temperature=1.0)
-            with settings.context(lm=lm):
+            with optimizer_lm_context(lm=lm, phase="infer_rules.induction", lm_role="teacher"):
                 rules = (await self.rules_induction(examples_text=examples_text)).natural_language_rules
 
         return rules.strip()

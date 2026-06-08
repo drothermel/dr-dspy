@@ -2,8 +2,8 @@ import logging
 from collections.abc import Callable
 from typing import Any, cast
 
-from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool, tool_from_callable
+from dspy.compile.resolve import resolve_adapter
 from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
@@ -109,7 +109,7 @@ class ReAct(Module):
         self.extract = ChainOfThought(fallback_task_spec)
 
     def _format_trajectory(self, trajectory: dict[str, Any]):
-        adapter = settings.adapter or ChatAdapter()
+        adapter, _ = resolve_adapter(settings.adapter, transparency=settings.get("transparency", "strict"))
         trajectory_keys = ", ".join(trajectory.keys())
         trajectory_task_spec = make_task_spec(
             f"{trajectory_keys} -> x",

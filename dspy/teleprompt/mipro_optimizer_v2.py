@@ -18,6 +18,7 @@ from dspy.teleprompt.utils import (
     eval_candidate_program,
     get_program_with_highest_avg_score,
     get_task_spec,
+    optimizer_lm_context,
     print_full_program,
     save_candidate_program,
     set_task_spec,
@@ -218,7 +219,7 @@ class MIPROv2(Teleprompter):
             provide_traceback=provide_traceback,
         )
 
-        with settings.context(lm=self.task_model):
+        with optimizer_lm_context(lm=self.task_model, phase="mipro.bootstrap", lm_role="task_model"):
             # Step 1: Bootstrap few-shot examples
             demo_candidates = await self._bootstrap_fewshot_examples(
                 program,
@@ -249,7 +250,7 @@ class MIPROv2(Teleprompter):
         if zeroshot_opt:
             demo_candidates = None
 
-        with settings.context(lm=self.task_model):
+        with optimizer_lm_context(lm=self.task_model, phase="mipro.optimize", lm_role="task_model"):
             # Step 3: Find optimal prompt parameters
             return await self._optimize_prompt_parameters(
                 program,

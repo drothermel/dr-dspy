@@ -10,7 +10,6 @@ from typing_extensions import override
 
 from dspy.adapters.base import Adapter
 from dspy.adapters.chat_adapter import ChatAdapter
-from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
 from dspy.clients.utils_finetune import GRPOChatData, GRPOGroup, GRPORolloutGroup, GRPOStatus, TrainDataFormat
 from dspy.dsp.utils.settings import settings
@@ -531,7 +530,13 @@ class GRPO(FinetuneTeleprompter):
 
                             predictor = trace_instance[0]
                             pred_lm = predictor.lm
-                            adapter = self.adapter[pred_lm] or settings.adapter or XMLAdapter()
+                            from dspy.compile.resolve import resolve_adapter
+
+                            configured_adapter = self.adapter[pred_lm] if isinstance(self.adapter, dict) else self.adapter
+                            adapter, _ = resolve_adapter(
+                                configured_adapter or settings.adapter,
+                                transparency=settings.get("transparency", "strict"),
+                            )
                             assert isinstance(adapter, ChatAdapter), (
                                 f"Adapter {adapter} is not a ChatAdapter. GRPO training is not supported for this adapter."
                             )
