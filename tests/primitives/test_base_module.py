@@ -76,7 +76,7 @@ def test_deepcopy_with_nested_modules():
 
 def test_save_and_load_with_json(tmp_path):
     model = ChainOfThought(Signature("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
-    model.predict.signature = model.predict.signature.with_instructions("You are a helpful assistant.")  # ty:ignore[unresolved-attribute]
+    model.predict.signature = model.predict.signature.with_instructions("You are a helpful assistant.")
     model.predict.demos = [
         Example(q="What is the capital of France?", a="Paris", reasoning="n/a").with_inputs("q"),
         # Nested example

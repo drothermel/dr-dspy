@@ -131,17 +131,17 @@ class TestRLMInitialization:
         assert rlm.generate_action is not None
         assert rlm.extract is not None
         assert rlm.tools == {}  # No user tools provided
-        assert "context" in rlm.signature.input_fields  # ty:ignore[unresolved-attribute]
-        assert "query" in rlm.signature.input_fields  # ty:ignore[unresolved-attribute]
-        assert "answer" in rlm.signature.output_fields  # ty:ignore[unresolved-attribute]
+        assert "context" in rlm.signature.input_fields
+        assert "query" in rlm.signature.input_fields
+        assert "answer" in rlm.signature.output_fields
 
     def test_custom_signature(self):
         """Test RLM with custom signature."""
         rlm = RLM("document, question -> summary, key_facts", max_iterations=5)
-        assert "document" in rlm.signature.input_fields  # ty:ignore[unresolved-attribute]
-        assert "question" in rlm.signature.input_fields  # ty:ignore[unresolved-attribute]
-        assert "summary" in rlm.signature.output_fields  # ty:ignore[unresolved-attribute]
-        assert "key_facts" in rlm.signature.output_fields  # ty:ignore[unresolved-attribute]
+        assert "document" in rlm.signature.input_fields
+        assert "question" in rlm.signature.input_fields
+        assert "summary" in rlm.signature.output_fields
+        assert "key_facts" in rlm.signature.output_fields
 
     def test_custom_tools(self):
         """Test RLM with custom tools."""
@@ -327,7 +327,7 @@ class TestRLMFormatting:
         """Test action signature includes iteration input field."""
         rlm = RLM("context -> answer")
         action_sig = rlm.generate_action.signature
-        assert "iteration" in action_sig.input_fields  # ty:ignore[unresolved-attribute]
+        assert "iteration" in action_sig.input_fields
 
     def test_format_output(self):
         """Test output formatting."""
@@ -625,13 +625,13 @@ class TestRLMDynamicSignature:
         action_sig = rlm.generate_action.signature
 
         # Required input/output fields
-        assert "variables_info" in action_sig.input_fields  # ty:ignore[unresolved-attribute]
-        assert "repl_history" in action_sig.input_fields  # ty:ignore[unresolved-attribute]
-        assert "reasoning" in action_sig.output_fields  # ty:ignore[unresolved-attribute]
-        assert "code" in action_sig.output_fields  # ty:ignore[unresolved-attribute]
+        assert "variables_info" in action_sig.input_fields
+        assert "repl_history" in action_sig.input_fields
+        assert "reasoning" in action_sig.output_fields
+        assert "code" in action_sig.output_fields
 
         # Instructions mention key tools and variables
-        instructions = action_sig.instructions  # ty:ignore[unresolved-attribute]
+        instructions = action_sig.instructions
         assert "llm_query" in instructions
         assert "llm_query_batched" in instructions
         assert "SUBMIT" in instructions
@@ -644,11 +644,11 @@ class TestRLMDynamicSignature:
         """Test extract signature has required fields for all outputs."""
         rlm = RLM("document, question -> summary, key_facts, confidence")
         extract_sig = rlm.extract.signature
-        assert "variables_info" in extract_sig.input_fields  # ty:ignore[unresolved-attribute]
-        assert "repl_history" in extract_sig.input_fields  # ty:ignore[unresolved-attribute]
-        assert "summary" in extract_sig.output_fields  # ty:ignore[unresolved-attribute]
-        assert "key_facts" in extract_sig.output_fields  # ty:ignore[unresolved-attribute]
-        assert "confidence" in extract_sig.output_fields  # ty:ignore[unresolved-attribute]
+        assert "variables_info" in extract_sig.input_fields
+        assert "repl_history" in extract_sig.input_fields
+        assert "summary" in extract_sig.output_fields
+        assert "key_facts" in extract_sig.output_fields
+        assert "confidence" in extract_sig.output_fields
 
 
 # ============================================================================

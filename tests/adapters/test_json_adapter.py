@@ -820,7 +820,7 @@ def test_json_adapter_with_structured_outputs_does_not_mutate_original_signature
     with mock.patch("litellm.completion"):
         program(input1="Test input")
 
-    assert program.signature.output_fields == TestSignature.output_fields  # ty:ignore[unresolved-attribute]
+    assert program.signature.output_fields == TestSignature.output_fields
 
 
 def test_json_adapter_sync_call():

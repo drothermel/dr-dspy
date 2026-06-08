@@ -197,13 +197,13 @@ def test_load_dspy_program_cross_version():
     `ReAct` program.
     """
     path = Path(__file__).parent / "resources" / "saved_program.json"
-    loaded_react = ReAct("question->answer", tools=[])  # ty:ignore[invalid-argument-type]
+    loaded_react = ReAct("question->answer", tools=[])
     loaded_react.load(path)
     assert (
         "Imagine you are a detective racing against time to solve a high-profile"
-        in loaded_react.react.signature.instructions  # ty:ignore[unresolved-attribute]
+        in loaded_react.react.signature.instructions
     )
-    assert "Given the very verbose fields `question`" in loaded_react.extract.predict.signature.instructions  # ty:ignore[unresolved-attribute]
+    assert "Given the very verbose fields `question`" in loaded_react.extract.predict.signature.instructions
 
     assert len(loaded_react.react.demos) == 2
     assert len(loaded_react.extract.predict.demos) == 2

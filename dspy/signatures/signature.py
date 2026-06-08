@@ -612,7 +612,7 @@ def make_signature(
         # program of thought and teleprompters, so we just silently default to string.
         if type_ is None:
             type_ = str
-        if not isinstance(type_, (type, types.GenericAlias, typing._SpecialForm, types.UnionType)):  # ty: ignore[unresolved-attribute]
+        if not isinstance(type_, (type, types.GenericAlias, typing._SpecialForm, types.UnionType)):
             raise ValueError(f"Field types must be types, but received: {type_} of type {type(type_)}.")
         if not isinstance(field, FieldInfo):
             raise ValueError(f"Field values must be Field instances, but received: {field}.")

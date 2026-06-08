@@ -59,7 +59,7 @@ def test_initialization_with_string_signature():
     signature_string = "input1, input2 -> output"
     predict = Predict(signature_string)
     expected_instruction = "Given the fields `input1`, `input2`, produce the fields `output`."
-    assert predict.signature.instructions == expected_instruction  # ty:ignore[unresolved-attribute]
+    assert predict.signature.instructions == expected_instruction
     assert predict.signature.instructions == Signature(signature_string).instructions  # ty:ignore[too-many-positional-arguments, unresolved-attribute]
 
 
@@ -163,7 +163,7 @@ def test_instructions_after_dump_and_load_state():
     dumped_state = predict_instance.dump_state()
     new_instance = Predict(Signature("input -> output", "new instructions"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
     new_instance.load_state(dumped_state)
-    assert new_instance.signature.instructions == "original instructions"  # ty:ignore[unresolved-attribute]
+    assert new_instance.signature.instructions == "original instructions"
 
 
 def test_demos_after_dump_and_load_state():
@@ -270,10 +270,10 @@ def test_signature_fields_after_dump_and_load_state(tmp_path):
         sentiment = OutputField(desc="I am a malicious output!", prefix="I am a prefix!")
 
     new_instance = Predict(CustomSignature2)
-    assert new_instance.signature.dump_state() != original_instance.signature.dump_state()  # ty:ignore[unresolved-attribute]
+    assert new_instance.signature.dump_state() != original_instance.signature.dump_state()
     # After loading, the fields should be the same.
     new_instance.load(file_path)
-    assert new_instance.signature.dump_state() == original_instance.signature.dump_state()  # ty:ignore[unresolved-attribute]
+    assert new_instance.signature.dump_state() == original_instance.signature.dump_state()
 
 
 @pytest.mark.parametrize("filename", ["model.json", "model.pkl"])

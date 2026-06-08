@@ -17,7 +17,7 @@ def test_initialization_with_string_signature():
     lm = DummyLM([{"reasoning": "find the number after 1", "answer": "2"}])
     settings.configure(lm=lm)
     predict = ChainOfThought("question -> answer")
-    assert list(predict.predict.signature.output_fields.keys()) == [  # ty:ignore[unresolved-attribute]
+    assert list(predict.predict.signature.output_fields.keys()) == [
         "reasoning",
         "answer",
     ]
