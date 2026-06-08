@@ -118,7 +118,7 @@ class Embedder:
             return embeddings[0]
         return np.array(embeddings, dtype=np.float32)
 
-    def __call__(
+    async def __call__(
         self,
         inputs: str | list[str],
         batch_size: int | None = None,
@@ -142,23 +142,15 @@ class Embedder:
         """
         input_batches, caching, kwargs, is_single_input = self._preprocess(inputs, batch_size, caching, **kwargs)
 
-        compute_embeddings = _cached_compute_embeddings if caching else _compute_embeddings
-
-        embeddings_list = []
-
-        for batch in input_batches:
-            embeddings_list.extend(compute_embeddings(self.model, batch, caching=caching, **kwargs))
-        return self._postprocess(embeddings_list, is_single_input)
-
-    async def acall(self, inputs, batch_size=None, caching=None, **kwargs):
-        input_batches, caching, kwargs, is_single_input = self._preprocess(inputs, batch_size, caching, **kwargs)
-
         embeddings_list = []
         acompute_embeddings = _cached_acompute_embeddings if caching else _acompute_embeddings
 
         for batch in input_batches:
             embeddings_list.extend(await acompute_embeddings(self.model, batch, caching=caching, **kwargs))
         return self._postprocess(embeddings_list, is_single_input)
+
+    async def acall(self, inputs, batch_size=None, caching=None, **kwargs):
+        return await self.__call__(inputs, batch_size=batch_size, caching=caching, **kwargs)
 
 
 def _compute_embeddings(model, batch_inputs, caching=False, **kwargs):

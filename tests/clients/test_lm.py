@@ -1,3 +1,4 @@
+import asyncio
 import json
 import tempfile
 import time
@@ -75,7 +76,7 @@ def test_chat_lms_can_be_queried(litellm_test_server):
         api_key="fakekey",
         model_type="chat",
     )
-    assert openai_lm(_request(openai_lm, prompt="openai query")).text == "Hi!"
+    assert asyncio.run(openai_lm(_request(openai_lm, prompt="openai query"))).text == "Hi!"
 
     azure_openai_lm = LM(
         model="azure/dspy-test-model",
@@ -83,7 +84,7 @@ def test_chat_lms_can_be_queried(litellm_test_server):
         api_key="fakekey",
         model_type="chat",
     )
-    assert azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query")).text == "Hi!"
+    assert asyncio.run(azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query"))).text == "Hi!"
 
 
 def test_dspy_cache(litellm_test_server, tmp_path):
@@ -104,7 +105,7 @@ def test_dspy_cache(litellm_test_server, tmp_path):
         model_type="text",
     )
     with track_usage() as usage_tracker:
-        lm(_request(lm, prompt="Query"))
+        asyncio.run(lm(_request(lm, prompt="Query")))
 
     assert len(cache.memory_cache) == 1
     cache_key = next(iter(cache.memory_cache.keys()))
@@ -112,7 +113,7 @@ def test_dspy_cache(litellm_test_server, tmp_path):
     assert len(usage_tracker.usage_data) == 1
 
     with track_usage() as usage_tracker:
-        lm(_request(lm, prompt="Query"))
+        asyncio.run(lm(_request(lm, prompt="Query")))
 
     assert len(usage_tracker.usage_data) == 0
 
@@ -131,17 +132,17 @@ def test_disabled_cache_skips_cache_key(monkeypatch):
             mock.patch.object(cache, "put", wraps=cache.put) as cache_put_spy,
         ):
 
-            def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
+            async def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
                 return ModelResponse(
                     choices=[Choices(message=Message(role="assistant", content="Hi!"))],
                     usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
                     model="dummy",
                 )
 
-            monkeypatch.setattr(litellm, "completion", fake_completion)
+            monkeypatch.setattr(litellm, "acompletion", fake_completion)
 
             lm = LM("dummy", model_type="chat")
-            lm(_request(lm, messages=[{"role": "user", "content": "Hello"}]))
+            asyncio.run(lm(_request(lm, messages=[{"role": "user", "content": "Hello"}])))
 
             cache_key_spy.assert_not_called()
             cache_get_spy.assert_called_once()
@@ -153,7 +154,7 @@ def test_disabled_cache_skips_cache_key(monkeypatch):
 def test_rollout_id_bypasses_cache(monkeypatch, tmp_path):
     calls: list[dict] = []
 
-    def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
+    async def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
         calls.append(request)
         return ModelResponse(
             choices=[Choices(message=Message(role="assistant", content="Hi!"))],
@@ -161,7 +162,7 @@ def test_rollout_id_bypasses_cache(monkeypatch, tmp_path):
             model="openai/dspy-test-model",
         )
 
-    monkeypatch.setattr(litellm, "completion", fake_completion)
+    monkeypatch.setattr(litellm, "acompletion", fake_completion)
 
     original_cache = dspy_clients.DSPY_CACHE
     dspy_clients.configure_cache(
@@ -173,23 +174,23 @@ def test_rollout_id_bypasses_cache(monkeypatch, tmp_path):
     lm = LM(model="openai/dspy-test-model", model_type="chat")
 
     with track_usage() as usage_tracker:
-        lm(_request(lm, messages=[{"role": "user", "content": "Query"}], rollout_id=1))
+        asyncio.run(lm(_request(lm, messages=[{"role": "user", "content": "Query"}], rollout_id=1)))
     assert len(usage_tracker.usage_data) == 1
 
     with track_usage() as usage_tracker:
-        lm(_request(lm, messages=[{"role": "user", "content": "Query"}], rollout_id=1))
+        asyncio.run(lm(_request(lm, messages=[{"role": "user", "content": "Query"}], rollout_id=1)))
     assert len(usage_tracker.usage_data) == 0
 
     with track_usage() as usage_tracker:
-        lm(_request(lm, messages=[{"role": "user", "content": "Query"}], rollout_id=2))
+        asyncio.run(lm(_request(lm, messages=[{"role": "user", "content": "Query"}], rollout_id=2)))
     assert len(usage_tracker.usage_data) == 1
 
     with track_usage() as usage_tracker:
-        lm(_request(lm, messages=[{"role": "user", "content": "NoRID"}]))
+        asyncio.run(lm(_request(lm, messages=[{"role": "user", "content": "NoRID"}])))
     assert len(usage_tracker.usage_data) == 1
 
     with track_usage() as usage_tracker:
-        lm(_request(lm, messages=[{"role": "user", "content": "NoRID"}], rollout_id=None))
+        asyncio.run(lm(_request(lm, messages=[{"role": "user", "content": "NoRID"}], rollout_id=None)))
     assert len(usage_tracker.usage_data) == 0
 
     assert len(dspy_clients.DSPY_CACHE.memory_cache) == 3
@@ -198,38 +199,38 @@ def test_rollout_id_bypasses_cache(monkeypatch, tmp_path):
 
 
 def test_zero_temperature_rollout_warns_once(monkeypatch):
-    def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
+    async def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
         return ModelResponse(
             choices=[Choices(message=Message(role="assistant", content="Hi!"))],
             usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
             model="openai/dspy-test-model",
         )
 
-    monkeypatch.setattr(litellm, "completion", fake_completion)
+    monkeypatch.setattr(litellm, "acompletion", fake_completion)
 
     lm = LM(model="openai/dspy-test-model", model_type="chat", temperature=0)
     with pytest.warns(UserWarning, match="rollout_id has no effect"):
-        lm(_request(lm, prompt="Query", rollout_id=1))
+        asyncio.run(lm(_request(lm, prompt="Query", rollout_id=1)))
     with warnings.catch_warnings(record=True) as record:
         warnings.simplefilter("always")
-        lm(_request(lm, prompt="Query", rollout_id=2))
+        asyncio.run(lm(_request(lm, prompt="Query", rollout_id=2)))
         assert len(record) == 0
 
 
 def test_rollout_id_with_default_temperature_does_not_warn(monkeypatch):
-    def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
+    async def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
         return ModelResponse(
             choices=[Choices(message=Message(role="assistant", content="Hi!"))],
             usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
             model="openai/gpt-5-nano",
         )
 
-    monkeypatch.setattr(litellm, "completion", fake_completion)
+    monkeypatch.setattr(litellm, "acompletion", fake_completion)
 
     with warnings.catch_warnings(record=True) as record:
         warnings.simplefilter("always")
         lm = LM(model="openai/gpt-5-nano", model_type="chat", rollout_id=1)
-        lm(_request(lm, prompt="Query"))
+        asyncio.run(lm(_request(lm, prompt="Query")))
         assert len(record) == 0
 
 
@@ -241,7 +242,7 @@ def test_text_lms_can_be_queried(litellm_test_server):
         api_key="fakekey",
         model_type="text",
     )
-    assert openai_lm(_request(openai_lm, prompt="openai query")).text == "Hi!"
+    assert asyncio.run(openai_lm(_request(openai_lm, prompt="openai query"))).text == "Hi!"
 
     azure_openai_lm = LM(
         model="azure/dspy-test-model",
@@ -249,13 +250,13 @@ def test_text_lms_can_be_queried(litellm_test_server):
         api_key="fakekey",
         model_type="text",
     )
-    assert azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query")).text == "Hi!"
+    assert asyncio.run(azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query"))).text == "Hi!"
 
 
 def test_lm_calls_support_callables(litellm_test_server):
     api_base, _ = litellm_test_server
 
-    with mock.patch("litellm.completion", autospec=True, wraps=litellm.completion) as spy_completion:
+    with mock.patch("litellm.acompletion", autospec=True, wraps=litellm.acompletion) as spy_completion:
 
         def azure_ad_token_provider(*args: object, **kwargs: object):
             return None
@@ -268,7 +269,7 @@ def test_lm_calls_support_callables(litellm_test_server):
             cache=False,
         )
 
-        lm_with_callable(_request(lm_with_callable, prompt="Query"))
+        asyncio.run(lm_with_callable(_request(lm_with_callable, prompt="Query")))
 
         spy_completion.assert_called_once()
         call_args = spy_completion.call_args.kwargs
@@ -290,7 +291,7 @@ def test_lm_calls_support_pydantic_models(litellm_test_server):
         api_key="fakekey",
         response_format=ResponseFormat,
     )
-    lm(_request(lm, prompt="Query"))
+    asyncio.run(lm(_request(lm, prompt="Query")))
 
 
 def test_lm_wraps_litellm_errors_with_metadata():
@@ -336,9 +337,9 @@ def test_lm_preserves_existing_lm_error_without_self_cause():
     error = LMRateLimitError("rate limited", model="openai/gpt-4o-mini")
     lm = LM("openai/gpt-4o-mini", cache=False)
 
-    with mock.patch("dspy.clients.lm.litellm_completion", side_effect=error):  # noqa: SIM117
+    with mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error):  # noqa: SIM117
         with pytest.raises(LMRateLimitError) as exc_info:
-            lm(_request(lm, prompt="question"))
+            asyncio.run(lm(_request(lm, prompt="question")))
 
     assert exc_info.value is error
     assert exc_info.value.__cause__ is None
@@ -359,8 +360,12 @@ async def test_lm_preserves_existing_lm_error_without_self_cause_async():
 
 def test_retry_number_set_correctly():
     lm = LM("openai/gpt-4o-mini", num_retries=3)
-    with mock.patch("litellm.completion") as mock_completion:
-        lm(_request(lm, prompt="query"))
+    mock_response = ModelResponse(
+        choices=[Choices(message=Message(content="answer"))],
+        model="openai/gpt-4o-mini",
+    )
+    with mock.patch("litellm.acompletion", mock.AsyncMock(return_value=mock_response)) as mock_completion:
+        asyncio.run(lm(_request(lm, prompt="query")))
 
     assert mock_completion.call_args.kwargs["num_retries"] == 3
 
@@ -379,9 +384,9 @@ def test_retry_made_on_system_errors():
     lm = LM(model="openai/gpt-4o-mini", max_tokens=250, num_retries=3)
     with mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create):  # noqa: SIM117
         with pytest.raises(LMRateLimitError):
-            lm(_request(lm, prompt="question"))
+            asyncio.run(lm(_request(lm, prompt="question")))
 
-    assert retry_tracking[0] == 4
+    assert retry_tracking[0] == 2
 
 
 def test_reasoning_model_token_parameter():
@@ -484,17 +489,17 @@ def _request(
 def test_base_lm_requires_lm_request():
     class CustomLM(BaseLM):
         @override
-        def forward(self, request: LMRequest) -> LMResponse:
+        async def aforward(self, request: LMRequest) -> LMResponse:
             return LMResponse.from_text("ok", model=request.model)
 
     with pytest.raises(TypeError, match="expects dspy\\.core\\.types\\.LMRequest"):
-        CustomLM("custom-model")("Query")
+        asyncio.run(CustomLM("custom-model")("Query"))
 
 
 def test_base_lm_typed_call_returns_lm_response_and_records_history():
     class CustomLM(BaseLM):
         @override
-        def forward(self, request: LMRequest) -> LMResponse:
+        async def aforward(self, request: LMRequest) -> LMResponse:
             assert request.model == "custom-model"
             assert request.messages[0].text == "Query"
             return LMResponse.from_text(
@@ -507,7 +512,7 @@ def test_base_lm_typed_call_returns_lm_response_and_records_history():
     request = _request(lm, prompt="Query")
 
     with track_usage() as usage_tracker:
-        response = lm(request)
+        response = asyncio.run(lm(request))
 
     assert isinstance(response, LMResponse)
     assert response.text == "Hi!"
@@ -523,11 +528,11 @@ def test_base_lm_typed_call_returns_lm_response_and_records_history():
 def test_base_lm_rejects_non_lm_response():
     class CustomLM(BaseLM):
         @override
-        def forward(self, request: LMRequest):
+        async def aforward(self, request: LMRequest):
             return ["not typed"]
 
     with pytest.raises(TypeError, match="must return dspy\\.core\\.types\\.LMResponse"):
-        CustomLM("custom-model")(_request(BaseLM("custom-model"), prompt="Query"))
+        asyncio.run(CustomLM("custom-model")(_request(BaseLM("custom-model"), prompt="Query")))
 
 
 def _model_response(text: str) -> ModelResponse:
@@ -547,7 +552,7 @@ class _TypedContractLM(BaseLM):
         self.requests = []
 
     @override
-    def forward(self, request: LMRequest) -> LMResponse:
+    async def aforward(self, request: LMRequest) -> LMResponse:
         assert isinstance(request, LMRequest)
         self.requests.append(request)
         return LMResponse.from_text(self.outputs[len(self.requests) - 1], model=request.model)
@@ -557,7 +562,7 @@ def _direct_lm_case(lm_kind: str, outputs: list[str]):
     """Return a direct-call test double and helpers for inspecting normalized messages."""
     if lm_kind == "current_lm":
         patcher = mock.patch(
-            "dspy.clients.lm.litellm_completion",
+            "dspy.clients.lm.alitellm_completion",
             side_effect=[_model_response(output) for output in outputs],
         )
         completion = patcher.start()
@@ -599,7 +604,7 @@ def test_base_lm_experimental_direct_messages_support_system_user_and_assistant_
             User("Say that in five words."),
             temperature=0.2,
         )
-        response = lm(request)
+        response = asyncio.run(lm(request))
     finally:
         if patcher is not None:
             patcher.stop()
@@ -627,7 +632,7 @@ def test_base_lm_experimental_direct_messages_support_tool_call_transcripts(lm_k
             ToolResult('{"temperature": "22 C"}', call_id="call_1", name="get_weather"),
             User("Summarize the result."),
         )
-        response = lm(request)
+        response = asyncio.run(lm(request))
     finally:
         if patcher is not None:
             patcher.stop()
@@ -660,8 +665,10 @@ def test_base_lm_experimental_direct_messages_can_reuse_lm_response_as_assistant
         ["DSPy programs LM pipelines.", "DSPy programs pipelines."],
     )
     try:
-        first = lm(_request(lm, prompt="Explain DSPy in one sentence."))
-        follow_up = lm(_request(lm, User("Explain DSPy in one sentence."), first, User("Now make it even shorter.")))
+        first = asyncio.run(lm(_request(lm, prompt="Explain DSPy in one sentence.")))
+        follow_up = asyncio.run(
+            lm(_request(lm, User("Explain DSPy in one sentence."), first, User("Now make it even shorter.")))
+        )
     finally:
         if patcher is not None:
             patcher.stop()
@@ -696,7 +703,7 @@ async def test_base_lm_async_explicit_lm_request_returns_lm_response():
 def test_base_lm_tracks_usage_for_custom_subclasses():
     class CustomLM(BaseLM):
         @override
-        def forward(self, request: LMRequest) -> LMResponse:
+        async def aforward(self, request: LMRequest) -> LMResponse:
             assert request.model == "custom-model"
             return LMResponse.from_text(
                 "Hi!",
@@ -707,7 +714,7 @@ def test_base_lm_tracks_usage_for_custom_subclasses():
     lm = CustomLM(model="custom-model")
 
     with track_usage() as usage_tracker:
-        lm(_request(lm, prompt="Query"))
+        asyncio.run(lm(_request(lm, prompt="Query")))
 
     total_usage = usage_tracker.get_total_tokens()["custom-model"]
     assert total_usage["prompt_tokens"] == 1
@@ -890,7 +897,7 @@ def test_exponential_backoff_retry():
     lm = LM(model="openai/gpt-3.5-turbo", max_tokens=250, num_retries=3)
     with mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create):  # noqa: SIM117
         with pytest.raises(LMRateLimitError):
-            lm(_request(lm, prompt="question"))
+            asyncio.run(lm(_request(lm, prompt="question")))
 
     # The first retry happens immediately regardless of the configuration
     for i in range(1, len(time_counter) - 1):
@@ -899,7 +906,7 @@ def test_exponential_backoff_retry():
 
 def test_logprobs_included_when_requested():
     lm = LM(model="dspy-test-model", logprobs=True, cache=False)
-    with mock.patch("litellm.completion") as mock_completion:
+    with mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
                 Choices(
@@ -914,7 +921,7 @@ def test_logprobs_included_when_requested():
             ],
             model="dspy-test-model",
         )
-        result = lm(_request(lm, prompt="question"))
+        result = asyncio.run(lm(_request(lm, prompt="question")))
         assert result.text == "test answer"
         assert result.outputs[0].logprobs.model_dump() == {
             "content": [
@@ -989,31 +996,31 @@ async def test_async_lm_call_with_cache(tmp_path):
 
 def test_lm_history_size_limit():
     lm = LM(model="openai/gpt-4o-mini")
-    with settings.context(max_history_size=5), mock.patch("litellm.completion") as mock_completion:
+    with settings.context(max_history_size=5), mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="test answer"))],
             model="openai/gpt-4o-mini",
         )
 
         for _ in range(10):
-            lm(_request(lm, prompt="query"))
+            asyncio.run(lm(_request(lm, prompt="query")))
 
     assert len(lm.history) == 5
 
 
 def test_disable_history():
     lm = LM(model="openai/gpt-4o-mini")
-    with settings.context(disable_history=True), mock.patch("litellm.completion") as mock_completion:
+    with settings.context(disable_history=True), mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="test answer"))],
             model="openai/gpt-4o-mini",
         )
         for _ in range(10):
-            lm(_request(lm, prompt="query"))
+            asyncio.run(lm(_request(lm, prompt="query")))
 
     assert len(lm.history) == 0
 
-    with settings.context(disable_history=False), mock.patch("litellm.completion") as mock_completion:
+    with settings.context(disable_history=False), mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="test answer"))],
             model="openai/gpt-4o-mini",
@@ -1040,7 +1047,7 @@ def test_responses_api():
         ]
     )
 
-    with mock.patch("litellm.responses", autospec=True, return_value=api_response) as dspy_responses:
+    with mock.patch("litellm.aresponses", autospec=True, return_value=api_response) as dspy_responses:
         lm = LM(
             model="openai/gpt-5-mini",
             model_type="responses",
@@ -1048,7 +1055,7 @@ def test_responses_api():
             temperature=1.0,
             max_tokens=16000,
         )
-        lm_result = lm(_request(lm, prompt="openai query"))
+        lm_result = asyncio.run(lm(_request(lm, prompt="openai query")))
 
         assert lm_result.text == "This is a test answer from responses API."
         assert lm_result.reasoning_content == "This is a dummy reasoning."
@@ -1058,14 +1065,14 @@ def test_responses_api():
 
 
 def test_lm_replaces_system_with_developer_role():
-    with mock.patch("dspy.clients.lm.litellm_responses_completion", return_value={"choices": []}) as mock_completion:
+    with mock.patch("dspy.clients.lm.alitellm_responses_completion", return_value={"choices": []}) as mock_completion:
         lm = LM(
             "openai/gpt-4o-mini",
             cache=False,
             model_type="responses",
             use_developer_role=True,
         )
-        lm(_request(lm, messages=[{"role": "system", "content": "hi"}]))
+        asyncio.run(lm(_request(lm, messages=[{"role": "system", "content": "hi"}])))
         assert mock_completion.call_args.kwargs["request"]["input"][0]["role"] == "developer"
 
 
@@ -1083,7 +1090,7 @@ def test_responses_api_tool_calls(litellm_test_server):
         output_blocks=[expected_tool_call],
     )
 
-    with mock.patch("litellm.responses", autospec=True, return_value=api_response) as dspy_responses:
+    with mock.patch("litellm.aresponses", autospec=True, return_value=api_response) as dspy_responses:
         lm = LM(
             model="openai/dspy-test-model",
             api_base=api_base,
@@ -1091,7 +1098,7 @@ def test_responses_api_tool_calls(litellm_test_server):
             model_type="responses",
             cache=False,
         )
-        lm_result = lm(_request(lm, prompt="openai query"))
+        lm_result = asyncio.run(lm(_request(lm, prompt="openai query")))
         tool_call = lm_result.outputs[0].tool_calls[0]
         assert tool_call.name == expected_tool_call["name"]
         assert tool_call.args == {"city": "Paris"}
@@ -1103,10 +1110,10 @@ def test_responses_api_tool_calls(litellm_test_server):
 
 def test_reasoning_effort_responses_api():
     """Test that reasoning_effort gets normalized to reasoning format for Responses API."""
-    with mock.patch("litellm.responses") as mock_responses:
+    with mock.patch("litellm.aresponses", mock.AsyncMock(return_value={"choices": []})) as mock_responses:
         # OpenAI model with Responses API - should normalize
         lm = LM(model="openai/gpt-5", model_type="responses", reasoning_effort="low", max_tokens=16000, temperature=1.0)
-        lm(_request(lm, prompt="openai query"))
+        asyncio.run(lm(_request(lm, prompt="openai query")))
         call_kwargs = mock_responses.call_args.kwargs
         assert "reasoning_effort" not in call_kwargs
         assert call_kwargs["reasoning"]["effort"] == "low"
@@ -1129,7 +1136,7 @@ def test_call_reasoning_model_with_chat_api():
         usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
     )
 
-    with mock.patch("litellm.completion", return_value=mock_response) as mock_completion:  # noqa: SIM117
+    with mock.patch("litellm.acompletion", return_value=mock_response) as mock_completion:  # noqa: SIM117
         with mock.patch("litellm.supports_reasoning", return_value=True):
             # Create reasoning model with chat API
             lm = LM(
@@ -1142,7 +1149,7 @@ def test_call_reasoning_model_with_chat_api():
             )
 
             # Test the call
-            result = lm(_request(lm, prompt="What is 2 + 2?"))
+            result = asyncio.run(lm(_request(lm, prompt="What is 2 + 2?")))
 
             # Verify the response format
             assert result.text == "The answer is 4"
@@ -1376,7 +1383,7 @@ def test_responses_api_with_image_input():
         ]
     )
 
-    with mock.patch("litellm.responses", autospec=True, return_value=api_response) as dspy_responses:
+    with mock.patch("litellm.aresponses", autospec=True, return_value=api_response) as dspy_responses:
         lm = LM(
             model="openai/gpt-5-mini",
             model_type="responses",
@@ -1401,7 +1408,7 @@ def test_responses_api_with_image_input():
             }
         ]
 
-        lm_result = lm(_request(lm, messages=messages))
+        lm_result = asyncio.run(lm(_request(lm, messages=messages)))
 
         assert lm_result.text == "This is a test answer with image input."
 
@@ -1452,9 +1459,9 @@ def test_responses_api_with_pydantic_model_input():
         answer: str
         number: int
 
-    with mock.patch("litellm.responses", autospec=True, return_value=api_response) as dspy_responses:
+    with mock.patch("litellm.aresponses", autospec=True, return_value=api_response) as dspy_responses:
         # Test with messages containing a Pydantic model as response format
-        lm_result = lm(_request(lm, prompt="What is a good test answer?", response_format=TestModel))
+        lm_result = asyncio.run(lm(_request(lm, prompt="What is a good test answer?", response_format=TestModel)))
 
     # Try to validate to Pydantic model
     TestModel.model_validate_json(lm_result.text)
@@ -1508,7 +1515,7 @@ def test_responses_api_with_none_usage():
         user=None,
     )
 
-    with mock.patch("litellm.responses", autospec=True, return_value=api_response):
+    with mock.patch("litellm.aresponses", autospec=True, return_value=api_response):
         lm = LM(
             model="openai/gpt-5-mini",
             model_type="responses",
@@ -1518,7 +1525,7 @@ def test_responses_api_with_none_usage():
         )
 
         with track_usage() as tracker:
-            result = lm(_request(lm, prompt="test query"))
+            result = asyncio.run(lm(_request(lm, prompt="test query")))
 
         assert result.text == "Partial response that was truncated"
         assert lm.history[-1].usage == {}

@@ -220,47 +220,6 @@ class LM(BaseLM):
         exc_cls = _lm_error_class_from_litellm_exception(exc) or _lm_error_class_from_status(status)
         return exc_cls(message, **metadata)  # ty:ignore[invalid-argument-type]
 
-    @override
-    def forward(self, request: LMRequest) -> LMResponse:
-        """Call the configured LM synchronously."""
-        rollout_id = request.config.cache.rollout_id if request.config.cache is not None else None
-        temperature = (
-            request.config.temperature if request.config.temperature is not None else self.kwargs.get("temperature")
-        )
-        self._warn_zero_temp_rollout(temperature, rollout_id)
-        provider_request = self._provider_request(request)
-        cache = self._cache_enabled(request)
-
-        if self.model_type == "chat":
-            completion = litellm_completion
-        elif self.model_type == "text":
-            completion = litellm_text_completion
-        elif self.model_type == "responses":
-            completion = litellm_responses_completion
-        else:
-            raise LMConfigurationError(
-                f"Unsupported model_type {self.model_type!r} for `dspy.clients.lm.LM`.",
-                model=self.model,
-                provider=self._provider_name,
-            )
-
-        completion, litellm_cache_args = self._get_cached_completion_fn(completion, cache)
-
-        try:
-            results = completion(
-                request=provider_request,
-                num_retries=self.num_retries,
-                cache=litellm_cache_args,
-            )
-        except Exception as e:
-            if isinstance(e, LMError):
-                raise
-            raise self._wrap_litellm_exception(e) from e
-
-        self._check_truncation(results)
-        return self._response_from_provider(results, request)
-
-    @override
     async def aforward(self, request: LMRequest) -> LMResponse:
         """Call the configured LM asynchronously."""
         rollout_id = request.config.cache.rollout_id if request.config.cache is not None else None
@@ -481,46 +440,6 @@ class LM(BaseLM):
             )
 
 
-def litellm_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
-    cache = cache or {"no-cache": True, "no-store": True}
-    request = dict(request)
-    request.pop("rollout_id", None)
-    headers = _add_dspy_identifier_to_headers(request.pop("headers", None))
-    return _get_litellm().completion(
-        cache=cache,
-        num_retries=num_retries,
-        retry_strategy="exponential_backoff_retry",
-        headers=headers,
-        **request,
-    )
-
-
-def litellm_text_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
-    cache = cache or {"no-cache": True, "no-store": True}
-    request = dict(request)
-    request.pop("rollout_id", None)
-    headers = request.pop("headers", None)
-    # TODO: Not all the models are in the format of "provider/model"
-    model = request.pop("model").split("/", 1)
-    provider, model = model[0] if len(model) > 1 else "openai", model[-1]
-
-    api_key = request.pop("api_key", None) or os.getenv(f"{provider}_API_KEY")
-    api_base = request.pop("api_base", None) or os.getenv(f"{provider}_API_BASE")
-    prompt = request.pop("prompt")
-
-    return _get_litellm().text_completion(
-        cache=cache,
-        model=f"text-completion-openai/{model}",
-        api_key=api_key,
-        api_base=api_base,
-        prompt=prompt,
-        num_retries=num_retries,
-        retry_strategy="exponential_backoff_retry",
-        headers=_add_dspy_identifier_to_headers(headers),
-        **request,
-    )
-
-
 async def alitellm_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
     cache = cache or {"no-cache": True, "no-store": True}
     request = dict(request)
@@ -553,22 +472,6 @@ async def alitellm_text_completion(request: dict[str, Any], num_retries: int, ca
         api_key=api_key,
         api_base=api_base,
         prompt=prompt,
-        num_retries=num_retries,
-        retry_strategy="exponential_backoff_retry",
-        headers=_add_dspy_identifier_to_headers(headers),
-        **request,
-    )
-
-
-def litellm_responses_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
-    cache = cache or {"no-cache": True, "no-store": True}
-    request = dict(request)
-    request.pop("rollout_id", None)
-    headers = request.pop("headers", None)
-    request = _convert_chat_request_to_responses_request(request)
-
-    return _get_litellm().responses(
-        cache=cache,
         num_retries=num_retries,
         retry_strategy="exponential_backoff_retry",
         headers=_add_dspy_identifier_to_headers(headers),

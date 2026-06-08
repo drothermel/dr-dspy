@@ -1,3 +1,4 @@
+import asyncio
 from io import StringIO
 
 import pytest
@@ -33,8 +34,8 @@ def test_inspect_history_basic(capsys):
     settings.configure(lm=lm)
 
     predictor = Predict("query: str -> response: str")
-    predictor(query="Hi")
-    predictor(query="What's up?")
+    asyncio.run(predictor.acall(query="Hi"))
+    asyncio.run(predictor.acall(query="What's up?"))
 
     history = GLOBAL_HISTORY
     assert len(history) > 0
@@ -116,9 +117,9 @@ def test_inspect_history_with_n(capsys):
     settings.configure(lm=lm)
 
     predictor = Predict("query: str -> response: str")
-    predictor(query="First")
-    predictor(query="Second")
-    predictor(query="Third")
+    asyncio.run(predictor.acall(query="First"))
+    asyncio.run(predictor.acall(query="Second"))
+    asyncio.run(predictor.acall(query="Third"))
 
     inspect_history(n=2)
     out, _err = capsys.readouterr()
@@ -142,8 +143,8 @@ def test_inspect_history_n_larger_than_history(capsys):
     settings.configure(lm=lm)
 
     predictor = Predict("query: str -> response: str")
-    predictor(query="Query 1")
-    predictor(query="Query 2")
+    asyncio.run(predictor.acall(query="Query 1"))
+    asyncio.run(predictor.acall(query="Query 2"))
 
     inspect_history(n=5)
     history = GLOBAL_HISTORY

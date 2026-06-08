@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from dspy.adapters.types.reasoning import Reasoning
@@ -79,7 +81,7 @@ def test_reasoning_with_chain_of_thought():
     settings.configure(lm=lm)
 
     cot = ChainOfThought("question -> answer")
-    result = cot(question="What is the answer?")
+    result = asyncio.run(cot.acall(question="What is the answer?"))
 
     assert isinstance(result.reasoning, Reasoning)
     assert result.reasoning.strip() == "Let me think step by step"

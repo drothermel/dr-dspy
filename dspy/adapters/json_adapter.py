@@ -1,7 +1,7 @@
 import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
-from typing import Any, TypeVar, get_origin
+from typing import Any, get_origin
 
 import json_repair
 import pydantic
@@ -25,7 +25,6 @@ from dspy.utils.callback import BaseCallback
 from dspy.utils.exceptions import AdapterParseError, LMError
 
 logger = logging.getLogger(__name__)
-AdapterCallResult = TypeVar("AdapterCallResult", list[dict[str, Any]], Awaitable[list[dict[str, Any]]])
 
 
 def _has_open_ended_mapping(signature: SignatureMeta) -> bool:
@@ -55,18 +54,31 @@ class JSONAdapter(ChatAdapter):
             parallel_tool_calls=parallel_tool_calls,
         )
 
-    def _json_adapter_call_common(
+    async def _call_chat_adapter(
         self,
         lm: BaseLM,
         config: LMConfig,
         signature: type[Signature],
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
-        call_fn: Callable[[BaseLM, LMConfig, type[Signature], list[dict[str, Any]], dict[str, Any]], AdapterCallResult],
-    ) -> AdapterCallResult | None:
-        """Common call logic to be used for both sync and async calls."""
+    ) -> list[dict[str, Any]]:
+        return await super().acall(lm=lm, config=config, signature=signature, demos=demos, inputs=inputs)
+
+    async def _json_adapter_call_common(
+        self,
+        lm: BaseLM,
+        config: LMConfig,
+        signature: type[Signature],
+        demos: list[dict[str, Any]],
+        inputs: dict[str, Any],
+        call_fn: Callable[
+            [BaseLM, LMConfig, type[Signature], list[dict[str, Any]], dict[str, Any]],
+            Awaitable[list[dict[str, Any]]],
+        ],
+    ) -> list[dict[str, Any]] | None:
+        """Common call logic for async adapter calls."""
         if "response_format" not in lm.supported_params:
-            return call_fn(lm, config, signature, demos, inputs)
+            return await call_fn(lm, config, signature, demos, inputs)
 
         has_tool_calls = any(field.annotation == ToolCalls for field in signature.output_fields.values())
 
@@ -78,12 +90,13 @@ class JSONAdapter(ChatAdapter):
             # We found that structured output mode doesn't work well with dspy.ToolCalls as output field.
             # So we fall back to json mode if native function calling is disabled and ToolCalls is present.
             config = config.model_copy(update={"response_format": {"type": "json_object"}})
-            return call_fn(lm, config, signature, demos, inputs)
+            return await call_fn(lm, config, signature, demos, inputs)
         return None
 
     @override
-    def __call__(
+    async def acall(
         self,
+        *,
         lm: BaseLM,
         config: LMConfig | Mapping[str, Any] | None,
         signature: type[Signature],
@@ -91,8 +104,10 @@ class JSONAdapter(ChatAdapter):
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
         resolved_config = coerce_lm_config(config)
-        result = self._json_adapter_call_common(lm, resolved_config, signature, demos, inputs, super().__call__)
-        if result:
+        result = await self._json_adapter_call_common(
+            lm, resolved_config, signature, demos, inputs, self._call_chat_adapter
+        )
+        if result is not None:
             return result
 
         try:
@@ -100,7 +115,7 @@ class JSONAdapter(ChatAdapter):
                 signature, self.use_native_function_calling
             )
             resolved_config = resolved_config.model_copy(update={"response_format": structured_output_model})
-            return super().__call__(lm, resolved_config, signature, demos, inputs)
+            return await super().acall(lm=lm, config=resolved_config, signature=signature, demos=demos, inputs=inputs)
         except LMError:
             # Provider/backend failures should propagate; the fallback below is only for local structured-output
             # setup/schema failures where retrying in JSON mode is appropriate.
@@ -108,36 +123,7 @@ class JSONAdapter(ChatAdapter):
         except Exception:
             logger.warning("Failed to use structured output format, falling back to JSON mode.")
             resolved_config = resolved_config.model_copy(update={"response_format": {"type": "json_object"}})
-            return super().__call__(lm, resolved_config, signature, demos, inputs)
-
-    @override
-    async def acall(
-        self,
-        lm: BaseLM,
-        config: LMConfig | Mapping[str, Any] | None,
-        signature: type[Signature],
-        demos: list[dict[str, Any]],
-        inputs: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        resolved_config = coerce_lm_config(config)
-        result = self._json_adapter_call_common(lm, resolved_config, signature, demos, inputs, super().acall)
-        if result:
-            return await result
-
-        try:
-            structured_output_model = _get_structured_outputs_response_format(
-                signature, self.use_native_function_calling
-            )
-            resolved_config = resolved_config.model_copy(update={"response_format": structured_output_model})
-            return await super().acall(lm, resolved_config, signature, demos, inputs)
-        except LMError:
-            # Provider/backend failures should propagate; the fallback below is only for local structured-output
-            # setup/schema failures where retrying in JSON mode is appropriate.
-            raise
-        except Exception:
-            logger.warning("Failed to use structured output format, falling back to JSON mode.")
-            resolved_config = resolved_config.model_copy(update={"response_format": {"type": "json_object"}})
-            return await super().acall(lm, resolved_config, signature, demos, inputs)
+            return await super().acall(lm=lm, config=resolved_config, signature=signature, demos=demos, inputs=inputs)
 
     @override
     def format_field_structure(self, signature: type[Signature]) -> str:

@@ -1,3 +1,4 @@
+import asyncio
 from typing import Literal
 from unittest import mock
 
@@ -453,18 +454,20 @@ def test_baml_adapter_with_code():
         task: str = InputField()
         code: Code = OutputField()
 
-    with mock.patch("litellm.completion") as mock_completion:
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content='{"code": "print(\\"Generated code\\")"}'))],
             model="openai/gpt-4o-mini",
         )
 
-        result = adapter(
-            LM(model="openai/gpt-4o-mini", cache=False),
-            {},
-            CodeGenSignature,
-            [],
-            {"task": "Write a hello world program"},
+        result = asyncio.run(
+            adapter.acall(
+                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                config={},
+                signature=CodeGenSignature,
+                demos=[],
+                inputs={"task": "Write a hello world program"},
+            )
         )
 
         assert result[0]["code"].code == 'print("Generated code")'
@@ -548,7 +551,7 @@ async def test_baml_adapter_async_functionality():
         question: str = InputField()
         patient: PatientDetails = OutputField()
 
-    with mock.patch("litellm.acompletion") as mock_acompletion:
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_acompletion:
         mock_acompletion.return_value = ModelResponse(
             choices=[Choices(message=Message(content='{"patient": {"name": "John Doe", "age": 28}}'))],
             model="openai/gpt-4o",
@@ -556,7 +559,11 @@ async def test_baml_adapter_async_functionality():
 
         adapter = BAMLAdapter()
         result = await adapter.acall(
-            LM(model="openai/gpt-4o", cache=False), {}, TestSignature, [], {"question": "Extract patient info"}
+            lm=LM(model="openai/gpt-4o", cache=False),
+            config={},
+            signature=TestSignature,
+            demos=[],
+            inputs={"question": "Extract patient info"},
         )
 
         assert result[0]["patient"].name == "John Doe"

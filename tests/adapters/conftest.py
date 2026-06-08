@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 
 from typing_extensions import override
@@ -80,24 +81,25 @@ class CapturingLM(BaseLM):
         return self.source_lm.supported_params
 
     @override
-    def __call__(self, request: LMRequest):
+    async def __call__(self, request: LMRequest):
         self.calls.append({"request": request})
         raise StopAdapterCallCapture
 
 
-def adapter_format_as_openai(adapter, signature, demos, inputs):
-    """Return OpenAI-chat-shaped messages from adapter.format()."""
-    return [message_to_openai_chat(message) for message in adapter.format(signature, demos, inputs)]
-
-
-def format_messages_and_lm_kwargs(adapter, signature, demos, inputs, config=None, lm=None, lm_kwargs=None):
+async def _format_messages_and_lm_kwargs(adapter, signature, demos, inputs, config=None, lm=None, lm_kwargs=None):
     if lm_kwargs is not None:
         if config is not None:
             raise TypeError("Pass either `config` or `lm_kwargs`, not both.")
         config = lm_kwargs
     capturing_lm = CapturingLM(lm)
     with contextlib.suppress(StopAdapterCallCapture):
-        adapter(capturing_lm, coerce_lm_config(config), signature, demos, inputs)
+        await adapter.acall(
+            lm=capturing_lm,
+            config=coerce_lm_config(config),
+            signature=signature,
+            demos=demos,
+            inputs=inputs,
+        )
 
     assert len(capturing_lm.calls) == 1
     call = capturing_lm.calls[0]
@@ -106,3 +108,12 @@ def format_messages_and_lm_kwargs(adapter, signature, demos, inputs, config=None
         [message_to_openai_chat(message) for message in request.messages],
         captured_lm_kwargs(request),
     )
+
+
+def format_messages_and_lm_kwargs(adapter, signature, demos, inputs, config=None, lm=None, lm_kwargs=None):
+    return asyncio.run(_format_messages_and_lm_kwargs(adapter, signature, demos, inputs, config, lm, lm_kwargs))
+
+
+def adapter_format_as_openai(adapter, signature, demos, inputs):
+    """Return OpenAI-chat-shaped messages from adapter.format()."""
+    return [message_to_openai_chat(message) for message in adapter.format(signature, demos, inputs)]

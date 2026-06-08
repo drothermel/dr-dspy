@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Mapping
 from typing import Any
 
@@ -97,12 +98,14 @@ class TwoStepAdapter(Adapter):
         extractor_signature = self._create_extractor_signature(signature)
 
         try:
-            parsed_result = ChatAdapter()(
-                self.extraction_model,
-                LMConfig(),
-                extractor_signature,
-                [],
-                {"text": completion},
+            parsed_result = asyncio.run(
+                ChatAdapter().acall(
+                    lm=self.extraction_model,
+                    config=LMConfig(),
+                    signature=extractor_signature,
+                    demos=[],
+                    inputs={"text": completion},
+                )
             )
             return parsed_result[0]
 
@@ -146,11 +149,11 @@ class TwoStepAdapter(Adapter):
 
             try:
                 value = await ChatAdapter().acall(
-                    self.extraction_model,
-                    LMConfig(),
-                    extractor_signature,
-                    [],
-                    {"text": text or ""},
+                    lm=self.extraction_model,
+                    config=LMConfig(),
+                    signature=extractor_signature,
+                    demos=[],
+                    inputs={"text": text or ""},
                 )
                 value = value[0]
 

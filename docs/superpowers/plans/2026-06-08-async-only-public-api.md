@@ -129,7 +129,7 @@ uv run ruff check --fix && uv run ty check --fix && uv run ruff format
 uv run pytest tests/core/ tests/clients/test_lm.py -q
 ```
 
-- [x] **Commit Phase 1.5** (pending hash below)
+- [x] **Commit Phase 1.5** (`a4afdc75`)
 
 ---
 
@@ -243,7 +243,7 @@ uv run pytest tests/clients/ tests/adapters/ -q
 uv run ruff check --fix && uv run ty check --fix && uv run ruff format
 ```
 
-- [ ] **Commit Phase 2**
+- [x] **Commit Phase 2** (pending hash below)
 
 ```bash
 git commit -m "$(cat <<'EOF'

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 from typing import Literal, cast
@@ -129,7 +130,11 @@ def test_chat_adapter_sync_call():
     signature = make_signature("question->answer")
     adapter = ChatAdapter()
     lm = DummyLM([{"answer": "Paris"}])
-    result = adapter(lm, {}, signature, [], {"question": "What is the capital of France?"})
+    result = asyncio.run(
+        adapter.acall(
+            lm=lm, config={}, signature=signature, demos=[], inputs={"question": "What is the capital of France?"}
+        )
+    )
     assert result == [{"answer": "Paris"}]
 
 
@@ -138,7 +143,9 @@ async def test_chat_adapter_async_call():
     signature = make_signature("question->answer")
     adapter = ChatAdapter()
     lm = DummyLM([{"answer": "Paris"}])
-    result = await adapter.acall(lm, {}, signature, [], {"question": "What is the capital of France?"})
+    result = await adapter.acall(
+        lm=lm, config={}, signature=signature, demos=[], inputs={"question": "What is the capital of France?"}
+    )
     assert result == [{"answer": "Paris"}]
 
 
@@ -2289,10 +2296,10 @@ def test_chat_adapter_signature_information():
 
     with (
         settings.context(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter()),
-        mock.patch("litellm.completion") as mock_completion,
+        mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion,
     ):
         mock_completion.return_value = default_model_response("[[ ## output ## ]]\nok\n\n[[ ## completed ## ]]")
-        program(input1="Test", input2=11)
+        asyncio.run(program.acall(input1="Test", input2=11))
 
         mock_completion.assert_called_once()
         _, call_kwargs = mock_completion.call_args
@@ -2518,17 +2525,19 @@ def test_chat_adapter_with_code():
         code: Code = OutputField()
 
     adapter = ChatAdapter()
-    with mock.patch("litellm.completion") as mock_completion:
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content='[[ ## code ## ]]\nprint("Hello, world!")'))],
             model="openai/gpt-4o-mini",
         )
-        result = adapter(
-            LM(model="openai/gpt-4o-mini", cache=False),
-            {},
-            CodeGeneration,
-            [],
-            {"question": "Write a python program to print 'Hello, world!'"},
+        result = asyncio.run(
+            adapter.acall(
+                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                config={},
+                signature=CodeGeneration,
+                demos=[],
+                inputs={"question": "Write a python program to print 'Hello, world!'"},
+            )
         )
         assert result[0]["code"].code == 'print("Hello, world!")'
 
@@ -2596,71 +2605,7 @@ def test_chat_adapter_fallback_to_json_adapter_on_exception():
     signature = make_signature("question->answer")
     adapter = ChatAdapter()
 
-    with mock.patch("litellm.completion") as mock_completion:
-        # Mock returning a response compatible with JSONAdapter but not ChatAdapter
-        mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="{'answer': 'Paris'}"))],
-            model="openai/gpt-4o-mini",
-        )
-
-        lm = LM("openai/gpt-4o-mini", cache=False)
-
-        with mock.patch("dspy.adapters.json_adapter.JSONAdapter.__call__") as mock_json_adapter_call:
-            adapter(lm, {}, signature, [], {"question": "What is the capital of France?"})
-            mock_json_adapter_call.assert_called_once()
-
-        # The parse should succeed
-        result = adapter(lm, {}, signature, [], {"question": "What is the capital of France?"})
-        assert result == [{"answer": "Paris"}]
-
-
-def test_chat_adapter_fallback_preserves_native_function_calling_flag():
-    signature = make_signature("question->answer")
-    adapter = ChatAdapter(use_native_function_calling=False)
-    seen = {}
-
-    def fake_json_adapter_call(self, lm, config, signature, demos, inputs):
-        seen["use_native_function_calling"] = self.use_native_function_calling
-        return [{"answer": "Paris"}]
-
-    with mock.patch("litellm.completion") as mock_completion:
-        mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="nonsense"))],
-            model="openai/gpt-4o-mini",
-        )
-        lm = LM("openai/gpt-4o-mini", cache=False)
-
-        with mock.patch("dspy.adapters.json_adapter.JSONAdapter.__call__", new=fake_json_adapter_call):
-            result = adapter(lm, {}, signature, [], {"question": "What is the capital of France?"})
-
-    assert result == [{"answer": "Paris"}]
-    assert seen["use_native_function_calling"] is False
-
-
-def test_chat_adapter_respects_use_json_adapter_fallback_flag():
-    signature = make_signature("question->answer")
-    adapter = ChatAdapter(use_json_adapter_fallback=False)
-
-    with mock.patch("litellm.completion") as mock_completion:
-        mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="nonsense"))],
-            model="openai/gpt-4o-mini",
-        )
-
-        lm = LM("openai/gpt-4o-mini", cache=False)
-
-        with mock.patch("dspy.adapters.json_adapter.JSONAdapter.__call__") as mock_json_adapter_call:  # noqa: SIM117
-            with pytest.raises(AdapterParseError):
-                adapter(lm, {}, signature, [], {"question": "What is the capital of France?"})
-        mock_json_adapter_call.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_chat_adapter_fallback_to_json_adapter_on_exception_async():
-    signature = make_signature("question->answer")
-    adapter = ChatAdapter()
-
-    with mock.patch("litellm.acompletion") as mock_completion:
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         # Mock returning a response compatible with JSONAdapter but not ChatAdapter
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="{'answer': 'Paris'}"))],
@@ -2670,11 +2615,107 @@ async def test_chat_adapter_fallback_to_json_adapter_on_exception_async():
         lm = LM("openai/gpt-4o-mini", cache=False)
 
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall") as mock_json_adapter_acall:
-            await adapter.acall(lm, {}, signature, [], {"question": "What is the capital of France?"})
+            asyncio.run(
+                adapter.acall(
+                    lm=lm,
+                    config={},
+                    signature=signature,
+                    demos=[],
+                    inputs={"question": "What is the capital of France?"},
+                )
+            )
             mock_json_adapter_acall.assert_called_once()
 
         # The parse should succeed
-        result = await adapter.acall(lm, {}, signature, [], {"question": "What is the capital of France?"})
+        result = asyncio.run(
+            adapter.acall(
+                lm=lm, config={}, signature=signature, demos=[], inputs={"question": "What is the capital of France?"}
+            )
+        )
+        assert result == [{"answer": "Paris"}]
+
+
+def test_chat_adapter_fallback_preserves_native_function_calling_flag():
+    signature = make_signature("question->answer")
+    adapter = ChatAdapter(use_native_function_calling=False)
+    seen = {}
+
+    async def fake_json_adapter_acall(self, *, lm, config, signature, demos, inputs):
+        seen["use_native_function_calling"] = self.use_native_function_calling
+        return [{"answer": "Paris"}]
+
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
+        mock_completion.return_value = ModelResponse(
+            choices=[Choices(message=Message(content="nonsense"))],
+            model="openai/gpt-4o-mini",
+        )
+        lm = LM("openai/gpt-4o-mini", cache=False)
+
+        with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall", new=fake_json_adapter_acall):
+            result = asyncio.run(
+                adapter.acall(
+                    lm=lm,
+                    config={},
+                    signature=signature,
+                    demos=[],
+                    inputs={"question": "What is the capital of France?"},
+                )
+            )
+
+    assert result == [{"answer": "Paris"}]
+    assert seen["use_native_function_calling"] is False
+
+
+def test_chat_adapter_respects_use_json_adapter_fallback_flag():
+    signature = make_signature("question->answer")
+    adapter = ChatAdapter(use_json_adapter_fallback=False)
+
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
+        mock_completion.return_value = ModelResponse(
+            choices=[Choices(message=Message(content="nonsense"))],
+            model="openai/gpt-4o-mini",
+        )
+
+        lm = LM("openai/gpt-4o-mini", cache=False)
+
+        with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall") as mock_json_adapter_acall:  # noqa: SIM117
+            with pytest.raises(AdapterParseError):
+                asyncio.run(
+                    adapter.acall(
+                        lm=lm,
+                        config={},
+                        signature=signature,
+                        demos=[],
+                        inputs={"question": "What is the capital of France?"},
+                    )
+                )
+        mock_json_adapter_acall.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_chat_adapter_fallback_to_json_adapter_on_exception_async():
+    signature = make_signature("question->answer")
+    adapter = ChatAdapter()
+
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
+        # Mock returning a response compatible with JSONAdapter but not ChatAdapter
+        mock_completion.return_value = ModelResponse(
+            choices=[Choices(message=Message(content="{'answer': 'Paris'}"))],
+            model="openai/gpt-4o-mini",
+        )
+
+        lm = LM("openai/gpt-4o-mini", cache=False)
+
+        with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall") as mock_json_adapter_acall:
+            await adapter.acall(
+                lm=lm, config={}, signature=signature, demos=[], inputs={"question": "What is the capital of France?"}
+            )
+            mock_json_adapter_acall.assert_called_once()
+
+        # The parse should succeed
+        result = await adapter.acall(
+            lm=lm, config={}, signature=signature, demos=[], inputs={"question": "What is the capital of France?"}
+        )
         assert result == [{"answer": "Paris"}]
 
 
@@ -2688,7 +2729,7 @@ async def test_chat_adapter_async_fallback_preserves_native_function_calling_fla
         seen["use_native_function_calling"] = self.use_native_function_calling
         return [{"answer": "Paris"}]
 
-    with mock.patch("litellm.acompletion") as mock_completion:
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="nonsense"))],
             model="openai/gpt-4o-mini",
@@ -2696,7 +2737,9 @@ async def test_chat_adapter_async_fallback_preserves_native_function_calling_fla
         lm = LM("openai/gpt-4o-mini", cache=False)
 
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall", new=fake_json_adapter_acall):
-            result = await adapter.acall(lm, {}, signature, [], {"question": "What is the capital of France?"})
+            result = await adapter.acall(
+                lm=lm, config={}, signature=signature, demos=[], inputs={"question": "What is the capital of France?"}
+            )
 
     assert result == [{"answer": "Paris"}]
     assert seen["use_native_function_calling"] is False
@@ -2717,7 +2760,7 @@ def test_chat_adapter_toolcalls_native_function_calling():
     adapter = JSONAdapter(use_native_function_calling=True)
 
     # Case 1: Tool calls are present in the response, while content is None.
-    with mock.patch("litellm.completion") as mock_completion:
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
                 Choices(
@@ -2738,12 +2781,14 @@ def test_chat_adapter_toolcalls_native_function_calling():
             ],
             model="openai/gpt-4o-mini",
         )
-        result = adapter(
-            LM(model="openai/gpt-4o-mini", cache=False),
-            {},
-            MySignature,
-            [],
-            {"question": "What is the weather in Paris?", "tools": tools},
+        result = asyncio.run(
+            adapter.acall(
+                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                config={},
+                signature=MySignature,
+                demos=[],
+                inputs={"question": "What is the weather in Paris?", "tools": tools},
+            )
         )
 
         assert result[0]["tool_calls"] == ToolCalls(
@@ -2759,17 +2804,19 @@ def test_chat_adapter_toolcalls_native_function_calling():
         assert result[0]["answer"] is None
 
     # Case 2: Tool calls are not present in the response, while content is present.
-    with mock.patch("litellm.completion") as mock_completion:
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="{'answer': 'Paris'}"))],
             model="openai/gpt-4o-mini",
         )
-        result = adapter(
-            LM(model="openai/gpt-4o-mini", cache=False),
-            {},
-            MySignature,
-            [],
-            {"question": "What is the weather in Paris?", "tools": tools},
+        result = asyncio.run(
+            adapter.acall(
+                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                config={},
+                signature=MySignature,
+                demos=[],
+                inputs={"question": "What is the weather in Paris?", "tools": tools},
+            )
         )
         assert result[0]["answer"] == "Paris"
         assert result[0]["tool_calls"] is None
@@ -2788,7 +2835,7 @@ def test_chat_adapter_toolcalls_vague_match():
 
     adapter = ChatAdapter()
 
-    with mock.patch("litellm.completion") as mock_completion:
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         # Case 1: tool_calls field is a list of dicts
         mock_completion.return_value = ModelResponse(
             choices=[
@@ -2800,18 +2847,20 @@ def test_chat_adapter_toolcalls_vague_match():
             ],
             model="openai/gpt-4o-mini",
         )
-        result = adapter(
-            LM(model="openai/gpt-4o-mini", cache=False),
-            {},
-            MySignature,
-            [],
-            {"question": "What is the weather in Paris?", "tools": tools},
+        result = asyncio.run(
+            adapter.acall(
+                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                config={},
+                signature=MySignature,
+                demos=[],
+                inputs={"question": "What is the weather in Paris?", "tools": tools},
+            )
         )
         assert result[0]["tool_calls"] == ToolCalls(
             tool_calls=[ToolCalls.ToolCall(name="get_weather", args={"city": "Paris"})]
         )
 
-    with mock.patch("litellm.completion") as mock_completion:
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         # Case 2: tool_calls field is a single dict with "name" and "args" keys
         mock_completion.return_value = ModelResponse(
             choices=[
@@ -2823,12 +2872,14 @@ def test_chat_adapter_toolcalls_vague_match():
             ],
             model="openai/gpt-4o-mini",
         )
-        result = adapter(
-            LM(model="openai/gpt-4o-mini", cache=False),
-            {},
-            MySignature,
-            [],
-            {"question": "What is the weather in Paris?", "tools": tools},
+        result = asyncio.run(
+            adapter.acall(
+                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                config={},
+                signature=MySignature,
+                demos=[],
+                inputs={"question": "What is the weather in Paris?", "tools": tools},
+            )
         )
         assert result[0]["tool_calls"] == ToolCalls(
             tool_calls=[ToolCalls.ToolCall(name="get_weather", args={"city": "Paris"})]
@@ -2843,7 +2894,7 @@ def test_chat_adapter_native_reasoning():
 
     adapter = ChatAdapter()
 
-    with mock.patch("litellm.completion") as mock_completion:
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
                 Choices(
@@ -2863,12 +2914,14 @@ def test_chat_adapter_native_reasoning():
         )
         assert "reasoning" not in modified_signature.output_fields
 
-        result = adapter(
-            LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low", cache=False),
-            {},
-            MySignature,
-            [],
-            {"question": "What is the capital of France?"},
+        result = asyncio.run(
+            adapter.acall(
+                lm=LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low", cache=False),
+                config={},
+                signature=MySignature,
+                demos=[],
+                inputs={"question": "What is the capital of France?"},
+            )
         )
         assert result[0]["reasoning"] == Reasoning(content="Step-by-step thinking about the capital of France")
 
@@ -2889,7 +2942,7 @@ def test_chat_adapter_parses_float_with_underscores():
     adapter = ChatAdapter()
 
     # Simulate a response with a float number containing underscores
-    with mock.patch("litellm.completion") as mock_completion:
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
                 Choices(message=Message(content="[[ ## score ## ]]\n{'score': 123_456.789}\n[[ ## completed ## ]]"))
@@ -2898,7 +2951,9 @@ def test_chat_adapter_parses_float_with_underscores():
         )
 
         lm = LM("openai/gpt-4o-mini", cache=False)
-        result = adapter(lm, {}, MySignature, [], {"question": "What is the score?"})
+        result = asyncio.run(
+            adapter.acall(lm=lm, config={}, signature=MySignature, demos=[], inputs={"question": "What is the score?"})
+        )
 
         # The underscore-separated float should be parsed as a normal float
         assert result[0]["score"].score == 123456.789
@@ -2947,10 +3002,10 @@ def test_null_content_raises_adapter_parse_error():
         model="openai/gpt-4o-mini",
     )
 
-    with settings.context(lm=lm), mock.patch("litellm.completion", return_value=response):
+    with settings.context(lm=lm), mock.patch("litellm.acompletion", new_callable=mock.AsyncMock, return_value=response):
         cot = ChainOfThought("question -> answer")
         with pytest.raises(AdapterParseError):
-            cot(question="test")
+            asyncio.run(cot.acall(question="test"))
 
 
 def test_empty_string_content_raises_adapter_parse_error():
@@ -2963,10 +3018,10 @@ def test_empty_string_content_raises_adapter_parse_error():
         model="openai/gpt-4o-mini",
     )
 
-    with settings.context(lm=lm), mock.patch("litellm.completion", return_value=response):
+    with settings.context(lm=lm), mock.patch("litellm.acompletion", new_callable=mock.AsyncMock, return_value=response):
         cot = ChainOfThought("question -> answer")
         with pytest.raises(AdapterParseError):
-            cot(question="test")
+            asyncio.run(cot.acall(question="test"))
 
 
 def test_tool_call_with_null_content_does_not_raise():
@@ -3094,4 +3149,6 @@ def test_native_response_type_without_parse_lm_output_raises():
 
     adapter = ChatAdapter(native_response_types=[OpaqueType])
     with pytest.raises(TypeError, match="parse_lm_output"):
-        adapter(DummyLM([{}]), {}, OpaqueSignature, [], {"question": "test"})
+        asyncio.run(
+            adapter.acall(lm=DummyLM([{}]), config={}, signature=OpaqueSignature, demos=[], inputs={"question": "test"})
+        )

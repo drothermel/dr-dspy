@@ -1,3 +1,4 @@
+import asyncio
 import sys
 from unittest import mock
 
@@ -263,17 +264,19 @@ def test_xml_adapter_with_code():
         code: Code = OutputField()
 
     adapter = XMLAdapter()
-    with mock.patch("litellm.completion") as mock_completion:
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content='<code>print("Hello, world!")</code>'))],
             model="openai/gpt-4o-mini",
         )
-        result = adapter(
-            LM(model="openai/gpt-4o-mini", cache=False),
-            {},
-            CodeGeneration,
-            [],
-            {"question": "Write a python program to print 'Hello, world!'"},
+        result = asyncio.run(
+            adapter.acall(
+                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                config={},
+                signature=CodeGeneration,
+                demos=[],
+                inputs={"question": "Write a python program to print 'Hello, world!'"},
+            )
         )
         assert result[0]["code"].code == 'print("Hello, world!")'
 

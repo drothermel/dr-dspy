@@ -138,7 +138,7 @@ class DummyLM(BaseLM):
             return adapter.format_field_with_value(fields_with_values)
 
     @override
-    def forward(self, request: LMRequest) -> LMResponse:
+    async def aforward(self, request: LMRequest) -> LMResponse:
         messages = request.messages
         kwargs = {**self.kwargs, **request.config.model_dump(exclude_none=True)}
 
@@ -167,10 +167,6 @@ class DummyLM(BaseLM):
             outputs=outputs,
             usage=dotdict(prompt_tokens=0, completion_tokens=0, total_tokens=0),
         )
-
-    @override
-    async def aforward(self, request: LMRequest) -> LMResponse:
-        return self.forward(request)
 
     def _to_output(self, current_output: Any) -> LMOutput:
         if isinstance(current_output, dict):

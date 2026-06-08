@@ -276,45 +276,12 @@ class Adapter:
             config=merge_lm_request_config(lm, config),
         )
 
-    def _call_lm(self, lm: BaseLM, request: LMRequest) -> LMResponse:
-        return lm(request)
-
-    async def _acall_lm(self, lm: BaseLM, request: LMRequest) -> LMResponse:
-        return await lm.acall(request)
-
-    def __call__(
-        self,
-        lm: BaseLM,
-        config: LMConfig | Mapping[str, Any] | None,
-        signature: type[Signature],
-        demos: list[dict[str, Any]],
-        inputs: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        """
-        Execute the adapter pipeline: format inputs, call LM, and parse outputs.
-
-        Args:
-            lm: The Language Model instance to use for generation. Must be an instance of
-                `dspy.clients.base_lm.BaseLM`.
-            config: Generation controls for the LM call (e.g., temperature, max_tokens).
-            signature: The DSPy signature associated with this LM call.
-            demos: List of few-shot examples to include in the prompt. Each dictionary should contain keys matching the
-                signature's input and output field names. Examples are formatted as user/assistant message pairs.
-            inputs: The current input values for this call. Keys must match the signature's input field names.
-
-        Returns:
-            List of dictionaries representing parsed LM responses. Each dictionary contains keys matching the
-            signature's output field names. For multiple generations (n > 1), returns multiple dictionaries.
-        """
-        resolved_config = coerce_lm_config(config)
-        processed_signature, tools, resolved_config = self._call_preprocess(lm, resolved_config, signature, inputs)
-        messages = self.format(processed_signature, demos, inputs)
-        request = self._render_request(lm, resolved_config, tools, messages)
-        response = self._call_lm(lm, request)
-        return self._call_postprocess(processed_signature, signature, response, lm, resolved_config)
+    async def _call_lm(self, lm: BaseLM, request: LMRequest) -> LMResponse:
+        return await lm(request)
 
     async def acall(
         self,
+        *,
         lm: BaseLM,
         config: LMConfig | Mapping[str, Any] | None,
         signature: type[Signature],
@@ -325,7 +292,7 @@ class Adapter:
         processed_signature, tools, resolved_config = self._call_preprocess(lm, resolved_config, signature, inputs)
         messages = self.format(processed_signature, demos, inputs)
         request = self._render_request(lm, resolved_config, tools, messages)
-        response = await self._acall_lm(lm, request)
+        response = await self._call_lm(lm, request)
         return self._call_postprocess(processed_signature, signature, response, lm, resolved_config)
 
     def format(

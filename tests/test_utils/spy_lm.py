@@ -35,7 +35,7 @@ class SpyLM(LM):
         self.response_text = response_text
 
     @override
-    def forward(self, request: LMRequest) -> LMResponse:
+    async def aforward(self, request: LMRequest) -> LMResponse:
         messages = [message_to_openai_chat(message) for message in request.messages]
         kwargs = {**self.kwargs, **request.config.model_dump(exclude_none=True)}
         self.calls.append({"prompt": request_prompt(request), "messages": messages, "kwargs": kwargs})

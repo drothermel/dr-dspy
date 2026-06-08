@@ -1,3 +1,4 @@
+import asyncio
 import importlib.util
 from unittest.mock import MagicMock, patch
 
@@ -50,7 +51,7 @@ def test_litellm_embedding(cache):
 
         # Create embedding instance and call it.
         embedding = Embedder(model, caching=True)
-        result = embedding(inputs)
+        result = asyncio.run(embedding(inputs))
 
         # Verify litellm was called with correct parameters.
         # Because we disable the litellm cache, it should be called with caching=False.
@@ -60,13 +61,13 @@ def test_litellm_embedding(cache):
         np.testing.assert_allclose(result, mock_embeddings)
 
         # Second call should be cached.
-        result = embedding(inputs)
+        result = asyncio.run(embedding(inputs))
         assert mock_litellm.call_count == 1
         np.testing.assert_allclose(result, mock_embeddings)
 
         # Disable cache should issue new calls.
         embedding = Embedder(model, caching=False)
-        result = embedding(inputs)
+        result = asyncio.run(embedding(inputs))
         assert mock_litellm.call_count == 2
         np.testing.assert_allclose(result, mock_embeddings)
 
@@ -93,12 +94,12 @@ def test_callable_embedding(cache):
 
     # Create embedding instance with callable
     embedding = Embedder(embedding_fn)
-    result = embedding(inputs)
+    result = asyncio.run(embedding(inputs))
 
     assert embedding_fn.call_count == 1
     np.testing.assert_allclose(result, expected_embeddings)
 
-    result = embedding(inputs)
+    result = asyncio.run(embedding(inputs))
     # The second call should be cached.
     assert embedding_fn.call_count == 1
     np.testing.assert_allclose(result, expected_embeddings)
@@ -119,17 +120,17 @@ def test_callable_numpy_embedding_persists_to_disk(cache, tmp_path):
     embedding_fn = MagicMock(return_value=expected_embeddings)
     embedding = Embedder(embedding_fn)
 
-    result = embedding(inputs)
+    result = asyncio.run(embedding(inputs))
     assert embedding_fn.call_count == 1
     np.testing.assert_allclose(result, expected_embeddings)
 
-    result = embedding(inputs)
+    result = asyncio.run(embedding(inputs))
     assert embedding_fn.call_count == 1
     np.testing.assert_allclose(result, expected_embeddings)
 
     dspy_clients.DSPY_CACHE.reset_memory_cache()
 
-    result = embedding(inputs)
+    result = asyncio.run(embedding(inputs))
     assert embedding_fn.call_count == 1
     np.testing.assert_allclose(result, expected_embeddings)
 
@@ -138,7 +139,7 @@ def test_invalid_model_type():
     # Test that invalid model type raises ValueError
     with pytest.raises(ValueError):  # noqa: PT011, PT012
         embedding = Embedder(123)  # Invalid model type  # ty:ignore[invalid-argument-type]
-        embedding(["test"])
+        asyncio.run(embedding(["test"]))
 
 
 @pytest.mark.asyncio
@@ -171,8 +172,8 @@ def test_call_caching_false_overrides_instance_true(cache):
     with patch("litellm.embedding") as mock_litellm:
         mock_litellm.return_value = MockEmbeddingResponse([[0.1, 0.2, 0.3]])
         embedding = Embedder(model, caching=True)
-        embedding(inputs)
-        embedding(inputs, caching=False)
+        asyncio.run(embedding(inputs))
+        asyncio.run(embedding(inputs, caching=False))
         assert mock_litellm.call_count == 2
 
 
@@ -182,8 +183,8 @@ def test_call_caching_true_overrides_instance_false(cache):
     with patch("litellm.embedding") as mock_litellm:
         mock_litellm.return_value = MockEmbeddingResponse([[0.1, 0.2, 0.3]])
         embedding = Embedder(model, caching=False)
-        embedding(inputs, caching=True)
-        embedding(inputs, caching=True)
+        asyncio.run(embedding(inputs, caching=True))
+        asyncio.run(embedding(inputs, caching=True))
         assert mock_litellm.call_count == 1
 
 

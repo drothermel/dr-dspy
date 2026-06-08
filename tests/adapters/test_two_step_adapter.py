@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from typing_extensions import override
 
@@ -21,14 +23,10 @@ class RecordingTextLM(BaseLM):
         self.requests: list[LMRequest] = []
 
     @override
-    def forward(self, request: LMRequest) -> LMResponse:
+    async def aforward(self, request: LMRequest) -> LMResponse:
         self.requests.append(request)
         text = self.texts.pop(0) if self.texts else "No more responses"
         return LMResponse.from_text(text, model=self.model)
-
-    @override
-    async def aforward(self, request: LMRequest) -> LMResponse:
-        return self.forward(request)
 
 
 def test_two_step_adapter_format_exact_messages_for_simple_signature_with_demo():
@@ -105,7 +103,7 @@ def test_two_step_adapter_call():
 
     settings.configure(lm=main_lm, adapter=TwoStepAdapter(extraction_model=extraction_lm))
 
-    result = program(question="What is 5 + 7?")
+    result = asyncio.run(program.acall(question="What is 5 + 7?"))
 
     assert result.answer == 12
 

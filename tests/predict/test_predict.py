@@ -439,7 +439,7 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
     with patch("litellm.completion", return_value=FakeResp()) as completion_mock:
         lm = loaded_predict.lm
         assert lm is not None
-        lm.forward(LMRequest.from_call(model=lm.model, prompt="hello", cache=False))
+        asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
 
     assert completion_mock.call_count == 1
     assert completion_mock.call_args.kwargs.get(endpoint_override_key) != override_url
@@ -479,7 +479,7 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
         with patch("litellm.completion", return_value=FakeResp()) as completion_mock:
             lm = safe_loaded_predict.lm
             assert lm is not None
-            lm.forward(LMRequest.from_call(model=lm.model, prompt="hello", cache=False))
+            asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
 
     assert completion_mock.called
     assert not batch_completion_mock.called
@@ -489,7 +489,7 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
     with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:
         lm = opt_in_loaded_predict.lm
         assert lm is not None
-        lm.forward(LMRequest.from_call(model=lm.model, prompt="hello", cache=False))
+        asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
 
     opt_in_deployments = batch_completion_mock.call_args.kwargs["deployments"]
     assert opt_in_deployments[0]["api_base"] == override_url
@@ -526,7 +526,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     with patch("litellm.text_completion", return_value=FakeResp()) as text_completion_mock:
         lm = opt_in_loaded_predict.lm
         assert lm is not None
-        lm.forward(LMRequest.from_call(model=lm.model, prompt="hello", cache=False))
+        asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
 
     assert text_completion_mock.call_args.kwargs["api_base"] == override_url
     assert text_completion_mock.call_args.kwargs["api_key"] == env_api_key
@@ -536,7 +536,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     with patch("litellm.text_completion", return_value=FakeResp()) as text_completion_mock:
         lm = safe_loaded_predict.lm
         assert lm is not None
-        lm.forward(LMRequest.from_call(model=lm.model, prompt="hello", cache=False))
+        asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
 
     # In the safe path, the key still comes from the environment, but the serialized endpoint override does not.
     assert text_completion_mock.call_args.kwargs["api_key"] == env_api_key

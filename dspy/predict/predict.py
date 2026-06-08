@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import random
 import types
@@ -262,14 +263,14 @@ class Predict(Module, Parameter):
         lm, config, signature, demos, kwargs = self._forward_preprocess(**kwargs)
 
         adapter = settings.adapter or ChatAdapter()
-        completions = adapter(lm, config, signature, demos, kwargs)
+        completions = asyncio.run(adapter.acall(lm=lm, config=config, signature=signature, demos=demos, inputs=kwargs))
         return self._forward_postprocess(completions, signature, **kwargs)
 
     async def aforward(self, **kwargs):
         lm, config, signature, demos, kwargs = self._forward_preprocess(**kwargs)
 
         adapter = settings.adapter or ChatAdapter()
-        completions = await adapter.acall(lm, config, signature, demos, kwargs)
+        completions = await adapter.acall(lm=lm, config=config, signature=signature, demos=demos, inputs=kwargs)
         return self._forward_postprocess(completions, signature, **kwargs)
 
     def update_config(self, **kwargs) -> None:

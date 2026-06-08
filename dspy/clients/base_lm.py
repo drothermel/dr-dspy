@@ -48,8 +48,7 @@ class BaseLM:
     """Base class for DSPy language models.
 
     The only supported runtime boundary is `LMRequest -> LMResponse`.
-    Subclasses should implement `forward(request: LMRequest) -> LMResponse`
-    and, if needed, `aforward(request: LMRequest) -> LMResponse`.
+    Subclasses should implement `aforward(request: LMRequest) -> LMResponse`.
     """
 
     def __init__(
@@ -78,25 +77,10 @@ class BaseLM:
         return dict(temperature=temperature, max_tokens=max_tokens, **kwargs)
 
     @with_callbacks
-    def __call__(self, request: LMRequest) -> LMResponse:
+    async def __call__(self, request: LMRequest) -> LMResponse:
         if not isinstance(request, LMRequest):
             raise TypeError(
                 f"{type(self).__name__}.__call__ expects dspy.core.types.LMRequest, not {type(request).__name__}."
-            )
-
-        response = self.forward(request)
-        if not isinstance(response, LMResponse):
-            raise TypeError(
-                f"{type(self).__name__}.forward(request) must return dspy.core.types.LMResponse, "
-                f"but got {type(response).__name__}."
-            )
-        return self._finalize_lm_response(request, response)
-
-    @with_callbacks
-    async def acall(self, request: LMRequest) -> LMResponse:
-        if not isinstance(request, LMRequest):
-            raise TypeError(
-                f"{type(self).__name__}.acall expects dspy.core.types.LMRequest, not {type(request).__name__}."
             )
 
         response = await self.aforward(request)
@@ -106,6 +90,9 @@ class BaseLM:
                 f"but got {type(response).__name__}."
             )
         return self._finalize_lm_response(request, response)
+
+    async def acall(self, request: LMRequest) -> LMResponse:
+        return await self.__call__(request)
 
     @property
     def supports_function_calling(self) -> bool:
@@ -139,9 +126,6 @@ class BaseLM:
             )
             self.update_history(entry)
         return response
-
-    def forward(self, request: LMRequest) -> LMResponse:
-        raise NotImplementedError("Subclasses must implement this method.")
 
     async def aforward(self, request: LMRequest) -> LMResponse:
         raise NotImplementedError("Subclasses must implement this method.")

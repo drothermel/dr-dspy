@@ -125,12 +125,14 @@ class Refine(Module):
                     else:
 
                         class WrapperAdapter(cast("Any", adapter.__class__)):
-                            def __call__(self, lm, config, signature, demos, inputs):
+                            async def acall(self, *, lm, config, signature, demos, inputs):
                                 inputs["hint_"] = advice.get(signature2name[signature], "N/A")  # noqa: B023
                                 signature = signature.append(
                                     "hint_", InputField(desc="A hint to the module from an earlier run")
                                 )
-                                return adapter(lm, config, signature, demos, inputs)
+                                return await adapter.acall(
+                                    lm=lm, config=config, signature=signature, demos=demos, inputs=inputs
+                                )
 
                         with settings.context(adapter=WrapperAdapter()):
                             outputs = mod(**kwargs)

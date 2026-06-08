@@ -202,7 +202,7 @@ class NativeToolLM(BaseLM):
         return True
 
     @override
-    def forward(self, request: LMRequest) -> LMResponse:
+    async def aforward(self, request: LMRequest) -> LMResponse:
         self.calls.append({"messages": request.messages, "kwargs": captured_lm_kwargs(request)})
         if len(self.calls) == 1:
             tool_call = dotdict(
@@ -241,7 +241,7 @@ class ParallelNativeToolLM(BaseLM):
         return True
 
     @override
-    def forward(self, request: LMRequest) -> LMResponse:
+    async def aforward(self, request: LMRequest) -> LMResponse:
         self.calls.append({"messages": request.messages, "kwargs": captured_lm_kwargs(request)})
         if len(self.calls) == 1:
             tool_calls = [
