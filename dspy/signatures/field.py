@@ -74,12 +74,12 @@ def _warn_deprecated_field_args(**kwargs) -> None:
             warnings.warn(message, DeprecationWarning, stacklevel=3)
 
 
-def InputField(**kwargs): # noqa: N802
+def InputField(**kwargs):  # noqa: N802
     _warn_deprecated_field_args(**kwargs)
     return pydantic.Field(**move_kwargs(**kwargs, __dspy_field_type="input"))
 
 
-def OutputField(**kwargs): # noqa: N802
+def OutputField(**kwargs):  # noqa: N802
     _warn_deprecated_field_args(**kwargs)
     return pydantic.Field(**move_kwargs(**kwargs, __dspy_field_type="output"))
 

@@ -46,6 +46,7 @@ def configure_cache(
         safe_types=safe_types,
     )
 
+
 def _get_dspy_cache() -> Cache:
     disk_cache_dir = os.environ.get("DSPY_CACHEDIR") or str(Path.home() / ".dspy_cache")
     disk_cache_limit = int(os.environ.get("DSPY_CACHE_LIMIT", 3e10))

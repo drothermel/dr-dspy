@@ -303,7 +303,9 @@ class DatabricksRM:
             )
 
         if self.text_column_name not in col_names:
-            raise DatabricksRMError(f"text_column_name: '{self.text_column_name}' is not in the index columns: \n {col_names}")
+            raise DatabricksRMError(
+                f"text_column_name: '{self.text_column_name}' is not in the index columns: \n {col_names}"
+            )
 
         items = []
         if "data_array" in results["result"]:

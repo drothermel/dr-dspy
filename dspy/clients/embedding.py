@@ -83,7 +83,9 @@ class Embedder:
         ```
     """
 
-    def __init__(self, model: str | Callable, batch_size: int = 200, caching: bool = True, **kwargs: dict[str, Any]) -> None:
+    def __init__(
+        self, model: str | Callable, batch_size: int = 200, caching: bool = True, **kwargs: dict[str, Any]
+    ) -> None:
         self.model = model
         self.batch_size = batch_size
         self.caching = caching
@@ -116,7 +118,13 @@ class Embedder:
             return embeddings[0]
         return np.array(embeddings, dtype=np.float32)
 
-    def __call__(self, inputs: str | list[str], batch_size: int | None = None, caching: bool | None = None, **kwargs: dict[str, Any]) -> np.ndarray:
+    def __call__(
+        self,
+        inputs: str | list[str],
+        batch_size: int | None = None,
+        caching: bool | None = None,
+        **kwargs: dict[str, Any],
+    ) -> np.ndarray:
         """Compute embeddings for the given inputs.
 
         Args:

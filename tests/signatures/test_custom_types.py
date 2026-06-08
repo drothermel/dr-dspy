@@ -8,13 +8,14 @@ from dspy.signatures.signature import Signature
 
 def test_basic_custom_type_resolution():
     """Test basic custom type resolution with both explicit and automatic mapping."""
+
     class CustomType(pydantic.BaseModel):
         value: str
 
     # Custom types can be explicitly mapped
     explicit_sig = Signature(
         "input: CustomType -> output: str",  # ty:ignore[too-many-positional-arguments]
-        custom_types={"CustomType": CustomType}  # ty:ignore[unknown-argument]
+        custom_types={"CustomType": CustomType},  # ty:ignore[unknown-argument]
     )
     assert explicit_sig.input_fields["input"].annotation == CustomType  # ty:ignore[unresolved-attribute]
 
@@ -25,6 +26,7 @@ def test_basic_custom_type_resolution():
 
 def test_type_alias_for_nested_types():
     """Test using type aliases for nested types."""
+
     class Container:
         class NestedType(pydantic.BaseModel):
             value: str
@@ -37,6 +39,7 @@ def test_type_alias_for_nested_types():
     class Container2:
         class Query(pydantic.BaseModel):
             text: str
+
         class Score(pydantic.BaseModel):
             score: float
 
@@ -46,6 +49,7 @@ def test_type_alias_for_nested_types():
 
 class GlobalCustomType(pydantic.BaseModel):
     """A type defined at module level for testing module-level resolution."""
+
     value: str
     notes: str = ""
 
@@ -91,10 +95,12 @@ def test_recommended_patterns():
     sig5 = Signature("input: str -> output: OuterContainer.InnerType")  # ty:ignore[too-many-positional-arguments]
     assert sig5.output_fields["output"].annotation == OuterContainer.InnerType  # ty:ignore[unresolved-attribute]
 
+
 def test_expected_failure():
     # InnerType DNE when not OuterContainer.InnerTypes, so this type shouldnt be resolved
     with pytest.raises(ValueError):  # noqa: PT011
         Signature("input: str -> output: InnerType")  # ty:ignore[too-many-positional-arguments]
+
 
 def test_module_type_resolution():
     class TestModule(Module):
@@ -108,6 +114,7 @@ def test_module_type_resolution():
     module = TestModule()
     sig = module.predict.signature  # ty:ignore[unresolved-attribute]
     assert sig.output_fields["output"].annotation == OuterContainer.InnerType
+
 
 def test_basic_custom_type_resolution():  # noqa: F811
     class CustomType(pydantic.BaseModel):

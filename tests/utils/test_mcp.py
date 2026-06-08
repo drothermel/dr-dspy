@@ -14,6 +14,7 @@ if importlib.util.find_spec("mcp") is None:  # ty:ignore[possibly-missing-submod
 async def test_convert_mcp_tool():
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
+
     server_params = StdioServerParameters(
         command="python",
         args=["tests/utils/resources/mcp_server.py"],
@@ -48,9 +49,7 @@ async def test_convert_mcp_tool():
         error_tool = convert_mcp_tool(session, response.tools[2])
         assert error_tool.name == "wrong_tool"
         assert error_tool.desc == "This tool raises an error"
-        with pytest.raises(
-            RuntimeError, match="Failed to call a MCP tool: Error executing tool wrong_tool: error!"
-        ):
+        with pytest.raises(RuntimeError, match="Failed to call a MCP tool: Error executing tool wrong_tool: error!"):
             await error_tool.acall()  # ty:ignore[invalid-await]
 
         # Check nested Pydantic arg

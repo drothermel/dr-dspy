@@ -104,6 +104,7 @@ def test_sequential_execution_runs_on_main_thread():
 
 def test_sequential_max_errors_not_met():
     """Sequential execution should handle errors without crashing when max_errors is not reached."""
+
     def task(item):
         if item == 3:
             raise ValueError("Intentional error")
@@ -119,6 +120,7 @@ def test_sequential_max_errors_not_met():
 
 def test_sequential_max_errors_exceeded():
     """Sequential execution should cancel when max_errors is reached."""
+
     def task(item):
         if item == 3:
             raise ValueError("Intentional error")
@@ -133,6 +135,7 @@ def test_sequential_max_errors_exceeded():
 
 def test_sequential_tracks_failed_indices_and_exceptions():
     """Sequential execution should track failed indices and exception objects."""
+
     def task(item):
         if item == 3:
             raise ValueError("test error for 3")
@@ -158,6 +161,7 @@ def test_sequential_tracks_failed_indices_and_exceptions():
 
 def test_sequential_compare_results():
     """Sequential execution should track and display comparison metrics correctly."""
+
     def task(item):
         return item, item > 2  # (result, score)
 

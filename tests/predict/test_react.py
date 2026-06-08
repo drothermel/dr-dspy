@@ -30,7 +30,6 @@ def test_tool_observation_preserves_custom_type():
     def make_images():
         return Image("https://example.com/test.png"), Image(Image.new("RGB", (100, 100), "red"))  # ty:ignore[call-non-callable]
 
-
     adapter = SpyChatAdapter()
     lm = DummyLM(
         [

@@ -46,7 +46,9 @@ class BootstrapFewShotWithOptuna(Teleprompter):
     def objective(self, trial):
         program2 = self.student.reset_copy()
         for (name, compiled_predictor), (_, program2_predictor) in zip(
-            self.compiled_teleprompter.named_predictors(), program2.named_predictors(), strict=False,
+            self.compiled_teleprompter.named_predictors(),
+            program2.named_predictors(),
+            strict=False,
         ):
             all_demos = compiled_predictor.demos
             demo_index = trial.suggest_int(f"demo_index_for_{name}", 0, len(all_demos) - 1)
@@ -77,7 +79,9 @@ class BootstrapFewShotWithOptuna(Teleprompter):
             max_rounds=self.max_rounds,
         )
         self.compiled_teleprompter = teleprompter_optimize.compile(
-            self.student, teacher=self.teacher, trainset=self.trainset,
+            self.student,
+            teacher=self.teacher,
+            trainset=self.trainset,
         )
         study = optuna.create_study(direction="maximize")
         study.optimize(self.objective, n_trials=self.num_candidate_sets)

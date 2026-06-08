@@ -68,7 +68,10 @@ def _split_legacy_custom_type_text_to_parts(text: str) -> list[LMPart]:
 def _legacy_custom_type_payload_to_blocks(payload: str) -> list[dict[str, Any]]:
     parsed = _parse_legacy_payload(payload)
     if isinstance(parsed, list):
-        return [cast("dict[str, Any]", block) if isinstance(block, dict) else {"type": "text", "text": str(block)} for block in parsed]
+        return [
+            cast("dict[str, Any]", block) if isinstance(block, dict) else {"type": "text", "text": str(block)}
+            for block in parsed
+        ]
     return [{"type": "text", "text": payload}]
 
 
@@ -125,8 +128,15 @@ def _legacy_content_block_to_lm_part(block: object) -> LMPart:
         file = block.get("file", {})
         if file.get("file_data") is not None:
             media_type, data = _split_data_uri(file["file_data"])
-            return LMBinaryPart(data=data, media_type=media_type, filename=file.get("filename"), metadata={"legacy_content_block": block})
-        return LMBinaryPart(file_id=file.get("file_id", ""), filename=file.get("filename"), metadata={"legacy_content_block": block})
+            return LMBinaryPart(
+                data=data,
+                media_type=media_type,
+                filename=file.get("filename"),
+                metadata={"legacy_content_block": block},
+            )
+        return LMBinaryPart(
+            file_id=file.get("file_id", ""), filename=file.get("filename"), metadata={"legacy_content_block": block}
+        )
     if block_type == "document":
         source = block.get("source", {})
         return LMDocumentPart(

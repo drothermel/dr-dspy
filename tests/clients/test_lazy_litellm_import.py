@@ -29,7 +29,6 @@ def _hide_litellm(monkeypatch):
 def test_import_dspy_does_not_import_litellm(monkeypatch):
     monkeypatch.delitem(sys.modules, "litellm", raising=False)
 
-
     _ = LM
     _ = Embedder
     _ = streamify

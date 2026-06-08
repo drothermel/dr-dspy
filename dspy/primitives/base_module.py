@@ -166,6 +166,7 @@ class BaseModule:
         _apply(self.deepcopy())  # trial run raises before self is touched
         _apply(self)
         return self
+
     def save(self, path, save_program=False, modules_to_serialize=None) -> None:
         """Save the module.
 
@@ -208,8 +209,10 @@ class BaseModule:
             if not path.exists():
                 # Create the directory (and any parent directories)
                 path.mkdir(parents=True)
-            logger.warning("Loading untrusted .pkl files can run arbitrary code, which may be dangerous. To avoid "
-                          'this, prefer saving using json format using module.save("module.json").')
+            logger.warning(
+                "Loading untrusted .pkl files can run arbitrary code, which may be dangerous. To avoid "
+                'this, prefer saving using json format using module.save("module.json").'
+            )
             try:
                 modules_to_serialize = modules_to_serialize or []
                 for module in modules_to_serialize:
@@ -240,8 +243,10 @@ class BaseModule:
                     "with `.pkl`, or saving the whole program by setting `save_program=True`."
                 )
         elif path.suffix == ".pkl":
-            logger.warning("Loading untrusted .pkl files can run arbitrary code, which may be dangerous. To avoid "
-                          'this, prefer saving using json format using module.save("module.json").')
+            logger.warning(
+                "Loading untrusted .pkl files can run arbitrary code, which may be dangerous. To avoid "
+                'this, prefer saving using json format using module.save("module.json").'
+            )
             state = self.dump_state(json_mode=False)
             state["metadata"] = metadata
             with path.open("wb") as f:
@@ -268,9 +273,11 @@ class BaseModule:
                 state = orjson.loads(f.read())
         elif path.suffix == ".pkl":
             if not allow_pickle:
-                raise ValueError("Loading .pkl files can run arbitrary code, which may be dangerous. Prefer "
-                                 "saving with .json files if possible. Set `allow_pickle=True` "
-                                 "if you are sure about the source of the file and in a trusted environment.")
+                raise ValueError(
+                    "Loading .pkl files can run arbitrary code, which may be dangerous. Prefer "
+                    "saving with .json files if possible. Set `allow_pickle=True` "
+                    "if you are sure about the source of the file and in a trusted environment."
+                )
             with path.open("rb") as f:
                 state = cloudpickle.load(f)
         else:

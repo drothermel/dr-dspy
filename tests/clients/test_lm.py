@@ -298,7 +298,9 @@ def test_lm_wraps_litellm_errors_with_metadata():
     response.status_code = 429
     response.headers = {"x-request-id": "req-123", "retry-after": "2.5"}
 
-    error = litellm.RateLimitError(message="too many requests", llm_provider="openai", model="gpt-4o", response=response)
+    error = litellm.RateLimitError(
+        message="too many requests", llm_provider="openai", model="gpt-4o", response=response
+    )
     wrapped = lm._wrap_litellm_exception(error)
 
     assert isinstance(wrapped, LMRateLimitError)
@@ -1163,12 +1165,18 @@ def test_responses_api():
     api_response = make_response(
         output_blocks=[
             ResponseOutputMessage(
-                id="msg_1", type="message", role="assistant", status="completed", content=[
-                        {"type": "output_text", "text": "This is a test answer from responses API.", "annotations": []}
-                    ],  # ty:ignore[invalid-argument-type]
+                id="msg_1",
+                type="message",
+                role="assistant",
+                status="completed",
+                content=[
+                    {"type": "output_text", "text": "This is a test answer from responses API.", "annotations": []}
+                ],  # ty:ignore[invalid-argument-type]
             ),
             ResponseReasoningItem(
-                id="reasoning_1", type="reasoning", summary=[Summary(type="summary_text", text="This is a dummy reasoning.")],
+                id="reasoning_1",
+                type="reasoning",
+                summary=[Summary(type="summary_text", text="This is a dummy reasoning.")],
             ),
         ]
     )
@@ -1240,9 +1248,7 @@ def test_reasoning_effort_responses_api():
     """Test that reasoning_effort gets normalized to reasoning format for Responses API."""
     with mock.patch("litellm.responses") as mock_responses:
         # OpenAI model with Responses API - should normalize
-        lm = LM(
-            model="openai/gpt-5", model_type="responses", reasoning_effort="low", max_tokens=16000, temperature=1.0
-        )
+        lm = LM(model="openai/gpt-5", model_type="responses", reasoning_effort="low", max_tokens=16000, temperature=1.0)
         lm("openai query")
         call_kwargs = mock_responses.call_args.kwargs
         assert "reasoning_effort" not in call_kwargs
@@ -1508,9 +1514,11 @@ def test_responses_api_with_image_input():
     api_response = make_response(
         output_blocks=[
             ResponseOutputMessage(
-                id="msg_1", type="message", role="assistant", status="completed", content=[
-                        {"type": "output_text", "text": "This is a test answer with image input.", "annotations": []}
-                    ],  # ty:ignore[invalid-argument-type]
+                id="msg_1",
+                type="message",
+                role="assistant",
+                status="completed",
+                content=[{"type": "output_text", "text": "This is a test answer with image input.", "annotations": []}],  # ty:ignore[invalid-argument-type]
             ),
         ]
     )
@@ -1564,13 +1572,17 @@ def test_responses_api_with_pydantic_model_input():
     api_response = make_response(
         output_blocks=[
             ResponseOutputMessage(
-                id="msg_1", type="message", role="assistant", status="completed", content=[
-                        {
-                            "type": "output_text",
-                            "text": '{"answer" : "This is a good test answer", "number" : 42}',
-                            "annotations": [],
-                        }
-                    ],  # ty:ignore[invalid-argument-type]
+                id="msg_1",
+                type="message",
+                role="assistant",
+                status="completed",
+                content=[
+                    {
+                        "type": "output_text",
+                        "text": '{"answer" : "This is a good test answer", "number" : 42}',
+                        "annotations": [],
+                    }
+                ],  # ty:ignore[invalid-argument-type]
             ),
         ]
     )
@@ -1620,9 +1632,11 @@ def test_responses_api_with_none_usage():
         object="response",
         output=[
             ResponseOutputMessage(
-                id="msg_1", type="message", role="assistant", status="incomplete", content=[
-                        {"type": "output_text", "text": "Partial response that was truncated", "annotations": []}
-                    ],  # ty:ignore[invalid-argument-type]
+                id="msg_1",
+                type="message",
+                role="assistant",
+                status="incomplete",
+                content=[{"type": "output_text", "text": "Partial response that was truncated", "annotations": []}],  # ty:ignore[invalid-argument-type]
             ),
         ],
         metadata={},
@@ -1671,9 +1685,11 @@ async def test_responses_api_with_none_usage_async():
         object="response",
         output=[
             ResponseOutputMessage(
-                id="msg_1", type="message", role="assistant", status="incomplete", content=[
-                        {"type": "output_text", "text": "Partial async response", "annotations": []}
-                    ],  # ty:ignore[invalid-argument-type]
+                id="msg_1",
+                type="message",
+                role="assistant",
+                status="incomplete",
+                content=[{"type": "output_text", "text": "Partial async response", "annotations": []}],  # ty:ignore[invalid-argument-type]
             ),
         ],
         metadata={},

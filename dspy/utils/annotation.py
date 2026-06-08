@@ -7,17 +7,22 @@ P = ParamSpec("P")
 R = TypeVar("R")
 T = TypeVar("T")
 
+
 @overload
 def experimental(f: type[T], version: str | None = None) -> type[T]: ...
+
 
 @overload
 def experimental(f: Callable[P, R], version: str | None = None) -> Callable[P, R]: ...
 
+
 @overload
 def experimental(f: None = None, version: str | None = None) -> Callable[[type[T]], type[T]]: ...
 
+
 @overload
 def experimental(f: None = None, version: str | None = None) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
+
 
 def experimental(
     f: type[T] | Callable[P, R] | None = None,
@@ -36,8 +41,10 @@ def experimental(
     """
     if f:
         return _experimental(f, version)
+
     def decorator(f: Callable[P, R]) -> Callable[P, R]:
         return _experimental(f, version)
+
     return decorator
 
 

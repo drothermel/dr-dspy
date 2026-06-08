@@ -127,7 +127,8 @@ def test_pot_code_parse_error():
     with (
         patch("dspy.predict.program_of_thought.ProgramOfThought._execute_code") as mock_execute_code,
         pytest.raises(
-            RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: Error: Code format is not correct."  # noqa: RUF043
+            RuntimeError,
+            match="Max hops reached. Failed to run ProgramOfThought: Error: Code format is not correct.",  # noqa: RUF043
         ),
     ):
         pot(question="What is 1+1?")

@@ -332,7 +332,11 @@ class LMToolChoice(BaseModel):
 
     @classmethod
     def from_value(cls, value: Any = None, **overrides: Any) -> LMToolChoice:
-        if isinstance(value, Mapping) and value.get("type") == "function" and isinstance(value.get("function"), Mapping):
+        if (
+            isinstance(value, Mapping)
+            and value.get("type") == "function"
+            and isinstance(value.get("function"), Mapping)
+        ):
             # Accept OpenAI/LiteLLM-shaped tool choices for the current BaseLM
             # compatibility path. Internally, DSPy represents this as requiring
             # one allowed tool.
@@ -1718,7 +1722,9 @@ def _history_request_kwargs(request: LMRequest) -> dict[str, Any]:
 
 
 def _validate_one_source(part: Any) -> None:
-    sources = {name: getattr(part, name) for name in ("data", "url", "file_id", "path") if getattr(part, name) is not None}
+    sources = {
+        name: getattr(part, name) for name in ("data", "url", "file_id", "path") if getattr(part, name) is not None
+    }
     class_name = type(part).__name__
     if len(sources) != 1:
         raise ValueError(f"{class_name} requires exactly one of data, url, file_id, or path.")
@@ -1761,9 +1767,7 @@ def _messages_from_response(response: LMResponse) -> list[LMMessage]:
 
 
 def _is_message_sequence(value: Any) -> bool:
-    return isinstance(value, (list, tuple)) and all(
-        isinstance(item, (LMMessage, LMResponse)) for item in value
-    )
+    return isinstance(value, (list, tuple)) and all(isinstance(item, (LMMessage, LMResponse)) for item in value)
 
 
 def _coerce_part(value: Any) -> LMPart:

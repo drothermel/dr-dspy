@@ -21,7 +21,6 @@ from dspy.utils.exceptions import ContextWindowExceededError
 logger = logging.getLogger(__name__)
 
 
-
 class ReAct(Module):
     def __init__(self, signature: str | type["Signature"], tools: list[Callable], max_iters: int = 20) -> None:
         """

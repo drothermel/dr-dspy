@@ -20,19 +20,18 @@ from dspy.teleprompt.utils import get_prompt_model, get_signature
 MAX_INSTRUCT_IN_HISTORY = 5
 
 TIPS = {
-        "none": "",
-        "creative": "Don't be afraid to be creative when creating the new instruction!",
-        "simple": "Keep the instruction clear and concise.",
-        "description": "Make sure your instruction is very informative and descriptive.",
-        "high_stakes": "The instruction should include a high stakes scenario in which the LM must solve the task!",
-        "persona": 'Include a persona that is relevant to the task in the instruction (ie. "You are a ...")',
-    }
+    "none": "",
+    "creative": "Don't be afraid to be creative when creating the new instruction!",
+    "simple": "Keep the instruction clear and concise.",
+    "description": "Make sure your instruction is very informative and descriptive.",
+    "high_stakes": "The instruction should include a high stakes scenario in which the LM must solve the task!",
+    "persona": 'Include a persona that is relevant to the task in the instruction (ie. "You are a ...")',
+}
 
 
 class DescribeProgram(Signature):
-    (
-        """Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe what type of task this program appears to be designed to solve, and how it appears to work."""
-    )
+    """Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe what type of task this program appears to be designed to solve, and how it appears to work."""
+
     program_code = InputField(
         desc="Pseudocode for a language model program designed to solve a particular task.",
     )
@@ -45,9 +44,8 @@ class DescribeProgram(Signature):
 
 
 class DescribeModule(Signature):
-    (
-        """Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe the purpose of one of the specified module in this pipeline."""
-    )
+    """Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe the purpose of one of the specified module in this pipeline."""
+
     program_code = InputField(
         desc="Pseudocode for a language model program designed to solve a particular task.",
     )
@@ -73,9 +71,8 @@ def generate_instruction_class(
     use_tip=True,
 ):
     class GenerateSingleModuleInstruction(Signature):
-        (
-            """Use the information below to learn about a task that we are trying to solve using calls to an LM, then generate a new instruction that will be used to prompt a Language Model to better solve the task."""
-        )
+        """Use the information below to learn about a task that we are trying to solve using calls to an LM, then generate a new instruction that will be used to prompt a Language Model to better solve the task."""
+
         if use_dataset_summary:
             dataset_description = InputField(
                 desc="A description of the dataset that we are using.",
@@ -172,9 +169,9 @@ class GenerateModuleInstruction(Module):
 
         if self.use_task_demos:
             adjacent_sets = (
-                [demo_candidates[pred_i][demo_set_i]] +
-                demo_candidates[pred_i][demo_set_i + 1:] +
-                demo_candidates[pred_i][:demo_set_i]
+                [demo_candidates[pred_i][demo_set_i]]
+                + demo_candidates[pred_i][demo_set_i + 1 :]
+                + demo_candidates[pred_i][:demo_set_i]
             )
 
             example_strings = gather_examples_from_sets(adjacent_sets, num_demos_in_context)
@@ -191,7 +188,8 @@ class GenerateModuleInstruction(Module):
             try:
                 program_description = strip_prefix(
                     self.describe_program(
-                        program_code=self.program_code_string, program_example=task_demos,
+                        program_code=self.program_code_string,
+                        program_example=task_demos,
                     ).program_description,
                 )
                 if self.verbose:
@@ -207,7 +205,9 @@ class GenerateModuleInstruction(Module):
                     else:
                         outputs.append(field_name)
 
-                module_code = f"{program.predictors()[pred_i].__class__.__name__}({', '.join(inputs)}) -> {', '.join(outputs)}"
+                module_code = (
+                    f"{program.predictors()[pred_i].__class__.__name__}({', '.join(inputs)}) -> {', '.join(outputs)}"
+                )
 
                 module_description = self.describe_module(
                     program_code=self.program_code_string,
@@ -251,7 +251,7 @@ class GroundedProposer(Proposer):
         use_dataset_summary=True,
         program_aware=True,
         use_task_demos=True,
-        num_demos_in_context = 3,
+        num_demos_in_context=3,
         use_instruct_history=True,
         use_tip=True,
         set_tip_randomly=True,
@@ -267,8 +267,8 @@ class GroundedProposer(Proposer):
         self.num_demos_in_context = num_demos_in_context
         self.use_instruct_history = use_instruct_history
         self.use_tip = use_tip
-        self.set_tip_randomly=set_tip_randomly
-        self.set_history_randomly=set_history_randomly
+        self.set_tip_randomly = set_tip_randomly
+        self.set_history_randomly = set_history_randomly
         self.verbose = verbose
         self.rng = rng or random
 
@@ -284,11 +284,13 @@ class GroundedProposer(Proposer):
             except Exception:
                 self.program_aware = False
 
-        self.data_summary  = None
+        self.data_summary = None
         if self.use_dataset_summary:
             try:
                 self.data_summary = create_dataset_summary(
-                    trainset=trainset, view_data_batch_size=view_data_batch_size, prompt_model=prompt_model,
+                    trainset=trainset,
+                    view_data_batch_size=view_data_batch_size,
+                    prompt_model=prompt_model,
                 )
                 if self.verbose:
                     pass
@@ -301,7 +303,7 @@ class GroundedProposer(Proposer):
         program,
         demo_candidates,
         trial_logs,
-        N, # noqa: N803
+        N,  # noqa: N803
     ) -> dict[int, list[str]]:
         """This method is responsible for returning the full set of new instructions for our program, given the specified criteria."""
 
@@ -322,7 +324,7 @@ class GroundedProposer(Proposer):
             num_demos = max(len(demo_candidates[0]), 1)
 
         for pred_i, predictor in enumerate(program.predictors()):
-            for demo_set_i in range(num_demos)[:min(N, num_demos)]:
+            for demo_set_i in range(num_demos)[: min(N, num_demos)]:
                 if pred_i not in proposed_instructions:
                     proposed_instructions[pred_i] = []
                 selected_tip = None
@@ -364,7 +366,10 @@ class GroundedProposer(Proposer):
         """This method is responsible for returning a single instruction for a given predictor, using the specified criteria."""
 
         instruction_history = create_predictor_level_history_string(
-            program, pred_i, trial_logs, MAX_INSTRUCT_IN_HISTORY,
+            program,
+            pred_i,
+            trial_logs,
+            MAX_INSTRUCT_IN_HISTORY,
         )
 
         instruction_generator = GenerateModuleInstruction(
@@ -374,7 +379,7 @@ class GroundedProposer(Proposer):
             use_task_demos=self.use_task_demos and demo_candidates,
             use_instruct_history=self.use_instruct_history and instruction_history,
             use_tip=self.use_tip,
-            verbose=self.verbose
+            verbose=self.verbose,
         )
 
         rollout_lm = self.prompt_model.copy(
@@ -390,7 +395,7 @@ class GroundedProposer(Proposer):
                 program=program,
                 data_summary=self.data_summary,
                 previous_instructions=instruction_history,
-                num_demos_in_context = self.num_demos_in_context,
+                num_demos_in_context=self.num_demos_in_context,
                 tip=tip,
             ).proposed_instruction
 

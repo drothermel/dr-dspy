@@ -27,7 +27,10 @@ async def test_convert_custom_simple_tool():
     assert converted_tool.desc == "Add two numbers."
     assert converted_tool.args == {"a": {"title": "A", "type": "integer"}, "b": {"title": "B", "type": "integer"}}
     assert converted_tool.arg_types == {"a": int, "b": int}
-    assert converted_tool.arg_desc == {"a": "No description provided. (Required)", "b": "No description provided. (Required)"}
+    assert converted_tool.arg_desc == {
+        "a": "No description provided. (Required)",
+        "b": "No description provided. (Required)",
+    }
     assert await cast("Any", converted_tool).acall(a=1, b=2) == 3
 
 
@@ -48,7 +51,14 @@ async def test_convert_custom_tool_with_custom_class():
     converted_tool = convert_langchain_tool(get_age)
     assert converted_tool.name == "get_age"
     assert converted_tool.desc == "Get the age of the profile."
-    assert converted_tool.args == {"profile": {"title": "Profile", "type": "object", "properties": {"name": {"title": "Name", "type": "string"}, "age": {"title": "Age", "type": "integer"}}, "required": ["name", "age"]}}
+    assert converted_tool.args == {
+        "profile": {
+            "title": "Profile",
+            "type": "object",
+            "properties": {"name": {"title": "Name", "type": "string"}, "age": {"title": "Age", "type": "integer"}},
+            "required": ["name", "age"],
+        }
+    }
     assert converted_tool.arg_types == {"profile": Profile}
     assert converted_tool.arg_desc == {"profile": "No description provided. (Required)"}
     assert await cast("Any", converted_tool).acall(profile=Profile(name="John", age=20)) == 20

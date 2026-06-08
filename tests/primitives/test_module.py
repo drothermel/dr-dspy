@@ -208,6 +208,7 @@ def test_load_dspy_program_cross_version():
     assert len(loaded_react.react.demos) == 2
     assert len(loaded_react.extract.predict.demos) == 2
 
+
 def test_load_state_is_transactional():
     """
     Regression test for https://github.com/stanfordnlp/dspy/issues/9589
@@ -245,6 +246,4 @@ def test_load_state_is_transactional():
         with pytest.raises(KeyError):
             template.load(str(path))
 
-        assert template.a.predict.demos == [], (
-            "load_state partially mutated module before failing"
-        )
+        assert template.a.predict.demos == [], "load_state partially mutated module before failing"

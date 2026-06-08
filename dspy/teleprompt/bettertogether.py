@@ -183,10 +183,7 @@ class BetterTogether(Teleprompter):
             }
         for key, optimizer in optimizers.items():
             if not isinstance(optimizer, Teleprompter):
-                raise TypeError(
-                    f"Optimizer '{key}' must be a Teleprompter, "
-                    f"got {type(optimizer).__name__}"
-                )
+                raise TypeError(f"Optimizer '{key}' must be a Teleprompter, got {type(optimizer).__name__}")
         self.optimizers: dict[str, Teleprompter] = optimizers
 
     def compile(
@@ -296,7 +293,9 @@ class BetterTogether(Teleprompter):
 
         logger.info(f"\n{BOLD}{GREEN}==> BETTERTOGETHER COMPILATION COMPLETE <=={ENDC}")
         logger.info(f"{GREEN}Best score achieved:{ENDC} {student.candidate_programs[0]['score']}")
-        logger.info(f"{GREEN}Best strategy:{ENDC} {student.candidate_programs[0]['strategy'] or 'original (no optimization)'}")
+        logger.info(
+            f"{GREEN}Best strategy:{ENDC} {student.candidate_programs[0]['strategy'] or 'original (no optimization)'}"
+        )
 
         student._compiled = True
         return student
@@ -337,7 +336,9 @@ class BetterTogether(Teleprompter):
         num_val_examples = int(valset_ratio * len(trainset))
         valset = trainset[:num_val_examples]
         trainset = trainset[num_val_examples:]
-        logger.info(f"{BLUE}Created validation set: {len(valset)} examples. Training set: {len(trainset)} examples.{ENDC}")
+        logger.info(
+            f"{BLUE}Created validation set: {len(valset)} examples. Training set: {len(trainset)} examples.{ENDC}"
+        )
 
         return trainset, valset
 
@@ -369,8 +370,7 @@ class BetterTogether(Teleprompter):
         for optimizer_key, compile_args in optimizer_compile_args.items():
             if optimizer_key not in self.optimizers:
                 raise ValueError(
-                    f"Invalid optimizer key '{optimizer_key}'. "
-                    f"Valid keys are: {list(self.optimizers.keys())}"
+                    f"Invalid optimizer key '{optimizer_key}'. Valid keys are: {list(self.optimizers.keys())}"
                 )
             optimizer = self.optimizers[optimizer_key]
             self._validate_compile_args(optimizer, optimizer_key, compile_args)
@@ -378,15 +378,11 @@ class BetterTogether(Teleprompter):
             if optimizer.__class__.__name__ == "GEPA":
                 # GEPA accepts a teacher argument, but raises an error if it's set.
                 if teacher is not None:
-                    raise ValueError(
-                        "GEPA does not accept a teacher argument. Please remove the teacher argument."
-                    )
+                    raise ValueError("GEPA does not accept a teacher argument. Please remove the teacher argument.")
 
         return optimizer_compile_args
 
-    def _validate_compile_args(
-        self, optimizer: Teleprompter, optimizer_key: str, compile_args: dict[str, Any]
-    ) -> None:
+    def _validate_compile_args(self, optimizer: Teleprompter, optimizer_key: str, compile_args: dict[str, Any]) -> None:
         if "student" in compile_args:
             raise ValueError(
                 f"'student' is not allowed in optimizer_compile_args for optimizer '{optimizer_key}'. "
@@ -431,10 +427,12 @@ class BetterTogether(Teleprompter):
         logger.info(f"{YELLOW}Baseline score:{ENDC} {score}")
 
         for ind, step_code in enumerate(parsed_strategy):
-            current_strategy = self.STRAT_SEP.join(parsed_strategy[:ind + 1])
+            current_strategy = self.STRAT_SEP.join(parsed_strategy[: ind + 1])
             optimizer = self.optimizers[step_code]
 
-            logger.info(f"\n{BOLD}==> STEP {ind + 1}/{len(parsed_strategy)}: {optimizer.__class__.__name__.upper()} <=={ENDC}")
+            logger.info(
+                f"\n{BOLD}==> STEP {ind + 1}/{len(parsed_strategy)}: {optimizer.__class__.__name__.upper()} <=={ENDC}"
+            )
             logger.info(f"{BLUE}Current strategy:{ENDC} '{current_strategy}'")
             logger.info(f"{BLUE}Optimizer:{ENDC} {optimizer.__class__.__name__}")
 
@@ -445,9 +443,18 @@ class BetterTogether(Teleprompter):
 
                 compile_args = optimizer_args.get(step_code, {})
                 student, score, is_new_best, lms_relaunched = self._run_and_evaluate_step(
-                    optimizer, student, teacher, trainset, valset, compile_args,
-                    candidate_programs, current_strategy, rng,
-                    num_threads, effective_max_errors, provide_traceback
+                    optimizer,
+                    student,
+                    teacher,
+                    trainset,
+                    valset,
+                    compile_args,
+                    candidate_programs,
+                    current_strategy,
+                    rng,
+                    num_threads,
+                    effective_max_errors,
+                    provide_traceback,
                 )
 
                 if lms_relaunched:
@@ -474,8 +481,7 @@ class BetterTogether(Teleprompter):
 
         candidate_programs_with_idx = [(i, cp) for i, cp in enumerate(candidate_programs)]
         candidate_programs_with_idx.sort(
-            key=lambda x: (x[1]["score"] if x[1]["score"] is not None else float("-inf"), -x[0]),
-            reverse=True
+            key=lambda x: (x[1]["score"] if x[1]["score"] is not None else float("-inf"), -x[0]), reverse=True
         )
         candidate_programs = [cp for _, cp in candidate_programs_with_idx]
 
@@ -578,11 +584,13 @@ class BetterTogether(Teleprompter):
         score: float | None,
     ) -> None:
         """Add a candidate program to the list."""
-        candidate_programs.append({
-            "score": score,
-            "program": student.deepcopy(),
-            "strategy": strategy,
-        })
+        candidate_programs.append(
+            {
+                "score": score,
+                "program": student.deepcopy(),
+                "strategy": strategy,
+            }
+        )
 
     def _evaluate_on_valset(
         self,

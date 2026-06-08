@@ -69,12 +69,8 @@ class Document(Type):
         """
         document_block = {
             "type": "document",
-            "source": {
-                "type": "text",
-                "media_type": self.media_type,
-                "data": self.data
-            },
-            "citations": {"enabled": True}
+            "source": {"type": "text", "media_type": self.media_type, "data": self.data},
+            "citations": {"enabled": True},
         }
 
         if self.title:
@@ -84,8 +80,6 @@ class Document(Type):
             document_block["context"] = self.context
 
         return [document_block]
-
-
 
     @classmethod
     def description(cls) -> str:

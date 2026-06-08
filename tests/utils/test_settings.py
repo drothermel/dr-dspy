@@ -113,11 +113,7 @@ async def test_dspy_context_with_async_task_group():
             self.predict = Predict("question -> answer")
 
         async def aforward(self, question: str) -> str:
-            lm = (
-                LM("openai/gpt-4o-mini", cache=False)
-                if "France" in question
-                else LM("openai/gpt-4o", cache=False)
-            )
+            lm = LM("openai/gpt-4o-mini", cache=False) if "France" in question else LM("openai/gpt-4o", cache=False)
             with settings.context(lm=lm, trace=[]):
                 await asyncio.sleep(1)
                 assert settings.lm.model == lm.model
@@ -228,7 +224,6 @@ def test_dspy_settings_save_exclude_keys(tmp_path):
     assert settings.lm.model == "openai/gpt-4o"
     assert settings.adapter is None
     assert not settings.track_usage
-
 
 
 def test_settings_save_with_extra_modules(tmp_path):

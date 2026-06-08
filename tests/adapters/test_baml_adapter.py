@@ -27,6 +27,7 @@ from tests.adapters.conftest import format_messages_and_lm_kwargs
 # Test fixtures - Pydantic models for testing
 class PatientAddress(pydantic.BaseModel):
     """Patient Address model docstring"""
+
     street: str
     city: str
     country: Literal["US", "CA"]
@@ -37,6 +38,7 @@ class PatientDetails(pydantic.BaseModel):
     Patient Details model docstring
     Multiline docstring support test
     """
+
     name: str = pydantic.Field(description="Full name of the patient")
     age: int
     address: PatientAddress | None = None
@@ -44,6 +46,7 @@ class PatientDetails(pydantic.BaseModel):
 
 class ComplexNestedModel(pydantic.BaseModel):
     """Complex model docstring"""
+
     id: int = pydantic.Field(description="Unique identifier")
     details: PatientDetails
     tags: list[str] = pydantic.Field(default_factory=list)
@@ -70,32 +73,40 @@ def test_baml_adapter_format_exact_messages_for_simple_signature_with_demo():
         question: str = InputField()
         answer: str = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(BAMLAdapter(), QA, [{"question": "Q1", "answer": "A1"}], {"question": "Q2"})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        BAMLAdapter(), QA, [{"question": "Q1", "answer": "A1"}], {"question": "Q2"}
+    )
 
-    expected_messages = [{"role": "system",
-      "content": "Your input fields are:\n"
-                 "1. `question` (str):\n"
-                 "Your output fields are:\n"
-                 "1. `answer` (str):\n"
-                 "All interactions will be structured in the following way, with the appropriate "
-                 "values filled in.\n"
-                 "\n"
-                 "[[ ## question ## ]]\n"
-                 "{question}\n"
-                 "\n"
-                 "[[ ## answer ## ]]\n"
-                 "Output field `answer` should be of type: string\n"
-                 "\n"
-                 "[[ ## completed ## ]]\n"
-                 "In adhering to this structure, your objective is: \n"
-                 "        Given the fields `question`, produce the fields `answer`."},
-     {"role": "user", "content": "[[ ## question ## ]]\nQ1"},
-     {"role": "assistant", "content": '{\n  "answer": "A1"\n}'},
-     {"role": "user",
-      "content": "[[ ## question ## ]]\n"
-                 "Q2\n"
-                 "\n"
-                 "Respond with a JSON object in the following order of fields: `answer`."}]
+    expected_messages = [
+        {
+            "role": "system",
+            "content": "Your input fields are:\n"
+            "1. `question` (str):\n"
+            "Your output fields are:\n"
+            "1. `answer` (str):\n"
+            "All interactions will be structured in the following way, with the appropriate "
+            "values filled in.\n"
+            "\n"
+            "[[ ## question ## ]]\n"
+            "{question}\n"
+            "\n"
+            "[[ ## answer ## ]]\n"
+            "Output field `answer` should be of type: string\n"
+            "\n"
+            "[[ ## completed ## ]]\n"
+            "In adhering to this structure, your objective is: \n"
+            "        Given the fields `question`, produce the fields `answer`.",
+        },
+        {"role": "user", "content": "[[ ## question ## ]]\nQ1"},
+        {"role": "assistant", "content": '{\n  "answer": "A1"\n}'},
+        {
+            "role": "user",
+            "content": "[[ ## question ## ]]\n"
+            "Q2\n"
+            "\n"
+            "Respond with a JSON object in the following order of fields: `answer`.",
+        },
+    ]
     assert messages == expected_messages
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
@@ -112,32 +123,38 @@ def test_baml_adapter_format_exact_messages_with_nested_output():
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(BAMLAdapter(), TypedSignature, [], {"question": "Q"})
 
-    expected_messages = [{"role": "system",
-      "content": "Your input fields are:\n"
-                 "1. `question` (str):\n"
-                 "Your output fields are:\n"
-                 "1. `answer` (BamlNested):\n"
-                 "All interactions will be structured in the following way, with the appropriate "
-                 "values filled in.\n"
-                 "\n"
-                 "[[ ## question ## ]]\n"
-                 "{question}\n"
-                 "\n"
-                 "[[ ## answer ## ]]\n"
-                 "Output field `answer` should be of type: {\n"
-                 "  value: int,\n"
-                 "  tags: string[],\n"
-                 "}\n"
-                 "\n"
-                 "[[ ## completed ## ]]\n"
-                 "In adhering to this structure, your objective is: \n"
-                 "        Given the fields `question`, produce the fields `answer`."},
-     {"role": "user",
-      "content": "[[ ## question ## ]]\n"
-                 "Q\n"
-                 "\n"
-                 "Respond with a JSON object in the following order of fields: `answer` (must be "
-                 "formatted as a valid Python BamlNested)."}]
+    expected_messages = [
+        {
+            "role": "system",
+            "content": "Your input fields are:\n"
+            "1. `question` (str):\n"
+            "Your output fields are:\n"
+            "1. `answer` (BamlNested):\n"
+            "All interactions will be structured in the following way, with the appropriate "
+            "values filled in.\n"
+            "\n"
+            "[[ ## question ## ]]\n"
+            "{question}\n"
+            "\n"
+            "[[ ## answer ## ]]\n"
+            "Output field `answer` should be of type: {\n"
+            "  value: int,\n"
+            "  tags: string[],\n"
+            "}\n"
+            "\n"
+            "[[ ## completed ## ]]\n"
+            "In adhering to this structure, your objective is: \n"
+            "        Given the fields `question`, produce the fields `answer`.",
+        },
+        {
+            "role": "user",
+            "content": "[[ ## question ## ]]\n"
+            "Q\n"
+            "\n"
+            "Respond with a JSON object in the following order of fields: `answer` (must be "
+            "formatted as a valid Python BamlNested).",
+        },
+    ]
     assert messages == expected_messages
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
@@ -225,11 +242,13 @@ def test_baml_adapter_handles_complex_nested_models():
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
 
-    expected_patient_details = "\n".join([
-        f"{INDENTATION}{COMMENT_SYMBOL} Patient Details model docstring",
-        f"{INDENTATION}{COMMENT_SYMBOL} Multiline docstring support test",
-        f"{INDENTATION}details:",
-    ])
+    expected_patient_details = "\n".join(
+        [
+            f"{INDENTATION}{COMMENT_SYMBOL} Patient Details model docstring",
+            f"{INDENTATION}{COMMENT_SYMBOL} Multiline docstring support test",
+            f"{INDENTATION}details:",
+        ]
+    )
 
     assert f"{COMMENT_SYMBOL} Unique identifier" in schema
     assert expected_patient_details in schema

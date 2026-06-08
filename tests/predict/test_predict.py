@@ -252,6 +252,7 @@ def test_typed_demos_after_dump_and_load_state():
     assert loaded_demo["translated_items"][0]["name"] == "manzana"
     assert loaded_demo["translated_items"][1]["name"] == "plátano"
 
+
 def test_signature_fields_after_dump_and_load_state(tmp_path):
     class CustomSignature(Signature):
         """I am just an instruction."""
@@ -820,11 +821,14 @@ async def test_lm_usage_with_async():
 
     program.aforward = types.MethodType(patched_aforward, program)  # ty:ignore[invalid-assignment]
 
-    with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True), patch(
-        "litellm.acompletion",
-        return_value=ModelResponse(
-            choices=[{"message": {"content": "[[ ## answer ## ]]\nParis"}}],
-            usage={"total_tokens": 10},
+    with (
+        settings.context(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True),
+        patch(
+            "litellm.acompletion",
+            return_value=ModelResponse(
+                choices=[{"message": {"content": "[[ ## answer ## ]]\nParis"}}],
+                usage={"total_tokens": 10},
+            ),
         ),
     ):
         coroutines = [
@@ -1034,6 +1038,7 @@ def test_per_module_history_disabled():
         program(question="What is the capital of France?")
     assert len(program.history) == 0
 
+
 def test_input_field_default_value():
     class SpyLM(LM):
         def __init__(self):
@@ -1057,11 +1062,13 @@ def test_input_field_default_value():
     user_message = lm.calls[0]["messages"][-1]["content"]
     assert "DEFAULT_CONTEXT" in user_message
 
+
 def log_test_helper():
     lm = DummyLM([{"answer": "test output"}])
     settings.configure(lm=lm)
     dspy_logger = logging.getLogger("dspy")
     dspy_logger.propagate = True
+
 
 def test_extra_fields_warning(caplog):
     """Test that extra fields not in signature generate a warning."""
@@ -1127,6 +1134,7 @@ def test_warning_images(caplog):
         predict_instance(question="dog_image")
 
     assert "Type mismatch for field 'question': expected Image" in caplog.text
+
 
 def test_type_mismatch_warning(caplog):
     """Test that type mismatches in input fields generate a warning."""
@@ -1634,6 +1642,7 @@ def test_union_type_validation_string_signature(caplog):
 
     assert "Type mismatch for field 'mode'" in caplog.text
 
+
 @pytest.mark.parametrize("enable_type_warnings", [False, True])
 def test_basic_types_string_signature(caplog, enable_type_warnings):
     """Test type validation with basic types using string signatures."""
@@ -1663,6 +1672,7 @@ def test_basic_types_string_signature(caplog, enable_type_warnings):
     else:
         assert "Type mismatch" not in caplog.text
 
+
 def test_untyped_string_signature(caplog):
     """Test type validation with basic types using string signatures without type."""
     log_test_helper()
@@ -1689,6 +1699,7 @@ def test_untyped_class_signature(caplog):
         count = InputField()
         name = InputField()
         result = OutputField()
+
     predict_instance = Predict(TestSignature)
 
     # Test with correct types
@@ -1701,6 +1712,7 @@ def test_untyped_class_signature(caplog):
 
     assert "Type mismatch" not in caplog.text
 
+
 def test_string_to_list_signature(caplog):
     """Test type validation with string input field type where the module gets called with a list."""
     log_test_helper()
@@ -1710,6 +1722,7 @@ def test_string_to_list_signature(caplog):
         name: str = InputField()
         count = InputField()
         result = OutputField()
+
     predict_instance = Predict(TestSignature)
 
     caplog.clear()
@@ -1720,6 +1733,7 @@ def test_string_to_list_signature(caplog):
         predict_instance(name=["abc", "def", "geh"], count=123)
 
     assert "Type mismatch" not in caplog.text
+
 
 @pytest.mark.parametrize("enable_type_warnings", [False, True])
 def test_custom_signature_types(caplog, enable_type_warnings):

@@ -165,7 +165,6 @@ class BootstrapFewShot(Teleprompter):
                     bootstrapped[example_idx] = True
                     break
 
-
         # Unbootstrapped training examples
 
         self.validation = [x for idx, x in enumerate(self.trainset) if idx not in bootstrapped]

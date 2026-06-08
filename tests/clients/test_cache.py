@@ -186,6 +186,7 @@ def test_cache_miss(cache):
 
 def test_unserializable_key(cache):
     """Unserializable request key returns None without raising."""
+
     class UnserializableObject:
         pass
 
@@ -258,6 +259,7 @@ def test_request_cache_decorator(cache):
 
     # Mock the package-owned cache singleton.
     with patch("dspy.clients.DSPY_CACHE", cache):
+
         @request_cache()
         def test_function(prompt, model):
             return f"Response for {prompt} with {model}"
@@ -281,6 +283,7 @@ def test_request_cache_decorator_with_ignored_args_for_cache_key(cache):
 
     # Mock the package-owned cache singleton.
     with patch("dspy.clients.DSPY_CACHE", cache):
+
         @request_cache(ignored_args_for_cache_key=["model"])
         def test_function1(prompt, model):
             return f"Response for {prompt} with {model}"
@@ -307,6 +310,7 @@ async def test_request_cache_decorator_async(cache):
 
     # Mock the package-owned cache singleton.
     with patch("dspy.clients.DSPY_CACHE", cache):
+
         @request_cache()
         async def test_function(prompt, model):
             return f"Response for {prompt} with {model}"
@@ -330,6 +334,7 @@ def test_cache_consistency_with_lm_call_modifies_the_request(cache):
 
     # Mock the package-owned cache singleton.
     with patch("dspy.clients.DSPY_CACHE", cache):
+
         @request_cache()
         def test_function(**kwargs: object):
             del kwargs["field_to_delete"]
@@ -502,8 +507,10 @@ def test_restricted_and_unrestricted_share_wire_format(tmp_path):
     request = {"model": "test", "prompt": "shared"}
 
     unrestricted = Cache(
-        enable_disk_cache=True, enable_memory_cache=False,
-        disk_cache_dir=shared_dir, disk_size_limit_bytes=1024 * 1024,
+        enable_disk_cache=True,
+        enable_memory_cache=False,
+        disk_cache_dir=shared_dir,
+        disk_size_limit_bytes=1024 * 1024,
     )
     try:
         unrestricted.put(request, {"value": "hello"})

@@ -25,15 +25,17 @@ _TRUSTED_MODULE_PREFIXES = (
     "openai.types.",
 )
 
-_NUMPY_ALLOWED: frozenset[tuple[str, str]] = frozenset({
-    ("numpy", "dtype"),
-    ("numpy", "ndarray"),
-    ("numpy._core.numeric", "_frombuffer"),
-    ("numpy.core.numeric", "_frombuffer"),
-    ("numpy.core.multiarray", "_reconstruct"),
-    ("numpy._core.multiarray", "_reconstruct"),
-    ("_codecs", "encode"),
-})
+_NUMPY_ALLOWED: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("numpy", "dtype"),
+        ("numpy", "ndarray"),
+        ("numpy._core.numeric", "_frombuffer"),
+        ("numpy.core.numeric", "_frombuffer"),
+        ("numpy.core.multiarray", "_reconstruct"),
+        ("numpy._core.multiarray", "_reconstruct"),
+        ("_codecs", "encode"),
+    }
+)
 
 
 class DeserializationError(Exception):

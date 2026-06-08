@@ -89,8 +89,6 @@ if __name__ == "__main__":
     dataset = HotPotQA(**data_args)
 
 
-
-
 """
 What was the population of the city where Woodward Avenue ends in 2010?
 Where did the star , who is also an executive producer, of the Mick begin her carrer?

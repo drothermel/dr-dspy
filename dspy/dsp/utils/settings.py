@@ -260,7 +260,8 @@ class Settings:
         return repr(combined_config)
 
     def save(
-        self, path: str,
+        self,
+        path: str,
         modules_to_serialize: list[str] | None = None,
         exclude_keys: list[str] | None = None,
     ) -> None:
@@ -314,7 +315,6 @@ class Settings:
 
         with Path(path).open("rb") as f:
             return cloudpickle.load(f)
-
 
 
 settings = Settings()

@@ -20,12 +20,19 @@ from dspy.signatures.signature import (
 
 logger = logging.getLogger(__name__)
 
+
 class CodeAct(ReAct, ProgramOfThought):
     """
     CodeAct is a module that utilizes the Code Interpreter and predefined tools to solve the problem.
     """
 
-    def __init__(self, signature: str | type[Signature], tools: list[Callable], max_iters: int = 5, interpreter: PythonInterpreter | None = None) -> None:
+    def __init__(
+        self,
+        signature: str | type[Signature],
+        tools: list[Callable],
+        max_iters: int = 5,
+        interpreter: PythonInterpreter | None = None,
+    ) -> None:
         """
         Initializes the CodeAct class with the specified model, temperature, and max tokens.
 
@@ -69,12 +76,18 @@ class CodeAct(ReAct, ProgramOfThought):
                 "\n".join(instructions),
             )
             .append("trajectory", InputField(), type_=str)
-            .append("generated_code", OutputField(desc="Python code that when executed, produces output relevant to answering the question"), type_=str)
+            .append(
+                "generated_code",
+                OutputField(desc="Python code that when executed, produces output relevant to answering the question"),
+                type_=str,
+            )
             .append("finished", OutputField(desc="a boolean flag to determine if the process is done"), type_=bool)
         )
 
         extract_signature = make_signature(
-            cast("Any", _field_infos_to_signature_fields({**self.signature.input_fields, **self.signature.output_fields})),
+            cast(
+                "Any", _field_infos_to_signature_fields({**self.signature.input_fields, **self.signature.output_fields})
+            ),
             self.signature.instructions,
         ).append("trajectory", InputField(), type_=str)
 

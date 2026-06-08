@@ -57,7 +57,6 @@ class GSM8K:
         devset = official_train[200:500]
         testset = official_test[:]
 
-
         trainset = [Example(**x).with_inputs("question") for x in trainset]
         devset = [Example(**x).with_inputs("question") for x in devset]
         testset = [Example(**x).with_inputs("question") for x in testset]

@@ -53,10 +53,7 @@ class ReActV2(Module):
                 raise ValueError(f"Missing required final output field(s): {', '.join(missing)}")
             return {name: kwargs[name] for name in output_names}
 
-        args = {
-            name: _json_schema_for_annotation(field.annotation)
-            for name, field in output_fields.items()
-        }
+        args = {name: _json_schema_for_annotation(field.annotation) for name, field in output_fields.items()}
         arg_types = {name: field.annotation for name, field in output_fields.items()}
         return Tool(
             submit,

@@ -13,6 +13,8 @@ URL: https://github.com/huggingface/datasets/blob/fa73ab472eecf9136a3daf7a0fbff1
 Changes: 2025-08-10 - Ran ruff to format the code to DSPy styles.
          2026-05-07 - Replaced xxhash with hashlib.sha256 to remove C-extension dep.
 """
+
+
 class Hasher:
     """Hasher that accepts python objects as inputs."""
 

@@ -349,12 +349,16 @@ async def test_usage_tracker_async_parallel():
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="{'answer': 'Paris'}"))],
             usage=Usage(
-                prompt_tokens=1117, completion_tokens=46, total_tokens=1163, prompt_tokens_details={"cached_tokens": 0, "audio_tokens": 0}, completion_tokens_details={
-                        "reasoning_tokens": 0,
-                        "audio_tokens": 0,
-                        "accepted_prediction_tokens": 0,
-                        "rejected_prediction_tokens": 0,
-                    },
+                prompt_tokens=1117,
+                completion_tokens=46,
+                total_tokens=1163,
+                prompt_tokens_details={"cached_tokens": 0, "audio_tokens": 0},
+                completion_tokens_details={
+                    "reasoning_tokens": 0,
+                    "audio_tokens": 0,
+                    "accepted_prediction_tokens": 0,
+                    "rejected_prediction_tokens": 0,
+                },
             ),
             model="openai/gpt-4o-mini",
         )
@@ -365,9 +369,7 @@ async def test_usage_tracker_async_parallel():
             program.acall(question="What is the capital of France?"),
             program.acall(question="What is the capital of France?"),
         ]
-        with settings.context(
-            lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True, adapter=JSONAdapter()
-        ):
+        with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True, adapter=JSONAdapter()):
             results = await asyncio.gather(*coroutines)
 
         assert results[0].get_lm_usage() is not None
@@ -511,9 +513,7 @@ async def test_module_history_async():
 
         assert program.history[0]["outputs"] == ["{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"]
 
-        with settings.context(
-            disable_history=True, lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()
-        ):
+        with settings.context(disable_history=True, lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()):
             await program.acall(question="What is the capital of France?")
 
         # No history is recorded when history is disabled.
@@ -521,9 +521,7 @@ async def test_module_history_async():
         assert len(program.cot.history) == 2
         assert len(program.cot.predict.history) == 2
 
-        with settings.context(
-            disable_history=False, lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()
-        ):
+        with settings.context(disable_history=False, lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()):
             await program.acall(question="What is the capital of France?")
         # History is recorded again when history is enabled.
         assert len(program.history) == 2

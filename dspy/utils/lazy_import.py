@@ -37,6 +37,7 @@ def _detect_dspy_dist() -> str:
             continue
     return "dspy"
 
+
 _INSTALL_HINTS: dict[str, str] = {
     "optuna": "optuna",
     "mcp": "mcp",
@@ -168,10 +169,7 @@ def require(module: str, *, extra: str | None = None, feature: str | None = None
         feat = feature or "this feature"
         ext = extra or _INSTALL_HINTS.get(top, top)
         dist = _detect_dspy_dist()
-        message = (
-            f"{top} is required to use {feat}. "
-            f"Install with `pip install {dist}[{ext}]` or `pip install {top}`."
-        )
+        message = f"{top} is required to use {feat}. Install with `pip install {dist}[{ext}]` or `pip install {top}`."
         parent = inspect.stack()[1]
         frame_data = {
             "filename": parent.filename,

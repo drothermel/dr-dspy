@@ -178,7 +178,6 @@ def f1_score(prediction, ground_truth):
     return (2 * precision * recall) / (precision + recall)
 
 
-
 def hotpot_f1_score(prediction, ground_truth):
     """Compute HotPotQA-style token F1 with special labels.
 

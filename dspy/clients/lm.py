@@ -49,10 +49,13 @@ def _get_litellm():
 
 def _is_openai_reasoning_model(model: str) -> bool:
     model_family = model.split("/")[-1].lower() if "/" in model else model.lower()
-    return re.match(
-        r"^(?:o[1345](?:-(?:mini|nano|pro))?(?:-\d{4}-\d{2}-\d{2})?|gpt-5(?!-chat)(?:-.*)?)$",
-        model_family,
-    ) is not None
+    return (
+        re.match(
+            r"^(?:o[1345](?:-(?:mini|nano|pro))?(?:-\d{4}-\d{2}-\d{2})?|gpt-5(?!-chat)(?:-.*)?)$",
+            model_family,
+        )
+        is not None
+    )
 
 
 class LM(BaseLM):
@@ -209,12 +212,7 @@ class LM(BaseLM):
         exc_cls = _lm_error_class_from_litellm_exception(exc) or _lm_error_class_from_status(status)
         return exc_cls(message, **metadata)  # ty:ignore[invalid-argument-type]
 
-    def forward(
-        self,
-        prompt: str | None = None,
-        messages: list[dict[str, Any]] | None = None,
-        **kwargs
-    ):
+    def forward(self, prompt: str | None = None, messages: list[dict[str, Any]] | None = None, **kwargs):
         """Call the configured LM synchronously.
 
         LiteLLM/provider exceptions are wrapped in DSPy's structured LM error
@@ -698,9 +696,11 @@ def _add_dspy_identifier_to_headers(headers: dict[str, Any] | None = None):
         **headers,
     }
 
-#--------
+
+# --------
 # Errors
-#--------
+# --------
+
 
 def _safe_litellm_exception_class(name: str) -> type[Exception] | None:
     cls = getattr(_get_litellm(), name, None)

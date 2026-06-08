@@ -70,7 +70,11 @@ class JSONAdapter(ChatAdapter):
 
         has_tool_calls = any(field.annotation == ToolCalls for field in signature.output_fields.values())
 
-        if _has_open_ended_mapping(signature) or (not self.use_native_function_calling and has_tool_calls) or not lm.supports_response_schema:
+        if (
+            _has_open_ended_mapping(signature)
+            or (not self.use_native_function_calling and has_tool_calls)
+            or not lm.supports_response_schema
+        ):
             # We found that structured output mode doesn't work well with dspy.ToolCalls as output field.
             # So we fall back to json mode if native function calling is disabled and ToolCalls is present.
             lm_kwargs["response_format"] = {"type": "json_object"}

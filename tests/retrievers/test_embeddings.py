@@ -132,7 +132,6 @@ def test_embeddings_from_saved():
         assert loaded_retriever.corpus == original_retriever.corpus
 
 
-
 def test_embeddings_load_nonexistent_path():
     with pytest.raises((FileNotFoundError, OSError)):
         Embeddings.from_saved("/nonexistent/path", dummy_embedder)

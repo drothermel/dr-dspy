@@ -181,7 +181,9 @@ class DatabricksProvider(Provider):
         if "train_data_path" not in train_kwargs:  # ty:ignore[unsupported-operator]
             raise ValueError("The `train_data_path` must be provided to finetune on Databricks.")
         train_kwargs["train_data_path"] = DatabricksProvider.upload_data(  # ty:ignore[invalid-assignment]
-            train_data, train_kwargs["train_data_path"], train_data_format  # ty:ignore[invalid-argument-type, not-subscriptable]
+            train_data,
+            train_kwargs["train_data_path"],
+            train_data_format,  # ty:ignore[invalid-argument-type, not-subscriptable]
         )
 
         try:
@@ -229,7 +231,11 @@ class DatabricksProvider(Provider):
         model_to_deploy = train_kwargs.get("register_to")  # ty:ignore[unresolved-attribute]
         job.endpoint_name = model_to_deploy.replace(".", "_")  # ty:ignore[unresolved-attribute]
         DatabricksProvider.deploy_finetuned_model(
-            model_to_deploy, train_data_format, databricks_host, databricks_token, deploy_timeout  # ty:ignore[invalid-argument-type]
+            model_to_deploy,
+            train_data_format,
+            databricks_host,
+            databricks_token,
+            deploy_timeout,  # ty:ignore[invalid-argument-type]
         )
         job.launch_completed = True
         # The finetuned model name should be in the format: "databricks/<endpoint_name>".

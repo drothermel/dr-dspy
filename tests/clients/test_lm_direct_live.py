@@ -7,6 +7,7 @@ providers.
 They are intentionally flat rather than parametrized so each test can be run individually from an editor or notebook-like
 workflow. Each test skips unless the required provider credential is available.
 """
+
 import os
 
 import pytest

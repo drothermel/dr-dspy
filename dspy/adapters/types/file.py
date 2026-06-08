@@ -57,8 +57,7 @@ class File(Type):
             if "file_data" in values or "file_id" in values or "filename" in values:
                 return values
             raise ValueError(
-                "Value of `dspy.adapters.types.file.File` must contain at least one of: "
-                "file_data, file_id, or filename"
+                "Value of `dspy.adapters.types.file.File` must contain at least one of: file_data, file_id, or filename"
             )
 
         return encode_file_to_dict(values)
@@ -83,7 +82,9 @@ class File(Type):
             if self.file_data.startswith("data:"):
                 # file data has "data:text/plain;base64,..." format
                 mime_type = self.file_data.split(";")[0].split(":")[1]
-                len_data = len(self.file_data.split("base64,")[1]) if "base64," in self.file_data else len(self.file_data)
+                len_data = (
+                    len(self.file_data.split("base64,")[1]) if "base64," in self.file_data else len(self.file_data)
+                )
                 parts.append(f"file_data=<DATA_URI({mime_type}, {len_data} chars)>")
             else:
                 len_data = len(self.file_data)

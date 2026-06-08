@@ -120,8 +120,7 @@ def test_basic_image_operations(test_case):
 
     # Convert string URLs to Image objects
     inputs = {
-        k: Image(v) if isinstance(v, str) and k in ["image", "ui_image"] else v
-        for k, v in test_case["inputs"].items()
+        k: Image(v) if isinstance(v, str) and k in ["image", "ui_image"] else v for k, v in test_case["inputs"].items()
     }
 
     result = predictor(**inputs)
@@ -488,6 +487,7 @@ def test_invalid_string_format():
     # Should raise a ValueError and not pass the string through
     with pytest.raises(ValueError, match="Unrecognized"):
         Image(invalid_string)
+
 
 def test_pil_image_with_download_parameter():
     """Test behavior when PIL image is passed with download=True"""

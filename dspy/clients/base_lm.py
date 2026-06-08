@@ -227,8 +227,7 @@ class BaseLM:
         contract = getattr(type(self), "forward_contract", "legacy")
         if contract not in {"legacy", "typed_lm"}:
             raise ValueError(
-                f"{type(self).__name__}.forward_contract must be 'legacy' or 'typed_lm', "
-                f"but got {contract!r}."
+                f"{type(self).__name__}.forward_contract must be 'legacy' or 'typed_lm', but got {contract!r}."
             )
         return contract
 
@@ -611,12 +610,7 @@ class BaseLM:
             self.update_history(entry)
         return response
 
-    def forward(
-        self,
-        prompt: str | None = None,
-        messages: list[dict[str, Any]] | None = None,
-        **kwargs
-    ):
+    def forward(self, prompt: str | None = None, messages: list[dict[str, Any]] | None = None, **kwargs):
         """Forward pass for the language model.
 
         Subclasses must implement this method according to `forward_contract`.
@@ -642,12 +636,7 @@ class BaseLM:
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
-    async def aforward(
-        self,
-        prompt: str | None = None,
-        messages: list[dict[str, Any]] | None = None,
-        **kwargs
-    ):
+    async def aforward(self, prompt: str | None = None, messages: list[dict[str, Any]] | None = None, **kwargs):
         """Async forward pass for the language model.
 
         Subclasses that support async calls must implement this method according to `forward_contract`.
@@ -684,7 +673,9 @@ class BaseLM:
             A dictionary that can be passed to `BaseLM.load_state`. The state
             excludes API keys.
         """
-        filtered_kwargs = {key: value for key, value in self.kwargs.items() if key not in ("api_key", LM_CLASS_STATE_KEY)}
+        filtered_kwargs = {
+            key: value for key, value in self.kwargs.items() if key not in ("api_key", LM_CLASS_STATE_KEY)
+        }
         return {
             LM_CLASS_STATE_KEY: f"{type(self).__module__}.{type(self).__qualname__}",
             "model": self.model,

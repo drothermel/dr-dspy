@@ -60,9 +60,7 @@ class WeaviateRM:
         # Check the type of weaviate_client (this is added to support v3 and v4)
         if hasattr(weaviate_client, "collections"):
             self._client_type = "WeaviateClient"
-            self._weaviate_collection = cast("Any", weaviate_client).collections.get(
-                self._weaviate_collection_name
-            )
+            self._weaviate_collection = cast("Any", weaviate_client).collections.get(self._weaviate_collection_name)
         elif hasattr(weaviate_client, "query"):
             self._client_type = "Client"
             self._weaviate_collection = None
@@ -103,8 +101,8 @@ class WeaviateRM:
 
             elif self._client_type == "Client":
                 q = cast("Any", self._weaviate_client).query.get(
-                        self._weaviate_collection_name, [self._weaviate_collection_text_key]
-                    )
+                    self._weaviate_collection_name, [self._weaviate_collection_text_key]
+                )
                 if tenant:
                     q = q.with_tenant(tenant)
                 results = q.with_hybrid(query=query).with_limit(k).do()
@@ -121,7 +119,9 @@ class WeaviateRM:
         if self._client_type == "WeaviateClient":
             objects = []
             collection = cast("Any", self._weaviate_collection)
-            for counter, item in enumerate(collection.iterator()): # TODO: Apply tenant_id to object iteration; search is tenant-scoped but get_objects is not.
+            for counter, item in enumerate(
+                collection.iterator()
+            ):  # TODO: Apply tenant_id to object iteration; search is tenant-scoped but get_objects is not.
                 if counter >= num_samples:
                     break
                 new_object = {}
@@ -135,8 +135,7 @@ class WeaviateRM:
     def insert(self, new_object_properties: dict[str, object]) -> None:
         if self._client_type == "WeaviateClient":
             cast("Any", self._weaviate_collection).data.insert(
-                properties=cast("Any", new_object_properties),
-                uuid=get_valid_uuid(uuid4())
-            ) # TODO: Apply tenant_id to inserts; search is tenant-scoped but insert is not.
+                properties=cast("Any", new_object_properties), uuid=get_valid_uuid(uuid4())
+            )  # TODO: Apply tenant_id to inserts; search is tenant-scoped but insert is not.
         else:
             raise AttributeError("`insert` is not supported for the v3 Weaviate Python client, please upgrade to v4.")

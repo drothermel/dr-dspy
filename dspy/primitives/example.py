@@ -86,6 +86,7 @@ class Example:
         [`Metrics`](../../learn/evaluation/metrics.md): Write metric functions
             that compare an `Example` with a prediction.
     """
+
     # TODO: Add a `dspy.datasets.DataLoader` API link once the datasets API
     # pages exist.
 
@@ -325,6 +326,7 @@ class Example:
             >>> Example(question="Why?", answer="Because.").toDict()
             {'question': 'Why?', 'answer': 'Because.'}
         """
+
         def convert_to_serializable(value):
             if hasattr(value, "toDict"):
                 return value.toDict()

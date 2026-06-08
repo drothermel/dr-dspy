@@ -67,12 +67,13 @@ def create_directory(path) -> None:
 
 def deduplicate(seq: list[str]) -> list[str]:
     """
-        From Raymond Hettinger
-        https://twitter.com/raymondh/status/944125570534621185
-        Since Python 3.6 Dict are ordered
-        Benchmark: https://gist.github.com/peterbe/67b9e40af60a1d5bcb1cfb4b2937b088
+    From Raymond Hettinger
+    https://twitter.com/raymondh/status/944125570534621185
+    Since Python 3.6 Dict are ordered
+    Benchmark: https://gist.github.com/peterbe/67b9e40af60a1d5bcb1cfb4b2937b088
     """
     return list(dict.fromkeys(seq))
+
 
 def batch(group, bsize, provide_offset=False):
     """Split a list into batches of specified size.

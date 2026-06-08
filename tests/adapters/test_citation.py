@@ -12,7 +12,7 @@ def test_citation_validate_input():
         document_index=0,
         start_char_index=0,
         end_char_index=23,
-        supported_text="The Earth orbits the Sun."
+        supported_text="The Earth orbits the Sun.",
     )
     assert citation.cited_text == "The Earth orbits the Sun."
     assert citation.document_index == 0
@@ -34,7 +34,7 @@ def test_citations_in_nested_type():
         document_index=0,
         start_char_index=0,
         end_char_index=13,
-        supported_text="Hello, world!"
+        supported_text="Hello, world!",
     )
     citations = Citations(citations=[citation])
     wrapper = Wrapper(citations=citations)
@@ -48,7 +48,7 @@ def test_citation_with_all_fields():
         document_title="Physics Facts",
         start_char_index=10,
         end_char_index=31,
-        supported_text="Water boils at 100°C."
+        supported_text="Water boils at 100°C.",
     )
     assert citation.cited_text == "Water boils at 100°C."
     assert citation.document_index == 1
@@ -65,7 +65,7 @@ def test_citation_format():
         document_title="Weather Guide",
         start_char_index=5,
         end_char_index=21,
-        supported_text="The sky is blue."
+        supported_text="The sky is blue.",
     )
 
     formatted = citation.format()
@@ -80,23 +80,25 @@ def test_citation_format():
 
 
 def test_citations_format():
-    citations = Citations(citations=[
-        Citations.Citation(
-            cited_text="First citation",
-            document_index=0,
-            start_char_index=0,
-            end_char_index=14,
-            supported_text="First citation"
-        ),
-        Citations.Citation(
-            cited_text="Second citation",
-            document_index=1,
-            document_title="Source",
-            start_char_index=20,
-            end_char_index=35,
-            supported_text="Second citation"
-        )
-    ])
+    citations = Citations(
+        citations=[
+            Citations.Citation(
+                cited_text="First citation",
+                document_index=0,
+                start_char_index=0,
+                end_char_index=14,
+                supported_text="First citation",
+            ),
+            Citations.Citation(
+                cited_text="Second citation",
+                document_index=1,
+                document_title="Source",
+                start_char_index=20,
+                end_char_index=35,
+                supported_text="Second citation",
+            ),
+        ]
+    )
 
     formatted = citations.format()
 
@@ -115,7 +117,7 @@ def test_citations_from_dict_list():
             "document_title": "Weather Guide",
             "start_char_index": 0,
             "end_char_index": 15,
-            "supported_text": "The sky was blue yesterday."
+            "supported_text": "The sky was blue yesterday.",
         }
     ]
 
@@ -132,25 +134,28 @@ def test_citations_postprocessing():
 
     class CitationSignature(Signature):
         """Test signature with citations."""
+
         question: str = InputField()
         answer: str = OutputField()
         citations: Citations = OutputField()
 
     adapter = ChatAdapter(native_response_types=[Citations])
 
-    outputs = [{
-        "text": "[[ ## answer ## ]]\nThe answer is blue.\n\n[[ ## citations ## ]]\n[]",
-        "citations": [
-            {
-                "cited_text": "The sky is blue",
-                "document_index": 0,
-                "document_title": "Weather Guide",
-                "start_char_index": 10,
-                "end_char_index": 25,
-                "supported_text": "The sky is blue"
-            }
-        ]
-    }]
+    outputs = [
+        {
+            "text": "[[ ## answer ## ]]\nThe answer is blue.\n\n[[ ## citations ## ]]\n[]",
+            "citations": [
+                {
+                    "cited_text": "The sky is blue",
+                    "document_index": 0,
+                    "document_title": "Weather Guide",
+                    "start_char_index": 10,
+                    "end_char_index": 25,
+                    "supported_text": "The sky is blue",
+                }
+            ],
+        }
+    ]
 
     result = adapter._call_postprocess(
         CitationSignature.delete("citations"),
@@ -170,17 +175,25 @@ def test_citations_postprocessing():
 def test_citation_extraction_from_lm_response():
     from unittest.mock import MagicMock
 
-    mock_choice = MagicMock(message=MagicMock(provider_specific_fields={"citations": [[
-        {
-            "type": "char_location",
-            "cited_text": "The sky is blue",
-            "document_index": 0,
-            "document_title": "Weather Guide",
-            "start_char_index": 10,
-            "end_char_index": 25,
-            "supported_text": "The sky is blue"
-        }
-    ]]}))
+    mock_choice = MagicMock(
+        message=MagicMock(
+            provider_specific_fields={
+                "citations": [
+                    [
+                        {
+                            "type": "char_location",
+                            "cited_text": "The sky is blue",
+                            "document_index": 0,
+                            "document_title": "Weather Guide",
+                            "start_char_index": 10,
+                            "end_char_index": 25,
+                            "supported_text": "The sky is blue",
+                        }
+                    ]
+                ]
+            }
+        )
+    )
 
     lm = LM(model="test")
     citations = lm._extract_citations_from_response(mock_choice)

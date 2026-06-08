@@ -303,9 +303,7 @@ class MultiModalInstructionProposer(ProposalFn):
         for component_name in components_to_update:
             if component_name in candidate and component_name in reflective_dataset:
                 current_instruction = candidate[component_name]
-                component_reflective_data = cast(
-                    "list[ReflectiveExample]", reflective_dataset[component_name]
-                )
+                component_reflective_data = cast("list[ReflectiveExample]", reflective_dataset[component_name])
 
                 # Call the single-instruction proposer.
                 #

@@ -87,7 +87,9 @@ class EnvPool:
         try:
             mp = cast("Any", importlib.import_module("multiprocess"))
         except ImportError as err:
-            raise ImportError("multiprocess is not installed. " "Please install it via `pip install multiprocess`.") from err
+            raise ImportError(
+                "multiprocess is not installed. Please install it via `pip install multiprocess`."
+            ) from err
 
         # Must call set_start_method('spawn') here, before creating any processes
         with contextlib.suppress(RuntimeError):
@@ -166,7 +168,6 @@ class _EnvSession:
 class AlfWorld:
     def __init__(self, max_threads: int = 20) -> None:
         self.POOL = EnvPool(size=max_threads)
-
 
         dataset = [Example(idx=idx).with_inputs("idx") for idx in range(3500)]
         random.Random(0).shuffle(dataset)

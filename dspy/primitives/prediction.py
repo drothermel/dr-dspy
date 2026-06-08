@@ -45,7 +45,7 @@ class Prediction(Example):
             return f"Prediction(\n    {store_repr}\n)"
 
         num_completions = len(self._completions)
-        return f"Prediction(\n    {store_repr},\n    completions=Completions(...)\n) ({num_completions-1} completions omitted)"
+        return f"Prediction(\n    {store_repr},\n    completions=Completions(...)\n) ({num_completions - 1} completions omitted)"
 
     def __str__(self) -> str:
         return self.__repr__()

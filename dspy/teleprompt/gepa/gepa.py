@@ -118,8 +118,7 @@ class DspyGEPAResult:
 
     def to_dict(self) -> dict[str, Any]:
         cands = [
-            {name: pred.signature.instructions for name, pred in cand.named_predictors()}
-            for cand in self.candidates
+            {name: pred.signature.instructions for name, pred in cand.named_predictors()} for cand in self.candidates
         ]
 
         return {
@@ -544,11 +543,7 @@ class GEPA(Teleprompter):
                 module_outputs: Prediction,
                 captured_trace: "DSPyTrace",
             ) -> ScoreWithFeedback:
-                pred_output = (
-                    Prediction(**predictor_output)
-                    if isinstance(predictor_output, dict)
-                    else predictor_output
-                )
+                pred_output = Prediction(**predictor_output) if isinstance(predictor_output, dict) else predictor_output
                 trace_for_pred: DSPyTrace = [(predictor, predictor_inputs, pred_output)]
                 o = self.metric_fn(
                     module_inputs,

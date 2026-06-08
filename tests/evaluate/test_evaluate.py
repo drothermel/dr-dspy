@@ -60,9 +60,7 @@ def test_evaluate_call():
 
 def test_evaluate_single_thread_runs_in_main_thread():
     """Evaluate with num_threads=1 should run in the main thread."""
-    settings.configure(
-        lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}})
-    )
+    settings.configure(lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
 
     execution_threads = []
@@ -88,6 +86,7 @@ def test_evaluate_single_thread_runs_in_main_thread():
 @pytest.mark.extra
 def test_construct_result_df():
     import pandas as pd
+
     devset = [
         new_example("What is 1+1?", "2"),
         new_example("What is 2+2?", "4"),
@@ -194,9 +193,7 @@ def test_evaluate_call_wrong_answer():
         ),
         (
             lambda text: Predict("text: str -> entities: list[dict[str, str]]")(text=text).entities,
-            Example(text="United States", entities=[{"name": "United States", "type": "location"}]).with_inputs(
-                "text"
-            ),
+            Example(text="United States", entities=[{"name": "United States", "type": "location"}]).with_inputs("text"),
         ),
         (
             lambda text: Predict("text: str -> first_word: Tuple[str, int]")(text=text).words,
@@ -289,6 +286,7 @@ def test_evaluate_callback():
     assert callback.end_call_outputs.score == 100.0  # ty:ignore[unresolved-attribute]
     assert callback.end_call_count == 1
 
+
 def test_evaluation_result_repr():
     result = EvaluationResult(score=100.0, results=[(new_example("What is 1+1?", "2"), {"answer": "2"}, 100.0)])  # ty:ignore[invalid-argument-type]
     assert repr(result) == "EvaluationResult(score=100.0, results=<list of 1 results>)"
@@ -365,6 +363,7 @@ def test_evaluate_save_as_json_with_history():
 
     finally:
         import os
+
         if os.path.exists(temp_json):
             os.unlink(temp_json)
 
@@ -411,6 +410,7 @@ def test_evaluate_save_as_csv_with_history():
 
         # Verify CSV file was created
         import csv
+
         with open(temp_csv) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
@@ -422,6 +422,6 @@ def test_evaluate_save_as_csv_with_history():
 
     finally:
         import os
+
         if os.path.exists(temp_csv):
             os.unlink(temp_csv)
-

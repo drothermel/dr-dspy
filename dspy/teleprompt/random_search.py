@@ -51,7 +51,6 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         self.num_candidate_sets = num_candidate_programs
         self.max_labeled_demos = max_labeled_demos
 
-
     def compile(self, student, *, teacher=None, trainset, valset=None, restrict=None, labeled_sample=True):
         self.trainset = trainset
         self.valset = valset or trainset  # TODO: FIXME: Note this choice.
@@ -138,7 +137,6 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         best_program.candidate_programs = sorted(
             best_program.candidate_programs, key=lambda x: x["score"], reverse=True
         )
-
 
         return best_program
 

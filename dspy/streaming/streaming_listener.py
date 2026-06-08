@@ -287,9 +287,7 @@ class StreamListener:
             )
         return None
 
-    def _default_handle_stream_chunk(
-        self, token: str | None, end_identifier: re.Pattern[str]
-    ) -> StreamResponse | None:
+    def _default_handle_stream_chunk(self, token: str | None, end_identifier: re.Pattern[str]) -> StreamResponse | None:
         concat_message = "".join(self.field_end_queue.queue).strip()
 
         if re.search(end_identifier, concat_message):

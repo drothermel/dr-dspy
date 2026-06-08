@@ -53,9 +53,7 @@ def test_example_len():
 
 
 def test_example_repr_str_img():
-    example = Example(
-        img=Image(url="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
-    )
+    example = Example(img=Image(url="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"))
     assert (
         repr(example)
         == "Example({'img': Image(url=data:image/gif;base64,<IMAGE_BASE_64_ENCODED(56)>)}) (input_keys=None)"
@@ -152,6 +150,7 @@ def test_example_to_dict_with_history():
 
     # Verify JSON serialization works
     import json
+
     json_str = json.dumps(result)
     restored = json.loads(json_str)
     assert restored["history"]["messages"] == result["history"]["messages"]

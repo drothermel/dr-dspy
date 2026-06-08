@@ -93,14 +93,14 @@ class Avatar(Module):
                 )
         else:
             self.actor.signature = self.actor.signature.append(
-                f"action_{idx+1}",
+                f"action_{idx + 1}",
                 OutputField(
-                    prefix=f"Action {idx+1}:",
-                    desc=f"{get_number_with_suffix(idx+1)} action to taken",
+                    prefix=f"Action {idx + 1}:",
+                    desc=f"{get_number_with_suffix(idx + 1)} action to taken",
                 ),
             )
             self.actor.signature = self.actor.signature.with_updated_fields(
-                f"action_{idx+1}",
+                f"action_{idx + 1}",
                 Action,
             )
 

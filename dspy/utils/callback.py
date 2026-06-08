@@ -333,7 +333,6 @@ def with_callbacks(fn):
 
         return async_wrapper
 
-
     @functools.wraps(fn)
     def sync_wrapper(instance, *args, **kwargs):
         callbacks = _get_active_callbacks(instance)

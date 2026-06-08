@@ -148,6 +148,7 @@ class Embeddings:
         if self.index is not None:
             try:
                 import faiss  # ty: ignore[unresolved-import]
+
                 faiss.write_index(self.index, str(save_path / "faiss_index.bin"))
             except ImportError:
                 # If FAISS is not available, we can't save the index
@@ -199,6 +200,7 @@ class Embeddings:
         if config["has_faiss_index"] and faiss_index_path.exists():
             try:
                 import faiss  # ty: ignore[unresolved-import]
+
                 self.index = faiss.read_index(str(faiss_index_path))
             except ImportError:
                 # If FAISS is not available, fall back to brute force

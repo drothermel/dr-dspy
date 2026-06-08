@@ -150,6 +150,7 @@ class SignatureMeta(type(BaseModel)):
         if sys.version_info >= (3, 14):
             try:
                 import annotationlib
+
                 # Try to get from explicit __annotations__ first (e.g., from __future__ import annotations)
                 raw_annotations = namespace.get("__annotations__")
 
@@ -158,8 +159,7 @@ class SignatureMeta(type(BaseModel)):
                     annotate_func = annotationlib.get_annotate_from_class_namespace(namespace)
                     if annotate_func:
                         raw_annotations = annotationlib.call_annotate_function(
-                            annotate_func,
-                            format=annotationlib.Format.FORWARDREF
+                            annotate_func, format=annotationlib.Format.FORWARDREF
                         )
                     else:
                         raw_annotations = {}
@@ -173,7 +173,9 @@ class SignatureMeta(type(BaseModel)):
                 continue  # Don't add types to non-field attributes
             if not name.startswith("__") and name not in raw_annotations:
                 raw_annotations[name] = str
-                field.json_schema_extra[IS_TYPE_UNDEFINED] = True  # Mark that the type was originally undefined in the signature
+                field.json_schema_extra[IS_TYPE_UNDEFINED] = (
+                    True  # Mark that the type was originally undefined in the signature
+                )
         ordered_annotations = {name: raw_annotations[name] for name in field_order if name in raw_annotations}
         ordered_annotations.update({k: v for k, v in raw_annotations.items() if k not in ordered_annotations})
         namespace["__annotations__"] = ordered_annotations
@@ -251,7 +253,11 @@ class SignatureMeta(type(BaseModel)):
         return f"{input_fields} -> {output_fields}"
 
     def _get_fields_with_type(cls, field_type) -> dict[str, FieldInfo]:
-        return {k: v for k, v in cast("Any", cls).model_fields.items() if _field_info_extra(v)["__dspy_field_type"] == field_type}
+        return {
+            k: v
+            for k, v in cast("Any", cls).model_fields.items()
+            if _field_info_extra(v)["__dspy_field_type"] == field_type
+        }
 
     def __repr__(cls) -> str:
         """Output a representation of the signature.
@@ -639,9 +645,9 @@ def _parse_signature(signature: str, names=None) -> dict[str, tuple[type, Any]]:
 
     input_fields = list(_parse_field_string(inputs_str, names))
     output_fields = list(_parse_field_string(outputs_str, names))
-    duplicate_field_names = sorted({field_name for field_name, *_ in input_fields}.intersection(
-        field_name for field_name, *_ in output_fields
-    ))
+    duplicate_field_names = sorted(
+        {field_name for field_name, *_ in input_fields}.intersection(field_name for field_name, *_ in output_fields)
+    )
     if duplicate_field_names:
         raise ValueError(
             "Input and output fields must have distinct names, but found duplicates: "
@@ -650,7 +656,7 @@ def _parse_signature(signature: str, names=None) -> dict[str, tuple[type, Any]]:
 
     fields = {}
     for field_name, field_type, is_type_undefined in input_fields:
-        fields[field_name] = (field_type, InputField(IS_TYPE_UNDEFINED= is_type_undefined))
+        fields[field_name] = (field_type, InputField(IS_TYPE_UNDEFINED=is_type_undefined))
     for field_name, field_type, _ in output_fields:
         fields[field_name] = (field_type, OutputField())
 
@@ -668,7 +674,9 @@ def _parse_field_string(field_string: str, names=None) -> Iterator[tuple[str, ty
     function_def = cast("ast.FunctionDef", ast.parse(f"def f({field_string}): pass").body[0])
     args = function_def.args.args
     field_names: list[str] = [arg.arg for arg in args]
-    types_list: list[type] = [str if arg.annotation is None else _parse_type_node(arg.annotation, names) for arg in args]
+    types_list: list[type] = [
+        str if arg.annotation is None else _parse_type_node(arg.annotation, names) for arg in args
+    ]
     is_type_undefined: list[bool] = [arg.annotation is None for arg in args]
     return zip(field_names, types_list, is_type_undefined, strict=False)
 

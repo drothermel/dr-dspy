@@ -22,7 +22,6 @@ class Ensemble(Teleprompter):
         size = self.size
         reduce_fn = self.reduce_fn
 
-
         class EnsembledProgram(Module):
             def __init__(self) -> None:
                 super().__init__()

@@ -1,4 +1,5 @@
 """Tests for the SandboxSerializable ABC and build_repl_variable helper."""
+
 import pytest
 
 from dspy.primitives.repl_types import REPLVariable

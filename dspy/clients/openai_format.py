@@ -139,7 +139,10 @@ def message_to_responses_input_items(message: LMMessage) -> list[dict[str, Any]]
     """Convert one DSPy message into one or more Responses input items."""
     if message.role == "tool" and len(message.parts) == 1 and isinstance(message.parts[0], LMToolResultPart):
         result = message.parts[0]
-        item = {"type": "function_call_output", "output": responses_tool_output_text(tool_result_to_openai(result)["content"])}
+        item = {
+            "type": "function_call_output",
+            "output": responses_tool_output_text(tool_result_to_openai(result)["content"]),
+        }
         if result.call_id is not None:
             item["call_id"] = result.call_id
         return [item]
@@ -222,7 +225,9 @@ def messages_to_text_prompt(messages: list[LMMessage]) -> str:
         texts = []
         for part in message.parts:
             if not isinstance(part, LMTextPart):
-                raise ValueError(f"OpenAI text completions only support text parts, but received {type(part).__name__}.")
+                raise ValueError(
+                    f"OpenAI text completions only support text parts, but received {type(part).__name__}."
+                )
             texts.append(part.text)
         chunks.append("".join(texts))
     return "\n\n".join(chunks + ["BEGIN RESPONSE:"])
@@ -518,7 +523,9 @@ def responses_tool_output_text(content: Any) -> str:
         return content
     if isinstance(content, list):
         return "".join(
-            block.get("text", "") if isinstance(block, dict) and block.get("type") in {"text", "input_text"} else str(block)
+            block.get("text", "")
+            if isinstance(block, dict) and block.get("type") in {"text", "input_text"}
+            else str(block)
             for block in content
         )
     return str(content)
@@ -669,7 +676,12 @@ def responses_function_call_to_part(output_item: Any) -> LMToolCallPart:
             provider_data["raw_arguments"] = args
             provider_data["arguments_parse_error"] = str(error)
             args = {}
-    return LMToolCallPart(id=get_value(output_item, "call_id"), name=get_value(output_item, "name", ""), args=args, provider_data=provider_data)
+    return LMToolCallPart(
+        id=get_value(output_item, "call_id"),
+        name=get_value(output_item, "name", ""),
+        args=args,
+        provider_data=provider_data,
+    )
 
 
 def citation_to_part(citation: Any) -> LMCitationPart:
@@ -878,7 +890,22 @@ def model_dump(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return dict(value)
     data = {}
-    for key in ("id", "call_id", "type", "name", "arguments", "status", "text", "refusal", "url", "data", "file_id", "filename", "media_type", "mime_type"):
+    for key in (
+        "id",
+        "call_id",
+        "type",
+        "name",
+        "arguments",
+        "status",
+        "text",
+        "refusal",
+        "url",
+        "data",
+        "file_id",
+        "filename",
+        "media_type",
+        "mime_type",
+    ):
         item = getattr(value, key, None)
         if item is not None:
             data[key] = item
@@ -915,7 +942,13 @@ def legacy_outputs_from_lm_response(response: LMResponse) -> list[dict[str, Any]
             continue
         if output.provider_output is not None:
             outputs.append(output.provider_output)
-        elif output.text is not None and not output.reasoning_content and not output.tool_calls and not output.citations and output.logprobs is None:
+        elif (
+            output.text is not None
+            and not output.reasoning_content
+            and not output.tool_calls
+            and not output.citations
+            and output.logprobs is None
+        ):
             outputs.append(output.text)
         else:
             outputs.append(output.to_output_dict())

@@ -157,7 +157,6 @@ def test_nested_batch_method():
         def forward(self, input):
             return self.predictor.batch([Example(input=input).with_inputs("input")] * 2)
 
-
     result = MyModule().batch([Example(input="test input").with_inputs("input")] * 2)
 
     assert {result[0][0].output, result[0][1].output, result[1][0].output, result[1][1].output} == {

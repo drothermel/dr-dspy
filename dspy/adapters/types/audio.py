@@ -94,9 +94,7 @@ class Audio(Type):
         return cls(data=encoded_data, audio_format=audio_format)
 
     @classmethod
-    def from_array(
-        cls, array: object, sampling_rate: int, format: str = "wav"
-    ) -> "Audio":
+    def from_array(cls, array: object, sampling_rate: int, format: str = "wav") -> "Audio":
         """
         Process numpy-like array and encode it as base64. Uses sampling rate and audio format for encoding.
         """
@@ -120,6 +118,7 @@ class Audio(Type):
     def __repr__(self) -> str:
         length = len(self.data)
         return f"Audio(data=<AUDIO_BASE_64_ENCODED({length})>, audio_format='{self.audio_format}')"
+
 
 def encode_audio(audio: object, sampling_rate: int = 16000, format: str = "wav") -> dict[str, str]:
     """

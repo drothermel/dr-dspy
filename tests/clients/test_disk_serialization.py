@@ -63,6 +63,7 @@ def _roundtrip(value, allowed=None):
 
 # -- roundtrip tests (through diskcache) --
 
+
 def _make_cache(directory, allowed):
     return diskcache.FanoutCache(
         directory=directory,
@@ -84,18 +85,22 @@ def _write_tool_call_cache(directory):
     cache["k"] = ModelResponse(
         id="chatcmpl-tool",
         model="dummy",
-        choices=[{
-            "message": {
-                "content": None,
-                "tool_calls": [{
-                    "id": "call_1",
-                    "type": "function",
-                    "function": {"name": "get_weather", "arguments": '{"city":"SF"}'},
-                }],
-            },
-            "index": 0,
-            "finish_reason": "tool_calls",
-        }],
+        choices=[
+            {
+                "message": {
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {"name": "get_weather", "arguments": '{"city":"SF"}'},
+                        }
+                    ],
+                },
+                "index": 0,
+                "finish_reason": "tool_calls",
+            }
+        ],
         usage={"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
     )
     cache.close()
@@ -125,14 +130,16 @@ def _write_responses_function_call_cache(directory):
         instructions=None,
         model="dummy",
         object="response",
-        output=[ResponseFunctionToolCall(
-            id="fc_1",
-            call_id="call_1",
-            type="function_call",
-            name="get_weather",
-            arguments='{"city":"SF"}',
-            status="completed",
-        )],
+        output=[
+            ResponseFunctionToolCall(
+                id="fc_1",
+                call_id="call_1",
+                type="function_call",
+                name="get_weather",
+                arguments='{"city":"SF"}',
+                status="completed",
+            )
+        ],
         metadata={},
         parallel_tool_calls=False,
         temperature=1.0,
@@ -172,13 +179,17 @@ _SUBPROCESS_CASES = {
 }
 
 
-@pytest.mark.parametrize("value", [
-    {"a": 1, "b": [2, 3]},
-    [1, "two", 3.0],
-    "hello",
-    42,
-    (1, 2, 3),
-], ids=["dict", "list", "str", "int", "tuple"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        {"a": 1, "b": [2, 3]},
+        [1, "two", 3.0],
+        "hello",
+        42,
+        (1, 2, 3),
+    ],
+    ids=["dict", "list", "str", "int", "tuple"],
+)
 def test_plain_values_roundtrip(tmp_path, value):
     cache = _make_cache(str(tmp_path), set())
     cache["k"] = value
@@ -224,7 +235,9 @@ def test_litellm_response_roundtrip(tmp_path):
 def test_text_completion_response_roundtrip(tmp_path):
     cache = _make_cache(str(tmp_path), set())
     response = TextCompletionResponse(
-        id="cmpl-test", choices=[{"text": "Hello", "index": 0, "finish_reason": "stop"}], model="m",
+        id="cmpl-test",
+        choices=[{"text": "Hello", "index": 0, "finish_reason": "stop"}],
+        model="m",
     )
     cache["k"] = response
     result = cache["k"]
@@ -236,7 +249,8 @@ def test_embedding_response_roundtrip(tmp_path):
     cache = _make_cache(str(tmp_path), set())
     response = EmbeddingResponse(
         data=[{"embedding": [0.1, 0.2], "index": 0, "object": "embedding"}],
-        model="m", usage={"prompt_tokens": 1, "total_tokens": 1},  # ty:ignore[invalid-argument-type]
+        model="m",
+        usage={"prompt_tokens": 1, "total_tokens": 1},  # ty:ignore[invalid-argument-type]
     )
     cache["k"] = response
     result = cache["k"]
@@ -290,18 +304,22 @@ def test_tool_call_response_roundtrip(tmp_path):
     cache = _make_cache(str(tmp_path), set())
     response = ModelResponse(
         id="chatcmpl-tool",
-        choices=[{
-            "message": {
-                "content": None,
-                "tool_calls": [{
-                    "id": "call_1",
-                    "type": "function",
-                    "function": {"name": "get_weather", "arguments": '{"city":"SF"}'},
-                }],
-            },
-            "index": 0,
-            "finish_reason": "tool_calls",
-        }],
+        choices=[
+            {
+                "message": {
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {"name": "get_weather", "arguments": '{"city":"SF"}'},
+                        }
+                    ],
+                },
+                "index": 0,
+                "finish_reason": "tool_calls",
+            }
+        ],
     )
     cache["k"] = response
     result = cache["k"]
@@ -320,6 +338,7 @@ def test_cached_responses_function_call_normalizes_after_fresh_process_roundtrip
 
 
 # -- allowlist enforcement --
+
 
 def test_unlisted_type_blocked_on_read(tmp_path):
     cache = _make_cache(str(tmp_path), set())
@@ -343,21 +362,22 @@ def test_allowlists_are_isolated(tmp_path):
 def test_numpy_ctypeslib_blocked():
     """Only specific numpy reconstruction functions are allowed, not arbitrary submodules."""
     payload = (
-        b"\x80\x05"                    # PROTO 5
-        b"\x8c\x0fnumpy.ctypeslib"     # SHORT_BINUNICODE (15 bytes)
-        b"\x8c\x0cload_library"        # SHORT_BINUNICODE (12 bytes)
-        b"\x93"                         # STACK_GLOBAL
-        b"\x8c\x04evil"                 # SHORT_BINUNICODE "evil"
-        b"\x8c\x04/tmp"                 # SHORT_BINUNICODE "/tmp"
-        b"\x86"                         # TUPLE2
-        b"R"                            # REDUCE
-        b"."                            # STOP
+        b"\x80\x05"  # PROTO 5
+        b"\x8c\x0fnumpy.ctypeslib"  # SHORT_BINUNICODE (15 bytes)
+        b"\x8c\x0cload_library"  # SHORT_BINUNICODE (12 bytes)
+        b"\x93"  # STACK_GLOBAL
+        b"\x8c\x04evil"  # SHORT_BINUNICODE "evil"
+        b"\x8c\x04/tmp"  # SHORT_BINUNICODE "/tmp"
+        b"\x86"  # TUPLE2
+        b"R"  # REDUCE
+        b"."  # STOP
     )
     with pytest.raises(DeserializationError):
         _restricted_load(io.BytesIO(payload), set())  # ty:ignore[invalid-argument-type]
 
 
 # -- _restricted_load unit tests --
+
 
 def test_restricted_load_rejects_unknown_type():
     data = pickle.dumps(_UnlistedModel(value=1))
@@ -383,7 +403,8 @@ def test_nested_class_safe_types(tmp_path):
 
 def test_restricted_load_allows_builtin_types():
     response = ModelResponse(
-        id="t", choices=[{"message": {"content": "hi"}, "index": 0, "finish_reason": "stop"}],
+        id="t",
+        choices=[{"message": {"content": "hi"}, "index": 0, "finish_reason": "stop"}],
     )
     result = _roundtrip(response)
     assert isinstance(result, ModelResponse)
@@ -393,14 +414,18 @@ def test_all_cached_lm_types_roundtrip():
     """Every LM return type that DSPy caches must roundtrip through the restricted unpickler."""
     test_values = [
         ModelResponse(
-            id="t", choices=[{"message": {"content": "hi"}, "index": 0, "finish_reason": "stop"}],
+            id="t",
+            choices=[{"message": {"content": "hi"}, "index": 0, "finish_reason": "stop"}],
         ),
         TextCompletionResponse(
-            id="t", choices=[{"text": "hi", "index": 0, "finish_reason": "stop"}], model="m",
+            id="t",
+            choices=[{"text": "hi", "index": 0, "finish_reason": "stop"}],
+            model="m",
         ),
         EmbeddingResponse(
             data=[{"embedding": [0.1], "index": 0, "object": "embedding"}],
-            model="m", usage={"prompt_tokens": 1, "total_tokens": 1},  # ty:ignore[invalid-argument-type]
+            model="m",
+            usage={"prompt_tokens": 1, "total_tokens": 1},  # ty:ignore[invalid-argument-type]
         ),
     ]
     for value in test_values:

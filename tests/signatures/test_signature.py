@@ -106,8 +106,7 @@ def test_signature_instructions_none():
 
 
 def test_signature_from_dict():
-    signature = Signature(
-        {"input1": InputField(), "input2": InputField(), "output": OutputField()})  # ty:ignore[too-many-positional-arguments]
+    signature = Signature({"input1": InputField(), "input2": InputField(), "output": OutputField()})  # ty:ignore[too-many-positional-arguments]
     for k in ["input1", "input2", "output"]:
         assert k in signature.fields  # ty:ignore[unresolved-attribute]
         assert signature.fields[k].annotation == str  # ty:ignore[unresolved-attribute]
@@ -166,8 +165,7 @@ def test_order_preserved_with_mixed_annotations():
 
 
 def test_infer_prefix():
-    assert infer_prefix(
-        "someAttributeName42IsCool") == "Some Attribute Name 42 Is Cool"
+    assert infer_prefix("someAttributeName42IsCool") == "Some Attribute Name 42 Is Cool"
     assert infer_prefix("version2Update") == "Version 2 Update"
     assert infer_prefix("modelT45Enhanced") == "Model T 45 Enhanced"
     assert infer_prefix("someAttributeName") == "Some Attribute Name"
@@ -263,8 +261,7 @@ def test_typed_signatures_basic_types():
 
 
 def test_typed_signatures_generics():
-    sig = Signature(
-        "input_list: list[int], input_dict: dict[str, float] -> output_tuple: tuple[str, int]")  # ty:ignore[too-many-positional-arguments]
+    sig = Signature("input_list: list[int], input_dict: dict[str, float] -> output_tuple: tuple[str, int]")  # ty:ignore[too-many-positional-arguments]
     assert "input_list" in sig.input_fields  # ty:ignore[unresolved-attribute]
     assert sig.input_fields["input_list"].annotation == list[int]  # ty:ignore[unresolved-attribute]
     assert "input_dict" in sig.input_fields  # ty:ignore[unresolved-attribute]
@@ -274,8 +271,7 @@ def test_typed_signatures_generics():
 
 
 def test_typed_signatures_unions_and_optionals():
-    sig = Signature(
-        "input_opt: Optional[str], input_union: Union[int, None] -> output_union: Union[int, str]")  # ty:ignore[too-many-positional-arguments]
+    sig = Signature("input_opt: Optional[str], input_union: Union[int, None] -> output_union: Union[int, str]")  # ty:ignore[too-many-positional-arguments]
     assert "input_opt" in sig.input_fields  # ty:ignore[unresolved-attribute]
     # Optional[str] is actually Union[str, None]
     # Depending on the environment, it might resolve to Union[str, None] or Optional[str], either is correct.
@@ -289,27 +285,15 @@ def test_typed_signatures_unions_and_optionals():
 
     assert "input_union" in sig.input_fields  # ty:ignore[unresolved-attribute]
     input_union_annotation = sig.input_fields["input_union"].annotation  # ty:ignore[unresolved-attribute]
-    assert (
-        getattr(input_union_annotation, "__origin__", None) is Union
-    )
-    assert (
-        int in input_union_annotation.__args__
-    )
-    assert (
-        type(None) in input_union_annotation.__args__
-    )
+    assert getattr(input_union_annotation, "__origin__", None) is Union
+    assert int in input_union_annotation.__args__
+    assert type(None) in input_union_annotation.__args__
 
     assert "output_union" in sig.output_fields  # ty:ignore[unresolved-attribute]
     output_union_annotation = sig.output_fields["output_union"].annotation  # ty:ignore[unresolved-attribute]
-    assert (
-        getattr(output_union_annotation, "__origin__", None) is Union
-    )
-    assert (
-        int in output_union_annotation.__args__
-    )
-    assert (
-        str in output_union_annotation.__args__
-    )
+    assert getattr(output_union_annotation, "__origin__", None) is Union
+    assert int in output_union_annotation.__args__
+    assert str in output_union_annotation.__args__
 
 
 def test_typed_signatures_any():
@@ -321,8 +305,7 @@ def test_typed_signatures_any():
 
 
 def test_typed_signatures_nested():
-    sig = Signature(
-        "input_nested: list[Union[str, int]] -> output_nested: Tuple[int, Optional[float], list[str]]")  # ty:ignore[too-many-positional-arguments]
+    sig = Signature("input_nested: list[Union[str, int]] -> output_nested: Tuple[int, Optional[float], list[str]]")  # ty:ignore[too-many-positional-arguments]
     input_nested_ann = sig.input_fields["input_nested"].annotation  # ty:ignore[unresolved-attribute]
     assert getattr(input_nested_ann, "__origin__", None) is list
     assert len(input_nested_ann.__args__) == 1
@@ -385,10 +368,8 @@ def test_typed_signatures_complex_combinations():
     # Expecting list[str] and dict[str, Any]
     # Because sets don't preserve order, just check membership.
     # Find the list[str] arg
-    list_arg = next(a for a in possible_args if getattr(
-        a, "__origin__", None) is list)
-    dict_arg = next(a for a in possible_args if getattr(
-        a, "__origin__", None) is dict)
+    list_arg = next(a for a in possible_args if getattr(a, "__origin__", None) is list)
+    dict_arg = next(a for a in possible_args if getattr(a, "__origin__", None) is dict)
     assert list_arg.__args__ == (str,)
     k, v = dict_arg.__args__
     assert k == str
@@ -396,8 +377,7 @@ def test_typed_signatures_complex_combinations():
 
 
 def test_make_signature_from_string():
-    sig = Signature(
-        "input1: int, input2: dict[str, int] -> output1: list[str], output2: Union[int, str]")  # ty:ignore[too-many-positional-arguments]
+    sig = Signature("input1: int, input2: dict[str, int] -> output1: list[str], output2: Union[int, str]")  # ty:ignore[too-many-positional-arguments]
     assert "input1" in sig.input_fields  # ty:ignore[unresolved-attribute]
     assert sig.input_fields["input1"].annotation == int  # ty:ignore[unresolved-attribute]
     assert "input2" in sig.input_fields  # ty:ignore[unresolved-attribute]
@@ -432,7 +412,7 @@ def test_basic_custom_type():
 
     test_signature = Signature(
         "input: CustomType -> output: str",  # ty:ignore[too-many-positional-arguments]
-        custom_types={"CustomType": CustomType}  # ty:ignore[unknown-argument]
+        custom_types={"CustomType": CustomType},  # ty:ignore[unknown-argument]
     )
 
     assert test_signature.input_fields["input"].annotation == CustomType  # ty:ignore[unresolved-attribute]
@@ -457,6 +437,7 @@ def test_custom_type_from_different_module():
     path_obj = Path("/test/path")
     pred = Predict(test_signature)(input=path_obj)  # ty:ignore[invalid-argument-type]
     assert pred.output == "/test/path"
+
 
 def test_pep604_union_type_inline():
     sig = Signature(
@@ -484,15 +465,9 @@ def test_pep604_union_type_inline():
 
     assert "output_union" in sig.output_fields  # ty:ignore[unresolved-attribute]
     output_union_annotation = sig.output_fields["output_union"].annotation  # ty:ignore[unresolved-attribute]
-    assert (
-        getattr(output_union_annotation, "__origin__", None) is Union
-    )
-    assert (
-        int in output_union_annotation.__args__
-    )
-    assert (
-        str in output_union_annotation.__args__
-    )
+    assert getattr(output_union_annotation, "__origin__", None) is Union
+    assert int in output_union_annotation.__args__
+    assert str in output_union_annotation.__args__
 
 
 def test_pep604_union_type_inline_equivalence():
@@ -586,7 +561,7 @@ def test_pep604_union_type_with_custom_types():
 
     sig = Signature(
         "input: CustomType | None -> output: int | str",  # ty:ignore[too-many-positional-arguments]
-        custom_types={"CustomType": CustomType}  # ty:ignore[unknown-argument]
+        custom_types={"CustomType": CustomType},  # ty:ignore[unknown-argument]
     )
 
     assert sig.input_fields["input"].annotation == Union[CustomType, None]  # ty:ignore[unresolved-attribute]
@@ -603,6 +578,7 @@ def test_pep604_union_type_with_custom_types():
 def test_signature_cloudpickle_roundtrip():
     class MySignature(Signature):
         """Answer the question."""
+
         context: list[str] = InputField()
         question: str = InputField()
         answer: str = OutputField()
@@ -619,6 +595,7 @@ def test_signature_cloudpickle_roundtrip():
 def test_predict_cloudpickle_roundtrip():
     class QA(Signature):
         """Answer the question."""
+
         question: str = InputField()
         answer: str = OutputField()
 

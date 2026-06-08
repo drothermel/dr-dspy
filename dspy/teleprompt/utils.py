@@ -43,7 +43,6 @@ def create_minibatch(trainset, batch_size=50, rng=None):
     return [trainset[i] for i in sampled_indices]
 
 
-
 def eval_candidate_program(batch_size, trainset, candidate_program, evaluate, rng=None):
     """Evaluate a candidate program on the trainset, using the specified batch size."""
 
@@ -55,7 +54,7 @@ def eval_candidate_program(batch_size, trainset, candidate_program, evaluate, rn
         return evaluate(
             candidate_program,
             devset=create_minibatch(trainset, batch_size, rng),
-            callback_metadata={"metric_key": "eval_minibatch"}
+            callback_metadata={"metric_key": "eval_minibatch"},
         )
     except Exception:
         logger.error("An exception occurred during evaluation", exc_info=True)
@@ -350,7 +349,6 @@ def create_n_fewshot_demo_sets(
 
     # Go through and create each candidate set
     for seed in range(-3, num_candidate_sets):
-
         trainset_copy = list(trainset)
 
         if seed == -3 and include_non_bootstrapped:

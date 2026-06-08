@@ -21,10 +21,7 @@ def _rows_to_examples(
 
     resolved_fields = list(fields) if fields is not None else list(rows_list[0])
 
-    return [
-        Example({field: row[field] for field in resolved_fields}).with_inputs(*input_keys)
-        for row in rows_list
-    ]
+    return [Example({field: row[field] for field in resolved_fields}).with_inputs(*input_keys) for row in rows_list]
 
 
 class DataLoader(Dataset):
@@ -61,10 +58,7 @@ class DataLoader(Dataset):
             }
 
         if isinstance(dataset, DatasetDict):
-            return {
-                split_name: _rows_to_examples(rows, fields, input_keys)
-                for split_name, rows in dataset.items()
-            }
+            return {split_name: _rows_to_examples(rows, fields, input_keys) for split_name, rows in dataset.items()}
 
         return _rows_to_examples(cast("Iterable[Mapping[str, object]]", dataset), fields, input_keys)
 
@@ -89,9 +83,7 @@ class DataLoader(Dataset):
         if fields is None:
             fields = list(df.columns)
 
-        return [
-            Example({field: row[field] for field in fields}).with_inputs(*input_keys) for _, row in df.iterrows()
-        ]
+        return [Example({field: row[field] for field in fields}).with_inputs(*input_keys) for _, row in df.iterrows()]
 
     def from_json(
         self,

@@ -6,7 +6,6 @@ if TYPE_CHECKING:
     from langchain.tools import BaseTool  # ty:ignore[unresolved-import]
 
 
-
 def convert_langchain_tool(tool: "BaseTool") -> Tool:
     """Build a DSPy tool from a LangChain tool.
 
@@ -19,6 +18,7 @@ def convert_langchain_tool(tool: "BaseTool") -> Tool:
     Returns:
         A DSPy Tool object.
     """
+
     async def func(**kwargs):
         try:
             return await tool.ainvoke(kwargs)
@@ -36,11 +36,4 @@ def convert_langchain_tool(tool: "BaseTool") -> Tool:
         for key, field in args_schema.model_fields.items()
     }
 
-    return Tool(
-        func=func,
-        name=tool.name,
-        desc=tool.description,
-        args=args,
-        arg_types=arg_types,
-        arg_desc=arg_desc
-    )
+    return Tool(func=func, name=tool.name, desc=tool.description, args=args, arg_types=arg_types, arg_desc=arg_desc)

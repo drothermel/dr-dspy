@@ -139,7 +139,9 @@ class REPLHistory(pydantic.BaseModel):
     def format(self) -> str:
         if not self.entries:
             return "You have not interacted with the REPL environment yet."
-        return "\n".join(entry.format(index=i, max_output_chars=self.max_output_chars) for i, entry in enumerate(self.entries))
+        return "\n".join(
+            entry.format(index=i, max_output_chars=self.max_output_chars) for i, entry in enumerate(self.entries)
+        )
 
     @pydantic.model_serializer()
     def serialize_model(self) -> str:

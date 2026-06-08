@@ -3,6 +3,7 @@
 This test requires valid Databricks credentials, so it is skipped on github actions. Right now it is only used for
 manual testing.
 """
+
 import pytest
 
 from dspy.clients.databricks import (

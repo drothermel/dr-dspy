@@ -31,8 +31,7 @@ def _import_optuna():
     except ModuleNotFoundError as exc:
         if exc.name == "optuna":
             raise ImportError(
-                "MIPROv2 requires optional dependency 'optuna'. "
-                "Install it with `pip install dspy[optuna]`."
+                "MIPROv2 requires optional dependency 'optuna'. Install it with `pip install dspy[optuna]`."
             ) from exc
         raise
     return optuna
@@ -125,28 +124,22 @@ class MIPROv2(Teleprompter):
         view_data_batch_size: int = 10,
         tip_aware_proposer: bool = True,
         fewshot_aware_proposer: bool = True,
-        requires_permission_to_run: bool | None = None, # deprecated
+        requires_permission_to_run: bool | None = None,  # deprecated
         provide_traceback: bool | None = None,
     ) -> Any:
         if not requires_permission_to_run:
-            logger.warning(
-                "'requires_permission_to_run' is deprecated and will be removed in a future version."
-            )
+            logger.warning("'requires_permission_to_run' is deprecated and will be removed in a future version.")
         elif requires_permission_to_run:
-            raise ValueError("User confirmation is removed from MIPROv2. Please remove the 'requires_permission_to_run' argument.")
+            raise ValueError(
+                "User confirmation is removed from MIPROv2. Please remove the 'requires_permission_to_run' argument."
+            )
 
-        effective_max_errors = (
-            self.max_errors
-            if self.max_errors is not None
-            else settings.max_errors
-        )
+        effective_max_errors = self.max_errors if self.max_errors is not None else settings.max_errors
 
         effective_max_bootstrapped_demos = (
             max_bootstrapped_demos if max_bootstrapped_demos is not None else self.max_bootstrapped_demos
         )
-        effective_max_labeled_demos = (
-            max_labeled_demos if max_labeled_demos is not None else self.max_labeled_demos
-        )
+        effective_max_labeled_demos = max_labeled_demos if max_labeled_demos is not None else self.max_labeled_demos
 
         zeroshot_opt = (effective_max_bootstrapped_demos == 0) and (effective_max_labeled_demos == 0)
 
@@ -169,18 +162,13 @@ class MIPROv2(Teleprompter):
         seed = seed or self.seed
         self._set_random_seeds(seed)
 
-
         trainset, valset = self._set_and_validate_datasets(trainset, valset)
 
         num_instruct_candidates = (
-            self.num_instruct_candidates
-            if self.num_instruct_candidates is not None
-            else self.num_candidates
+            self.num_instruct_candidates if self.num_instruct_candidates is not None else self.num_candidates
         )
         num_fewshot_candidates = (
-            self.num_fewshot_candidates
-            if self.num_fewshot_candidates is not None
-            else self.num_candidates
+            self.num_fewshot_candidates if self.num_fewshot_candidates is not None else self.num_candidates
         )
 
         # Set hyperparameters based on run mode (if set)
@@ -269,7 +257,6 @@ class MIPROv2(Teleprompter):
                 seed,
             )
 
-
     def _set_random_seeds(self, seed) -> None:
         self.rng = random.Random(seed)
 
@@ -279,7 +266,6 @@ class MIPROv2(Teleprompter):
             num_vars *= 2  # Account for few-shot examples + instruction variables
         # Trials = MAX(c*M*log(N), c=2, 3/2*N)
         return int(max(2 * num_vars * math.log2(num_candidates), 1.5 * num_candidates))
-
 
     def _set_hyperparams_from_run_mode(
         self,
@@ -429,9 +415,7 @@ class MIPROv2(Teleprompter):
             num_candidate_sets=num_fewshot_candidates,
             trainset=trainset,
             max_labeled_demos=(LABELED_FEWSHOT_EXAMPLES_IN_CONTEXT if zeroshot else max_labeled_demos),
-            max_bootstrapped_demos=(
-                BOOTSTRAPPED_FEWSHOT_EXAMPLES_IN_CONTEXT if zeroshot else max_bootstrapped_demos
-            ),
+            max_bootstrapped_demos=(BOOTSTRAPPED_FEWSHOT_EXAMPLES_IN_CONTEXT if zeroshot else max_bootstrapped_demos),
             metric=self.metric,
             max_errors=max_errors,
             teacher=teacher,
@@ -441,7 +425,6 @@ class MIPROv2(Teleprompter):
             rng=self.rng,
         )
         # Bootstrapping failures intentionally propagate because running MIPRO without few-shot candidates weakens the optimization substantially.
-
 
     def _propose_instructions(
         self,

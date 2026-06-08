@@ -89,13 +89,7 @@ class SIMBA(Teleprompter):
         else:
             self.strategies = [append_a_rule]
 
-    def compile(
-        self,
-        student: Module,
-        *,
-        trainset: list[Example],
-        seed: int = 0
-    ) -> Module:
+    def compile(self, student: Module, *, trainset: list[Example], seed: int = 0) -> Module:
         """
         Compile and optimize the student module using SIMBA.
 
@@ -178,7 +172,7 @@ class SIMBA(Teleprompter):
         for batch_idx in range(self.max_steps):
             trial_logs[batch_idx] = {}
 
-            logger.info(f"Starting batch {batch_idx+1} of {self.max_steps}.")
+            logger.info(f"Starting batch {batch_idx + 1} of {self.max_steps}.")
 
             # STEP 1: Get next batch
             if instance_idx + self.bsize > len(trainset):
@@ -244,14 +238,14 @@ class SIMBA(Teleprompter):
             # Baseline for the batch is just the average of all runs
             all_scores_in_this_batch = [o["score"] for o in outputs]
             baseline_score = sum(all_scores_in_this_batch) / len(all_scores_in_this_batch)
-            logger.info(f"Batch {batch_idx+1}: Baseline mini-batch score: {baseline_score}\n")
+            logger.info(f"Batch {batch_idx + 1}: Baseline mini-batch score: {baseline_score}\n")
 
             # STEP 4: Build new candidate programs by applying a strategy to some top buckets.
             system_candidates = []
             for bucket_idx, (bucket, bucket_stats) in enumerate(buckets):
                 max_to_min_gap, max_score, max_to_avg_gap = bucket_stats
                 logger.info(
-                    f"Batch {batch_idx+1}: Processing bucket #{bucket_idx+1}, with max score {max_score}, "
+                    f"Batch {batch_idx + 1}: Processing bucket #{bucket_idx + 1}, with max score {max_score}, "
                     f"max-to-min gap {max_to_min_gap}, and max-to-avg gap {max_to_avg_gap}."
                 )
 
@@ -282,7 +276,7 @@ class SIMBA(Teleprompter):
                 # Pick a strategy
                 strategy = rng.choice(self.strategies)
                 logger.info(
-                    f"Batch {batch_idx+1}: Invoking strategy: {strategy.__name__}"
+                    f"Batch {batch_idx + 1}: Invoking strategy: {strategy.__name__}"
                     + (f", having dropped {num_demos_to_drop} demos per predictor" if num_demos_to_drop else "")
                 )
 
@@ -307,7 +301,9 @@ class SIMBA(Teleprompter):
                     break
 
             # STEP 5: Evaluate these new system_candidates on the same mini-batch
-            logger.info(f"Batch {batch_idx+1}: Evaluating {len(system_candidates)} programs on {self.bsize} examples.")
+            logger.info(
+                f"Batch {batch_idx + 1}: Evaluating {len(system_candidates)} programs on {self.bsize} examples."
+            )
 
             exec_pairs = [(wrap_program(sys, self.metric), ex) for sys in system_candidates for ex in batch]
             outputs = run_parallel(exec_pairs)
@@ -323,7 +319,7 @@ class SIMBA(Teleprompter):
                 candidate_scores.append(avg_sys_score)
 
             logger.info(
-                f"Scores after {batch_idx+1} batches: {candidate_scores}, "
+                f"Scores after {batch_idx + 1} batches: {candidate_scores}, "
                 f"Best: {max(candidate_scores) if candidate_scores else 'N/A'}\n"
             )
 

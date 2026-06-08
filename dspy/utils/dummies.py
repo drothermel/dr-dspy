@@ -95,6 +95,7 @@ class DummyLM(BaseLM):
         # Set adapter, defaulting to ChatAdapter
         if adapter is None:
             from dspy.adapters.chat_adapter import ChatAdapter
+
             adapter = ChatAdapter()
         self.adapter = adapter
 
@@ -217,5 +218,7 @@ class DummyVectorizer:
 
         vecs = np.array(vecs, dtype=np.float32)
         vecs -= np.mean(vecs, axis=1, keepdims=True)
-        vecs /= np.linalg.norm(vecs, axis=1, keepdims=True) + 1e-10  # Epsilon avoids division by zero for empty or constant vectors.
+        vecs /= (
+            np.linalg.norm(vecs, axis=1, keepdims=True) + 1e-10
+        )  # Epsilon avoids division by zero for empty or constant vectors.
         return vecs

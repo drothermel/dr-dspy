@@ -37,7 +37,8 @@ def test_json_adapter_format_exact_messages_for_simple_signature():
         question: str = InputField()
         answer: str = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(JSONAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        JSONAdapter(),
         StringSignature,
         demos=[],
         inputs={"question": "What is the capital of France?"},
@@ -84,7 +85,8 @@ def test_json_adapter_format_exact_messages_with_demo_and_typed_output():
         answer: str = OutputField()
         confidence: float = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(JSONAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        JSONAdapter(),
         MultiAnswer,
         demos=[{"question": "Q1", "answer": "A1", "confidence": 0.9}],
         inputs={"question": "Q2"},
@@ -117,8 +119,11 @@ Outputs will be a JSON object with the following fields.
 In adhering to this structure, your objective is:\x20
         Given the fields `question`, produce the fields `answer`, `confidence`.""",
         },
-        {"role": "user", "content": """[[ ## question ## ]]
-Q1"""},
+        {
+            "role": "user",
+            "content": """[[ ## question ## ]]
+Q1""",
+        },
         {
             "role": "assistant",
             "content": """{
@@ -229,7 +234,8 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
             }
         ]
     )
-    messages, lm_kwargs = format_messages_and_lm_kwargs(JSONAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        JSONAdapter(),
         RichRenderingSignature,
         demos=[
             {
@@ -249,115 +255,140 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
         },
     )
 
-    expected_messages = [{"role": "system",
-      "content": 'Your input fields are:\n'
-                 '1. `history` (History): \n'
-                 '2. `image` (Image): \n'
-                 '3. `tools` (list[Tool]): \n'
-                 '4. `profile` (Profile): \n'
-                 '5. `question` (str):\n'
-                 'Your output fields are:\n'
-                 '1. `answer` (AnswerCard):\n'
-                 'All interactions will be structured in the following way, with the appropriate '
-                 'values filled in.\n'
-                 '\n'
-                 'Inputs will have the following structure:\n'
-                 '\n'
-                 '[[ ## history ## ]]\n'
-                 '{history}\n'
-                 '\n'
-                 '[[ ## image ## ]]\n'
-                 '{image}\n'
-                 '\n'
-                 '[[ ## tools ## ]]\n'
-                 '{tools}\n'
-                 '\n'
-                 '[[ ## profile ## ]]\n'
-                 '{profile}\n'
-                 '\n'
-                 '[[ ## question ## ]]\n'
-                 '{question}\n'
-                 '\n'
-                 'Outputs will be a JSON object with the following fields.\n'
-                 '\n'
-                 '{\n'
-                 '  "answer": "{answer}        # note: the value you produce must adhere to the JSON '
-                 'schema: {\\"type\\": \\"object\\", \\"properties\\": {\\"answer\\": {\\"type\\": '
-                 '\\"string\\", \\"title\\": \\"Answer\\"}, \\"sources\\": {\\"type\\": \\"array\\", '
-                 '\\"items\\": {\\"type\\": \\"string\\"}, \\"title\\": \\"Sources\\"}}, '
-                 '\\"required\\": [\\"answer\\", \\"sources\\"], \\"title\\": \\"AnswerCard\\"}"\n'
-                 '}\n'
-                 'In adhering to this structure, your objective is: \n'
-                 '        Answer using all supplied context.'},
-     {"role": "user",
-      "content": [{"type": "text",
-                   "text": "This is an example of the task, though some input or output fields are not "
-                           "supplied.\n"
-                           "\n"
-                           "[[ ## image ## ]]\n"},
-                  {"type": "image_url", "image_url": {"url": "https://example.com/demo.png"}},
-                  {"type": "text",
-                   "text": '\n'
-                           '\n'
-                           '[[ ## tools ## ]]\n'
-                           '["search, whose description is <desc>Search for documents.</desc>. It '
-                           "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
-                           '\'default\': 3}}."]\n'
-                           '\n'
-                           '[[ ## profile ## ]]\n'
-                           '{"name": "Ada", "location": {"city": "London", "country": "UK"}, '
-                           '"interests": ["math", "machines"]}\n'
-                           '\n'
-                           '[[ ## question ## ]]\n'
-                           'What should we mention?'}]},
-     {"role": "assistant",
-      "content": '{\n'
-                 '  "answer": {\n'
-                 '    "answer": "Mention analytical engines.",\n'
-                 '    "sources": [\n'
-                 '      "demo"\n'
-                 '    ]\n'
-                 '  }\n'
-                 '}'},
-     {"role": "user",
-      "content": '[[ ## profile ## ]]\n'
-                 '{"name": "Ada", "location": {"city": "London", "country": "UK"}, "interests": '
-                 '["math", "machines"]}\n'
-                 '\n'
-                 '[[ ## question ## ]]\n'
-                 'Who is Ada?'},
-     {"role": "assistant",
-      "content": '{\n'
-                 '  "answer": {\n'
-                 '    "answer": "Ada is a mathematician.",\n'
-                 '    "sources": [\n'
-                 '      "memory"\n'
-                 '    ]\n'
-                 '  }\n'
-                 '}'},
-     {"role": "user",
-      "content": [{"type": "text", "text": "[[ ## image ## ]]\n"},
-                  {"type": "image_url", "image_url": {"url": "https://example.com/current.png"}},
-                  {"type": "text",
-                   "text": '\n'
-                           '\n'
-                           '[[ ## tools ## ]]\n'
-                           '["search, whose description is <desc>Search for documents.</desc>. It '
-                           "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
-                           '\'default\': 3}}."]\n'
-                           '\n'
-                           '[[ ## profile ## ]]\n'
-                           '{"name": "Grace", "location": {"city": "Arlington", "country": "USA"}, '
-                           '"interests": ["compilers", "navy"]}\n'
-                           '\n'
-                           '[[ ## question ## ]]\n'
-                           'What should the answer include?\n'
-                           '\n'
-                           'Respond with a JSON object in the following order of fields: `answer` '
-                           '(must be formatted as a valid Python AnswerCard).'}]}]
+    expected_messages = [
+        {
+            "role": "system",
+            "content": "Your input fields are:\n"
+            "1. `history` (History): \n"
+            "2. `image` (Image): \n"
+            "3. `tools` (list[Tool]): \n"
+            "4. `profile` (Profile): \n"
+            "5. `question` (str):\n"
+            "Your output fields are:\n"
+            "1. `answer` (AnswerCard):\n"
+            "All interactions will be structured in the following way, with the appropriate "
+            "values filled in.\n"
+            "\n"
+            "Inputs will have the following structure:\n"
+            "\n"
+            "[[ ## history ## ]]\n"
+            "{history}\n"
+            "\n"
+            "[[ ## image ## ]]\n"
+            "{image}\n"
+            "\n"
+            "[[ ## tools ## ]]\n"
+            "{tools}\n"
+            "\n"
+            "[[ ## profile ## ]]\n"
+            "{profile}\n"
+            "\n"
+            "[[ ## question ## ]]\n"
+            "{question}\n"
+            "\n"
+            "Outputs will be a JSON object with the following fields.\n"
+            "\n"
+            "{\n"
+            '  "answer": "{answer}        # note: the value you produce must adhere to the JSON '
+            'schema: {\\"type\\": \\"object\\", \\"properties\\": {\\"answer\\": {\\"type\\": '
+            '\\"string\\", \\"title\\": \\"Answer\\"}, \\"sources\\": {\\"type\\": \\"array\\", '
+            '\\"items\\": {\\"type\\": \\"string\\"}, \\"title\\": \\"Sources\\"}}, '
+            '\\"required\\": [\\"answer\\", \\"sources\\"], \\"title\\": \\"AnswerCard\\"}"\n'
+            "}\n"
+            "In adhering to this structure, your objective is: \n"
+            "        Answer using all supplied context.",
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "This is an example of the task, though some input or output fields are not "
+                    "supplied.\n"
+                    "\n"
+                    "[[ ## image ## ]]\n",
+                },
+                {"type": "image_url", "image_url": {"url": "https://example.com/demo.png"}},
+                {
+                    "type": "text",
+                    "text": "\n"
+                    "\n"
+                    "[[ ## tools ## ]]\n"
+                    '["search, whose description is <desc>Search for documents.</desc>. It '
+                    "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
+                    "'default': 3}}.\"]\n"
+                    "\n"
+                    "[[ ## profile ## ]]\n"
+                    '{"name": "Ada", "location": {"city": "London", "country": "UK"}, '
+                    '"interests": ["math", "machines"]}\n'
+                    "\n"
+                    "[[ ## question ## ]]\n"
+                    "What should we mention?",
+                },
+            ],
+        },
+        {
+            "role": "assistant",
+            "content": "{\n"
+            '  "answer": {\n'
+            '    "answer": "Mention analytical engines.",\n'
+            '    "sources": [\n'
+            '      "demo"\n'
+            "    ]\n"
+            "  }\n"
+            "}",
+        },
+        {
+            "role": "user",
+            "content": "[[ ## profile ## ]]\n"
+            '{"name": "Ada", "location": {"city": "London", "country": "UK"}, "interests": '
+            '["math", "machines"]}\n'
+            "\n"
+            "[[ ## question ## ]]\n"
+            "Who is Ada?",
+        },
+        {
+            "role": "assistant",
+            "content": "{\n"
+            '  "answer": {\n'
+            '    "answer": "Ada is a mathematician.",\n'
+            '    "sources": [\n'
+            '      "memory"\n'
+            "    ]\n"
+            "  }\n"
+            "}",
+        },
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "[[ ## image ## ]]\n"},
+                {"type": "image_url", "image_url": {"url": "https://example.com/current.png"}},
+                {
+                    "type": "text",
+                    "text": "\n"
+                    "\n"
+                    "[[ ## tools ## ]]\n"
+                    '["search, whose description is <desc>Search for documents.</desc>. It '
+                    "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
+                    "'default': 3}}.\"]\n"
+                    "\n"
+                    "[[ ## profile ## ]]\n"
+                    '{"name": "Grace", "location": {"city": "Arlington", "country": "USA"}, '
+                    '"interests": ["compilers", "navy"]}\n'
+                    "\n"
+                    "[[ ## question ## ]]\n"
+                    "What should the answer include?\n"
+                    "\n"
+                    "Respond with a JSON object in the following order of fields: `answer` "
+                    "(must be formatted as a valid Python AnswerCard).",
+                },
+            ],
+        },
+    ]
     assert messages == expected_messages
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
+
 
 def test_json_adapter_format_exact_messages_with_int_and_mapping_outputs():
     class IntDictSignature(Signature):
@@ -365,40 +396,48 @@ def test_json_adapter_format_exact_messages_with_int_and_mapping_outputs():
         count: int = OutputField()
         metadata: dict[str, int] = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(JSONAdapter(), IntDictSignature, [], {"question": "Count things"})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        JSONAdapter(), IntDictSignature, [], {"question": "Count things"}
+    )
 
-    expected_messages = [{"role": "system",
-      "content": 'Your input fields are:\n'
-                 '1. `question` (str):\n'
-                 'Your output fields are:\n'
-                 '1. `count` (int): \n'
-                 '2. `metadata` (dict[str, int]):\n'
-                 'All interactions will be structured in the following way, with the appropriate '
-                 'values filled in.\n'
-                 '\n'
-                 'Inputs will have the following structure:\n'
-                 '\n'
-                 '[[ ## question ## ]]\n'
-                 '{question}\n'
-                 '\n'
-                 'Outputs will be a JSON object with the following fields.\n'
-                 '\n'
-                 '{\n'
-                 '  "count": "{count}        # note: the value you produce must be a single int '
-                 'value",\n'
-                 '  "metadata": "{metadata}        # note: the value you produce must adhere to the '
-                 'JSON schema: {\\"type\\": \\"object\\", \\"additionalProperties\\": {\\"type\\": '
-                 '\\"integer\\"}}"\n'
-                 '}\n'
-                 'In adhering to this structure, your objective is: \n'
-                 '        Given the fields `question`, produce the fields `count`, `metadata`.'},
-     {"role": "user",
-      "content": "[[ ## question ## ]]\n"
-                 "Count things\n"
-                 "\n"
-                 "Respond with a JSON object in the following order of fields: `count` (must be "
-                 "formatted as a valid Python int), then `metadata` (must be formatted as a valid "
-                 "Python dict[str, int])."}]
+    expected_messages = [
+        {
+            "role": "system",
+            "content": "Your input fields are:\n"
+            "1. `question` (str):\n"
+            "Your output fields are:\n"
+            "1. `count` (int): \n"
+            "2. `metadata` (dict[str, int]):\n"
+            "All interactions will be structured in the following way, with the appropriate "
+            "values filled in.\n"
+            "\n"
+            "Inputs will have the following structure:\n"
+            "\n"
+            "[[ ## question ## ]]\n"
+            "{question}\n"
+            "\n"
+            "Outputs will be a JSON object with the following fields.\n"
+            "\n"
+            "{\n"
+            '  "count": "{count}        # note: the value you produce must be a single int '
+            'value",\n'
+            '  "metadata": "{metadata}        # note: the value you produce must adhere to the '
+            'JSON schema: {\\"type\\": \\"object\\", \\"additionalProperties\\": {\\"type\\": '
+            '\\"integer\\"}}"\n'
+            "}\n"
+            "In adhering to this structure, your objective is: \n"
+            "        Given the fields `question`, produce the fields `count`, `metadata`.",
+        },
+        {
+            "role": "user",
+            "content": "[[ ## question ## ]]\n"
+            "Count things\n"
+            "\n"
+            "Respond with a JSON object in the following order of fields: `count` (must be "
+            "formatted as a valid Python int), then `metadata` (must be formatted as a valid "
+            "Python dict[str, int]).",
+        },
+    ]
     assert messages == expected_messages
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
@@ -416,37 +455,43 @@ def test_json_adapter_format_exact_messages_with_literal_and_enum_outputs():
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(JSONAdapter(), LiteralEnumSignature, [], {"text": "Looks good"})
 
-    expected_messages = [{"role": "system",
-      "content": 'Your input fields are:\n'
-                 '1. `text` (str):\n'
-                 'Your output fields are:\n'
-                 "1. `decision` (Literal['accept', 'reject']): \n"
-                 '2. `label` (Label):\n'
-                 'All interactions will be structured in the following way, with the appropriate '
-                 'values filled in.\n'
-                 '\n'
-                 'Inputs will have the following structure:\n'
-                 '\n'
-                 '[[ ## text ## ]]\n'
-                 '{text}\n'
-                 '\n'
-                 'Outputs will be a JSON object with the following fields.\n'
-                 '\n'
-                 '{\n'
-                 '  "decision": "{decision}        # note: the value you produce must exactly match '
-                 '(no extra characters) one of: accept; reject",\n'
-                 '  "label": "{label}        # note: the value you produce must be one of: positive; '
-                 'negative"\n'
-                 '}\n'
-                 'In adhering to this structure, your objective is: \n'
-                 '        Given the fields `text`, produce the fields `decision`, `label`.'},
-     {"role": "user",
-      "content": "[[ ## text ## ]]\n"
-                 "Looks good\n"
-                 "\n"
-                 "Respond with a JSON object in the following order of fields: `decision` (must be "
-                 "formatted as a valid Python Literal['accept', 'reject']), then `label` (must be "
-                 "formatted as a valid Python Label)."}]
+    expected_messages = [
+        {
+            "role": "system",
+            "content": "Your input fields are:\n"
+            "1. `text` (str):\n"
+            "Your output fields are:\n"
+            "1. `decision` (Literal['accept', 'reject']): \n"
+            "2. `label` (Label):\n"
+            "All interactions will be structured in the following way, with the appropriate "
+            "values filled in.\n"
+            "\n"
+            "Inputs will have the following structure:\n"
+            "\n"
+            "[[ ## text ## ]]\n"
+            "{text}\n"
+            "\n"
+            "Outputs will be a JSON object with the following fields.\n"
+            "\n"
+            "{\n"
+            '  "decision": "{decision}        # note: the value you produce must exactly match '
+            '(no extra characters) one of: accept; reject",\n'
+            '  "label": "{label}        # note: the value you produce must be one of: positive; '
+            'negative"\n'
+            "}\n"
+            "In adhering to this structure, your objective is: \n"
+            "        Given the fields `text`, produce the fields `decision`, `label`.",
+        },
+        {
+            "role": "user",
+            "content": "[[ ## text ## ]]\n"
+            "Looks good\n"
+            "\n"
+            "Respond with a JSON object in the following order of fields: `decision` (must be "
+            "formatted as a valid Python Literal['accept', 'reject']), then `label` (must be "
+            "formatted as a valid Python Label).",
+        },
+    ]
     assert messages == expected_messages
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
@@ -468,41 +513,47 @@ def test_json_adapter_format_exact_messages_with_nested_pydantic_output():
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(JSONAdapter(), PydanticSignature, [], {"question": "Summarize"})
 
-    expected_messages = [{"role": "system",
-      "content": 'Your input fields are:\n'
-                 '1. `question` (str):\n'
-                 'Your output fields are:\n'
-                 '1. `summary` (JsonNestedSummary):\n'
-                 'All interactions will be structured in the following way, with the appropriate '
-                 'values filled in.\n'
-                 '\n'
-                 'Inputs will have the following structure:\n'
-                 '\n'
-                 '[[ ## question ## ]]\n'
-                 '{question}\n'
-                 '\n'
-                 'Outputs will be a JSON object with the following fields.\n'
-                 '\n'
-                 '{\n'
-                 '  "summary": "{summary}        # note: the value you produce must adhere to the JSON '
-                 'schema: {\\"type\\": \\"object\\", \\"$defs\\": {\\"JsonNestedAddress\\": '
-                 '{\\"type\\": \\"object\\", \\"properties\\": {\\"city\\": {\\"type\\": \\"string\\", '
-                 '\\"title\\": \\"City\\"}, \\"country\\": {\\"type\\": \\"string\\", \\"title\\": '
-                 '\\"Country\\"}}, \\"required\\": [\\"city\\", \\"country\\"], \\"title\\": '
-                 '\\"JsonNestedAddress\\"}}, \\"properties\\": {\\"address\\": {\\"$ref\\": '
-                 '\\"#/$defs/JsonNestedAddress\\"}, \\"scores\\": {\\"type\\": \\"array\\", '
-                 '\\"items\\": {\\"type\\": \\"number\\"}, \\"title\\": \\"Scores\\"}, \\"title\\": '
-                 '{\\"type\\": \\"string\\", \\"title\\": \\"Title\\"}}, \\"required\\": [\\"title\\", '
-                 '\\"address\\", \\"scores\\"], \\"title\\": \\"JsonNestedSummary\\"}"\n'
-                 '}\n'
-                 'In adhering to this structure, your objective is: \n'
-                 '        Given the fields `question`, produce the fields `summary`.'},
-     {"role": "user",
-      "content": "[[ ## question ## ]]\n"
-                 "Summarize\n"
-                 "\n"
-                 "Respond with a JSON object in the following order of fields: `summary` (must be "
-                 "formatted as a valid Python JsonNestedSummary)."}]
+    expected_messages = [
+        {
+            "role": "system",
+            "content": "Your input fields are:\n"
+            "1. `question` (str):\n"
+            "Your output fields are:\n"
+            "1. `summary` (JsonNestedSummary):\n"
+            "All interactions will be structured in the following way, with the appropriate "
+            "values filled in.\n"
+            "\n"
+            "Inputs will have the following structure:\n"
+            "\n"
+            "[[ ## question ## ]]\n"
+            "{question}\n"
+            "\n"
+            "Outputs will be a JSON object with the following fields.\n"
+            "\n"
+            "{\n"
+            '  "summary": "{summary}        # note: the value you produce must adhere to the JSON '
+            'schema: {\\"type\\": \\"object\\", \\"$defs\\": {\\"JsonNestedAddress\\": '
+            '{\\"type\\": \\"object\\", \\"properties\\": {\\"city\\": {\\"type\\": \\"string\\", '
+            '\\"title\\": \\"City\\"}, \\"country\\": {\\"type\\": \\"string\\", \\"title\\": '
+            '\\"Country\\"}}, \\"required\\": [\\"city\\", \\"country\\"], \\"title\\": '
+            '\\"JsonNestedAddress\\"}}, \\"properties\\": {\\"address\\": {\\"$ref\\": '
+            '\\"#/$defs/JsonNestedAddress\\"}, \\"scores\\": {\\"type\\": \\"array\\", '
+            '\\"items\\": {\\"type\\": \\"number\\"}, \\"title\\": \\"Scores\\"}, \\"title\\": '
+            '{\\"type\\": \\"string\\", \\"title\\": \\"Title\\"}}, \\"required\\": [\\"title\\", '
+            '\\"address\\", \\"scores\\"], \\"title\\": \\"JsonNestedSummary\\"}"\n'
+            "}\n"
+            "In adhering to this structure, your objective is: \n"
+            "        Given the fields `question`, produce the fields `summary`.",
+        },
+        {
+            "role": "user",
+            "content": "[[ ## question ## ]]\n"
+            "Summarize\n"
+            "\n"
+            "Respond with a JSON object in the following order of fields: `summary` (must be "
+            "formatted as a valid Python JsonNestedSummary).",
+        },
+    ]
     assert messages == expected_messages
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
@@ -515,57 +566,68 @@ def test_json_adapter_format_exact_messages_with_incomplete_demo():
         answer: str = OutputField()
         score: float = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(JSONAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        JSONAdapter(),
         IncompleteDemoSignature,
         [{"question": "Q1", "answer": "A1"}],
         {"question": "Q2", "context": "C2"},
     )
 
-    expected_messages = [{"role": "system",
-      "content": 'Your input fields are:\n'
-                 '1. `question` (str): \n'
-                 '2. `context` (str):\n'
-                 'Your output fields are:\n'
-                 '1. `answer` (str): \n'
-                 '2. `score` (float):\n'
-                 'All interactions will be structured in the following way, with the appropriate '
-                 'values filled in.\n'
-                 '\n'
-                 'Inputs will have the following structure:\n'
-                 '\n'
-                 '[[ ## question ## ]]\n'
-                 '{question}\n'
-                 '\n'
-                 '[[ ## context ## ]]\n'
-                 '{context}\n'
-                 '\n'
-                 'Outputs will be a JSON object with the following fields.\n'
-                 '\n'
-                 '{\n'
-                 '  "answer": "{answer}",\n'
-                 '  "score": "{score}        # note: the value you produce must be a single float '
-                 'value"\n'
-                 '}\n'
-                 'In adhering to this structure, your objective is: \n'
-                 '        Given the fields `question`, `context`, produce the fields `answer`, '
-                 '`score`.'},
-     {"role": "user",
-      "content": "This is an example of the task, though some input or output fields are not "
-                 "supplied.\n"
-                 "\n"
-                 "[[ ## question ## ]]\n"
-                 "Q1"},
-     {"role": "assistant",
-      "content": '{\n  "answer": "A1",\n  "score": "Not supplied for this particular example. "\n}'},
-     {"role": "user",
-      "content": "[[ ## question ## ]]\n"
-                 "Q2\n"
-                 "\n"
-                 "[[ ## context ## ]]\n"
-                 "C2\n"
-                 "\n"
-                 "Respond with a JSON object in the following order of fields: `answer`, then `score` "
-                 "(must be formatted as a valid Python float)."}]
+    expected_messages = [
+        {
+            "role": "system",
+            "content": "Your input fields are:\n"
+            "1. `question` (str): \n"
+            "2. `context` (str):\n"
+            "Your output fields are:\n"
+            "1. `answer` (str): \n"
+            "2. `score` (float):\n"
+            "All interactions will be structured in the following way, with the appropriate "
+            "values filled in.\n"
+            "\n"
+            "Inputs will have the following structure:\n"
+            "\n"
+            "[[ ## question ## ]]\n"
+            "{question}\n"
+            "\n"
+            "[[ ## context ## ]]\n"
+            "{context}\n"
+            "\n"
+            "Outputs will be a JSON object with the following fields.\n"
+            "\n"
+            "{\n"
+            '  "answer": "{answer}",\n'
+            '  "score": "{score}        # note: the value you produce must be a single float '
+            'value"\n'
+            "}\n"
+            "In adhering to this structure, your objective is: \n"
+            "        Given the fields `question`, `context`, produce the fields `answer`, "
+            "`score`.",
+        },
+        {
+            "role": "user",
+            "content": "This is an example of the task, though some input or output fields are not "
+            "supplied.\n"
+            "\n"
+            "[[ ## question ## ]]\n"
+            "Q1",
+        },
+        {
+            "role": "assistant",
+            "content": '{\n  "answer": "A1",\n  "score": "Not supplied for this particular example. "\n}',
+        },
+        {
+            "role": "user",
+            "content": "[[ ## question ## ]]\n"
+            "Q2\n"
+            "\n"
+            "[[ ## context ## ]]\n"
+            "C2\n"
+            "\n"
+            "Respond with a JSON object in the following order of fields: `answer`, then `score` "
+            "(must be formatted as a valid Python float).",
+        },
+    ]
     assert messages == expected_messages
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
@@ -594,100 +656,122 @@ def test_json_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
         lm=FunctionCallingLM([{}]),
     )
 
-    expected_messages = [{"role": "system",
-      "content": "Your input fields are:\n"
-                 "1. `question` (str):\n"
-                 "Your output fields are:\n"
-                 "\n"
-                 "All interactions will be structured in the following way, with the appropriate "
-                 "values filled in.\n"
-                 "\n"
-                 "Inputs will have the following structure:\n"
-                 "\n"
-                 "[[ ## question ## ]]\n"
-                 "{question}\n"
-                 "\n"
-                 "Outputs will be a JSON object with the following fields.\n"
-                 "\n"
-                 "{}\n"
-                 "In adhering to this structure, your objective is: \n"
-                 "        Given the fields `question`, `tools`, produce the fields `tool_calls`."},
-     {"role": "user",
-      "content": "[[ ## question ## ]]\n"
-                 "Q?\n"
-                 "\n"
-                 "Respond with a JSON object in the following order of fields: ."}]
+    expected_messages = [
+        {
+            "role": "system",
+            "content": "Your input fields are:\n"
+            "1. `question` (str):\n"
+            "Your output fields are:\n"
+            "\n"
+            "All interactions will be structured in the following way, with the appropriate "
+            "values filled in.\n"
+            "\n"
+            "Inputs will have the following structure:\n"
+            "\n"
+            "[[ ## question ## ]]\n"
+            "{question}\n"
+            "\n"
+            "Outputs will be a JSON object with the following fields.\n"
+            "\n"
+            "{}\n"
+            "In adhering to this structure, your objective is: \n"
+            "        Given the fields `question`, `tools`, produce the fields `tool_calls`.",
+        },
+        {
+            "role": "user",
+            "content": "[[ ## question ## ]]\nQ?\n\nRespond with a JSON object in the following order of fields: .",
+        },
+    ]
     assert messages == expected_messages
-    expected_lm_kwargs = {"tools": [{"type": "function",
-                "function": {"name": "search",
-                             "description": "Search for documents.",
-                             "parameters": {"type": "object",
-                                            "properties": {"query": {"type": "string"},
-                                                           "k": {"type": "integer", "default": 3}},
-                                            "required": ["query", "k"]}}}]}
+    expected_lm_kwargs = {
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "search",
+                    "description": "Search for documents.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"query": {"type": "string"}, "k": {"type": "integer", "default": 3}},
+                        "required": ["query", "k"],
+                    },
+                },
+            }
+        ]
+    }
     assert lm_kwargs == expected_lm_kwargs
+
 
 def test_json_adapter_format_exact_messages_with_tool_calls_output_demo():
     class ToolCallsSignature(Signature):
         question: str = InputField()
         tool_calls: ToolCalls = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(JSONAdapter(use_native_function_calling=False),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        JSONAdapter(use_native_function_calling=False),
         ToolCallsSignature,
         [{"question": "Q1", "tool_calls": ToolCalls.from_dict_list([{"name": "search", "args": {"query": "cats"}}])}],
         {"question": "Q2"},
     )
 
-    expected_messages = [{"role": "system",
-      "content": 'Your input fields are:\n'
-                 '1. `question` (str):\n'
-                 'Your output fields are:\n'
-                 '1. `tool_calls` (ToolCalls): \n'
-                 '    Type description of ToolCalls: Tool calls must be a JSON object with `tool_calls`, '
-                 'a list of calls. Each call must include `name` and `args`. Example: {"tool_calls": '
-                 '[{"name": "search", "args": {"query": "cats"}}]}\n'
-                 'All interactions will be structured in the following way, with the appropriate '
-                 'values filled in.\n'
-                 '\n'
-                 'Inputs will have the following structure:\n'
-                 '\n'
-                 '[[ ## question ## ]]\n'
-                 '{question}\n'
-                 '\n'
-                 'Outputs will be a JSON object with the following fields.\n'
-                 '\n'
-                 '{\n'
-                 '  "tool_calls": "{tool_calls}        # note: the value you produce must adhere to '
-                 'the JSON schema: {\\"type\\": \\"object\\", \\"$defs\\": {\\"ToolCall\\": '
-                 '{\\"type\\": \\"object\\", \\"properties\\": {\\"args\\": {\\"type\\": \\"object\\", '
-                 '\\"additionalProperties\\": true, \\"title\\": \\"Args\\"}, \\"name\\": {\\"type\\": '
-                 '\\"string\\", \\"title\\": \\"Name\\"}}, \\"required\\": [\\"name\\", \\"args\\"], '
-                 '\\"title\\": \\"ToolCall\\"}}, \\"properties\\": {\\"tool_calls\\": {\\"type\\": '
-                 '\\"array\\", \\"items\\": {\\"$ref\\": \\"#/$defs/ToolCall\\"}, \\"title\\": \\"Tool '
-                 'Calls\\"}}, \\"required\\": [\\"tool_calls\\"], \\"title\\": \\"ToolCalls\\"}"\n'
-                 '}\n'
-                 'In adhering to this structure, your objective is: \n'
-                 '        Given the fields `question`, produce the fields `tool_calls`.'},
-     {"role": "user", "content": "[[ ## question ## ]]\nQ1"},
-     {"role": "assistant",
-      "content": '{\n'
-                 '  "tool_calls": {\n'
-                 '    "tool_calls": [\n'
-                 '      {\n'
-                 '        "name": "search",\n'
-                 '        "args": {\n'
-                 '          "query": "cats"\n'
-                 '        }\n'
-                 '      }\n'
-                 '    ]\n'
-                 '  }\n'
-                 '}'},
-     {"role": "user",
-      "content": "[[ ## question ## ]]\n"
-                 "Q2\n"
-                 "\n"
-                 'Respond with a JSON object in the following order of fields: `tool_calls` (must be '
-                 'a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]}).'}]
+    expected_messages = [
+        {
+            "role": "system",
+            "content": "Your input fields are:\n"
+            "1. `question` (str):\n"
+            "Your output fields are:\n"
+            "1. `tool_calls` (ToolCalls): \n"
+            "    Type description of ToolCalls: Tool calls must be a JSON object with `tool_calls`, "
+            'a list of calls. Each call must include `name` and `args`. Example: {"tool_calls": '
+            '[{"name": "search", "args": {"query": "cats"}}]}\n'
+            "All interactions will be structured in the following way, with the appropriate "
+            "values filled in.\n"
+            "\n"
+            "Inputs will have the following structure:\n"
+            "\n"
+            "[[ ## question ## ]]\n"
+            "{question}\n"
+            "\n"
+            "Outputs will be a JSON object with the following fields.\n"
+            "\n"
+            "{\n"
+            '  "tool_calls": "{tool_calls}        # note: the value you produce must adhere to '
+            'the JSON schema: {\\"type\\": \\"object\\", \\"$defs\\": {\\"ToolCall\\": '
+            '{\\"type\\": \\"object\\", \\"properties\\": {\\"args\\": {\\"type\\": \\"object\\", '
+            '\\"additionalProperties\\": true, \\"title\\": \\"Args\\"}, \\"name\\": {\\"type\\": '
+            '\\"string\\", \\"title\\": \\"Name\\"}}, \\"required\\": [\\"name\\", \\"args\\"], '
+            '\\"title\\": \\"ToolCall\\"}}, \\"properties\\": {\\"tool_calls\\": {\\"type\\": '
+            '\\"array\\", \\"items\\": {\\"$ref\\": \\"#/$defs/ToolCall\\"}, \\"title\\": \\"Tool '
+            'Calls\\"}}, \\"required\\": [\\"tool_calls\\"], \\"title\\": \\"ToolCalls\\"}"\n'
+            "}\n"
+            "In adhering to this structure, your objective is: \n"
+            "        Given the fields `question`, produce the fields `tool_calls`.",
+        },
+        {"role": "user", "content": "[[ ## question ## ]]\nQ1"},
+        {
+            "role": "assistant",
+            "content": "{\n"
+            '  "tool_calls": {\n'
+            '    "tool_calls": [\n'
+            "      {\n"
+            '        "name": "search",\n'
+            '        "args": {\n'
+            '          "query": "cats"\n'
+            "        }\n"
+            "      }\n"
+            "    ]\n"
+            "  }\n"
+            "}",
+        },
+        {
+            "role": "user",
+            "content": "[[ ## question ## ]]\n"
+            "Q2\n"
+            "\n"
+            "Respond with a JSON object in the following order of fields: `tool_calls` (must be "
+            'a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]}).',
+        },
+    ]
     assert messages == expected_messages
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
@@ -735,7 +819,7 @@ def test_json_adapter_format_exact_non_native_tool_result_history_field():
         "Q2\n"
         "\n"
         "[[ ## tools ## ]]\n"
-        '["search. It takes arguments {\'query\': {\'type\': \'string\'}}."]\n'
+        "[\"search. It takes arguments {'query': {'type': 'string'}}.\"]\n"
         "\n"
         "Respond with a JSON object in the following order of fields: `next_thought`, then "
         '`tool_calls` (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]}).'
@@ -800,7 +884,6 @@ def test_json_adapter_not_using_structured_outputs_when_not_supported_by_model()
     mock_completion.assert_called_once()
     _, call_kwargs = mock_completion.call_args
     assert "response_format" not in call_kwargs
-
 
 
 def test_json_adapter_with_structured_outputs_does_not_mutate_original_signature():
@@ -1643,7 +1726,11 @@ def test_json_adapter_with_responses_api():
         object="response",
         output=[
             ResponseOutputMessage(
-                id="msg_1", type="message", role="assistant", status="completed", content=[{"type": "output_text", "text": '{"answer": "Washington, D.C."}', "annotations": []}],  # ty:ignore[invalid-argument-type]
+                id="msg_1",
+                type="message",
+                role="assistant",
+                status="completed",
+                content=[{"type": "output_text", "text": '{"answer": "Washington, D.C."}', "annotations": []}],  # ty:ignore[invalid-argument-type]
             ),
         ],
         metadata={},

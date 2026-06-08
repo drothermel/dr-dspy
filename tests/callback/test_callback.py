@@ -189,6 +189,7 @@ def test_callback_complex_module():
         "on_module_end",
     ]
 
+
 @pytest.mark.asyncio
 async def test_callback_async_module():
     callback = MyCallback()

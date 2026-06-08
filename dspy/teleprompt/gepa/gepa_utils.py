@@ -339,4 +339,3 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 raise TypeError("Unexpected output type from the base LM! Expected str or dict")
 
         return outputs
-

@@ -7,6 +7,7 @@ that is compatible with Python 3.14's removal of ast.Num and ast.Str.
 Based on magicattr 0.1.6 by Jairus Martin (MIT License)
 https://github.com/frmdstryr/magicattr
 """
+
 import ast
 import sys
 from functools import reduce

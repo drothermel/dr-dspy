@@ -20,6 +20,7 @@ def strip_prefix(text):
     modified_text = re.sub(pattern, "", text)
     return modified_text.strip('"')
 
+
 def create_instruction_set_history_string(base_program, trial_logs, top_n):
     program_history = []
     for trial_num in trial_logs:
@@ -27,10 +28,12 @@ def create_instruction_set_history_string(base_program, trial_logs, top_n):
         if "program_path" in trial:
             trial_program = base_program.deepcopy()
             trial_program.load(trial["program_path"])
-            program_history.append({
-                "program": trial_program,
-                "score": trial["score"],
-            })
+            program_history.append(
+                {
+                    "program": trial_program,
+                    "score": trial["score"],
+                }
+            )
 
     # Deduplicate program history based on the program's instruction set
     seen_programs = set()
@@ -54,6 +57,7 @@ def create_instruction_set_history_string(base_program, trial_logs, top_n):
 
     return instruction_set_history_string
 
+
 def parse_list_of_instructions(instruction_string):
     # Instruction proposals may arrive as JSON list strings or quoted text; accept both shapes.
     try:
@@ -63,6 +67,7 @@ def parse_list_of_instructions(instruction_string):
 
     return re.findall(r'"([^"]*)"', instruction_string)
 
+
 def get_program_instruction_set_string(program) -> str:
     instruction_list = []
     for _, pred in enumerate(program.predictors()):
@@ -70,6 +75,7 @@ def get_program_instruction_set_string(program) -> str:
         instruction_list.append(f'"{pred_instructions}"')
     # Joining the list into a single string that looks like a list
     return f"[{', '.join(instruction_list)}]"
+
 
 def create_predictor_level_history_string(base_program, predictor_i, trial_logs, top_n):
     instruction_aggregate = {}
@@ -80,10 +86,12 @@ def create_predictor_level_history_string(base_program, predictor_i, trial_logs,
         if "program_path" in trial:
             trial_program = base_program.deepcopy()
             trial_program.load(trial["program_path"])
-            instruction_history.append({
-                "program": trial_program,
-                "score": trial["score"],
-            })
+            instruction_history.append(
+                {
+                    "program": trial_program,
+                    "score": trial["score"],
+                }
+            )
 
     for history_item in instruction_history:
         predictor = history_item["program"].predictors()[predictor_i]
@@ -117,6 +125,7 @@ def create_predictor_level_history_string(base_program, predictor_i, trial_logs,
 
     return predictor_history_string
 
+
 def create_example_string(fields, example):
 
     output = []
@@ -129,6 +138,7 @@ def create_example_string(fields, example):
         output.append(field_str)
 
     return "\n".join(output)
+
 
 def get_dspy_source_code(module):
     header = []
@@ -161,7 +171,11 @@ def get_dspy_source_code(module):
             except TypeError:
                 continue
             if isinstance(item, Parameter):
-                if hasattr(item, "signature") and item.signature is not None and item.signature.__pydantic_parent_namespace__["signature_name"] + "_sig" not in completed_set:
+                if (
+                    hasattr(item, "signature")
+                    and item.signature is not None
+                    and item.signature.__pydantic_parent_namespace__["signature_name"] + "_sig" not in completed_set
+                ):
                     try:
                         header.append(inspect.getsource(item.signature))
                     except (TypeError, OSError):

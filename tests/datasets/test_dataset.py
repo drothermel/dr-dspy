@@ -15,6 +15,7 @@ dummy_data = """content,question,answer
 class CSVDataset(Dataset):
     def __init__(self, file_path, input_keys=None, **kwargs: object) -> None:
         import pandas as pd
+
         super().__init__(input_keys=input_keys, **kwargs)  # ty:ignore[invalid-argument-type]
         df = pd.read_csv(file_path)
         data = df.to_dict(orient="records")

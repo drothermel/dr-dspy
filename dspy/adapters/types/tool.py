@@ -434,7 +434,9 @@ class ToolCalls(Type):
         if isinstance(data, list) and all(
             isinstance(item, dict) and _is_tool_call_dict(cast("dict[str, Any]", item)) for item in data
         ):
-            return {"tool_calls": [cls.ToolCall(**_normalize_tool_call_dict(cast("dict[str, Any]", item))) for item in data]}
+            return {
+                "tool_calls": [cls.ToolCall(**_normalize_tool_call_dict(cast("dict[str, Any]", item))) for item in data]
+            }
         if isinstance(data, dict):
             data = cast("dict[str, Any]", data)
             if "tool_calls" in data:
@@ -515,16 +517,12 @@ def _is_tool_call_dict(data: dict[str, Any]) -> bool:
 
 def _normalize_tool_call_dict(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
-        raise ValueError(
-            f"Received invalid tool call value for `dspy.adapters.types.tool.ToolCalls`: {data}"
-        )
+        raise ValueError(f"Received invalid tool call value for `dspy.adapters.types.tool.ToolCalls`: {data}")
 
     if "function" in data:
         function = data.get("function") or {}
         if not isinstance(function, dict):
-            raise ValueError(
-                f"Received invalid function value for `dspy.adapters.types.tool.ToolCalls`: {function}"
-            )
+            raise ValueError(f"Received invalid function value for `dspy.adapters.types.tool.ToolCalls`: {function}")
 
         arguments = function.get("arguments", {})
         name = function.get("name") or data.get("name")

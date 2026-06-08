@@ -186,7 +186,7 @@ class COPRO(Teleprompter):
         for d in range(
             self.depth,
         ):  # TODO: fix this so that we eval the new batch of predictors with the new best following predictors
-            logger.info(f"Iteration Depth: {d+1}/{self.depth}.")
+            logger.info(f"Iteration Depth: {d + 1}/{self.depth}.")
 
             latest_scores = []
 
@@ -196,9 +196,7 @@ class COPRO(Teleprompter):
                 if len(module.predictors()) > 1:
                     # Unless our program has multiple predictors, in which case we need to reevaluate all prompts with
                     # the new prompt(s) for the other predictor(s).
-                    candidates_ = all_candidates[
-                        id(p_old)
-                    ]
+                    candidates_ = all_candidates[id(p_old)]
 
                 # For each candidate
                 for c_i, c in enumerate(candidates_):
@@ -219,11 +217,11 @@ class COPRO(Teleprompter):
 
                     # Score the instruction / prefix
                     for i, predictor in enumerate(module_clone.predictors()):
-                        logger.debug(f"Predictor {i+1}")
+                        logger.debug(f"Predictor {i + 1}")
                         self._print_signature(predictor)
                     logger.info(
-                        f"At Depth {d+1}/{self.depth}, Evaluating Prompt Candidate #{c_i+1}/{len(candidates_)} for "
-                        f"Predictor {p_i+1} of {len(module.predictors())}.",
+                        f"At Depth {d + 1}/{self.depth}, Evaluating Prompt Candidate #{c_i + 1}/{len(candidates_)} for "
+                        f"Predictor {p_i + 1} of {len(module.predictors())}.",
                     )
                     score = evaluate(module_clone, devset=trainset, **eval_kwargs).score
                     if self.prompt_model:
@@ -300,9 +298,9 @@ class COPRO(Teleprompter):
 
                 for i in range(shortest_len - 1, -1, -1):
                     # breakpoint()
-                    attempts.append(f'Instruction #{shortest_len-i}: {best_predictors[i]["instruction"]}')
-                    attempts.append(f'Prefix #{shortest_len-i}: {best_predictors[i]["prefix"]}')
-                    attempts.append(f'Resulting Score #{shortest_len-i}: {best_predictors[i]["score"]}')
+                    attempts.append(f"Instruction #{shortest_len - i}: {best_predictors[i]['instruction']}")
+                    attempts.append(f"Prefix #{shortest_len - i}: {best_predictors[i]['prefix']}")
+                    attempts.append(f"Resulting Score #{shortest_len - i}: {best_predictors[i]['score']}")
 
                 # Generate next batch of potential prompts to optimize, with previous attempts as input
                 if self.prompt_model:

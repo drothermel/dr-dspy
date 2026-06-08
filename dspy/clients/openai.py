@@ -91,7 +91,6 @@ class OpenAIProvider(Provider):
 
         return OpenAIProvider.get_trained_model(job)
 
-
     @staticmethod
     def does_job_exist(job_id: str) -> bool:
         try:
@@ -142,7 +141,6 @@ class OpenAIProvider(Provider):
         provider_job = _openai().fine_tuning.jobs.retrieve(job_id)
         provider_status = provider_job.status
         return provider_status_to_training_status[provider_status]
-
 
     @staticmethod
     def validate_data_format(data_format: TrainDataFormat) -> None:

@@ -19,20 +19,26 @@ def test_two_step_adapter_format_exact_messages_for_simple_signature_with_demo()
         answer: str = OutputField()
 
     adapter = TwoStepAdapter(DummyLM([{"answer": "x"}]))
-    messages, lm_kwargs = format_messages_and_lm_kwargs(adapter, QA, [{"question": "Q1", "answer": "A1"}], {"question": "Q2"})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        adapter, QA, [{"question": "Q1", "answer": "A1"}], {"question": "Q2"}
+    )
 
-    expected_messages = [{"role": "system",
-      "content": "You are a helpful assistant that can solve tasks based on user input.\n"
-                 "As input, you will be provided with:\n"
-                 "1. `question` (str):\n"
-                 "Your outputs must contain:\n"
-                 "1. `answer` (str):\n"
-                 "You should lay out your outputs in detail so that your answer can be understood by "
-                 "another agent\n"
-                 "Specific instructions: Given the fields `question`, produce the fields `answer`."},
-     {"role": "user", "content": "question: Q1"},
-     {"role": "assistant", "content": "answer: A1"},
-     {"role": "user", "content": "question: Q2"}]
+    expected_messages = [
+        {
+            "role": "system",
+            "content": "You are a helpful assistant that can solve tasks based on user input.\n"
+            "As input, you will be provided with:\n"
+            "1. `question` (str):\n"
+            "Your outputs must contain:\n"
+            "1. `answer` (str):\n"
+            "You should lay out your outputs in detail so that your answer can be understood by "
+            "another agent\n"
+            "Specific instructions: Given the fields `question`, produce the fields `answer`.",
+        },
+        {"role": "user", "content": "question: Q1"},
+        {"role": "assistant", "content": "answer: A1"},
+        {"role": "user", "content": "question: Q2"},
+    ]
     assert messages == expected_messages
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
@@ -47,18 +53,22 @@ def test_two_step_adapter_format_exact_messages_with_typed_outputs():
     adapter = TwoStepAdapter(DummyLM([{"count": 1, "answer": "x"}]))
     messages, lm_kwargs = format_messages_and_lm_kwargs(adapter, TypedSignature, [], {"question": "Q"})
 
-    expected_messages = [{"role": "system",
-      "content": "You are a helpful assistant that can solve tasks based on user input.\n"
-                 "As input, you will be provided with:\n"
-                 "1. `question` (str):\n"
-                 "Your outputs must contain:\n"
-                 "1. `count` (int): \n"
-                 "2. `answer` (str):\n"
-                 "You should lay out your outputs in detail so that your answer can be understood by "
-                 "another agent\n"
-                 "Specific instructions: Given the fields `question`, produce the fields `count`, "
-                 "`answer`."},
-     {"role": "user", "content": "question: Q"}]
+    expected_messages = [
+        {
+            "role": "system",
+            "content": "You are a helpful assistant that can solve tasks based on user input.\n"
+            "As input, you will be provided with:\n"
+            "1. `question` (str):\n"
+            "Your outputs must contain:\n"
+            "1. `count` (int): \n"
+            "2. `answer` (str):\n"
+            "You should lay out your outputs in detail so that your answer can be understood by "
+            "another agent\n"
+            "Specific instructions: Given the fields `question`, produce the fields `count`, "
+            "`answer`.",
+        },
+        {"role": "user", "content": "question: Q"},
+    ]
     assert messages == expected_messages
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
