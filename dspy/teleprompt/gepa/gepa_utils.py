@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import random
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Callable, Protocol, TypedDict, cast
 
 from gepa import EvaluationBatch, GEPAAdapter
@@ -19,6 +21,16 @@ if TYPE_CHECKING:
     from gepa.core.adapter import ProposalFn
 
 logger = logging.getLogger(__name__)
+
+_gepa_eval_executor = ThreadPoolExecutor(max_workers=1)
+
+
+def _run_async_from_sync(coro):
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    return _gepa_eval_executor.submit(asyncio.run, coro).result()
 
 
 class LoggerAdapter:
@@ -149,6 +161,9 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
 
     @override
     def evaluate(self, batch, candidate, capture_traces=False):
+        return _run_async_from_sync(self._aevaluate(batch, candidate, capture_traces))
+
+    async def _aevaluate(self, batch, candidate, capture_traces=False):
         program = self.build_program(candidate)
         callback_metadata = (
             {"metric_key": "eval_full"}
@@ -160,7 +175,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             # bootstrap_trace_data-like flow with trace capture
             from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
 
-            trajs = bootstrap_trace_module.bootstrap_trace_data(
+            trajs = await bootstrap_trace_module.bootstrap_trace_data(
                 program=program,
                 dataset=batch,
                 metric=self.metric_fn,
@@ -194,7 +209,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             provide_traceback=True,
             max_errors=len(batch) * 100,
         )
-        res = evaluator(program, callback_metadata=callback_metadata)
+        res = await evaluator(program, callback_metadata=callback_metadata)
         outputs = [r[1] for r in res.results]
         scores = [r[2] for r in res.results]
         scores = [s["score"] if hasattr(s, "score") else s for s in scores]

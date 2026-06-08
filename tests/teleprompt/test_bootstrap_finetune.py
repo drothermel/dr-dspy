@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import patch
 
 from dspy.dsp.utils.settings import settings
@@ -32,8 +33,8 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    def forward(self, **kwargs: object):
-        return self.predictor(**kwargs)
+    async def aforward(self, **kwargs: object):
+        return await self.predictor(**kwargs)
 
 
 def test_compile_with_predict_instances():
@@ -54,7 +55,7 @@ def test_compile_with_predict_instances():
     # Mock the fine-tuning process since DummyLM doesn't support it
     with patch.object(bootstrap, "finetune_lms") as mock_finetune:
         mock_finetune.return_value = {(lm, None): lm}
-        compiled_student = bootstrap.compile(student, teacher=teacher, trainset=trainset)
+        compiled_student = asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset))
 
         assert compiled_student is not None, "Failed to compile student"
         assert hasattr(compiled_student, "_compiled") and compiled_student._compiled, "Student compilation flag not set"
@@ -75,7 +76,7 @@ def test_error_handling_missing_lm():
 
     # This should raise ValueError about missing LM and hint to use set_lm
     try:
-        bootstrap.compile(student, trainset=trainset)
+        asyncio.run(bootstrap.compile(student, trainset=trainset))
         raise AssertionError("Should have raised ValueError for missing LM")
     except ValueError as e:
         assert "does not have an LM assigned" in str(e)

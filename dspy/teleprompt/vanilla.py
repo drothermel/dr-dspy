@@ -10,7 +10,7 @@ class LabeledFewShot(Teleprompter):
         self.k = k
 
     @override
-    def compile(self, student, *, trainset, sample=True):
+    async def compile(self, student, *, trainset, sample=True):
         self.student = student.reset_copy()
         self.trainset = trainset
 

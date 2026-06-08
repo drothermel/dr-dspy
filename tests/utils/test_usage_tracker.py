@@ -1,3 +1,4 @@
+import asyncio
 from unittest import mock
 
 from pydantic import BaseModel
@@ -356,34 +357,34 @@ def test_parallel_executor_with_usage_tracker():
 
     settings.configure(lm=mock_lm, adapter=JSONAdapter())
 
-    def task1():
-        # Simulate LM usage tracking for task 1
-        settings.usage_tracker.add_usage(
-            "openai/gpt-4o-mini",
-            {
-                "prompt_tokens": 50,
-                "completion_tokens": 10,
-                "total_tokens": 60,
-            },
-        )
-        return settings.usage_tracker.get_total_tokens()
+    async def task1():
+        with settings.context(usage_tracker=UsageTracker()):
+            settings.usage_tracker.add_usage(
+                "openai/gpt-4o-mini",
+                {
+                    "prompt_tokens": 50,
+                    "completion_tokens": 10,
+                    "total_tokens": 60,
+                },
+            )
+            return settings.usage_tracker.get_total_tokens()
 
-    def task2():
-        # Simulate LM usage tracking for task 2 with different values
-        settings.usage_tracker.add_usage(
-            "openai/gpt-4o-mini",
-            {
-                "prompt_tokens": 80,
-                "completion_tokens": 15,
-                "total_tokens": 95,
-            },
-        )
-        return settings.usage_tracker.get_total_tokens()
+    async def task2():
+        with settings.context(usage_tracker=UsageTracker()):
+            settings.usage_tracker.add_usage(
+                "openai/gpt-4o-mini",
+                {
+                    "prompt_tokens": 80,
+                    "completion_tokens": 15,
+                    "total_tokens": 95,
+                },
+            )
+            return settings.usage_tracker.get_total_tokens()
 
     # Execute tasks in parallel
     with settings.context(track_usage=True, usage_tracker=parent_tracker):
         executor = Parallel()
-        results = executor([(task1, {}), (task2, {})])
+        results = asyncio.run(executor([(task1, {}), (task2, {})]))
     # Verify that the two workers had different usage
     usage1 = results[0]
     usage2 = results[1]

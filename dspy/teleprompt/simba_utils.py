@@ -38,11 +38,11 @@ def prepare_models_for_resampling(program: Module, n: int, teacher_settings: dic
 
 
 def wrap_program(program: Module, metric: Callable):
-    def wrapped_program(example):
+    async def wrapped_program(example):
         with settings.context(trace=[]):
             prediction, trace, score = None, None, 0.0
             try:
-                prediction = program(**example.inputs())
+                prediction = await program(**example.inputs())
             except Exception as e:
                 logger.warning(e)
             trace = settings.trace.copy()
@@ -111,7 +111,7 @@ def append_a_demo(demo_input_field_maxlen):
     return append_a_demo_
 
 
-def append_a_rule(bucket, system, **kwargs) -> bool:
+async def append_a_rule(bucket, system, **kwargs) -> bool:
     predictor2name = kwargs["predictor2name"]
     batch_10p_score, batch_90p_score = kwargs["batch_10p_score"], kwargs["batch_90p_score"]
     prompt_model = kwargs["prompt_model"] or settings.lm
@@ -167,7 +167,7 @@ def append_a_rule(bucket, system, **kwargs) -> bool:
 
     with settings.context(trace=[], lm=prompt_model):
         advice_program = Predict(OfferFeedback)
-        advice = advice_program(**kwargs).module_advice
+        advice = (await advice_program(**kwargs)).module_advice
 
     for name, predictor in system.named_predictors():
         if name in advice:

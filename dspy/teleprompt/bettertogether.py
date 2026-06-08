@@ -189,7 +189,7 @@ class BetterTogether(Teleprompter):
         self.optimizers: dict[str, Teleprompter] = optimizers
 
     @override
-    def compile(
+    async def compile(
         self,
         student: Module,
         *,
@@ -280,7 +280,7 @@ class BetterTogether(Teleprompter):
         parsed_strategy = self._prepare_strategy(strategy)
         optimizer_compile_args = self._prepare_optimizer_compile_args(optimizer_compile_args, teacher)
 
-        student = self._run_strategies(
+        student = await self._run_strategies(
             student,
             trainset,
             teacher,
@@ -400,7 +400,7 @@ class BetterTogether(Teleprompter):
                 f"{optimizer.__class__.__name__}.compile() accepts: {list(valid_params.keys())}"
             )
 
-    def _run_strategies(
+    async def _run_strategies(
         self,
         student: Module,
         trainset: list[Example],
@@ -425,7 +425,9 @@ class BetterTogether(Teleprompter):
         launch_lms(student)
         flag_lms_launched = True
 
-        score = self._evaluate_on_valset(student, valset, rng, num_threads, effective_max_errors, provide_traceback)
+        score = await self._evaluate_on_valset(
+            student, valset, rng, num_threads, effective_max_errors, provide_traceback
+        )
         self._add_candidate(candidate_programs, student, strategy="", score=score)
         logger.info(f"{YELLOW}Baseline score:{ENDC} {score}")
 
@@ -445,7 +447,7 @@ class BetterTogether(Teleprompter):
                     rng.shuffle(trainset)
 
                 compile_args = optimizer_args.get(step_code, {})
-                student, score, is_new_best, lms_relaunched = self._run_and_evaluate_step(
+                student, score, is_new_best, lms_relaunched = await self._run_and_evaluate_step(
                     optimizer,
                     student,
                     teacher,
@@ -505,7 +507,7 @@ class BetterTogether(Teleprompter):
 
         return best_student
 
-    def _run_and_evaluate_step(
+    async def _run_and_evaluate_step(
         self,
         optimizer: Teleprompter,
         student: Module,
@@ -538,7 +540,7 @@ class BetterTogether(Teleprompter):
         accepted_params = set(sig.parameters.keys())
         filtered_compile_args = {k: v for k, v in potential_args.items() if k in accepted_params}
 
-        student = optimizer.compile(student, **filtered_compile_args)
+        student = await optimizer.compile(student, **filtered_compile_args)
 
         # Restore LMs if optimizer incorrectly reset them
         # TODO: Some optimizers like BootstrapFewShotWithRandomSearch reset predictor LMs during compilation,
@@ -563,7 +565,9 @@ class BetterTogether(Teleprompter):
             launch_lms(student)
             lms_relaunched = True
 
-        score = self._evaluate_on_valset(student, valset, rng, num_threads, effective_max_errors, provide_traceback)
+        score = await self._evaluate_on_valset(
+            student, valset, rng, num_threads, effective_max_errors, provide_traceback
+        )
         self._add_candidate(candidate_programs, student, current_strategy, score)
 
         valid_scores = [cp["score"] for cp in candidate_programs if cp["score"] is not None]
@@ -595,7 +599,7 @@ class BetterTogether(Teleprompter):
             }
         )
 
-    def _evaluate_on_valset(
+    async def _evaluate_on_valset(
         self,
         program: Module,
         valset: list[Example] | None,
@@ -618,5 +622,5 @@ class BetterTogether(Teleprompter):
             display_progress=True,
             provide_traceback=provide_traceback,
         )
-        eval_result = eval_candidate_program(len(valset), valset, program, evaluate, rng)
+        eval_result = await eval_candidate_program(len(valset), valset, program, evaluate, rng)
         return eval_result.score

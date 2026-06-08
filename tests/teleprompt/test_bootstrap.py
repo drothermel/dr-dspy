@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from dspy.dsp.utils.settings import settings
@@ -33,8 +35,8 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    def forward(self, **kwargs: object):
-        return self.predictor(**kwargs)
+    async def aforward(self, **kwargs: object):
+        return await self.predictor(**kwargs)
 
 
 def test_compile_with_predict_instances():
@@ -48,7 +50,7 @@ def test_compile_with_predict_instances():
 
     # Initialize BootstrapFewShot and compile the student
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
-    compiled_student = bootstrap.compile(student, teacher=teacher, trainset=trainset)
+    compiled_student = asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset))
 
     assert compiled_student is not None, "Failed to compile student"
     assert hasattr(compiled_student, "_compiled") and compiled_student._compiled, "Student compilation flag not set"
@@ -62,7 +64,7 @@ def test_bootstrap_effectiveness():
     settings.configure(lm=lm, trace=[])
 
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
-    compiled_student = bootstrap.compile(student, teacher=teacher, trainset=trainset)
+    compiled_student = asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset))
 
     # Check that the compiled student has the correct demos
     assert len(compiled_student.predictor.demos) == 1
@@ -74,7 +76,7 @@ def test_bootstrap_effectiveness():
     # even though it would normally reply with "Ring-ding-ding-ding-dingeringeding!"
     # on the second output, if it seems an example that perfectly matches the
     # prompt, it will use that instead. That is why we expect "blue" here.
-    prediction = compiled_student(input=trainset[0].input)
+    prediction = asyncio.run(compiled_student(input=trainset[0].input))
     assert prediction.output == trainset[0].output
 
 
@@ -88,7 +90,7 @@ def test_error_handling_during_bootstrap():
             super().__init__()
             self.predictor = Predict(signature)
 
-        def forward(self, **kwargs: object):
+        async def aforward(self, **kwargs: object):
             raise RuntimeError("Simulated error")
 
     student = SimpleModule("input -> output")
@@ -110,7 +112,7 @@ def test_error_handling_during_bootstrap():
     )
 
     with pytest.raises(RuntimeError, match="Simulated error"):
-        bootstrap.compile(student, teacher=teacher, trainset=trainset)
+        asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset))
 
 
 def test_validation_set_usage():
@@ -129,7 +131,7 @@ def test_validation_set_usage():
     settings.configure(lm=lm)
 
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
-    compiled_student = bootstrap.compile(student, teacher=teacher, trainset=trainset)
+    compiled_student = asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset))
 
     # Check that validation examples are part of student's demos after compilation
     assert len(compiled_student.predictor.demos) >= len(valset), "Validation set not used in compiled student demos"

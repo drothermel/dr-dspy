@@ -54,7 +54,9 @@ class BootstrapFinetune(FinetuneTeleprompter):
         self.num_threads = num_threads
 
     @override
-    def compile(self, student: Module, trainset: list[Example], teacher: Module | list[Module] | None = None) -> Module:
+    async def compile(
+        self, student: Module, trainset: list[Example], teacher: Module | list[Module] | None = None
+    ) -> Module:
         logger.info("Preparing the student and teacher programs...")
         all_predictors_have_lms(student)
 
@@ -65,7 +67,9 @@ class BootstrapFinetune(FinetuneTeleprompter):
         teachers = [prepare_teacher(student, cast("Module | None", t)) for t in teachers]
         num_threads = self.num_threads or settings.num_threads
         for t in teachers:
-            trace_data += bootstrap_trace_data(program=t, dataset=trainset, metric=self.metric, num_threads=num_threads)
+            trace_data += await bootstrap_trace_data(
+                program=t, dataset=trainset, metric=self.metric, num_threads=num_threads
+            )
 
         logger.info("Preparing the train data...")
         key_to_data = {}

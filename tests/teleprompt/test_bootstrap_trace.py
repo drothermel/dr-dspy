@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, ClassVar
 from unittest import mock
 
@@ -85,15 +86,17 @@ def test_bootstrap_trace_data():
 
     completion_side_effect.call_count = 0  # ty: ignore[unresolved-attribute]
 
-    with mock.patch("litellm.completion", side_effect=completion_side_effect):
+    with mock.patch("litellm.acompletion", new=mock.AsyncMock(side_effect=completion_side_effect)):
         # Call bootstrap_trace_data
-        results = bootstrap_trace_data(
-            program=program,
-            dataset=dataset,
-            metric=exact_match_metric,
-            num_threads=1,
-            raise_on_error=False,
-            capture_failed_parses=True,
+        results = asyncio.run(
+            bootstrap_trace_data(
+                program=program,
+                dataset=dataset,
+                metric=exact_match_metric,
+                num_threads=1,
+                raise_on_error=False,
+                capture_failed_parses=True,
+            )
         )
 
     # Verify results
@@ -137,7 +140,7 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch):
     from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
 
     class DummyProgram(Module):
-        def forward(self, **kwargs: object):  # pragma: no cover - stub forward
+        async def aforward(self, **kwargs: object):  # pragma: no cover - stub aforward
             return Prediction()
 
     captured_metadata: dict[str, Any] = {}
@@ -146,7 +149,7 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch):
         def __init__(self, *args: object, **kwargs: object):
             pass
 
-        def __call__(self, *args: object, callback_metadata=None, **kwargs: object):
+        async def __call__(self, *args: object, callback_metadata=None, **kwargs: object):
             captured_metadata["value"] = callback_metadata
 
             class _Result:
@@ -156,10 +159,12 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch):
 
     monkeypatch.setattr(bootstrap_trace_module, "Evaluate", DummyEvaluate)
 
-    bootstrap_trace_module.bootstrap_trace_data(
-        program=DummyProgram(),
-        dataset=[],
-        callback_metadata={"disable_logging": True},
+    asyncio.run(
+        bootstrap_trace_module.bootstrap_trace_data(
+            program=DummyProgram(),
+            dataset=[],
+            callback_metadata={"disable_logging": True},
+        )
     )
 
     assert captured_metadata["value"] == {"disable_logging": True}

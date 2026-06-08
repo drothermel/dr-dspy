@@ -1,6 +1,5 @@
 import asyncio
 import sys
-import time
 from concurrent.futures import ThreadPoolExecutor
 from unittest import mock
 
@@ -71,12 +70,12 @@ def test_dspy_context_with_dspy_parallel():
         def __init__(self):
             self.predict = Predict("question -> answer")
 
-        def forward(self, question: str) -> str:
+        async def aforward(self, question: str) -> str:
             lm = LM("openai/gpt-4o-mini", cache=False) if "France" in question else settings.lm
             with settings.context(lm=lm):
-                time.sleep(1)
+                await asyncio.sleep(1)
                 assert settings.lm.model == lm.model
-                return self.predict(question=question)
+                return await self.predict(question=question)
 
     with mock.patch("litellm.completion") as mock_completion:
         mock_completion.return_value = ModelResponse(

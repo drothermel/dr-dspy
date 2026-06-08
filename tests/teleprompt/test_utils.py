@@ -1,4 +1,5 @@
-from unittest.mock import Mock, patch
+import asyncio
+from unittest.mock import AsyncMock, Mock, patch
 
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
@@ -12,20 +13,21 @@ class DummyModule(Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, **kwargs: object):
+    async def aforward(self, **kwargs: object):
         pass
 
 
 def test_eval_candidate_program_full_trainset():
     trainset = [1, 2, 3, 4, 5]
     candidate_program = DummyModule()
-    evaluate = Mock(return_value=0)
+    evaluate = AsyncMock(return_value=0)
     batch_size = 10
 
-    result = eval_candidate_program(batch_size, trainset, candidate_program, evaluate)
+    result = asyncio.run(eval_candidate_program(batch_size, trainset, candidate_program, evaluate))
 
-    evaluate.assert_called_once()
-    _, called_kwargs = evaluate.call_args
+    evaluate.assert_awaited_once()
+    assert evaluate.await_args is not None
+    _, called_kwargs = evaluate.await_args
     assert len(called_kwargs["devset"]) == len(trainset)
     assert called_kwargs["callback_metadata"] == {"metric_key": "eval_full"}
     assert result == 0
@@ -34,13 +36,14 @@ def test_eval_candidate_program_full_trainset():
 def test_eval_candidate_program_minibatch():
     trainset = [1, 2, 3, 4, 5]
     candidate_program = DummyModule()
-    evaluate = Mock(return_value=0)
+    evaluate = AsyncMock(return_value=0)
     batch_size = 3
 
-    result = eval_candidate_program(batch_size, trainset, candidate_program, evaluate)
+    result = asyncio.run(eval_candidate_program(batch_size, trainset, candidate_program, evaluate))
 
-    evaluate.assert_called_once()
-    _, called_kwargs = evaluate.call_args
+    evaluate.assert_awaited_once()
+    assert evaluate.await_args is not None
+    _, called_kwargs = evaluate.await_args
     assert len(called_kwargs["devset"]) == batch_size
     assert called_kwargs["callback_metadata"] == {"metric_key": "eval_minibatch"}
     assert result == 0
@@ -49,10 +52,10 @@ def test_eval_candidate_program_minibatch():
 def test_eval_candidate_program_failure():
     trainset = [1, 2, 3, 4, 5]
     candidate_program = DummyModule()
-    evaluate = Mock(side_effect=ValueError("Error"))
+    evaluate = AsyncMock(side_effect=ValueError("Error"))
     batch_size = 3
 
-    result = eval_candidate_program(batch_size, trainset, candidate_program, evaluate)
+    result = asyncio.run(eval_candidate_program(batch_size, trainset, candidate_program, evaluate))
 
     assert result.score == 0.0
 
@@ -71,18 +74,20 @@ def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled():
 
     with patch("dspy.teleprompt.utils.BootstrapFewShot") as MockBootstrap:
         mock_instance = Mock()
-        mock_instance.compile.return_value = student
+        mock_instance.compile = AsyncMock(return_value=student)
         MockBootstrap.return_value = mock_instance
 
-        create_n_fewshot_demo_sets(
-            student=student,
-            num_candidate_sets=4,  # -3, -2, -1, 0 → hits seed=-1
-            trainset=trainset,
-            max_labeled_demos=1,
-            max_bootstrapped_demos=1,
-            metric=lambda ex, pred, trace=None: 1.0,  # noqa: ARG005
-            teacher_settings={},
-            metric_threshold=0.9,
+        asyncio.run(
+            create_n_fewshot_demo_sets(
+                student=student,
+                num_candidate_sets=4,  # -3, -2, -1, 0 → hits seed=-1
+                trainset=trainset,
+                max_labeled_demos=1,
+                max_bootstrapped_demos=1,
+                metric=lambda ex, pred, trace=None: 1.0,  # noqa: ARG005
+                teacher_settings={},
+                metric_threshold=0.9,
+            )
         )
 
         # Find the call where seed == -1 (unshuffled few-shot)

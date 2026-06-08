@@ -1,7 +1,9 @@
+import asyncio
 import logging
 import math
 import random
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
 from typing_extensions import override
@@ -25,6 +27,16 @@ if TYPE_CHECKING:
     import optuna
 
 logger = logging.getLogger(__name__)
+
+_mipro_optuna_executor = ThreadPoolExecutor(max_workers=1)
+
+
+def _run_async_from_sync(coro):
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    return _mipro_optuna_executor.submit(asyncio.run, coro).result()
 
 
 def _import_optuna():
@@ -108,7 +120,7 @@ class MIPROv2(Teleprompter):
             )
 
     @override
-    def compile(
+    async def compile(
         self,
         student: Any,
         *,
@@ -208,7 +220,7 @@ class MIPROv2(Teleprompter):
 
         with settings.context(lm=self.task_model):
             # Step 1: Bootstrap few-shot examples
-            demo_candidates = self._bootstrap_fewshot_examples(
+            demo_candidates = await self._bootstrap_fewshot_examples(
                 program,
                 trainset,
                 seed,
@@ -221,7 +233,7 @@ class MIPROv2(Teleprompter):
             )
 
         # Step 2: Propose instruction candidates
-        instruction_candidates = self._propose_instructions(
+        instruction_candidates = await self._propose_instructions(
             program,
             trainset,
             demo_candidates,
@@ -239,7 +251,7 @@ class MIPROv2(Teleprompter):
 
         with settings.context(lm=self.task_model):
             # Step 3: Find optimal prompt parameters
-            return self._optimize_prompt_parameters(
+            return await self._optimize_prompt_parameters(
                 program,
                 instruction_candidates,
                 demo_candidates,
@@ -377,7 +389,7 @@ class MIPROv2(Teleprompter):
 
         return prompt_model_line, task_model_line
 
-    def _bootstrap_fewshot_examples(
+    async def _bootstrap_fewshot_examples(
         self,
         program: Any,
         trainset: list,
@@ -405,7 +417,7 @@ class MIPROv2(Teleprompter):
         if max_errors is None:
             max_errors = settings.max_errors
 
-        return create_n_fewshot_demo_sets(
+        return await create_n_fewshot_demo_sets(
             student=program,
             num_candidate_sets=num_fewshot_candidates,
             trainset=trainset,
@@ -421,7 +433,7 @@ class MIPROv2(Teleprompter):
         )
         # Bootstrapping failures intentionally propagate because running MIPRO without few-shot candidates weakens the optimization substantially.
 
-    def _propose_instructions(
+    async def _propose_instructions(
         self,
         program: Any,
         trainset: list,
@@ -457,7 +469,7 @@ class MIPROv2(Teleprompter):
         )
 
         logger.info(f"\nProposing N={num_instruct_candidates} instructions...\n")
-        instruction_candidates = proposer.propose_instructions_for_program(
+        instruction_candidates = await proposer.propose_instructions_for_program(
             trainset=trainset,
             program=program,
             demo_candidates=demo_candidates,
@@ -474,7 +486,7 @@ class MIPROv2(Teleprompter):
 
         return instruction_candidates
 
-    def _optimize_prompt_parameters(
+    async def _optimize_prompt_parameters(
         self,
         program: Any,
         instruction_candidates: dict[int, list[str]],
@@ -503,7 +515,7 @@ class MIPROv2(Teleprompter):
         )
         logger.info(f"== Trial {1} / {adjusted_num_trials} - Full Evaluation of Default Program ==")
 
-        default_score = eval_candidate_program(len(valset), valset, program, evaluate, self.rng).score
+        default_score = (await eval_candidate_program(len(valset), valset, program, evaluate, self.rng)).score
         logger.info(f"Default program score: {default_score}\n")
 
         trial_logs = {}
@@ -547,7 +559,9 @@ class MIPROv2(Teleprompter):
                 print_full_program(candidate_program)
 
             batch_size = minibatch_size if minibatch else len(valset)
-            score = eval_candidate_program(batch_size, valset, candidate_program, evaluate, self.rng).score
+            score = _run_async_from_sync(
+                eval_candidate_program(batch_size, valset, candidate_program, evaluate, self.rng)
+            ).score
             total_eval_calls += batch_size
 
             if not minibatch and score > best_score:
@@ -596,21 +610,23 @@ class MIPROv2(Teleprompter):
             if minibatch and (
                 (trial_num % (minibatch_full_eval_steps + 1) == 0) or (trial_num == (adjusted_num_trials - 1))
             ):
-                best_score, best_program, total_eval_calls = self._perform_full_evaluation(
-                    trial_num,
-                    adjusted_num_trials,
-                    param_score_dict,
-                    fully_evaled_param_combos,
-                    evaluate,
-                    valset,
-                    trial_logs,
-                    total_eval_calls,
-                    score_data,
-                    best_score,
-                    best_program,
-                    study,
-                    instruction_candidates,
-                    demo_candidates,
+                best_score, best_program, total_eval_calls = _run_async_from_sync(
+                    self._perform_full_evaluation(
+                        trial_num,
+                        adjusted_num_trials,
+                        param_score_dict,
+                        fully_evaled_param_combos,
+                        evaluate,
+                        valset,
+                        trial_logs,
+                        total_eval_calls,
+                        score_data,
+                        best_score,
+                        best_program,
+                        study,
+                        instruction_candidates,
+                        demo_candidates,
+                    )
                 )
 
             return score
@@ -755,7 +771,7 @@ class MIPROv2(Teleprompter):
 
         return param_distributions
 
-    def _perform_full_evaluation(
+    async def _perform_full_evaluation(
         self,
         trial_num: int,
         adjusted_num_trials: int,
@@ -780,7 +796,9 @@ class MIPROv2(Teleprompter):
             param_score_dict, fully_evaled_param_combos
         )
         logger.info(f"Doing full eval on next top averaging program (Avg Score: {mean_score}) from minibatch trials...")
-        full_eval_score = eval_candidate_program(len(valset), valset, highest_mean_program, evaluate, self.rng).score
+        full_eval_score = (
+            await eval_candidate_program(len(valset), valset, highest_mean_program, evaluate, self.rng)
+        ).score
         score_data.append({"score": full_eval_score, "program": highest_mean_program, "full_eval": True})
 
         trial = optuna.trial.create_trial(

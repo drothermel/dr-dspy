@@ -5,7 +5,7 @@ class Teleprompter:
     def __init__(self) -> None:
         pass
 
-    def compile(self, *args: Any, **kwargs: Any) -> Any:
+    async def compile(self, *args: Any, **kwargs: Any) -> Any:
         """
         Optimize the student program.
 

@@ -146,7 +146,7 @@ class GenerateModuleInstruction(Module):
             use_tip=use_tip,
         )
 
-    def forward(
+    async def aforward(
         self,
         demo_candidates,
         pred_i,
@@ -192,9 +192,11 @@ class GenerateModuleInstruction(Module):
         if self.program_aware:
             try:
                 program_description = strip_prefix(
-                    self.describe_program(
-                        program_code=self.program_code_string,
-                        program_example=task_demos,
+                    (
+                        await self.describe_program(
+                            program_code=self.program_code_string,
+                            program_example=task_demos,
+                        )
                     ).program_description,
                 )
                 if self.verbose:
@@ -214,12 +216,14 @@ class GenerateModuleInstruction(Module):
                     f"{program.predictors()[pred_i].__class__.__name__}({', '.join(inputs)}) -> {', '.join(outputs)}"
                 )
 
-                module_description = self.describe_module(
-                    program_code=self.program_code_string,
-                    program_description=program_description,
-                    program_example=task_demos,
-                    module=module_code,
-                    max_depth=10,
+                module_description = (
+                    await self.describe_module(
+                        program_code=self.program_code_string,
+                        program_description=program_description,
+                        program_example=task_demos,
+                        module=module_code,
+                        max_depth=10,
+                    )
                 ).module_description
             except Exception:
                 if self.verbose:
@@ -229,7 +233,7 @@ class GenerateModuleInstruction(Module):
         if self.verbose:
             pass
 
-        instruct = self.generate_module_instruction(
+        instruct = await self.generate_module_instruction(
             dataset_description=data_summary,
             program_code=self.program_code_string,
             module=module_code,
@@ -293,20 +297,19 @@ class GroundedProposer(Proposer):
                 self.program_aware = False
 
         self.data_summary = None
-        if self.use_dataset_summary:
-            try:
-                self.data_summary = create_dataset_summary(
-                    trainset=trainset,
-                    view_data_batch_size=view_data_batch_size,
-                    prompt_model=prompt_model,
-                )
-                if self.verbose:
-                    pass
-            except Exception:
-                self.use_dataset_summary = False
+        self._summary_trainset = trainset
+        self._view_data_batch_size = view_data_batch_size
+
+    async def _ensure_data_summary(self) -> None:
+        if self.data_summary is None and self.use_dataset_summary:
+            self.data_summary = await create_dataset_summary(
+                trainset=self._summary_trainset,
+                view_data_batch_size=self._view_data_batch_size,
+                prompt_model=self.prompt_model,
+            )
 
     @override
-    def propose_instructions_for_program(
+    async def propose_instructions_for_program(
         self,
         trainset,
         program,
@@ -316,6 +319,7 @@ class GroundedProposer(Proposer):
     ) -> dict[int, list[str]]:
         """This method is responsible for returning the full set of new instructions for our program, given the specified criteria."""
 
+        await self._ensure_data_summary()
         proposed_instructions = {}
 
         if self.set_history_randomly:
@@ -349,7 +353,7 @@ class GroundedProposer(Proposer):
                         pass
 
                 proposed_instructions[pred_i].append(
-                    self.propose_instruction_for_predictor(
+                    await self.propose_instruction_for_predictor(
                         program=program,
                         predictor=predictor,
                         pred_i=pred_i,
@@ -363,7 +367,7 @@ class GroundedProposer(Proposer):
         return proposed_instructions
 
     @override
-    def propose_instruction_for_predictor(
+    async def propose_instruction_for_predictor(
         self,
         program,
         predictor,
@@ -398,15 +402,17 @@ class GroundedProposer(Proposer):
         )
 
         with settings.context(lm=rollout_lm):
-            proposed_instruction = instruction_generator(
-                demo_candidates=demo_candidates,
-                pred_i=pred_i,
-                demo_set_i=demo_set_i,
-                program=program,
-                data_summary=self.data_summary,
-                previous_instructions=instruction_history,
-                num_demos_in_context=self.num_demos_in_context,
-                tip=tip,
+            proposed_instruction = (
+                await instruction_generator(
+                    demo_candidates=demo_candidates,
+                    pred_i=pred_i,
+                    demo_set_i=demo_set_i,
+                    program=program,
+                    data_summary=self.data_summary,
+                    previous_instructions=instruction_history,
+                    num_demos_in_context=self.num_demos_in_context,
+                    tip=tip,
+                )
             ).proposed_instruction
 
         if self.verbose:

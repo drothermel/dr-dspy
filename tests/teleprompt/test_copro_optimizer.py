@@ -1,3 +1,5 @@
+import asyncio
+
 from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.example import Example
@@ -35,8 +37,8 @@ class SimpleModule(Module):
         # COPRO doesn't work with Predict.
         self.predictor = ChainOfThought(signature)
 
-    def forward(self, **kwargs: object):
-        return self.predictor(**kwargs)
+    async def aforward(self, **kwargs: object):
+        return await self.predictor(**kwargs)
 
 
 def test_signature_optimizer_optimization_process():
@@ -55,8 +57,8 @@ def test_signature_optimizer_optimization_process():
     student = SimpleModule("input -> output")
 
     # Assuming the compile method of COPRO requires a student module, a development set, and evaluation kwargs
-    optimized_student = optimizer.compile(
-        student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False}
+    optimized_student = asyncio.run(
+        optimizer.compile(student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False})
     )
 
     # Check that the optimized student has been modified from the original
@@ -82,8 +84,8 @@ def test_signature_optimizer_statistics_tracking():
         )
     )
     student = SimpleModule("input -> output")
-    optimized_student = optimizer.compile(
-        student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False}
+    optimized_student = asyncio.run(
+        optimizer.compile(student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False})
     )
 
     # Verify that statistics have been tracked and attached to the optimized student
@@ -113,13 +115,13 @@ def test_optimization_and_output_verification():
     student = SimpleModule("input -> output")
 
     # Compile the student with the optimizer
-    optimized_student = optimizer.compile(
-        student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False}
+    optimized_student = asyncio.run(
+        optimizer.compile(student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False})
     )
 
     # Simulate calling the optimized student with a new input
     test_input = "What is the capital of France?"
-    prediction = optimized_student(input=test_input)
+    prediction = asyncio.run(optimized_student(input=test_input))
 
     assert prediction.output == "Paris"
 
@@ -137,8 +139,8 @@ def test_statistics_tracking_during_optimization():
     optimizer.track_stats = True  # Enable statistics tracking
 
     student = SimpleModule("input -> output")
-    optimized_student = optimizer.compile(
-        student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False}
+    optimized_student = asyncio.run(
+        optimizer.compile(student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False})
     )
 
     # Verify that statistics have been tracked

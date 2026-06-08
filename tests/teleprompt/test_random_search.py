@@ -1,3 +1,5 @@
+import asyncio
+
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
@@ -11,8 +13,8 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    def forward(self, **kwargs: object):
-        return self.predictor(**kwargs)
+    async def aforward(self, **kwargs: object):
+        return await self.predictor(**kwargs)
 
 
 def simple_metric(example, prediction, trace=None):
@@ -37,4 +39,4 @@ def test_basic_workflow():
         Example(input="What is the color of the sky?", output="blue").with_inputs("input"),
         Example(input="What does the fox say?", output="Ring-ding-ding-ding-dingeringeding!").with_inputs("input"),
     ]
-    optimizer.compile(student, teacher=teacher, trainset=trainset)
+    asyncio.run(optimizer.compile(student, teacher=teacher, trainset=trainset))

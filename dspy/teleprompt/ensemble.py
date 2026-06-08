@@ -21,7 +21,7 @@ class Ensemble(Teleprompter):
         self.deterministic = deterministic
 
     @override
-    def compile(self, programs):
+    async def compile(self, programs):
         size = self.size
         reduce_fn = self.reduce_fn
 
@@ -30,9 +30,9 @@ class Ensemble(Teleprompter):
                 super().__init__()
                 self.programs = programs
 
-            def forward(self, *args, **kwargs):
+            async def aforward(self, *args, **kwargs):
                 programs = random.sample(self.programs, size) if size else self.programs
-                outputs = [prog(*args, **kwargs) for prog in programs]
+                outputs = [await prog(*args, **kwargs) for prog in programs]
 
                 if reduce_fn:
                     return reduce_fn(outputs)

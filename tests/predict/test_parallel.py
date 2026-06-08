@@ -159,9 +159,7 @@ def test_nested_batch_method():
         async def aforward(self, input):
             return await self.predictor.batch([Example(input=input).with_inputs("input")] * 2)
 
-    result = asyncio.run(
-        MyModule().batch([Example(input="test input").with_inputs("input")] * 2)
-    )
+    result = asyncio.run(MyModule().batch([Example(input="test input").with_inputs("input")] * 2))
 
     assert {result[0][0].output, result[0][1].output, result[1][0].output, result[1][1].output} == {
         "test output 1",

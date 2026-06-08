@@ -2,7 +2,6 @@ import asyncio
 import copy
 import enum
 import logging
-import time
 import types
 from datetime import datetime
 from unittest.mock import AsyncMock, patch
@@ -797,10 +796,10 @@ def test_lm_usage():
 def test_lm_usage_with_parallel():
     program = Predict("question -> answer")
 
-    def program_wrapper(question):
+    async def program_wrapper(question):
         # Sleep to make it possible to cause a race condition
-        time.sleep(0.5)
-        return asyncio.run(program(question=question))
+        await asyncio.sleep(0.5)
+        return await program(question=question)
 
     settings.configure(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True)
     with patch(

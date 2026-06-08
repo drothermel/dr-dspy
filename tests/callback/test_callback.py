@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 import pytest
@@ -177,7 +178,7 @@ def test_callback_complex_module():
     )
 
     cot = ChainOfThought("question -> answer", n=3)  # ty:ignore[invalid-argument-type]
-    result = cot(question="How are you?")
+    result = asyncio.run(cot(question="How are you?"))
     assert result["answer"] == "test output"
     assert result["reasoning"] == "No more responses"
 
@@ -249,12 +250,12 @@ def test_tool_calls():
         def __init__(self):
             self.tools = [Tool(tool_1), Tool(tool_2)]
 
-        def forward(self, query: str) -> str:
+        async def aforward(self, query: str) -> str:
             query = self.tools[0](query=query)  # ty:ignore[invalid-assignment]
             return self.tools[1](query=query)  # ty:ignore[invalid-return-type]
 
     module = MyModule()
-    result = module("query")
+    result = asyncio.run(module("query"))
 
     assert result == "result 2"
     assert len(callback.calls) == 6
@@ -286,19 +287,19 @@ def test_active_id():
             self.child_1 = Child()
             self.child_2 = Child()
 
-        def forward(self):
-            self.child_1()
-            self.child_2()
+        async def aforward(self):
+            await self.child_1()
+            await self.child_2()
 
     class Child(Module):
-        def forward(self):
+        async def aforward(self):
             pass
 
     callback = CustomCallback()
     settings.configure(callbacks=[callback])
 
     parent = Parent()
-    parent()
+    asyncio.run(parent())
 
     assert len(callback.call_ids) == 3
     # All three calls should have different call ids

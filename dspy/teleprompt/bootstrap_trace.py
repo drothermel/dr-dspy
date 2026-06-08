@@ -27,7 +27,7 @@ class TraceData(TypedDict):
     score: float | None
 
 
-def bootstrap_trace_data(
+async def bootstrap_trace_data(
     program: Module,
     dataset: list[Example],
     metric: Callable | None = None,
@@ -41,6 +41,7 @@ def bootstrap_trace_data(
 ) -> list[TraceData]:
     # Return a list of dicts with the following keys: example_ind, example, prediction, trace, and score
     # (if metric != None)
+    _ = capture_failed_parses
     evaluator = Evaluate(
         devset=dataset,
         num_threads=num_threads,
@@ -56,14 +57,12 @@ def bootstrap_trace_data(
             return prediction.format_reward or format_failure_score
         return metric(example, prediction, trace) if metric else True
 
-    # Use `object.__getattribute__` to bypass the custom hook `Module.__getattribute__` so that we avoid
-    # the warning that `forward` is not accessed through `__call__`.
-    original_forward = object.__getattribute__(program, "forward")
+    original_aforward = object.__getattribute__(program, "aforward")
 
-    def patched_forward(program_to_use: Module, **kwargs):
+    async def patched_aforward(program_to_use: Module, **kwargs):
         with settings.context(trace=[]):
             try:
-                return original_forward(**kwargs), settings.trace.copy()
+                return await original_aforward(**kwargs), settings.trace.copy()
             except AdapterParseError as e:
                 completion_str = e.lm_response
                 parsed_result = e.parsed_result
@@ -108,16 +107,18 @@ def bootstrap_trace_data(
 
                 return failed_pred, trace
 
-    program.forward = MethodType(patched_forward, program)  # ty: ignore[unresolved-attribute]
+    program.aforward = MethodType(patched_aforward, program)  # ty: ignore[unresolved-attribute]
 
     try:
-        results = evaluator(
-            program,
-            metric=wrapped_metric,
-            callback_metadata=callback_metadata,
+        results = (
+            await evaluator(
+                program,
+                metric=wrapped_metric,
+                callback_metadata=callback_metadata,
+            )
         ).results
     finally:
-        program.forward = original_forward  # ty: ignore[unresolved-attribute]
+        program.aforward = original_aforward  # ty: ignore[unresolved-attribute]
 
     data = []
     for example_ind, (example, prediction, score) in enumerate(results):

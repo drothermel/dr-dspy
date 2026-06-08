@@ -92,7 +92,7 @@ class SIMBA(Teleprompter):
             self.strategies = [append_a_rule]
 
     @override
-    def compile(self, student: Module, *, trainset: list[Example], seed: int = 0) -> Module:
+    async def compile(self, student: Module, *, trainset: list[Example], seed: int = 0) -> Module:
         """
         Compile and optimize the student module using SIMBA.
 
@@ -210,7 +210,7 @@ class SIMBA(Teleprompter):
 
             # STEP 2: Execute
             logger.info(f"Sampling program trajectories on {self.bsize} examples x {self.num_candidates} samples.")
-            outputs = run_parallel(exec_pairs)
+            outputs = cast("list[dict[str, Any]]", await run_parallel(exec_pairs))
             assert len(outputs) == len(exec_pairs) == self.bsize * self.num_candidates
 
             # STEP 3: Sort the training buckets by (max-to-min gap, max score, and max-to-avg gap).
@@ -284,7 +284,7 @@ class SIMBA(Teleprompter):
                 )
 
                 try:
-                    strategy(
+                    await strategy(
                         bucket,
                         system_candidate,
                         predictor2name=predictor2name,
@@ -309,7 +309,7 @@ class SIMBA(Teleprompter):
             )
 
             exec_pairs = [(wrap_program(sys, self.metric), ex) for sys in system_candidates for ex in batch]
-            outputs = run_parallel(exec_pairs)
+            outputs = cast("list[dict[str, Any]]", await run_parallel(exec_pairs))
             assert len(outputs) == len(exec_pairs) == len(system_candidates) * self.bsize
 
             # STEP 6: Compute average mini-batch scores for each new candidate
@@ -348,7 +348,7 @@ class SIMBA(Teleprompter):
         candidate_programs = [winning_programs[i].deepcopy() for i in program_idxs]
         logger.info(f"VALIDATION: Evaluating {len(candidate_programs)} programs on the full trainset.")
         exec_pairs = [(wrap_program(sys, self.metric), ex) for sys in candidate_programs for ex in trainset]
-        outputs = run_parallel(exec_pairs)
+        outputs = cast("list[dict[str, Any]]", await run_parallel(exec_pairs))
 
         scores = []
         for idx_prog, _ in enumerate(candidate_programs):

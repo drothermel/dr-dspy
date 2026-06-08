@@ -54,13 +54,13 @@ def order_input_keys_in_string(unordered_repr):
     return re.sub(pattern, reorder_keys, unordered_repr)
 
 
-def create_dataset_summary(trainset, view_data_batch_size, prompt_model, log_file=None, verbose=False):
+async def create_dataset_summary(trainset, view_data_batch_size, prompt_model, log_file=None, verbose=False):
     if verbose:
         pass
     upper_lim = min(len(trainset), view_data_batch_size)
     prompt_model = prompt_model if prompt_model else settings.lm
     with settings.context(lm=prompt_model):
-        observation = Predict(DatasetDescriptor, n=1, temperature=1.0)(
+        observation = await Predict(DatasetDescriptor, n=1, temperature=1.0)(
             examples=order_input_keys_in_string(trainset[0:upper_lim].__repr__())
         )
     observations = observation["observations"]
@@ -80,7 +80,7 @@ def create_dataset_summary(trainset, view_data_batch_size, prompt_model, log_fil
                 pass
             upper_lim = min(len(trainset), b + view_data_batch_size)
             with settings.context(lm=prompt_model):
-                output = Predict(DatasetDescriptorWithPriorObservations, n=1, temperature=1.0)(
+                output = await Predict(DatasetDescriptorWithPriorObservations, n=1, temperature=1.0)(
                     prior_observations=observations,
                     examples=order_input_keys_in_string(trainset[b:upper_lim].__repr__()),
                 )
@@ -99,9 +99,9 @@ def create_dataset_summary(trainset, view_data_batch_size, prompt_model, log_fil
 
     if prompt_model:
         with settings.context(lm=prompt_model):
-            summary = Predict(ObservationSummarizer, n=1, temperature=1.0)(observations=observations)
+            summary = await Predict(ObservationSummarizer, n=1, temperature=1.0)(observations=observations)
     else:
-        summary = Predict(ObservationSummarizer, n=1, temperature=1.0)(observations=observations)
+        summary = await Predict(ObservationSummarizer, n=1, temperature=1.0)(observations=observations)
     if verbose:
         pass
     if log_file:

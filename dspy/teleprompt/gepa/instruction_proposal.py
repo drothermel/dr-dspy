@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
@@ -63,7 +64,7 @@ class SingleComponentMultiModalProposer(Module):
         super().__init__()
         self.propose_instruction = Predict(GenerateEnhancedMultimodalInstructionFromFeedback)
 
-    def forward(self, current_instruction: str, reflective_dataset: list[ReflectiveExample]) -> str:
+    async def aforward(self, current_instruction: str, reflective_dataset: list[ReflectiveExample]) -> str:
         """
         Generate an improved instruction based on current instruction and feedback examples.
 
@@ -88,7 +89,7 @@ class SingleComponentMultiModalProposer(Module):
         predict_kwargs["examples_with_feedback"] = self._create_multimodal_examples(formatted_examples, image_map)
 
         # Use current dspy LM settings (GEPA will pass reflection_lm via context)
-        result = self.propose_instruction(**predict_kwargs)
+        result = await self.propose_instruction(**predict_kwargs)
 
         return result.improved_instruction
 
@@ -290,16 +291,20 @@ class MultiModalInstructionProposer(ProposalFn):
         reflective_dataset: Mapping[str, Sequence[Mapping[str, Any]]],
         components_to_update: list[str],
     ) -> dict[str, str]:
-        """GEPA-compatible proposal function.
+        return asyncio.run(
+            self._propose(
+                candidate=candidate,
+                reflective_dataset=reflective_dataset,
+                components_to_update=components_to_update,
+            )
+        )
 
-        Args:
-            candidate: Current component name -> instruction mapping
-            reflective_dataset: Component name -> list of reflective examples
-            components_to_update: List of component names to update
-
-        Returns:
-            dict: Component name -> new instruction mapping
-        """
+    async def _propose(
+        self,
+        candidate: dict[str, str],
+        reflective_dataset: Mapping[str, Sequence[Mapping[str, Any]]],
+        components_to_update: list[str],
+    ) -> dict[str, str]:
         updated_components = {}
 
         for component_name in components_to_update:
@@ -311,7 +316,7 @@ class MultiModalInstructionProposer(ProposalFn):
                 #
                 # In the future, proposals could consider multiple components instructions,
                 # instead of just the current instruction, for more holistic instruction proposals.
-                new_instruction = self.single_proposer(
+                new_instruction = await self.single_proposer(
                     current_instruction=current_instruction, reflective_dataset=component_reflective_data
                 )
 

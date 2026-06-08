@@ -1,9 +1,15 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, cast
+
 from typing_extensions import override
 
 from dspy.evaluate.evaluate import Evaluate
 from dspy.teleprompt.teleprompt import Teleprompter
 
 from .bootstrap import BootstrapFewShot
+
+_optuna_executor = ThreadPoolExecutor(max_workers=1)
 
 
 def _import_optuna():
@@ -45,6 +51,16 @@ class BootstrapFewShotWithOptuna(Teleprompter):
 
         # print("Going to sample", self.max_num_traces, "traces in total.")
 
+    async def _evaluate_program(self, program):
+        evaluate = Evaluate(
+            devset=self.valset,
+            metric=self.metric,
+            num_threads=self.num_threads,
+            display_table=False,
+            display_progress=True,
+        )
+        return await evaluate(program)
+
     def objective(self, trial):
         program2 = self.student.reset_copy()
         for (name, compiled_predictor), (_, program2_predictor) in zip(
@@ -56,19 +72,19 @@ class BootstrapFewShotWithOptuna(Teleprompter):
             demo_index = trial.suggest_int(f"demo_index_for_{name}", 0, len(all_demos) - 1)
             selected_demo = dict(all_demos[demo_index])
             program2_predictor.demos = [selected_demo]
-        evaluate = Evaluate(
-            devset=self.valset,
-            metric=self.metric,
-            num_threads=self.num_threads,
-            display_table=False,
-            display_progress=True,
-        )
-        result = evaluate(program2)
+
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            result = asyncio.run(self._evaluate_program(program2))
+        else:
+            result = _optuna_executor.submit(asyncio.run, self._evaluate_program(program2)).result()
+
         trial.set_user_attr("program", program2)
-        return result.score
+        return cast("Any", result).score
 
     @override
-    def compile(self, student, *, teacher=None, max_demos, trainset, valset=None):
+    async def compile(self, student, *, teacher=None, max_demos, trainset, valset=None):
         optuna = _import_optuna()
         self.trainset = trainset
         self.valset = valset or trainset
@@ -81,7 +97,7 @@ class BootstrapFewShotWithOptuna(Teleprompter):
             teacher_settings=self.teacher_settings,
             max_rounds=self.max_rounds,
         )
-        self.compiled_teleprompter = teleprompter_optimize.compile(
+        self.compiled_teleprompter = await teleprompter_optimize.compile(
             self.student,
             teacher=self.teacher,
             trainset=self.trainset,

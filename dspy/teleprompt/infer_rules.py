@@ -27,12 +27,12 @@ class InferRules(BootstrapFewShot):
         self.max_errors = kwargs.get("max_errors")
 
     @override
-    def compile(self, student, *, teacher=None, trainset, valset=None):
+    async def compile(self, student, *, teacher=None, trainset, valset=None):
         if valset is None:
             train_size = int(0.5 * len(trainset))
             trainset, valset = trainset[:train_size], trainset[train_size:]
 
-        super().compile(student, teacher=teacher, trainset=trainset)
+        await super().compile(student, teacher=teacher, trainset=trainset)
 
         original_program = self.student.deepcopy()
         all_predictors = [p for p in original_program.predictors() if hasattr(p, "signature")]
@@ -49,11 +49,11 @@ class InferRules(BootstrapFewShot):
                 predictor.signature.instructions = instructions_list[i]
 
             for i, predictor in enumerate(candidate_predictors):
-                rules = self.induce_natural_language_rules(predictor, trainset)
+                rules = await self.induce_natural_language_rules(predictor, trainset)
                 predictor.signature.instructions = instructions_list[i]
                 self.update_program_instructions(predictor, rules)
 
-            score = self.evaluate_program(candidate_program, valset)
+            score = await self.evaluate_program(candidate_program, valset)
 
             if score > best_score:
                 best_score = score
@@ -65,13 +65,13 @@ class InferRules(BootstrapFewShot):
 
         return best_program
 
-    def induce_natural_language_rules(self, predictor, trainset):
+    async def induce_natural_language_rules(self, predictor, trainset):
         demos = self.get_predictor_demos(trainset, predictor)
         signature = predictor.signature
         while True:
             examples_text = self.format_examples(demos, signature)
             try:
-                return self.rules_induction_program(examples_text)
+                return await self.rules_induction_program(examples_text)
             except Exception as e:
                 assert (
                     isinstance(e, ValueError)
@@ -114,7 +114,7 @@ class InferRules(BootstrapFewShot):
             for example in trainset
         ]
 
-    def evaluate_program(self, program, dataset):
+    async def evaluate_program(self, program, dataset):
         effective_max_errors = self.max_errors if self.max_errors is not None else settings.max_errors
         evaluate = Evaluate(
             devset=dataset,
@@ -124,7 +124,7 @@ class InferRules(BootstrapFewShot):
             display_table=False,
             display_progress=True,
         )
-        return evaluate(program, metric=self.metric).score
+        return (await evaluate(program, metric=self.metric)).score
 
 
 class RulesInductionProgram(Module):
@@ -144,11 +144,11 @@ class RulesInductionProgram(Module):
         self.teacher_settings = teacher_settings or {}
         self.rng = random.Random(0)
 
-    def forward(self, examples_text):
+    async def aforward(self, examples_text):
         with settings.context(**self.teacher_settings):
             # Generate rules with a fresh rollout and non-zero temperature.
             lm = settings.lm.copy(rollout_id=self.rng.randint(0, 10**9), temperature=1.0)
             with settings.context(lm=lm):
-                rules = self.rules_induction(examples_text=examples_text).natural_language_rules
+                rules = (await self.rules_induction(examples_text=examples_text)).natural_language_rules
 
         return rules.strip()

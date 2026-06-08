@@ -484,7 +484,7 @@ class GEPA(Teleprompter):
         return total
 
     @override
-    def compile(
+    async def compile(
         self,
         student: Module,
         *,

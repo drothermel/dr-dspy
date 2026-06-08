@@ -59,18 +59,19 @@ class KNNFewShot(Teleprompter):
         self.few_shot_bootstrap_args = few_shot_bootstrap_args
 
     @override
-    def compile(self, student, *, teacher=None):
+    async def compile(self, student, *, teacher=None):
         student_copy = student.reset_copy()
+        knn_few_shot = self
 
-        def forward_pass(_, **kwargs):
-            knn_trainset = self.KNN(**kwargs)
-            few_shot_bootstrap = BootstrapFewShot(**self.few_shot_bootstrap_args)
-            compiled_program = few_shot_bootstrap.compile(
+        async def aforward_pass(_, **kwargs):
+            knn_trainset = knn_few_shot.KNN(**kwargs)
+            few_shot_bootstrap = BootstrapFewShot(**knn_few_shot.few_shot_bootstrap_args)
+            compiled_program = await few_shot_bootstrap.compile(
                 student,
                 teacher=teacher,
                 trainset=knn_trainset,
             )
-            return compiled_program(**kwargs)
+            return await compiled_program(**kwargs)
 
-        student_copy.forward = types.MethodType(forward_pass, student_copy)
+        student_copy.aforward = types.MethodType(aforward_pass, student_copy)
         return student_copy

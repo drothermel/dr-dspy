@@ -550,11 +550,11 @@ Strategy: migrate shared helpers first (`utils.py`, `simba_utils.py`, `bootstrap
 
 ### `dspy/evaluate/auto_evaluation.py`
 
-- [ ] Metrics modules with `forward` → `aforward` if they call LMs (grep file)
+- [x] Metrics modules with `forward` → `aforward` if they call LMs (grep file)
 
 ### `dspy/propose/grounded_proposer.py`
 
-- [ ] Async `aforward`
+- [x] Async `aforward`
 
 ### Retrievers (lower priority if not used in your experiments — still migrate for consistency)
 
@@ -578,7 +578,7 @@ Retrievers may stay sync if they only hit local/vector DB — **only async-ify t
 uv run pytest tests/teleprompt/ tests/propose/ tests/evaluate/ -q
 ```
 
-- [ ] **Commit Phase 6**
+- [x] **Commit Phase 6** (`pending`)
 
 ```bash
 git commit -m "$(cat <<'EOF'

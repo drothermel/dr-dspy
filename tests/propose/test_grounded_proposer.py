@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from typing_extensions import override
 
@@ -20,9 +22,18 @@ def test_propose_instructions_for_program(demo_candidates):
     program = Predict("question -> answer")
     trainset = []
 
-    proposer = GroundedProposer(prompt_model=prompt_model, program=program, trainset=trainset, verbose=False)
-    result = proposer.propose_instructions_for_program(
-        trainset=trainset, program=program, demo_candidates=demo_candidates, trial_logs={}, N=1
+    proposer = GroundedProposer(
+        prompt_model=prompt_model,
+        program=program,
+        trainset=trainset,
+        verbose=False,
+        use_dataset_summary=False,
+        program_aware=False,
+    )
+    result = asyncio.run(
+        proposer.propose_instructions_for_program(
+            trainset=trainset, program=program, demo_candidates=demo_candidates, trial_logs={}, N=1
+        )
     )
     assert isinstance(result, dict)
     assert len(result) == len(program.predictors())
@@ -54,14 +65,16 @@ def test_propose_instruction_for_predictor(demo_candidates):
         verbose=False,
         init_temperature=0.7,
     )
-    result = proposer.propose_instruction_for_predictor(
-        program=program,
-        predictor=None,
-        pred_i=0,
-        demo_candidates=demo_candidates,
-        demo_set_i=0,
-        trial_logs={},
-        tip=None,
+    result = asyncio.run(
+        proposer.propose_instruction_for_predictor(
+            program=program,
+            predictor=None,
+            pred_i=0,
+            demo_candidates=demo_candidates,
+            demo_set_i=0,
+            trial_logs={},
+            tip=None,
+        )
     )
     assert result == "instruction"
     assert prompt_model.last_copy_kwargs["temperature"] == 0.7

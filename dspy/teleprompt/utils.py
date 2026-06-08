@@ -33,15 +33,15 @@ def create_minibatch(trainset, batch_size=50, rng=None):
     return [trainset[i] for i in sampled_indices]
 
 
-def eval_candidate_program(batch_size, trainset, candidate_program, evaluate, rng=None):
+async def eval_candidate_program(batch_size, trainset, candidate_program, evaluate, rng=None):
     """Evaluate a candidate program on the trainset, using the specified batch size."""
 
     try:
         # Evaluate on the full trainset
         if batch_size >= len(trainset):
-            return evaluate(candidate_program, devset=trainset, callback_metadata={"metric_key": "eval_full"})
+            return await evaluate(candidate_program, devset=trainset, callback_metadata={"metric_key": "eval_full"})
         # Or evaluate on a minibatch
-        return evaluate(
+        return await evaluate(
             candidate_program,
             devset=create_minibatch(trainset, batch_size, rng),
             callback_metadata={"metric_key": "eval_minibatch"},
@@ -52,7 +52,7 @@ def eval_candidate_program(batch_size, trainset, candidate_program, evaluate, rn
         return Prediction(score=0.0, results=[])
 
 
-def eval_candidate_program_with_pruning(
+async def eval_candidate_program_with_pruning(
     trial,
     trial_logs,
     trainset,
@@ -73,11 +73,13 @@ def eval_candidate_program_with_pruning(
         start_index = i * batch_size
         end_index = min((i + 1) * batch_size, len(trainset))
         split_trainset = trainset[start_index:end_index]
-        split_score = evaluate(
-            candidate_program,
-            devset=split_trainset,
-            display_table=0,
-        )
+        split_score = (
+            await evaluate(
+                candidate_program,
+                devset=split_trainset,
+                display_table=0,
+            )
+        ).score
         total_eval_size += len(split_trainset)
 
         total_score += split_score * len(split_trainset)
@@ -127,7 +129,7 @@ def get_program_with_highest_avg_score(param_score_dict, fully_evaled_param_comb
     raise ValueError("No unevaluated parameter combination found with a recorded score.")
 
 
-def calculate_last_n_proposed_quality(
+async def calculate_last_n_proposed_quality(
     base_program,
     trial_logs,
     evaluate,
@@ -158,7 +160,7 @@ def calculate_last_n_proposed_quality(
         program = base_program.deepcopy()
         program.load(trial_logs[trial_num]["program_path"])
 
-        dev_score = evaluate(program, devset=devset)
+        dev_score = (await evaluate(program, devset=devset)).score
 
         total_train_score += train_score
         total_dev_score += dev_score
@@ -172,14 +174,14 @@ def calculate_last_n_proposed_quality(
 ### LOGGING UTILS ###
 
 
-def get_task_model_history_for_full_example(
+async def get_task_model_history_for_full_example(
     candidate_program,
     task_model,
     devset,
     evaluate,
 ):
     """Get a full trace of the task model's history for a given candidate program."""
-    _ = evaluate(candidate_program, devset=devset[:1])
+    _ = await evaluate(candidate_program, devset=devset[:1])
     _ = task_model.inspect_history(n=len(candidate_program.predictors()))
     return task_model.inspect_history(n=len(candidate_program.predictors()))
 
@@ -303,7 +305,7 @@ def set_signature(predictor, updated_signature) -> None:
     predictor.signature = updated_signature
 
 
-def create_n_fewshot_demo_sets(
+async def create_n_fewshot_demo_sets(
     student,
     num_candidate_sets,
     trainset,
@@ -348,7 +350,7 @@ def create_n_fewshot_demo_sets(
         elif seed == -2 and max_labeled_demos > 0 and include_non_bootstrapped:
             # labels only
             teleprompter = LabeledFewShot(k=max_labeled_demos)
-            program2 = teleprompter.compile(
+            program2 = await teleprompter.compile(
                 student,
                 trainset=trainset_copy,
                 sample=labeled_sample,
@@ -365,7 +367,7 @@ def create_n_fewshot_demo_sets(
                 teacher_settings=teacher_settings,
                 max_rounds=max_rounds,
             )
-            program2 = program.compile(student, teacher=teacher, trainset=trainset_copy)
+            program2 = await program.compile(student, teacher=teacher, trainset=trainset_copy)
 
         else:
             # shuffled few-shot
@@ -382,7 +384,7 @@ def create_n_fewshot_demo_sets(
                 max_rounds=max_rounds,
             )
 
-            program2 = teleprompter.compile(
+            program2 = await teleprompter.compile(
                 student,
                 teacher=teacher,
                 trainset=trainset_copy,

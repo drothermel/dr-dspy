@@ -1,14 +1,13 @@
-from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from random import sample
-from typing import Callable
+from typing import Any, Callable, cast
 
 from pydantic import BaseModel
-from tqdm import tqdm
 from typing_extensions import override
 
 from dspy.dsp.utils.settings import settings
 from dspy.predict.avatar.models import ActionOutput
+from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
@@ -70,6 +69,18 @@ class FeedbackBasedInstruction(Signature):
     )
 
 
+class _AvatarEvalModule(Module):
+    def __init__(self, optimizer: "AvatarOptimizer", actor: Module, return_outputs: bool) -> None:
+        super().__init__()
+        self._optimizer = optimizer
+        self._actor = actor
+        self._return_outputs = return_outputs
+
+    async def aforward(self, **kwargs):
+        example = Example(**kwargs)
+        return await self._optimizer.process_example(self._actor, example, self._return_outputs)
+
+
 class AvatarOptimizer(Teleprompter):
     def __init__(
         self,
@@ -96,12 +107,12 @@ class AvatarOptimizer(Teleprompter):
         self.comparator = Predict(Comparator)
         self.feedback_instruction = Predict(FeedbackBasedInstruction)
 
-    def process_example(self, actor, example, return_outputs):
+    async def process_example(self, actor, example, return_outputs):
         actor = deepcopy(actor)
 
         try:
             with settings.context(trace=[]):
-                prediction = actor(**example.inputs())
+                prediction = await actor(**example.inputs())
                 trace = list(settings.trace)
             score = self.metric(example, prediction, trace)
 
@@ -114,37 +125,37 @@ class AvatarOptimizer(Teleprompter):
                 return example, None, 0
             return 0
 
-    def thread_safe_evaluator(self, devset, actor, return_outputs=False, num_threads=None):
+    async def thread_safe_evaluator(self, devset, actor, return_outputs=False, num_threads=None):
         total_score = 0
         total_examples = len(devset)
-        results = []
         num_threads = num_threads or settings.num_threads
-
-        with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            futures = [executor.submit(self.process_example, actor, example, return_outputs) for example in devset]
-
-            for future in tqdm(futures, total=total_examples, desc="Processing examples"):
-                result = future.result()
-                if return_outputs:
-                    example, prediction, score = result
-                    total_score += score
-                    results.append((example, prediction, score))
-                else:
-                    total_score += result
-
-        avg_metric = total_score / total_examples
+        eval_module = _AvatarEvalModule(self, actor, return_outputs)
+        run_parallel = Parallel(
+            num_threads=num_threads,
+            disable_progress_bar=False,
+        )
+        exec_pairs = [(eval_module, example) for example in devset]
+        parallel_results = await run_parallel(exec_pairs)
 
         if return_outputs:
+            results = []
+            for result in parallel_results:
+                example, prediction, score = cast("tuple[Any, Any, float]", result)
+                total_score += score
+                results.append((example, prediction, score))
+            avg_metric = total_score / total_examples
             return avg_metric, results
-        return avg_metric
 
-    def _get_pos_neg_results(
+        total_score = sum(cast("float", score) for score in parallel_results)
+        return total_score / total_examples
+
+    async def _get_pos_neg_results(
         self, actor: Module, trainset: list[Example]
     ) -> tuple[float, list[EvalResult], list[EvalResult]]:
         pos_inputs = []
         neg_inputs = []
 
-        avg_score, results = self.thread_safe_evaluator(trainset, actor, return_outputs=True)
+        avg_score, results = await self.thread_safe_evaluator(trainset, actor, return_outputs=True)
 
         for example, prediction, score in results:
             if score >= self.upper_bound:
@@ -172,12 +183,12 @@ class AvatarOptimizer(Teleprompter):
         return (avg_score, pos_inputs, neg_inputs)
 
     @override
-    def compile(self, student, *, trainset):
+    async def compile(self, student, *, trainset):
         best_actor = deepcopy(student)
         best_score = -999 if self.optimize_for == "max" else 999
 
         for _i in range(self.max_iters):
-            score, pos_inputs, neg_inputs = self._get_pos_neg_results(best_actor, trainset)
+            score, pos_inputs, neg_inputs = await self._get_pos_neg_results(best_actor, trainset)
 
             if self.max_positive_inputs and len(pos_inputs) > self.max_positive_inputs:
                 pos_inputs = sample(pos_inputs, self.max_positive_inputs)
@@ -185,15 +196,19 @@ class AvatarOptimizer(Teleprompter):
             if self.max_negative_inputs and len(neg_inputs) > self.max_negative_inputs:
                 neg_inputs = sample(neg_inputs, self.max_negative_inputs)
 
-            feedback = self.comparator(
-                instruction=best_actor.actor.signature.instructions,
-                actions=[str(tool) for tool in best_actor.tools],
-                pos_input_with_metrics=pos_inputs,
-                neg_input_with_metrics=neg_inputs,
+            feedback = (
+                await self.comparator(
+                    instruction=best_actor.actor.signature.instructions,
+                    actions=[str(tool) for tool in best_actor.tools],
+                    pos_input_with_metrics=pos_inputs,
+                    neg_input_with_metrics=neg_inputs,
+                )
             ).feedback
 
-            new_instruction = self.feedback_instruction(
-                previous_instruction=best_actor.actor.signature.instructions, feedback=feedback
+            new_instruction = (
+                await self.feedback_instruction(
+                    previous_instruction=best_actor.actor.signature.instructions, feedback=feedback
+                )
             ).new_instruction
 
             if (self.optimize_for == "max" and best_score < score) or (

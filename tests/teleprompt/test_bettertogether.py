@@ -4,7 +4,8 @@ Most of the code in this test file was LLM-generated but has been verified
 to correctly test the BetterTogether optimizer functionality.
 """
 
-from unittest.mock import Mock, patch
+import asyncio
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from typing_extensions import override
@@ -43,8 +44,8 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    def forward(self, **kwargs: object):
-        return self.predictor(**kwargs)
+    async def aforward(self, **kwargs: object):
+        return await self.predictor(**kwargs)
 
 
 # ============================================================================
@@ -56,7 +57,7 @@ class SimpleOptimizer(Teleprompter):
     """A simple optimizer that returns the student unchanged."""
 
     @override
-    def compile(self, student, **kwargs: object):
+    async def compile(self, student, **kwargs: object):
         return student
 
 
@@ -67,7 +68,7 @@ class MarkedOptimizer(Teleprompter):
         self.marker = marker
 
     @override
-    def compile(self, student, **kwargs: object):
+    async def compile(self, student, **kwargs: object):
         prog = SimpleModule("input -> output")
         prog.marker = self.marker  # ty:ignore[unresolved-attribute]
         return prog
@@ -80,7 +81,7 @@ class CapturingOptimizer(Teleprompter):
         self.received_kwargs = {}
 
     @override
-    def compile(
+    async def compile(
         self, student, trainset=None, valset=None, teacher=None, num_trials=None, max_bootstrapped_demos=None, **kwargs
     ):
         self.received_kwargs = {
@@ -112,7 +113,7 @@ def student_with_lm():
 def mock_bt_dependencies():
     """Mock the common BetterTogether dependencies."""
     with (
-        patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval,
+        patch("dspy.teleprompt.bettertogether.eval_candidate_program", new_callable=AsyncMock) as mock_eval,
         patch("dspy.teleprompt.bettertogether.launch_lms") as mock_launch,
         patch("dspy.teleprompt.bettertogether.kill_lms") as mock_kill,
     ):
@@ -197,7 +198,7 @@ def test_compile_basic():
             self.compile_called = False
 
         @override
-        def compile(self, student, **kwargs: object):
+        async def compile(self, student, **kwargs: object):
             self.compile_called = True
             return student
 
@@ -205,12 +206,12 @@ def test_compile_basic():
     optimizer = BetterTogether(metric=simple_metric, p=mock_p)
 
     # Mock evaluation to avoid actually running the metric
-    with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
+    with patch("dspy.teleprompt.bettertogether.eval_candidate_program", new_callable=AsyncMock) as mock_eval:
         mock_eval.return_value = Mock(score=0.8)
 
         with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
-                compiled = optimizer.compile(student, trainset=trainset, valset=valset, strategy="p")
+                compiled = asyncio.run(optimizer.compile(student, trainset=trainset, valset=valset, strategy="p"))
 
     assert compiled is not None, "Compilation returned None"
     assert hasattr(compiled, "candidate_programs"), "Missing candidate_programs attribute"
@@ -227,7 +228,7 @@ def test_trainset_validation():
     student.set_lm(lm)
 
     try:
-        optimizer.compile(student, trainset=[], valset=valset)
+        asyncio.run(optimizer.compile(student, trainset=[], valset=valset))
         raise AssertionError("Should have raised ValueError for empty trainset")
     except ValueError as e:
         assert "cannot be empty" in str(e).lower()
@@ -243,14 +244,14 @@ def test_valset_ratio_validation():
 
     # Test valset_ratio >= 1
     try:
-        optimizer.compile(student, trainset=trainset, valset_ratio=1.0)
+        asyncio.run(optimizer.compile(student, trainset=trainset, valset_ratio=1.0))
         raise AssertionError("Should have raised ValueError for valset_ratio >= 1")
     except ValueError as e:
         assert "must be in range [0, 1)" in str(e)
 
     # Test valset_ratio < 0
     try:
-        optimizer.compile(student, trainset=trainset, valset_ratio=-0.1)
+        asyncio.run(optimizer.compile(student, trainset=trainset, valset_ratio=-0.1))
         raise AssertionError("Should have raised ValueError for valset_ratio < 0")
     except ValueError as e:
         assert "must be in range [0, 1)" in str(e)
@@ -291,8 +292,10 @@ def test_compile_args_passed_to_optimizer(student_with_lm, mock_bt_dependencies)
     # Define custom compile args for optimizer 'p'
     custom_args = {"num_trials": 20, "max_bootstrapped_demos": 8}
 
-    optimizer.compile(
-        student_with_lm, trainset=trainset, valset=valset, strategy="p", optimizer_compile_args={"p": custom_args}
+    asyncio.run(
+        optimizer.compile(
+            student_with_lm, trainset=trainset, valset=valset, strategy="p", optimizer_compile_args={"p": custom_args}
+        )
     )
 
     # Verify the custom args were passed to the optimizer
@@ -317,7 +320,7 @@ def test_compile_args_multi_optimizer_strategy():
             self.received_kwargs = {}
 
         @override
-        def compile(self, student, trainset=None, num_trials=None, **kwargs: object):
+        async def compile(self, student, trainset=None, num_trials=None, **kwargs: object):
             self.received_kwargs = {"trainset": trainset, "num_trials": num_trials, **kwargs}
             return student
 
@@ -326,7 +329,7 @@ def test_compile_args_multi_optimizer_strategy():
             self.received_kwargs = {}
 
         @override
-        def compile(self, student, trainset=None, num_batches=None, **kwargs: object):
+        async def compile(self, student, trainset=None, num_batches=None, **kwargs: object):
             self.received_kwargs = {"trainset": trainset, "num_batches": num_batches, **kwargs}
             return student
 
@@ -337,17 +340,19 @@ def test_compile_args_multi_optimizer_strategy():
     # Define different compile args for each optimizer
     compile_args = {"p": {"num_trials": 10}, "w": {"num_batches": 5}}
 
-    with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
+    with patch("dspy.teleprompt.bettertogether.eval_candidate_program", new_callable=AsyncMock) as mock_eval:
         mock_eval.return_value = Mock(score=0.85)
         with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
-                    optimizer.compile(
-                        student,
-                        trainset=trainset,
-                        valset=valset,
-                        strategy="p -> w",
-                        optimizer_compile_args=compile_args,
+                    asyncio.run(
+                        optimizer.compile(
+                            student,
+                            trainset=trainset,
+                            valset=valset,
+                            strategy="p -> w",
+                            optimizer_compile_args=compile_args,
+                        )
                     )
 
     # Verify each optimizer received its specific args
@@ -376,7 +381,7 @@ def test_compile_args_override_global_params():
             self.received_kwargs = {}
 
         @override
-        def compile(self, student, trainset=None, valset=None, teacher=None, **kwargs: object):
+        async def compile(self, student, trainset=None, valset=None, teacher=None, **kwargs: object):
             self.received_kwargs = {"trainset": trainset, "valset": valset, "teacher": teacher, **kwargs}
             return student
 
@@ -397,17 +402,19 @@ def test_compile_args_override_global_params():
         }
     }
 
-    with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
+    with patch("dspy.teleprompt.bettertogether.eval_candidate_program", new_callable=AsyncMock) as mock_eval:
         mock_eval.return_value = Mock(score=0.9)
         with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
-                optimizer.compile(
-                    student,
-                    trainset=trainset,  # Global trainset (examples[:2])
-                    valset=valset,  # Global valset (examples[2])
-                    teacher=None,  # Global teacher (None)
-                    strategy="p",
-                    optimizer_compile_args=compile_args,
+                asyncio.run(
+                    optimizer.compile(
+                        student,
+                        trainset=trainset,  # Global trainset (examples[:2])
+                        valset=valset,  # Global valset (examples[2])
+                        teacher=None,  # Global teacher (None)
+                        strategy="p",
+                        optimizer_compile_args=compile_args,
+                    )
                 )
 
     # Verify the optimizer received the override values, not the global ones
@@ -439,7 +446,7 @@ def test_trainset_shuffling_between_steps():
 
     class TrainsetCapturingOptimizer(Teleprompter):
         @override
-        def compile(self, student, trainset=None, **kwargs: object):
+        async def compile(self, student, trainset=None, **kwargs: object):
             trainsets_received.append(trainset)
             return student
 
@@ -447,17 +454,19 @@ def test_trainset_shuffling_between_steps():
     mock_w = TrainsetCapturingOptimizer()
     optimizer = BetterTogether(metric=simple_metric, p=mock_p, w=mock_w)
 
-    with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
+    with patch("dspy.teleprompt.bettertogether.eval_candidate_program", new_callable=AsyncMock) as mock_eval:
         mock_eval.return_value = Mock(score=0.8)
         with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
-                    optimizer.compile(
-                        student,
-                        trainset=trainset,
-                        valset=valset,
-                        strategy="p -> w",
-                        shuffle_trainset_between_steps=True,
+                    asyncio.run(
+                        optimizer.compile(
+                            student,
+                            trainset=trainset,
+                            valset=valset,
+                            strategy="p -> w",
+                            shuffle_trainset_between_steps=True,
+                        )
                     )
 
     # Verify trainset was shuffled between steps
@@ -490,7 +499,7 @@ def test_strategy_execution_order():
             self.name = name
 
         @override
-        def compile(self, student, **kwargs: object):
+        async def compile(self, student, **kwargs: object):
             # Create a new student with a marker to track the optimization path
             optimized = SimpleModule("input -> output")
             if not hasattr(student, "optimization_path"):
@@ -504,12 +513,12 @@ def test_strategy_execution_order():
     mock_w = LoggingOptimizer("w")
     optimizer = BetterTogether(metric=simple_metric, p=mock_p, w=mock_w)
 
-    with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
+    with patch("dspy.teleprompt.bettertogether.eval_candidate_program", new_callable=AsyncMock) as mock_eval:
         mock_eval.return_value = Mock(score=0.85)
         with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
-                    optimizer.compile(student, trainset=trainset, valset=valset, strategy="p -> w -> p")
+                    asyncio.run(optimizer.compile(student, trainset=trainset, valset=valset, strategy="p -> w -> p"))
 
     # Verify execution order
     assert len(execution_log) == 3, "Should have executed 3 optimization steps"
@@ -528,19 +537,19 @@ def test_lm_lifecycle_management():
 
     class SimpleOptimizer(Teleprompter):
         @override
-        def compile(self, student, **kwargs: object):
+        async def compile(self, student, **kwargs: object):
             return student
 
     mock_p = SimpleOptimizer()
     mock_w = SimpleOptimizer()
     optimizer = BetterTogether(metric=simple_metric, p=mock_p, w=mock_w)
 
-    with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
+    with patch("dspy.teleprompt.bettertogether.eval_candidate_program", new_callable=AsyncMock) as mock_eval:
         mock_eval.return_value = Mock(score=0.8)
         with patch("dspy.teleprompt.bettertogether.launch_lms") as mock_launch:  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms") as mock_kill:
                 with patch.object(optimizer, "_models_changed", return_value=True):
-                    optimizer.compile(student, trainset=trainset, valset=valset, strategy="p -> w")
+                    asyncio.run(optimizer.compile(student, trainset=trainset, valset=valset, strategy="p -> w"))
 
     # Verify launch and kill were called
     # When models change (which we mocked to return True), launch should be called
@@ -559,14 +568,14 @@ def test_error_handling_returns_best_program():
     # Create optimizers where the second one will fail
     class SuccessfulOptimizer(Teleprompter):
         @override
-        def compile(self, student, **kwargs: object):
+        async def compile(self, student, **kwargs: object):
             optimized = SimpleModule("input -> output")
             optimized.step_name = "p_success"  # ty:ignore[unresolved-attribute]
             return optimized
 
     class FailingOptimizer(Teleprompter):
         @override
-        def compile(self, student, **kwargs: object):
+        async def compile(self, student, **kwargs: object):
             raise RuntimeError("Intentional failure for testing")
 
     mock_p = SuccessfulOptimizer()
@@ -574,7 +583,7 @@ def test_error_handling_returns_best_program():
     optimizer = BetterTogether(metric=simple_metric, p=mock_p, w=mock_w)
 
     # First call succeeds with score 0.7, second call (to failing optimizer) fails
-    with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
+    with patch("dspy.teleprompt.bettertogether.eval_candidate_program", new_callable=AsyncMock) as mock_eval:
         mock_eval.side_effect = [
             Mock(score=0.5),  # Baseline
             Mock(score=0.7),  # After p (success)
@@ -582,7 +591,9 @@ def test_error_handling_returns_best_program():
         with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
-                    result = optimizer.compile(student, trainset=trainset, valset=valset, strategy="p -> w")
+                    result = asyncio.run(
+                        optimizer.compile(student, trainset=trainset, valset=valset, strategy="p -> w")
+                    )
 
     # Verify a program was returned despite the failure
     assert result is not None, "Should return a program even if a step fails"
@@ -607,7 +618,7 @@ def test_program_selection(student_with_lm, test_valset, expected_marker, test_d
 
     # Set up scores: baseline=0.5, p=0.9 (best), w=0.7
     # When test_valset is provided, best score wins; when None, latest wins
-    with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
+    with patch("dspy.teleprompt.bettertogether.eval_candidate_program", new_callable=AsyncMock) as mock_eval:
         if test_valset is not None:
             mock_eval.side_effect = [
                 Mock(score=0.5),  # Baseline
@@ -617,8 +628,8 @@ def test_program_selection(student_with_lm, test_valset, expected_marker, test_d
         with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
-                    result = optimizer.compile(
-                        student_with_lm, trainset=trainset, valset=test_valset, strategy="p -> w"
+                    result = asyncio.run(
+                        optimizer.compile(student_with_lm, trainset=trainset, valset=test_valset, strategy="p -> w")
                     )
 
     # Verify the correct program was returned based on valset presence
@@ -633,7 +644,7 @@ def test_candidate_programs_structure(student_with_lm):
     optimizer = BetterTogether(metric=simple_metric, p=mock_p, w=mock_w)
 
     # Set up scores: baseline=0.5, p=0.8, w=0.9 (best)
-    with patch("dspy.teleprompt.bettertogether.eval_candidate_program") as mock_eval:
+    with patch("dspy.teleprompt.bettertogether.eval_candidate_program", new_callable=AsyncMock) as mock_eval:
         mock_eval.side_effect = [
             Mock(score=0.5),  # Baseline
             Mock(score=0.8),  # After p
@@ -642,7 +653,9 @@ def test_candidate_programs_structure(student_with_lm):
         with patch("dspy.teleprompt.bettertogether.launch_lms"):  # noqa: SIM117
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
-                    result = optimizer.compile(student_with_lm, trainset=trainset, valset=valset, strategy="p -> w")
+                    result = asyncio.run(
+                        optimizer.compile(student_with_lm, trainset=trainset, valset=valset, strategy="p -> w")
+                    )
 
     assert hasattr(result, "candidate_programs"), "Result should have candidate_programs attribute"
     candidates = result.candidate_programs
@@ -675,7 +688,7 @@ def test_empty_valset_handling(student_with_lm):
 
     with patch("dspy.teleprompt.bettertogether.launch_lms"), patch("dspy.teleprompt.bettertogether.kill_lms"):  # noqa: SIM117
         with patch.object(optimizer, "_models_changed", return_value=False):
-            result = optimizer.compile(student_with_lm, trainset=trainset, valset=[], strategy="p")
+            result = asyncio.run(optimizer.compile(student_with_lm, trainset=trainset, valset=[], strategy="p"))
 
     assert hasattr(result, "marker"), "Result should have marker"
     assert result.marker == "optimized", "Should return the latest program when valset is empty list"
@@ -690,7 +703,7 @@ def test_empty_valset_handling(student_with_lm):
 
     with patch("dspy.teleprompt.bettertogether.launch_lms"), patch("dspy.teleprompt.bettertogether.kill_lms"):  # noqa: SIM117
         with patch.object(optimizer2, "_models_changed", return_value=False):
-            result2 = optimizer2.compile(student2, trainset=trainset, valset=None, strategy="p")
+            result2 = asyncio.run(optimizer2.compile(student2, trainset=trainset, valset=None, strategy="p"))
 
     assert hasattr(result2, "marker"), "Result2 should have marker"
     assert result2.marker == "optimized", "Should return the latest program when valset is None"
