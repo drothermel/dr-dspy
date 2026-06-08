@@ -60,7 +60,7 @@ class SemanticF1(Module):
         scores = await self.module(
             question=example.question, ground_truth=example.response, system_response=pred.response
         )
-        score = f1_score(scores.precision, scores.recall)
+        score = f1_score(precision=scores.precision, recall=scores.recall)
 
         return Prediction(score=score if trace is None else score >= self.threshold)
 
@@ -121,6 +121,6 @@ class CompleteAndGrounded(Module):
         groundedness = await self.groundedness_module(
             question=example.question, retrieved_context=pred.context, system_response=pred.response
         )
-        score = f1_score(groundedness.groundedness, completeness.completeness)
+        score = f1_score(precision=groundedness.groundedness, recall=completeness.completeness)
 
         return Prediction(score=score if trace is None else score >= self.threshold)

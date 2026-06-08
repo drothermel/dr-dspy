@@ -33,7 +33,7 @@ def EM(prediction, answers_list):  # noqa: N802
     if not isinstance(answers_list, list):
         raise ValueError(f"`answers_list` must be a list, got {type(answers_list)}")
 
-    return max(em_score(prediction, ans) for ans in answers_list)
+    return max(em_score(prediction=prediction, ground_truth=ans) for ans in answers_list)
 
 
 def F1(prediction, answers_list):  # noqa: N802
@@ -57,7 +57,7 @@ def F1(prediction, answers_list):  # noqa: N802
     if not isinstance(answers_list, list):
         raise ValueError(f"`answers_list` must be a list, got {type(answers_list)}")
 
-    return max(f1_score(prediction, ans) for ans in answers_list)
+    return max(f1_score(prediction=prediction, ground_truth=ans) for ans in answers_list)
 
 
 def HotPotF1(prediction, answers_list):  # noqa: N802
@@ -81,7 +81,7 @@ def HotPotF1(prediction, answers_list):  # noqa: N802
     if not isinstance(answers_list, list):
         raise ValueError(f"`answers_list` must be a list, got {type(answers_list)}")
 
-    return max(hotpot_f1_score(prediction, ans) for ans in answers_list)
+    return max(hotpot_f1_score(prediction=prediction, ground_truth=ans) for ans in answers_list)
 
 
 def normalize_text(s):
@@ -138,7 +138,7 @@ def em_score(prediction, ground_truth):
         em_score("Paris", "paris")  # True
         ```
     """
-    return normalize_text(prediction) == normalize_text(ground_truth)
+    return normalize_text(s=prediction) == normalize_text(s=ground_truth)
 
 
 def f1_score(prediction, ground_truth):
@@ -160,8 +160,8 @@ def f1_score(prediction, ground_truth):
         round(f1_score("the Eiffel Tower", "Eiffel Tower"), 2)  # 1.0
         ```
     """
-    prediction_tokens = normalize_text(prediction).split()
-    ground_truth_tokens = normalize_text(ground_truth).split()
+    prediction_tokens = normalize_text(s=prediction).split()
+    ground_truth_tokens = normalize_text(s=ground_truth).split()
 
     common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
     num_same = sum(common.values())
@@ -196,8 +196,8 @@ def hotpot_f1_score(prediction, ground_truth):
         hotpot_f1_score("no", "yes")  # 0.0
         ```
     """
-    normalized_prediction = normalize_text(prediction)
-    normalized_ground_truth = normalize_text(ground_truth)
+    normalized_prediction = normalize_text(s=prediction)
+    normalized_ground_truth = normalize_text(s=ground_truth)
 
     if normalized_prediction in ["yes", "no", "noanswer"] and normalized_prediction != normalized_ground_truth:
         return 0
@@ -234,8 +234,8 @@ def precision_score(prediction, ground_truth):
         precision_score("eiffel tower in paris", "eiffel tower")  # 0.67
         ```
     """
-    prediction_tokens = normalize_text(prediction).split()
-    ground_truth_tokens = normalize_text(ground_truth).split()
+    prediction_tokens = normalize_text(s=prediction).split()
+    ground_truth_tokens = normalize_text(s=ground_truth).split()
 
     common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
     num_same = sum(common.values())
@@ -259,11 +259,11 @@ def _passage_match(passages: list[str], answers: list[str]) -> bool:
     def passage_has_answers(passage: str, answers: list[str]) -> bool:
         """Return True if the passage contains any of the answers."""
         return has_answer(
-            tokenized_answers=[DPR_normalize(normalize_text(ans)) for ans in answers],
-            text=normalize_text(passage),
+            tokenized_answers=[DPR_normalize(normalize_text(s=ans)) for ans in answers],
+            text=normalize_text(s=passage),
         )
 
-    return any(passage_has_answers(psg, answers) for psg in passages)
+    return any(passage_has_answers(passage=psg, answers=answers) for psg in passages)
 
 
 def _answer_match(prediction, answers, frac=1.0):
@@ -273,9 +273,9 @@ def _answer_match(prediction, answers, frac=1.0):
     maximum token-level F1 across answers is at least `frac`.
     """
     if frac >= 1.0:
-        return EM(prediction, answers)
+        return EM(prediction=prediction, answers_list=answers)
 
-    return F1(prediction, answers) >= frac
+    return F1(prediction=prediction, answers_list=answers) >= frac
 
 
 def answer_exact_match(example, pred, trace=None, frac=1.0):
@@ -307,9 +307,9 @@ def answer_exact_match(example, pred, trace=None, frac=1.0):
         ```
     """
     if isinstance(example.answer, str):
-        return _answer_match(pred.answer, [example.answer], frac=frac)
+        return _answer_match(prediction=pred.answer, answers=[example.answer], frac=frac)
     if isinstance(example.answer, list):
-        return _answer_match(pred.answer, example.answer, frac=frac)
+        return _answer_match(prediction=pred.answer, answers=example.answer, frac=frac)
 
     raise ValueError(f"Invalid answer type: {type(example.answer)}")
 
@@ -339,8 +339,8 @@ def answer_passage_match(example, pred, trace=None):
         ```
     """
     if isinstance(example.answer, str):
-        return _passage_match(pred.context, [example.answer])
+        return _passage_match(passages=pred.context, answers=[example.answer])
     if isinstance(example.answer, list):
-        return _passage_match(pred.context, example.answer)
+        return _passage_match(passages=pred.context, answers=example.answer)
 
     raise ValueError(f"Invalid answer type: {type(example.answer)}")
