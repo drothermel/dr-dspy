@@ -232,6 +232,10 @@ known-first-party = ["dspy"]
 ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
+"dspy/core/types/**/*.py" = [
+    "TC001",  # Cross-module imports are runtime-required for Pydantic models in this package.
+    "TC003",  # Iterator/Callable types are referenced at runtime in stream wrappers.
+]
 "tests/**/*.py" = [
     "S101",    # Allow assert statements in tests
     "TID252",  # Allow relative imports in tests

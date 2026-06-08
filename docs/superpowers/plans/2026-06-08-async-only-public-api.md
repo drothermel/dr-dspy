@@ -96,18 +96,7 @@ uv run ruff format
 uv run pytest tests/ -q --ignore=tests/reliability
 ```
 
-- [x] **Commit Phase 1**
-
-```bash
-git add -A
-git commit -m "$(cat <<'EOF'
-refactor: remove streaming and sync/async bridge utilities
-
-Drop streamify, asyncify, and syncify to simplify the execution model
-before migrating to an async-only public API.
-EOF
-)"
-```
+- [x] **Commit Phase 1** (`2d104b89`)
 
 ---
 
@@ -140,7 +129,7 @@ uv run ruff check --fix && uv run ty check --fix && uv run ruff format
 uv run pytest tests/core/ tests/clients/test_lm.py -q
 ```
 
-- [ ] **Commit Phase 1.5**
+- [x] **Commit Phase 1.5** (pending hash below)
 
 ---
 
