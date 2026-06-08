@@ -483,7 +483,7 @@ class Parallel:
 uv run pytest tests/evaluate/ tests/predict/test_parallel.py tests/utils/test_parallelizer.py -q
 ```
 
-- [x] **Commit Phase 5** (`pending`)
+- [x] **Commit Phase 5** (`ad4190db`)
 
 ```bash
 git commit -m "$(cat <<'EOF'
