@@ -23,18 +23,10 @@ def simple_metric(example, prediction, trace=None):
 
 
 def test_basic_workflow():
-    """Test to ensure the basic compile flow runs without errors."""
     student = SimpleModule(ts("input -> output"))
     teacher = SimpleModule(ts("input -> output"))
-
-    lm = DummyLM(
-        [
-            "Initial thoughts",
-            "Finish[blue]",  # Expected output for both training and validation
-        ]  # ty:ignore[invalid-argument-type]
-    )
+    lm = DummyLM(["Initial thoughts", "Finish[blue]"])
     settings.configure(lm=lm)
-
     optimizer = BootstrapFewShotWithRandomSearch(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
     trainset = [
         Example(input="What is the color of the sky?", output="blue").with_inputs("input"),

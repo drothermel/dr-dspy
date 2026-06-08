@@ -33,11 +33,9 @@ def clear_history():
 def test_inspect_history_basic(capsys):
     lm = DummyLM([{"response": "Hello"}, {"response": "How are you?"}])
     settings.configure(lm=lm)
-
     predictor = Predict(ts("query: str -> response: str"))
     asyncio.run(predictor.acall(query="Hi"))
     asyncio.run(predictor.acall(query="What's up?"))
-
     history = GLOBAL_HISTORY
     assert len(history) > 0
     assert isinstance(history, list)
@@ -66,9 +64,7 @@ def test_inspect_history_renders_message_tool_calls():
             uuid="1",
         )
     ]
-
     pretty_print_history(history, n=1, file=out)
-
     text = out.getvalue()
     assert "Assistant message:" in text
     assert "Tool calls:" in text
@@ -103,9 +99,7 @@ def test_inspect_history_renders_output_tool_calls_without_text():
             uuid="1",
         )
     ]
-
     pretty_print_history(history, n=1, file=out)
-
     text = out.getvalue()
     assert "Response:" not in text
     assert "Tool calls:" in text
@@ -116,12 +110,10 @@ def test_inspect_history_renders_output_tool_calls_without_text():
 def test_inspect_history_with_n(capsys):
     lm = DummyLM([{"response": "One"}, {"response": "Two"}, {"response": "Three"}])
     settings.configure(lm=lm)
-
     predictor = Predict(ts("query: str -> response: str"))
     asyncio.run(predictor.acall(query="First"))
     asyncio.run(predictor.acall(query="Second"))
     asyncio.run(predictor.acall(query="Third"))
-
     inspect_history(n=2)
     out, _err = capsys.readouterr()
     assert "First" not in out
@@ -132,7 +124,6 @@ def test_inspect_history_with_n(capsys):
 def test_inspect_empty_history(capsys):
     lm = DummyLM([])
     settings.configure(lm=lm)
-
     inspect_history()
     history = GLOBAL_HISTORY
     assert len(history) == 0
@@ -142,11 +133,9 @@ def test_inspect_empty_history(capsys):
 def test_inspect_history_n_larger_than_history(capsys):
     lm = DummyLM([{"response": "First"}, {"response": "Second"}])
     settings.configure(lm=lm)
-
     predictor = Predict(ts("query: str -> response: str"))
     asyncio.run(predictor.acall(query="Query 1"))
     asyncio.run(predictor.acall(query="Query 2"))
-
     inspect_history(n=5)
     history = GLOBAL_HISTORY
     assert len(history) == 2

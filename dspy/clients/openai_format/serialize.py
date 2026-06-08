@@ -34,11 +34,6 @@ from dspy.core.types import (
 
 
 def parts_to_openai_content(parts: list[Any]) -> str | list[dict[str, Any]]:
-    """Convert DSPy parts into OpenAI `content`.
-
-    OpenAI accepts a bare string for the common single-text case. Mixed content
-    becomes a list of content blocks.
-    """
     if len(parts) == 1 and isinstance(parts[0], LMTextPart):
         return parts[0].text
     blocks: list[dict[str, Any]] = []
@@ -48,7 +43,6 @@ def parts_to_openai_content(parts: list[Any]) -> str | list[dict[str, Any]]:
 
 
 def part_to_openai_blocks(part: Any) -> list[dict[str, Any]]:
-    """Convert one DSPy part into one or more OpenAI content blocks."""
     if isinstance(part, LMOpaquePart):
         return [dict(part.block)]
     if isinstance(part, LMTextPart):
@@ -150,14 +144,13 @@ def tool_choice_to_openai(choice: LMToolChoice) -> dict[str, Any]:
     if choice.allowed:
         if len(choice.allowed) != 1 or choice.mode not in {"required", "auto"}:
             raise ValueError(
-                "OpenAI-format tool_choice only supports constraining to a single allowed tool "
-                "with mode 'required' or 'auto'."
+                "OpenAI-format tool_choice only supports constraining to a single allowed tool with mode 'required' or 'auto'."
             )
         data: dict[str, Any] = {"tool_choice": {"type": "function", "function": {"name": choice.allowed[0]}}}
     else:
         data = {"tool_choice": choice.mode}
     if choice.parallel is not None:
-        data["parallel_tool_calls"] = choice.parallel  # ty:ignore[invalid-assignment]
+        data["parallel_tool_calls"] = choice.parallel
     return data
 
 
@@ -174,7 +167,6 @@ def tool_result_to_openai(result: LMToolResultPart) -> dict[str, Any]:
 
 
 def common_config_kwargs(config: LMConfig, *, model: str | None = None, endpoint: str = "chat") -> dict[str, Any]:
-    """Convert shared DSPy config fields into Chat Completions kwargs."""
     data = dict(config.extensions)
     _validate_openai_reasoning_temperature(config, model=model, endpoint=endpoint)
     for key in ("temperature", "top_p"):
@@ -200,7 +192,6 @@ def common_config_kwargs(config: LMConfig, *, model: str | None = None, endpoint
 
 
 def responses_config_kwargs(config: LMConfig, *, model: str | None = None) -> dict[str, Any]:
-    """Convert shared DSPy config fields into Responses API kwargs."""
     data = dict(config.extensions) if config.extensions else {}
     _validate_openai_reasoning_temperature(config, model=model, endpoint="responses")
     for key in ("temperature", "top_p"):
@@ -226,7 +217,6 @@ def responses_config_kwargs(config: LMConfig, *, model: str | None = None) -> di
 
 
 def text_config_kwargs(config: LMConfig) -> dict[str, Any]:
-    """Convert shared DSPy config fields into text-completion kwargs."""
     data = dict(config.extensions)
     for key in ("temperature", "max_tokens", "top_p"):
         value = getattr(config, key)
@@ -265,18 +255,14 @@ def _validate_openai_reasoning_temperature(config: LMConfig, *, model: str | Non
         return
     if config.temperature in {None, 1}:
         return
-
     from dspy.utils.exceptions import LMUnsupportedFeatureError
 
     raise LMUnsupportedFeatureError(
-        "OpenAI reasoning models only support the default temperature when reasoning effort is active. "
-        "Use temperature=None or temperature=1, or set reasoning_effort='none'.",
+        "OpenAI reasoning models only support the default temperature when reasoning effort is active. Use temperature=None or temperature=1, or set reasoning_effort='none'.",
         model=model,
         provider="openai",
         features=["temperature", "reasoning"],
-        issues=[
-            f"{endpoint} request used reasoning effort {effort!r} with temperature={config.temperature!r}.",
-        ],
+        issues=[f"{endpoint} request used reasoning effort {effort!r} with temperature={config.temperature!r}."],
     )
 
 

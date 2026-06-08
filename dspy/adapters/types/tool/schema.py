@@ -12,8 +12,6 @@ class PydanticJsonSchemaHandler(Protocol):
 
 
 def _resolve_json_schema_reference(schema: dict[str, Any]) -> dict[str, Any]:
-    """Recursively resolve json model schema, expanding all references."""
-
     if "$defs" not in schema and "definitions" not in schema:
         return schema
 
@@ -27,7 +25,6 @@ def _resolve_json_schema_reference(schema: dict[str, Any]) -> dict[str, Any]:
                 ref_path = ref_value.split("/")[-1] if isinstance(ref_value, str) else str(ref_value).split("/")[-1]
                 return resolve_refs(schema["$defs"][ref_path])
             return {k: resolve_refs(v) for k, v in obj.items()}
-
         return [resolve_refs(item) for item in obj]
 
     resolved_schema = cast("dict[str, Any]", resolve_refs(schema))
@@ -35,26 +32,13 @@ def _resolve_json_schema_reference(schema: dict[str, Any]) -> dict[str, Any]:
     return resolved_schema
 
 
-def convert_input_schema_to_tool_args(
-    schema: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Type], dict[str, str]]:
-    """Convert an input json schema to tool arguments compatible with DSPy Tool.
-
-    Args:
-        schema: An input json schema describing the tool's input parameters
-
-    Returns:
-        A tuple of (args, arg_types, arg_desc) for DSPy Tool definition.
-    """
-    args, arg_types, arg_desc = {}, {}, {}
+def convert_input_schema_to_tool_args(schema: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Type], dict[str, str]]:
+    args, arg_types, arg_desc = ({}, {}, {})
     properties = schema.get("properties")
     if properties is None:
-        return args, arg_types, arg_desc
-
+        return (args, arg_types, arg_desc)
     required = schema.get("required", [])
-
     defs = schema.get("$defs", {})
-
     for name, prop in properties.items():
         prop = cast("dict[str, Any]", prop)
         if len(defs) > 0:
@@ -65,5 +49,4 @@ def convert_input_schema_to_tool_args(
         arg_desc[name] = prop.get("description", "No description provided.")
         if name in required:
             arg_desc[name] += " (Required)"
-
-    return args, arg_types, arg_desc
+    return (args, arg_types, arg_desc)

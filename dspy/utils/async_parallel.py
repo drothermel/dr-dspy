@@ -1,5 +1,3 @@
-"""Async bounded parallel execution utilities."""
-
 from __future__ import annotations
 
 import asyncio
@@ -10,16 +8,12 @@ import tqdm
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Sequence
-
 logger = logging.getLogger(__name__)
-
 T = TypeVar("T")
 R = TypeVar("R")
 
 
 class BoundedRunStats:
-    """Failure metadata collected by `run_bounded`."""
-
     def __init__(self) -> None:
         self.failed_indices: list[int] = []
         self.exceptions_map: dict[int, BaseException] = {}
@@ -35,44 +29,26 @@ async def run_bounded(
     disable_progress_bar: bool = False,
     compare_results: bool = False,
 ) -> tuple[list[R | None], BoundedRunStats]:
-    """Run an async function over items with bounded concurrency.
-
-    Returns ordered results (``None`` for failed items) and failure metadata.
-    Raises when ``max_errors`` is exceeded.
-    """
     if max_concurrency < 1:
         raise ValueError("max_concurrency must be at least 1.")
-
     stats = BoundedRunStats()
     results: list[R | None] = [None] * len(items)
     error_count = 0
     cancel = asyncio.Event()
     lock = asyncio.Lock()
-
-    pbar = tqdm.tqdm(
-        total=len(items),
-        dynamic_ncols=True,
-        disable=disable_progress_bar or len(items) == 0,
-    )
+    pbar = tqdm.tqdm(total=len(items), dynamic_ncols=True, disable=disable_progress_bar or len(items) == 0)
 
     async def run_indexed(index: int, item: T) -> None:
         nonlocal error_count
-
         if cancel.is_set():
             return
-
         try:
             outcome = await fn(item)
         except Exception as exc:
             if provide_traceback:
                 logger.exception("Error for %r: %s", item, exc)
             else:
-                logger.error(  # noqa: TRY400
-                    "Error for %r: %s. Set `provide_traceback=True` for traceback.",
-                    item,
-                    exc,
-                )
-
+                logger.error("Error for %r: %s. Set `provide_traceback=True` for traceback.", item, exc)
             async with lock:
                 stats.failed_indices.append(index)
                 stats.exceptions_map[index] = exc
@@ -80,9 +56,7 @@ async def run_bounded(
                 if max_errors is not None and error_count >= max_errors:
                     cancel.set()
             return
-
         results[index] = outcome
-
         if compare_results:
             completed = [r for r in results if r is not None]
             total_score = sum(r[-1] for r in completed if isinstance(r, tuple))
@@ -107,8 +81,6 @@ async def run_bounded(
         await asyncio.gather(*(run_one(index, item) for index, item in enumerate(items)))
     finally:
         pbar.close()
-
     if cancel.is_set():
         raise RuntimeError("Execution cancelled due to errors or interruption.")
-
-    return results, stats
+    return (results, stats)

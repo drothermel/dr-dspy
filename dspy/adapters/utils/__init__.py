@@ -1,9 +1,4 @@
-from .fields import (
-    format_field_value,
-    get_annotation_name,
-    get_field_description_string,
-    translate_field_type,
-)
+from .fields import format_field_value, get_annotation_name, get_field_description_string, translate_field_type
 from .json import serialize_for_json
 from .messages import build_lm_message
 from .multimodal import (

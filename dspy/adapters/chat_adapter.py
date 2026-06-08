@@ -28,8 +28,7 @@ if TYPE_CHECKING:
     from dspy.clients.base_lm import BaseLM
     from dspy.task_spec import TaskSpec
     from dspy.utils.callback import BaseCallback
-
-field_header_pattern = re.compile(r"\[\[ ## (\w+) ## \]\]")
+field_header_pattern = re.compile("\\[\\[ ## (\\w+) ## \\]\\]")
 
 
 class FieldInfoWithName(NamedTuple):
@@ -38,17 +37,6 @@ class FieldInfoWithName(NamedTuple):
 
 
 class ChatAdapter(Adapter):
-    """Default Adapter for most language models.
-
-    The ChatAdapter formats DSPy task specs into a format compatible with most language models.
-    It uses delimiter patterns like `[[ ## field_name ## ]]` to clearly separate input and output fields in
-    the message content.
-
-    Key features:
-        - Structures inputs and outputs using field header markers for clear field delineation.
-        - Provides automatic fallback to JSONAdapter if the chat format fails.
-    """
-
     def __init__(
         self,
         callbacks: list[BaseCallback] | None = None,
@@ -57,17 +45,6 @@ class ChatAdapter(Adapter):
         use_json_adapter_fallback: bool = True,
         parallel_tool_calls: bool | None = None,
     ) -> None:
-        """
-        Args:
-            callbacks: List of callback functions to execute during adapter methods.
-            use_native_function_calling: Whether to enable native function calling capabilities.
-            native_response_types: List of output field types handled by native LM features.
-            use_json_adapter_fallback: Whether to automatically fallback to JSONAdapter if the ChatAdapter fails.
-                If True, when an error occurs (except ContextWindowExceededError), the adapter will retry using
-                JSONAdapter. Defaults to True.
-            parallel_tool_calls: Whether to request provider-side parallel tool-call generation when native function
-                calling is active. If None, the adapter does not set the provider option.
-        """
         super().__init__(
             callbacks=callbacks,
             use_native_function_calling=use_native_function_calling,
@@ -80,19 +57,12 @@ class ChatAdapter(Adapter):
         from dspy.adapters.json_adapter import JSONAdapter
 
         return JSONAdapter(
-            use_native_function_calling=self.use_native_function_calling,
-            parallel_tool_calls=self.parallel_tool_calls,
+            use_native_function_calling=self.use_native_function_calling, parallel_tool_calls=self.parallel_tool_calls
         )
 
     @override
     async def acall(
-        self,
-        *,
-        lm: BaseLM,
-        config: Any,
-        task_spec: TaskSpec,
-        demos: list[dict[str, Any]],
-        inputs: dict[str, Any],
+        self, *, lm: BaseLM, config: Any, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any]
     ) -> list[dict[str, Any]]:
         try:
             return await super().acall(lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs)
@@ -101,9 +71,7 @@ class ChatAdapter(Adapter):
         except Exception as e:
             from dspy.adapters.json_adapter import JSONAdapter
 
-            if isinstance(e, LMError) or isinstance(self, JSONAdapter) or not self.use_json_adapter_fallback:
-                # On LM errors, already using JSONAdapter, or use_json_adapter_fallback is False, we don't want to
-                # retry with a different adapter. Raise the original error instead of the fallback error.
+            if isinstance(e, LMError) or isinstance(self, JSONAdapter) or (not self.use_json_adapter_fallback):
                 raise
             return await self._make_json_adapter_fallback().acall(
                 lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs
@@ -111,21 +79,12 @@ class ChatAdapter(Adapter):
 
     @override
     def format_field_description(self, task_spec: TaskSpec) -> str:
-        return (
-            f"Your input fields are:\n{get_field_spec_description_string(task_spec.input_fields)}\n"
-            f"Your output fields are:\n{get_field_spec_description_string(task_spec.output_fields)}"
-        )
+        return f"Your input fields are:\n{get_field_spec_description_string(task_spec.input_fields)}\nYour output fields are:\n{get_field_spec_description_string(task_spec.output_fields)}"
 
     @override
     def format_field_structure(self, task_spec: TaskSpec) -> str:
-        """
-        `ChatAdapter` requires input and output fields to be in their own sections, with section header using markers
-        `[[ ## field_name ## ]]`. An arbitrary field `completed` ([[ ## completed ## ]]) is added to the end of the
-        output fields section to indicate the end of the output fields.
-        """
         parts = []
         parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
-
         input_field_infos = task_spec_input_field_infos(task_spec)
         output_field_infos = task_spec_output_field_infos(task_spec)
 
@@ -136,7 +95,7 @@ class ChatAdapter(Adapter):
                         field_name=field_name, field_info=field_info
                     )
                     for field_name, field_info in field_infos.items()
-                },
+                }
             )
 
         parts.append(format_task_spec_fields_for_instructions(input_field_infos))
@@ -169,7 +128,6 @@ class ChatAdapter(Adapter):
                 main_request=main_request,
                 output_requirements=output_requirements,
             )
-
         input_field_infos = task_spec_input_field_infos(task_spec)
         messages = [prefix]
         for k in task_spec.input_fields:
@@ -177,32 +135,14 @@ class ChatAdapter(Adapter):
                 value = inputs.get(k)
                 formatted_field_value = format_field_value(field_info=input_field_infos[k], value=value)
                 messages.append(f"[[ ## {k} ## ]]\n{formatted_field_value}")
-
         if main_request:
             output_requirements = self.user_message_output_requirements(task_spec)
             if output_requirements is not None:
                 messages.append(output_requirements)
-
         messages.append(suffix)
         return "\n\n".join(messages).strip()
 
     def user_message_output_requirements(self, task_spec: TaskSpec) -> str:
-        """Returns a simplified format reminder for the language model.
-
-        In chat-based interactions, language models may lose track of the required output format
-        as the conversation context grows longer. This method generates a concise reminder of
-        the expected output structure that can be included in user messages.
-
-        Args:
-            task_spec: The DSPy task spec defining the expected input/output fields.
-
-        Returns:
-            A simplified description of the required output format.
-
-        Note:
-            This is a more lightweight version of `format_field_structure` specifically designed
-            for inline reminders within chat messages.
-        """
 
         def type_info(field_type: object) -> str:
             if field_type == ToolCalls:
@@ -213,24 +153,21 @@ class ChatAdapter(Adapter):
 
         message = "Respond with the corresponding output fields, starting with the field "
         message += ", then ".join(
-            f"`[[ ## {f} ## ]]`{type_info(field.type_)}" for f, field in task_spec.output_fields.items()
+            (f"`[[ ## {f} ## ]]`{type_info(field.type_)}" for f, field in task_spec.output_fields.items())
         )
         message += ", and then ending with the marker for `[[ ## completed ## ]]`."
         return message
 
     @override
     def format_assistant_message_content(
-        self,
-        task_spec: TaskSpec,
-        outputs: dict[str, Any],
-        missing_field_message: str | None = None,
+        self, task_spec: TaskSpec, outputs: dict[str, Any], missing_field_message: str | None = None
     ) -> str:
         output_field_infos = task_spec_output_field_infos(task_spec)
         assistant_message_content = self.format_field_with_value(
             {
                 FieldInfoWithName(name=k, info=output_field_infos[k]): outputs.get(k, missing_field_message)
                 for k in task_spec.output_fields
-            },
+            }
         )
         assistant_message_content += "\n\n[[ ## completed ## ]]\n"
         return assistant_message_content
@@ -238,22 +175,18 @@ class ChatAdapter(Adapter):
     @override
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
         sections = [(None, [])]
-
         for line in completion.splitlines():
             match = field_header_pattern.match(line.strip())
             if match:
-                # If the header pattern is found, split the rest of the line as content
                 header = match.group(1)
                 remaining_content = line[match.end() :].strip()
                 sections.append((header, [remaining_content] if remaining_content else []))
             else:
                 sections[-1][1].append(line)
-
         sections = [(k, "\n".join(v).strip()) for k, v in sections]
-
         fields = {}
         for k, v in sections:
-            if (k not in fields) and (k in task_spec.output_fields):
+            if k not in fields and k in task_spec.output_fields:
                 try:
                     fields[k] = parse_value(value=v, annotation=task_spec.output_fields[k].type_)
                 except Exception as e:
@@ -265,48 +198,20 @@ class ChatAdapter(Adapter):
                     )
         if fields.keys() != task_spec.output_fields.keys():
             raise AdapterParseError(
-                adapter_name="ChatAdapter",
-                task_spec=task_spec,
-                lm_response=completion,
-                parsed_result=fields,
+                adapter_name="ChatAdapter", task_spec=task_spec, lm_response=completion, parsed_result=fields
             )
-
         return fields
 
     def format_field_with_value(self, fields_with_values: dict[FieldInfoWithName, Any]) -> str:
-        """
-        Formats the values of the specified fields according to the field's DSPy type (input or output),
-        annotation (e.g. str, int, etc.), and the type of the value itself. Joins the formatted values
-        into a single string, which is a multiline string if there are multiple fields.
-
-        Args:
-            fields_with_values: A dictionary mapping information about a field to its corresponding
-                value.
-
-        Returns:
-            The joined formatted values of the fields, represented as a string
-        """
         output = []
         for field, field_value in fields_with_values.items():
             formatted_field_value = format_field_value(field_info=field.info, value=field_value)
             output.append(f"[[ ## {field.name} ## ]]\n{formatted_field_value}")
-
         return "\n\n".join(output).strip()
 
     def format_finetune_data(
-        self,
-        task_spec: TaskSpec,
-        demos: list[dict[str, Any]],
-        inputs: dict[str, Any],
-        outputs: dict[str, Any],
+        self, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any], outputs: dict[str, Any]
     ) -> dict[str, list[Any]]:
-        """
-        Format the call data into finetuning data according to the OpenAI API specifications.
-
-        For the chat adapter, this means formatting the data as a list of messages, where each message is a dictionary
-        with a "role" and "content" key. The role can be "system", "user", or "assistant". Then, the messages are
-        wrapped in a dictionary with a "messages" key.
-        """
         from dspy.clients.openai_format import message_to_openai_chat
 
         system_user_messages = [

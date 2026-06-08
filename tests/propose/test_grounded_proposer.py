@@ -11,18 +11,12 @@ from tests.task_spec.helpers import ts
 
 
 @pytest.mark.parametrize(
-    "demo_candidates",
-    [
-        None,
-        [[[Example(question="What is the capital of France?", answer="Paris")]]],
-    ],
+    "demo_candidates", [None, [[[Example(question="What is the capital of France?", answer="Paris")]]]]
 )
 def test_propose_instructions_for_program(demo_candidates):
-    # Set large number here so that lm always returns the same response
     prompt_model = DummyLM([{"proposed_instruction": "instruction"}] * 10)
     program = Predict(ts("question -> answer"))
     trainset = []
-
     proposer = GroundedProposer(
         prompt_model=prompt_model,
         program=program,
@@ -43,13 +37,10 @@ def test_propose_instructions_for_program(demo_candidates):
 
 
 @pytest.mark.parametrize(
-    "demo_candidates",
-    [
-        None,
-        [[[Example(question="What is the capital of France?", answer="Paris")]]],
-    ],
+    "demo_candidates", [None, [[[Example(question="What is the capital of France?", answer="Paris")]]]]
 )
 def test_propose_instruction_for_predictor(demo_candidates):
+
     class TrackingDummyLM(DummyLM):
         @override
         def copy(self, **kwargs: object):
@@ -58,13 +49,8 @@ def test_propose_instruction_for_predictor(demo_candidates):
 
     prompt_model = TrackingDummyLM([{"proposed_instruction": "instruction"}] * 10)
     program = Predict(ts("question -> answer"))
-
     proposer = GroundedProposer(
-        prompt_model=prompt_model,
-        program=program,
-        trainset=[],
-        verbose=False,
-        init_temperature=0.7,
+        prompt_model=prompt_model, program=program, trainset=[], verbose=False, init_temperature=0.7
     )
     result = asyncio.run(
         proposer.propose_instruction_for_predictor(

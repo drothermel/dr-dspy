@@ -7,11 +7,9 @@ import pytest
 try:
     import numpy as np
 except ImportError:
-    pytest.skip("numpy is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
-
+    pytest.skip("numpy is not installed", allow_module_level=True)
 if importlib.util.find_spec("litellm") is None:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
-
+    pytest.skip("litellm is not installed", allow_module_level=True)
 from dspy.clients.embedding import Embedder
 
 
@@ -26,38 +24,23 @@ class MockEmbeddingResponse:
 def test_litellm_embedding():
     model = "text-embedding-ada-002"
     inputs = ["hello", "world"]
-    mock_embeddings = [
-        [0.1, 0.2, 0.3],
-        [0.4, 0.5, 0.6],
-    ]
-
+    mock_embeddings = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
     with patch("dspy.clients.embedding._get_litellm") as mock_get_litellm:
         mock_litellm = MagicMock()
         mock_get_litellm.return_value = mock_litellm
         mock_litellm.aembedding = AsyncMock(return_value=MockEmbeddingResponse(mock_embeddings))
-
         embedding = Embedder(model)
         result = asyncio.run(embedding(inputs))
-
-        mock_litellm.aembedding.assert_called_once_with(
-            model=model,
-            input=inputs,
-            caching=False,
-        )
+        mock_litellm.aembedding.assert_called_once_with(model=model, input=inputs, caching=False)
         assert len(result) == len(inputs)
         np.testing.assert_allclose(result, mock_embeddings)
-
         asyncio.run(embedding(inputs))
         assert mock_litellm.aembedding.call_count == 2
 
 
 def test_callable_embedding():
     inputs = ["hello", "world", "test"]
-    expected_embeddings = [
-        [0.1, 0.2, 0.3],
-        [0.4, 0.5, 0.6],
-        [0.7, 0.8, 0.9],
-    ]
+    expected_embeddings = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]]
 
     class EmbeddingFn:
         def __init__(self):
@@ -70,17 +53,15 @@ def test_callable_embedding():
     embedding_fn = EmbeddingFn()
     embedding = Embedder(embedding_fn)
     result = asyncio.run(embedding(inputs))
-
     assert embedding_fn.call_count == 1
     np.testing.assert_allclose(result, expected_embeddings)
-
     asyncio.run(embedding(inputs))
     assert embedding_fn.call_count == 2
 
 
 def test_invalid_model_type():
-    with pytest.raises(ValueError):  # noqa: PT011, PT012
-        embedding = Embedder(123)  # ty:ignore[invalid-argument-type]
+    with pytest.raises(ValueError):
+        embedding = Embedder(123)
         asyncio.run(embedding(["test"]))
 
 
@@ -88,11 +69,7 @@ def test_invalid_model_type():
 async def test_async_embedding():
     model = "text-embedding-ada-002"
     inputs = ["hello", "world"]
-    mock_embeddings = [
-        [0.1, 0.2, 0.3],
-        [0.4, 0.5, 0.6],
-    ]
-
+    mock_embeddings = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
     with patch("dspy.clients.embedding._get_litellm") as mock_get_litellm:
         mock_litellm = MagicMock()
         mock_get_litellm.return_value = mock_litellm
@@ -101,9 +78,7 @@ async def test_async_embedding():
             return MockEmbeddingResponse(mock_embeddings)
 
         mock_litellm.aembedding = aembedding
-
         embedding = Embedder(model)
         result = await embedding.acall(inputs)
-
         assert len(result) == len(inputs)
         np.testing.assert_allclose(result, mock_embeddings)

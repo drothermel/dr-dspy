@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, get_args
+from typing import Any, get_args
 
 import pydantic
 
 from dspy.adapters.types.history import History
 from dspy.adapters.types.reasoning import Reasoning
-from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls, tool_from_callable
+from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
@@ -17,29 +17,27 @@ from dspy.utils.exceptions import AdapterParseError, ContextWindowExceededError
 
 logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
 
 @experimental
 class ReActV2(Module):
-    def __init__(self, task_spec: TaskSpec, tools: list[Callable | Tool], max_iters: int = 20) -> None:
+    def __init__(self, task_spec: TaskSpec, tools: list[Tool], max_iters: int = 20) -> None:
         super().__init__()
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"ReActV2 requires a TaskSpec instance, got {type(task_spec).__name__}.")
         self.task_spec = task_spec
         self.max_iters = max_iters
-
-        user_tools = [tool_from_callable(tool) for tool in tools]
         self.tools = {}
-        for tool in user_tools:
+        for tool in tools:
+            if not isinstance(tool, Tool):
+                raise TypeError(
+                    "tools must be Tool instances with an explicit description. Use Tool(func, description='...')."
+                )
             if tool.name is None:
                 raise ValueError("Tool name could not be determined.")
             self.tools[tool.name] = tool
         if "submit" in self.tools:
             raise ValueError("`submit` is reserved by ReActV2 as the final-output tool.")
         self.tools["submit"] = self._make_submit_tool()
-
         self.react = Predict(self._make_react_task_spec())
 
     def _make_submit_tool(self) -> Tool:
@@ -55,27 +53,19 @@ class ReActV2(Module):
         args = {name: _json_schema_for_annotation(field.type_) for name, field in output_fields.items()}
         arg_types = {name: field.type_ for name, field in output_fields.items()}
         return Tool(
-            submit,
-            description="Submit the final outputs for the task.",
-            name="submit",
-            args=args,
-            arg_types=arg_types,
+            submit, description="Submit the final outputs for the task.", name="submit", args=args, arg_types=arg_types
         )
 
     def _make_react_task_spec(self) -> TaskSpec:
         fields: dict[str, FieldSpec] = {}
         for name, field in self.task_spec.input_fields.items():
             fields[name] = input_field(
-                name,
-                _optional_annotation(field.type_),
-                desc=field.desc if field.desc != f"${{{name}}}" else None,
+                name, _optional_annotation(field.type_), desc=field.desc if field.desc != f"${{{name}}}" else None
             )
-
         fields["history"] = input_field("history", History)
         fields["tools"] = input_field("tools", list[Tool])
         fields["next_thought"] = output_field("next_thought", Reasoning)
         fields["tool_calls"] = output_field("tool_calls", ToolCalls)
-
         inputs = ", ".join(f"`{name}`" for name in self.task_spec.input_fields)
         outputs = ", ".join(f"`{name}`" for name in self.task_spec.output_fields)
         tool_names = ", ".join(f"`{name}`" for name in self.tools)
@@ -88,22 +78,16 @@ class ReActV2(Module):
                 f"The available tools are: {tool_names}.",
             ]
         ).strip()
-
         return make_task_spec(fields, instructions=instructions)
 
     async def aforward(self, **input_args):
         max_iters = input_args.pop("max_iters", self.max_iters)
         history = _coerce_history(input_args.pop("history", None))
         pending_inputs = {name: input_args[name] for name in self.task_spec.input_fields if name in input_args}
-
         break_reason = "max_iters"
         for turn_index in range(max_iters):
             try:
-                pred = await self.react(
-                    history=history,
-                    tools=list(self.tools.values()),
-                    **pending_inputs,
-                )
+                pred = await self.react(history=history, tools=list(self.tools.values()), **pending_inputs)
                 tool_calls = _coerce_tool_calls(getattr(pred, "tool_calls", None))
             except (AdapterParseError, ValueError) as err:
                 logger.warning("Ending ReActV2 loop after parse failure: %s", _fmt_exc(err))
@@ -113,11 +97,9 @@ class ReActV2(Module):
                 logger.warning("Ending ReActV2 loop after context window exceeded.")
                 break_reason = "context_window_exceeded"
                 break
-
             if not tool_calls.tool_calls:
                 break_reason = "empty_tool_calls"
                 break
-
             tool_calls = _ensure_tool_call_ids(tool_calls, turn_index)
             tool_call_results, final_outputs = self._execute_tool_calls(tool_calls)
             event = self._history_event(pending_inputs, pred, tool_calls, tool_call_results)
@@ -125,25 +107,21 @@ class ReActV2(Module):
                 event.update(final_outputs)
             _append_history_event(history, event)
             pending_inputs = {}
-
             if final_outputs is not None:
                 return Prediction(**final_outputs, history=history, termination_reason="submit")
-
         return await self._forced_submit(history, pending_inputs, break_reason, max_iters)
 
     def _execute_tool_calls(self, tool_calls: ToolCalls) -> tuple[ToolCallResults, dict[str, Any] | None]:
         values = []
         is_errors = []
         final_outputs = None
-
         for tool_call in tool_calls.tool_calls:
             if tool_call.name not in self.tools:
                 values.append(f"Unknown tool: {tool_call.name}")
                 is_errors.append(True)
                 continue
-
             try:
-                value = self.tools[tool_call.name](**(tool_call.args or {}))
+                value = self.tools[tool_call.name](**tool_call.args or {})
                 values.append(value)
                 is_errors.append(False)
                 if tool_call.name == "submit" and isinstance(value, dict):
@@ -151,8 +129,7 @@ class ReActV2(Module):
             except Exception as err:
                 values.append(f"Execution error in {tool_call.name}: {_fmt_exc(err)}")
                 is_errors.append(True)
-
-        return ToolCallResults.from_tool_calls_and_values(tool_calls, values, is_errors), final_outputs
+        return (ToolCallResults.from_tool_calls_and_values(tool_calls, values, is_errors), final_outputs)
 
     def _history_event(
         self,
@@ -171,40 +148,29 @@ class ReActV2(Module):
         return event
 
     async def _forced_submit(
-        self,
-        history: History,
-        pending_inputs: dict[str, Any],
-        break_reason: str,
-        turn_index: int,
+        self, history: History, pending_inputs: dict[str, Any], break_reason: str, turn_index: int
     ) -> Prediction:
         try:
             pred = await self.react(
                 history=history,
                 tools=list(self.tools.values()),
-                config={
-                    "tool_choice": {"mode": "required", "allowed": ["submit"]},
-                    "reasoning": None,
-                },
+                config={"tool_choice": {"mode": "required", "allowed": ["submit"]}, "reasoning": None},
                 **pending_inputs,
             )
             tool_calls = _ensure_tool_call_ids(_coerce_tool_calls(getattr(pred, "tool_calls", None)), turn_index)
         except (AdapterParseError, ValueError, ContextWindowExceededError) as err:
             logger.warning("Forced submit failed: %s", _fmt_exc(err))
             return Prediction(history=history, termination_reason=break_reason or "failed")
-
         submit_calls = ToolCalls(tool_calls=[call for call in tool_calls.tool_calls if call.name == "submit"])
         if not submit_calls.tool_calls:
             return Prediction(history=history, termination_reason=break_reason or "failed")
-
         tool_call_results, final_outputs = self._execute_tool_calls(submit_calls)
         event = self._history_event(pending_inputs, pred, submit_calls, tool_call_results)
         if final_outputs is not None:
             event.update(final_outputs)
         _append_history_event(history, event)
-
         if final_outputs is not None:
             return Prediction(**final_outputs, history=history, termination_reason="forced_submit")
-
         return Prediction(history=history, termination_reason=break_reason or "failed")
 
 

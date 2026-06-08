@@ -30,11 +30,7 @@ if TYPE_CHECKING:
 
 class AdapterCallMixin(AdapterNativeMixin):
     def _call_preprocess(
-        self,
-        lm: BaseLM,
-        config: LMConfig | Mapping[str, Any],
-        task_spec: TaskSpec,
-        inputs: dict[str, Any],
+        self, lm: BaseLM, config: LMConfig | Mapping[str, Any], task_spec: TaskSpec, inputs: dict[str, Any]
     ) -> tuple[TaskSpec, list[LMToolSpec], LMConfig]:
         if not isinstance(config, LMConfig):
             config = coerce_lm_config(config)
@@ -45,20 +41,15 @@ class AdapterCallMixin(AdapterNativeMixin):
         else:
             tool_call_input_field_name = self._get_tool_call_input_field_name(task_spec)
             tool_call_output_field_name = self._get_tool_call_output_field_name(task_spec)
-
             if tool_call_output_field_name and tool_call_input_field_name is None:
                 raise ValueError(
-                    f"You provided an output field {tool_call_output_field_name} to receive the tool calls information, "
-                    "but did not provide any tools as the input. Please provide a list of tools as the input by adding an "
-                    "input field with type `list[dspy.adapters.types.tool.Tool]`."
+                    f"You provided an output field {tool_call_output_field_name} to receive the tool calls information, but did not provide any tools as the input. Please provide a list of tools as the input by adding an input field with type `list[dspy.adapters.types.tool.Tool]`."
                 )
-
             if tool_call_output_field_name and lm.supports_function_calling:
                 if tool_call_input_field_name is None:
                     raise ValueError("Tool call input field is required when native function calling is enabled.")
                 input_tools = inputs[tool_call_input_field_name]
                 input_tools = input_tools if isinstance(input_tools, list) else [input_tools]
-
                 tools = [_coerce_tool_spec(tool) for tool in input_tools]
                 if self.parallel_tool_calls is not None:
                     if config.tool_choice is None:
@@ -73,10 +64,8 @@ class AdapterCallMixin(AdapterNativeMixin):
                                 )
                             }
                         )
-
                 task_spec = task_spec.delete(tool_call_output_field_name)
                 task_spec = task_spec.delete(tool_call_input_field_name)
-
         for name, field in task_spec.output_fields.items():
             field_type = field.type_
             if not (
@@ -92,8 +81,7 @@ class AdapterCallMixin(AdapterNativeMixin):
                 task_spec = self._adapt_citations_native(task_spec=task_spec, field_name=name, lm=lm)
             else:
                 task_spec = task_spec.delete(name)
-
-        return task_spec, tools, config
+        return (task_spec, tools, config)
 
     def _call_postprocess(
         self,
@@ -104,15 +92,12 @@ class AdapterCallMixin(AdapterNativeMixin):
         _config: LMConfig | Mapping[str, Any],
     ) -> list[dict[str, Any]]:
         values = []
-
         tool_call_output_field_name = self._get_tool_call_output_field_name(original_task_spec)
-
         for output in response.outputs:
             output_logprobs = output.logprobs
             tool_calls = output.tool_calls
             text = output.text
-
-            if text is not None and not (tool_calls and tool_call_output_field_name):
+            if text is not None and (not (tool_calls and tool_call_output_field_name)):
                 value = self.parse(task_spec=processed_task_spec, completion=text)
             elif tool_calls and tool_call_output_field_name:
                 try:
@@ -123,7 +108,7 @@ class AdapterCallMixin(AdapterNativeMixin):
                     )
                 except AdapterParseError:
                     value = {}
-            elif text is None and not processed_task_spec.output_fields:
+            elif text is None and (not processed_task_spec.output_fields):
                 value = {}
             else:
                 raise AdapterParseError(
@@ -132,15 +117,11 @@ class AdapterCallMixin(AdapterNativeMixin):
                     lm_response=str(output),
                     message="The LM returned an empty or null response.",
                 )
-
-            # Fields removed for native features are absent from the processed parse.
             for field_name in original_task_spec.output_fields:
                 value.setdefault(field_name, None)
-
             if tool_calls and tool_call_output_field_name:
                 tool_calls = [_provider_tool_call_to_tool_call_dict(tool_call) for tool_call in tool_calls]
                 value[tool_call_output_field_name] = ToolCalls.from_dict_list(tool_calls)
-
             for name, field in original_task_spec.output_fields.items():
                 field_type = field.type_
                 if (
@@ -151,27 +132,16 @@ class AdapterCallMixin(AdapterNativeMixin):
                     parsed_value = field_type.parse_lm_output(output)
                     if parsed_value is not None:
                         value[name] = parsed_value
-
             if output_logprobs:
                 value["logprobs"] = output_logprobs
-
             values.append(value)
-
         return values
 
     def _render_request(
-        self,
-        lm: BaseLM,
-        config: LMConfig,
-        tools: list[LMToolSpec],
-        messages: Sequence[LMMessage],
+        self, lm: BaseLM, config: LMConfig, tools: list[LMToolSpec], messages: Sequence[LMMessage]
     ) -> LMRequest:
-        """Build the normalized LM request for the current adapter call path."""
         return LMRequest(
-            model=lm.model,
-            messages=list(messages),
-            tools=tools,
-            config=merge_lm_request_config(lm=lm, config=config),
+            model=lm.model, messages=list(messages), tools=tools, config=merge_lm_request_config(lm=lm, config=config)
         )
 
     async def _call_lm(self, lm: BaseLM, request: LMRequest) -> LMResponse:
@@ -189,11 +159,7 @@ class AdapterCallMixin(AdapterNativeMixin):
         from dspy.compile.resolve import resolve_call, resolve_lm_config
         from dspy.core.types.history import _history_request_messages_as_openai
         from dspy.dsp.utils.settings import settings
-        from dspy.utils.transparency import (
-            ACTIVE_CALL_METADATA,
-            ACTIVE_COMPILED_CALL,
-            validate_compiled_call,
-        )
+        from dspy.utils.transparency import ACTIVE_CALL_METADATA, ACTIVE_COMPILED_CALL, validate_compiled_call
 
         resolved_config = coerce_lm_config(config)
         original_field_names = set(task_spec.fields.keys())

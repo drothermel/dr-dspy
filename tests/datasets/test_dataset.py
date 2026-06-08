@@ -6,25 +6,22 @@ import pytest
 from dspy.datasets.dataset import Dataset
 from dspy.primitives.example import Example
 
-dummy_data = """content,question,answer
-"This is content 1","What is this?","This is answer 1"
-"This is content 2","What is that?","This is answer 2"
-"""
+dummy_data = 'content,question,answer\n"This is content 1","What is this?","This is answer 1"\n"This is content 2","What is that?","This is answer 2"\n'
 
 
 class CSVDataset(Dataset):
     def __init__(self, file_path, input_keys=None, **kwargs: object) -> None:
         import pandas as pd
 
-        super().__init__(input_keys=input_keys, **kwargs)  # ty:ignore[invalid-argument-type]
+        super().__init__(input_keys=input_keys, **kwargs)
         df = pd.read_csv(file_path)
         data = df.to_dict(orient="records")
         self._train = [
-            Example(**record, dspy_uuid=str(uuid.uuid4()), dspy_split="train").with_inputs(*input_keys)  # ty:ignore[not-iterable]
+            Example(**record, dspy_uuid=str(uuid.uuid4()), dspy_split="train").with_inputs(*input_keys)
             for record in data[:1]
         ]
         self._dev = [
-            Example(**record, dspy_uuid=str(uuid.uuid4()), dspy_split="dev").with_inputs(*input_keys)  # ty:ignore[not-iterable]
+            Example(**record, dspy_uuid=str(uuid.uuid4()), dspy_split="dev").with_inputs(*input_keys)
             for record in data[1:2]
         ]
 
@@ -41,10 +38,9 @@ def csv_file():
 def test_input_keys(csv_file):
     dataset = CSVDataset(csv_file, input_keys=["content", "question"])
     assert dataset.train is not None
-
     for example in dataset.train:
         inputs = example.inputs()
         assert inputs is not None
         assert "content" in inputs
         assert "question" in inputs
-        assert set(example._input_keys) == {"content", "question"}  # ty:ignore[invalid-argument-type]
+        assert set(example._input_keys) == {"content", "question"}

@@ -21,7 +21,6 @@ from tests.task_spec.helpers import ts
 
 @pytest.fixture
 def sample_pil_image():
-    """Fixture to provide a sample image for testing"""
     url = "https://images.dog.ceo/breeds/dane-great/n02109047_8912.jpg"
     response = requests.get(url)
     response.raise_for_status()
@@ -46,14 +45,13 @@ def sample_dspy_image_no_download():
 
 def count_messages_with_image_url_pattern(messages):
     pattern = {"type": "image_url", "image_url": {"url": lambda x: isinstance(x, str)}}
-
     try:
 
         def check_pattern(obj, pattern):
             if isinstance(pattern, dict):
                 if not isinstance(obj, dict):
                     return False
-                return all(k in obj and check_pattern(obj[k], v) for k, v in pattern.items())
+                return all((k in obj and check_pattern(obj[k], v) for k, v in pattern.items()))
             if callable(pattern):
                 return pattern(obj)
             return obj == pattern
@@ -74,7 +72,6 @@ def count_messages_with_image_url_pattern(messages):
 
 
 def setup_predictor(spec, expected_output):
-    """Helper to set up a predictor with DummyLM"""
     lm = DummyLM([expected_output])
     settings.configure(lm=lm)
     if isinstance(spec, str):
@@ -83,7 +80,7 @@ def setup_predictor(spec, expected_output):
         task_spec = spec
     else:
         raise TypeError(f"Expected str or TaskSpec, got {type(spec).__name__}")
-    return Predict(task_spec), lm
+    return (Predict(task_spec), lm)
 
 
 @pytest.mark.parametrize(
@@ -122,17 +119,11 @@ def setup_predictor(spec, expected_output):
     ],
 )
 def test_basic_image_operations(test_case):
-    """Consolidated test for basic image operations"""
     predictor, lm = setup_predictor(test_case["signature"], test_case["expected"])
-
-    # Convert string URLs to Image objects
     inputs = {
         k: Image(v) if isinstance(v, str) and k in ["image", "ui_image"] else v for k, v in test_case["inputs"].items()
     }
-
     result = asyncio.run(predictor(**inputs))
-
-    # Check result based on output field name
     output_field = next(f for f in ["probabilities", "generated_code", "bboxes", "captions"] if hasattr(result, f))
     assert getattr(result, output_field) == test_case["expected"][test_case["key_output"]]
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
@@ -150,62 +141,47 @@ def test_basic_image_operations(test_case):
 def test_image_input_formats(
     request, sample_pil_image, sample_dspy_image_download, sample_dspy_image_no_download, image_input, description
 ):
-    """Test different input formats for image fields"""
     signature = "image: Image, class_labels: list[str] -> probabilities: dict[str, float]"
     expected = {"probabilities": {"dog": 0.8, "cat": 0.1, "bird": 0.1}}
     predictor, lm = setup_predictor(signature, expected)
-
     input_map = {
         "pil_image": sample_pil_image,
         "encoded_pil_image": encode_image(sample_pil_image),
         "dspy_image_download": sample_dspy_image_download,
         "dspy_image_no_download": sample_dspy_image_no_download,
     }
-
     actual_input = input_map[image_input]
-    # TODO: Support PIL/base64 inputs without requiring callers to pre-coerce them to Image, then remove this xfail.
     if image_input in ["pil_image", "encoded_pil_image"]:
-        pytest.xfail(f"{description} not fully supported without Image coercion")  # ty:ignore[too-many-positional-arguments]
-
+        pytest.xfail(f"{description} not fully supported without Image coercion")
     result = asyncio.run(predictor(image=actual_input, class_labels=["dog", "cat", "bird"]))
     assert result.probabilities == expected["probabilities"]
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
 
 
 def test_predictor_save_load(sample_url, sample_pil_image):
-    """Test saving and loading predictors with image fields"""
     signature = "image: Image -> caption: str"
     examples = [
         Example(image=Image(sample_url), caption="Example 1"),
         Example(image=sample_pil_image, caption="Example 2"),
     ]
-
     predictor, lm = setup_predictor(signature, {"caption": "A golden retriever"})
     optimizer = LabeledFewShot(k=1)
     compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
-
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(ts("image: Image -> caption: str"))
         loaded_predictor.load(temp_file.name)
-
     asyncio.run(loaded_predictor(image=Image("https://example.com/dog.jpg")))
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 2
     assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
 
 
 def test_save_load_complex_default_types():
-    """Test saving and loading predictors with complex default types (lists of images)"""
     examples = [
         Example(
-            image_list=[
-                Image("https://example.com/dog.jpg"),
-                Image("https://example.com/cat.jpg"),
-            ],
-            caption="Example 1",
-        ).with_inputs("image_list"),
+            image_list=[Image("https://example.com/dog.jpg"), Image("https://example.com/cat.jpg")], caption="Example 1"
+        ).with_inputs("image_list")
     ]
-
     ComplexTypeSignature = make_task_spec(
         {
             "image_list": FieldSpec.input("image_list", type_=list[Image], desc="A list of images"),
@@ -214,16 +190,13 @@ def test_save_load_complex_default_types():
         instructions="Caption image lists.",
         name="ComplexTypeSignature",
     )
-
     predictor, lm = setup_predictor(ComplexTypeSignature, {"caption": "A list of images"})
     optimizer = LabeledFewShot(k=1)
     compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
-
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(ComplexTypeSignature)
         loaded_predictor.load(temp_file.name)
-
     result = asyncio.run(loaded_predictor(**examples[0].inputs()))
     assert result.caption == "A list of images"
     assert str(lm.history[-1].messages_as_openai).count("'url'") == 4
@@ -235,12 +208,8 @@ BasicImageSignature = make_task_spec(
     instructions="Basic signature with a single image input.",
     name="BasicImageSignature",
 )
-
 ImageListSignature = make_task_spec(
-    {
-        "image_list": FieldSpec.input("image_list", type_=list[Image]),
-        "output": FieldSpec.output("output"),
-    },
+    {"image_list": FieldSpec.input("image_list", type_=list[Image]), "output": FieldSpec.output("output")},
     instructions="Signature with a list of images input.",
     name="ImageListSignature",
 )
@@ -266,10 +235,7 @@ ImageListSignature = make_task_spec(
     ],
 )
 def test_save_load_complex_types(test_case):
-    """Test saving and loading predictors with complex types"""
     task_spec = test_case["task_spec"]
-
-    # Convert string URLs to Image objects in input
     processed_input = {}
     for key, value in test_case["inputs"].items():
         if isinstance(value, str) and "http" in value:
@@ -278,34 +244,22 @@ def test_save_load_complex_types(test_case):
             processed_input[key] = [Image(url) for url in value]
         else:
             processed_input[key] = value
-
-    # Create example and predictor
     examples = [Example(**processed_input, **test_case["expected"]).with_inputs(*processed_input.keys())]
-
     predictor, lm = setup_predictor(task_spec, test_case["expected"])
     optimizer = LabeledFewShot(k=1)
     compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
-
-    # Test save and load
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(task_spec)
         loaded_predictor.load(temp_file.name)
-
-    # Run prediction
     result = asyncio.run(loaded_predictor(**processed_input))
-
-    # Verify output matches expected
     for key, value in test_case["expected"].items():
         assert getattr(result, key) == value
-
-    # Verify correct number of image URLs in messages
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == test_case["expected_image_urls"]
     assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
 
 
 def test_save_load_pydantic_model():
-    """Test saving and loading predictors with pydantic models"""
 
     class ImageModel(pydantic.BaseModel):
         image: Image
@@ -313,29 +267,19 @@ def test_save_load_pydantic_model():
         output: str
 
     PydanticSignature = make_task_spec(
-        {
-            "model_input": FieldSpec.input("model_input", type_=ImageModel),
-            "output": FieldSpec.output("output"),
-        },
+        {"model_input": FieldSpec.input("model_input", type_=ImageModel), "output": FieldSpec.output("output")},
         instructions="Process pydantic image model.",
         name="PydanticSignature",
     )
-
-    # Create model instance
     model_input = ImageModel(
         image=Image("https://example.com/dog.jpg"),
         image_list=[Image("https://example.com/cat.jpg")],
         output="Multiple photos",
     )
-
-    # Create example and predictor
     examples = [Example(model_input=model_input, output="Multiple photos").with_inputs("model_input")]
-
     predictor, lm = setup_predictor(PydanticSignature, {"output": "Multiple photos"})
     optimizer = LabeledFewShot(k=1)
     compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
-
-    # Test save and load
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(PydanticSignature)
@@ -345,28 +289,18 @@ def test_save_load_pydantic_model():
             state = json.load(saved_file)
         model_input_type = state["task_spec"]["inputs"][0]["type"]
         loaded_predictor.load_state(state, custom_types={model_input_type: ImageModel})
-
-    # Run prediction
     result = asyncio.run(loaded_predictor(model_input=model_input))
-
-    # Verify output matches expected
     assert result.output == "Multiple photos"
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 4
     assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
 
 
 def test_optional_image_field():
-    """Test that optional image fields are not required"""
-
     OptionalImageSignature = make_task_spec(
-        {
-            "image": FieldSpec.input("image", type_=Image | None),
-            "output": FieldSpec.output("output"),
-        },
+        {"image": FieldSpec.input("image", type_=Image | None), "output": FieldSpec.output("output")},
         instructions="Process optional image.",
         name="OptionalImageSignature",
     )
-
     predictor, lm = setup_predictor(OptionalImageSignature, {"output": "Hello"})
     result = asyncio.run(predictor(image=None))
     assert result.output == "Hello"
@@ -374,17 +308,10 @@ def test_optional_image_field():
 
 
 def test_pdf_url_support():
-    """Test support for PDF files from URLs"""
     pdf_url = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
-
-    # Create a Image object from the PDF URL with download=True
     pdf_image = Image(pdf_url, download=True)
-
-    # The data URI should contain application/pdf in the MIME type
     assert "data:application/pdf" in pdf_image.url
     assert ";base64," in pdf_image.url
-
-    # Test using it in a predictor
     PDFSignature = make_task_spec(
         {
             "document": FieldSpec.input("document", type_=Image, desc="A PDF document"),
@@ -393,81 +320,47 @@ def test_pdf_url_support():
         instructions="Summarize PDF documents.",
         name="PDFSignature",
     )
-
     predictor, lm = setup_predictor(PDFSignature, {"summary": "This is a dummy PDF"})
     result = asyncio.run(predictor(document=pdf_image))
-
     assert result.summary == "This is a dummy PDF"
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
-
-    # Ensure the URL was properly expanded in messages
     messages_str = str(lm.history[-1].messages_as_openai)
     assert "application/pdf" in messages_str
 
 
 def test_different_mime_types():
-    """Test support for different file types and MIME type detection"""
-    # Test with various file types
     file_urls = {
         "pdf": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
         "image": "https://images.dog.ceo/breeds/dane-great/n02109047_8912.jpg",
     }
-
-    expected_mime_types = {
-        "pdf": "application/pdf",
-        "image": "image/jpeg",
-    }
-
+    expected_mime_types = {"pdf": "application/pdf", "image": "image/jpeg"}
     for file_type, url in file_urls.items():
-        # Download and encode
         encoded = encode_image(url, download_images=True)
-
-        # Check for correct MIME type in the encoded data - using 'in' instead of startswith
-        # to account for possible parameters in the MIME type
         assert f"data:{expected_mime_types[file_type]}" in encoded
         assert ";base64," in encoded
 
 
 def test_mime_type_from_response_headers():
-    """Test that MIME types from response headers are correctly used"""
-    # This URL returns proper Content-Type header
     pdf_url = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
-
-    # Make an actual request to get the content type from headers
     response = requests.get(pdf_url)
     expected_mime_type = response.headers.get("Content-Type", "")
-
-    # Should be application/pdf or similar
     assert "pdf" in expected_mime_type.lower()
-
-    # Encode with download to test MIME type from headers
     encoded = encode_image(pdf_url, download_images=True)
-
-    # The encoded data should contain the correct MIME type
     assert "application/pdf" in encoded
     assert ";base64," in encoded
 
 
 def test_pdf_from_file():
-    """Test handling a PDF file from disk"""
-    # Download a PDF to a temporary file
     pdf_url = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
     response = requests.get(pdf_url)
     response.raise_for_status()
-
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_file:
         tmp_file.write(response.content)
         tmp_file_path = tmp_file.name
-
     try:
-        # Create a Image from the file
         pdf_image = Image(tmp_file_path)
-
-        # The constructor encodes the file into a data URI we can inspect directly
         assert "data:application/pdf" in pdf_image.url
         assert ";base64," in pdf_image.url
-
-        # Test the image in a predictor
         FilePDFSignature = make_task_spec(
             {
                 "document": FieldSpec.input("document", type_=Image, desc="A PDF document from file"),
@@ -476,24 +369,19 @@ def test_pdf_from_file():
             instructions="Summarize PDF from file.",
             name="FilePDFSignature",
         )
-
         predictor, lm = setup_predictor(FilePDFSignature, {"summary": "This is a PDF from file"})
         result = asyncio.run(predictor(document=pdf_image))
-
         assert result.summary == "This is a PDF from file"
         assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
     finally:
-        # Clean up the temporary file
         with contextlib.suppress(Exception):
             os.unlink(tmp_file_path)
 
 
 def test_image_repr():
-    """Test string representation of Image objects"""
     url_image = Image("https://example.com/dog.jpg")
-    assert str(url_image) == ('[{"type": "image_url", "image_url": {"url": "https://example.com/dog.jpg"}}]')
+    assert str(url_image) == '[{"type": "image_url", "image_url": {"url": "https://example.com/dog.jpg"}}]'
     assert repr(url_image) == "Image(url='https://example.com/dog.jpg')"
-
     sample_pil = PILImage.new("RGB", (60, 30), color="red")
     pil_image = Image(sample_pil)
     assert str(pil_image).startswith('[{"type": "image_url",')
@@ -502,27 +390,17 @@ def test_image_repr():
 
 
 def test_invalid_string_format():
-    """Test that invalid string formats raise a ValueError"""
     invalid_string = "this_is_not_a_url_or_file"
-
-    # Should raise a ValueError and not pass the string through
     with pytest.raises(ValueError, match="Unrecognized"):
         Image(invalid_string)
 
 
 def test_pil_image_with_download_parameter():
-    """Test behavior when PIL image is passed with download=True"""
     sample_pil = PILImage.new("RGB", (60, 30), color="red")
-
-    # PIL image should be encoded regardless of download parameter
     image_no_download = Image(sample_pil)
     image_with_download = Image(sample_pil, download=True)
-
-    # Both should result in base64 encoded data URIs
     assert image_no_download.url.startswith("data:")
     assert image_with_download.url.startswith("data:")
     assert "base64," in image_no_download.url
     assert "base64," in image_with_download.url
-
-    # They should be identical since PIL images are always encoded
     assert image_no_download.url == image_with_download.url

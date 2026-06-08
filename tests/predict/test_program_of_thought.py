@@ -9,14 +9,10 @@ from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.utils.dummies import DummyLM
 
 BasicQA = make_task_spec(
-    {
-        "question": FieldSpec.input("question"),
-        "answer": FieldSpec.output("answer", desc="often between 1 and 5 words"),
-    },
+    {"question": FieldSpec.input("question"), "answer": FieldSpec.output("answer", desc="often between 1 and 5 words")},
     instructions="Answer the question.",
     name="BasicQA",
 )
-
 ExtremumFinder = make_task_spec(
     {
         "input_list": FieldSpec.input("input_list"),
@@ -32,10 +28,7 @@ ExtremumFinder = make_task_spec(
 def test_pot_code_generation():
     lm = DummyLM(
         [
-            {
-                "reasoning": "Reason_A",
-                "generated_code": "```python\nresult = 1+1\nSUBMIT({'answer': result})\n```",
-            },
+            {"reasoning": "Reason_A", "generated_code": "```python\nresult = 1+1\nSUBMIT({'answer': result})\n```"},
             {"reasoning": "Reason_B", "answer": "2"},
         ]
     )
@@ -46,7 +39,6 @@ def test_pot_code_generation():
     assert pot.interpreter.deno_process is None
 
 
-# This test ensures the old finetuned saved models still work
 @pytest.mark.deno
 def test_old_style_pot():
     lm = DummyLM(
@@ -85,14 +77,8 @@ def test_pot_support_multiple_fields():
 def test_pot_code_generation_with_one_error():
     lm = DummyLM(
         [
-            {
-                "reasoning": "Reason_A",
-                "generated_code": "```python\nresult = 1+0/0\nSUBMIT({'answer': result})\n```",
-            },
-            {
-                "reasoning": "Reason_B",
-                "generated_code": "```python\nresult = 1+1\nSUBMIT({'answer': result})\n```",
-            },
+            {"reasoning": "Reason_A", "generated_code": "```python\nresult = 1+0/0\nSUBMIT({'answer': result})\n```"},
+            {"reasoning": "Reason_B", "generated_code": "```python\nresult = 1+1\nSUBMIT({'answer': result})\n```"},
             {"reasoning": "Reason_C", "answer": "2"},
         ]
     )
@@ -107,36 +93,24 @@ def test_pot_code_generation_with_one_error():
 def test_pot_code_generation_persistent_errors():
     max_iters = 3
     lm = DummyLM(
-        [
-            {
-                "reasoning": "Reason_A",
-                "generated_code": "```python\nresult = 1+0/0\nSUBMIT({'answer': result})\n```",
-            },
-        ]
+        [{"reasoning": "Reason_A", "generated_code": "```python\nresult = 1+0/0\nSUBMIT({'answer': result})\n```"}]
         * max_iters
     )
     settings.configure(lm=lm)
-
     pot = ProgramOfThought(BasicQA, max_iters=max_iters)
-    with pytest.raises(RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: ZeroDivisionError:"):  # noqa: RUF043
+    with pytest.raises(RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: ZeroDivisionError:"):
         asyncio.run(pot(question="What is 1+1?"))
 
 
 def test_pot_code_parse_error():
     max_iters = 3
-    lm = DummyLM(
-        [
-            {"reasoning": "Reason_A", "generated_code": "```python\ninvalid=python=code\n```"},
-        ]
-        * max_iters
-    )
+    lm = DummyLM([{"reasoning": "Reason_A", "generated_code": "```python\ninvalid=python=code\n```"}] * max_iters)
     settings.configure(lm=lm)
     pot = ProgramOfThought(BasicQA, max_iters=max_iters)
     with (
         patch("dspy.predict.program_of_thought.ProgramOfThought._execute_code") as mock_execute_code,
         pytest.raises(
-            RuntimeError,
-            match="Max hops reached. Failed to run ProgramOfThought: Error: Code format is not correct.",  # noqa: RUF043
+            RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: Error: Code format is not correct."
         ),
     ):
         asyncio.run(pot(question="What is 1+1?"))

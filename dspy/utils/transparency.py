@@ -1,5 +1,3 @@
-"""Transparency and compiled-call audit types."""
-
 from __future__ import annotations
 
 import contextvars
@@ -12,24 +10,17 @@ from dspy.core.types import LMConfig
 from dspy.task_spec import TaskSpec
 
 logger = logging.getLogger(__name__)
-
 TransparencyMode = Literal["strict", "warn", "verbose", "off"]
-
 ACTIVE_COMPILED_CALL: contextvars.ContextVar[CompiledCall | None] = contextvars.ContextVar(
-    "active_compiled_call",
-    default=None,
+    "active_compiled_call", default=None
 )
 ACTIVE_CALL_METADATA: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
-    "active_call_metadata",
-    default={},
+    "active_call_metadata", default={}
 )
-
 PLACEHOLDER_DESC_PREFIX = "${"
 
 
-class TransparencyViolation(Exception):  # noqa: N818
-    """Raised when strict transparency rules are violated."""
-
+class TransparencyViolation(Exception):
     def __init__(self, message: str, *, fixes: list[str] | None = None) -> None:
         self.fixes = fixes or []
         full_message = message
@@ -39,10 +30,7 @@ class TransparencyViolation(Exception):  # noqa: N818
 
 
 class CompiledCall(BaseModel):
-    """Resolved metadata for one adapter→LM invocation."""
-
     model_config = ConfigDict(arbitrary_types_allowed=True)
-
     call_id: str
     module: str = "unknown"
     phase: str = "predict"
@@ -68,25 +56,18 @@ def collect_task_spec_violations(task_spec: TaskSpec | None) -> list[str]:
     if task_spec is None:
         return []
     return [
-        f"Field {field.name!r} uses placeholder desc {field.desc!r}. "
-        f"Fix: set an explicit desc= on input_field/output_field."
+        f"Field {field.name!r} uses placeholder desc {field.desc!r}. Fix: set an explicit desc= on input_field/output_field."
         for field in (*task_spec.inputs, *task_spec.outputs)
         if is_placeholder_desc(field.desc, field.name)
     ]
 
 
-def collect_config_violations(
-    *,
-    config: LMConfig,
-    lm_kwargs: dict[str, Any],
-    cache: bool | None,
-) -> list[str]:
+def collect_config_violations(*, config: LMConfig, lm_kwargs: dict[str, Any], cache: bool | None) -> list[str]:
     violations: list[str] = []
     temperature = config.temperature if config.temperature is not None else lm_kwargs.get("temperature")
     max_tokens = config.max_tokens if config.max_tokens is not None else lm_kwargs.get("max_tokens")
     if max_tokens is None and lm_kwargs.get("max_completion_tokens") is not None:
         max_tokens = lm_kwargs.get("max_completion_tokens")
-
     if temperature is None:
         violations.append(
             "temperature is None (provider default). Fix: LM(..., temperature=0.0) or pass config={'temperature': ...}."
@@ -101,37 +82,23 @@ def collect_config_violations(
 
 
 def validate_compiled_call(call: CompiledCall, mode: TransparencyMode) -> list[str]:
-    """Validate a compiled call. Returns violation messages; raises in strict mode."""
     violations = list(call.violations)
-
     if not call.adapter_class or call.adapter_class == "ChatAdapter(default)":
         violations.append(
-            "adapter not configured (would default to ChatAdapter). "
-            "Fix: settings.configure(adapter=JSONAdapter()) or pass adapter in settings.context(...)."
+            "adapter not configured (would default to ChatAdapter). Fix: settings.configure(adapter=JSONAdapter()) or pass adapter in settings.context(...)."
         )
-
     for task_spec in (call.original_task_spec, call.processed_task_spec):
         violations.extend(collect_task_spec_violations(task_spec))
-
     if call.lm_model:
-        violations.extend(
-            collect_config_violations(
-                config=call.config,
-                lm_kwargs={},
-                cache=call.cache,
-            )
-        )
-
+        violations.extend(collect_config_violations(config=call.config, lm_kwargs={}, cache=call.cache))
     if mode == "strict" and violations:
         raise TransparencyViolation(
             f"Transparency strict mode violation(s) in phase={call.phase!r}, lm_role={call.lm_role!r}:",
             fixes=violations,
         )
-
     if mode in ("warn", "verbose") and violations:
         for violation in violations:
             logger.warning("Transparency: %s", violation)
-
     if mode == "verbose":
         logger.info(
             "CompiledCall module=%s phase=%s adapter=%s lm=%s mutations=%s",
@@ -141,7 +108,6 @@ def validate_compiled_call(call: CompiledCall, mode: TransparencyMode) -> list[s
             call.lm_model,
             call.task_spec_mutations,
         )
-
     return violations
 
 

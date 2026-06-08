@@ -19,20 +19,12 @@ from tests.task_spec.helpers import ts
 
 
 def new_example(question, answer):
-    """Helper function to create a new example."""
-    return Example(
-        question=question,
-        answer=answer,
-    ).with_inputs("question")
+    return Example(question=question, answer=answer).with_inputs("question")
 
 
 def test_evaluate_initialization():
     devset = [new_example("What is 1+1?", "2")]
-    ev = Evaluate(
-        devset=devset,
-        metric=answer_exact_match,
-        display_progress=False,
-    )
+    ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False)
     assert ev.devset == devset
     assert ev.metric == answer_exact_match
     assert ev.num_threads is None
@@ -40,33 +32,19 @@ def test_evaluate_initialization():
 
 
 def test_evaluate_call():
-    settings.configure(
-        lm=DummyLM(
-            {
-                "What is 1+1?": {"answer": "2"},
-                "What is 2+2?": {"answer": "4"},
-            }
-        )
-    )
+    settings.configure(lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
     program = Predict(ts("question -> answer"))
     assert asyncio.run(program(question="What is 1+1?")).answer == "2"
-    ev = Evaluate(
-        devset=devset,
-        metric=answer_exact_match,
-        display_progress=False,
-    )
+    ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False)
     score = asyncio.run(ev(program))
     assert score.score == 100.0
 
 
 def test_evaluate_single_thread_runs_in_main_thread():
-    """Evaluate with num_threads=1 should run in the main thread."""
     settings.configure(lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
-
     execution_threads = []
-
     original_metric = answer_exact_match
 
     def tracking_metric(example, prediction, trace=None):
@@ -74,12 +52,7 @@ def test_evaluate_single_thread_runs_in_main_thread():
         return original_metric(example, prediction, trace)
 
     program = Predict(ts("question -> answer"))
-    ev = Evaluate(
-        devset=devset,
-        metric=tracking_metric,
-        display_progress=False,
-        num_threads=1,
-    )
+    ev = Evaluate(devset=devset, metric=tracking_metric, display_progress=False, num_threads=1)
     result = asyncio.run(ev(program))
     assert result.score == 100.0
     assert all(t is threading.main_thread() for t in execution_threads)
@@ -89,21 +62,14 @@ def test_evaluate_single_thread_runs_in_main_thread():
 def test_construct_result_df():
     import pandas as pd
 
-    devset = [
-        new_example("What is 1+1?", "2"),
-        new_example("What is 2+2?", "4"),
-        new_example("What is 3+3?", "-1"),
-    ]
-    ev = Evaluate(
-        devset=devset,
-        metric=answer_exact_match,
-    )
+    devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4"), new_example("What is 3+3?", "-1")]
+    ev = Evaluate(devset=devset, metric=answer_exact_match)
     results = [
         (devset[0], {"answer": "2"}, 100.0),
         (devset[1], {"answer": "4"}, 100.0),
         (devset[2], {"answer": "-1"}, 0.0),
     ]
-    result_df = ev._construct_result_table(results, answer_exact_match.__name__)  # ty:ignore[invalid-argument-type]
+    result_df = ev._construct_result_table(results, answer_exact_match.__name__)
     pd.testing.assert_frame_equal(
         result_df,
         pd.DataFrame(
@@ -122,18 +88,13 @@ def test_multithread_evaluate_call():
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
     program = Predict(ts("question -> answer"))
     assert asyncio.run(program(question="What is 1+1?")).answer == "2"
-    ev = Evaluate(
-        devset=devset,
-        metric=answer_exact_match,
-        display_progress=False,
-        num_threads=2,
-    )
+    ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False, num_threads=2)
     result = asyncio.run(ev(program))
     assert result.score == 100.0
 
 
 def test_multi_thread_evaluate_call_cancelled(monkeypatch):
-    # slow LM that sleeps for 1 second before returning the answer
+
     class SlowLM(DummyLM):
         @override
         def __call__(self, *args: object, **kwargs: object):
@@ -143,12 +104,10 @@ def test_multi_thread_evaluate_call_cancelled(monkeypatch):
             return super().__call__(*args, **kwargs)
 
     settings.configure(lm=SlowLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
-
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
     program = Predict(ts("question -> answer"))
     assert asyncio.run(program(question="What is 1+1?")).answer == "2"
 
-    # spawn a thread that will sleep for .1 seconds then send a KeyboardInterrupt
     def sleep_then_interrupt():
         import time
 
@@ -159,14 +118,8 @@ def test_multi_thread_evaluate_call_cancelled(monkeypatch):
 
     input_thread = threading.Thread(target=sleep_then_interrupt)
     input_thread.start()
-
-    with pytest.raises(KeyboardInterrupt):  # noqa: PT012
-        ev = Evaluate(
-            devset=devset,
-            metric=answer_exact_match,
-            display_progress=False,
-            num_threads=2,
-        )
+    with pytest.raises(KeyboardInterrupt):
+        ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False, num_threads=2)
         asyncio.run(ev(program))
 
 
@@ -174,11 +127,7 @@ def test_evaluate_call_wrong_answer():
     settings.configure(lm=DummyLM({"What is 1+1?": {"answer": "0"}, "What is 2+2?": {"answer": "0"}}))
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
     program = Predict(ts("question -> answer"))
-    ev = Evaluate(
-        devset=devset,
-        metric=answer_exact_match,
-        display_progress=False,
-    )
+    ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False)
     result = asyncio.run(ev(program))
     assert result.score == 0.0
 
@@ -188,8 +137,6 @@ def test_evaluate_call_wrong_answer():
     "program_with_example",
     [
         (Predict(ts("question -> answer")), new_example("What is 1+1?", "2")),
-        # Create programs that do not return dictionary-like objects because Evaluate()
-        # has failed for such cases in the past
         (
             lambda text: asyncio.run(Predict(ts("text: str -> entities: list[str]"))(text=text)).entities,
             Example(text="United States", entities=["United States"]).with_inputs("text"),
@@ -209,22 +156,9 @@ def test_evaluate_display_table(program_with_example, display_table, capfd):
     program, example = program_with_example
     example_input = next(iter(example.inputs().values()))
     example_output = {key: value for key, value in example.to_dict().items() if key not in example.inputs()}
-
-    settings.configure(
-        lm=DummyLM(
-            {
-                example_input: example_output,
-            }
-        )
-    )
-
-    ev = Evaluate(
-        devset=[example],
-        metric=lambda example, pred, **kwargs: example == pred,  # noqa: ARG005
-        display_table=display_table,
-    )
+    settings.configure(lm=DummyLM({example_input: example_output}))
+    ev = Evaluate(devset=[example], metric=lambda example, pred, **kwargs: example == pred, display_table=display_table)
     assert ev.display_table == display_table
-
     asyncio.run(ev(program))
     out, _ = capfd.readouterr()
     if display_table:
@@ -233,6 +167,7 @@ def test_evaluate_display_table(program_with_example, display_table, capfd):
 
 
 def test_evaluate_callback():
+
     class TestCallback(BaseCallback):
         def __init__(self):
             self.start_call_inputs = None
@@ -241,125 +176,70 @@ def test_evaluate_callback():
             self.end_call_count = 0
 
         @override
-        def on_evaluate_start(
-            self,
-            call_id: str,
-            instance,
-            inputs,
-        ):
+        def on_evaluate_start(self, call_id: str, instance, inputs):
             self.start_call_inputs = inputs
             self.start_call_count += 1
 
         @override
-        def on_evaluate_end(
-            self,
-            call_id: str,
-            outputs,
-            exception=None,
-        ):
+        def on_evaluate_end(self, call_id: str, outputs, exception=None):
             self.end_call_outputs = outputs
             self.end_call_count += 1
 
     callback = TestCallback()
     settings.configure(
-        lm=DummyLM(
-            {
-                "What is 1+1?": {"answer": "2"},
-                "What is 2+2?": {"answer": "4"},
-            }
-        ),
-        callbacks=[callback],
+        lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}), callbacks=[callback]
     )
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
     program = Predict(ts("question -> answer"))
     assert asyncio.run(program(question="What is 1+1?")).answer == "2"
-    ev = Evaluate(
-        devset=devset,
-        metric=answer_exact_match,
-        display_progress=False,
-    )
+    ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False)
     result = asyncio.run(ev(program))
     assert result.score == 100.0
-    assert callback.start_call_inputs["program"] == program  # ty:ignore[not-subscriptable]
+    assert callback.start_call_inputs["program"] == program
     assert callback.start_call_count == 1
-    assert callback.end_call_outputs.score == 100.0  # ty:ignore[unresolved-attribute]
+    assert callback.end_call_outputs.score == 100.0
     assert callback.end_call_count == 1
 
 
 def test_evaluation_result_repr():
-    result = EvaluationResult(score=100.0, results=[(new_example("What is 1+1?", "2"), {"answer": "2"}, 100.0)])  # ty:ignore[invalid-argument-type]
+    result = EvaluationResult(score=100.0, results=[(new_example("What is 1+1?", "2"), {"answer": "2"}, 100.0)])
     assert repr(result) == "EvaluationResult(score=100.0, results=<list of 1 results>)"
 
 
 def test_evaluate_save_as_json_with_history():
-    """Test that save_as_json works with Examples containing History objects."""
-    # Setup
-    settings.configure(
-        lm=DummyLM(
-            {
-                "What is 1+1?": {"answer": "2"},
-                "What is 2+2?": {"answer": "4"},
-            }
-        )
-    )
-
-    # Create history objects
-    history1 = History(
-        messages=[
-            {"question": "Previous Q1", "answer": "Previous A1"},
-        ]
-    )
+    settings.configure(lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
+    history1 = History(messages=[{"question": "Previous Q1", "answer": "Previous A1"}])
     history2 = History(
         messages=[
             {"question": "Previous Q2", "answer": "Previous A2"},
             {"question": "Previous Q3", "answer": "Previous A3"},
         ]
     )
-
-    # Create examples with history
     devset = [
         Example(question="What is 1+1?", answer="2", history=history1).with_inputs("question"),
         Example(question="What is 2+2?", answer="4", history=history2).with_inputs("question"),
     ]
-
     program = Predict(ts("question -> answer"))
-
-    # Create evaluator with save_as_json
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         temp_json = f.name
-
     try:
-        evaluator = Evaluate(
-            devset=devset,
-            metric=answer_exact_match,
-            display_progress=False,
-            save_as_json=temp_json,
-        )
-
+        evaluator = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False, save_as_json=temp_json)
         result = asyncio.run(evaluator(program))
         assert result.score == 100.0
-
-        # Verify JSON file was created and is valid
         with open(temp_json) as f:
             data = json.load(f)
-
         assert len(data) == 2
-
-        # Verify history was properly serialized in first record
         assert "history" in data[0]
         assert isinstance(data[0]["history"], dict)
         assert "messages" in data[0]["history"]
         assert len(data[0]["history"]["messages"]) == 1
         assert data[0]["history"]["messages"][0] == {"question": "Previous Q1", "answer": "Previous A1"}
-
-        # Verify history was properly serialized in second record
         assert "history" in data[1]
         assert isinstance(data[1]["history"], dict)
         assert "messages" in data[1]["history"]
         assert len(data[1]["history"]["messages"]) == 2
         assert data[1]["history"]["messages"][0] == {"question": "Previous Q2", "answer": "Previous A2"}
         assert data[1]["history"]["messages"][1] == {"question": "Previous Q3", "answer": "Previous A3"}
-
     finally:
         import os
 
@@ -368,57 +248,24 @@ def test_evaluate_save_as_json_with_history():
 
 
 def test_evaluate_save_as_csv_with_history():
-    """Test that save_as_csv works with Examples containing History objects."""
-    # Setup
-    settings.configure(
-        lm=DummyLM(
-            {
-                "What is 1+1?": {"answer": "2"},
-            }
-        )
-    )
-
-    # Create history object
-    history = History(
-        messages=[
-            {"question": "Previous Q", "answer": "Previous A"},
-        ]
-    )
-
-    # Create example with history
-    devset = [
-        Example(question="What is 1+1?", answer="2", history=history).with_inputs("question"),
-    ]
-
+    settings.configure(lm=DummyLM({"What is 1+1?": {"answer": "2"}}))
+    history = History(messages=[{"question": "Previous Q", "answer": "Previous A"}])
+    devset = [Example(question="What is 1+1?", answer="2", history=history).with_inputs("question")]
     program = Predict(ts("question -> answer"))
-
-    # Create evaluator with save_as_csv
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         temp_csv = f.name
-
     try:
-        evaluator = Evaluate(
-            devset=devset,
-            metric=answer_exact_match,
-            display_progress=False,
-            save_as_csv=temp_csv,
-        )
-
+        evaluator = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False, save_as_csv=temp_csv)
         result = asyncio.run(evaluator(program))
         assert result.score == 100.0
-
-        # Verify CSV file was created
         import csv
 
         with open(temp_csv) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
-
         assert len(rows) == 1
         assert "history" in rows[0]
-        # CSV will have string representation of the dict
         assert "messages" in rows[0]["history"]
-
     finally:
         import os
 

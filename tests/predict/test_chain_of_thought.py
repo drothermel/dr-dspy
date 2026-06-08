@@ -6,8 +6,7 @@ import pytest
 try:
     from litellm.utils import Choices, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
-
+    pytest.skip("litellm is not installed", allow_module_level=True)
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.clients.lm import LM
 from dspy.dsp.utils.settings import settings
@@ -23,10 +22,7 @@ def test_initialization_with_string_signature():
     predict = ChainOfThought(
         ts("question -> answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",)))
     )
-    assert list(predict.predict.task_spec.output_fields.keys()) == [
-        "reasoning",
-        "answer",
-    ]
+    assert list(predict.predict.task_spec.output_fields.keys()) == ["reasoning", "answer"]
     assert asyncio.run(predict(question="What is 1+1?")).answer == "2"
 
 
@@ -42,8 +38,6 @@ async def test_async_chain_of_thought():
 
 
 def test_chain_of_thought_with_native_reasoning():
-    """Test ChainOfThought with a model that supports native reasoning, but using manual fields."""
-
     lm = LM(
         model="anthropic/claude-3-7-sonnet-20250219",
         temperature=0.0,
@@ -52,7 +46,6 @@ def test_chain_of_thought_with_native_reasoning():
         reasoning_effort="low",
     )
     settings.configure(lm=lm, adapter=ChatAdapter())
-
     with mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
@@ -60,43 +53,35 @@ def test_chain_of_thought_with_native_reasoning():
                     message=Message(
                         content="[[ ## answer ## ]]\nParis\n[[ ## completion ## ]]",
                         reasoning_content="Step-by-step thinking about the capital of France",
-                    ),
+                    )
                 )
             ],
             model="anthropic/claude-3-7-sonnet-20250219",
         )
-
         cot = ChainOfThought(
             ts("question -> answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",)))
         )
         result = asyncio.run(cot(question="What is the capital of France?"))
         assert result.answer == "Paris"
         assert result.reasoning == "Step-by-step thinking about the capital of France"
-
         _args, _kwargs = mock_completion.call_args
 
 
 def test_chain_of_thought_with_manual_reasoning():
-    """Test ChainOfThought with manual reasoning where LM doesn't support native reasoning."""
     lm = LM(model="openai/gpt-4o-mini")
     settings.configure(lm=lm)
-
     with mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
                 Choices(
                     reasoning="Step-by-step thinking about the capital of France",
                     message=Message(
-                        content=(
-                            "[[ ## reasoning ## ]]\nStep-by-step thinking about the capital of France\n"
-                            "[[ ## answer ## ]]\nParis\n[[ ## completion ## ]]"
-                        )
+                        content="[[ ## reasoning ## ]]\nStep-by-step thinking about the capital of France\n[[ ## answer ## ]]\nParis\n[[ ## completion ## ]]"
                     ),
                 )
             ],
             model="openai/gpt-4o-mini",
         )
-
         cot = ChainOfThought(
             ts("question -> answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",)))
         )

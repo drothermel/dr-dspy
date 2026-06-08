@@ -8,13 +8,6 @@ from dspy.utils.async_parallel import BoundedRunStats, run_bounded
 
 
 class Parallel:
-    """Bounded async execution of (module, example) pairs.
-
-    Examples:
-        >>> parallel = Parallel(max_concurrency=4)  # doctest: +SKIP
-        >>> results = await parallel([(predict, example), ...])  # doctest: +SKIP
-    """
-
     def __init__(
         self,
         num_threads: int | None = None,
@@ -27,25 +20,6 @@ class Parallel:
         timeout: int = 120,
         straggler_limit: int = 3,
     ) -> None:
-        """
-        A utility class for bounded async execution of (module, example) pairs.
-        Supports various example formats (e.g., `Example`, dict, tuple, list), robust error handling,
-        optional progress tracking, and can optionally return failed examples and exceptions.
-
-        Args:
-            num_threads (int | None): Deprecated alias for ``max_concurrency``.
-            max_concurrency (int | None): Maximum concurrent module executions. Defaults to
-                ``settings.num_threads``.
-            max_errors (int | None): The maximum number of errors allowed before raising an exception.
-                Defaults to ``settings.max_errors``.
-            access_examples (bool): Whether to unpack `Example` objects via `.inputs()`. Defaults to True.
-            return_failed_examples (bool): Whether to return failed examples. Defaults to False.
-            provide_traceback (bool | None): Whether to provide traceback. Defaults to None.
-            disable_progress_bar (bool): Whether to disable progress bar. Defaults to False.
-            timeout (int): Reserved for future straggler handling. Currently unused.
-            straggler_limit (int): Reserved for future straggler handling. Currently unused.
-        """
-
         concurrency = max_concurrency if max_concurrency is not None else num_threads
         self.max_concurrency = concurrency or settings.num_threads
         self.num_threads = self.max_concurrency
@@ -56,14 +30,12 @@ class Parallel:
         self.disable_progress_bar = disable_progress_bar
         self.timeout = timeout
         self.straggler_limit = straggler_limit
-
         self.failed_examples: list[Any] = []
         self.exceptions: list[BaseException] = []
         self._last_stats = BoundedRunStats()
 
     async def _run_pair(self, pair: tuple[Any, Any]) -> Any:
         module, example = pair
-
         if isinstance(example, Example):
             if self.access_examples:
                 return await module(**example.inputs())
@@ -79,14 +51,10 @@ class Parallel:
         )
 
     async def __call__(
-        self,
-        exec_pairs: list[tuple[Any, Any]],
-        num_threads: int | None = None,
-        max_concurrency: int | None = None,
+        self, exec_pairs: list[tuple[Any, Any]], num_threads: int | None = None, max_concurrency: int | None = None
     ) -> list[Any] | tuple[list[Any], list[Any], list[BaseException]]:
         concurrency = max_concurrency if max_concurrency is not None else num_threads
         concurrency = concurrency or self.max_concurrency
-
         results, stats = await run_bounded(
             items=exec_pairs,
             fn=self._run_pair,
@@ -96,7 +64,6 @@ class Parallel:
             disable_progress_bar=self.disable_progress_bar,
         )
         self._last_stats = stats
-
         if self.return_failed_examples:
             self.failed_examples = []
             self.exceptions = []
@@ -106,6 +73,5 @@ class Parallel:
                     self.failed_examples.append(original_example)
                     if exception := stats.exceptions_map.get(failed_idx):
                         self.exceptions.append(exception)
-
-            return results, self.failed_examples, self.exceptions
+            return (results, self.failed_examples, self.exceptions)
         return results

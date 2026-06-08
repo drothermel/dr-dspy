@@ -12,7 +12,7 @@ class Tool(BaseModel):
 
     @override
     def __str__(self) -> str:
-        return f"{self.name}{f'(valid_input: {self.input_type})' if self.input_type else ''}: {self.desc}"
+        return f"{self.name}{(f'(valid_input: {self.input_type})' if self.input_type else '')}: {self.desc}"
 
     @override
     def __repr__(self) -> str:

@@ -16,7 +16,7 @@ from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spe
 
 
 class XMLAdapter(ChatAdapter):
-    field_pattern = re.compile(r"<(?P<name>\w+)>((?P<content>.*?))</\1>", re.DOTALL)
+    field_pattern = re.compile("<(?P<name>\\w+)>((?P<content>.*?))</\\1>", re.DOTALL)
 
     @override
     def format_field_with_value(self, fields_with_values: dict[FieldInfoWithName, Any]) -> str:
@@ -28,13 +28,8 @@ class XMLAdapter(ChatAdapter):
 
     @override
     def format_field_structure(self, task_spec: TaskSpec) -> str:
-        """
-        XMLAdapter requires input and output fields to be wrapped in XML tags like `<field_name>`.
-        """
-
         parts = []
         parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
-
         input_field_infos = task_spec_input_field_infos(task_spec)
         output_field_infos = task_spec_output_field_infos(task_spec)
 
@@ -45,7 +40,7 @@ class XMLAdapter(ChatAdapter):
                         field_name=field_name, field_info=field_info
                     )
                     for field_name, field_info in field_infos.items()
-                },
+                }
             )
 
         parts.append(format_task_spec_fields_for_instructions(input_field_infos))
@@ -72,41 +67,34 @@ class XMLAdapter(ChatAdapter):
                 output_requirements=output_requirements,
                 field_wrapper="xml",
             )
-
         input_field_infos = task_spec_input_field_infos(task_spec)
         messages = [prefix]
-
         messages.append(
             self.format_field_with_value(
                 {
                     FieldInfoWithName(name=k, info=input_field_infos[k]): inputs.get(k)
                     for k in task_spec.input_fields
                     if k in inputs
-                },
+                }
             )
         )
-
         if main_request:
             output_requirements = self.user_message_output_requirements(task_spec)
             if output_requirements is not None:
                 messages.append(output_requirements)
-
         messages.append(suffix)
         return "\n\n".join(messages).strip()
 
     @override
     def format_assistant_message_content(
-        self,
-        task_spec: TaskSpec,
-        outputs: dict[str, Any],
-        missing_field_message: str | None = None,
+        self, task_spec: TaskSpec, outputs: dict[str, Any], missing_field_message: str | None = None
     ) -> str:
         output_field_infos = task_spec_output_field_infos(task_spec)
         return self.format_field_with_value(
             {
                 FieldInfoWithName(name=k, info=output_field_infos[k]): outputs.get(k, missing_field_message)
                 for k in task_spec.output_fields
-            },
+            }
         )
 
     @override
@@ -126,10 +114,7 @@ class XMLAdapter(ChatAdapter):
                 raw_fields[name] = content
         fields = {
             k: self._parse_field_value(
-                field_type=task_spec.output_fields[k].type_,
-                raw=v,
-                completion=completion,
-                task_spec=task_spec,
+                field_type=task_spec.output_fields[k].type_, raw=v, completion=completion, task_spec=task_spec
             )
             for k, v in raw_fields.items()
         }
@@ -137,20 +122,11 @@ class XMLAdapter(ChatAdapter):
             from dspy.utils.exceptions import AdapterParseError
 
             raise AdapterParseError(
-                adapter_name="XMLAdapter",
-                task_spec=task_spec,
-                lm_response=completion,
-                parsed_result=fields,
+                adapter_name="XMLAdapter", task_spec=task_spec, lm_response=completion, parsed_result=fields
             )
         return fields
 
-    def _parse_field_value(
-        self,
-        field_type: object,
-        raw: str,
-        completion: str,
-        task_spec: TaskSpec,
-    ) -> object:
+    def _parse_field_value(self, field_type: object, raw: str, completion: str, task_spec: TaskSpec) -> object:
         from dspy.adapters.utils import parse_value
 
         try:

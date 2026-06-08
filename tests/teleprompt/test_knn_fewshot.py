@@ -12,13 +12,11 @@ from tests.task_spec.helpers import ts
 
 
 def mock_example(question: str, answer: str) -> Example:
-    """Creates a mock DSP example with specified question and answer."""
     return Example(question=question, answer=answer).with_inputs("question")
 
 
 @pytest.fixture
 def setup_knn_few_shot() -> KNNFewShot:
-    """Sets up a KNNFewShot instance for testing."""
     trainset = [
         mock_example("What is the capital of France?", "Paris"),
         mock_example("What is the largest ocean?", "Pacific"),
@@ -28,7 +26,6 @@ def setup_knn_few_shot() -> KNNFewShot:
 
 
 def test_knn_few_shot_initialization(setup_knn_few_shot):
-    """Tests the KNNFewShot initialization."""
     knn_few_shot = setup_knn_few_shot
     assert knn_few_shot.KNN.k == 2, "Incorrect k value for KNN"
     assert len(knn_few_shot.KNN.trainset) == 3, "Incorrect trainset size for KNN"
@@ -44,30 +41,19 @@ class SimpleModule(Module):
 
     @override
     def reset_copy(self):
-        # Creates a new instance of SimpleModule with the same predictor
         return SimpleModule(self.predictor.task_spec)
 
 
-# Disabled from pytest collection by leading underscore; restore once KNNFewShot compile behavior is fixed.
 def _test_knn_few_shot_compile(setup_knn_few_shot):
-    """Tests the compile method of KNNFewShot with SimpleModule as student."""
     student = SimpleModule(ts("input -> output"))
-    teacher = SimpleModule(ts("input -> output"))  # Assuming teacher uses the same module type
-
-    # Setup DummyLM with a response for a query similar to one of the training examples
-    lm = DummyLM(["Madrid", "10"])  # ty:ignore[invalid-argument-type]
-    settings.configure(lm=lm)  # Responses for the capital of Spain and the result of 5+5)
-
+    teacher = SimpleModule(ts("input -> output"))
+    lm = DummyLM(["Madrid", "10"])
+    settings.configure(lm=lm)
     knn_few_shot = setup_knn_few_shot
     trainset = knn_few_shot.KNN.trainset
     compiled_student = knn_few_shot.compile(student, teacher=teacher, trainset=trainset, valset=None)
-
     assert len(compiled_student.predictor.demos) == 1
     assert compiled_student.predictor.demos[0].input == trainset[0].input
     assert compiled_student.predictor.demos[0].output == trainset[0].output
-    # Simulate a query that is similar to one of the training examples
     output = compiled_student.forward(input="What is the capital of Spain?").output
-
-    # Validate that the output corresponds to one of the expected DummyLM responses
-    # This assumes the compiled_student's forward method will execute the predictor with the given query
     assert output in ["Madrid", "10"], "The compiled student did not return the correct output based on the query"

@@ -1,5 +1,3 @@
-"""Normalized LM types — request configuration."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -9,25 +7,19 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class LMToolSpec(BaseModel):
-    """Provider-independent schema for a tool available to an LM."""
-
     type: Literal["function"] = "function"
     name: str
     description: str | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
     provider_data: dict[str, Any] = Field(default_factory=dict)
-
     model_config = ConfigDict(extra="forbid")
 
 
 class LMReasoningConfig(BaseModel):
-    """Reasoning controls for models with native reasoning support."""
-
     effort: str | None = None
     max_tokens: int | None = None
     summary: str | None = None
-
     model_config = ConfigDict(extra="forbid")
 
     @classmethod
@@ -38,13 +30,9 @@ class LMReasoningConfig(BaseModel):
 
 
 class LMToolChoice(BaseModel):
-    """Tool-choice controls for native tool-capable models."""
-
     mode: Literal["auto", "required", "none"] = "auto"
-    # Tool names that are allowed for a model request.
     allowed: list[str] | None = None
     parallel: bool | None = None
-
     model_config = ConfigDict(extra="forbid")
 
     @classmethod
@@ -55,16 +43,8 @@ class LMToolChoice(BaseModel):
 
 
 class LMPromptCacheConfig(BaseModel):
-    """Provider-side prompt/token cache controls.
-
-    Prompt caching is not DSPy memoization. The provider call still happens,
-    but the backend may reuse cached prompt prefixes or KV state for lower
-    latency or lower input-token cost.
-    """
-
     enabled: bool | None = None
     key: str | None = None
-
     model_config = ConfigDict(extra="forbid")
 
     @classmethod
@@ -92,8 +72,6 @@ def _config_data(value: Any, *, str_field: str | None = None, bool_field: str | 
 
 
 class LMConfig(BaseModel):
-    """Common generation controls for an LM request."""
-
     temperature: float | None = None
     max_tokens: int | None = None
     top_p: float | None = None
@@ -105,7 +83,6 @@ class LMConfig(BaseModel):
     tool_choice: LMToolChoice | None = None
     prompt_cache: LMPromptCacheConfig | None = None
     extensions: dict[str, Any] = Field(default_factory=dict)
-
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     @classmethod
@@ -118,7 +95,6 @@ def _merge_lm_config(left: LMConfig | None, right: LMConfig | None) -> LMConfig 
         return right
     if right is None:
         return left
-
     data = left.model_dump(exclude_none=True)
     extensions = {**left.extensions}
     for key in right.model_fields_set:
@@ -145,11 +121,9 @@ def _merge_lm_config(left: LMConfig | None, right: LMConfig | None) -> LMConfig 
 def _merge_config_overrides(config: LMConfig, kwargs: dict[str, Any]) -> LMConfig:
     if not kwargs:
         return config
-
     data = config.model_dump()
     extensions = dict(config.extensions)
     field_names = set(LMConfig.model_fields)
-
     for key, value in kwargs.items():
         if key == "extensions":
             if value is None:
@@ -162,7 +136,6 @@ def _merge_config_overrides(config: LMConfig, kwargs: dict[str, Any]) -> LMConfi
             data[key] = value
         else:
             raise ValueError(f"Unknown LM config override: {key!r}")
-
     data["extensions"] = extensions
     return LMConfig(**data)
 
@@ -176,18 +149,11 @@ def _coerce_from_call_config_kwargs(kwargs: Mapping[str, Any]) -> dict[str, Any]
 
 
 def _lm_config_data_from_kwargs(raw: Mapping[str, Any]) -> dict[str, Any]:
-    """Extract LMConfig fields from a loose kwargs mapping.
-
-    Provider-only settings such as ``api_base`` and ``api_key`` are ignored so
-    callers can spread ``lm.kwargs`` into ``LMRequest.from_call`` safely.
-    """
     if not raw:
         return {}
-
     data = dict(raw)
     if "max_completion_tokens" in data and "max_tokens" not in data:
         data["max_tokens"] = data.pop("max_completion_tokens")
-
     data = _coerce_from_call_config_kwargs(data)
     field_names = set(LMConfig.model_fields) - {"extensions"}
     filtered = {key: value for key, value in data.items() if key in field_names and value is not None}

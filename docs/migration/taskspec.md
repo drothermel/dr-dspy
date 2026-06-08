@@ -14,7 +14,7 @@ DSPy no longer exposes the legacy `Signature` API. Use `TaskSpec` subclasses and
 | `OutputField(desc="...")` | `output_field("name", desc="...")` |
 | `Predict("q -> a")` | `Predict(QATaskSpec())` |
 | `predictor.signature` | `predictor.task_spec` |
-| `Tool(func)` | `Tool(func, description="...")` or `tool_from_callable(func)` |
+| `Tool(func)` | `Tool(func, description="...")` |
 
 ## Defining a task
 
@@ -75,13 +75,13 @@ result = asyncio.run(predict(question="What is DSPy?"))
 `Tool` requires an explicit description:
 
 ```python
-from dspy.adapters.types.tool import Tool, tool_from_callable
+from dspy.adapters.types.tool import Tool
 
 def search(query: str) -> str:
     return query
 
 tool = Tool(search, description="Search documents by query.")
-# ReAct/CodeAct/RLM accept raw callables and wrap them with tool_from_callable().
+# ReAct, CodeAct, RLM, and ReActV2 require tools=[Tool(...)].
 ```
 
 ## TaskSpec transforms

@@ -22,9 +22,7 @@ from dspy.teleprompt.utils import get_task_spec, optimizer_lm_context, set_task_
 
 if TYPE_CHECKING:
     from gepa.core.adapter import ProposalFn
-
 logger = logging.getLogger(__name__)
-
 _gepa_eval_executor = ThreadPoolExecutor(max_workers=1)
 
 
@@ -50,21 +48,9 @@ class LoggerAdapter:
 
 
 DSPyTrace = list[tuple[Any, dict[str, Any], Prediction]]
-
 ReflectiveExample = TypedDict(
-    "ReflectiveExample",
-    {
-        "Inputs": dict[str, Any],
-        "Generated Outputs": dict[str, Any] | str,
-        "Feedback": str,
-    },
+    "ReflectiveExample", {"Inputs": dict[str, Any], "Generated Outputs": dict[str, Any] | str, "Feedback": str}
 )
-
-ReflectiveExample.__doc__ = """
-Structure of individual examples in the reflective dataset.
-
-Each example contains the predictor inputs, generated outputs, and feedback from evaluation.
-"""
 
 
 class ScoreWithFeedback(Prediction):
@@ -80,22 +66,7 @@ class PredictorFeedbackFn(Protocol):
         module_inputs: Example,
         module_outputs: Prediction,
         captured_trace: DSPyTrace,
-    ) -> ScoreWithFeedback:
-        """
-        This function is used to provide feedback to a specific predictor.
-        The function is called with the following arguments:
-        - predictor_output: The output of the predictor.
-        - predictor_inputs: The inputs to the predictor.
-        - module_inputs: The inputs to the whole program --- `Example`.
-        - module_outputs: The outputs of the whole program --- `Prediction`.
-        - captured_trace: The trace of the module's execution.
-        # Shape of trace is: [predictor_invocation_idx -> Tuple[Predictor, PredictorInputs, Prediction]]
-        # Each trace is a tuple of (Predictor, PredictorInputs, Prediction)
-
-        The function should return a `ScoreWithFeedback` object.
-        The feedback is a string that is used to guide the evolution of the predictor.
-        """
-        ...
+    ) -> ScoreWithFeedback: ...
 
 
 class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
@@ -133,7 +104,6 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         components_to_update: list[str],
     ) -> dict[str, str]:
         reflection_lm = self.reflection_lm or settings.lm
-        # If custom proposer provided, override everything with custom proposer
         if self.custom_instruction_proposer:
             with optimizer_lm_context(lm=reflection_lm, phase="gepa.reflection", lm_role="reflection_lm"):
                 return self.custom_instruction_proposer(
@@ -141,10 +111,8 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                     reflective_dataset=reflective_dataset,
                     components_to_update=components_to_update,
                 )
-
         results: dict[str, str] = {}
         proposer = Predict(FrameworkGepaInstructionProposalTaskSpec())
-
         with optimizer_lm_context(lm=reflection_lm, phase="gepa.reflection", lm_role="reflection_lm"):
             for name in components_to_update:
                 base_instruction = candidate[name]
@@ -156,19 +124,13 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                     )
                 )
                 results[name] = prediction.new_instruction
-
         return results
 
     def build_program(self, candidate: dict[str, str]):
         new_prog = self.student.deepcopy()
-
         for name, pred in new_prog.named_predictors():
             if name in candidate:
-                set_task_spec(
-                    predictor=pred,
-                    task_spec=get_task_spec(pred).with_instructions(candidate[name]),
-                )
-
+                set_task_spec(predictor=pred, task_spec=get_task_spec(pred).with_instructions(candidate[name]))
         return new_prog
 
     @override
@@ -182,9 +144,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             if self.reflection_minibatch_size is None or len(batch) > self.reflection_minibatch_size
             else {"disable_logging": True}
         )
-
         if capture_traces:
-            # bootstrap_trace_data-like flow with trace capture
             from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
 
             trajs = await bootstrap_trace_module.bootstrap_trace_data(
@@ -211,7 +171,6 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                     elif score is None:
                         score = self.failure_score
                     scores.append(score)
-
             return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajs)
         evaluator = Evaluate(
             devset=batch,
@@ -232,19 +191,14 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         self, candidate, eval_batch, components_to_update
     ) -> dict[str, list[ReflectiveExample]]:
         program = self.build_program(candidate)
-
         ret_d: dict[str, list[ReflectiveExample]] = {}
-
         for pred_name in components_to_update:
-            # Find the predictor object
             module = None
             for name, m in program.named_predictors():
                 if name == pred_name:
                     module = m
                     break
             assert module is not None, f"Predictor not found: {pred_name}"
-
-            # Create reflective examples from traces
             items: list[ReflectiveExample] = []
             for data in eval_batch.trajectories or []:
                 trace = data["trace"]
@@ -253,30 +207,24 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 module_score = data["score"]
                 if isinstance(module_score, ScoreWithFeedback):
                     module_score = module_score.score
-
                 trace_instances = [t for t in trace if get_task_spec(t[0]).equals(get_task_spec(module))]
                 if not self.add_format_failure_as_feedback:
                     trace_instances = [t for t in trace_instances if not isinstance(t[2], FailedPrediction)]
                 if len(trace_instances) == 0:
                     continue
-
                 selected = None
                 for t in trace_instances:
                     if isinstance(t[2], FailedPrediction):
                         selected = t
                         break
-
                 if selected is None:
                     if isinstance(prediction, FailedPrediction):
                         continue
                     selected = self.rng.choice(trace_instances)
-
                 inputs = selected[1]
                 outputs = selected[2]
-
                 new_inputs = {}
                 new_outputs = {}
-
                 contains_history = False
                 history_key_name = None
                 for input_key, input_val in inputs.items():
@@ -284,24 +232,19 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                         contains_history = True
                         assert history_key_name is None
                         history_key_name = input_key
-
                 if contains_history:
                     s = "```json\n"
                     for i, message in enumerate(inputs[history_key_name].messages):
                         s += f"  {i}: {message}\n"
                     s += "```"
                     new_inputs["Context"] = s
-
                 for input_key, input_val in inputs.items():
                     if contains_history and input_key == history_key_name:
                         continue
-
                     if isinstance(input_val, Type) and self.custom_instruction_proposer is not None:
-                        # Keep original object - will be properly formatted when sent to reflection LM
                         new_inputs[input_key] = input_val
                     else:
                         new_inputs[input_key] = str(input_val)
-
                 if isinstance(outputs, FailedPrediction):
                     s = "Couldn't parse the output as per the expected output format. The model's raw response was:\n"
                     s += "```\n"
@@ -311,7 +254,6 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 else:
                     for output_key, output_val in outputs.items():
                         new_outputs[output_key] = str(output_val)
-
                 d = {"Inputs": new_inputs, "Generated Outputs": new_outputs}
                 if isinstance(outputs, FailedPrediction):
                     from dspy.compile.resolve import resolve_adapter
@@ -321,7 +263,6 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                     for message in adapter.format(task_spec=get_task_spec(module), demos=[], inputs={}):
                         structure_instruction += message.role + ": " + (message.text or "") + "\n"
                     d["Feedback"] = "Your output failed to parse. Follow this structure:\n" + structure_instruction
-                    # d['score'] = self.failure_score
                 else:
                     feedback_fn = self.feedback_map[pred_name]
                     fb = feedback_fn(
@@ -339,17 +280,11 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                             )
                             self.warn_on_score_mismatch = False
                         fb["score"] = module_score
-
                 items.append(cast("ReflectiveExample", d))
-
             if len(items) == 0:
                 logger.warning(f"  No valid reflective examples found for {pred_name}")
                 continue
-
             ret_d[pred_name] = items
-
         if len(ret_d) == 0:
             raise Exception("No valid predictions found for any module.")
-
         return ret_d
-

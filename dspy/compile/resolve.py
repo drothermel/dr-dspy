@@ -1,5 +1,3 @@
-"""Resolve adapter and LM configuration for transparency auditing."""
-
 from __future__ import annotations
 
 import uuid
@@ -20,16 +18,14 @@ def resolve_adapter(
 ) -> tuple[Adapter, list[str]]:
     notes: list[str] = []
     if settings_adapter is not None:
-        return settings_adapter, notes
-
+        return (settings_adapter, notes)
     if transparency == "off":
         if fallback_adapter_factory is None:
             from dspy.adapters.chat_adapter import ChatAdapter
 
             fallback_adapter_factory = ChatAdapter
         notes.append("defaulted to ChatAdapter because transparency=off and adapter was not configured")
-        return fallback_adapter_factory(), notes
-
+        return (fallback_adapter_factory(), notes)
     from dspy.utils.transparency import TransparencyViolation
 
     raise TransparencyViolation(
@@ -39,19 +35,14 @@ def resolve_adapter(
 
 
 def resolve_lm_config(
-    lm: BaseLM,
-    predict_config: LMConfig | dict[str, Any] | None,
-    *,
-    override: dict[str, Any] | None = None,
+    lm: BaseLM, predict_config: LMConfig | dict[str, Any] | None, *, override: dict[str, Any] | None = None
 ) -> tuple[LMConfig, dict[str, str]]:
-    """Merge LM defaults with per-call config without mutating values."""
     base = coerce_lm_config(predict_config)
     if override:
         merged = _merge_lm_config(base, coerce_lm_config(override))
         config = merged if merged is not None else coerce_lm_config(override)
     else:
         config = base
-
     merged_request = _merge_lm_config(lm_defaults_config(lm), config) or config
     provenance: dict[str, str] = {}
     for field in ("temperature", "max_tokens", "n", "top_p"):
@@ -65,7 +56,7 @@ def resolve_lm_config(
             provenance[field] = "lm.kwargs"
         else:
             provenance[field] = "unset"
-    return merged_request, provenance
+    return (merged_request, provenance)
 
 
 def resolve_call(
@@ -87,7 +78,6 @@ def resolve_call(
     adapter_class = type(adapter).__name__
     if adapter_notes:
         adapter_class = f"{adapter_class}({'; '.join(adapter_notes)})"
-
     cache = getattr(lm, "cache", lm.kwargs.get("cache") if hasattr(lm, "kwargs") else None)
     return CompiledCall(
         call_id=str(uuid.uuid4()),

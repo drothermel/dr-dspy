@@ -21,19 +21,15 @@ from dspy.core.types import (
 
 
 def completion_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
-    """Convert an OpenAI Chat or text completion response into `LMResponse`."""
     choices = get_value(response, "choices", []) or []
     if not isinstance(choices, list):
         choices = []
-
     model = get_value(response, "model")
     if not isinstance(model, str):
         model = request.model
-
     response_id = get_value(response, "id")
     if not isinstance(response_id, str):
         response_id = None
-
     outputs = [choice_to_lm_output(choice) for choice in choices] if choices else [LMOutput(parts=[])]
     return LMResponse(
         model=model,
@@ -45,7 +41,6 @@ def completion_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
 
 
 def choice_to_lm_output(choice: Any) -> LMOutput:
-    """Convert one completion choice into one DSPy output candidate."""
     message = get_value(choice, "message")
     parts = []
     if message is not None:
@@ -56,7 +51,7 @@ def choice_to_lm_output(choice: Any) -> LMOutput:
         if content:
             parts.extend(message_content_to_parts(content))
         for tool_call in get_value(message, "tool_calls") or []:
-            parts.append(provider_tool_call_to_part(tool_call))  # noqa: PERF401 dynamic typing/lint migration for scoped ty adoption
+            parts.append(provider_tool_call_to_part(tool_call))
         parts.extend(extract_citations_from_choice(choice))
     else:
         text = get_value(choice, "text")
@@ -73,12 +68,6 @@ def choice_to_lm_output(choice: Any) -> LMOutput:
 
 
 def responses_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
-    """Convert an OpenAI Responses object into `LMResponse`.
-
-    The Responses API represents one assistant answer as a sequence of output
-    items: messages, function calls, reasoning, binary artifacts, images, and refusals.
-    DSPy stores those as typed parts on one `LMOutput`.
-    """
     parts = []
     output_items = get_value(response, "output", []) or []
     if not isinstance(output_items, list):
@@ -104,15 +93,12 @@ def responses_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
                 text = get_value(item, "text")
                 if text:
                     parts.append(LMThinkingPart(text=text))
-
     model = get_value(response, "model")
     if not isinstance(model, str):
         model = request.model
-
     response_id = get_value(response, "id")
     if not isinstance(response_id, str):
         response_id = None
-
     return LMResponse(
         model=model,
         outputs=[LMOutput(parts=parts, provider_output=response)],
@@ -152,7 +138,6 @@ def response_content_item_to_parts(item: Any) -> list[Any]:
 
 
 def provider_tool_call_to_part(tool_call: Any) -> LMToolCallPart:
-    """Convert an OpenAI-shaped tool call into a DSPy tool-call part."""
     function = get_value(tool_call, "function", {})
     name = get_value(function, "name") or get_value(tool_call, "name")
     arguments = get_value(function, "arguments", get_value(tool_call, "arguments", "{}"))
@@ -168,7 +153,6 @@ def provider_tool_call_to_part(tool_call: Any) -> LMToolCallPart:
 
 
 def responses_function_call_to_part(output_item: Any) -> LMToolCallPart:
-    """Convert one Responses function_call item into a DSPy tool-call part."""
     args = get_value(output_item, "arguments", {})
     provider_data = model_dump(output_item)
     if isinstance(args, str):
@@ -243,10 +227,10 @@ def output_image_to_part(value: Any) -> LMImagePart:
 def output_audio_to_part(value: Any) -> LMAudioPart:
     data = model_dump(value)
     audio = data.get("audio") if isinstance(data.get("audio"), dict) else data
-    source = audio.get("url")  # ty:ignore[unresolved-attribute]
-    b64_data = audio.get("data") or audio.get("b64_json")  # ty:ignore[unresolved-attribute]
-    file_id = audio.get("file_id")  # ty:ignore[unresolved-attribute]
-    media_type = audio.get("media_type") or audio.get("mime_type") or "audio/wav"  # ty:ignore[unresolved-attribute]
+    source = audio.get("url")
+    b64_data = audio.get("data") or audio.get("b64_json")
+    file_id = audio.get("file_id")
+    media_type = audio.get("media_type") or audio.get("mime_type") or "audio/wav"
     if b64_data is not None:
         if isinstance(b64_data, str) and b64_data.startswith("data:"):
             media_type, b64_data = split_data_uri(b64_data)
@@ -261,11 +245,11 @@ def output_audio_to_part(value: Any) -> LMAudioPart:
 def output_file_to_part(value: Any) -> LMBinaryPart:
     data = model_dump(value)
     file = data.get("file") if isinstance(data.get("file"), dict) else data
-    source = file.get("url")  # ty:ignore[unresolved-attribute]
-    b64_data = file.get("file_data") or file.get("data")  # ty:ignore[unresolved-attribute]
-    file_id = file.get("file_id") or file.get("id")  # ty:ignore[unresolved-attribute]
-    filename = file.get("filename")  # ty:ignore[unresolved-attribute]
-    media_type = file.get("media_type") or file.get("mime_type") or "application/octet-stream"  # ty:ignore[unresolved-attribute]
+    source = file.get("url")
+    b64_data = file.get("file_data") or file.get("data")
+    file_id = file.get("file_id") or file.get("id")
+    filename = file.get("filename")
+    media_type = file.get("media_type") or file.get("mime_type") or "application/octet-stream"
     if b64_data is not None:
         if isinstance(b64_data, str) and b64_data.startswith("data:"):
             media_type, b64_data = split_data_uri(b64_data)
@@ -288,7 +272,6 @@ def cost_from_response(response: Any) -> float | None:
 
 
 def usage_from_response(response: Any) -> LMUsage | None:
-    """Convert provider usage objects or dictionaries into `LMUsage`."""
     usage = get_value(response, "usage")
     if usage is None:
         return None
@@ -301,9 +284,9 @@ def usage_from_response(response: Any) -> LMUsage | None:
                 continue
             try:
                 value = getattr(usage, key)
-            except Exception:  # noqa: S112 dynamic typing/lint migration for scoped ty adoption
+            except Exception:
                 continue
-            if value is not None and not callable(value):
+            if value is not None and (not callable(value)):
                 data[key] = value
         usage = data
     return LMUsage(**dict(usage))

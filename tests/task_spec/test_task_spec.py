@@ -69,10 +69,8 @@ def test_append_prepend_delete():
     base = ts("q -> a", instructions="Test")
     with_reasoning = base.append(FieldSpec.output("reasoning", desc="Chain of thought"))
     assert list(with_reasoning.output_fields) == ["a", "reasoning"]
-
     with_context = base.prepend(FieldSpec.input("context", desc="Background"))
     assert list(with_context.input_fields) == ["context", "q"]
-
     trimmed = with_context.delete("context")
     assert list(trimmed.input_fields) == ["q"]
 
@@ -89,9 +87,7 @@ def test_equals_and_fingerprint():
 
 def test_serialize_round_trip():
     original = make_task_spec(
-        "question: int, context: list[str] -> answer",
-        instructions="Answer using context.",
-        name="RAG",
+        "question: int, context: list[str] -> answer", instructions="Answer using context.", name="RAG"
     )
     restored = TaskSpec.from_dict(original.to_dict())
     assert original.equals(restored)
@@ -140,29 +136,21 @@ def test_make_task_spec_from_field_lists():
 
 
 def test_make_task_spec_rejects_mismatched_field_role():
-    with pytest.raises(ValueError, match=r"expected.*output"):
-        make_task_spec(
-            outputs=[input_field("answer")],
-            instructions="Test.",
-        )
+    with pytest.raises(ValueError, match="expected.*output"):
+        make_task_spec(outputs=[input_field("answer")], instructions="Test.")
 
 
 def test_make_task_spec_rejects_spec_and_lists():
     with pytest.raises(TypeError, match="not both"):
-        make_task_spec(
-            "q -> a",
-            inputs=[input_field("q")],
-            instructions="Test.",
-        )
+        make_task_spec("q -> a", inputs=[input_field("q")], instructions="Test.")
 
 
 def test_custom_types_in_string_spec():
+
     class CustomType:
         pass
 
     spec = make_task_spec(
-        "input: CustomType -> output",
-        instructions="Use custom type.",
-        custom_types={"CustomType": CustomType},
+        "input: CustomType -> output", instructions="Use custom type.", custom_types={"CustomType": CustomType}
     )
     assert spec.input_fields["input"].type_ is CustomType

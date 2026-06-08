@@ -9,6 +9,18 @@ from dspy.adapters.types.base_type import Type as DspyType
 from dspy.adapters.utils.fields import format_field_value
 from dspy.task_spec import TaskSpec
 
+_MULTIMODAL_BLOCK_TYPES = frozenset({"image_url", "input_image", "file", "input_audio", "input_file"})
+
+
+def _is_openai_content_blocks(value: object) -> bool:
+    return (
+        isinstance(value, list) and bool(value) and all(isinstance(block, dict) and "type" in block for block in value)
+    )
+
+
+def _content_blocks_include_multimodal(blocks: list[dict[str, Any]]) -> bool:
+    return any(block.get("type") in _MULTIMODAL_BLOCK_TYPES for block in blocks)
+
 
 def _parse_serialized_content_block_string(value: object) -> list[dict[str, Any]] | None:
     if not isinstance(value, str):
@@ -32,10 +44,15 @@ def value_contains_multimodal_custom_type(value: object) -> bool:
         return value.renders_as_content_blocks()
     if _parse_serialized_content_block_string(value) is not None:
         return True
-    if isinstance(value, list):
+    if _is_openai_content_blocks(value):
+        return _content_blocks_include_multimodal(cast("list[dict[str, Any]]", value))
+    if isinstance(value, list | tuple):
         return any(value_contains_multimodal_custom_type(item) for item in value)
     if isinstance(value, dict):
-        return any(value_contains_multimodal_custom_type(item) for item in value.values())
+        block = cast("dict[str, Any]", value)
+        if block.get("type") in _MULTIMODAL_BLOCK_TYPES:
+            return True
+        return any(value_contains_multimodal_custom_type(item) for item in block.values())
     if isinstance(value, pydantic.BaseModel):
         return any(value_contains_multimodal_custom_type(getattr(value, name)) for name in type(value).model_fields)
     return False
@@ -53,7 +70,9 @@ def collect_multimodal_content_blocks(value: object) -> list[dict[str, Any]]:
         return value.to_content_blocks() if value.renders_as_content_blocks() else []
     if blocks := _parse_serialized_content_block_string(value):
         return blocks
-    if isinstance(value, list):
+    if _is_openai_content_blocks(value):
+        return cast("list[dict[str, Any]]", value)
+    if isinstance(value, list | tuple):
         blocks: list[dict[str, Any]] = []
         for item in value:
             blocks.extend(collect_multimodal_content_blocks(item))
@@ -72,12 +91,7 @@ def collect_multimodal_content_blocks(value: object) -> list[dict[str, Any]]:
 
 
 def field_value_to_content_blocks(
-    field_info: FieldInfo,
-    field_name: str,
-    value: object,
-    *,
-    prefix: str = "",
-    field_wrapper: str | None = None,
+    field_info: FieldInfo, field_name: str, value: object, *, prefix: str = "", field_wrapper: str | None = None
 ) -> list[dict[str, Any]]:
     if field_wrapper == "xml":
         open_tag = f"{prefix}<{field_name}>\n"
@@ -89,8 +103,9 @@ def field_value_to_content_blocks(
             return [{"type": "text", "text": open_tag}, *nested_blocks, {"type": "text", "text": close_tag}]
         formatted_field_value = format_field_value(field_info=field_info, value=value)
         return [{"type": "text", "text": f"{open_tag}{formatted_field_value}{close_tag}"}]
-
     header = f"{prefix}[[ ## {field_name} ## ]]\n"
+    if _is_openai_content_blocks(value):
+        return [{"type": "text", "text": header}, *cast("list[dict[str, Any]]", value)]
     if isinstance(value, DspyType) and value.renders_as_content_blocks():
         return [{"type": "text", "text": header}, *value.to_content_blocks()]
     nested_blocks = collect_multimodal_content_blocks(value)
@@ -115,7 +130,6 @@ def build_multimodal_user_message_content(
     blocks: list[dict[str, Any]] = []
     if prefix:
         blocks.append({"type": "text", "text": prefix})
-
     field_blocks_added = False
     input_field_infos = task_spec_input_field_infos(task_spec)
     for field_name in task_spec.input_fields:
@@ -132,10 +146,8 @@ def build_multimodal_user_message_content(
                 field_wrapper=field_wrapper,
             )
         )
-
     if main_request and output_requirements is not None:
         blocks.append({"type": "text", "text": f"\n\n{output_requirements}"})
-
     if suffix:
         blocks.append({"type": "text", "text": suffix})
     return blocks

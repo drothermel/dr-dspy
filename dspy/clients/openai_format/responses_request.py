@@ -15,7 +15,6 @@ from dspy.core.types import LMMessage, LMRequest, LMToolCallPart, LMToolResultPa
 
 
 def to_openai_responses_request(request: LMRequest) -> dict[str, Any]:
-    """Convert a normalized DSPy request into Responses API kwargs."""
     config = request.config
     data: dict[str, Any] = {
         "model": request.model,
@@ -30,7 +29,6 @@ def to_openai_responses_request(request: LMRequest) -> dict[str, Any]:
 
 
 def message_to_responses_input_items(message: LMMessage) -> list[dict[str, Any]]:
-    """Convert one DSPy message into one or more Responses input items."""
     if message.role == "tool" and len(message.parts) == 1 and isinstance(message.parts[0], LMToolResultPart):
         result = message.parts[0]
         item = {
@@ -40,18 +38,15 @@ def message_to_responses_input_items(message: LMMessage) -> list[dict[str, Any]]
         if result.call_id is not None:
             item["call_id"] = result.call_id
         return [item]
-
     tool_calls = [part for part in message.parts if isinstance(part, LMToolCallPart)]
     content_parts = [part for part in message.parts if not isinstance(part, LMToolCallPart)]
     content = parts_to_responses_content(content_parts)
     items: list[dict[str, Any]] = []
-
-    if content or message.role != "assistant" or not tool_calls:
+    if content or message.role != "assistant" or (not tool_calls):
         item: dict[str, Any] = {"role": message.role, "content": content}
         if message.name is not None:
             item["name"] = message.name
         items.append(item)
-
     if message.role == "assistant":
         items.extend(tool_call_to_responses_input(tool_call) for tool_call in tool_calls)
     return items

@@ -34,14 +34,11 @@ def test_refine_forward_success_first_attempt():
 
     def reward_fn(kwargs, pred: Prediction) -> float:
         reward_call_count[0] += 1
-        # The answer should always be one word.
         return 1.0 if len(pred.answer) == 1 else 0.0
 
     predict = DummyModule(ts("question -> answer"), count_calls)
-
     refine = Refine(module=predict, N=3, reward_fn=reward_fn, threshold=1.0)
     result = asyncio.run(refine(question="What is the capital of Belgium?"))
-
     assert result.answer == "Brussels", "Result should be `Brussels`"
     assert reward_call_count[0] > 0, "Reward function should have been called"
     assert module_call_count[0] == 3, (
@@ -57,9 +54,8 @@ def test_refine_module_default_fail_count():
         raise ValueError("Deliberately failing")
 
     predict = DummyModule(ts("question -> answer"), always_raise)
-
     refine = Refine(module=predict, N=3, reward_fn=lambda _, __: 1.0, threshold=0.0)
-    with pytest.raises(ValueError):  # noqa: PT011
+    with pytest.raises(ValueError):
         asyncio.run(refine(question="What is the capital of Belgium?"))
 
 
@@ -75,9 +71,8 @@ def test_refine_module_custom_fail_count():
         return await self.predictor(**kwargs)
 
     predict = DummyModule(ts("question -> answer"), raise_on_second_call)
-
     refine = Refine(module=predict, N=3, reward_fn=lambda _, __: 1.0, threshold=0.0, fail_count=1)
-    with pytest.raises(ValueError):  # noqa: PT011
+    with pytest.raises(ValueError):
         asyncio.run(refine(question="What is the capital of Belgium?"))
     assert module_call_count[0] == 2, (
         "Module should have been called exactly 2 times, but was called %d times" % module_call_count[0]

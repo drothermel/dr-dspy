@@ -1,5 +1,3 @@
-"""Immutable TaskSpec instance representing a typed LM task contract."""
-
 import hashlib
 import json
 from typing import Literal
@@ -7,18 +5,11 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from dspy.task_spec.field_spec import FieldSpec
-from dspy.task_spec.serialize import (
-    TASK_SPEC_VERSION,
-    field_spec_from_dict,
-    field_spec_to_dict,
-)
+from dspy.task_spec.serialize import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
 
 
 class TaskSpec(BaseModel):
-    """Frozen task contract: instructions plus ordered input and output fields."""
-
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
-
     name: str
     instructions: str
     inputs: tuple[FieldSpec, ...] = Field(default_factory=tuple)
@@ -87,7 +78,9 @@ class TaskSpec(BaseModel):
     def equals(self, other: object) -> bool:
         if not isinstance(other, TaskSpec):
             return False
-        return self.instructions == other.instructions and self.inputs == other.inputs and self.outputs == other.outputs
+        return (
+            self.instructions == other.instructions and self.inputs == other.inputs and (self.outputs == other.outputs)
+        )
 
     def fingerprint(self) -> int:
         payload = {
@@ -112,8 +105,7 @@ class TaskSpec(BaseModel):
         version = data.get("task_spec_version")
         if version != TASK_SPEC_VERSION:
             raise ValueError(
-                f"Unsupported task_spec_version: {version!r}. Expected {TASK_SPEC_VERSION}. "
-                "Recompile or recreate the program with the current DSPy version."
+                f"Unsupported task_spec_version: {version!r}. Expected {TASK_SPEC_VERSION}. Recompile or recreate the program with the current DSPy version."
             )
         return cls(
             name=data["name"],
@@ -123,11 +115,7 @@ class TaskSpec(BaseModel):
         )
 
     def to_declaration(self) -> str:
-        """Render an explicit declaration string for optimizers and logging."""
-        lines = [
-            f"TaskSpec(name={self.name!r}, instructions={self.instructions!r})",
-            f"  spec: {self.spec_string}",
-        ]
+        lines = [f"TaskSpec(name={self.name!r}, instructions={self.instructions!r})", f"  spec: {self.spec_string}"]
         for field in (*self.inputs, *self.outputs):
             role: Literal["input", "output"] = field.role
             lines.append(f"  {role} {field.name}: {field.type_!r} desc={field.desc!r} prefix={field.prefix!r}")

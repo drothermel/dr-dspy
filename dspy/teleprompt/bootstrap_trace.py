@@ -39,15 +39,13 @@ async def bootstrap_trace_data(
     log_format_failures: bool = False,
     callback_metadata: dict[str, Any] | None = None,
 ) -> list[TraceData]:
-    # Return a list of dicts with the following keys: example_ind, example, prediction, trace, and score
-    # (if metric != None)
     _ = capture_failed_parses
     evaluator = Evaluate(
         devset=dataset,
         num_threads=num_threads,
         display_progress=True,
-        provide_traceback=False,  # TODO: Confirm traceback policy for bootstrap trace evaluation.
-        max_errors=len(dataset) * 10,  # TODO: Confirm max_errors policy for bootstrap trace evaluation.
+        provide_traceback=False,
+        max_errors=len(dataset) * 10,
         failure_score=failure_score,
     )
 
@@ -62,16 +60,14 @@ async def bootstrap_trace_data(
     async def patched_aforward(program_to_use: Module, **kwargs):
         with settings.context(trace=[]):
             try:
-                return await original_aforward(**kwargs), settings.trace.copy()
+                return (await original_aforward(**kwargs), settings.trace.copy())
             except AdapterParseError as e:
                 completion_str = e.lm_response
                 parsed_result = e.parsed_result
                 failed_task_spec = e.task_spec
                 failed_inputs = kwargs
-
                 present = list(parsed_result.keys()) if parsed_result else None
                 expected = list(failed_task_spec.output_fields.keys())
-
                 from dspy.teleprompt.utils import get_task_spec
 
                 found_pred = None
@@ -81,9 +77,7 @@ async def bootstrap_trace_data(
                         break
                 if found_pred is None:
                     raise ValueError(f"Failed to find the predictor for the failed task spec: {failed_task_spec}")
-
                 trace = settings.trace.copy()
-                # Trace is Tuple[signature, inputs, prediction outputs]
                 if present:
                     failed_pred = FailedPrediction(
                         completion_text=completion_str,
@@ -92,48 +86,25 @@ async def bootstrap_trace_data(
                     )
                 else:
                     failed_pred = FailedPrediction(completion_text=completion_str, format_reward=format_failure_score)
-
-                trace.append(
-                    (
-                        found_pred,
-                        failed_inputs,
-                        failed_pred,
-                    )
-                )
-
+                trace.append((found_pred, failed_inputs, failed_pred))
                 if log_format_failures:
                     logging.warning(
-                        "Failed to parse output for example. This is likely due to the LLM response not following "
-                        "the adapter's formatting."
+                        "Failed to parse output for example. This is likely due to the LLM response not following the adapter's formatting."
                     )
+                return (failed_pred, trace)
 
-                return failed_pred, trace
-
-    program.aforward = MethodType(patched_aforward, program)  # ty: ignore[unresolved-attribute]
-
+    program.aforward = MethodType(patched_aforward, program)
     try:
-        results = (
-            await evaluator(
-                program,
-                metric=wrapped_metric,
-                callback_metadata=callback_metadata,
-            )
-        ).results
+        results = (await evaluator(program, metric=wrapped_metric, callback_metadata=callback_metadata)).results
     finally:
-        program.aforward = original_aforward  # ty: ignore[unresolved-attribute]
-
+        program.aforward = original_aforward
     data = []
     for example_ind, (example, prediction, score) in enumerate(results):
         try:
             prediction, trace = prediction
         except ValueError:
-            # TODO(GRPO Team): Often during GRPO bootstrapping, the LLM response does not follow dspy formatting. This
-            # leads to a value error. To reproduce this issue, try Qwen/Qwen2.5-Coder-0.5B-Instruct with MATH dataset.
-            # Proposal(Lakshya): We should capture the incorrectly-formatted LLM response, and store it in the trace,
-            # and pass it to in the GRPO group with a high-negative user-configurable score.
             logger.warning(
-                "Failed to unpack prediction and trace. This is likely due to the LLM response not following "
-                "dspy formatting."
+                "Failed to unpack prediction and trace. This is likely due to the LLM response not following dspy formatting."
             )
             if raise_on_error:
                 raise
@@ -146,5 +117,4 @@ async def bootstrap_trace_data(
             "score": score if metric else None,
         }
         data.append(entry)
-
     return data

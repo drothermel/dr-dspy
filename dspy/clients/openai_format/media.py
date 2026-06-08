@@ -6,13 +6,7 @@ from typing import Any
 
 import pydantic
 
-from dspy.core.types import (
-    LMAudioPart,
-    LMBinaryPart,
-    LMDocumentPart,
-    LMImagePart,
-    LMTextPart,
-)
+from dspy.core.types import LMAudioPart, LMBinaryPart, LMDocumentPart, LMImagePart, LMTextPart
 
 
 def media_source(part: LMImagePart | LMAudioPart | LMDocumentPart | LMBinaryPart) -> str:
@@ -37,10 +31,7 @@ def media_type_for_path(path: str, *, fallback: str) -> str:
 
 
 def data_uri_from_path(path: str, *, fallback_media_type: str) -> str:
-    return data_uri(
-        media_type=media_type_for_path(path, fallback=fallback_media_type),
-        data=read_path_base64(path),
-    )
+    return data_uri(media_type=media_type_for_path(path, fallback=fallback_media_type), data=read_path_base64(path))
 
 
 def data_uri(media_type: str, data: str) -> str:
@@ -51,10 +42,10 @@ def data_uri(media_type: str, data: str) -> str:
 
 def split_data_uri(value: str) -> tuple[str, str]:
     if not value.startswith("data:") or "," not in value:
-        return "application/octet-stream", value
+        return ("application/octet-stream", value)
     header, data = value.split(",", 1)
     media_type = header.removeprefix("data:").split(";", 1)[0]
-    return media_type, data
+    return (media_type, data)
 
 
 def media_format(media_type: str) -> str:
@@ -79,7 +70,7 @@ def _rebuild_pydantic_serializers(value: Any) -> None:
         seen.add(id(item))
         if isinstance(item, pydantic.BaseModel):
             type(item).model_rebuild(force=True, raise_errors=False)
-            stack.extend([*item.__dict__.values(), *((item.__pydantic_extra__ or {}).values())])
+            stack.extend([*item.__dict__.values(), *(item.__pydantic_extra__ or {}).values()])
         elif isinstance(item, (dict, list, tuple)):
             stack.extend(item.values() if isinstance(item, dict) else item)
 

@@ -54,19 +54,13 @@ def test_predictors():
 
 def test_forward():
     program = HopModule()
-    settings.configure(
-        lm=DummyLM(
-            {
-                "What is 1+1?": {"query": "let me check"},
-                "let me check": {"answer": "2"},
-            }
-        )
-    )
+    settings.configure(lm=DummyLM({"What is 1+1?": {"query": "let me check"}, "let me check": {"answer": "2"}}))
     result = asyncio.run(program(question="What is 1+1?")).answer
     assert result == "2"
 
 
 def test_nested_named_predictors():
+
     class Hop2Module(Module):
         def __init__(self):
             super().__init__()
@@ -87,40 +81,40 @@ def test_empty_module():
 
 def test_single_level():
     module = Module()
-    module.sub = Module()  # ty:ignore[unresolved-attribute]
+    module.sub = Module()
     expected = [("self", module), ("self.sub", module.sub)]
     assert list(module.named_sub_modules()) == expected
 
 
 def test_multiple_levels():
     module = Module()
-    module.sub = Module()  # ty:ignore[unresolved-attribute]
-    module.sub.subsub = Module()  # ty:ignore[unresolved-attribute]
+    module.sub = Module()
+    module.sub.subsub = Module()
     expected = [("self", module), ("self.sub", module.sub), ("self.sub.subsub", module.sub.subsub)]
     assert list(module.named_sub_modules()) == expected
 
 
 def test_multiple_sub_modules():
     module = Module()
-    module.sub1 = Module()  # ty:ignore[unresolved-attribute]
-    module.sub2 = Module()  # ty:ignore[unresolved-attribute]
+    module.sub1 = Module()
+    module.sub2 = Module()
     expected = [("self", module), ("self.sub1", module.sub1), ("self.sub2", module.sub2)]
     assert sorted(module.named_sub_modules()) == sorted(expected)
 
 
 def test_non_base_module_attributes():
     module = Module()
-    module.sub = Module()  # ty:ignore[unresolved-attribute]
-    module.not_a_sub = "Not a self"  # ty:ignore[unresolved-attribute]
+    module.sub = Module()
+    module.not_a_sub = "Not a self"
     expected = [("self", module), ("self.sub", module.sub)]
     assert list(module.named_sub_modules()) == expected
 
 
 def test_complex_module_traversal():
     root = Module()
-    root.sub_module = Module()  # ty:ignore[unresolved-attribute]
-    root.sub_module.nested_list = [Module(), {"key": Module()}]  # ty:ignore[unresolved-attribute]
-    root.sub_module.nested_tuple = (Module(), [Module(), Module()])  # ty:ignore[unresolved-attribute]
+    root.sub_module = Module()
+    root.sub_module.nested_list = [Module(), {"key": Module()}]
+    root.sub_module.nested_tuple = (Module(), [Module(), Module()])
     expected_names = {
         "self",
         "self.sub_module",
@@ -131,7 +125,6 @@ def test_complex_module_traversal():
         "self.sub_module.nested_tuple[1][1]",
     }
     found_names = {name for name, _ in root.named_sub_modules()}
-
     assert found_names == expected_names, (
         f"Missing or extra modules found. Missing: {expected_names - found_names}, Extra: {found_names - expected_names}"
     )
@@ -139,20 +132,19 @@ def test_complex_module_traversal():
 
 def test_complex_module_traversal_with_same_module():
     root = Module()
-    root.sub_module = Module()  # ty:ignore[unresolved-attribute]
-    root.sub_module.nested_list = [Module(), {"key": Module()}]  # ty:ignore[unresolved-attribute]
+    root.sub_module = Module()
+    root.sub_module.nested_list = [Module(), {"key": Module()}]
     same_module = Module()
-    root.sub_module.nested_tuple = (Module(), [same_module, same_module])  # ty:ignore[unresolved-attribute]
+    root.sub_module.nested_tuple = (Module(), [same_module, same_module])
     expected_names = {
         "self",
         "self.sub_module",
         "self.sub_module.nested_list[0]",
-        "self.sub_module.nested_list[1][key]",  # NOTE: named_sub_modules allows recursive structures
+        "self.sub_module.nested_list[1][key]",
         "self.sub_module.nested_tuple[0]",
         "self.sub_module.nested_tuple[1][0]",
     }
     found_names = {name for name, _ in root.named_sub_modules()}
-
     assert found_names == expected_names, (
         f"Missing or extra modules found. Missing: {expected_names - found_names}, Extra: {found_names - expected_names}"
     )
@@ -160,13 +152,11 @@ def test_complex_module_traversal_with_same_module():
 
 def test_named_parameters_traverses_nested_containers():
     root = Module()
-    root.sub_module = Module()  # ty:ignore[unresolved-attribute]
-    root.sub_module.nested_predict = Predict(ts("question -> answer", instructions="Answer the question."))  # ty:ignore[unresolved-attribute]
-    root.sub_module.nested_list = [Predict(ts("question -> answer", instructions="Answer the question."))]  # ty:ignore[unresolved-attribute]
-    root.sub_module.nested_dict = {"key": Predict(ts("question -> answer", instructions="Answer the question."))}  # ty:ignore[unresolved-attribute]
-
+    root.sub_module = Module()
+    root.sub_module.nested_predict = Predict(ts("question -> answer", instructions="Answer the question."))
+    root.sub_module.nested_list = [Predict(ts("question -> answer", instructions="Answer the question."))]
+    root.sub_module.nested_dict = {"key": Predict(ts("question -> answer", instructions="Answer the question."))}
     found_names = {name for name, _ in root.named_parameters()}
-
     assert "self.sub_module.nested_predict" in found_names
     assert "self.sub_module.nested_list[0]" in found_names
     assert "self.sub_module.nested_dict[key]" in found_names
@@ -174,19 +164,18 @@ def test_named_parameters_traverses_nested_containers():
 
 def test_complex_module_set_attribute_by_name():
     root = Module()
-    root.sub_module = Module()  # ty:ignore[unresolved-attribute]
-    root.sub_module.nested_list = [Module(), {"key": Module()}]  # ty:ignore[unresolved-attribute]
+    root.sub_module = Module()
+    root.sub_module.nested_list = [Module(), {"key": Module()}]
     same_module = Module()
-    root.sub_module.nested_tuple = (Module(), [same_module, same_module])  # ty:ignore[unresolved-attribute]
-
+    root.sub_module.nested_tuple = (Module(), [same_module, same_module])
     set_attribute_by_name(root, "test_attrib", True)
     assert root.test_attrib is True
     set_attribute_by_name(root, "sub_module.test_attrib", True)
     assert root.sub_module.test_attrib is True
     set_attribute_by_name(root, "sub_module.nested_list[0].test_attrib", True)
-    assert root.sub_module.nested_list[0].test_attrib is True  # ty:ignore[unresolved-attribute]
+    assert root.sub_module.nested_list[0].test_attrib is True
     set_attribute_by_name(root, "sub_module.nested_list[1]['key'].test_attrib", True)
-    assert root.sub_module.nested_list[1]["key"].test_attrib is True  # ty:ignore[not-subscriptable]
+    assert root.sub_module.nested_list[1]["key"].test_attrib is True
     set_attribute_by_name(root, "sub_module.nested_tuple[0].test_attrib", True)
     assert root.sub_module.nested_tuple[0].test_attrib is True
     set_attribute_by_name(root, "sub_module.nested_tuple[1][0].test_attrib", True)
@@ -203,19 +192,10 @@ class DuplicateModule(Module):
 
 def test_named_parameters_duplicate_references():
     module = DuplicateModule()
-    # Only testing for whether exceptions are thrown or not
-    # As Module.named_parameters() is recursive, this is mainly for catching infinite recursion
     module.named_parameters()
 
 
 def test_load_state_is_transactional():
-    """
-    Regression test for https://github.com/stanfordnlp/dspy/issues/9589
-
-    load_state must be all-or-nothing. If it fails mid-load (missing key
-    or malformed value), the module must be completely unchanged.
-    """
-
     Sig = ts("question -> answer")
 
     class Prog(Module):
@@ -228,19 +208,14 @@ def test_load_state_is_transactional():
     sentinel = Example(question="q1", answer="a1").with_inputs("question")
     source.a.predict.demos = [sentinel]
     source.b.predict.demos = [sentinel]
-
     with tempfile.TemporaryDirectory() as d:
         path = Path(d) / "state.json"
         source.save(str(path), save_program=False)
-
         raw = json.loads(path.read_text())
         corrupted = {k: v for k, v in raw.items() if "b." not in k}
         path.write_text(json.dumps(corrupted))
-
         template = Prog()
         assert template.a.predict.demos == []
-
         with pytest.raises(KeyError):
             template.load(str(path))
-
         assert template.a.predict.demos == [], "load_state partially mutated module before failing"

@@ -1,12 +1,3 @@
-"""
-REPL data types for RLM and interpreter interactions.
-
-These types represent the state and history of REPL-based execution:
-- REPLVariable: Metadata about variables available in the REPL
-- REPLEntry: A single interaction (reasoning, code, output)
-- REPLHistory: Container for the full interaction history
-"""
-
 from __future__ import annotations
 
 import json
@@ -22,38 +13,22 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from pydantic.fields import FieldInfo
-
 __all__ = ["REPLVariable", "REPLEntry", "REPLHistory"]
 
 
 class REPLVariable(pydantic.BaseModel):
-    """Metadata about a variable available in the REPL environment."""
-
     name: str
     type_name: str
     desc: str = ""
     constraints: str = ""
     total_length: int
     preview: str
-
     model_config = pydantic.ConfigDict(frozen=True)
 
     @classmethod
     def from_value(
-        cls,
-        name: str,
-        value: Any,
-        field_info: FieldInfo | None = None,
-        preview_chars: int = 1000,
+        cls, name: str, value: Any, field_info: FieldInfo | None = None, preview_chars: int = 1000
     ) -> REPLVariable:
-        """Create REPLVariable from an actual value and optional field info.
-
-        Args:
-            name: Variable name
-            value: The actual value
-            field_info: Optional pydantic FieldInfo with desc/constraints metadata
-            preview_chars: Max characters for preview
-        """
         jsonable = serialize_for_json(value)
         value_str = json.dumps(jsonable, indent=2) if isinstance(jsonable, (dict, list)) else str(jsonable)
         is_truncated = len(value_str) > preview_chars
@@ -62,18 +37,15 @@ class REPLVariable(pydantic.BaseModel):
             preview = value_str[:half] + "..." + value_str[-half:]
         else:
             preview = value_str
-
-        # Extract desc and constraints from field_info if provided
         desc = ""
         constraints = ""
         extra_dict: dict[str, Any] = {}
         if field_info:
             extra_dict |= cast("dict[str, Any]", field_info.json_schema_extra or {})
         raw_desc = extra_dict.get("desc", "")
-        if raw_desc and not raw_desc.startswith("${"):
+        if raw_desc and (not raw_desc.startswith("${")):
             desc = raw_desc
         constraints = extra_dict.get("constraints", "")
-
         return cls(
             name=name,
             type_name=type(value).__name__,
@@ -84,7 +56,6 @@ class REPLVariable(pydantic.BaseModel):
         )
 
     def format(self) -> str:
-        """Format variable metadata for prompt inclusion."""
         lines = [f"Variable: `{self.name}` (access it in your code)"]
         lines.append(f"Type: {self.type_name}")
         if self.desc:
@@ -101,17 +72,13 @@ class REPLVariable(pydantic.BaseModel):
 
 
 class REPLEntry(pydantic.BaseModel):
-    """A single REPL interaction entry containing reasoning, code, and output."""
-
     reasoning: str = ""
     code: str
     output: str
-
     model_config = pydantic.ConfigDict(frozen=True)
 
     @staticmethod
-    def format_output(output: str, max_output_chars: int = 10_000) -> str:
-        """Format output with head+tail truncation, preserving true length in header."""
+    def format_output(output: str, max_output_chars: int = 10000) -> str:
         raw_len = len(output)
         if raw_len > max_output_chars:
             half = max_output_chars // 2
@@ -119,29 +86,22 @@ class REPLEntry(pydantic.BaseModel):
             output = output[:half] + f"\n\n... ({omitted:,} characters omitted) ...\n\n" + output[-half:]
         return f"Output ({raw_len:,} chars):\n{output}"
 
-    def format(self, index: int, max_output_chars: int = 10_000) -> str:
-        """Format this entry for inclusion in prompts."""
+    def format(self, index: int, max_output_chars: int = 10000) -> str:
         reasoning_line = f"Reasoning: {self.reasoning}\n" if self.reasoning else ""
         code_block = f"```python\n{self.code}\n```"
         return f"=== Step {index + 1} ===\n{reasoning_line}Code:\n{code_block}\n{self.format_output(self.output, max_output_chars)}"
 
 
 class REPLHistory(pydantic.BaseModel):
-    """Container for REPL interaction history.
-
-    Immutable: append() returns a new instance with the entry added.
-    """
-
     entries: list[REPLEntry] = Field(default_factory=list)
-    max_output_chars: int = 10_000
-
+    max_output_chars: int = 10000
     model_config = pydantic.ConfigDict(frozen=True)
 
     def format(self) -> str:
         if not self.entries:
             return "You have not interacted with the REPL environment yet."
         return "\n".join(
-            entry.format(index=i, max_output_chars=self.max_output_chars) for i, entry in enumerate(self.entries)
+            (entry.format(index=i, max_output_chars=self.max_output_chars) for i, entry in enumerate(self.entries))
         )
 
     @pydantic.model_serializer()
@@ -149,7 +109,6 @@ class REPLHistory(pydantic.BaseModel):
         return self.format()
 
     def append(self, *, reasoning: str = "", code: str, output: str) -> REPLHistory:
-        """Return a new REPLHistory with the entry appended."""
         new_entry = REPLEntry(reasoning=reasoning, code=code, output=output)
         return REPLHistory(entries=list(self.entries) + [new_entry], max_output_chars=self.max_output_chars)
 
@@ -157,7 +116,7 @@ class REPLHistory(pydantic.BaseModel):
         return len(self.entries)
 
     @override
-    def __iter__(self) -> Iterator[REPLEntry]:  # ty: ignore[invalid-method-override]
+    def __iter__(self) -> Iterator[REPLEntry]:
         return iter(self.entries)
 
     def __bool__(self) -> bool:

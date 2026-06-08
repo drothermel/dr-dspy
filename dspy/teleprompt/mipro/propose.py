@@ -7,7 +7,6 @@ from dspy.teleprompt.utils import get_task_spec
 
 if TYPE_CHECKING:
     from dspy.teleprompt.mipro.optimizer import MIPROv2
-
 logger = logging.getLogger(__name__)
 
 
@@ -27,7 +26,6 @@ async def propose_instructions(
     logger.info(
         "We will use the few-shot examples from the previous step, a generated dataset summary, a summary of the program code, and a randomly selected prompting tip to propose instructions."
     )
-
     proposer = GroundedProposer(
         program=program,
         trainset=trainset,
@@ -45,21 +43,14 @@ async def propose_instructions(
         rng=optimizer.rng,
         init_temperature=optimizer.init_temperature,
     )
-
     logger.info(f"\nProposing N={num_instruct_candidates} instructions...\n")
     instruction_candidates = await proposer.propose_instructions_for_program(
-        trainset=trainset,
-        program=program,
-        demo_candidates=demo_candidates,
-        N=num_instruct_candidates,
-        trial_logs={},
+        trainset=trainset, program=program, demo_candidates=demo_candidates, N=num_instruct_candidates, trial_logs={}
     )
-
     for i, pred in enumerate(program.predictors()):
         logger.info(f"Proposed Instructions for Predictor {i}:\n")
         instruction_candidates[i][0] = get_task_spec(pred).instructions
         for j, instruction in enumerate(instruction_candidates[i]):
             logger.info(f"{j}: {instruction}\n")
         logger.info("\n")
-
     return instruction_candidates

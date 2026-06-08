@@ -18,8 +18,7 @@ def _import_optuna():
     except ModuleNotFoundError as exc:
         if exc.name == "optuna":
             raise ImportError(
-                "BootstrapFewShotWithOptuna requires optional dependency 'optuna'. "
-                "Install it with `pip install dspy[optuna]`."
+                "BootstrapFewShotWithOptuna requires optional dependency 'optuna'. Install it with `pip install dspy[optuna]`."
             ) from exc
         raise
     return optuna
@@ -43,13 +42,7 @@ class BootstrapFewShotWithOptuna(Teleprompter):
         self.min_num_samples = 1
         self.max_num_samples = max_bootstrapped_demos
         self.num_candidate_sets = num_candidate_programs
-        # self.max_num_traces = 1 + int(max_bootstrapped_demos / 2.0 * self.num_candidate_sets)
-
-        # Semi-hacky way to get the parent class's _bootstrap function to stop early.
-        # self.max_bootstrapped_demos = self.max_num_traces
         self.max_labeled_demos = max_labeled_demos
-
-        # print("Going to sample", self.max_num_traces, "traces in total.")
 
     async def _evaluate_program(self, program):
         evaluate = Evaluate(
@@ -64,22 +57,18 @@ class BootstrapFewShotWithOptuna(Teleprompter):
     def objective(self, trial):
         program2 = self.student.reset_copy()
         for (name, compiled_predictor), (_, program2_predictor) in zip(
-            self.compiled_teleprompter.named_predictors(),
-            program2.named_predictors(),
-            strict=False,
+            self.compiled_teleprompter.named_predictors(), program2.named_predictors(), strict=False
         ):
             all_demos = compiled_predictor.demos
             demo_index = trial.suggest_int(f"demo_index_for_{name}", 0, len(all_demos) - 1)
             selected_demo = dict(all_demos[demo_index])
             program2_predictor.demos = [selected_demo]
-
         try:
             asyncio.get_running_loop()
         except RuntimeError:
             result = asyncio.run(self._evaluate_program(program2))
         else:
             result = _optuna_executor.submit(asyncio.run, self._evaluate_program(program2)).result()
-
         trial.set_user_attr("program", program2)
         return cast("Any", result).score
 
@@ -98,9 +87,7 @@ class BootstrapFewShotWithOptuna(Teleprompter):
             max_rounds=self.max_rounds,
         )
         self.compiled_teleprompter = await teleprompter_optimize.compile(
-            self.student,
-            teacher=self.teacher,
-            trainset=self.trainset,
+            self.student, teacher=self.teacher, trainset=self.trainset
         )
         study = optuna.create_study(direction="maximize")
         study.optimize(self.objective, n_trials=self.num_candidate_sets)

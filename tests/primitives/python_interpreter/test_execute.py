@@ -30,12 +30,8 @@ def test_user_variable_definitions():
 
 
 def test_rejects_python_keywords_as_variable_names():
-    """Test that Python keywords are rejected as variable names."""
     with PythonInterpreter() as interpreter:
-        # These are valid Python identifiers but reserved keywords
-        # Using them as variable names would cause syntax errors
         keywords_to_test = ["for", "class", "import", "def", "return", "if", "while"]
-
         for keyword in keywords_to_test:
             with pytest.raises(CodeInterpreterError, match="Invalid variable name"):
                 interpreter.execute("print(x)", variables={keyword: 42})
@@ -59,97 +55,59 @@ def test_exception_args():
     with PythonInterpreter() as interpreter:
         token = random.randint(1, 10**9)
         code = f"raise ValueError({token})"
-        with pytest.raises(CodeInterpreterError, match=rf"ValueError: \[{token}\]"):
+        with pytest.raises(CodeInterpreterError, match=f"ValueError: \\[{token}\\]"):
             interpreter.execute(code)
 
 
 def test_submit_with_list():
-    """Test SUBMIT() with a list argument returns FinalOutput with dict format."""
-
     with PythonInterpreter() as interpreter:
         token = random.randint(1, 10**9)
         code = f"SUBMIT(['The result is', {token}])"
         result = interpreter(code)
-
         assert isinstance(result, FinalOutput)
-        # SUBMIT now always returns a dict with "output" key for single-output default
         assert result.output == {"output": ["The result is", token]}
 
 
 def test_submit_with_typed_signature():
-    """Test SUBMIT with typed output signature."""
-
-    output_fields = [
-        {"name": "answer", "type": "str"},
-        {"name": "confidence", "type": "float"},
-    ]
-
+    output_fields = [{"name": "answer", "type": "str"}, {"name": "confidence", "type": "float"}]
     with PythonInterpreter(output_fields=output_fields) as sandbox:
         result = sandbox.execute('SUBMIT(answer="the answer", confidence=0.95)')
-
         assert isinstance(result, FinalOutput)
         assert result.output == {"answer": "the answer", "confidence": 0.95}
 
 
 def test_submit_positional_args():
-    """Test SUBMIT with positional arguments."""
-
-    output_fields = [
-        {"name": "answer", "type": "str"},
-        {"name": "confidence", "type": "float"},
-    ]
-
+    output_fields = [{"name": "answer", "type": "str"}, {"name": "confidence", "type": "float"}]
     with PythonInterpreter(output_fields=output_fields) as sandbox:
         result = sandbox.execute('SUBMIT("the answer", 0.95)')
-
         assert isinstance(result, FinalOutput)
         assert result.output == {"answer": "the answer", "confidence": 0.95}
 
 
 def test_submit_multi_output():
-    """Test SUBMIT with multiple output fields using positional args."""
-
-    output_fields = [
-        {"name": "answer", "type": "str"},
-        {"name": "score", "type": "int"},
-    ]
-
+    output_fields = [{"name": "answer", "type": "str"}, {"name": "score", "type": "int"}]
     with PythonInterpreter(output_fields=output_fields) as sandbox:
-        # Positional args: values mapped to output fields in order
-        code = """
-a = "my answer"
-s = 42
-SUBMIT(a, s)
-"""
+        code = '\na = "my answer"\ns = 42\nSUBMIT(a, s)\n'
         result = sandbox.execute(code)
-
         assert isinstance(result, FinalOutput)
         assert result.output == {"answer": "my answer", "score": 42}
 
 
 def test_submit_wrong_arg_count():
-    """Test SUBMIT with wrong number of args gives clear error."""
-
-    output_fields = [
-        {"name": "answer", "type": "str"},
-        {"name": "score", "type": "int"},
-    ]
-
+    output_fields = [{"name": "answer", "type": "str"}, {"name": "score", "type": "int"}]
     with PythonInterpreter(output_fields=output_fields) as sandbox:
         with pytest.raises(CodeInterpreterError) as exc_info:
-            sandbox.execute("x = 1; SUBMIT(x)")  # Only 1 arg, expects 2
+            sandbox.execute("x = 1; SUBMIT(x)")
         assert "missing 1 required positional argument" in str(exc_info.value)
 
 
 def test_extract_parameters():
-    """Test that _extract_parameters correctly extracts function signatures."""
 
-    def example_fn(required: str, optional: int = 5, untyped=None) -> str:  # ty:ignore[empty-body]
+    def example_fn(required: str, optional: int = 5, untyped=None) -> str:
         pass
 
     sandbox = PythonInterpreter()
     params = sandbox._extract_parameters(example_fn)
-
     assert len(params) == 3
     assert params[0] == {"name": "required", "type": "str"}
     assert params[1] == {"name": "optional", "type": "int", "default": 5}
@@ -157,15 +115,12 @@ def test_extract_parameters():
 
 
 def test_extract_parameters_complex_types():
-    """Test that _extract_parameters handles complex types gracefully."""
 
-    def complex_fn(items: list | None = None, data: dict[str, int] | None = None) -> list:  # ty:ignore[empty-body]
+    def complex_fn(items: list | None = None, data: dict[str, int] | None = None) -> list:
         pass
 
     sandbox = PythonInterpreter()
     params = sandbox._extract_parameters(complex_fn)
-
     assert len(params) == 2
-    # Complex types like Union are not included in type annotation
     assert params[0] == {"name": "items", "default": None}
     assert params[1] == {"name": "data", "default": None}

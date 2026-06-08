@@ -1,4 +1,3 @@
-import inspect
 import textwrap
 from collections.abc import Callable
 from typing import Any, cast
@@ -11,70 +10,35 @@ from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict, Prediction
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
+from dspy.utils.source_format import get_formatted_source
 
 from .predict import Module
 
 
 class OfferFeedbackTaskSpec(TaskSpec):
     name: str = "framework.refine.offer_feedback"
-    instructions: str = (
-        "In the discussion, assign blame to each module that contributed to the final reward being below the "
-        "threshold, if any. Then, prescribe concrete advice of how the module should act on its future input when we "
-        "retry the process, if it were to receive the same or similar inputs. If a module is not to blame, the advice "
-        "should be N/A. The module will not see its own history, so it needs to rely on entirely concrete and "
-        "actionable advice from you to avoid the same mistake on the same or similar inputs."
-    )
+    instructions: str = "In the discussion, assign blame to each module that contributed to the final reward being below the threshold, if any. Then, prescribe concrete advice of how the module should act on its future input when we retry the process, if it were to receive the same or similar inputs. If a module is not to blame, the advice should be N/A. The module will not see its own history, so it needs to rely on entirely concrete and actionable advice from you to avoid the same mistake on the same or similar inputs."
     inputs: tuple[FieldSpec, ...] = (
         input_field("program_code", str, desc="The code of the program that we are analyzing"),
-        input_field(
-            "modules_defn",
-            str,
-            desc="The definition of each module in the program, including its I/O",
-        ),
+        input_field("modules_defn", str, desc="The definition of each module in the program, including its I/O"),
         input_field("program_inputs", str, desc="The inputs to the program that we are analyzing"),
         input_field(
-            "program_trajectory",
-            str,
-            desc="The trajectory of the program's execution, showing each module's I/O",
+            "program_trajectory", str, desc="The trajectory of the program's execution, showing each module's I/O"
         ),
+        input_field("program_outputs", str, desc="The outputs of the program that we are analyzing"),
+        input_field("reward_code", str, desc="The code of the reward function that we are analyzing"),
+        input_field("target_threshold", float, desc="The target threshold for the reward function"),
+        input_field("reward_value", float, desc="The reward value assigned to the program's outputs"),
         input_field(
-            "program_outputs",
-            str,
-            desc="The outputs of the program that we are analyzing",
-        ),
-        input_field(
-            "reward_code",
-            str,
-            desc="The code of the reward function that we are analyzing",
-        ),
-        input_field(
-            "target_threshold",
-            float,
-            desc="The target threshold for the reward function",
-        ),
-        input_field(
-            "reward_value",
-            float,
-            desc="The reward value assigned to the program's outputs",
-        ),
-        input_field(
-            "module_names",
-            list[str],
-            desc="The names of the modules in the program, for which we seek advice",
+            "module_names", list[str], desc="The names of the modules in the program, for which we seek advice"
         ),
     )
     outputs: tuple[FieldSpec, ...] = (
-        output_field(
-            "discussion",
-            str,
-            desc="Discussing blame of where each module went wrong, if it did",
-        ),
+        output_field("discussion", str, desc="Discussing blame of where each module went wrong, if it did"),
         output_field(
             "advice",
             dict[str, str],
-            desc="For each module, describe very concretely, in this order: the specific scenarios in which it has made "
-            "mistakes in the past and what each mistake was, followed by what it should do differently in that kind of"
-            "scenario in the future. If the module is not to blame, write N/A.",
+            desc="For each module, describe very concretely, in this order: the specific scenarios in which it has made mistakes in the past and what each mistake was, followed by what it should do differently in that kind ofscenario in the future. If the module is not to blame, write N/A.",
         ),
     )
 
@@ -83,84 +47,34 @@ class Refine(Module):
     def __init__(
         self,
         module: Module,
-        N: int,  # noqa: N803
+        N: int,
         reward_fn: Callable[[dict, Prediction], float],
         threshold: float,
         fail_count: int | None = None,
     ) -> None:
-        """
-        Refines a module by running it up to N times with different rollout IDs at `temperature=1.0`
-        and returns the best prediction.
-
-        This module runs the provided module multiple times with varying rollout identifiers and selects
-        either the first prediction that exceeds the specified threshold or the one with the highest reward.
-        If no prediction meets the threshold, it automatically generates feedback to improve future predictions.
-
-
-        Args:
-            module (Module): The module to refine.
-            N (int): The number of times to run the module. must
-            reward_fn (Callable): The reward function.
-            threshold (float): The threshold for the reward function.
-            fail_count (int | None, optional): The number of times the module can fail before raising an error
-
-        Examples:
-            ```python
-            from dspy.clients.lm import LM
-            from dspy.dsp.utils.settings import settings
-            from dspy.predict.chain_of_thought import ChainOfThought
-            from dspy.predict.refine import Refine
-            from dspy.task_spec import TaskSpec, input_field, output_field
-
-            settings.configure(lm=LM("openai/gpt-4o-mini"))
-
-            class QATaskSpec(TaskSpec):
-                name: str = "QA"
-                instructions: str = "Answer the question."
-                inputs: tuple = (input_field("question"),)
-                outputs: tuple = (output_field("answer"),)
-
-            # Define a QA module with chain of thought
-            qa = ChainOfThought(QATaskSpec())
-
-            # Define a reward function that checks for one-word answers
-            def one_word_answer(args, pred):
-                return 1.0 if len(pred.answer.split()) == 1 else 0.0
-
-            # Create a refined module that tries up to 3 times
-            best_of_3 = Refine(module=qa, N=3, reward_fn=one_word_answer, threshold=1.0)
-
-            # Use the refined module
-            result = best_of_3(question="What is the capital of Belgium?").answer
-            # Returns: Brussels
-            ```
-        """
         self.module = module
-        self.reward_fn = lambda *args: reward_fn(*args)  # to prevent this from becoming a parameter
+        self.reward_fn = lambda *args: reward_fn(*args)
         self.threshold = threshold
         self.N = N
-        self.fail_count = fail_count or N  # Defaults to N when fail_count is falsy.
-        self.module_code = inspect.getsource(module.__class__)
+        self.fail_count = fail_count or N
+        self.module_code = get_formatted_source(module.__class__)
         try:
-            self.reward_fn_code = inspect.getsource(reward_fn)
+            self.reward_fn_code = get_formatted_source(reward_fn)
         except TypeError:
-            self.reward_fn_code = inspect.getsource(reward_fn.__class__)
+            self.reward_fn_code = get_formatted_source(reward_fn.__class__)
 
     async def aforward(self, **kwargs):
         lm = self.module.get_lm() or settings.lm
-        best_pred, best_trace, best_reward = None, None, -float("inf")
+        best_pred, best_trace, best_reward = (None, None, -float("inf"))
         advice = None
         adapter, _ = resolve_adapter(settings.adapter, transparency=settings.get("transparency", "strict"))
-
         for idx in range(self.N):
             lm_ = lm.copy(temperature=1.0)
             mod = self.module.deepcopy()
             mod.set_lm(lm_)
-
             predictor2name = {predictor: name for name, predictor in mod.named_predictors()}
             task_spec2name = {predictor.task_spec: name for name, predictor in mod.named_predictors()}
             module_names = [name for name, _ in mod.named_predictors()]
-
             try:
                 with settings.context(trace=[]):
                     if not advice:
@@ -169,13 +83,9 @@ class Refine(Module):
 
                         class WrapperAdapter(cast("Any", adapter.__class__)):
                             async def acall(self, *, lm, config, task_spec, demos, inputs):
-                                inputs["hint_"] = advice.get(task_spec2name[task_spec], "N/A")  # noqa: B023
+                                inputs["hint_"] = advice.get(task_spec2name[task_spec], "N/A")
                                 task_spec = task_spec.append(
-                                    input_field(
-                                        "hint_",
-                                        str,
-                                        desc="A hint to the module from an earlier run",
-                                    ),
+                                    input_field("hint_", str, desc="A hint to the module from an earlier run")
                                 )
                                 return await adapter.acall(
                                     lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs
@@ -183,23 +93,14 @@ class Refine(Module):
 
                         with settings.context(adapter=WrapperAdapter()):
                             outputs = await mod(**kwargs)
-
                     trace = settings.trace.copy()
-
-                    # TODO: Remove the hint from the trace, if it's there.
-
-                    # NOTE: Not including the trace of reward_fn.
                     reward = self.reward_fn(kwargs, outputs)
-
                 if reward > best_reward:
-                    best_reward, best_pred, best_trace = reward, outputs, trace
-
+                    best_reward, best_pred, best_trace = (reward, outputs, trace)
                 if self.threshold is not None and reward >= self.threshold:
                     break
-
                 if idx == self.N - 1:
                     break
-
                 modules = {"program_code": self.module_code, "modules_defn": inspect_modules(mod)}
                 trajectory = [{"module_name": predictor2name[p], "inputs": i, "outputs": dict(o)} for p, i, o in trace]
                 trajectory = {
@@ -212,16 +113,12 @@ class Refine(Module):
                     "target_threshold": self.threshold,
                     "reward_value": reward,
                 }
-
                 advise_kwargs = dict(**modules, **trajectory, **reward, module_names=module_names)
-                # Serialize non-string advice inputs for the feedback predictor.
                 advise_kwargs = {
                     k: v if isinstance(v, str) else orjson.dumps(recursive_mask(v), option=orjson.OPT_INDENT_2).decode()
                     for k, v in advise_kwargs.items()
                 }
                 advice = (await Predict(OfferFeedbackTaskSpec())(**advise_kwargs)).advice
-                # print(f"Advice for each module: {advice}")
-
             except Exception:
                 if idx > self.fail_count:
                     raise
@@ -234,12 +131,10 @@ class Refine(Module):
 def inspect_modules(program):
     separator = "-" * 80
     output = [separator]
-
     for _, (name, predictor) in enumerate(program.named_predictors()):
         task_spec = predictor.task_spec
         instructions = textwrap.dedent(task_spec.instructions)
         instructions = ("\n" + "\t" * 2).join([""] + instructions.splitlines())
-
         output.append(f"Module {name}")
         output.append("\n\tInput Fields:")
         output.append(
@@ -255,7 +150,6 @@ def inspect_modules(program):
         )
         output.append(f"\tOriginal Instructions: {instructions}")
         output.append(separator)
-
     return "\n".join([o.strip("\n") for o in output])
 
 
@@ -265,7 +159,6 @@ def recursive_mask(o):
         return o
     except TypeError:
         pass
-
     if isinstance(o, dict):
         return {k: recursive_mask(v) for k, v in o.items()}
     if isinstance(o, list):

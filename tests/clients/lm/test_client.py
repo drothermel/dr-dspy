@@ -12,21 +12,17 @@ from typing_extensions import override
 
 if TYPE_CHECKING:
     from litellm.utils import ModelResponse
-
 try:
     import litellm
     from litellm.utils import Choices, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
-
+    pytest.skip("litellm is not installed", allow_module_level=True)
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm import LM
 from dspy.core.types import Assistant, LMHistoryEntry, LMRequest, LMResponse, System, ToolCall, ToolResult, User
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
-from dspy.utils.exceptions import (
-    LMConfigurationError,
-)
+from dspy.utils.exceptions import LMConfigurationError
 from dspy.utils.usage_tracker import track_usage
 from tests.clients.lm.conftest import _direct_lm_case, _request
 from tests.task_spec.helpers import ts
@@ -34,45 +30,22 @@ from tests.task_spec.helpers import ts
 
 def test_chat_lms_can_be_queried(litellm_test_server):
     api_base, _ = litellm_test_server
-    openai_lm = LM(
-        model="openai/dspy-test-model",
-        api_base=api_base,
-        api_key="fakekey",
-        model_type="chat",
-    )
+    openai_lm = LM(model="openai/dspy-test-model", api_base=api_base, api_key="fakekey", model_type="chat")
     assert asyncio.run(openai_lm(_request(openai_lm, prompt="openai query"))).text == "Hi!"
-
-    azure_openai_lm = LM(
-        model="azure/dspy-test-model",
-        api_base=api_base,
-        api_key="fakekey",
-        model_type="chat",
-    )
+    azure_openai_lm = LM(model="azure/dspy-test-model", api_base=api_base, api_key="fakekey", model_type="chat")
     assert asyncio.run(azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query"))).text == "Hi!"
 
 
 def test_text_lms_can_be_queried(litellm_test_server):
     api_base, _ = litellm_test_server
-    openai_lm = LM(
-        model="openai/dspy-test-model",
-        api_base=api_base,
-        api_key="fakekey",
-        model_type="text",
-    )
+    openai_lm = LM(model="openai/dspy-test-model", api_base=api_base, api_key="fakekey", model_type="text")
     assert asyncio.run(openai_lm(_request(openai_lm, prompt="openai query"))).text == "Hi!"
-
-    azure_openai_lm = LM(
-        model="azure/dspy-test-model",
-        api_base=api_base,
-        api_key="fakekey",
-        model_type="text",
-    )
+    azure_openai_lm = LM(model="azure/dspy-test-model", api_base=api_base, api_key="fakekey", model_type="text")
     assert asyncio.run(azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query"))).text == "Hi!"
 
 
 def test_lm_calls_support_callables(litellm_test_server):
     api_base, _ = litellm_test_server
-
     with mock.patch("litellm.acompletion", autospec=True, wraps=litellm.acompletion) as spy_completion:
 
         def azure_ad_token_provider(*args: object, **kwargs: object):
@@ -84,9 +57,7 @@ def test_lm_calls_support_callables(litellm_test_server):
             api_key="fakekey",
             azure_ad_token_provider=azure_ad_token_provider,
         )
-
         asyncio.run(lm_with_callable(_request(lm_with_callable, prompt="Query")))
-
         spy_completion.assert_called_once()
         call_args = spy_completion.call_args.kwargs
         assert call_args["model"] == "openai/dspy-test-model"
@@ -101,12 +72,7 @@ def test_lm_calls_support_pydantic_models(litellm_test_server):
     class ResponseFormat(pydantic.BaseModel):
         response: str
 
-    lm = LM(
-        model="openai/dspy-test-model",
-        api_base=api_base,
-        api_key="fakekey",
-        response_format=ResponseFormat,
-    )
+    lm = LM(model="openai/dspy-test-model", api_base=api_base, api_key="fakekey", response_format=ResponseFormat)
     asyncio.run(lm(_request(lm, prompt="Query")))
 
 
@@ -120,21 +86,20 @@ def test_reasoning_model_token_parameter():
         ("openai/gpt-5", True),
         ("openai/gpt-5-mini", True),
         ("openai/gpt-5-nano", True),
-        ("azure/gpt-5-chat", False),  # gpt-5-chat is NOT a reasoning model
+        ("azure/gpt-5-chat", False),
         ("openai/gpt-4", False),
         ("anthropic/claude-2", False),
     ]
-
     for model_name, is_reasoning_model in test_cases:
         lm = LM(
             model=model_name,
             temperature=1.0 if is_reasoning_model else 0.7,
-            max_tokens=16_000 if is_reasoning_model else 1000,
+            max_tokens=16000 if is_reasoning_model else 1000,
         )
         if is_reasoning_model:
             assert "max_completion_tokens" in lm.kwargs
             assert "max_tokens" not in lm.kwargs
-            assert lm.kwargs["max_completion_tokens"] == 16_000
+            assert lm.kwargs["max_completion_tokens"] == 16000
         else:
             assert "max_completion_tokens" not in lm.kwargs
             assert "max_tokens" in lm.kwargs
@@ -143,38 +108,20 @@ def test_reasoning_model_token_parameter():
 
 @pytest.mark.parametrize("model_name", ["openai/o1", "openai/gpt-5-nano", "openai/gpt-5-mini"])
 def test_reasoning_model_requirements(model_name):
-    # Should raise LMConfigurationError when reasoning-model temperature or max_tokens constraints are violated.
     with pytest.raises(
         LMConfigurationError,
-        match=r"reasoning models require passing temperature=1\.0 or None and max_tokens >= 16000 or None",
+        match="reasoning models require passing temperature=1\\.0 or None and max_tokens >= 16000 or None",
     ):
-        LM(
-            model=model_name,
-            temperature=0.7,
-            max_tokens=1000,
-        )
-
-    lm = LM(
-        model=model_name,
-        temperature=1.0,
-        max_tokens=16_000,
-    )
-    assert lm.kwargs["max_completion_tokens"] == 16_000
-
-    lm = LM(
-        model=model_name,
-    )
+        LM(model=model_name, temperature=0.7, max_tokens=1000)
+    lm = LM(model=model_name, temperature=1.0, max_tokens=16000)
+    assert lm.kwargs["max_completion_tokens"] == 16000
+    lm = LM(model=model_name)
     assert lm.kwargs["temperature"] is None
     assert lm.kwargs["max_completion_tokens"] is None
 
 
 def test_gpt_5_chat_not_reasoning_model():
-    """Test that gpt-5-chat is NOT treated as a reasoning model."""
-    lm = LM(
-        model="openai/gpt-5-chat",
-        temperature=0.7,
-        max_tokens=1000,
-    )
+    lm = LM(model="openai/gpt-5-chat", temperature=0.7, max_tokens=1000)
     assert "max_completion_tokens" not in lm.kwargs
     assert "max_tokens" in lm.kwargs
     assert lm.kwargs["max_tokens"] == 1000
@@ -183,8 +130,7 @@ def test_gpt_5_chat_not_reasoning_model():
 
 def test_base_lm_init_uses_lm_defaults_and_isolates_callback_list():
     callbacks = [object()]
-    lm = BaseLM("custom-model", callbacks=callbacks)  # ty:ignore[invalid-argument-type]
-
+    lm = BaseLM("custom-model", callbacks=callbacks)
     assert lm.kwargs == {"temperature": None, "max_tokens": None}
     assert lm.num_retries == 3
     assert lm.callbacks == callbacks
@@ -192,6 +138,7 @@ def test_base_lm_init_uses_lm_defaults_and_isolates_callback_list():
 
 
 def test_base_lm_requires_lm_request():
+
     class CustomLM(BaseLM):
         @override
         async def aforward(self, request: LMRequest) -> LMResponse:
@@ -202,23 +149,20 @@ def test_base_lm_requires_lm_request():
 
 
 def test_base_lm_typed_call_returns_lm_response_and_records_history():
+
     class CustomLM(BaseLM):
         @override
         async def aforward(self, request: LMRequest) -> LMResponse:
             assert request.model == "custom-model"
             assert request.messages[0].text == "Query"
             return LMResponse.from_text(
-                "Hi!",
-                model="custom-model",
-                usage={"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
+                "Hi!", model="custom-model", usage={"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3}
             )
 
     lm = CustomLM("custom-model")
     request = _request(lm, prompt="Query")
-
     with track_usage() as usage_tracker:
         response = asyncio.run(lm(request))
-
     assert isinstance(response, LMResponse)
     assert response.text == "Hi!"
     assert len(lm.history) == 1
@@ -231,6 +175,7 @@ def test_base_lm_typed_call_returns_lm_response_and_records_history():
 
 
 def test_base_lm_rejects_non_lm_response():
+
     class CustomLM(BaseLM):
         @override
         async def aforward(self, request: LMRequest):
@@ -256,7 +201,6 @@ def test_base_lm_experimental_direct_messages_support_system_user_and_assistant_
     finally:
         if patcher is not None:
             patcher.stop()
-
     assert isinstance(response, LMResponse)
     assert response.text == "Five-word answer."
     assert get_messages(0) == [
@@ -284,7 +228,6 @@ def test_base_lm_experimental_direct_messages_support_tool_call_transcripts(lm_k
     finally:
         if patcher is not None:
             patcher.stop()
-
     assert response.text == "It is 22 C in Paris."
     assert get_messages(0) == [
         {"role": "user", "content": "What is the weather in Paris?"},
@@ -309,8 +252,7 @@ def test_base_lm_experimental_direct_messages_support_tool_call_transcripts(lm_k
 @pytest.mark.parametrize("lm_kind", ["current_lm", "typed_lm"])
 def test_base_lm_experimental_direct_messages_can_reuse_lm_response_as_assistant_turn(lm_kind):
     lm, get_messages, get_request, patcher = _direct_lm_case(
-        lm_kind,
-        ["DSPy programs LM pipelines.", "DSPy programs pipelines."],
+        lm_kind, ["DSPy programs LM pipelines.", "DSPy programs pipelines."]
     )
     try:
         first = asyncio.run(lm(_request(lm, prompt="Explain DSPy in one sentence.")))
@@ -320,7 +262,6 @@ def test_base_lm_experimental_direct_messages_can_reuse_lm_response_as_assistant
     finally:
         if patcher is not None:
             patcher.stop()
-
     assert first.text == "DSPy programs LM pipelines."
     assert follow_up.text == "DSPy programs pipelines."
     assert get_messages(0) == [{"role": "user", "content": "Explain DSPy in one sentence."}]
@@ -335,6 +276,7 @@ def test_base_lm_experimental_direct_messages_can_reuse_lm_response_as_assistant
 
 @pytest.mark.asyncio
 async def test_base_lm_async_explicit_lm_request_returns_lm_response():
+
     class CustomLM(BaseLM):
         @override
         async def aforward(self, request: LMRequest) -> LMResponse:
@@ -343,27 +285,23 @@ async def test_base_lm_async_explicit_lm_request_returns_lm_response():
 
     request = LMRequest.from_call(model="custom-model", prompt="Query")
     response = await CustomLM("custom-model").acall(request)
-
     assert isinstance(response, LMResponse)
     assert response.text == "Hi async!"
 
 
 def test_base_lm_tracks_usage_for_custom_subclasses():
+
     class CustomLM(BaseLM):
         @override
         async def aforward(self, request: LMRequest) -> LMResponse:
             assert request.model == "custom-model"
             return LMResponse.from_text(
-                "Hi!",
-                model="custom-model",
-                usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                "Hi!", model="custom-model", usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
             )
 
     lm = CustomLM(model="custom-model")
-
     with track_usage() as usage_tracker:
         asyncio.run(lm(_request(lm, prompt="Query")))
-
     total_usage = usage_tracker.get_total_tokens()["custom-model"]
     assert total_usage["prompt_tokens"] == 1
     assert total_usage["completion_tokens"] == 1
@@ -371,14 +309,15 @@ def test_base_lm_tracks_usage_for_custom_subclasses():
 
 
 def test_base_lm_copy_is_shallow_runtime_copy_with_isolated_dspy_state():
+
     class CustomLM(BaseLM):
         pass
 
     callback = object()
     client = object()
-    lm = CustomLM(model="custom-model", callbacks=[callback], temperature=0.1)  # ty:ignore[invalid-argument-type]
-    lm.client = client  # ty:ignore[unresolved-attribute]
-    lm.extra_state = {"mutable": []}  # ty:ignore[unresolved-attribute]
+    lm = CustomLM(model="custom-model", callbacks=[callback], temperature=0.1)
+    lm.client = client
+    lm.extra_state = {"mutable": []}
     lm.history = [
         LMHistoryEntry(
             request=LMRequest.from_call(model="custom-model", prompt="original"),
@@ -387,12 +326,10 @@ def test_base_lm_copy_is_shallow_runtime_copy_with_isolated_dspy_state():
             uuid="uuid",
         )
     ]
-
     copied_lm = lm.copy(temperature=0.2)
-
     assert copied_lm is not lm
     assert copied_lm.client is client
-    assert copied_lm.extra_state is lm.extra_state  # ty:ignore[unresolved-attribute]
+    assert copied_lm.extra_state is lm.extra_state
     assert copied_lm.history == []
     assert copied_lm.history is not lm.history
     assert copied_lm.callbacks == [callback]
@@ -411,7 +348,6 @@ def test_dump_state():
         launch_kwargs={"temperature": 1},
         train_kwargs={"temperature": 5},
     )
-
     assert lm.dump_state() == {
         "_dspy_lm_class": "dspy.clients.lm.LM",
         "model": "openai/gpt-4o-mini",
@@ -426,35 +362,22 @@ def test_dump_state():
 
 
 def test_reasoning_model_dump_state_uses_constructor_max_tokens():
-    lm = LM(
-        model="openai/gpt-5-nano",
-        temperature=1.0,
-        max_tokens=16_000,
-        num_retries=1,
-    )
-
+    lm = LM(model="openai/gpt-5-nano", temperature=1.0, max_tokens=16000, num_retries=1)
     state = lm.dump_state()
-
-    assert lm.kwargs["max_completion_tokens"] == 16_000
+    assert lm.kwargs["max_completion_tokens"] == 16000
     assert "max_completion_tokens" not in state
-    assert state["max_tokens"] == 16_000
+    assert state["max_tokens"] == 16000
 
 
 def test_dump_state_preserves_enabled_developer_role():
     lm = LM("openai/gpt-4o-mini", use_developer_role=True)
-
     assert lm.dump_state()["use_developer_role"] is True
     assert LM.load_state(lm.dump_state()).use_developer_role is True
 
 
 def test_dump_state_ignores_internal_class_marker_kwarg():
-    lm = LM(
-        model="openai/gpt-4o-mini",
-        _dspy_lm_class="malicious.module.LM",
-    )
-
+    lm = LM(model="openai/gpt-4o-mini", _dspy_lm_class="malicious.module.LM")
     dumped_state = lm.dump_state()
-
     assert dumped_state["_dspy_lm_class"] == "dspy.clients.lm.LM"
     assert lm.kwargs["_dspy_lm_class"] == "malicious.module.LM"
 
@@ -469,25 +392,16 @@ def test_load_state():
         launch_kwargs={"temperature": 1},
         train_kwargs={"temperature": 5},
     )
-
     loaded_lm = LM.load_state(lm.dump_state())
-
     assert isinstance(loaded_lm, LM)
     assert loaded_lm.dump_state() == lm.dump_state()
 
 
 def test_reasoning_model_load_state_round_trips_canonical_state():
-    lm = LM(
-        model="openai/gpt-5-nano",
-        temperature=1.0,
-        max_tokens=16_000,
-        num_retries=1,
-    )
-
+    lm = LM(model="openai/gpt-5-nano", temperature=1.0, max_tokens=16000, num_retries=1)
     loaded_lm = BaseLM.load_state(lm.dump_state())
-
     assert isinstance(loaded_lm, LM)
-    assert loaded_lm.kwargs["max_completion_tokens"] == 16_000
+    assert loaded_lm.kwargs["max_completion_tokens"] == 16000
     assert loaded_lm.dump_state() == lm.dump_state()
 
 
@@ -498,18 +412,16 @@ def test_reasoning_model_load_state_accepts_max_completion_tokens_alias():
         "model_type": "chat",
         "num_retries": 1,
         "temperature": 1.0,
-        "max_completion_tokens": 16_000,
+        "max_completion_tokens": 16000,
         "finetuning_model": None,
         "launch_kwargs": {},
         "train_kwargs": {},
     }
-
     loaded_lm = BaseLM.load_state(state)
-
     assert isinstance(loaded_lm, LM)
-    assert loaded_lm.kwargs["max_completion_tokens"] == 16_000
+    assert loaded_lm.kwargs["max_completion_tokens"] == 16000
     assert "max_completion_tokens" not in loaded_lm.dump_state()
-    assert loaded_lm.dump_state()["max_tokens"] == 16_000
+    assert loaded_lm.dump_state()["max_tokens"] == 16000
 
 
 def test_lm_load_state_forwards_allow_custom_lm_class(monkeypatch):
@@ -521,9 +433,7 @@ def test_lm_load_state_forwards_allow_custom_lm_class(monkeypatch):
         return original_load_state(cls, state, allow_custom_lm_class=allow_custom_lm_class)
 
     monkeypatch.setattr(BaseLM, "load_state", classmethod(spy_load_state))
-
     LM.load_state(LM("openai/gpt-4o-mini").dump_state(), allow_custom_lm_class=True)
-
     assert calls == [True]
 
 
@@ -570,13 +480,10 @@ async def test_async_lm_call():
     from litellm.utils import Choices, Message, ModelResponse
 
     mock_response = ModelResponse(choices=[Choices(message=Message(content="answer"))], model="openai/gpt-4o-mini")
-
     with patch("litellm.acompletion") as mock_acompletion:
         mock_acompletion.return_value = mock_response
-
         lm = LM(model="openai/gpt-4o-mini")
         result = await lm.acall(_request(lm, prompt="question"))
-
         assert result.text == "answer"
         mock_acompletion.assert_called_once()
 
@@ -586,13 +493,10 @@ async def test_lm_history_size_limit():
     lm = LM(model="openai/gpt-4o-mini")
     with settings.context(max_history_size=5), mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="test answer"))],
-            model="openai/gpt-4o-mini",
+            choices=[Choices(message=Message(content="test answer"))], model="openai/gpt-4o-mini"
         )
-
         for _ in range(10):
             await lm(_request(lm, prompt="query"))
-
     assert len(lm.history) == 5
 
 
@@ -600,41 +504,28 @@ def test_disable_history():
     lm = LM(model="openai/gpt-4o-mini")
     with settings.context(disable_history=True), mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="test answer"))],
-            model="openai/gpt-4o-mini",
+            choices=[Choices(message=Message(content="test answer"))], model="openai/gpt-4o-mini"
         )
         for _ in range(10):
             asyncio.run(lm(_request(lm, prompt="query")))
-
     assert len(lm.history) == 0
-
     with settings.context(disable_history=False), mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="test answer"))],
-            model="openai/gpt-4o-mini",
+            choices=[Choices(message=Message(content="test answer"))], model="openai/gpt-4o-mini"
         )
 
 
 def test_call_reasoning_model_with_chat_api():
-    """Test that Chat API properly handles reasoning models and returns data in correct format."""
-    # Create message with reasoning_content attribute
     message = Message(content="The answer is 4", role="assistant")
-    # Add reasoning_content attribute
     message.reasoning_content = "Step 1: I need to add 2 + 2\nStep 2: 2 + 2 = 4\nTherefore, the answer is 4"
-
-    # Create choice with the message
     mock_choice = Choices(message=message)
-
-    # Mock response with reasoning content for chat completion
     mock_response = ModelResponse(
         choices=[mock_choice],
         model="anthropic/claude-3-7-sonnet-20250219",
         usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
     )
-
-    with mock.patch("litellm.acompletion", return_value=mock_response) as mock_completion:  # noqa: SIM117
+    with mock.patch("litellm.acompletion", return_value=mock_response) as mock_completion:
         with mock.patch("litellm.supports_reasoning", return_value=True):
-            # Create reasoning model with chat API
             lm = LM(
                 model="anthropic/claude-3-7-sonnet-20250219",
                 model_type="chat",
@@ -642,16 +533,10 @@ def test_call_reasoning_model_with_chat_api():
                 max_tokens=16000,
                 reasoning={"effort": "low"},
             )
-
-            # Test the call
             result = asyncio.run(lm(_request(lm, prompt="What is 2 + 2?")))
-
-            # Verify the response format
             assert result.text == "The answer is 4"
             assert result.reasoning_content is not None
             assert "Step 1" in result.reasoning_content
-
-            # Verify mock was called with correct parameters
             mock_completion.assert_called_once()
             call_kwargs = mock_completion.call_args.kwargs
             assert call_kwargs["model"] == "anthropic/claude-3-7-sonnet-20250219"
@@ -660,27 +545,16 @@ def test_call_reasoning_model_with_chat_api():
 
 def test_api_key_not_saved_in_json():
     lm = LM(
-        model="openai/gpt-4o-mini",
-        model_type="chat",
-        temperature=1.0,
-        max_tokens=100,
-        api_key="sk-test-api-key-12345",
+        model="openai/gpt-4o-mini", model_type="chat", temperature=1.0, max_tokens=100, api_key="sk-test-api-key-12345"
     )
-
     predict = Predict(ts("question -> answer"))
     predict.lm = lm
-
     with tempfile.TemporaryDirectory() as tmpdir:
         json_path = Path(tmpdir) / "program.json"
         predict.save(json_path)
-
         with open(json_path) as f:
             saved_state = json.load(f)
-
-        # Verify API key is not in the saved state
         assert "api_key" not in saved_state.get("lm", {}), "API key should not be saved in JSON"
-
-        # Verify other attributes are saved
         assert saved_state["lm"]["model"] == "openai/gpt-4o-mini"
         assert saved_state["lm"]["temperature"] == 1.0
         assert saved_state["lm"]["max_tokens"] == 100

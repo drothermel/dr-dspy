@@ -45,6 +45,7 @@ def test_framework_task_specs_have_explicit_field_descs(spec_cls):
 
 
 def test_chain_of_thought_reasoning_field_has_explicit_desc():
+
     class QATaskSpec(TaskSpec):
         name: str = "QA"
         instructions: str = "Answer."

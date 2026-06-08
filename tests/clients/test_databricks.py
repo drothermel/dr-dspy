@@ -1,9 +1,3 @@
-"""Test the Databricks finetuning and deployment.
-
-This test requires valid Databricks credentials, so it is skipped on github actions. Right now it is only used for
-manual testing.
-"""
-
 import pytest
 
 from dspy.clients.databricks import (
@@ -16,30 +10,23 @@ from dspy.core.types import LMRequest
 from dspy.dsp.utils.settings import settings
 
 try:
-    from databricks.sdk import WorkspaceClient  # ty:ignore[unresolved-import]
+    from databricks.sdk import WorkspaceClient
 
     WorkspaceClient()
 except (ImportError, Exception):
-    # Skip the test if the Databricks SDK is not configured or credentials are not available.
     pytestmark = pytest.mark.skip(reason="Databricks SDK not configured or credentials not available")
 
 
 def test_create_directory_in_databricks_unity_catalog():
-    from databricks.sdk import WorkspaceClient  # ty:ignore[unresolved-import]
+    from databricks.sdk import WorkspaceClient
 
     w = WorkspaceClient()
-
     with pytest.raises(
         ValueError,
-        match=(
-            "Databricks Unity Catalog path must be in the format '/Volumes/<catalog>/<schema>/<volume>/...', "  # noqa: RUF043
-            "but received: /badstring/whatever"
-        ),
+        match="Databricks Unity Catalog path must be in the format '/Volumes/<catalog>/<schema>/<volume>/...', but received: /badstring/whatever",
     ):
         _create_directory_in_databricks_unity_catalog(w, "/badstring/whatever")
-
     _create_directory_in_databricks_unity_catalog(w, "/Volumes/main/chenmoney/testing/dspy_testing")
-    # Check that the directory was created successfully, otherwise `get_directory_metadata` will raise an exception.
     w.files.get_directory_metadata("/Volumes/main/chenmoney/testing/dspy_testing")
 
 
@@ -65,14 +52,12 @@ def test_create_finetuning_job():
         },
     ]
     settings.experimental = True
-
     job = TrainingJobDatabricks()
-
     DatabricksProvider.finetune(
         job=job,
         model="meta-llama/Llama-3.2-1B",
         train_data=fake_training_data,
-        data_format="chat",  # ty:ignore[unknown-argument]
+        data_format="chat",
         train_kwargs={
             "train_data_path": "/Volumes/main/chenmoney/testing/dspy_testing",
             "register_to": "main.chenmoney.finetuned_model",
@@ -80,17 +65,12 @@ def test_create_finetuning_job():
             "skip_deploy": True,
         },
     )
-    assert job.finetuning_run.status.display_name is not None  # ty:ignore[unresolved-attribute]
+    assert job.finetuning_run.status.display_name is not None
 
 
 def test_deploy_finetuned_model():
     settings.experimental = True
     model_to_deploy = "main.chenmoney.finetuned_model"
-
-    DatabricksProvider.deploy_finetuned_model(
-        model=model_to_deploy,
-        data_format="chat",  # ty:ignore[invalid-argument-type]
-    )
-
+    DatabricksProvider.deploy_finetuned_model(model=model_to_deploy, data_format="chat")
     lm = LM(model="databricks/main_chenmoney_finetuned_model")
     lm(LMRequest.from_call(model=lm.model, prompt="what is 2 + 2?"))

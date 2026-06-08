@@ -1,5 +1,3 @@
-"""Deno subprocess I/O for the PythonInterpreter sandbox."""
-
 import functools
 import json
 import logging
@@ -9,17 +7,11 @@ from pathlib import Path
 from typing import IO, TYPE_CHECKING
 
 from dspy.primitives.code_interpreter import CodeInterpreterError
-from dspy.primitives.python_interpreter.jsonrpc import (
-    canonicalize_path,
-    jsonrpc_notification,
-    jsonrpc_request,
-)
+from dspy.primitives.python_interpreter.jsonrpc import canonicalize_path, jsonrpc_notification, jsonrpc_request
 
 if TYPE_CHECKING:
     from dspy.primitives.python_interpreter.interpreter import PythonInterpreter
-
 logger = logging.getLogger(__name__)
-
 MAX_SKIP_LINES = 100
 
 
@@ -27,7 +19,6 @@ MAX_SKIP_LINES = 100
 def get_deno_dir() -> str | None:
     if "DENO_DIR" in os.environ:
         return os.environ["DENO_DIR"]
-
     try:
         result = subprocess.run(["deno", "info", "--json"], capture_output=True, text=True, check=False)
         if result.returncode == 0:
@@ -35,7 +26,6 @@ def get_deno_dir() -> str | None:
             return info.get("denoDir")
     except Exception:
         logger.warning("Unable to find the Deno cache dir.")
-
     return None
 
 
@@ -62,9 +52,6 @@ def mount_files(interpreter: "PythonInterpreter") -> None:
                 path_obj.open("a").close()
             else:
                 raise FileNotFoundError(f"Cannot mount non-existent file: {path}")
-        # Virtual path keeps the user's basename so sandbox code refers to the
-        # file by the name passed in; host_path is realpath'd so Deno's
-        # permission check matches the canonical entries in --allow-read.
         virtual_path = f"/sandbox/{path_obj.name}"
         host_path = canonicalize_path(path)
         send_request(
@@ -90,7 +77,6 @@ def sync_files(interpreter: "PythonInterpreter") -> None:
 
 def ensure_deno_process(interpreter: "PythonInterpreter") -> None:
     if interpreter.deno_process is None or interpreter.deno_process.poll() is not None:
-        # Process identity changed (or process missing), so replay setup.
         interpreter._tools_registered = False
         interpreter._mounted_files = False
         try:
@@ -104,20 +90,12 @@ def ensure_deno_process(interpreter: "PythonInterpreter") -> None:
                 env=os.environ.copy(),
             )
         except FileNotFoundError as e:
-            install_instructions = (
-                "Deno executable not found. Please install Deno to proceed.\n"
-                "Installation instructions:\n"
-                "> curl -fsSL https://deno.land/install.sh | sh\n"
-                "*or*, on macOS with Homebrew:\n"
-                "> brew install deno\n"
-                "For additional configurations: https://docs.deno.com/runtime/getting_started/installation/"
-            )
+            install_instructions = "Deno executable not found. Please install Deno to proceed.\nInstallation instructions:\n> curl -fsSL https://deno.land/install.sh | sh\n*or*, on macOS with Homebrew:\n> brew install deno\nFor additional configurations: https://docs.deno.com/runtime/getting_started/installation/"
             raise CodeInterpreterError(install_instructions) from e
         health_check(interpreter)
 
 
 def require_deno_process(interpreter: "PythonInterpreter") -> subprocess.Popen[str]:
-    """Return the active Deno subprocess, creating it if needed."""
     ensure_deno_process(interpreter)
     if interpreter.deno_process is None:
         raise CodeInterpreterError("Deno process unavailable")
@@ -139,12 +117,10 @@ def deno_stdout(interpreter: "PythonInterpreter") -> IO[str]:
 
 
 def read_response_line(interpreter: "PythonInterpreter", context: str) -> str:
-    """Read one stdout line from Deno or raise a process-level error."""
     process = require_deno_process(interpreter)
     response_line = deno_stdout(interpreter).readline().strip()
     if response_line:
         return response_line
-
     exit_code = process.poll()
     if exit_code is not None:
         stderr = process.stderr.read() if process.stderr else ""
@@ -153,11 +129,9 @@ def read_response_line(interpreter: "PythonInterpreter", context: str) -> str:
 
 
 def parse_response_line(response_line: str, context: str) -> dict | None:
-    """Parse a JSON-RPC line, returning None for non-JSON or malformed lines."""
     if not response_line.startswith("{"):
         logger.debug("Skipping non-JSON output during %s: %s", context, response_line)
         return None
-
     try:
         return json.loads(response_line)
     except json.JSONDecodeError:
@@ -166,18 +140,12 @@ def parse_response_line(response_line: str, context: str) -> dict | None:
 
 
 def send_request(interpreter: "PythonInterpreter", method: str, params: dict, context: str) -> dict:
-    """Send a JSON-RPC request and return the parsed response.
-
-    Non-JSON lines (e.g. Pyodide package loading messages) are skipped,
-    up to ``MAX_SKIP_LINES`` to prevent unbounded blocking.
-    """
     interpreter._request_id += 1
     request_id = interpreter._request_id
     msg = jsonrpc_request(method=method, params=params, id=request_id)
     stdin = deno_stdin(interpreter)
     stdin.write(msg + "\n")
     stdin.flush()
-
     skipped = 0
     while skipped <= MAX_SKIP_LINES:
         response_line = read_response_line(interpreter, context)
@@ -185,7 +153,6 @@ def send_request(interpreter: "PythonInterpreter", method: str, params: dict, co
         if response is None:
             skipped += 1
             continue
-
         if response.get("id") != request_id:
             raise CodeInterpreterError(
                 f"Response ID mismatch {context}: expected {request_id}, got {response.get('id')}"
@@ -193,17 +160,12 @@ def send_request(interpreter: "PythonInterpreter", method: str, params: dict, co
         if "error" in response:
             raise CodeInterpreterError(f"Error {context}: {response['error'].get('message', 'Unknown error')}")
         return response
-
     raise CodeInterpreterError(f"Too many non-JSON lines ({skipped}) {context}")
 
 
 def health_check(interpreter: "PythonInterpreter") -> None:
-    """Verify the subprocess is alive by executing a simple expression."""
     response = send_request(
-        interpreter=interpreter,
-        method="execute",
-        params={"code": "print(1+1)"},
-        context="during health check",
+        interpreter=interpreter, method="execute", params={"code": "print(1+1)"}, context="during health check"
     )
     if response.get("result", {}).get("output", "").strip() != "2":
         raise CodeInterpreterError(f"Unexpected ping response: {response}")

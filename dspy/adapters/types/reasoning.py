@@ -14,15 +14,6 @@ if TYPE_CHECKING:
 
 
 class Reasoning(Type):
-    """Reasoning type in DSPy.
-
-    This type is useful when you want the DSPy output to include the reasoning of the LM. We build this type so that
-    DSPy can support the reasoning model and non-reasoning model with the same code.
-
-    This is a str-like type, you can convert a string directly to a Reasoning object, and from DSPy adapters'
-    perspective, `Reasoning` is treated as a string.
-    """
-
     content: str
 
     @override
@@ -34,10 +25,8 @@ class Reasoning(Type):
     def validate_input(cls, data: object) -> object:
         if isinstance(data, cls):
             return data
-
         if isinstance(data, str):
             return {"content": data}
-
         if isinstance(data, dict):
             data = cast("dict[str, object]", data)
             if "content" not in data:
@@ -45,13 +34,11 @@ class Reasoning(Type):
             if not isinstance(data["content"], str):
                 raise ValueError(f"`content` field must be a string, but received type: {type(data['content'])}")
             return {"content": data["content"]}
-
         raise ValueError(f"Received invalid value for `dspy.Reasoning`: {data}")
 
     @classmethod
     @override
     def parse_lm_output(cls, output: LMOutput) -> Reasoning | None:
-        """Parse the typed LM output into a Reasoning object."""
         if output.reasoning_content:
             return Reasoning(content=output.reasoning_content)
         return None
@@ -59,15 +46,6 @@ class Reasoning(Type):
     @classmethod
     @override
     def parse_stream_chunk(cls, chunk: object) -> str | None:
-        """
-        Parse a stream chunk into reasoning content if available.
-
-        Args:
-            chunk: A stream chunk from the LM.
-
-        Returns:
-            The reasoning content (str) if available, None otherwise.
-        """
         try:
             if choices := getattr(chunk, "choices", None):
                 return getattr(choices[0].delta, "reasoning_content", None)
@@ -111,7 +89,7 @@ class Reasoning(Type):
         return item in self.content
 
     @override
-    def __iter__(self) -> Iterator[str]:  # ty: ignore[invalid-method-override]
+    def __iter__(self) -> Iterator[str]:
         return iter(self.content)
 
     def __add__(self, other: object) -> object:
@@ -129,25 +107,8 @@ class Reasoning(Type):
         return NotImplemented
 
     def __getattr__(self, name: str) -> object:
-        """
-        Delegate string methods to the underlying content.
-
-        This makes Reasoning fully str-like by forwarding any string method calls
-        (like .strip(), .lower(), .split(), etc.) to the content string.
-
-        Note: This is called only when the attribute is not found on the Reasoning instance,
-        so it won't interfere with Pydantic fields or existing methods.
-        """
-        # Check if this is a valid string method/attribute
         if hasattr(str, name):
-            # Delegate to the content string
             return getattr(self.content, name)
-
-        # If it's not a string method, provide a helpful error
         raise AttributeError(
-            f"`{type(self).__name__}` object has no attribute '{name}'. "
-            f"If you are using `dspy.predict.chain_of_thought.ChainOfThought`, note that the 'reasoning' field "
-            "in ChainOfThought is now a "
-            "`dspy.Reasoning` object (not a plain string). "
-            f"You can convert it to a string with str(reasoning) or access the content with reasoning.content."
+            f"`{type(self).__name__}` object has no attribute '{name}'. If you are using `dspy.predict.chain_of_thought.ChainOfThought`, note that the 'reasoning' field in ChainOfThought is now a `dspy.Reasoning` object (not a plain string). You can convert it to a string with str(reasoning) or access the content with reasoning.content."
         )

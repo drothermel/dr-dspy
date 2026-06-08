@@ -13,7 +13,6 @@ from typing_extensions import override
 from dspy.dsp.utils.utils import dotdict
 
 logger = logging.getLogger(__name__)
-
 DEFAULT_CONFIG = dotdict(
     lm=None,
     adapter=None,
@@ -26,44 +25,25 @@ DEFAULT_CONFIG = dotdict(
     track_usage=False,
     usage_tracker=None,
     caller_modules=None,
-    provide_traceback=False,  # Whether to include traceback information in error logs.
-    num_threads=8,  # Number of threads to use for parallel processing.
-    max_errors=10,  # Maximum errors before halting operations.
-    # If true, async tools can be called in sync mode by getting converted to sync.
+    provide_traceback=False,
+    num_threads=8,
+    max_errors=10,
     allow_tool_async_sync_conversion=False,
     max_history_size=10000,
     max_trace_size=10000,
-    warn_on_type_mismatch=True,  # Whether to log warnings when a module's input type doesn't match the signature type.
+    warn_on_type_mismatch=True,
     transparency="strict",
     run_log_enabled=True,
     run_log_dir=None,
 )
-
 main_thread_config = copy.deepcopy(DEFAULT_CONFIG)
 config_owner_thread_id = None
 config_owner_async_task = None
-
 global_lock = threading.Lock()
-
 thread_local_overrides = contextvars.ContextVar("context_overrides", default=dotdict())
 
 
 class Settings:
-    """
-    A singleton class for DSPy configuration settings.
-    Thread-safe global configuration.
-    - 'configure' can be called by only one 'owner' thread (the first thread that calls it).
-    - Other threads see the configured global values from 'main_thread_config'.
-    - 'context' sets thread-local overrides. These overrides propagate to threads spawned
-      inside that context block when using async batch utilities (e.g. ``Parallel``) that copy overrides.
-
-      1. Only one unique thread (which can be any thread!) can call settings.configure.
-      2. It affects a global state, visible to all. As a result, user threads work, but they shouldn't be
-         mixed with concurrent changes to settings.configure from the "main" thread.
-         (TODO: In the future, add warnings: if there are near-in-time user-thread reads followed by .configure calls.)
-      3. Any thread can use settings.context. It propagates to child threads created with DSPy primitives: Parallel, etc.
-    """
-
     _instance = None
 
     def __new__(cls):
@@ -117,88 +97,30 @@ class Settings:
     def _ensure_configure_allowed(self) -> None:
         global main_thread_config, config_owner_thread_id, config_owner_async_task
         current_thread_id = threading.get_ident()
-
         if config_owner_thread_id is None:
-            # First `configure` call assigns the owner thread id.
             config_owner_thread_id = current_thread_id
-
         if config_owner_thread_id != current_thread_id:
-            # Disallow a second `configure` calls from other threads.
             raise RuntimeError("settings can only be changed by the thread that initially configured it.")
-
-        # Async task doesn't allow a second `configure` call, must use settings.context(...) instead.
         is_async_task = False
         try:
             if asyncio.current_task() is not None:
                 is_async_task = True
         except RuntimeError:
-            # This exception (e.g., "no current task") means we are not in an async loop/task,
-            # or asyncio module itself is not fully functional in this specific sub-thread context.
             is_async_task = False
-
         if not is_async_task:
             return
-
         if config_owner_async_task is None:
-            # First `configure` call assigns the owner async task.
             config_owner_async_task = asyncio.current_task()
             return
-
         if config_owner_async_task != asyncio.current_task():
             raise RuntimeError(
-                "settings.configure(...) can only be called from the same async task that called it first. Please "
-                "use `settings.context(...)` in other async tasks instead."
+                "settings.configure(...) can only be called from the same async task that called it first. Please use `settings.context(...)` in other async tasks instead."
             )
 
     def configure(self, **kwargs) -> None:
-        """Set the default language model, adapter, and other settings for DSPy.
-
-        Call `settings.configure(...)` once near the top of your script. Every
-        DSPy module will use these defaults unless you override them with
-        `settings.context(...)`. The values persist until you call
-        `settings.configure(...)` again.
-
-        Only the thread that first calls `settings.configure(...)` may call it
-        again. Use `settings.context(...)` for temporary overrides in other
-        threads or async tasks.
-
-        Args:
-            **kwargs: Settings to update. Common keys include `lm` (a
-                `dspy.clients.lm.LM`), `adapter` (e.g. `dspy.adapters.json_adapter.JSONAdapter()`),
-                `callbacks`, `track_usage`, `async_max_workers`, and
-                `num_threads`.
-
-        Examples:
-            Set a default LM:
-            ```python
-            from dspy.clients.lm import LM
-            from dspy.dsp.utils.settings import settings
-
-            settings.configure(lm=LM("openai/gpt-5-mini"))
-            ```
-
-            Set multiple defaults at once:
-            ```python
-            from dspy.adapters.json_adapter import JSONAdapter
-            from dspy.clients.lm import LM
-            from dspy.dsp.utils.settings import settings
-
-            settings.configure(
-                lm=LM("anthropic/claude-sonnet-4-6"),
-                adapter=JSONAdapter(),
-                track_usage=True,
-            )
-            ```
-
-        See Also:
-            `dspy.clients.lm.LM`: create the language model you pass as `lm`.
-            `settings.context`: temporary overrides inside one block.
-        """
         self._ensure_configure_allowed()
-
         for k, v in kwargs.items():
             main_thread_config[k] = v
-
         if kwargs:
             from dspy.utils.run_log import init_run_session
 
@@ -215,43 +137,9 @@ class Settings:
 
     @contextmanager
     def context(self, **kwargs):
-        """Override DSPy settings for one `with` block.
-
-        Use `settings.context(...)` when you need temporary settings—a different
-        LM, adapter, or flag—without changing the process-wide defaults from
-        `settings.configure(...)`. The block inherits every current setting,
-        overrides only the keys you pass, and restores the originals on exit.
-
-        Unlike `settings.configure(...)`, you can call `settings.context(...)` from
-        any thread or async task.
-
-        Args:
-            **kwargs: Settings to override, such as `lm`, `adapter`,
-                `track_usage`, or `allow_tool_async_sync_conversion`.
-
-        Examples:
-            Use a different LM for one call:
-            ```python
-            from dspy.clients.lm import LM
-            from dspy.dsp.utils.settings import settings
-            from dspy.predict.predict import Predict
-
-            settings.configure(lm=LM("openai/gpt-5-mini"))
-            qa = Predict("question -> answer")
-
-            with settings.context(lm=LM("anthropic/claude-sonnet-4-6")):
-                result = qa(question="What is the capital of France?")
-                # uses claude-sonnet-4-6 inside this block
-            # back to gpt-5-mini here
-            ```
-
-        See Also:
-            `settings.configure`: set process-wide defaults.
-        """
         original_overrides = thread_local_overrides.get().copy()
         new_overrides = dotdict({**main_thread_config, **original_overrides, **kwargs})
         token = thread_local_overrides.set(new_overrides)
-
         try:
             yield
         finally:
@@ -264,59 +152,30 @@ class Settings:
         return repr(combined_config)
 
     def save(
-        self,
-        path: str,
-        modules_to_serialize: list[str] | None = None,
-        exclude_keys: list[str] | None = None,
+        self, path: str, modules_to_serialize: list[str] | None = None, exclude_keys: list[str] | None = None
     ) -> None:
-        """
-        Save the settings to a file using cloudpickle.
-
-        Args:
-            path: The file path to save the settings to.
-            modules_to_serialize (list or None): A list of modules to serialize with cloudpickle's `register_pickle_by_value`.
-                If None, then no modules will be registered for serialization.
-            exclude_keys (list or None): A list of keys to exclude during saving.
-        """
         logger.warning(
-            "`dspy.settings` are serialized using cloudpickle. Because cloudpickle allows for the "
-            "execution of arbitrary code during deserialization, you should only load files from "
-            "verified sources within a trusted environment."
+            "`dspy.settings` are serialized using cloudpickle. Because cloudpickle allows for the execution of arbitrary code during deserialization, you should only load files from verified sources within a trusted environment."
         )
         try:
             modules_to_serialize = modules_to_serialize or []
             for module in modules_to_serialize:
                 cloudpickle.register_pickle_by_value(module)
-
             exclude_keys = exclude_keys or []
             data = {key: value for key, value in self.config.items() if key not in exclude_keys}
             with Path(path).open("wb") as f:
                 cloudpickle.dump(data, f)
         except Exception as e:
             raise RuntimeError(
-                f"Saving failed with error: {e}. Please remove the non-picklable attributes from the values "
-                "in the `dspy.settings`."
+                f"Saving failed with error: {e}. Please remove the non-picklable attributes from the values in the `dspy.settings`."
             )
 
     @classmethod
     def load(cls, path: str, allow_pickle: bool = False) -> dict[str, Any]:
-        """
-        Load the settings from a file using cloudpickle.
-
-        Args:
-            path: The file path to load the settings from.
-            allow_pickle: Whether to allow loading with pickle. Loading untrusted .pkl files
-                can run arbitrary code. Set to True only if you trust the source of the file.
-
-        Returns:
-            A dict that stores the loaded settings.
-        """
         if not allow_pickle:
             raise ValueError(
-                "Loading .pkl files can run arbitrary code, which may be dangerous. "
-                "Set `allow_pickle=True` if you trust the source of the file."
+                "Loading .pkl files can run arbitrary code, which may be dangerous. Set `allow_pickle=True` if you trust the source of the file."
             )
-
         with Path(path).open("rb") as f:
             return cloudpickle.load(f)
 

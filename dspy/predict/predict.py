@@ -21,61 +21,31 @@ from dspy.utils.constants import IS_TYPE_UNDEFINED
 from dspy.utils.transparency import reset_active_call_metadata, set_active_call_metadata
 
 logger = logging.getLogger(__name__)
-
 UNSAFE_LM_STATE_KEYS = {"api_base", "base_url", "model_list"}
 
 
 def _sanitize_lm_state(lm_state: dict, allow_unsafe_lm_state: bool) -> dict:
     if allow_unsafe_lm_state:
         return lm_state
-
     unsafe_keys = sorted(UNSAFE_LM_STATE_KEYS.intersection(lm_state))
-
     if not unsafe_keys:
         return lm_state
-
     sanitized_lm_state = {k: v for k, v in lm_state.items() if k not in UNSAFE_LM_STATE_KEYS}
     logger.warning(
-        "Ignoring unsafe LM config key(s) during state load: %s. "
-        "Pass allow_unsafe_lm_state=True to preserve these keys for trusted files.",
+        "Ignoring unsafe LM config key(s) during state load: %s. Pass allow_unsafe_lm_state=True to preserve these keys for trusted files.",
         unsafe_keys,
     )
     return sanitized_lm_state
 
 
 class Predict(Module, Parameter):
-    """Basic DSPy module that maps inputs to outputs using a language model.
-
-    Args:
-        task_spec: The input/output task spec describing the task.
-        callbacks: Optional list of callbacks for instrumentation.
-        **config: Default keyword arguments forwarded to the underlying
-            language model. These values can be overridden for a single
-            invocation by passing a ``config`` dictionary when calling the
-            module. For example::
-
-                from dspy.predict.predict import Predict
-                from dspy.task_spec import TaskSpec, input_field, output_field
-
-                class QATaskSpec(TaskSpec):
-                    name: str = "QA"
-                    instructions: str = "Answer the question."
-                    inputs: tuple = (input_field("q"),)
-                    outputs: tuple = (output_field("a"),)
-
-                predict = Predict(QATaskSpec(), temperature=1.0)
-                result = await predict(q="What is 1 + 52?", config={"temperature": 1.0})
-    """
-
     def __init__(self, task_spec: TaskSpec, callbacks: list[BaseCallback] | None = None, **config) -> None:
         if isinstance(task_spec, str):
             raise TypeError(
-                "Predict requires a TaskSpec instance, not a string. "
-                "Use a TaskSpec subclass or make_task_spec(...) to create one."
+                "Predict requires a TaskSpec instance, not a string. Use a TaskSpec subclass or make_task_spec(...) to create one."
             )
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"Predict requires a TaskSpec instance, got {type(task_spec).__name__}.")
-
         super().__init__(callbacks=callbacks)
         self.stage = random.randbytes(8).hex()
         self.task_spec: TaskSpec = task_spec
@@ -92,55 +62,33 @@ class Predict(Module, Parameter):
     def dump_state(self, json_mode=True):
         state_keys = ["traces", "train"]
         state = {k: getattr(self, k) for k in state_keys}
-
         state["demos"] = []
         for demo in self.demos:
             demo = demo.copy()
-
             for field in demo:
-                # Demos are serialized for state round-trips; nested model object types are not preserved after load.
                 demo[field] = serialize_object(demo[field])
-
-            if json_mode and not isinstance(demo, dict):
+            if json_mode and (not isinstance(demo, dict)):
                 state["demos"].append(demo.to_dict())
             else:
                 state["demos"].append(demo)
-
         state["task_spec"] = self.task_spec.to_dict()
         state["lm"] = self.lm.dump_state() if self.lm else None
         return state
 
     @override
     def load_state(
-        self,
-        state: dict,
-        *,
-        allow_unsafe_lm_state: bool = False,
-        custom_types: dict[str, type] | None = None,
+        self, state: dict, *, allow_unsafe_lm_state: bool = False, custom_types: dict[str, type] | None = None
     ) -> "Predict":
-        """Load the saved state of a `Predict` object.
-
-        Args:
-            state: The saved state of a `Predict` object.
-            allow_unsafe_lm_state: If True, preserves `api_base`, `base_url`, and `model_list` from
-                serialized LM state and allows importing custom LM classes. Enable only when loading trusted files.
-            custom_types: Optional mapping of serialized type names to types when restoring a saved task spec.
-
-        Returns:
-            Self to allow method chaining.
-        """
         excluded_keys = ["task_spec", "extended_signature", "lm"]
         for name, value in state.items():
             if name not in excluded_keys:
                 setattr(self, name, value)
-
         if "task_spec" not in state:
             if "signature" in state:
                 raise ValueError(
                     "Saved state uses legacy 'signature' format. Re-save the program with the current DSPy version."
                 )
             raise ValueError("Missing required 'task_spec' key in saved Predict state.")
-
         self.task_spec = TaskSpec.from_dict(state["task_spec"], custom_types=custom_types)
         sanitized_lm_state = _sanitize_lm_state(state["lm"], allow_unsafe_lm_state) if state["lm"] else None
         self.lm = (
@@ -148,30 +96,22 @@ class Predict(Module, Parameter):
             if sanitized_lm_state
             else None
         )
-
         return self
 
     def _get_positional_args_error_message(self) -> str:
         input_fields = list(self.task_spec.input_fields.keys())
-        return (
-            "Positional arguments are not allowed when calling `dspy.predict.predict.Predict`, must use keyword "
-            "arguments "
-            f"that match your task spec input fields: '{', '.join(input_fields)}'. For example: "
-            f"`predict({input_fields[0]}=input_value, ...)`."
-        )
+        return f"Positional arguments are not allowed when calling `dspy.predict.predict.Predict`, must use keyword arguments that match your task spec input fields: '{', '.join(input_fields)}'. For example: `predict({input_fields[0]}=input_value, ...)`."
 
     @override
     def __call__(self, *args, **kwargs):
         if args:
             raise ValueError(self._get_positional_args_error_message())
-
         return super().__call__(**kwargs)
 
     @override
     async def acall(self, *args, **kwargs):
         if args:
             raise ValueError(self._get_positional_args_error_message())
-
         return await super().acall(**kwargs)
 
     def _forward_preprocess(self, **kwargs):
@@ -190,47 +130,30 @@ class Predict(Module, Parameter):
             config = merged if merged is not None else coerce_lm_config(override)
         else:
             config = base_config
-
         lm = kwargs.pop("lm", self.lm) or settings.lm
-
         if lm is None:
             raise ValueError(
-                "No LM is loaded. Configure one with "
-                "`from dspy.clients.lm import LM; from dspy.dsp.utils.settings import settings; "
-                "settings.configure(lm=LM('openai/gpt-4o-mini'))`."
+                "No LM is loaded. Configure one with `from dspy.clients.lm import LM; from dspy.dsp.utils.settings import settings; settings.configure(lm=LM('openai/gpt-4o-mini'))`."
             )
-
         if isinstance(lm, str):
-            # Many users mistakenly pass a model string instead of constructing an LM, so provide
-            # a specific error message at the call site.
             raise ValueError(
-                f"LM must be an instance of `dspy.clients.base_lm.BaseLM`, not a string. Instead of using a string "
-                f"like "
-                f"'settings.configure(lm=\"{lm}\")', configure the LM like "
-                f"'settings.configure(lm=LM(\"{lm}\"))' after importing "
-                "`LM` from `dspy.clients.lm` and `settings` from `dspy.dsp.utils.settings`."
+                f"""LM must be an instance of `dspy.clients.base_lm.BaseLM`, not a string. Instead of using a string like 'settings.configure(lm="{lm}")', configure the LM like 'settings.configure(lm=LM("{lm}"))' after importing `LM` from `dspy.clients.lm` and `settings` from `dspy.dsp.utils.settings`."""
             )
         if not isinstance(lm, BaseLM):
             raise ValueError(
                 f"LM must be an instance of `dspy.clients.base_lm.BaseLM`, not {type(lm)}. Received `lm={lm}`."
             )
-
         if "prediction" in kwargs and (
             isinstance(kwargs["prediction"], dict)
             and kwargs["prediction"].get("type") == "content"
-            and "content" in kwargs["prediction"]
+            and ("content" in kwargs["prediction"])
         ):
-            # If the `prediction` is the standard predicted outputs format
-            # (https://platform.openai.com/docs/guides/predicted-outputs), we remove it from input kwargs and add it
-            # to provider-specific extensions.
             extensions = dict(config.extensions)
             extensions["prediction"] = kwargs.pop("prediction")
             config = config.model_copy(update={"extensions": extensions})
-
         for k, field_info in input_fields.items():
             if k not in kwargs and field_info.default is not PydanticUndefined:
                 kwargs[k] = field_info.default
-
         extra_fields = [k for k in kwargs if k not in input_fields]
         if extra_fields:
             logger.warning(
@@ -238,43 +161,34 @@ class Predict(Module, Parameter):
                 extra_fields,
                 list(input_fields.keys()),
             )
-
         if settings.warn_on_type_mismatch:
             for field_name, field_info in input_fields.items():
                 if field_name in kwargs:
                     value = kwargs[field_name]
                     expected_type = field_info.annotation
                     json_schema_extra = cast("dict[str, Any]", field_info.json_schema_extra or {})
-
                     if value is None or json_schema_extra.get(IS_TYPE_UNDEFINED, False):
                         continue
-
                     if not _is_value_compatible_with_type(value, cast("type", expected_type)):
                         logger.warning(
-                            "Type mismatch for field '%s': expected %s based on given task spec, "
-                            "but the provided value is incompatible: %s.",
+                            "Type mismatch for field '%s': expected %s based on given task spec, but the provided value is incompatible: %s.",
                             field_name,
                             _get_type_name(expected_type),
                             value,
                         )
-
         missing = [
             k
             for k, field_info in input_fields.items()
-            if k not in kwargs and not _annotation_allows_none(field_info.annotation)
+            if k not in kwargs and (not _annotation_allows_none(field_info.annotation))
         ]
         if missing:
             present = [k for k in input_fields if k in kwargs]
-            logger.warning(
-                "Not all input fields were provided to module. Present: %s. Missing: %s.",
-                present,
-                missing,
-            )
-        return lm, config, task_spec, demos, kwargs
+            logger.warning("Not all input fields were provided to module. Present: %s. Missing: %s.", present, missing)
+        return (lm, config, task_spec, demos, kwargs)
 
     def _forward_postprocess(self, completions, task_spec, **kwargs):
         pred = Prediction.from_completions(completions, task_spec=task_spec)
-        if kwargs.pop("_trace", True) and settings.trace is not None and settings.max_trace_size > 0:
+        if kwargs.pop("_trace", True) and settings.trace is not None and (settings.max_trace_size > 0):
             trace = settings.trace
             if len(trace) >= settings.max_trace_size:
                 trace.pop(0)
@@ -283,23 +197,12 @@ class Predict(Module, Parameter):
 
     async def aforward(self, **kwargs):
         lm, config, task_spec, demos, kwargs = self._forward_preprocess(**kwargs)
-
         transparency = settings.get("transparency", "strict")
         adapter, _adapter_notes = resolve_adapter(settings.adapter, transparency=transparency)
         config, _provenance = resolve_lm_config(lm, config)
-        metadata_token = set_active_call_metadata(
-            module=type(self).__name__,
-            phase="predict",
-            lm_role="default",
-        )
+        metadata_token = set_active_call_metadata(module=type(self).__name__, phase="predict", lm_role="default")
         try:
-            completions = await adapter.acall(
-                lm=lm,
-                config=config,
-                task_spec=task_spec,
-                demos=demos,
-                inputs=kwargs,
-            )
+            completions = await adapter.acall(lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=kwargs)
         finally:
             reset_active_call_metadata(metadata_token)
         return self._forward_postprocess(completions, task_spec, **kwargs)
@@ -316,86 +219,62 @@ class Predict(Module, Parameter):
 
 
 def _get_type_name(type_annotation) -> str:
-    """Helper method to get the name for a type annotation."""
-
     origin = get_origin(type_annotation)
     args = get_args(type_annotation)
-
     if origin is None:
-        # Primitives like str, int, etc.
         if hasattr(type_annotation, "__name__"):
             return type_annotation.__name__
         return str(type_annotation)
-
-    # Handle Literal types
     if origin is Literal:
         literal_values = ", ".join(repr(arg) for arg in args)
         return f"Literal[{literal_values}]"
-
-    # Types like list[str], dict[str, int], generics, etc.
     if args:
-        # Handle Ellipsis in tuples (e.g., tuple[int, ...])
         args_str = ", ".join("..." if arg is ... else _get_type_name(arg) for arg in args)
         origin_name = getattr(origin, "__name__", str(origin))
         return f"{origin_name}[{args_str}]"
-
     return getattr(origin, "__name__", str(origin))
 
 
 def _annotation_allows_none(annotation: Any) -> bool:
     origin = get_origin(annotation)
     args = get_args(annotation)
-
     if annotation is None or annotation is type(None):
         return True
-
     if origin is Annotated:
         return bool(args) and _annotation_allows_none(args[0])
-
     if origin is Union or origin is types.UnionType:
         return any(_annotation_allows_none(arg) for arg in args)
-
     return False
 
 
 def _is_value_compatible_with_type(value: Any, expected: type) -> bool:
-    """Return True if the value matches the expected type hint."""
-    # Special handle list[str] because we allow setting input type to str, however, invoking with a list thereof.
     if expected is str and isinstance(value, list) and all(isinstance(item, str) for item in value):
         return True
-
     return _check_type(value, expected)
 
 
 def _check_type(value: Any, expected: type) -> bool:
-    """Stdlib replacement for typeguard.check_type."""
     if expected is Any:
         return True
-
     origin = get_origin(expected)
     args = get_args(expected)
-
     if origin is Union or origin is types.UnionType:
         return any(_check_type(value, arg) for arg in args)
-
     if origin is Literal:
         return value in args
-
     if origin is list:
         if not isinstance(value, list):
             return False
         if args:
             return all(_check_type(item, args[0]) for item in value)
         return True
-
     if origin is dict:
         if not isinstance(value, dict):
             return False
         if args:
             key_type, val_type = args
-            return all(_check_type(k, key_type) and _check_type(v, val_type) for k, v in value.items())
+            return all((_check_type(k, key_type) and _check_type(v, val_type) for k, v in value.items()))
         return True
-
     if origin is tuple:
         if not isinstance(value, tuple):
             return False
@@ -404,30 +283,21 @@ def _check_type(value: Any, expected: type) -> bool:
                 return all(_check_type(item, args[0]) for item in value)
             if len(value) != len(args):
                 return False
-            return all(_check_type(item, arg) for item, arg in zip(value, args, strict=False))
+            return all((_check_type(item, arg) for item, arg in zip(value, args, strict=False)))
         return True
-
     if origin is set or origin is frozenset:
         if not isinstance(value, origin):
             return False
         if args:
             return all(_check_type(item, args[0]) for item in value)
         return True
-
     if isinstance(expected, type):
         return isinstance(value, expected)
-
     return False
 
 
 def serialize_object(obj):
-    """
-    Recursively serialize a given object into a JSON-compatible format.
-    Supports Pydantic models, lists, dicts, and primitive types.
-    """
     if isinstance(obj, BaseModel):
-        # Use model_dump with mode="json" to ensure all fields (including HttpUrl, datetime, etc.)
-        # are converted to JSON-serializable types (strings)
         return obj.model_dump(mode="json")
     if isinstance(obj, list):
         return [serialize_object(item) for item in obj]

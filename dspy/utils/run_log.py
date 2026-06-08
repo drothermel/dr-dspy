@@ -1,5 +1,3 @@
-"""JSONL run logging for LM calls."""
-
 from __future__ import annotations
 
 import datetime
@@ -13,15 +11,13 @@ from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
-
 _SESSION_LOCK = threading.Lock()
 _SESSION: dict[str, Any] | None = None
-
-_SECRET_KEY_PATTERN = re.compile(r"(api[_-]?key|authorization|token|secret)", re.IGNORECASE)
+_SECRET_KEY_PATTERN = re.compile("(api[_-]?key|authorization|token|secret)", re.IGNORECASE)
 
 
 def slug_run_id(raw: str) -> str:
-    slug = re.sub(r"[^a-zA-Z0-9._-]+", "_", raw.strip())
+    slug = re.sub("[^a-zA-Z0-9._-]+", "_", raw.strip())
     return slug or "default_run"
 
 
@@ -74,12 +70,7 @@ def _redact_content_part(part: dict[str, Any]) -> dict[str, Any]:
         data = part.get("input_audio", part.get("audio", {}))
         raw = data.get("data", "") if isinstance(data, dict) else ""
         encoded = raw.encode("utf-8") if isinstance(raw, str) else b""
-        return {
-            "type": part_type,
-            "redacted": True,
-            "sha256": _hash_bytes(encoded),
-            "byte_length": len(encoded),
-        }
+        return {"type": part_type, "redacted": True, "sha256": _hash_bytes(encoded), "byte_length": len(encoded)}
     return {"type": part_type, "redacted": True, "keys": sorted(part.keys())}
 
 
@@ -115,22 +106,16 @@ def get_run_session() -> dict[str, Any] | None:
 
 
 def init_run_session(
-    *,
-    run_log_enabled: bool,
-    run_log_dir: str | None,
-    settings_snapshot: dict[str, Any] | None = None,
+    *, run_log_enabled: bool, run_log_dir: str | None, settings_snapshot: dict[str, Any] | None = None
 ) -> Path | None:
-    """Create a new timestamped run directory and write run.json."""
     global _SESSION
     if not run_log_enabled:
         with _SESSION_LOCK:
             _SESSION = None
         return None
-
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     run_dir = resolve_log_root(run_log_dir) / resolve_run_bucket() / timestamp
     run_dir.mkdir(parents=True, exist_ok=True)
-
     snapshot = _serialize_for_json(settings_snapshot or {})
     run_json = {
         "timestamp": timestamp,
@@ -139,23 +124,16 @@ def init_run_session(
         "settings": snapshot,
     }
     (run_dir / "run.json").write_text(json.dumps(run_json, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-
     with _SESSION_LOCK:
-        _SESSION = {
-            "run_dir": run_dir,
-            "calls_path": run_dir / "calls.jsonl",
-            "timestamp": timestamp,
-        }
+        _SESSION = {"run_dir": run_dir, "calls_path": run_dir / "calls.jsonl", "timestamp": timestamp}
     return run_dir
 
 
 def append_call_record(record: dict[str, Any]) -> None:
-    """Append one JSON object as a line to calls.jsonl (thread-safe)."""
     with _SESSION_LOCK:
         session = _SESSION
     if session is None:
         return
-
     line = json.dumps(_serialize_for_json(record), ensure_ascii=False) + "\n"
     calls_path: Path = session["calls_path"]
     with _SESSION_LOCK, calls_path.open("a", encoding="utf-8") as handle:

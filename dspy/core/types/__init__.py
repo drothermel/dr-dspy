@@ -1,13 +1,4 @@
-"""Normalized request, response, and stream types for DSPy language models."""
-
-from dspy.core.types.builders import (
-    Assistant,
-    Developer,
-    System,
-    ToolCall,
-    ToolResult,
-    User,
-)
+from dspy.core.types.builders import Assistant, Developer, System, ToolCall, ToolResult, User
 from dspy.core.types.config import (
     LMConfig,
     LMPromptCacheConfig,

@@ -17,13 +17,7 @@ from dspy.core.types import (
 def test_config_extensions_surface_in_history_kwargs():
     config = LMConfig(temperature=0.2, extensions={"provider_flag": True})
     request = LMRequest(model="model", messages=[], config=config)
-    entry = LMHistoryEntry(
-        request=request,
-        response=LMResponse.from_text("ok"),
-        timestamp="timestamp",
-        uuid="uuid",
-    )
-
+    entry = LMHistoryEntry(request=request, response=LMResponse.from_text("ok"), timestamp="timestamp", uuid="uuid")
     assert entry.kwargs == {"provider_flag": True, "temperature": 0.2}
 
 
@@ -39,20 +33,18 @@ def test_lm_config_accepts_canonical_nested_fields():
         prompt_cache=LMPromptCacheConfig(enabled=True, key="prompt-cache"),
         extensions={"provider_flag": True},
     )
-
-    assert config.reasoning.effort == "high"  # ty:ignore[unresolved-attribute]
-    assert config.reasoning.summary == "auto"  # ty:ignore[unresolved-attribute]
-    assert config.tool_choice.mode == "auto"  # ty:ignore[unresolved-attribute]
-    assert config.tool_choice.parallel is False  # ty:ignore[unresolved-attribute]
-    assert config.prompt_cache.enabled is True  # ty:ignore[unresolved-attribute]
-    assert config.prompt_cache.key == "prompt-cache"  # ty:ignore[unresolved-attribute]
+    assert config.reasoning.effort == "high"
+    assert config.reasoning.summary == "auto"
+    assert config.tool_choice.mode == "auto"
+    assert config.tool_choice.parallel is False
+    assert config.prompt_cache.enabled is True
+    assert config.prompt_cache.key == "prompt-cache"
     assert config.extensions == {"provider_flag": True}
 
 
 def test_usage_normalizes_existing_user_visible_token_aliases():
     provider_usage = LMUsage(prompt_tokens=1, completion_tokens=2)
     canonical_usage = LMUsage(input_tokens=1, output_tokens=2)
-
     assert provider_usage.input_tokens == 1
     assert provider_usage.output_tokens == 2
     assert provider_usage.total_tokens == 3
@@ -63,13 +55,7 @@ def test_usage_normalizes_existing_user_visible_token_aliases():
 
 def test_default_config_does_not_serialize_empty_stop_sequences():
     request = LMRequest.from_call(model="model", prompt="hi")
-    entry = LMHistoryEntry(
-        request=request,
-        response=LMResponse.from_text("ok"),
-        timestamp="timestamp",
-        uuid="uuid",
-    )
-
+    entry = LMHistoryEntry(request=request, response=LMResponse.from_text("ok"), timestamp="timestamp", uuid="uuid")
     assert request.config.stop is None
     assert entry.kwargs == {}
 
@@ -79,7 +65,6 @@ def test_history_entry_exposes_typed_derived_properties():
     request = LMRequest.from_call(model="model", messages=[message], temperature=0.2)
     response = LMResponse.from_text("ok", model="response-model", usage={"input_tokens": 1}, cost=0.5)
     entry = LMHistoryEntry(request=request, response=response, timestamp="timestamp", uuid="uuid")
-
     assert entry.model == "model"
     assert entry.prompt == "hi"
     assert entry.messages == [message]

@@ -18,7 +18,7 @@ _databricks_sdk_installed = _is_databricks_sdk_installed()
 
 
 class DatabricksRMError(Exception):
-    """Error raised for Databricks retriever configuration or response failures."""
+    pass
 
 
 @dataclass
@@ -28,68 +28,10 @@ class Document:
     type: str
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "page_content": self.page_content,
-            "metadata": self.metadata,
-            "type": self.type,
-        }
+        return {"page_content": self.page_content, "metadata": self.metadata, "type": self.type}
 
 
 class DatabricksRM:
-    """
-    A retriever module that uses a Databricks Mosaic AI Vector Search Index to return the top-k
-    embeddings for a given query.
-
-    Examples:
-        Below is a code snippet that shows how to set up a Databricks Vector Search Index
-        and configure a DatabricksRM DSPy retriever module to query the index.
-
-        (example adapted from "Databricks: How to create and query a Vector Search Index:
-        https://docs.databricks.com/en/generative-ai/create-query-vector-search.html#create-a-vector-search-index)
-
-        ```python
-        from databricks.vector_search.client import VectorSearchClient
-
-        # Create a Databricks Vector Search Endpoint
-        client = VectorSearchClient()
-        client.create_endpoint(
-            name="your_vector_search_endpoint_name",
-            endpoint_type="STANDARD"
-        )
-
-        # Create a Databricks Direct Access Vector Search Index
-        index = client.create_direct_access_index(
-            endpoint_name="your_vector_search_endpoint_name",
-            index_name="your_index_name",
-            primary_key="id",
-            embedding_dimension=1024,
-            embedding_vector_column="text_vector",
-            schema={
-              "id": "int",
-              "field2": "str",
-              "field3": "float",
-              "text_vector": "array<float>"
-            }
-        )
-
-        # Create a DatabricksRM retriever module to query the Databricks Direct Access Vector
-        # Search Index
-        retriever = DatabricksRM(
-            databricks_index_name = "your_index_name",
-            docs_id_column_name="id",
-            text_column_name="field2",
-            k=3
-        )
-        ```
-
-        Below is a code snippet that shows how to query the Databricks Direct Access Vector
-        Search Index using the DatabricksRM retriever module:
-
-        ```python
-        retrieved_results = DatabricksRM(query="Example query text"))
-        ```
-    """
-
     def __init__(
         self,
         databricks_index_name: str,
@@ -105,38 +47,6 @@ class DatabricksRM:
         text_column_name: str = "text",
         use_with_databricks_agent_framework: bool = False,
     ) -> None:
-        """
-        Args:
-            databricks_index_name (str): The name of the Databricks Vector Search Index to query.
-            databricks_endpoint (str | None): The URL of the Databricks Workspace containing
-                the Vector Search Index. Defaults to the value of the ``DATABRICKS_HOST``
-                environment variable. If unspecified, the Databricks SDK is used to identify the
-                endpoint based on the current environment.
-            databricks_token (str | None): The Databricks Workspace authentication token to use
-                when querying the Vector Search Index. Defaults to the value of the
-                ``DATABRICKS_TOKEN`` environment variable. If unspecified, the Databricks SDK is
-                used to identify the token based on the current environment.
-            databricks_client_id (str): Databricks service principal id. If not specified,
-                the token is resolved from the current environment (DATABRICKS_CLIENT_ID).
-            databricks_client_secret (str): Databricks service principal secret. If not specified,
-                the endpoint is resolved from the current environment (DATABRICKS_CLIENT_SECRET).
-            columns (list[str] | None): Extra column names to include in response,
-                in addition to the document id and text columns specified by
-                ``docs_id_column_name`` and ``text_column_name``.
-            filters_json (str | None): A JSON string specifying additional query filters.
-                Example filters: ``{"id <": 5}`` selects records that have an ``id`` column value
-                less than 5, and ``{"id >=": 5, "id <": 10}`` selects records that have an ``id``
-                column value greater than or equal to 5 and less than 10.
-            k (int): The number of documents to retrieve.
-            docs_id_column_name (str): The name of the column in the Databricks Vector Search Index
-                containing document IDs.
-            docs_uri_column_name (str | None): The name of the column in the Databricks Vector Search Index
-                containing document URI.
-            text_column_name (str): The name of the column in the Databricks Vector Search Index
-                containing document text to retrieve.
-            use_with_databricks_agent_framework (bool): Whether to use the `DatabricksRM` in a way that is
-                compatible with the Databricks Mosaic Agent Framework.
-        """
         self.databricks_token = databricks_token if databricks_token is not None else os.environ.get("DATABRICKS_TOKEN")
         self.databricks_endpoint = (
             databricks_endpoint if databricks_endpoint is not None else os.environ.get("DATABRICKS_HOST")
@@ -151,11 +61,7 @@ class DatabricksRM:
         )
         if not _databricks_sdk_installed and (self.databricks_token, self.databricks_endpoint).count(None) > 0:
             raise ValueError(
-                "To retrieve documents with Databricks Vector Search, you must install the"
-                " databricks-sdk Python library, supply the databricks_token and"
-                " databricks_endpoint parameters, or set the DATABRICKS_TOKEN and DATABRICKS_HOST"
-                " environment variables. You may also supply a service principal the databricks_client_id and"
-                " databricks_client_secret parameters, or set the DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET"
+                "To retrieve documents with Databricks Vector Search, you must install the databricks-sdk Python library, supply the databricks_token and databricks_endpoint parameters, or set the DATABRICKS_TOKEN and DATABRICKS_HOST environment variables. You may also supply a service principal the databricks_client_id and databricks_client_secret parameters, or set the DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET"
             )
         self.databricks_index_name = databricks_index_name
         self.columns = list({docs_id_column_name, text_column_name, *(columns or [])})
@@ -167,48 +73,26 @@ class DatabricksRM:
         self.use_with_databricks_agent_framework = use_with_databricks_agent_framework
         if self.use_with_databricks_agent_framework:
             try:
-                import mlflow  # ty: ignore[unresolved-import]
+                import mlflow
 
-                mlflow.models.set_retriever_schema(
-                    primary_key="doc_id",
-                    text_column="page_content",
-                    doc_uri="doc_uri",
-                )
+                mlflow.models.set_retriever_schema(primary_key="doc_id", text_column="page_content", doc_uri="doc_uri")
             except ImportError:
                 raise ValueError(
-                    "To use the `DatabricksRM` retriever module with the Databricks Mosaic Agent Framework, "
-                    "you must install the mlflow Python library. Please install mlflow via `pip install mlflow`."
+                    "To use the `DatabricksRM` retriever module with the Databricks Mosaic Agent Framework, you must install the mlflow Python library. Please install mlflow via `pip install mlflow`."
                 )
 
     def __call__(
-        self,
-        query: str | list[float],
-        query_type: str = "ANN",
-        filters_json: str | None = None,
+        self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
     ) -> Prediction | list[dict[str, Any]]:
         return self.forward(query=query, query_type=query_type, filters_json=filters_json)
 
     def _extract_doc_ids(self, item: dict[str, Any]) -> str:
-        """Extracts the document id from a search result
-
-        Args:
-            item: dict[str, Any]: a record from the search results.
-        Returns:
-            str: document id.
-        """
         if self.docs_id_column_name == "metadata":
             docs_dict = json.loads(item["metadata"])
             return docs_dict["document_id"]
         return item[self.docs_id_column_name]
 
     def _get_extra_columns(self, item: dict[str, Any]) -> dict[str, Any]:
-        """Extracts search result column values, excluding the "text" and not "id" columns
-
-        Args:
-            item: dict[str, Any]: a record from the search results.
-        Returns:
-            dict[str, Any]: Search result column values, excluding the "text", "id" and "uri" columns.
-        """
         extra_columns = {
             k: v
             for k, v in item.items()
@@ -222,32 +106,8 @@ class DatabricksRM:
         return extra_columns
 
     def forward(
-        self,
-        query: str | list[float],
-        query_type: str = "ANN",
-        filters_json: str | None = None,
+        self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
     ) -> Prediction | list[dict[str, Any]]:
-        """
-        Retrieve documents from a Databricks Mosaic AI Vector Search Index that are relevant to the
-        specified query.
-
-        Args:
-            query (str | list[float]): The query text or numeric query vector for which to
-                retrieve relevant documents.
-            query_type (str): The type of search query to perform against the Databricks Vector
-                Search Index. Must be either 'ANN' (approximate nearest neighbor) or 'HYBRID'
-                (hybrid search).
-            filters_json (str | None): A JSON string specifying additional query filters.
-                Example filters: ``{"id <": 5}`` selects records that have an ``id`` column value
-                less than 5, and ``{"id >=": 5, "id <": 10}`` selects records that have an ``id``
-                column value greater than or equal to 5 and less than 10. If specified, this
-                parameter overrides the `filters_json` parameter passed to the constructor.
-
-        Returns:
-            A list of dictionaries when ``use_with_databricks_agent_framework`` is ``True``,
-            or a ``dspy.primitives.prediction.Prediction`` object when ``use_with_databricks_agent_framework`` is
-            ``False``.
-        """
         if isinstance(query, str):
             query_text = query
             query_vector = None
@@ -256,7 +116,6 @@ class DatabricksRM:
             query_text = None
         else:
             raise TypeError("Query must be a string or a list of floats.")
-
         if _databricks_sdk_installed:
             results = self._query_via_databricks_sdk(
                 index_name=self.databricks_index_name,
@@ -285,27 +144,21 @@ class DatabricksRM:
                 query_vector=query_vector,
                 filters_json=filters_json or self.filters_json,
             )
-
         col_names = [column["name"] for column in results["manifest"]["columns"]]
-
         if self.docs_id_column_name not in col_names:
             raise DatabricksRMError(
                 f"docs_id_column_name: '{self.docs_id_column_name}' is not in the index columns: \n {col_names}"
             )
-
         if self.text_column_name not in col_names:
             raise DatabricksRMError(
                 f"text_column_name: '{self.text_column_name}' is not in the index columns: \n {col_names}"
             )
-
         items = []
         if "data_array" in results["result"]:
             for data_row in results["result"]["data_array"]:
                 item = dict(zip(col_names, data_row, strict=False))
                 items += [item]
-
         sorted_docs = sorted(items, key=lambda x: x["score"], reverse=True)[: self.k]
-
         if self.use_with_databricks_agent_framework:
             return [
                 Document(
@@ -340,51 +193,14 @@ class DatabricksRM:
         databricks_client_secret: str | None,
         filters_json: str | None,
     ) -> dict[str, Any]:
-        """
-        Query a Databricks Vector Search Index via the Databricks SDK.
-        Assumes that the databricks-sdk Python library is installed.
-
-        Args:
-            index_name (str): Name of the Databricks vector search index to query
-            k (int): Number of relevant documents to retrieve.
-            columns (list[str]): Column names to include in response.
-            query_text (str | None): Text query for which to find relevant documents. Exactly
-                one of query_text or query_vector must be specified.
-            query_vector (list[float] | None): Numeric query vector for which to find relevant
-                documents. Exactly one of query_text or query_vector must be specified.
-            filters_json (str | None): JSON string representing additional query filters.
-            databricks_token (str): Databricks authentication token. If not specified,
-                the token is resolved from the current environment.
-            databricks_endpoint (str): Databricks index endpoint url. If not specified,
-                the endpoint is resolved from the current environment.
-            databricks_client_id (str): Databricks service principal id. If not specified,
-                the token is resolved from the current environment (DATABRICKS_CLIENT_ID).
-            databricks_client_secret (str): Databricks service principal secret. If not specified,
-                the endpoint is resolved from the current environment (DATABRICKS_CLIENT_SECRET).
-        Returns:
-        Returns:
-            dict[str, Any]: Parsed JSON response from the Databricks Vector Search Index query.
-        """
-
-        from databricks.sdk import WorkspaceClient  # ty: ignore[unresolved-import]
+        from databricks.sdk import WorkspaceClient
 
         if (query_text, query_vector).count(None) != 1:
             raise ValueError("Exactly one of query_text or query_vector must be specified.")
-
         if databricks_client_secret and databricks_client_id:
-            # Use client ID and secret for authentication if they are provided
-            databricks_client = WorkspaceClient(
-                client_id=databricks_client_id,
-                client_secret=databricks_client_secret,
-            )
-
+            databricks_client = WorkspaceClient(client_id=databricks_client_id, client_secret=databricks_client_secret)
         else:
-            # Fallback for token-based authentication
-            databricks_client = WorkspaceClient(
-                host=databricks_endpoint,
-                token=databricks_token,
-            )
-
+            databricks_client = WorkspaceClient(host=databricks_endpoint, token=databricks_token)
         return databricks_client.vector_search_indexes.query_index(
             index_name=index_name,
             query_type=query_type,
@@ -407,38 +223,12 @@ class DatabricksRM:
         query_vector: list[float] | None,
         filters_json: str | None,
     ) -> dict[str, Any]:
-        """
-        Query a Databricks Vector Search Index via the Python requests library.
-
-        Args:
-            index_name (str): Name of the Databricks vector search index to query
-            k (int): Number of relevant documents to retrieve.
-            columns (list[str]): Column names to include in response.
-            databricks_token (str): Databricks authentication token.
-            databricks_endpoint (str): Databricks index endpoint url.
-            query_text (str | None): Text query for which to find relevant documents. Exactly
-                one of query_text or query_vector must be specified.
-            query_vector (list[float] | None): Numeric query vector for which to find relevant
-                documents. Exactly one of query_text or query_vector must be specified.
-            filters_json (str | None): JSON string representing additional query filters.
-
-        Returns:
-            dict[str, Any]: Parsed JSON response from the Databricks Vector Search Index query.
-        """
         import requests
 
         if (query_text, query_vector).count(None) != 1:
             raise ValueError("Exactly one of query_text or query_vector must be specified.")
-
-        headers = {
-            "Authorization": f"Bearer {databricks_token}",
-            "Content-Type": "application/json",
-        }
-        payload: dict[str, object] = {
-            "columns": columns,
-            "num_results": k,
-            "query_type": query_type,
-        }
+        headers = {"Authorization": f"Bearer {databricks_token}", "Content-Type": "application/json"}
+        payload: dict[str, object] = {"columns": columns, "num_results": k, "query_type": query_type}
         if filters_json is not None:
             payload["filters_json"] = filters_json
         if query_text is not None:

@@ -14,8 +14,5 @@ def _field_names(spec_part: str) -> tuple[str, ...]:
 def ts(spec: str, instructions: str | None = None, **kwargs) -> TaskSpec:
     if instructions is None:
         inputs_str, outputs_str = spec.split("->", 1)
-        instructions = default_task_instructions(
-            inputs=_field_names(inputs_str),
-            outputs=_field_names(outputs_str),
-        )
+        instructions = default_task_instructions(inputs=_field_names(inputs_str), outputs=_field_names(outputs_str))
     return make_task_spec(spec, instructions=instructions, **kwargs)

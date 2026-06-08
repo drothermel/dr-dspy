@@ -34,23 +34,12 @@ def test_two_step_adapter_format_exact_messages_for_simple_signature_with_demo()
     QA = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
     adapter = TwoStepAdapter(DummyLM([{"answer": "x"}]), extraction_adapter=ChatAdapter())
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=adapter,
-        task_spec=QA,
-        demos=[{"question": "Q1", "answer": "A1"}],
-        inputs={"question": "Q2"},
+        adapter=adapter, task_spec=QA, demos=[{"question": "Q1", "answer": "A1"}], inputs={"question": "Q2"}
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "You are a helpful assistant that can solve tasks based on user input.\n"
-            "As input, you will be provided with:\n"
-            "1. `question` (str):\n"
-            "Your outputs must contain:\n"
-            "1. `answer` (str):\n"
-            "You should lay out your outputs in detail so that your answer can be understood by "
-            "another agent\n"
-            "Specific instructions: Given the fields `question`, produce the fields `answer`.",
+            "content": "You are a helpful assistant that can solve tasks based on user input.\nAs input, you will be provided with:\n1. `question` (str):\nYour outputs must contain:\n1. `answer` (str):\nYou should lay out your outputs in detail so that your answer can be understood by another agent\nSpecific instructions: Given the fields `question`, produce the fields `answer`.",
         },
         {"role": "user", "content": "question: Q1"},
         {"role": "assistant", "content": "answer: A1"},
@@ -74,20 +63,10 @@ def test_two_step_adapter_format_exact_messages_with_typed_outputs():
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=adapter, task_spec=TypedSignature, demos=[], inputs={"question": "Q"}
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "You are a helpful assistant that can solve tasks based on user input.\n"
-            "As input, you will be provided with:\n"
-            "1. `question` (str):\n"
-            "Your outputs must contain:\n"
-            "1. `count` (int): \n"
-            "2. `answer` (str):\n"
-            "You should lay out your outputs in detail so that your answer can be understood by "
-            "another agent\n"
-            "Specific instructions: Given the fields `question`, produce the fields `count`, "
-            "`answer`.",
+            "content": "You are a helpful assistant that can solve tasks based on user input.\nAs input, you will be provided with:\n1. `question` (str):\nYour outputs must contain:\n1. `count` (int): \n2. `answer` (str):\nYou should lay out your outputs in detail so that your answer can be understood by another agent\nSpecific instructions: Given the fields `question`, produce the fields `count`, `answer`.",
         },
         {"role": "user", "content": "question: Q"},
     ]
@@ -106,19 +85,13 @@ def test_two_step_adapter_call():
         instructions="Given the fields `question`, produce the fields `solution`, `answer`.",
     )
     program = Predict(TestSignature)
-
     main_lm = RecordingTextLM(["text from main LM"])
     extraction_lm = DummyLM([{"solution": "result", "answer": 12}])
-
     settings.configure(
-        lm=main_lm,
-        adapter=TwoStepAdapter(extraction_model=extraction_lm, extraction_adapter=ChatAdapter()),
+        lm=main_lm, adapter=TwoStepAdapter(extraction_model=extraction_lm, extraction_adapter=ChatAdapter())
     )
-
     result = asyncio.run(program.acall(question="What is 5 + 7?"))
-
     assert result.answer == 12
-
     main_messages = [message_to_openai_chat(message) for message in main_lm.requests[0].messages]
     assert len(main_messages) == 2
     assert main_messages[0]["role"] == "system"
@@ -130,7 +103,6 @@ def test_two_step_adapter_call():
     content = main_messages[1]["content"]
     assert "question:" in content.lower()
     assert "What is 5 + 7?" in content
-
     extraction_messages = extraction_lm.history[0].messages_as_openai
     assert len(extraction_messages) == 2
     assert extraction_messages[0]["role"] == "system"
@@ -154,18 +126,13 @@ async def test_two_step_adapter_async_call():
         instructions="Given the fields `question`, produce the fields `solution`, `answer`.",
     )
     program = Predict(TestSignature)
-
     main_lm = RecordingTextLM(["text from main LM"])
     extraction_lm = DummyLM([{"solution": "result", "answer": 12}])
-
     with settings.context(
-        lm=main_lm,
-        adapter=TwoStepAdapter(extraction_model=extraction_lm, extraction_adapter=ChatAdapter()),
+        lm=main_lm, adapter=TwoStepAdapter(extraction_model=extraction_lm, extraction_adapter=ChatAdapter())
     ):
         result = await program.acall(question="What is 5 + 7?")
-
     assert result.answer == 12
-
     main_messages = [message_to_openai_chat(message) for message in main_lm.requests[0].messages]
     assert len(main_messages) == 2
     assert main_messages[0]["role"] == "system"
@@ -177,7 +144,6 @@ async def test_two_step_adapter_async_call():
     content = main_messages[1]["content"]
     assert "question:" in content.lower()
     assert "What is 5 + 7?" in content
-
     extraction_messages = extraction_lm.history[0].messages_as_openai
     assert len(extraction_messages) == 2
     assert extraction_messages[0]["role"] == "system"
@@ -201,13 +167,10 @@ async def test_two_step_adapter_extraction():
         instructions="Given the fields `input_text`, produce the fields `tags`, `confidence`.",
     )
     first_response = "main LM response"
-
     extraction_lm = DummyLM([{"tags": ["AI", "deep learning", "neural networks"], "confidence": 0.87}])
     adapter = TwoStepAdapter(extraction_lm, extraction_adapter=ChatAdapter())
     settings.configure(adapter=adapter, lm=extraction_lm)
-
     result = await adapter._run_extraction(original_task_spec=ComplexSignature, text=first_response)
-
     assert result["tags"] == ["AI", "deep learning", "neural networks"]
     assert result["confidence"] == 0.87
 
@@ -222,9 +185,7 @@ async def test_two_step_adapter_extraction_errors():
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
     first_response = "main LM response"
-
     extraction_lm = RecordingTextLM(["not parseable extraction output"])
     adapter = TwoStepAdapter(extraction_lm, extraction_adapter=ChatAdapter())
-
     with pytest.raises(AdapterParseError):
         await adapter._run_extraction(original_task_spec=TestSignature, text=first_response)

@@ -7,6 +7,7 @@ from tests.task_spec.helpers import ts
 
 
 def test_get_dspy_source_code_from_py_module():
+
     class MyProgram(Module):
         def __init__(self):
             super().__init__()
@@ -25,6 +26,5 @@ def test_get_dspy_source_code_skips_builtin_predict():
 
 def test_get_dspy_source_code_raises_for_unsourcable_class():
     UnsourcableProgram = type("UnsourcableProgram", (Module,), {})
-
     with pytest.raises(OSError, match="source code not available"):
         get_dspy_source_code(UnsourcableProgram())

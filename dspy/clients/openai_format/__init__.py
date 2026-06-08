@@ -1,13 +1,3 @@
-"""Translate between DSPy's LM types and OpenAI-shaped JSON.
-
-This package does not call any provider. It only maps data shapes:
-
-```text
-LMRequest -> OpenAI Chat / Responses / text-completion kwargs
-provider response -> LMResponse
-```
-"""
-
 from dspy.clients.openai_format.chat_request import message_to_openai_chat, to_openai_chat_request
 from dspy.clients.openai_format.parse import (
     completion_to_lm_response,

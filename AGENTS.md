@@ -64,6 +64,8 @@ from dspy.adapters.types.tool import Tool
 tool = Tool(my_func, description="Describe what the tool does.")
 ```
 
+ReAct, CodeAct, RLM, and ReActV2 require `tools=[Tool(...)]` (raw callables are rejected).
+
 See `docs/migration/taskspec.md` for the full Signature → TaskSpec translation table.
 
 Field descriptions must be explicit under strict transparency (placeholder `${field}` descs are rejected).

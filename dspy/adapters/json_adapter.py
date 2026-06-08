@@ -29,11 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 def _has_open_ended_mapping(task_spec: TaskSpec) -> bool:
-    """
-    Check whether any output field in the task spec has an open-ended mapping type,
-    such as dict[str, Any]. Structured Outputs require explicit properties, so such fields
-    are incompatible.
-    """
     return any(get_origin(field.type_) is dict for field in task_spec.output_fields.values())
 
 
@@ -44,7 +39,6 @@ class JSONAdapter(ChatAdapter):
         use_native_function_calling: bool = True,
         parallel_tool_calls: bool | None = None,
     ) -> None:
-        # JSONAdapter uses native function calling by default.
         super().__init__(
             callbacks=callbacks,
             use_native_function_calling=use_native_function_calling,
@@ -52,12 +46,7 @@ class JSONAdapter(ChatAdapter):
         )
 
     async def _call_chat_adapter(
-        self,
-        lm: BaseLM,
-        config: LMConfig,
-        task_spec: TaskSpec,
-        demos: list[dict[str, Any]],
-        inputs: dict[str, Any],
+        self, lm: BaseLM, config: LMConfig, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any]
     ) -> list[dict[str, Any]]:
         return await super().acall(lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs)
 
@@ -69,23 +58,17 @@ class JSONAdapter(ChatAdapter):
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
         call_fn: Callable[
-            [BaseLM, LMConfig, TaskSpec, list[dict[str, Any]], dict[str, Any]],
-            Awaitable[list[dict[str, Any]]],
+            [BaseLM, LMConfig, TaskSpec, list[dict[str, Any]], dict[str, Any]], Awaitable[list[dict[str, Any]]]
         ],
     ) -> list[dict[str, Any]] | None:
-        """Common call logic for async adapter calls."""
         if "response_format" not in lm.supported_params:
             return await call_fn(lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs)
-
         has_tool_calls = any(field.type_ == ToolCalls for field in task_spec.output_fields.values())
-
         if (
             _has_open_ended_mapping(task_spec)
             or (not self.use_native_function_calling and has_tool_calls)
-            or not lm.supports_response_schema
+            or (not lm.supports_response_schema)
         ):
-            # We found that structured output mode doesn't work well with dspy.ToolCalls as output field.
-            # So we fall back to json mode if native function calling is disabled and ToolCalls is present.
             config = config.model_copy(update={"response_format": {"type": "json_object"}})
             return await call_fn(lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs)
         return None
@@ -111,7 +94,6 @@ class JSONAdapter(ChatAdapter):
         )
         if result is not None:
             return result
-
         try:
             structured_output_model = _get_structured_outputs_response_format(
                 task_spec=task_spec, use_native_function_calling=self.use_native_function_calling
@@ -119,8 +101,6 @@ class JSONAdapter(ChatAdapter):
             resolved_config = resolved_config.model_copy(update={"response_format": structured_output_model})
             return await super().acall(lm=lm, config=resolved_config, task_spec=task_spec, demos=demos, inputs=inputs)
         except LMError:
-            # Provider/backend failures should propagate; the fallback below is only for local structured-output
-            # setup/schema failures where retrying in JSON mode is appropriate.
             raise
         except Exception:
             logger.warning("Failed to use structured output format, falling back to JSON mode.")
@@ -131,7 +111,6 @@ class JSONAdapter(ChatAdapter):
     def format_field_structure(self, task_spec: TaskSpec) -> str:
         parts = []
         parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
-
         input_field_infos = task_spec_input_field_infos(task_spec)
         output_field_infos = task_spec_output_field_infos(task_spec)
 
@@ -154,6 +133,7 @@ class JSONAdapter(ChatAdapter):
 
     @override
     def user_message_output_requirements(self, task_spec: TaskSpec) -> str:
+
         def type_info(field_type: object) -> str:
             if field_type == ToolCalls:
                 return ' (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]})'
@@ -164,16 +144,13 @@ class JSONAdapter(ChatAdapter):
             )
 
         message = "Respond with a JSON object in the following order of fields: "
-        message += ", then ".join(f"`{f}`{type_info(field.type_)}" for f, field in task_spec.output_fields.items())
+        message += ", then ".join((f"`{f}`{type_info(field.type_)}" for f, field in task_spec.output_fields.items()))
         message += "."
         return message
 
     @override
     def format_assistant_message_content(
-        self,
-        task_spec: TaskSpec,
-        outputs: dict[str, Any],
-        missing_field_message: str | None = None,
+        self, task_spec: TaskSpec, outputs: dict[str, Any], missing_field_message: str | None = None
     ) -> str:
         output_field_infos = task_spec_output_field_infos(task_spec)
         fields_with_values = {
@@ -185,14 +162,12 @@ class JSONAdapter(ChatAdapter):
     @override
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
         fields = json_repair.loads(completion)
-
         if not isinstance(fields, dict):
-            pattern = r"\{(?:[^{}]|(?R))*\}"
+            pattern = "\\{(?:[^{}]|(?R))*\\}"
             match = regex.search(pattern, completion, regex.DOTALL)
             if match:
                 completion = match.group(0)
                 fields = json_repair.loads(completion)
-
         if not isinstance(fields, dict):
             raise AdapterParseError(
                 adapter_name="JSONAdapter",
@@ -200,36 +175,18 @@ class JSONAdapter(ChatAdapter):
                 lm_response=completion,
                 message="LM response cannot be serialized to a JSON object.",
             )
-
         fields = {k: v for k, v in fields.items() if k in task_spec.output_fields}
-
-        # Attempt to cast each value to type task_spec.output_fields[k].type_.
         for k, v in fields.items():
             if k in task_spec.output_fields:
                 fields[k] = parse_value(value=v, annotation=task_spec.output_fields[k].type_)
-
         if fields.keys() != task_spec.output_fields.keys():
             raise AdapterParseError(
-                adapter_name="JSONAdapter",
-                task_spec=task_spec,
-                lm_response=completion,
-                parsed_result=fields,
+                adapter_name="JSONAdapter", task_spec=task_spec, lm_response=completion, parsed_result=fields
             )
-
         return fields
 
     @override
     def format_field_with_value(self, fields_with_values: dict[FieldInfoWithName, Any], role: str = "user") -> str:
-        """
-        Formats the values of the specified fields according to the field's DSPy type (input or output),
-        annotation (e.g. str, int, etc.), and the type of the value itself. Joins the formatted values
-        into a single string, which is a multiline string if there are multiple fields.
-
-        Args:
-            fields_with_values: A dictionary mapping information about a field to its corresponding value.
-        Returns:
-            The joined formatted values of the fields, represented as a string.
-        """
         if role == "user":
             output = []
             for field, field_value in fields_with_values.items():
@@ -244,76 +201,45 @@ class JSONAdapter(ChatAdapter):
     def format_finetune_data(
         self, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any], outputs: dict[str, Any]
     ) -> dict[str, list[Any]]:
-        # TODO: implement format_finetune_data method in JSONAdapter
         raise NotImplementedError
 
 
 def _get_structured_outputs_response_format(
-    task_spec: TaskSpec,
-    use_native_function_calling: bool = True,
+    task_spec: TaskSpec, use_native_function_calling: bool = True
 ) -> type[pydantic.BaseModel]:
-    """
-    Builds a Pydantic model from a DSPy task spec's output_fields and ensures the generated JSON schema
-    is compatible with OpenAI Structured Outputs (all objects have a "required" key listing every property,
-    and additionalProperties is always false).
-
-    IMPORTANT: If any field's type is an open-ended mapping (e.g. dict[str, Any]), then a structured
-    schema cannot be generated since all properties must be explicitly declared. In that case, an exception
-    is raised so that the caller can fall back to using a plain "json_object" response_format.
-    """
-    # Keep this guard because callers may invoke the schema builder directly, bypassing _json_adapter_call_common().
     for name, field in task_spec.output_fields.items():
         if get_origin(field.type_) is dict:
             raise ValueError(
                 f"Field '{name}' has an open-ended mapping type which is not supported by Structured Outputs."
             )
-
     fields = {}
     for name, field in task_spec.output_fields.items():
         field_type = field.type_
         if use_native_function_calling and field_type == ToolCalls:
-            # Skip ToolCalls field if native function calling is enabled.
             continue
         fields[name] = (field_type, ...)
-
-    # Build the model with extra fields forbidden.
-    pydantic_model = pydantic.create_model(  # ty: ignore[no-matching-overload]
-        "DSPyProgramOutputs",
-        __config__=pydantic.ConfigDict(extra="forbid"),
-        **fields,
+    pydantic_model = pydantic.create_model(
+        "DSPyProgramOutputs", __config__=pydantic.ConfigDict(extra="forbid"), **fields
     )
-
-    # Generate the initial schema.
     schema = pydantic_model.model_json_schema()
-
-    # Remove any DSPy-specific metadata.
     for prop in schema.get("properties", {}).values():
         prop.pop("json_schema_extra", None)
 
     def enforce_required(schema_part: dict[str, Any]) -> None:
-        """
-        Recursively ensure that:
-            - for any object schema, a "required" key is added with all property names (or [] if no properties)
-            - additionalProperties is set to False regardless of the previous value.
-            - the same enforcement is run for nested arrays and definitions.
-        """
         if schema_part.get("type") == "object":
             props = schema_part.get("properties")
             if props is not None:
-                # For objects with explicitly declared properties:
                 schema_part["required"] = list(props.keys())
                 schema_part["additionalProperties"] = False
                 for sub_schema in props.values():
                     if isinstance(sub_schema, dict):
                         enforce_required(sub_schema)
             else:
-                # For objects with no properties (should not happen normally but a fallback).
                 schema_part["properties"] = {}
                 schema_part["required"] = []
                 schema_part["additionalProperties"] = False
         if schema_part.get("type") == "array" and isinstance(schema_part.get("items"), dict):
             enforce_required(schema_part["items"])
-        # Also enforce in any nested definitions / $defs.
         for key in ("$defs", "definitions"):
             if key in schema_part:
                 for def_schema in schema_part[key].values():
@@ -321,10 +247,8 @@ def _get_structured_outputs_response_format(
 
     enforce_required(schema)
 
-    # Override the model's JSON schema generation to return our precomputed schema.
     def model_json_schema(*_args: object, **_kwargs: object) -> dict[str, Any]:
         return schema
 
     pydantic_model.model_json_schema = model_json_schema
-
     return pydantic_model

@@ -40,28 +40,11 @@ class AdapterConversationMixin(AdapterMixinBase):
         return None
 
     def format_conversation_history(
-        self,
-        task_spec: TaskSpec,
-        history_field_name: str,
-        inputs: dict[str, Any],
+        self, task_spec: TaskSpec, history_field_name: str, inputs: dict[str, Any]
     ) -> list[LMMessage]:
-        """Format the conversation history.
-
-        This method formats the conversation history and the current input as multiturn messages.
-
-        Args:
-            task_spec: The DSPy task spec for which to format the conversation history.
-            history_field_name: The name of the history field in the task spec.
-            inputs: The input arguments to the DSPy module.
-
-        Returns:
-            A list of multiturn messages as expected by the LM.
-        """
         conversation_history = inputs[history_field_name].messages if history_field_name in inputs else None
-
         if conversation_history is None:
             return []
-
         messages = []
         for message in conversation_history:
             tool_call_field_name, tool_calls = _tool_calls_from_message(message)
@@ -70,29 +53,24 @@ class AdapterConversationMixin(AdapterMixinBase):
                 if tool_calls is not None and tool_calls.tool_call_results is not None
                 else None
             )
-
             user_content = self.format_user_message_content(task_spec=task_spec, inputs=message)
             if user_content:
                 messages.append(build_lm_message(role="user", content=user_content))
-
             if self.use_native_function_calling and tool_calls is not None:
                 content_task_spec = task_spec
                 for name, field in task_spec.output_fields.items():
                     if field.type_ == ToolCalls or message.get(name) is None:
                         content_task_spec = content_task_spec.delete(name)
-
                 content = (
                     self.format_assistant_message_content(task_spec=content_task_spec, outputs=message)
                     if content_task_spec.output_fields
                     else ""
                 )
-
                 if tool_call_results is not None:
                     tool_call_ids = [tool_call.id for tool_call in tool_calls.tool_calls]
                     result_ids = [result.call_id for result in tool_call_results.tool_call_results]
                     if tool_call_ids != result_ids or not all(tool_call_ids):
                         tool_call_results = None
-
                 if content or tool_call_results is not None:
                     assistant_kwargs: dict[str, Any] = {"content": content or None}
                     if tool_call_results is not None:
@@ -100,25 +78,19 @@ class AdapterConversationMixin(AdapterMixinBase):
                             _tool_call_as_openai_message_tool_call(tool_call) for tool_call in tool_calls.tool_calls
                         ]
                     messages.append(build_lm_message("assistant", **assistant_kwargs))
-
                 if tool_call_results is not None:
                     for result in tool_call_results.tool_call_results:
                         content = _tool_result_content(result.value)
                         messages.append(
                             build_lm_message(
-                                role="tool",
-                                content=content,
-                                tool_call_id=result.call_id,
-                                name=result.name,
+                                role="tool", content=content, tool_call_id=result.call_id, name=result.name
                             )
                         )
                 continue
-
             assistant_values = message
-            if tool_call_field_name is not None and tool_calls is not None and tool_call_results is not None:
+            if tool_call_field_name is not None and tool_calls is not None and (tool_call_results is not None):
                 assistant_values = dict(message)
                 assistant_values[tool_call_field_name] = tool_calls.model_copy(update={"tool_call_results": None})
-
             assistant_content = self.format_assistant_message_content(task_spec=task_spec, outputs=assistant_values)
             if assistant_content:
                 messages.append(build_lm_message(role="assistant", content=assistant_content))
@@ -126,7 +98,5 @@ class AdapterConversationMixin(AdapterMixinBase):
                 result_input = {"tool_call_results": tool_call_results}
                 content = self.format_user_message_content(task_spec=ToolCallResultsTaskSpec(), inputs=result_input)
                 messages.append(build_lm_message(role="user", content=content))
-
         del inputs[history_field_name]
-
         return messages

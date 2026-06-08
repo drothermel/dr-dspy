@@ -1,5 +1,3 @@
-"""OpenAI content-block coercion for LM parts."""
-
 from __future__ import annotations
 
 import mimetypes
@@ -29,7 +27,6 @@ def _parts_from_openai_content(content: Any) -> list[LMPart]:
         return [LMTextPart(text=content)]
     if not isinstance(content, list):
         return [_coerce_part(content)]
-
     parts = []
     for item in content:
         item_type = item.get("type") if isinstance(item, dict) else None
@@ -70,11 +67,9 @@ def _tool_call_from_openai(tool_call: Any) -> LMToolCallPart:
         if isinstance(part, LMToolCallPart):
             return part
         raise TypeError(f"Cannot convert {type(tool_call)!r} to an LMToolCallPart.")
-
     function = tool_call.get("function", {})
     if not isinstance(function, Mapping):
         function = {}
-
     args = function.get("arguments", {})
     if isinstance(args, str):
         args = _parse_json_object(args)
@@ -82,12 +77,7 @@ def _tool_call_from_openai(tool_call: Any) -> LMToolCallPart:
         args = dict(args)
     else:
         args = {}
-
-    return LMToolCallPart(
-        id=tool_call.get("id"),
-        name=function.get("name") or tool_call.get("name") or "",
-        args=args,
-    )
+    return LMToolCallPart(id=tool_call.get("id"), name=function.get("name") or tool_call.get("name") or "", args=args)
 
 
 def _image_source_to_part(source: str) -> LMImagePart:
@@ -103,12 +93,10 @@ def _image_source_to_part(source: str) -> LMImagePart:
 def _audio_dict_to_part(audio: dict[str, Any]) -> LMAudioPart:
     if not isinstance(audio, dict):
         raise TypeError("Audio content block must be a mapping.")
-
     audio_format = audio.get("format") or "wav"
     if not isinstance(audio_format, str):
         raise TypeError("Audio format must be a string.")
     media_type = audio_format if "/" in audio_format else f"audio/{audio_format}"
-
     if audio.get("data") is not None:
         data = audio["data"]
         if isinstance(data, str) and data.startswith("data:"):
@@ -141,17 +129,12 @@ def _document_dict_to_part(item: dict[str, Any]) -> LMDocumentPart:
     for source_key in ("data", "url", "file_id", "path"):
         if item.get(source_key) is not None:
             return LMDocumentPart(**{source_key: item[source_key]}, media_type=media_type, **common)
-
     source = item.get("source")
     if isinstance(source, dict):
-        return LMDocumentPart(
-            source=source,
-            citations=item.get("citations") or {},
-            **common,  # ty:ignore[invalid-argument-type]
-        )
+        return LMDocumentPart(source=source, citations=item.get("citations") or {}, **common)
     if isinstance(source, str):
         kwargs = _media_source_kwargs(source, default_media_type=media_type)
-        return LMDocumentPart(**kwargs, **common)  # ty:ignore[invalid-argument-type]
+        return LMDocumentPart(**kwargs, **common)
     raise ValueError("Document content block requires source.")
 
 
@@ -174,20 +157,18 @@ def _media_dict_to_video_part(video: dict[str, Any]) -> LMVideoPart:
 
 def _split_data_uri(value: str) -> tuple[str, str]:
     if not value.startswith("data:") or "," not in value:
-        return "application/octet-stream", value
+        return ("application/octet-stream", value)
     header, data = value.split(",", 1)
     media_type = header.removeprefix("data:").split(";", 1)[0]
-    return media_type, data
+    return (media_type, data)
 
 
 def _media_source_kwargs(source: str, *, default_media_type: str) -> dict[str, str]:
     if source.startswith("data:"):
         media_type, data = _split_data_uri(source)
         return {"data": data, "media_type": media_type}
-
     parsed = urlparse(source)
     if parsed.scheme in {"http", "https"}:
         media_type = mimetypes.guess_type(parsed.path)[0] or default_media_type
         return {"url": source, "media_type": media_type}
-
     return {"file_id": source, "media_type": default_media_type}

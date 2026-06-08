@@ -7,8 +7,7 @@ import pytest
 try:
     from litellm import Choices, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
-
+    pytest.skip("litellm is not installed", allow_module_level=True)
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
 from dspy.dsp.utils.settings import settings
@@ -21,20 +20,11 @@ from dspy.teleprompt.bootstrap_trace import FailedPrediction, bootstrap_trace_da
 
 
 def test_bootstrap_trace_data():
-    """Test bootstrap_trace_data function with a single Predict program."""
-
     string_to_int_task_spec = make_task_spec(
-        {
-            "text": FieldSpec.input("text", str),
-            "number": FieldSpec.output("number", int),
-        },
+        {"text": FieldSpec.input("text", str), "number": FieldSpec.output("number", int)},
         instructions="Convert a string number to integer",
     )
-
-    # Create program with a single Predict.
     program = Predict(string_to_int_task_spec)
-
-    # Create dummy dataset of size 5
     dataset = [
         Example(text="one", number=1).with_inputs("text"),
         Example(text="two", number=2).with_inputs("text"),
@@ -43,51 +33,36 @@ def test_bootstrap_trace_data():
         Example(text="five", number=5).with_inputs("text"),
     ]
 
-    # Define exact match metric
     def exact_match_metric(example, prediction, trace=None):
         return example.number == prediction.number
 
-    # Configure dspy
     settings.configure(lm=LM(model="openai/gpt-4o-mini"), adapter=JSONAdapter())
-
-    # Mock litellm completion responses
-    # 4 successful responses and 1 that will trigger AdapterParseError
     successful_responses = [
         ModelResponse(
-            choices=[Choices(message=Message(content='```json\n{"number": 1}\n```'))],
-            model="openai/gpt-4o-mini",
+            choices=[Choices(message=Message(content='```json\n{"number": 1}\n```'))], model="openai/gpt-4o-mini"
         ),
         ModelResponse(
-            choices=[Choices(message=Message(content='```json\n{"number": 2}\n```'))],
-            model="openai/gpt-4o-mini",
+            choices=[Choices(message=Message(content='```json\n{"number": 2}\n```'))], model="openai/gpt-4o-mini"
         ),
         ModelResponse(
-            choices=[Choices(message=Message(content='```json\n{"number": 3}\n```'))],
-            model="openai/gpt-4o-mini",
+            choices=[Choices(message=Message(content='```json\n{"number": 3}\n```'))], model="openai/gpt-4o-mini"
         ),
         ModelResponse(
-            choices=[Choices(message=Message(content='```json\n{"number": 4}\n```'))],
-            model="openai/gpt-4o-mini",
+            choices=[Choices(message=Message(content='```json\n{"number": 4}\n```'))], model="openai/gpt-4o-mini"
         ),
     ]
 
-    # Create a side effect that will trigger AdapterParseError on the 3rd call (index 2)
     def completion_side_effect(*args: object, **kwargs: object):
-        call_count = completion_side_effect.call_count  # ty: ignore[unresolved-attribute]
-        completion_side_effect.call_count += 1  # ty: ignore[unresolved-attribute]
-
+        call_count = completion_side_effect.call_count
+        completion_side_effect.call_count += 1
         if call_count in (2, 3):
-            # Return malformed responses for both structured-output mode and JSON-mode fallback.
             return ModelResponse(
-                choices=[Choices(message=Message(content="This is an invalid JSON!"))],
-                model="openai/gpt-4o-mini",
+                choices=[Choices(message=Message(content="This is an invalid JSON!"))], model="openai/gpt-4o-mini"
             )
         return successful_responses[call_count if call_count < 2 else call_count - 2]
 
-    completion_side_effect.call_count = 0  # ty: ignore[unresolved-attribute]
-
+    completion_side_effect.call_count = 0
     with mock.patch("litellm.acompletion", new=mock.AsyncMock(side_effect=completion_side_effect)):
-        # Call bootstrap_trace_data
         results = asyncio.run(
             bootstrap_trace_data(
                 program=program,
@@ -98,40 +73,27 @@ def test_bootstrap_trace_data():
                 capture_failed_parses=True,
             )
         )
-
-    # Verify results
     assert len(results) == 5, f"Expected 5 results, got {len(results)}"
-
-    # Count successful and failed predictions
     successful_count = 0
     failed_count = 0
-
     for result in results:
         assert "example" in result
         assert "prediction" in result
         assert "trace" in result
         assert "example_ind" in result
         assert "score" in result
-
         if isinstance(result["prediction"], FailedPrediction):
             failed_count += 1
-            # Verify failed prediction structure
             assert hasattr(result["prediction"], "completion_text")
             assert hasattr(result["prediction"], "format_reward")
             assert result["prediction"].completion_text == "This is an invalid JSON!"
         else:
             successful_count += 1
-            # Verify successful prediction structure
             assert hasattr(result["prediction"], "number")
-
-    # Verify we have the expected number of successful and failed bootstrapping
     assert successful_count == 4, f"Expected 4 successful predictions, got {successful_count}"
     assert failed_count == 1, f"Expected 1 failed prediction, got {failed_count}"
-
-    # Verify that traces are present
     for result in results:
         assert len(result["trace"]) > 0, "Trace should not be empty"
-        # Each trace entry should be a tuple of (predictor, inputs, prediction)
         for trace_entry in result["trace"]:
             assert len(trace_entry) == 3, "Trace entry should have 3 elements"
 
@@ -140,7 +102,7 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch):
     from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
 
     class DummyProgram(Module):
-        async def aforward(self, **kwargs: object):  # pragma: no cover - stub aforward
+        async def aforward(self, **kwargs: object):
             return Prediction()
 
     captured_metadata: dict[str, Any] = {}
@@ -158,13 +120,9 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch):
             return _Result()
 
     monkeypatch.setattr(bootstrap_trace_module, "Evaluate", DummyEvaluate)
-
     asyncio.run(
         bootstrap_trace_module.bootstrap_trace_data(
-            program=DummyProgram(),
-            dataset=[],
-            callback_metadata={"disable_logging": True},
+            program=DummyProgram(), dataset=[], callback_metadata={"disable_logging": True}
         )
     )
-
     assert captured_metadata["value"] == {"disable_logging": True}

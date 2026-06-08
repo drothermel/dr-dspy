@@ -4,7 +4,6 @@ from typing import cast, overload
 
 from dspy.datasets.dataset import Dataset
 
-### A bunch of colors, originally from matplotlib
 all_colors = [
     "alice blue",
     "dodger blue",
@@ -165,20 +164,14 @@ class Colors(Dataset):
             test_size=test_size,
             input_keys=input_keys,
         )
-
         self.sort_by_suffix = sort_by_suffix
         colors = self.sorted_by_suffix(all_colors)
-
-        train_size = int(
-            len(colors) * 0.6
-        )  # chosen to ensure that similar colors aren't repeated between train and dev
-        train_colors, dev_colors = colors[:train_size], colors[train_size:]
-
+        train_size = int(len(colors) * 0.6)
+        train_colors, dev_colors = (colors[:train_size], colors[train_size:])
         train_rows = [{"color": color} for color in train_colors]
         dev_rows = [{"color": color} for color in dev_colors]
         self._train = train_rows
         self._dev = dev_rows
-
         random.Random(0).shuffle(train_rows)
         random.Random(0).shuffle(dev_rows)
 
@@ -191,10 +184,8 @@ class Colors(Dataset):
     def sorted_by_suffix(self, colors: Sequence[str] | Sequence[dict[str, str]]) -> list[str] | list[dict[str, str]]:
         if not self.sort_by_suffix:
             return cast("list[str] | list[dict[str, str]]", list(colors))
-
         if not colors:
             return cast("list[str] | list[dict[str, str]]", list(colors))
-
         if isinstance(colors[0], str):
             return cast("list[str]", sorted(colors, key=lambda x: x[::-1]))
         return cast("list[dict[str, str]]", sorted(colors, key=lambda x: x["color"][::-1]))

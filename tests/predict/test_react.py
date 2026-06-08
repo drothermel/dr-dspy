@@ -8,6 +8,7 @@ from typing_extensions import override
 import dspy.adapters.base as adapter_base
 import dspy.adapters.utils as adapter_utils
 from dspy.adapters.chat_adapter import ChatAdapter
+from dspy.adapters.types.tool import Tool
 from dspy.dsp.utils.settings import settings
 from dspy.predict.react import ReAct
 from dspy.primitives.prediction import Prediction
@@ -18,9 +19,20 @@ from tests.task_spec.helpers import ts
 
 
 @pytest.mark.extra
+def test_react_requires_tool_instances():
+
+    def search(query: str) -> str:
+        return query
+
+    with pytest.raises(TypeError, match="tools must be Tool instances"):
+        ReAct(ts("question -> answer"), tools=[search])
+
+
 def test_tool_observation_preserves_custom_type():
     pytest.importorskip("PIL.Image")
-    from PIL import Image
+    from PIL import Image as PILImage
+
+    from dspy.adapters.types.image import Image
 
     captured_calls = []
 
@@ -28,41 +40,31 @@ def test_tool_observation_preserves_custom_type():
         @override
         def format_user_message_content(self, task_spec, inputs, *args: object, **kwargs: object):
             captured_calls.append((task_spec, dict(inputs)))
-            return super().format_user_message_content(task_spec, inputs, *args, **kwargs)  # ty:ignore[invalid-argument-type]
+            return super().format_user_message_content(task_spec, inputs, *args, **kwargs)
 
     def make_images():
-        return Image("https://example.com/test.png"), Image(Image.new("RGB", (100, 100), "red"))  # ty:ignore[call-non-callable]
+        return (Image("https://example.com/test.png"), Image(PILImage.new("RGB", (100, 100), "red")))
 
     adapter = SpyChatAdapter()
     lm = DummyLM(
         [
-            {
-                "next_thought": "I should call the image tool.",
-                "next_tool_name": "make_images",
-                "next_tool_args": {},
-            },
-            {
-                "next_thought": "I now have the image so I can finish.",
-                "next_tool_name": "finish",
-                "next_tool_args": {},
-            },
+            {"next_thought": "I should call the image tool.", "next_tool_name": "make_images", "next_tool_args": {}},
+            {"next_thought": "I now have the image so I can finish.", "next_tool_name": "finish", "next_tool_args": {}},
             {"reasoning": "image ready", "answer": "done"},
         ],
         adapter=adapter,
     )
     settings.configure(lm=lm, adapter=adapter)
-
-    react = ReAct(ts("question -> answer"), tools=[make_images])
+    react = ReAct(ts("question -> answer"), tools=[Tool(make_images, description="Create images.")])
     asyncio.run(react(question="Draw me something red"))
-
     sigs_with_obs = [sig for sig, inputs in captured_calls if "observation_0" in inputs]
     assert sigs_with_obs, "Expected ReAct to format a trajectory containing observation_0"
-
     observation_content = lm.history[1].messages_as_openai[1]["content"]
     assert sum(1 for part in observation_content if isinstance(part, dict) and part.get("type") == "image_url") == 2
 
 
 def test_tool_calling_with_pydantic_args():
+
     class CalendarEvent(BaseModel):
         name: str
         date: str
@@ -78,16 +80,16 @@ def test_tool_calling_with_pydantic_args():
             "participant_name": FieldSpec.input("participant_name", desc="The name of the participant to invite"),
             "event_info": FieldSpec.input("event_info", type_=CalendarEvent, desc="The information about the event"),
             "invitation_letter": FieldSpec.output(
-                "invitation_letter",
-                desc="The invitation letter to be sent to the participant",
+                "invitation_letter", desc="The invitation letter to be sent to the participant"
             ),
         },
         instructions="Write invitation letters.",
         name="InvitationSignature",
     )
-
-    react = ReAct(InvitationSignature, tools=[write_invitation_letter])
-
+    react = ReAct(
+        InvitationSignature,
+        tools=[Tool(write_invitation_letter, description="Write an invitation letter for a participant.")],
+    )
     lm = DummyLM(
         [
             {
@@ -103,10 +105,7 @@ def test_tool_calling_with_pydantic_args():
                 },
             },
             {
-                "next_thought": (
-                    "I have successfully written the invitation letter for Alice to the Science Fair. Now "
-                    "I can finish the task."
-                ),
+                "next_thought": "I have successfully written the invitation letter for Alice to the Science Fair. Now I can finish the task.",
                 "next_tool_name": "finish",
                 "next_tool_args": {},
             },
@@ -117,19 +116,15 @@ def test_tool_calling_with_pydantic_args():
         ]
     )
     settings.configure(lm=lm)
-
     outputs = asyncio.run(
         react(
             participant_name="Alice",
             event_info=CalendarEvent(
-                name="Science Fair",
-                date="Friday",
-                participants={"Alice": "female", "Bob": "male"},
+                name="Science Fair", date="Friday", participants={"Alice": "female", "Bob": "male"}
             ),
         )
     )
     assert outputs.invitation_letter == "It's my honor to invite Alice to the Science Fair event on Friday."
-
     expected_trajectory = {
         "thought_0": "I need to write an invitation letter for Alice to the Science Fair event.",
         "tool_name_0": "write_invitation_letter",
@@ -151,19 +146,16 @@ def test_tool_calling_with_pydantic_args():
 
 
 def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(monkeypatch):
+
     def get_user_info(name: str):
         return {"name": name}
 
     CustomerService = make_task_spec(
-        {
-            "user_request": FieldSpec.input("user_request"),
-            "process_result": FieldSpec.output("process_result"),
-        },
+        {"user_request": FieldSpec.input("user_request"), "process_result": FieldSpec.output("process_result")},
         instructions="Handle customer service requests.",
         name="CustomerService",
     )
-
-    react = ReAct(CustomerService, tools=[get_user_info])
+    react = ReAct(CustomerService, tools=[Tool(get_user_info, description="Get user information by name.")])
     problem_annotation = react.react.task_spec.output_fields["next_tool_args"].type_
 
     def guarded_issubclass(cls, class_or_tuple):
@@ -173,7 +165,6 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
 
     monkeypatch.setattr(adapter_base, "issubclass", guarded_issubclass, raising=False)
     monkeypatch.setattr(adapter_utils, "issubclass", guarded_issubclass, raising=False)
-
     lm = DummyLM(
         [
             {
@@ -192,21 +183,19 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
             },
         ]
     )
-
     with settings.context(lm=lm):
         result = asyncio.run(react(user_request="Help me, my name is Adam"))
-
     assert result.process_result == "Resolved Adam's request."
     assert result.trajectory["tool_name_0"] == "get_user_info"
     assert result.trajectory["tool_args_0"] == {"name": "Adam"}
 
 
 def test_tool_calling_without_typehint():
+
     def foo(a, b):
-        """Add two numbers."""
         return a + b
 
-    react = ReAct(ts("a, b -> c:int"), tools=[foo])
+    react = ReAct(ts("a, b -> c:int"), tools=[Tool(foo, description="Combine inputs.")])
     lm = DummyLM(
         [
             {"next_thought": "I need to add two numbers.", "next_tool_name": "foo", "next_tool_args": {"a": 1, "b": 2}},
@@ -216,14 +205,10 @@ def test_tool_calling_without_typehint():
     )
     settings.configure(lm=lm)
     outputs = asyncio.run(react(a=1, b=2))
-
     expected_trajectory = {
         "thought_0": "I need to add two numbers.",
         "tool_name_0": "foo",
-        "tool_args_0": {
-            "a": 1,
-            "b": 2,
-        },
+        "tool_args_0": {"a": 1, "b": 2},
         "observation_0": 3,
         "thought_1": "I have the sum, now I can finish.",
         "tool_name_1": "finish",
@@ -234,44 +219,33 @@ def test_tool_calling_without_typehint():
 
 
 def test_trajectory_truncation():
-    # Create a simple tool for testing
+
     def echo(text: str) -> str:
         return f"Echoed: {text}"
 
-    # Create ReAct instance with our echo tool
-    react = ReAct(ts("input_text -> output_text"), tools=[echo])
-
-    # Mock react.react to simulate multiple tool calls
+    react = ReAct(ts("input_text -> output_text"), tools=[Tool(echo, description="Echo input text.")])
     call_count = 0
 
     async def mock_react(**kwargs: object):
         nonlocal call_count
         call_count += 1
-
         if call_count < 3:
-            # First 2 calls use the echo tool
             return Prediction(
                 next_thought=f"Thought {call_count}",
                 next_tool_name="echo",
                 next_tool_args={"text": f"Text {call_count}"},
             )
         if call_count == 3:
-            # The 3rd call raises context window exceeded error
             raise ContextWindowExceededError
-        # The 4th call finishes
         return Prediction(next_thought="Final thought", next_tool_name="finish", next_tool_args={})
 
-    react.react = mock_react  # ty:ignore[invalid-assignment]
+    react.react = mock_react
 
     async def mock_extract(**kwargs: object):
         return Prediction(output_text="Final output")
 
-    react.extract = mock_extract  # ty:ignore[invalid-assignment]
-
-    # Call forward and get the result
+    react.extract = mock_extract
     result = asyncio.run(react(input_text="test input"))
-
-    # Verify that older entries in the trajectory were truncated
     assert "thought_0" not in result.trajectory
     assert "thought_2" in result.trajectory
     assert result.output_text == "Final output"
@@ -279,24 +253,23 @@ def test_trajectory_truncation():
 
 @pytest.mark.asyncio
 async def test_context_window_exceeded_after_retries():
+
     def echo(text: str) -> str:
         return f"Echoed: {text}"
 
-    react = ReAct(ts("input_text -> output_text"), tools=[echo])
+    react = ReAct(ts("input_text -> output_text"), tools=[Tool(echo, description="Echo input text.")])
 
     async def mock_react(**kwargs: object):
         raise ContextWindowExceededError
 
-    # Test sync version
     extract_calls = []
 
     async def mock_extract(**kwargs: object):
         extract_calls.append(kwargs)
         return Prediction(output_text="Fallback output")
 
-    react.react = mock_react  # ty:ignore[invalid-assignment]
-    react.extract = mock_extract  # ty:ignore[invalid-assignment]
-
+    react.react = mock_react
+    react.extract = mock_extract
     result = await react(input_text="test input")
     assert result.trajectory == {}
     assert result.output_text == "Fallback output"
@@ -306,34 +279,21 @@ async def test_context_window_exceeded_after_retries():
 
 
 def test_error_retry():
-    # --- a tiny tool that always fails -------------------------------------
+
     def foo(a, b):
         raise Exception("tool error")
 
-    # --- program under test -------------------------------------------------
-    react = ReAct(ts("a, b -> c:int"), tools=[foo])
+    react = ReAct(ts("a, b -> c:int"), tools=[Tool(foo, description="Combine inputs.")])
     lm = DummyLM(
         [
-            {
-                "next_thought": "I need to add two numbers.",
-                "next_tool_name": "foo",
-                "next_tool_args": {"a": 1, "b": 2},
-            },
-            {
-                "next_thought": "I need to add two numbers.",
-                "next_tool_name": "foo",
-                "next_tool_args": {"a": 1, "b": 2},
-            },
-            # (The model *would* succeed on the 3rd turn, but max_iters=2 stops earlier.)
+            {"next_thought": "I need to add two numbers.", "next_tool_name": "foo", "next_tool_args": {"a": 1, "b": 2}},
+            {"next_thought": "I need to add two numbers.", "next_tool_name": "foo", "next_tool_args": {"a": 1, "b": 2}},
             {"reasoning": "I added the numbers successfully", "c": 3},
         ]
     )
     settings.configure(lm=lm)
-
     outputs = asyncio.run(react(a=1, b=2, max_iters=2))
     traj = outputs.trajectory
-
-    # --- exact-match checks (thoughts + tool calls) -------------------------
     control_expected = {
         "thought_0": "I need to add two numbers.",
         "tool_name_0": "foo",
@@ -344,17 +304,14 @@ def test_error_retry():
     }
     for k, v in control_expected.items():
         assert traj[k] == v, f"{k} mismatch"
-
-    # --- flexible checks for observations ----------------------------------
-    # We only care that each observation mentions our error string; we ignore
-    # any extra traceback detail or differing prefixes.
     for i in range(2):
         obs = traj[f"observation_{i}"]
-        assert re.search(r"\btool error\b", obs), f"unexpected observation_{i!r}: {obs}"
+        assert re.search("\\btool error\\b", obs), f"unexpected observation_{i!r}: {obs}"
 
 
 @pytest.mark.asyncio
 async def test_async_tool_calling_with_pydantic_args():
+
     class CalendarEvent(BaseModel):
         name: str
         date: str
@@ -370,16 +327,16 @@ async def test_async_tool_calling_with_pydantic_args():
             "participant_name": FieldSpec.input("participant_name", desc="The name of the participant to invite"),
             "event_info": FieldSpec.input("event_info", type_=CalendarEvent, desc="The information about the event"),
             "invitation_letter": FieldSpec.output(
-                "invitation_letter",
-                desc="The invitation letter to be sent to the participant",
+                "invitation_letter", desc="The invitation letter to be sent to the participant"
             ),
         },
         instructions="Write invitation letters.",
         name="InvitationSignature",
     )
-
-    react = ReAct(InvitationSignature, tools=[write_invitation_letter])
-
+    react = ReAct(
+        InvitationSignature,
+        tools=[Tool(write_invitation_letter, description="Write an invitation letter for a participant.")],
+    )
     lm = DummyLM(
         [
             {
@@ -395,10 +352,7 @@ async def test_async_tool_calling_with_pydantic_args():
                 },
             },
             {
-                "next_thought": (
-                    "I have successfully written the invitation letter for Alice to the Science Fair. Now "
-                    "I can finish the task."
-                ),
+                "next_thought": "I have successfully written the invitation letter for Alice to the Science Fair. Now I can finish the task.",
                 "next_tool_name": "finish",
                 "next_tool_args": {},
             },
@@ -412,13 +366,10 @@ async def test_async_tool_calling_with_pydantic_args():
         outputs = await react.acall(
             participant_name="Alice",
             event_info=CalendarEvent(
-                name="Science Fair",
-                date="Friday",
-                participants={"Alice": "female", "Bob": "male"},
+                name="Science Fair", date="Friday", participants={"Alice": "female", "Bob": "male"}
             ),
         )
     assert outputs.invitation_letter == "It's my honor to invite Alice to the Science Fair event on Friday."
-
     expected_trajectory = {
         "thought_0": "I need to write an invitation letter for Alice to the Science Fair event.",
         "tool_name_0": "write_invitation_letter",
@@ -441,32 +392,21 @@ async def test_async_tool_calling_with_pydantic_args():
 
 @pytest.mark.asyncio
 async def test_async_error_retry():
-    # A tiny tool that always fails
+
     async def foo(a, b):
         raise Exception("tool error")
 
-    react = ReAct(ts("a, b -> c:int"), tools=[foo])
+    react = ReAct(ts("a, b -> c:int"), tools=[Tool(foo, description="Combine inputs.")])
     lm = DummyLM(
         [
-            {
-                "next_thought": "I need to add two numbers.",
-                "next_tool_name": "foo",
-                "next_tool_args": {"a": 1, "b": 2},
-            },
-            {
-                "next_thought": "I need to add two numbers.",
-                "next_tool_name": "foo",
-                "next_tool_args": {"a": 1, "b": 2},
-            },
-            # (The model *would* succeed on the 3rd turn, but max_iters=2 stops earlier.)
+            {"next_thought": "I need to add two numbers.", "next_tool_name": "foo", "next_tool_args": {"a": 1, "b": 2}},
+            {"next_thought": "I need to add two numbers.", "next_tool_name": "foo", "next_tool_args": {"a": 1, "b": 2}},
             {"reasoning": "I added the numbers successfully", "c": 3},
         ]
     )
     with settings.context(lm=lm):
         outputs = await react.acall(a=1, b=2, max_iters=2)
     traj = outputs.trajectory
-
-    # Exact-match checks (thoughts + tool calls)
     control_expected = {
         "thought_0": "I need to add two numbers.",
         "tool_name_0": "foo",
@@ -477,10 +417,6 @@ async def test_async_error_retry():
     }
     for k, v in control_expected.items():
         assert traj[k] == v, f"{k} mismatch"
-
-    # Flexible checks for observations
-    # We only care that each observation mentions our error string; we ignore
-    # any extra traceback detail or differing prefixes.
     for i in range(2):
         obs = traj[f"observation_{i}"]
-        assert re.search(r"\btool error\b", obs), f"unexpected observation_{i!r}: {obs}"
+        assert re.search("\\btool error\\b", obs), f"unexpected observation_{i!r}: {obs}"

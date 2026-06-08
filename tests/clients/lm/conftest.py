@@ -6,13 +6,11 @@ from typing_extensions import override
 
 if TYPE_CHECKING:
     from litellm.utils import ModelResponse
-
 try:
     from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
     from litellm.utils import Choices, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
-
+    pytest.skip("litellm is not installed", allow_module_level=True)
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm import LM
 from dspy.core.types import LMRequest, LMResponse
@@ -45,35 +43,19 @@ def make_response(output_blocks):
     )
 
 
-def _request(
-    lm: BaseLM,
-    *items: object,
-    prompt: str | None = None,
-    messages=None,
-    **kwargs: Any,
-) -> LMRequest:
-    return LMRequest.from_call(
-        model=lm.model,
-        items=items,
-        prompt=prompt,
-        messages=messages,
-        **kwargs,
-    )
+def _request(lm: BaseLM, *items: object, prompt: str | None = None, messages=None, **kwargs: Any) -> LMRequest:
+    return LMRequest.from_call(model=lm.model, items=items, prompt=prompt, messages=messages, **kwargs)
 
 
 def _model_response(text: str) -> ModelResponse:
     return ModelResponse(
-        choices=[Choices(message=Message(role="assistant", content=text))],
-        usage={},
-        model="custom-model",
+        choices=[Choices(message=Message(role="assistant", content=text))], usage={}, model="custom-model"
     )
 
 
 class _TypedContractLM(BaseLM):
-    """Test double that records normalized requests received through the typed LM contract."""
-
     def __init__(self, *args: object, outputs: list[str], **kwargs: object):
-        super().__init__(*args, **kwargs)  # ty:ignore[invalid-argument-type]
+        super().__init__(*args, **kwargs)
         self.outputs = outputs
         self.requests = []
 
@@ -85,11 +67,9 @@ class _TypedContractLM(BaseLM):
 
 
 def _direct_lm_case(lm_kind: str, outputs: list[str]):
-    """Return a direct-call test double and helpers for inspecting normalized messages."""
     if lm_kind == "current_lm":
         patcher = mock.patch(
-            "dspy.clients.lm.alitellm_completion",
-            side_effect=[_model_response(output) for output in outputs],
+            "dspy.clients.lm.alitellm_completion", side_effect=[_model_response(output) for output in outputs]
         )
         completion = patcher.start()
         lm = LM("custom-model")
@@ -100,8 +80,7 @@ def _direct_lm_case(lm_kind: str, outputs: list[str]):
         def get_request(index: int):
             return None
 
-        return lm, get_messages, get_request, patcher
-
+        return (lm, get_messages, get_request, patcher)
     if lm_kind == "typed_lm":
         lm = _TypedContractLM("custom-model", outputs=outputs)
 
@@ -113,6 +92,5 @@ def _direct_lm_case(lm_kind: str, outputs: list[str]):
         def get_request(index: int):
             return lm.requests[index]
 
-        return lm, get_messages, get_request, None
-
+        return (lm, get_messages, get_request, None)
     raise ValueError(f"Unknown lm_kind: {lm_kind}")

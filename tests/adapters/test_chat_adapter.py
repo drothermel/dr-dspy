@@ -13,8 +13,7 @@ from dspy.utils.dummies import DummyLM
 try:
     from litellm.utils import ChatCompletionMessageToolCall, Choices, Function, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
-
+    pytest.skip("litellm is not installed", allow_module_level=True)
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types.audio import Audio
@@ -37,11 +36,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.utils.exceptions import AdapterParseError
-from tests.adapters.conftest import (
-    adapter_format_as_openai,
-    default_model_response,
-    format_messages_and_lm_kwargs,
-)
+from tests.adapters.conftest import adapter_format_as_openai, default_model_response, format_messages_and_lm_kwargs
 from tests.task_spec.helpers import ts
 
 
@@ -63,7 +58,6 @@ def outputs_to_lm_response(outputs: list[dict]) -> LMResponse:
 @pytest.mark.parametrize(
     ("input_literal", "output_literal", "input_value", "expected_input_str", "expected_output_str"),
     [
-        # Scenario 1: double quotes escaped within strings
         (
             Literal["one", "two", 'three"'],
             Literal["four", "five", 'six"'],
@@ -71,7 +65,6 @@ def outputs_to_lm_response(outputs: list[dict]) -> LMResponse:
             "Literal['one', 'two', 'three\"']",
             "Literal['four', 'five', 'six\"']",
         ),
-        # Scenario 2: Single quotes inside strings
         (
             Literal["she's here", "okay", "test"],
             Literal["done", "maybe'soon", "later"],
@@ -79,7 +72,6 @@ def outputs_to_lm_response(outputs: list[dict]) -> LMResponse:
             "Literal[\"she's here\", 'okay', 'test']",
             "Literal['done', \"maybe'soon\", 'later']",
         ),
-        # Scenario 3: Strings containing both single and double quotes
         (
             Literal["both\"and'", "another"],
             Literal["yet\"another'", "plain"],
@@ -87,33 +79,13 @@ def outputs_to_lm_response(outputs: list[dict]) -> LMResponse:
             "Literal['both\"and\\'', 'another']",
             "Literal['yet\"another\\'', 'plain']",
         ),
-        # Scenario 4: No quotes at all (check the default)
-        (
-            Literal["foo", "bar"],
-            Literal["baz", "qux"],
-            "foo",
-            "Literal['foo', 'bar']",
-            "Literal['baz', 'qux']",
-        ),
-        # Scenario 5: Mixed types
-        (
-            Literal[1, "bar"],
-            Literal[True, 3, "foo"],
-            "bar",
-            "Literal[1, 'bar']",
-            "Literal[True, 3, 'foo']",
-        ),
+        (Literal["foo", "bar"], Literal["baz", "qux"], "foo", "Literal['foo', 'bar']", "Literal['baz', 'qux']"),
+        (Literal[1, "bar"], Literal[True, 3, "foo"], "bar", "Literal[1, 'bar']", "Literal[True, 3, 'foo']"),
     ],
 )
 def test_chat_adapter_quotes_literals_as_expected(
     input_literal, output_literal, input_value, expected_input_str, expected_output_str
 ):
-    """
-    This test verifies that when we declare Literal fields with various mixes
-    of single/double quotes, the generated content string includes those
-    Literals exactly as we want them to appear (like IPython does).
-    """
-
     TestSignature = make_task_spec(
         {
             "input_text": FieldSpec.input("input_text", type_=input_literal),
@@ -126,7 +98,6 @@ def test_chat_adapter_quotes_literals_as_expected(
         adapter=adapter, task_spec=TestSignature, demos=[], inputs={"input_text": input_value}
     )
     content = messages[0]["content"]
-
     assert expected_input_str in content
     assert expected_output_str in content
 
@@ -157,40 +128,18 @@ async def test_chat_adapter_async_call():
 def test_chat_adapter_format_exact_messages_for_simple_signature():
     QA = ts("question -> answer", instructions="Answer the question.")
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=ChatAdapter(),
-        task_spec=QA,
-        demos=[],
-        inputs={"question": "What is the capital of France?"},
+        adapter=ChatAdapter(), task_spec=QA, demos=[], inputs={"question": "What is the capital of France?"}
     )
-
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
-
     assert messages == [
         {
             "role": "system",
-            "content": """Your input fields are:
-1. `question` (str):
-Your output fields are:
-1. `answer` (str):
-All interactions will be structured in the following way, with the appropriate values filled in.
-
-[[ ## question ## ]]
-{question}
-
-[[ ## answer ## ]]
-{answer}
-
-[[ ## completed ## ]]
-In adhering to this structure, your objective is:\x20
-        Answer the question.""",
+            "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Answer the question.",
         },
         {
             "role": "user",
-            "content": """[[ ## question ## ]]
-What is the capital of France?
-
-Respond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.""",
+            "content": "[[ ## question ## ]]\nWhat is the capital of France?\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
         },
     ]
 
@@ -210,60 +159,27 @@ def test_chat_adapter_format_exact_messages_with_demo_and_typed_outputs():
         demos=[{"question": "Q1", "answers": ["A1", "A2"], "scores": [0.1, 0.9]}],
         inputs={"question": "Q2"},
     )
-
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
-
     assert messages == [
         {
             "role": "system",
-            "content": """Your input fields are:
-1. `question` (str):
-Your output fields are:
-1. `answers` (list[str]):\x20
-2. `scores` (list[float]):
-All interactions will be structured in the following way, with the appropriate values filled in.
-
-[[ ## question ## ]]
-{question}
-
-[[ ## answers ## ]]
-{answers}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "string"}}
-
-[[ ## scores ## ]]
-{scores}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "number"}}
-
-[[ ## completed ## ]]
-In adhering to this structure, your objective is:\x20
-        Answer the question with multiple answers and scores""",
+            "content": 'Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answers` (list[str]): \n2. `scores` (list[float]):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answers ## ]]\n{answers}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "string"}}\n\n[[ ## scores ## ]]\n{scores}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "number"}}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Answer the question with multiple answers and scores',
         },
-        {
-            "role": "user",
-            "content": """[[ ## question ## ]]
-Q1""",
-        },
+        {"role": "user", "content": "[[ ## question ## ]]\nQ1"},
         {
             "role": "assistant",
-            "content": """[[ ## answers ## ]]
-["A1", "A2"]
-
-[[ ## scores ## ]]
-[0.1, 0.9]
-
-[[ ## completed ## ]]
-""",
+            "content": '[[ ## answers ## ]]\n["A1", "A2"]\n\n[[ ## scores ## ]]\n[0.1, 0.9]\n\n[[ ## completed ## ]]\n',
         },
         {
             "role": "user",
-            "content": """[[ ## question ## ]]
-Q2
-
-Respond with the corresponding output fields, starting with the field `[[ ## answers ## ]]` (must be formatted as a valid Python list[str]), then `[[ ## scores ## ]]` (must be formatted as a valid Python list[float]), and then ending with the marker for `[[ ## completed ## ]]`.""",
+            "content": "[[ ## question ## ]]\nQ2\n\nRespond with the corresponding output fields, starting with the field `[[ ## answers ## ]]` (must be formatted as a valid Python list[str]), then `[[ ## scores ## ]]` (must be formatted as a valid Python list[float]), and then ending with the marker for `[[ ## completed ## ]]`.",
         },
     ]
 
 
 def test_chat_adapter_format_exact_messages_with_nested_pydantic_models():
+
     class Address(pydantic.BaseModel):
         city: str
         country: str
@@ -278,10 +194,7 @@ def test_chat_adapter_format_exact_messages_with_nested_pydantic_models():
         score: float
 
     PydanticSignature = make_task_spec(
-        {
-            "person": FieldSpec.input("person", type_=Person),
-            "summary": FieldSpec.output("summary", type_=Summary),
-        },
+        {"person": FieldSpec.input("person", type_=Person), "summary": FieldSpec.output("summary", type_=Summary)},
         instructions="Given the fields `person`, produce the fields `summary`.",
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -290,39 +203,14 @@ def test_chat_adapter_format_exact_messages_with_nested_pydantic_models():
         demos=[],
         inputs={"person": Person(name="Ada", address=Address(city="London", country="UK"), tags=["math", "code"])},
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `person` (Person):\n"
-            "Your output fields are:\n"
-            "1. `summary` (Summary):\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## person ## ]]\n"
-            "{person}\n"
-            "\n"
-            "[[ ## summary ## ]]\n"
-            "{summary}        # note: the value you produce must adhere to the JSON schema: "
-            '{"type": "object", "properties": {"headline": {"type": "string", "title": '
-            '"Headline"}, "score": {"type": "number", "title": "Score"}}, "required": '
-            '["headline", "score"], "title": "Summary"}\n'
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `person`, produce the fields `summary`.",
+            "content": 'Your input fields are:\n1. `person` (Person):\nYour output fields are:\n1. `summary` (Summary):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## person ## ]]\n{person}\n\n[[ ## summary ## ]]\n{summary}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "properties": {"headline": {"type": "string", "title": "Headline"}, "score": {"type": "number", "title": "Score"}}, "required": ["headline", "score"], "title": "Summary"}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `person`, produce the fields `summary`.',
         },
         {
             "role": "user",
-            "content": "[[ ## person ## ]]\n"
-            '{"name": "Ada", "address": {"city": "London", "country": "UK"}, "tags": ["math", '
-            '"code"]}\n'
-            "\n"
-            "Respond with the corresponding output fields, starting with the field `[[ ## summary "
-            "## ]]` (must be formatted as a valid Python Summary), and then ending with the "
-            "marker for `[[ ## completed ## ]]`.",
+            "content": '[[ ## person ## ]]\n{"name": "Ada", "address": {"city": "London", "country": "UK"}, "tags": ["math", "code"]}\n\nRespond with the corresponding output fields, starting with the field `[[ ## summary ## ]]` (must be formatted as a valid Python Summary), and then ending with the marker for `[[ ## completed ## ]]`.',
         },
     ]
     assert messages == expected_messages
@@ -346,65 +234,22 @@ def test_chat_adapter_format_exact_messages_with_incomplete_demo():
         demos=[{"question": "Q1", "answer": "A1"}],
         inputs={"question": "Q2", "context": "C2"},
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `question` (str): \n"
-            "2. `context` (str):\n"
-            "Your output fields are:\n"
-            "1. `answer` (str): \n"
-            "2. `confidence` (float):\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "{question}\n"
-            "\n"
-            "[[ ## context ## ]]\n"
-            "{context}\n"
-            "\n"
-            "[[ ## answer ## ]]\n"
-            "{answer}\n"
-            "\n"
-            "[[ ## confidence ## ]]\n"
-            "{confidence}        # note: the value you produce must be a single float value\n"
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `question`, `context`, produce the fields `answer`, "
-            "`confidence`.",
+            "content": "Your input fields are:\n1. `question` (str): \n2. `context` (str):\nYour output fields are:\n1. `answer` (str): \n2. `confidence` (float):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## context ## ]]\n{context}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## confidence ## ]]\n{confidence}        # note: the value you produce must be a single float value\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `context`, produce the fields `answer`, `confidence`.",
         },
         {
             "role": "user",
-            "content": "This is an example of the task, though some input or output fields are not "
-            "supplied.\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "Q1",
+            "content": "This is an example of the task, though some input or output fields are not supplied.\n\n[[ ## question ## ]]\nQ1",
         },
         {
             "role": "assistant",
-            "content": "[[ ## answer ## ]]\n"
-            "A1\n"
-            "\n"
-            "[[ ## confidence ## ]]\n"
-            "Not supplied for this particular example.\n"
-            "\n"
-            "[[ ## completed ## ]]\n",
+            "content": "[[ ## answer ## ]]\nA1\n\n[[ ## confidence ## ]]\nNot supplied for this particular example.\n\n[[ ## completed ## ]]\n",
         },
         {
             "role": "user",
-            "content": "[[ ## question ## ]]\n"
-            "Q2\n"
-            "\n"
-            "[[ ## context ## ]]\n"
-            "C2\n"
-            "\n"
-            "Respond with the corresponding output fields, starting with the field `[[ ## answer "
-            "## ]]`, then `[[ ## confidence ## ]]` (must be formatted as a valid Python float), "
-            "and then ending with the marker for `[[ ## completed ## ]]`.",
+            "content": "[[ ## question ## ]]\nQ2\n\n[[ ## context ## ]]\nC2\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, then `[[ ## confidence ## ]]` (must be formatted as a valid Python float), and then ending with the marker for `[[ ## completed ## ]]`.",
         },
     ]
     assert messages == expected_messages
@@ -422,10 +267,7 @@ def test_chat_adapter_format_exact_messages_with_history():
         instructions="Given the fields `history`, `question`, produce the fields `answer`.",
     )
     history = History(
-        messages=[
-            {"question": "What is 1+1?", "answer": "2"},
-            {"question": "What is 2+2?", "answer": "4"},
-        ]
+        messages=[{"question": "What is 1+1?", "answer": "2"}, {"question": "What is 2+2?", "answer": "4"}]
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(),
@@ -433,30 +275,10 @@ def test_chat_adapter_format_exact_messages_with_history():
         demos=[],
         inputs={"history": history, "question": "What is 3+3?"},
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `history` (History): \n"
-            "2. `question` (str):\n"
-            "Your output fields are:\n"
-            "1. `answer` (str):\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## history ## ]]\n"
-            "{history}\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "{question}\n"
-            "\n"
-            "[[ ## answer ## ]]\n"
-            "{answer}\n"
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `history`, `question`, produce the fields `answer`.",
+            "content": "Your input fields are:\n1. `history` (History): \n2. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## history ## ]]\n{history}\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `history`, `question`, produce the fields `answer`.",
         },
         {"role": "user", "content": "[[ ## question ## ]]\nWhat is 1+1?"},
         {"role": "assistant", "content": "[[ ## answer ## ]]\n2\n\n[[ ## completed ## ]]\n"},
@@ -464,11 +286,7 @@ def test_chat_adapter_format_exact_messages_with_history():
         {"role": "assistant", "content": "[[ ## answer ## ]]\n4\n\n[[ ## completed ## ]]\n"},
         {
             "role": "user",
-            "content": "[[ ## question ## ]]\n"
-            "What is 3+3?\n"
-            "\n"
-            "Respond with the corresponding output fields, starting with the field `[[ ## answer "
-            "## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
+            "content": "[[ ## question ## ]]\nWhat is 3+3?\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
         },
     ]
     assert messages == expected_messages
@@ -481,40 +299,16 @@ def test_chat_adapter_format_exact_messages_with_list_value_for_string_input():
         "context -> answer", instructions="Given the fields `context`, produce the fields `answer`."
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=ChatAdapter(),
-        task_spec=ListAsStringSignature,
-        demos=[],
-        inputs={"context": ["alpha", "beta"]},
+        adapter=ChatAdapter(), task_spec=ListAsStringSignature, demos=[], inputs={"context": ["alpha", "beta"]}
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `context` (str):\n"
-            "Your output fields are:\n"
-            "1. `answer` (str):\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## context ## ]]\n"
-            "{context}\n"
-            "\n"
-            "[[ ## answer ## ]]\n"
-            "{answer}\n"
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `context`, produce the fields `answer`.",
+            "content": "Your input fields are:\n1. `context` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## context ## ]]\n{context}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `context`, produce the fields `answer`.",
         },
         {
             "role": "user",
-            "content": "[[ ## context ## ]]\n"
-            "[1] «alpha»\n"
-            "[2] «beta»\n"
-            "\n"
-            "Respond with the corresponding output fields, starting with the field `[[ ## answer "
-            "## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
+            "content": "[[ ## context ## ]]\n[1] «alpha»\n[2] «beta»\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
         },
     ]
     assert messages == expected_messages
@@ -524,48 +318,20 @@ def test_chat_adapter_format_exact_messages_with_list_value_for_string_input():
 
 def test_chat_adapter_format_exact_messages_with_literal_output():
     LiteralSignature = make_task_spec(
-        {
-            "question": FieldSpec.input("question"),
-            "verdict": FieldSpec.output("verdict", type_=Literal["yes", "no"]),
-        },
+        {"question": FieldSpec.input("question"), "verdict": FieldSpec.output("verdict", type_=Literal["yes", "no"])},
         instructions="Given the fields `question`, produce the fields `verdict`.",
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=ChatAdapter(),
-        task_spec=LiteralSignature,
-        demos=[],
-        inputs={"question": "Is the sky blue?"},
+        adapter=ChatAdapter(), task_spec=LiteralSignature, demos=[], inputs={"question": "Is the sky blue?"}
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `question` (str):\n"
-            "Your output fields are:\n"
-            "1. `verdict` (Literal['yes', 'no']):\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "{question}\n"
-            "\n"
-            "[[ ## verdict ## ]]\n"
-            "{verdict}        # note: the value you produce must exactly match (no extra "
-            "characters) one of: yes; no\n"
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `question`, produce the fields `verdict`.",
+            "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `verdict` (Literal['yes', 'no']):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## verdict ## ]]\n{verdict}        # note: the value you produce must exactly match (no extra characters) one of: yes; no\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `verdict`.",
         },
         {
             "role": "user",
-            "content": "[[ ## question ## ]]\n"
-            "Is the sky blue?\n"
-            "\n"
-            "Respond with the corresponding output fields, starting with the field `[[ ## verdict "
-            "## ]]` (must be formatted as a valid Python Literal['yes', 'no']), and then ending "
-            "with the marker for `[[ ## completed ## ]]`.",
+            "content": "[[ ## question ## ]]\nIs the sky blue?\n\nRespond with the corresponding output fields, starting with the field `[[ ## verdict ## ]]` (must be formatted as a valid Python Literal['yes', 'no']), and then ending with the marker for `[[ ## completed ## ]]`.",
         },
     ]
     assert messages == expected_messages
@@ -595,42 +361,10 @@ def test_chat_adapter_format_exact_messages_with_multimodal_custom_type_inputs()
             "document": Document(data="Alpha beta", title="Doc"),
         },
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `image` (Image): \n"
-            "2. `audio` (Audio): \n"
-            "3. `file` (File): \n"
-            "4. `document` (Document): \n"
-            "    Type description of Document: A document containing text content that can be "
-            "referenced and cited. Include the full text content and optionally a title for "
-            "proper referencing.\n"
-            "Your output fields are:\n"
-            "1. `answer` (str):\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## image ## ]]\n"
-            "{image}\n"
-            "\n"
-            "[[ ## audio ## ]]\n"
-            "{audio}\n"
-            "\n"
-            "[[ ## file ## ]]\n"
-            "{file}\n"
-            "\n"
-            "[[ ## document ## ]]\n"
-            "{document}\n"
-            "\n"
-            "[[ ## answer ## ]]\n"
-            "{answer}\n"
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `image`, `audio`, `file`, `document`, produce the fields "
-            "`answer`.",
+            "content": "Your input fields are:\n1. `image` (Image): \n2. `audio` (Audio): \n3. `file` (File): \n4. `document` (Document): \n    Type description of Document: A document containing text content that can be referenced and cited. Include the full text content and optionally a title for proper referencing.\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## image ## ]]\n{image}\n\n[[ ## audio ## ]]\n{audio}\n\n[[ ## file ## ]]\n{file}\n\n[[ ## document ## ]]\n{document}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `image`, `audio`, `file`, `document`, produce the fields `answer`.",
         },
         {
             "role": "user",
@@ -650,11 +384,7 @@ def test_chat_adapter_format_exact_messages_with_multimodal_custom_type_inputs()
                 },
                 {
                     "type": "text",
-                    "text": "\n"
-                    "\n"
-                    "Respond with the corresponding output fields, starting with the field `[[ "
-                    "## answer ## ]]`, and then ending with the marker for `[[ ## completed ## "
-                    "]]`.",
+                    "text": "\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
                 },
             ],
         },
@@ -665,8 +395,8 @@ def test_chat_adapter_format_exact_messages_with_multimodal_custom_type_inputs()
 
 
 def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_image():
+
     def search(query: str, k: int = 3) -> str:
-        """Search for documents."""
         return query
 
     class Location(pydantic.BaseModel):
@@ -694,15 +424,9 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
         instructions="Answer using all supplied context.",
     )
     tool = Tool(search, description="Search for documents.")
-    demo_profile = Profile(
-        name="Ada",
-        location=Location(city="London", country="UK"),
-        interests=["math", "machines"],
-    )
+    demo_profile = Profile(name="Ada", location=Location(city="London", country="UK"), interests=["math", "machines"])
     current_profile = Profile(
-        name="Grace",
-        location=Location(city="Arlington", country="USA"),
-        interests=["compilers", "navy"],
+        name="Grace", location=Location(city="Arlington", country="USA"), interests=["compilers", "navy"]
     )
     history = History(
         messages=[
@@ -733,45 +457,10 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
             "question": "What should the answer include?",
         },
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `history` (History): \n"
-            "2. `image` (Image): \n"
-            "3. `tools` (list[Tool]): \n"
-            "4. `profile` (Profile): \n"
-            "5. `question` (str):\n"
-            "Your output fields are:\n"
-            "1. `answer` (AnswerCard):\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## history ## ]]\n"
-            "{history}\n"
-            "\n"
-            "[[ ## image ## ]]\n"
-            "{image}\n"
-            "\n"
-            "[[ ## tools ## ]]\n"
-            "{tools}\n"
-            "\n"
-            "[[ ## profile ## ]]\n"
-            "{profile}\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "{question}\n"
-            "\n"
-            "[[ ## answer ## ]]\n"
-            "{answer}        # note: the value you produce must adhere to the JSON schema: "
-            '{"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, '
-            '"sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, '
-            '"required": ["answer", "sources"], "title": "AnswerCard"}\n'
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Answer using all supplied context.",
+            "content": 'Your input fields are:\n1. `history` (History): \n2. `image` (Image): \n3. `tools` (list[Tool]): \n4. `profile` (Profile): \n5. `question` (str):\nYour output fields are:\n1. `answer` (AnswerCard):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## history ## ]]\n{history}\n\n[[ ## image ## ]]\n{image}\n\n[[ ## tools ## ]]\n{tools}\n\n[[ ## profile ## ]]\n{profile}\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, "sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, "required": ["answer", "sources"], "title": "AnswerCard"}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Answer using all supplied context.',
         },
         {
             "role": "user",
@@ -784,42 +473,26 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
                 {"type": "image_url", "image_url": {"url": "https://example.com/demo.png"}},
                 {
                     "type": "text",
-                    "text": "\n\n[[ ## tools ## ]]\n"
-                    '["search, whose description is <desc>Search for documents.</desc>. It '
-                    "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
-                    "'default': 3}}.\"]",
+                    "text": "\n\n[[ ## tools ## ]]\n[\"search, whose description is <desc>Search for documents.</desc>. It takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', 'default': 3}}.\"]",
                 },
                 {
                     "type": "text",
-                    "text": "\n\n[[ ## profile ## ]]\n"
-                    '{"name": "Ada", "location": {"city": "London", "country": "UK"}, '
-                    '"interests": ["math", "machines"]}',
+                    "text": '\n\n[[ ## profile ## ]]\n{"name": "Ada", "location": {"city": "London", "country": "UK"}, "interests": ["math", "machines"]}',
                 },
                 {"type": "text", "text": "\n\n[[ ## question ## ]]\nWhat should we mention?"},
             ],
         },
         {
             "role": "assistant",
-            "content": "[[ ## answer ## ]]\n"
-            '{"answer": "Mention analytical engines.", "sources": ["demo"]}\n'
-            "\n"
-            "[[ ## completed ## ]]\n",
+            "content": '[[ ## answer ## ]]\n{"answer": "Mention analytical engines.", "sources": ["demo"]}\n\n[[ ## completed ## ]]\n',
         },
         {
             "role": "user",
-            "content": "[[ ## profile ## ]]\n"
-            '{"name": "Ada", "location": {"city": "London", "country": "UK"}, "interests": '
-            '["math", "machines"]}\n'
-            "\n"
-            "[[ ## question ## ]]\n"
-            "Who is Ada?",
+            "content": '[[ ## profile ## ]]\n{"name": "Ada", "location": {"city": "London", "country": "UK"}, "interests": ["math", "machines"]}\n\n[[ ## question ## ]]\nWho is Ada?',
         },
         {
             "role": "assistant",
-            "content": "[[ ## answer ## ]]\n"
-            '{"answer": "Ada is a mathematician.", "sources": ["memory"]}\n'
-            "\n"
-            "[[ ## completed ## ]]\n",
+            "content": '[[ ## answer ## ]]\n{"answer": "Ada is a mathematician.", "sources": ["memory"]}\n\n[[ ## completed ## ]]\n',
         },
         {
             "role": "user",
@@ -828,26 +501,16 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
                 {"type": "image_url", "image_url": {"url": "https://example.com/current.png"}},
                 {
                     "type": "text",
-                    "text": "\n\n[[ ## tools ## ]]\n"
-                    '["search, whose description is <desc>Search for documents.</desc>. It '
-                    "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
-                    "'default': 3}}.\"]",
+                    "text": "\n\n[[ ## tools ## ]]\n[\"search, whose description is <desc>Search for documents.</desc>. It takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', 'default': 3}}.\"]",
                 },
                 {
                     "type": "text",
-                    "text": "\n\n[[ ## profile ## ]]\n"
-                    '{"name": "Grace", "location": {"city": "Arlington", "country": "USA"}, '
-                    '"interests": ["compilers", "navy"]}',
+                    "text": '\n\n[[ ## profile ## ]]\n{"name": "Grace", "location": {"city": "Arlington", "country": "USA"}, "interests": ["compilers", "navy"]}',
                 },
+                {"type": "text", "text": "\n\n[[ ## question ## ]]\nWhat should the answer include?"},
                 {
                     "type": "text",
-                    "text": "\n\n[[ ## question ## ]]\nWhat should the answer include?",
-                },
-                {
-                    "type": "text",
-                    "text": "\n\nRespond with the corresponding output fields, starting with the field `[[ "
-                    "## answer ## ]]` (must be formatted as a valid Python AnswerCard), and "
-                    "then ending with the marker for `[[ ## completed ## ]]`.",
+                    "text": "\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]` (must be formatted as a valid Python AnswerCard), and then ending with the marker for `[[ ## completed ## ]]`.",
                 },
             ],
         },
@@ -858,6 +521,7 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
 
 
 def test_chat_adapter_format_exact_messages_with_base_custom_type_input():
+
     class Event(DSPyType):
         label: str
 
@@ -871,39 +535,16 @@ def test_chat_adapter_format_exact_messages_with_base_custom_type_input():
             return "An event block."
 
     EventSignature = make_task_spec(
-        {
-            "event": FieldSpec.input("event", type_=Event),
-            "answer": FieldSpec.output("answer"),
-        },
+        {"event": FieldSpec.input("event", type_=Event), "answer": FieldSpec.output("answer")},
         instructions="Given the fields `event`, produce the fields `answer`.",
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=ChatAdapter(),
-        task_spec=EventSignature,
-        demos=[],
-        inputs={"event": Event(label="launch")},
+        adapter=ChatAdapter(), task_spec=EventSignature, demos=[], inputs={"event": Event(label="launch")}
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `event` (Event): \n"
-            "    Type description of Event: An event block.\n"
-            "Your output fields are:\n"
-            "1. `answer` (str):\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## event ## ]]\n"
-            "{event}\n"
-            "\n"
-            "[[ ## answer ## ]]\n"
-            "{answer}\n"
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `event`, produce the fields `answer`.",
+            "content": "Your input fields are:\n1. `event` (Event): \n    Type description of Event: An event block.\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## event ## ]]\n{event}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `event`, produce the fields `answer`.",
         },
         {
             "role": "user",
@@ -912,11 +553,7 @@ def test_chat_adapter_format_exact_messages_with_base_custom_type_input():
                 {"type": "event", "event": {"label": "launch"}},
                 {
                     "type": "text",
-                    "text": "\n"
-                    "\n"
-                    "Respond with the corresponding output fields, starting with the field `[[ "
-                    "## answer ## ]]`, and then ending with the marker for `[[ ## completed ## "
-                    "]]`.",
+                    "text": "\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
                 },
             ],
         },
@@ -928,10 +565,7 @@ def test_chat_adapter_format_exact_messages_with_base_custom_type_input():
 
 def test_chat_adapter_format_exact_messages_with_citations_output_demo():
     CitationSignature = make_task_spec(
-        {
-            "question": FieldSpec.input("question"),
-            "citations": FieldSpec.output("citations", type_=Citations),
-        },
+        {"question": FieldSpec.input("question"), "citations": FieldSpec.output("citations", type_=Citations)},
         instructions="Given the fields `question`, produce the fields `citations`.",
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -941,119 +575,46 @@ def test_chat_adapter_format_exact_messages_with_citations_output_demo():
             {
                 "question": "Q1",
                 "citations": Citations.from_dict_list(
-                    [
-                        {
-                            "cited_text": "alpha",
-                            "document_index": 0,
-                            "start_char_index": 0,
-                            "end_char_index": 5,
-                        }
-                    ]
+                    [{"cited_text": "alpha", "document_index": 0, "start_char_index": 0, "end_char_index": 5}]
                 ),
             }
         ],
         inputs={"question": "Q2"},
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `question` (str):\n"
-            "Your output fields are:\n"
-            "1. `citations` (Citations): \n"
-            "    Type description of Citations: Citations with quoted text and source references. "
-            "Include the exact text being cited and information about its source.\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "{question}\n"
-            "\n"
-            "[[ ## citations ## ]]\n"
-            "{citations}        # note: the value you produce must adhere to the JSON schema: "
-            '{"type": "object", "$defs": {"Citation": {"type": "object", "description": '
-            '"Individual citation with character location information.", "properties": {"type": '
-            '{"type": "string", "default": "char_location", "title": "Type"}, "cited_text": '
-            '{"type": "string", "title": "Cited Text"}, "document_index": {"type": "integer", '
-            '"title": "Document Index"}, "document_title": {"anyOf": [{"type": "string"}, '
-            '{"type": "null"}], "default": null, "title": "Document Title"}, "end_char_index": '
-            '{"type": "integer", "title": "End Char Index"}, "start_char_index": {"type": '
-            '"integer", "title": "Start Char Index"}, "supported_text": {"anyOf": [{"type": '
-            '"string"}, {"type": "null"}], "default": null, "title": "Supported Text"}}, '
-            '"required": ["cited_text", "document_index", "start_char_index", "end_char_index"], '
-            '"title": "Citation"}}, "description": "Experimental: This class may change or be '
-            "removed in a future release without warning (introduced in v3.0.4).\\n\\nCitations "
-            "extracted from an LM response with source references.\\n\\n    This type represents "
-            "citations returned by language models that support\\n    citation extraction, "
-            "particularly Anthropic's Citations API through LiteLLM.\\n    Citations include the "
-            "quoted text and source information.\\n\\n    Examples:\\n        ```python\\n        "
-            "import os\\n        from dspy.adapters.types.citation import Citations\\n        from "
-            "dspy.adapters.types.document import Document\\n        from dspy.clients.lm import "
-            "LM\\n        from dspy.predict.predict import Predict\\n        from "
-            "dspy.signatures.field import InputField, OutputField\\n        from "
-            "dspy.signatures.signature import Signature\\n\\n        "
-            'os.environ[\\"ANTHROPIC_API_KEY\\"] = \\"YOUR_ANTHROPIC_API_KEY\\"\\n\\n        '
-            "class AnswerWithSources(Signature):\\n            '''Answer questions using provided "
-            "documents with citations.'''\\n            documents: list[Document] = "
-            "InputField()\\n            question: str = InputField()\\n            "
-            "answer: str = OutputField()\\n            citations: Citations = "
-            "OutputField()\\n\\n        # Create documents to provide as sources\\n        "
-            'docs = [\\n            Document(\\n                data=\\"The Earth orbits the Sun '
-            'in an elliptical path.\\",\\n                title=\\"Basic Astronomy '
-            'Facts\\"\\n            ),\\n            Document(\\n                data=\\"Water '
-            'boils at 100°C at standard atmospheric pressure.\\",\\n                '
-            'title=\\"Physics Fundamentals\\",\\n                metadata={\\"author\\": \\"Dr. '
-            'Smith\\", \\"year\\": 2023}\\n            )\\n        ]\\n\\n        # Use with a '
-            "model that supports citations like Claude\\n        lm = "
-            'LM(\\"anthropic/claude-opus-4-1-20250805\\")\\n        predictor = '
-            "Predict(AnswerWithSources)\\n        result = predictor(documents=docs, "
-            'question=\\"What temperature does water boil?\\", lm=lm)\\n\\n        for citation '
-            "in result.citations.citations:\\n            print(citation.format())\\n        "
-            '```\\n    ", "properties": {"citations": {"type": "array", "items": {"$ref": '
-            '"#/$defs/Citation"}, "title": "Citations"}}, "required": ["citations"], "title": '
-            '"Citations"}\n'
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `question`, produce the fields `citations`.",
+            "content": 'Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `citations` (Citations): \n    Type description of Citations: Citations with quoted text and source references. Include the exact text being cited and information about its source.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## citations ## ]]\n{citations}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "$defs": {"Citation": {"type": "object", "description": "Individual citation with character location information.", "properties": {"type": {"type": "string", "default": "char_location", "title": "Type"}, "cited_text": {"type": "string", "title": "Cited Text"}, "document_index": {"type": "integer", "title": "Document Index"}, "document_title": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null, "title": "Document Title"}, "end_char_index": {"type": "integer", "title": "End Char Index"}, "start_char_index": {"type": "integer", "title": "Start Char Index"}, "supported_text": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null, "title": "Supported Text"}}, "required": ["cited_text", "document_index", "start_char_index", "end_char_index"], "title": "Citation"}}, "description": "Experimental: This class may change or be removed in a future release without warning (introduced in v3.0.4).\\n\\nCitations extracted from an LM response with source references.\\n\\n    This type represents citations returned by language models that support\\n    citation extraction, particularly Anthropic\'s Citations API through LiteLLM.\\n    Citations include the quoted text and source information.\\n\\n    Examples:\\n        ```python\\n        import os\\n        from dspy.adapters.types.citation import Citations\\n        from dspy.adapters.types.document import Document\\n        from dspy.clients.lm import LM\\n        from dspy.predict.predict import Predict\\n        from dspy.signatures.field import InputField, OutputField\\n        from dspy.signatures.signature import Signature\\n\\n        os.environ[\\"ANTHROPIC_API_KEY\\"] = \\"YOUR_ANTHROPIC_API_KEY\\"\\n\\n        class AnswerWithSources(Signature):\\n            \'\'\'Answer questions using provided documents with citations.\'\'\'\\n            documents: list[Document] = InputField()\\n            question: str = InputField()\\n            answer: str = OutputField()\\n            citations: Citations = OutputField()\\n\\n        # Create documents to provide as sources\\n        docs = [\\n            Document(\\n                data=\\"The Earth orbits the Sun in an elliptical path.\\",\\n                title=\\"Basic Astronomy Facts\\"\\n            ),\\n            Document(\\n                data=\\"Water boils at 100°C at standard atmospheric pressure.\\",\\n                title=\\"Physics Fundamentals\\",\\n                metadata={\\"author\\": \\"Dr. Smith\\", \\"year\\": 2023}\\n            )\\n        ]\\n\\n        # Use with a model that supports citations like Claude\\n        lm = LM(\\"anthropic/claude-opus-4-1-20250805\\")\\n        predictor = Predict(AnswerWithSources)\\n        result = predictor(documents=docs, question=\\"What temperature does water boil?\\", lm=lm)\\n\\n        for citation in result.citations.citations:\\n            print(citation.format())\\n        ```\\n    ", "properties": {"citations": {"type": "array", "items": {"$ref": "#/$defs/Citation"}, "title": "Citations"}}, "required": ["citations"], "title": "Citations"}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `citations`.',
         },
         {"role": "user", "content": "[[ ## question ## ]]\nQ1"},
         {
             "role": "assistant",
-            "content": "[[ ## citations ## ]]\n"
-            '[{"type": "char_location", "cited_text": "alpha", "document_index": 0, '
-            '"start_char_index": 0, "end_char_index": 5}]\n'
-            "\n"
-            "[[ ## completed ## ]]\n",
+            "content": '[[ ## citations ## ]]\n[{"type": "char_location", "cited_text": "alpha", "document_index": 0, "start_char_index": 0, "end_char_index": 5}]\n\n[[ ## completed ## ]]\n',
         },
         {
             "role": "user",
-            "content": "[[ ## question ## ]]\n"
-            "Q2\n"
-            "\n"
-            "Respond with the corresponding output fields, starting with the field `[[ ## "
-            "citations ## ]]` (must be formatted as a valid Python Citations), and then ending "
-            "with the marker for `[[ ## completed ## ]]`.",
+            "content": "[[ ## question ## ]]\nQ2\n\nRespond with the corresponding output fields, starting with the field `[[ ## citations ## ]]` (must be formatted as a valid Python Citations), and then ending with the marker for `[[ ## completed ## ]]`.",
         },
     ]
 
     def normalize_citations_schema_description(content):
-        return re.sub(
-            r'"description": ".*?", "properties":',
-            '"description": "<CITATIONS_SCHEMA_DESCRIPTION>", "properties":',
-            content,
-        )
+        start = content.find('{"type": "object", "$defs":')
+        if start == -1:
+            return content
+        prefix = content[:start]
+        schema_part = content[start:]
+        schema_part = re.sub(r'"description": "(?:[^"\\]|\\.)*"(?:, )?', "", schema_part)
+        return prefix + schema_part
 
     messages[0]["content"] = normalize_citations_schema_description(messages[0]["content"])
     expected_messages[0]["content"] = normalize_citations_schema_description(expected_messages[0]["content"])
-
     assert messages == expected_messages
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
 
 
 def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_citations():
+
     class AnthropicLM(DummyLM):
         def __init__(self):
             super().__init__([{}])
@@ -1068,40 +629,16 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_citations(
         instructions="Given the fields `question`, produce the fields `answer`, `citations`.",
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=ChatAdapter(),
-        task_spec=CitationSignature,
-        demos=[],
-        inputs={"question": "Q?"},
-        lm=AnthropicLM(),
+        adapter=ChatAdapter(), task_spec=CitationSignature, demos=[], inputs={"question": "Q?"}, lm=AnthropicLM()
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `question` (str):\n"
-            "Your output fields are:\n"
-            "1. `answer` (str):\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "{question}\n"
-            "\n"
-            "[[ ## answer ## ]]\n"
-            "{answer}\n"
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `question`, produce the fields `answer`, `citations`.",
+            "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`, `citations`.",
         },
         {
             "role": "user",
-            "content": "[[ ## question ## ]]\n"
-            "Q?\n"
-            "\n"
-            "Respond with the corresponding output fields, starting with the field `[[ ## answer "
-            "## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
+            "content": "[[ ## question ## ]]\nQ?\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
         },
     ]
     assert messages == expected_messages
@@ -1118,40 +655,16 @@ def test_chat_adapter_format_exact_messages_preserves_passthrough_lm_kwargs():
         task_spec=PassthroughSignature,
         demos=[],
         inputs={"question": "Q?"},
-        config={
-            "temperature": 0.7,
-            "max_tokens": 42,
-            "extensions": {"stream": True},
-        },
+        config={"temperature": 0.7, "max_tokens": 42, "extensions": {"stream": True}},
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `question` (str):\n"
-            "Your output fields are:\n"
-            "1. `answer` (str):\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "{question}\n"
-            "\n"
-            "[[ ## answer ## ]]\n"
-            "{answer}\n"
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `question`, produce the fields `answer`.",
+            "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`.",
         },
         {
             "role": "user",
-            "content": "[[ ## question ## ]]\n"
-            "Q?\n"
-            "\n"
-            "Respond with the corresponding output fields, starting with the field `[[ ## answer "
-            "## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
+            "content": "[[ ## question ## ]]\nQ?\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
         },
     ]
     assert messages == expected_messages
@@ -1160,6 +673,7 @@ def test_chat_adapter_format_exact_messages_preserves_passthrough_lm_kwargs():
 
 
 def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_reasoning():
+
     class ReasoningLM(DummyLM):
         def __init__(self, answers):
             super().__init__(answers)
@@ -1185,34 +699,14 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_reasoning(
         inputs={"question": "Q?"},
         lm=ReasoningLM([{}]),
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `question` (str):\n"
-            "Your output fields are:\n"
-            "1. `answer` (str):\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "{question}\n"
-            "\n"
-            "[[ ## answer ## ]]\n"
-            "{answer}\n"
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `question`, produce the fields `reasoning`, `answer`.",
+            "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `reasoning`, `answer`.",
         },
         {
             "role": "user",
-            "content": "[[ ## question ## ]]\n"
-            "Q?\n"
-            "\n"
-            "Respond with the corresponding output fields, starting with the field `[[ ## answer "
-            "## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
+            "content": "[[ ## question ## ]]\nQ?\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
         },
     ]
     assert messages == expected_messages
@@ -1221,6 +715,7 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_reasoning(
 
 
 def test_chat_adapter_native_tool_calling_still_enables_native_reasoning():
+
     class NativeToolReasoningLM(DummyLM):
         def __init__(self, answers):
             super().__init__(answers)
@@ -1255,12 +750,12 @@ def test_chat_adapter_native_tool_calling_still_enables_native_reasoning():
         inputs={"question": "Q?", "tools": [Tool(search, description="Search for documents.")]},
         lm=NativeToolReasoningLM([{}]),
     )
-
     assert "tools" in lm_kwargs
     assert lm_kwargs["reasoning_effort"] == "low"
 
 
 def test_chat_adapter_nonnative_strips_native_tool_kwargs():
+
     def search(query: str) -> str:
         return query
 
@@ -1277,19 +772,15 @@ def test_chat_adapter_nonnative_strips_native_tool_kwargs():
         task_spec=NonNativeToolSignature,
         demos=[],
         inputs={"question": "Q?", "tools": [Tool(search, description="Search for documents.")]},
-        config={
-            "tool_choice": {"mode": "required", "allowed": ["submit"], "parallel": True},
-        },
+        config={"tool_choice": {"mode": "required", "allowed": ["submit"], "parallel": True}},
     )
-
     assert "tools" not in lm_kwargs
     assert "tool_choice" not in lm_kwargs
     assert "parallel_tool_calls" not in lm_kwargs
 
 
 def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
-    python_code = Code["python"]  # ty:ignore[invalid-argument-type]
-
+    python_code = Code["python"]
     CodeSignature = make_task_spec(
         {
             "question": FieldSpec.input("question"),
@@ -1304,37 +795,10 @@ def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
         demos=[{"question": "Q1", "reasoning": Reasoning(content="Think"), "code": python_code(code="print('hi')")}],
         inputs={"question": "Q2"},
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `question` (str):\n"
-            "Your output fields are:\n"
-            "1. `reasoning` (Reasoning): \n"
-            "2. `code` (Code_python): \n"
-            "    Type description of Code_python: Code represented in a string, specified in the "
-            "`code` field. If this is an output field, the code field should follow the markdown "
-            "code block format, e.g. \n"
-            "```python\n"
-            "{code}\n"
-            "```\n"
-            "Programming language: python\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "{question}\n"
-            "\n"
-            "[[ ## reasoning ## ]]\n"
-            "{reasoning}\n"
-            "\n"
-            "[[ ## code ## ]]\n"
-            "{code}\n"
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `question`, produce the fields `reasoning`, `code`.",
+            "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `reasoning` (Reasoning): \n2. `code` (Code_python): \n    Type description of Code_python: Code represented in a string, specified in the `code` field. If this is an output field, the code field should follow the markdown code block format, e.g. \n```python\n{code}\n```\nProgramming language: python\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## reasoning ## ]]\n{reasoning}\n\n[[ ## code ## ]]\n{code}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `reasoning`, `code`.",
         },
         {"role": "user", "content": "[[ ## question ## ]]\nQ1"},
         {
@@ -1343,13 +807,7 @@ def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
         },
         {
             "role": "user",
-            "content": "[[ ## question ## ]]\n"
-            "Q2\n"
-            "\n"
-            "Respond with the corresponding output fields, starting with the field `[[ ## "
-            "reasoning ## ]]` (must be formatted as a valid Python Reasoning), then `[[ ## code ## ]]` "
-            "(must be formatted as a valid Python Code_python), and then ending with the marker "
-            "for `[[ ## completed ## ]]`.",
+            "content": "[[ ## question ## ]]\nQ2\n\nRespond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]` (must be formatted as a valid Python Reasoning), then `[[ ## code ## ]]` (must be formatted as a valid Python Code_python), and then ending with the marker for `[[ ## completed ## ]]`.",
         },
     ]
     assert messages == expected_messages
@@ -1358,6 +816,7 @@ def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
 
 
 def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calling():
+
     class FunctionCallingLM(DummyLM):
         @property
         @override
@@ -1365,7 +824,6 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
             return True
 
     def search(query: str, k: int = 3) -> str:
-        """Search for documents."""
         return query
 
     NativeToolSignature = make_task_spec(
@@ -1383,33 +841,14 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
         inputs={"question": "Q?", "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `question` (str):\n"
-            "Your output fields are:\n"
-            "\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "{question}\n"
-            "\n"
-            "\n"
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `question`, `tools`, produce the fields `tool_calls`.",
+            "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `tools`, produce the fields `tool_calls`.",
         },
         {
             "role": "user",
-            "content": "[[ ## question ## ]]\n"
-            "Q?\n"
-            "\n"
-            "Respond with the corresponding output fields, starting with the field , and then "
-            "ending with the marker for `[[ ## completed ## ]]`.",
+            "content": "[[ ## question ## ]]\nQ?\n\nRespond with the corresponding output fields, starting with the field , and then ending with the marker for `[[ ## completed ## ]]`.",
         },
     ]
     assert messages == expected_messages
@@ -1441,6 +880,7 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
     ],
 )
 def test_adapter_native_tool_calling_can_request_parallel_tool_calls(adapter):
+
     class FunctionCallingLM(DummyLM):
         @property
         @override
@@ -1465,12 +905,12 @@ def test_adapter_native_tool_calling_can_request_parallel_tool_calls(adapter):
         inputs={"question": "Q?", "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
-
     assert lm_kwargs["tool_choice"] == "auto"
     assert lm_kwargs["parallel_tool_calls"] is True
 
 
 def test_adapter_native_tool_calling_respects_lm_kwargs_parallel_tool_call_override():
+
     class FunctionCallingLM(DummyLM):
         @property
         @override
@@ -1496,12 +936,12 @@ def test_adapter_native_tool_calling_respects_lm_kwargs_parallel_tool_call_overr
         config={"tool_choice": {"mode": "auto", "parallel": False}},
         lm=FunctionCallingLM([{}]),
     )
-
     assert lm_kwargs["tool_choice"] == "auto"
     assert lm_kwargs["parallel_tool_calls"] is False
 
 
 def test_chat_adapter_native_tool_history_replay():
+
     class FunctionCallingLM(DummyLM):
         @property
         @override
@@ -1509,7 +949,6 @@ def test_chat_adapter_native_tool_history_replay():
             return True
 
     def search(query: str) -> str:
-        """Search for documents."""
         return query
 
     NativeToolHistorySignature = make_task_spec(
@@ -1533,7 +972,6 @@ def test_chat_adapter_native_tool_history_replay():
             }
         ]
     )
-
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
@@ -1541,27 +979,17 @@ def test_chat_adapter_native_tool_history_replay():
         inputs={"question": "Q2", "history": history, "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
-
     assert messages[1]["role"] == "user"
     assert "Q1" in messages[1]["content"]
     assert messages[2] == {
         "role": "assistant",
         "content": "[[ ## next_thought ## ]]\nI should search.\n\n[[ ## completed ## ]]\n",
         "tool_calls": [
-            {
-                "type": "function",
-                "function": {"name": "search", "arguments": '{"query": "cats"}'},
-                "id": "call_1",
-            }
+            {"type": "function", "function": {"name": "search", "arguments": '{"query": "cats"}'}, "id": "call_1"}
         ],
     }
     assert json.loads(messages[2]["tool_calls"][0]["function"]["arguments"]) == {"query": "cats"}
-    assert messages[3] == {
-        "role": "tool",
-        "content": '{"items": ["cat"]}',
-        "tool_call_id": "call_1",
-        "name": "search",
-    }
+    assert messages[3] == {"role": "tool", "content": '{"items": ["cat"]}', "tool_call_id": "call_1", "name": "search"}
     assert messages[4]["role"] == "user"
     assert "Q2" in messages[4]["content"]
     assert "history" not in messages[4]["content"]
@@ -1572,6 +1000,7 @@ def test_chat_adapter_native_tool_history_replay():
 
 
 def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
+
     class FunctionCallingLM(DummyLM):
         @property
         @override
@@ -1597,10 +1026,7 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
             ToolCalls.ToolCall(id="call_2", name="search", args={"query": "dogs"}),
         ]
     )
-    tool_call_results = ToolCallResults.from_tool_calls_and_values(
-        tool_calls,
-        [{"items": ["cat"]}, {"items": ["dog"]}],
-    )
+    tool_call_results = ToolCallResults.from_tool_calls_and_values(tool_calls, [{"items": ["cat"]}, {"items": ["dog"]}])
     history = History(
         messages=[
             {
@@ -1610,7 +1036,6 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
             }
         ]
     )
-
     messages, _lm_kwargs = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
@@ -1618,7 +1043,6 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
         inputs={"question": "Q2", "history": history, "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
-
     assert [tool_call["id"] for tool_call in messages[2]["tool_calls"]] == ["call_1", "call_2"]
     assert [(message["role"], message["tool_call_id"], message["content"]) for message in messages[3:5]] == [
         ("tool", "call_1", '{"items": ["cat"]}'),
@@ -1627,6 +1051,7 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
 
 
 def test_chat_adapter_native_tool_history_skips_empty_user_message():
+
     class FunctionCallingLM(DummyLM):
         @property
         @override
@@ -1647,14 +1072,7 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
     )
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat result"])
-    history = History(
-        messages=[
-            {
-                "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
-            }
-        ]
-    )
-
+    history = History(messages=[{"tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results)}])
     messages, _ = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
@@ -1662,7 +1080,6 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
         inputs={"history": history, "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
-
     assert messages[1]["role"] == "assistant"
     assert messages[1]["content"] is None
     assert messages[2]["role"] == "tool"
@@ -1689,6 +1106,7 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
     ],
 )
 def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_id, tool_call_results):
+
     class FunctionCallingLM(DummyLM):
         @property
         @override
@@ -1711,15 +1129,8 @@ def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_i
     tool_call = ToolCalls.ToolCall(id=tool_call_id, name="search", args={"query": "cats"})
     tool_calls = ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results)
     history = History(
-        messages=[
-            {
-                "question": "Q1",
-                "next_thought": Reasoning(content="I should search."),
-                "tool_calls": tool_calls,
-            }
-        ]
+        messages=[{"question": "Q1", "next_thought": Reasoning(content="I should search."), "tool_calls": tool_calls}]
     )
-
     messages, _ = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
@@ -1727,7 +1138,6 @@ def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_i
         inputs={"question": "Q2", "history": history, "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
-
     assert all("tool_calls" not in message for message in messages)
     assert all(message["role"] != "tool" for message in messages)
     assert messages[2]["role"] == "assistant"
@@ -1735,6 +1145,7 @@ def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_i
 
 
 def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
+
     def search(query: str) -> str:
         return query
 
@@ -1759,81 +1170,29 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
             }
         ]
     )
-
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(use_native_function_calling=False),
         task_spec=ToolHistorySignature,
         demos=[],
         inputs={"question": "Q2", "history": history, "tools": [Tool(search, description="Search for documents.")]},
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `question` (str): \n"
-            "2. `history` (History): \n"
-            "3. `tools` (list[Tool]):\n"
-            "Your output fields are:\n"
-            "1. `next_thought` (str): \n"
-            "2. `tool_calls` (ToolCalls): \n"
-            "    Type description of ToolCalls: Tool calls must be a JSON object with `tool_calls`, a list of "
-            'calls. Each call must include `name` and `args`. Example: {"tool_calls": [{"name": "search", '
-            '"args": {"query": "cats"}}]}\n'
-            "All interactions will be structured in the following way, with the appropriate values filled in.\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "{question}\n"
-            "\n"
-            "[[ ## history ## ]]\n"
-            "{history}\n"
-            "\n"
-            "[[ ## tools ## ]]\n"
-            "{tools}\n"
-            "\n"
-            "[[ ## next_thought ## ]]\n"
-            "{next_thought}\n"
-            "\n"
-            "[[ ## tool_calls ## ]]\n"
-            '{tool_calls}        # note: the value you produce must adhere to the JSON schema: {"type": "object", '
-            '"$defs": {"ToolCall": {"type": "object", "properties": {"args": {"type": "object", '
-            '"additionalProperties": true, "title": "Args"}, "name": {"type": "string", "title": "Name"}}, '
-            '"required": ["name", "args"], "title": "ToolCall"}}, "properties": {"tool_calls": {"type": "array", '
-            '"items": {"$ref": "#/$defs/ToolCall"}, "title": "Tool Calls"}}, "required": ["tool_calls"], "title": '
-            '"ToolCalls"}\n'
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, "
-            "`tool_calls`.",
+            "content": 'Your input fields are:\n1. `question` (str): \n2. `history` (History): \n3. `tools` (list[Tool]):\nYour output fields are:\n1. `next_thought` (str): \n2. `tool_calls` (ToolCalls): \n    Type description of ToolCalls: Tool calls must be a JSON object with `tool_calls`, a list of calls. Each call must include `name` and `args`. Example: {"tool_calls": [{"name": "search", "args": {"query": "cats"}}]}\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## history ## ]]\n{history}\n\n[[ ## tools ## ]]\n{tools}\n\n[[ ## next_thought ## ]]\n{next_thought}\n\n[[ ## tool_calls ## ]]\n{tool_calls}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "$defs": {"ToolCall": {"type": "object", "properties": {"args": {"type": "object", "additionalProperties": true, "title": "Args"}, "name": {"type": "string", "title": "Name"}}, "required": ["name", "args"], "title": "ToolCall"}}, "properties": {"tool_calls": {"type": "array", "items": {"$ref": "#/$defs/ToolCall"}, "title": "Tool Calls"}}, "required": ["tool_calls"], "title": "ToolCalls"}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.',
         },
         {"role": "user", "content": "[[ ## question ## ]]\nQ1"},
         {
             "role": "assistant",
-            "content": "[[ ## next_thought ## ]]\n"
-            "I should search.\n"
-            "\n"
-            "[[ ## tool_calls ## ]]\n"
-            '{"tool_calls": [{"name": "search", "args": {"query": "cats"}}]}\n'
-            "\n"
-            "[[ ## completed ## ]]\n",
+            "content": '[[ ## next_thought ## ]]\nI should search.\n\n[[ ## tool_calls ## ]]\n{"tool_calls": [{"name": "search", "args": {"query": "cats"}}]}\n\n[[ ## completed ## ]]\n',
         },
         {
             "role": "user",
-            "content": "[[ ## tool_call_results ## ]]\n"
-            '{"tool_call_results": [{"call_id": "call_1", "name": "search", "value": "cat", "is_error": false}]}',
+            "content": '[[ ## tool_call_results ## ]]\n{"tool_call_results": [{"call_id": "call_1", "name": "search", "value": "cat", "is_error": false}]}',
         },
         {
             "role": "user",
-            "content": "[[ ## question ## ]]\n"
-            "Q2\n"
-            "\n"
-            "[[ ## tools ## ]]\n"
-            "[\"search, whose description is <desc>Search for documents.</desc>. It takes arguments {'query': {'type': 'string'}}.\"]\n"
-            "\n"
-            "Respond with the corresponding output fields, starting with the field `[[ ## next_thought ## ]]`, then "
-            '`[[ ## tool_calls ## ]]` (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]}), and then ending with the '
-            "marker for `[[ ## completed ## ]]`.",
+            "content": '[[ ## question ## ]]\nQ2\n\n[[ ## tools ## ]]\n["search, whose description is <desc>Search for documents.</desc>. It takes arguments {\'query\': {\'type\': \'string\'}}."]\n\nRespond with the corresponding output fields, starting with the field `[[ ## next_thought ## ]]`, then `[[ ## tool_calls ## ]]` (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]}), and then ending with the marker for `[[ ## completed ## ]]`.',
         },
     ]
     assert messages == expected_messages
@@ -1841,10 +1200,10 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
 
 
 @pytest.mark.parametrize(
-    "adapter",
-    [ChatAdapter(use_native_function_calling=False), JSONAdapter(use_native_function_calling=False)],
+    "adapter", [ChatAdapter(use_native_function_calling=False), JSONAdapter(use_native_function_calling=False)]
 )
 def test_non_native_tool_history_remains_text_based(adapter):
+
     def search(query: str) -> str:
         return query
 
@@ -1878,7 +1237,6 @@ def test_non_native_tool_history_remains_text_based(adapter):
             "tools": [Tool(search, description="Search for documents.")],
         },
     )
-
     assert all(message["role"] != "tool" for message in messages)
     assert [message["role"] for message in messages[1:]] == ["user", "assistant", "user", "user"]
     assert "Q1" in messages[1]["content"]
@@ -1912,20 +1270,16 @@ def test_chat_adapter_format_accepts_custom_history_formatter_returning_messages
         adapter=CustomHistoryAdapter(),
         task_spec=HistorySignature,
         demos=[],
-        inputs={
-            "question": "Q2",
-            "history": History(messages=[{"question": "Q1"}]),
-        },
+        inputs={"question": "Q2", "history": History(messages=[{"question": "Q1"}])},
     )
-
     assert messages[1] == {"role": "user", "content": "custom history"}
     assert messages[2]["role"] == "user"
     assert "Q2" in messages[2]["content"]
 
 
 def test_chat_adapter_format_exact_messages_with_tool_input():
+
     def search(query: str, k: int = 3) -> str:
-        """Search for documents."""
         return query
 
     ToolSignature = make_task_spec(
@@ -1942,43 +1296,14 @@ def test_chat_adapter_format_exact_messages_with_tool_input():
         demos=[],
         inputs={"question": "Q?", "tools": [Tool(search, description="Search for documents.")]},
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `question` (str): \n"
-            "2. `tools` (list[Tool]):\n"
-            "Your output fields are:\n"
-            "1. `answer` (str):\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "{question}\n"
-            "\n"
-            "[[ ## tools ## ]]\n"
-            "{tools}\n"
-            "\n"
-            "[[ ## answer ## ]]\n"
-            "{answer}\n"
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Given the fields `question`, `tools`, produce the fields `answer`.",
+            "content": "Your input fields are:\n1. `question` (str): \n2. `tools` (list[Tool]):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## tools ## ]]\n{tools}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `tools`, produce the fields `answer`.",
         },
         {
             "role": "user",
-            "content": "[[ ## question ## ]]\n"
-            "Q?\n"
-            "\n"
-            "[[ ## tools ## ]]\n"
-            '["search, whose description is <desc>Search for documents.</desc>. It takes '
-            "arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', 'default': "
-            '3}}."]\n'
-            "\n"
-            "Respond with the corresponding output fields, starting with the field `[[ ## answer "
-            "## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
+            "content": "[[ ## question ## ]]\nQ?\n\n[[ ## tools ## ]]\n[\"search, whose description is <desc>Search for documents.</desc>. It takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', 'default': 3}}.\"]\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
         },
     ]
     assert messages == expected_messages
@@ -1987,8 +1312,8 @@ def test_chat_adapter_format_exact_messages_with_tool_input():
 
 
 def test_chat_adapter_format_exact_messages_kitchen_sink():
+
     def search(query: str, k: int = 3) -> str:
-        """Search for documents."""
         return query
 
     class Event(DSPyType):
@@ -2035,15 +1360,9 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
         instructions="Answer carefully using every available signal.",
     )
     tool = Tool(search, description="Search for documents.")
-    demo_profile = Profile(
-        name="Ada",
-        location=Location(city="London", country="UK"),
-        interests=["math", "machines"],
-    )
+    demo_profile = Profile(name="Ada", location=Location(city="London", country="UK"), interests=["math", "machines"])
     current_profile = Profile(
-        name="Grace",
-        location=Location(city="Arlington", country="USA"),
-        interests=["compilers", "navy"],
+        name="Grace", location=Location(city="Arlington", country="USA"), interests=["compilers", "navy"]
     )
     history = History(
         messages=[
@@ -2093,78 +1412,10 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
             "question": "What should the answer include?",
         },
     )
-
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n"
-            "1. `history` (History): \n"
-            "2. `image` (Image): \n"
-            "3. `audio` (Audio): \n"
-            "4. `file` (File): \n"
-            "5. `document` (Document): \n"
-            "    Type description of Document: A document containing text content that can be "
-            "referenced and cited. Include the full text content and optionally a title for "
-            "proper referencing.\n"
-            "6. `event` (Event): \n"
-            "    Type description of Event: An event block.\n"
-            "7. `tools` (list[Tool]): \n"
-            "8. `profile` (Profile): \n"
-            "9. `context` (str): \n"
-            "10. `question` (str):\n"
-            "Your output fields are:\n"
-            "1. `answer` (AnswerCard): \n"
-            "2. `verdict` (Literal['yes', 'no']): \n"
-            "3. `confidence` (float):\n"
-            "All interactions will be structured in the following way, with the appropriate "
-            "values filled in.\n"
-            "\n"
-            "[[ ## history ## ]]\n"
-            "{history}\n"
-            "\n"
-            "[[ ## image ## ]]\n"
-            "{image}\n"
-            "\n"
-            "[[ ## audio ## ]]\n"
-            "{audio}\n"
-            "\n"
-            "[[ ## file ## ]]\n"
-            "{file}\n"
-            "\n"
-            "[[ ## document ## ]]\n"
-            "{document}\n"
-            "\n"
-            "[[ ## event ## ]]\n"
-            "{event}\n"
-            "\n"
-            "[[ ## tools ## ]]\n"
-            "{tools}\n"
-            "\n"
-            "[[ ## profile ## ]]\n"
-            "{profile}\n"
-            "\n"
-            "[[ ## context ## ]]\n"
-            "{context}\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "{question}\n"
-            "\n"
-            "[[ ## answer ## ]]\n"
-            "{answer}        # note: the value you produce must adhere to the JSON schema: "
-            '{"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, '
-            '"sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, '
-            '"required": ["answer", "sources"], "title": "AnswerCard"}\n'
-            "\n"
-            "[[ ## verdict ## ]]\n"
-            "{verdict}        # note: the value you produce must exactly match (no extra "
-            "characters) one of: yes; no\n"
-            "\n"
-            "[[ ## confidence ## ]]\n"
-            "{confidence}        # note: the value you produce must be a single float value\n"
-            "\n"
-            "[[ ## completed ## ]]\n"
-            "In adhering to this structure, your objective is: \n"
-            "        Answer carefully using every available signal.",
+            "content": 'Your input fields are:\n1. `history` (History): \n2. `image` (Image): \n3. `audio` (Audio): \n4. `file` (File): \n5. `document` (Document): \n    Type description of Document: A document containing text content that can be referenced and cited. Include the full text content and optionally a title for proper referencing.\n6. `event` (Event): \n    Type description of Event: An event block.\n7. `tools` (list[Tool]): \n8. `profile` (Profile): \n9. `context` (str): \n10. `question` (str):\nYour output fields are:\n1. `answer` (AnswerCard): \n2. `verdict` (Literal[\'yes\', \'no\']): \n3. `confidence` (float):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## history ## ]]\n{history}\n\n[[ ## image ## ]]\n{image}\n\n[[ ## audio ## ]]\n{audio}\n\n[[ ## file ## ]]\n{file}\n\n[[ ## document ## ]]\n{document}\n\n[[ ## event ## ]]\n{event}\n\n[[ ## tools ## ]]\n{tools}\n\n[[ ## profile ## ]]\n{profile}\n\n[[ ## context ## ]]\n{context}\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, "sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, "required": ["answer", "sources"], "title": "AnswerCard"}\n\n[[ ## verdict ## ]]\n{verdict}        # note: the value you produce must exactly match (no extra characters) one of: yes; no\n\n[[ ## confidence ## ]]\n{confidence}        # note: the value you produce must be a single float value\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Answer carefully using every available signal.',
         },
         {
             "role": "user",
@@ -2190,83 +1441,35 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
                 {"type": "event", "event": {"label": "demo-event"}},
                 {
                     "type": "text",
-                    "text": "\n\n[[ ## tools ## ]]\n"
-                    '["search, whose description is <desc>Search for documents.</desc>. It '
-                    "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
-                    "'default': 3}}.\"]",
+                    "text": "\n\n[[ ## tools ## ]]\n[\"search, whose description is <desc>Search for documents.</desc>. It takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', 'default': 3}}.\"]",
                 },
                 {
                     "type": "text",
-                    "text": "\n\n[[ ## profile ## ]]\n"
-                    '{"name": "Ada", "location": {"city": "London", "country": "UK"}, '
-                    '"interests": ["math", "machines"]}',
+                    "text": '\n\n[[ ## profile ## ]]\n{"name": "Ada", "location": {"city": "London", "country": "UK"}, "interests": ["math", "machines"]}',
                 },
-                {
-                    "type": "text",
-                    "text": "\n\n[[ ## context ## ]]\n[1] «demo context one»\n[2] «demo context two»",
-                },
+                {"type": "text", "text": "\n\n[[ ## context ## ]]\n[1] «demo context one»\n[2] «demo context two»"},
                 {"type": "text", "text": "\n\n[[ ## question ## ]]\nWhat should we mention?"},
             ],
         },
         {
             "role": "assistant",
-            "content": "[[ ## answer ## ]]\n"
-            '{"answer": "Mention analytical engines.", "sources": ["demo"]}\n'
-            "\n"
-            "[[ ## verdict ## ]]\n"
-            "yes\n"
-            "\n"
-            "[[ ## confidence ## ]]\n"
-            "0.9\n"
-            "\n"
-            "[[ ## completed ## ]]\n",
+            "content": '[[ ## answer ## ]]\n{"answer": "Mention analytical engines.", "sources": ["demo"]}\n\n[[ ## verdict ## ]]\nyes\n\n[[ ## confidence ## ]]\n0.9\n\n[[ ## completed ## ]]\n',
         },
         {
             "role": "user",
-            "content": "This is an example of the task, though some input or output fields are not "
-            "supplied.\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "Incomplete example question",
+            "content": "This is an example of the task, though some input or output fields are not supplied.\n\n[[ ## question ## ]]\nIncomplete example question",
         },
         {
             "role": "assistant",
-            "content": "[[ ## answer ## ]]\n"
-            '{"answer": "Partial answer.", "sources": ["partial"]}\n'
-            "\n"
-            "[[ ## verdict ## ]]\n"
-            "Not supplied for this particular example. \n"
-            "\n"
-            "[[ ## confidence ## ]]\n"
-            "Not supplied for this particular example.\n"
-            "\n"
-            "[[ ## completed ## ]]\n",
+            "content": '[[ ## answer ## ]]\n{"answer": "Partial answer.", "sources": ["partial"]}\n\n[[ ## verdict ## ]]\nNot supplied for this particular example. \n\n[[ ## confidence ## ]]\nNot supplied for this particular example.\n\n[[ ## completed ## ]]\n',
         },
         {
             "role": "user",
-            "content": "[[ ## profile ## ]]\n"
-            '{"name": "Ada", "location": {"city": "London", "country": "UK"}, "interests": '
-            '["math", "machines"]}\n'
-            "\n"
-            "[[ ## context ## ]]\n"
-            "[1] «old note»\n"
-            "[2] «older note»\n"
-            "\n"
-            "[[ ## question ## ]]\n"
-            "Who is Ada?",
+            "content": '[[ ## profile ## ]]\n{"name": "Ada", "location": {"city": "London", "country": "UK"}, "interests": ["math", "machines"]}\n\n[[ ## context ## ]]\n[1] «old note»\n[2] «older note»\n\n[[ ## question ## ]]\nWho is Ada?',
         },
         {
             "role": "assistant",
-            "content": "[[ ## answer ## ]]\n"
-            '{"answer": "Ada is a mathematician.", "sources": ["memory"]}\n'
-            "\n"
-            "[[ ## verdict ## ]]\n"
-            "yes\n"
-            "\n"
-            "[[ ## confidence ## ]]\n"
-            "0.8\n"
-            "\n"
-            "[[ ## completed ## ]]\n",
+            "content": '[[ ## answer ## ]]\n{"answer": "Ada is a mathematician.", "sources": ["memory"]}\n\n[[ ## verdict ## ]]\nyes\n\n[[ ## confidence ## ]]\n0.8\n\n[[ ## completed ## ]]\n',
         },
         {
             "role": "user",
@@ -2288,32 +1491,20 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
                 {"type": "event", "event": {"label": "current-event"}},
                 {
                     "type": "text",
-                    "text": "\n\n[[ ## tools ## ]]\n"
-                    '["search, whose description is <desc>Search for documents.</desc>. It '
-                    "takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', "
-                    "'default': 3}}.\"]",
+                    "text": "\n\n[[ ## tools ## ]]\n[\"search, whose description is <desc>Search for documents.</desc>. It takes arguments {'query': {'type': 'string'}, 'k': {'type': 'integer', 'default': 3}}.\"]",
                 },
                 {
                     "type": "text",
-                    "text": "\n\n[[ ## profile ## ]]\n"
-                    '{"name": "Grace", "location": {"city": "Arlington", "country": "USA"}, '
-                    '"interests": ["compilers", "navy"]}',
+                    "text": '\n\n[[ ## profile ## ]]\n{"name": "Grace", "location": {"city": "Arlington", "country": "USA"}, "interests": ["compilers", "navy"]}',
                 },
                 {
                     "type": "text",
                     "text": "\n\n[[ ## context ## ]]\n[1] «current context one»\n[2] «current context two»",
                 },
+                {"type": "text", "text": "\n\n[[ ## question ## ]]\nWhat should the answer include?"},
                 {
                     "type": "text",
-                    "text": "\n\n[[ ## question ## ]]\nWhat should the answer include?",
-                },
-                {
-                    "type": "text",
-                    "text": "\n\nRespond with the corresponding output fields, starting with the field `[[ "
-                    "## answer ## ]]` (must be formatted as a valid Python AnswerCard), then "
-                    "`[[ ## verdict ## ]]` (must be formatted as a valid Python Literal['yes', "
-                    "'no']), then `[[ ## confidence ## ]]` (must be formatted as a valid Python "
-                    "float), and then ending with the marker for `[[ ## completed ## ]]`.",
+                    "text": "\n\nRespond with the corresponding output fields, starting with the field `[[ ## answer ## ]]` (must be formatted as a valid Python AnswerCard), then `[[ ## verdict ## ]]` (must be formatted as a valid Python Literal['yes', 'no']), then `[[ ## confidence ## ]]` (must be formatted as a valid Python float), and then ending with the marker for `[[ ## completed ## ]]`.",
                 },
             ],
         },
@@ -2324,9 +1515,6 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
 
 
 def test_chat_adapter_with_pydantic_models():
-    """
-    This test verifies that ChatAdapter can handle different input and output field types, both basic and nested.
-    """
 
     class DogClass(pydantic.BaseModel):
         dog_breeds: list[str] = pydantic.Field(description="List of the breeds of dogs")
@@ -2359,13 +1547,11 @@ def test_chat_adapter_with_pydantic_models():
             "question": "How many non-dog pets does John have?",
         },
     )
-
     system_content = messages[0]["content"]
     user_content = messages[1]["content"]
     assert "1. `owner` (PetOwner)" in system_content
     assert "2. `question` (str)" in system_content
     assert "1. `output` (Answer)" in system_content
-
     assert "name" in user_content
     assert "num_pets" in user_content
     assert "dogs" in user_content
@@ -2375,10 +1561,6 @@ def test_chat_adapter_with_pydantic_models():
 
 
 def test_chat_adapter_signature_information():
-    """
-    This test ensures that the signature information sent to the LM follows an expected format.
-    """
-
     TestSignature = make_task_spec(
         {
             "input1": FieldSpec.input("input1", desc="String Input"),
@@ -2388,24 +1570,19 @@ def test_chat_adapter_signature_information():
         instructions="Given the fields `input1`, `input2`, produce the fields `output`.",
     )
     program = Predict(TestSignature)
-
     with (
         settings.context(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter()),
         mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion,
     ):
         mock_completion.return_value = default_model_response("[[ ## output ## ]]\nok\n\n[[ ## completed ## ]]")
         asyncio.run(program.acall(input1="Test", input2=11))
-
         mock_completion.assert_called_once()
         _, call_kwargs = mock_completion.call_args
-
         assert len(call_kwargs["messages"]) == 2
         assert call_kwargs["messages"][0]["role"] == "system"
         assert call_kwargs["messages"][1]["role"] == "user"
-
         system_content = call_kwargs["messages"][0]["content"]
         user_content = call_kwargs["messages"][1]["content"]
-
         assert "1. `input1` (str)" in system_content
         assert "2. `input2` (int)" in system_content
         assert "1. `output` (str)" in system_content
@@ -2413,7 +1590,6 @@ def test_chat_adapter_signature_information():
         assert "[[ ## input2 ## ]]\n{input2}" in system_content
         assert "[[ ## output ## ]]\n{output}" in system_content
         assert "[[ ## completed ## ]]" in system_content
-
         assert "[[ ## input1 ## ]]" in user_content
         assert "[[ ## input2 ## ]]" in user_content
         assert "[[ ## output ## ]]" in user_content
@@ -2421,63 +1597,40 @@ def test_chat_adapter_signature_information():
 
 
 def test_chat_adapter_exception_raised_on_failure():
-    """
-    This test ensures that on an error, ChatAdapter raises an explicit exception.
-    """
     signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
     adapter = ChatAdapter()
     invalid_completion = "{'output':'mismatched value'}"
-    with pytest.raises(AdapterParseError, match=r"Adapter ChatAdapter failed to parse.*"):
+    with pytest.raises(AdapterParseError, match="Adapter ChatAdapter failed to parse.*"):
         adapter.parse(task_spec=signature, completion=invalid_completion)
 
 
 def test_chat_adapter_formats_image():
-    # Test basic image formatting
     image = Image(url="https://example.com/image.jpg")
-
     MySignature = make_task_spec(
-        {
-            "image": FieldSpec.input("image", type_=Image),
-            "text": FieldSpec.output("text"),
-        },
+        {"image": FieldSpec.input("image", type_=Image), "text": FieldSpec.output("text")},
         instructions="Given the fields `image`, produce the fields `text`.",
     )
     adapter = ChatAdapter()
     messages = adapter_format_as_openai(adapter=adapter, task_spec=MySignature, demos=[], inputs={"image": image})
-
     assert len(messages) == 2
     user_message_content = messages[1]["content"]
     assert user_message_content is not None
-
-    # The message should have 3 chunks of types: text, image_url, text
     assert len(user_message_content) == 3
     assert user_message_content[0]["type"] == "text"
     assert user_message_content[2]["type"] == "text"
-
-    # Assert that the image is formatted correctly
     expected_image_content = {"type": "image_url", "image_url": {"url": "https://example.com/image.jpg"}}
     assert expected_image_content in user_message_content
 
 
 def test_chat_adapter_formats_image_with_few_shot_examples():
     MySignature = make_task_spec(
-        {
-            "image": FieldSpec.input("image", type_=Image),
-            "text": FieldSpec.output("text"),
-        },
+        {"image": FieldSpec.input("image", type_=Image), "text": FieldSpec.output("text")},
         instructions="Given the fields `image`, produce the fields `text`.",
     )
     adapter = ChatAdapter()
-
     demos = [
-        Example(
-            image=Image(url="https://example.com/image1.jpg"),
-            text="This is a test image",
-        ),
-        Example(
-            image=Image(url="https://example.com/image2.jpg"),
-            text="This is another test image",
-        ),
+        Example(image=Image(url="https://example.com/image1.jpg"), text="This is a test image"),
+        Example(image=Image(url="https://example.com/image2.jpg"), text="This is another test image"),
     ]
     messages = adapter_format_as_openai(
         adapter=adapter,
@@ -2485,91 +1638,67 @@ def test_chat_adapter_formats_image_with_few_shot_examples():
         demos=demos,
         inputs={"image": Image(url="https://example.com/image3.jpg")},
     )
-
-    # 1 system message, 2 few shot examples (1 user and assistant message for each example), 1 user message
     assert len(messages) == 6
-
     assert "[[ ## completed ## ]]\n" in messages[2]["content"]
     assert "[[ ## completed ## ]]\n" in messages[4]["content"]
-
     assert {"type": "image_url", "image_url": {"url": "https://example.com/image1.jpg"}} in messages[1]["content"]
     assert {"type": "image_url", "image_url": {"url": "https://example.com/image2.jpg"}} in messages[3]["content"]
     assert {"type": "image_url", "image_url": {"url": "https://example.com/image3.jpg"}} in messages[5]["content"]
 
 
 def test_chat_adapter_formats_image_with_nested_images():
+
     class ImageWrapper(pydantic.BaseModel):
         images: list[Image]
         tag: list[str]
 
     MySignature = make_task_spec(
-        {
-            "image": FieldSpec.input("image", type_=ImageWrapper),
-            "text": FieldSpec.output("text"),
-        },
+        {"image": FieldSpec.input("image", type_=ImageWrapper), "text": FieldSpec.output("text")},
         instructions="Given the fields `image`, produce the fields `text`.",
     )
     image1 = Image(url="https://example.com/image1.jpg")
     image2 = Image(url="https://example.com/image2.jpg")
     image3 = Image(url="https://example.com/image3.jpg")
-
     image_wrapper = ImageWrapper(images=[image1, image2, image3], tag=["test", "example"])
-
     adapter = ChatAdapter()
     messages = adapter_format_as_openai(
         adapter=adapter, task_spec=MySignature, demos=[], inputs={"image": image_wrapper}
     )
-
     expected_image1_content = {"type": "image_url", "image_url": {"url": "https://example.com/image1.jpg"}}
     expected_image2_content = {"type": "image_url", "image_url": {"url": "https://example.com/image2.jpg"}}
     expected_image3_content = {"type": "image_url", "image_url": {"url": "https://example.com/image3.jpg"}}
-
     assert expected_image1_content in messages[1]["content"]
     assert expected_image2_content in messages[1]["content"]
     assert expected_image3_content in messages[1]["content"]
 
 
 def test_chat_adapter_formats_image_with_few_shot_examples_with_nested_images():
+
     class ImageWrapper(pydantic.BaseModel):
         images: list[Image]
         tag: list[str]
 
     MySignature = make_task_spec(
-        {
-            "image": FieldSpec.input("image", type_=ImageWrapper),
-            "text": FieldSpec.output("text"),
-        },
+        {"image": FieldSpec.input("image", type_=ImageWrapper), "text": FieldSpec.output("text")},
         instructions="Given the fields `image`, produce the fields `text`.",
     )
     image1 = Image(url="https://example.com/image1.jpg")
     image2 = Image(url="https://example.com/image2.jpg")
     image3 = Image(url="https://example.com/image3.jpg")
-
     image_wrapper = ImageWrapper(images=[image1, image2, image3], tag=["test", "example"])
-    demos = [
-        Example(
-            image=image_wrapper,
-            text="This is a test image",
-        ),
-    ]
-
+    demos = [Example(image=image_wrapper, text="This is a test image")]
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = ChatAdapter()
     messages = adapter_format_as_openai(
         adapter=adapter, task_spec=MySignature, demos=demos, inputs={"image": image_wrapper_2}
     )
-
     assert len(messages) == 4
-
-    # Image information in the few-shot example's user message
     expected_image1_content = {"type": "image_url", "image_url": {"url": "https://example.com/image1.jpg"}}
     expected_image2_content = {"type": "image_url", "image_url": {"url": "https://example.com/image2.jpg"}}
     expected_image3_content = {"type": "image_url", "image_url": {"url": "https://example.com/image3.jpg"}}
     assert expected_image1_content in messages[1]["content"]
     assert expected_image2_content in messages[1]["content"]
     assert expected_image3_content in messages[1]["content"]
-
-    # The query image is formatted in the last user message
     assert {"type": "image_url", "image_url": {"url": "https://example.com/image4.jpg"}} in messages[-1]["content"]
 
 
@@ -2585,18 +1714,15 @@ def test_chat_adapter_with_tool():
     )
 
     def get_weather(city: str) -> str:
-        """Get the weather for a city"""
         return f"The weather in {city} is sunny"
 
     def get_population(country: str, year: int) -> str:
-        """Get the population for a country"""
         return f"The population of {country} in {year} is 1000000"
 
     tools = [
         Tool(get_weather, description="Get the weather for a city"),
         Tool(get_population, description="Get the population for a country"),
     ]
-
     adapter = ChatAdapter()
     messages = adapter_format_as_openai(
         adapter=adapter,
@@ -2604,50 +1730,29 @@ def test_chat_adapter_with_tool():
         demos=[],
         inputs={"question": "What is the weather in Tokyo?", "tools": tools},
     )
-
     assert len(messages) == 2
-
-    # The output field type description should be included in the system message even if the output field is nested
     assert ToolCalls.description() in messages[0]["content"]
-
-    # The user message should include the question and the tools
     assert "What is the weather in Tokyo?" in messages[1]["content"]
     assert "get_weather" in messages[1]["content"]
     assert "get_population" in messages[1]["content"]
-
-    # Tool arguments format should be included in the user message
     assert "{'city': {'type': 'string'}}" in messages[1]["content"]
     assert "{'country': {'type': 'string'}, 'year': {'type': 'integer'}}" in messages[1]["content"]
 
 
 def test_chat_adapter_with_code():
-    # Test with code as input field
     CodeAnalysis = make_task_spec(
-        {
-            "code": FieldSpec.input("code", type_=Code),
-            "result": FieldSpec.output("result"),
-        },
+        {"code": FieldSpec.input("code", type_=Code), "result": FieldSpec.output("result")},
         instructions="Analyze the time complexity of the code",
     )
     adapter = ChatAdapter()
     messages = adapter_format_as_openai(
         adapter=adapter, task_spec=CodeAnalysis, demos=[], inputs={"code": "print('Hello, world!')"}
     )
-
     assert len(messages) == 2
-
-    # The output field type description should be included in the system message even if the output field is nested
     assert Code.description() in messages[0]["content"]
-
-    # The user message should include the question and the tools
     assert "print('Hello, world!')" in messages[1]["content"]
-
-    # Test with code as output field
     CodeGeneration = make_task_spec(
-        {
-            "question": FieldSpec.input("question"),
-            "code": FieldSpec.output("code", type_=Code),
-        },
+        {"question": FieldSpec.input("question"), "code": FieldSpec.output("code", type_=Code)},
         instructions="Generate code to answer the question",
     )
     adapter = ChatAdapter()
@@ -2669,13 +1774,8 @@ def test_chat_adapter_with_code():
 
 
 def test_code_output_field_omits_json_schema_in_prompt():
-    """Regression test for #9251: Code should avoid duplicating large JSON schema text."""
-
     CodeGeneration = make_task_spec(
-        {
-            "question": FieldSpec.input("question"),
-            "code": FieldSpec.output("code", type_=Code),
-        },
+        {"question": FieldSpec.input("question"), "code": FieldSpec.output("code", type_=Code)},
         instructions="Generate code to answer the question",
     )
     adapter = ChatAdapter()
@@ -2683,7 +1783,6 @@ def test_code_output_field_omits_json_schema_in_prompt():
         adapter=adapter, task_spec=CodeGeneration, demos=[], inputs={"question": "Hello"}
     )
     system_content = messages[0]["content"]
-
     assert Code.description() in system_content
     assert "JSON schema" not in system_content
     assert '"properties"' not in system_content
@@ -2691,13 +1790,8 @@ def test_code_output_field_omits_json_schema_in_prompt():
 
 
 def test_citations_output_field_keeps_json_schema_in_prompt():
-    """Non-Code custom types should keep schema guidance for structured output reliability."""
-
     CitationGeneration = make_task_spec(
-        {
-            "question": FieldSpec.input("question"),
-            "citations": FieldSpec.output("citations", type_=Citations),
-        },
+        {"question": FieldSpec.input("question"), "citations": FieldSpec.output("citations", type_=Citations)},
         instructions="Given the fields `question`, produce the fields `citations`.",
     )
     adapter = ChatAdapter()
@@ -2705,7 +1799,6 @@ def test_citations_output_field_keeps_json_schema_in_prompt():
         adapter=adapter, task_spec=CitationGeneration, demos=[], inputs={"question": "Hello"}
     )
     system_content = messages[0]["content"]
-
     assert "must adhere to the JSON schema" in system_content
     assert "Type description of Citations" in system_content
 
@@ -2725,7 +1818,6 @@ def test_chat_adapter_formats_conversation_history():
             {"question": "What is the capital of Germany?", "answer": "Berlin"},
         ]
     )
-
     adapter = ChatAdapter()
     messages = adapter_format_as_openai(
         adapter=adapter,
@@ -2733,7 +1825,6 @@ def test_chat_adapter_formats_conversation_history():
         demos=[],
         inputs={"question": "What is the capital of France?", "history": history},
     )
-
     assert len(messages) == 6
     assert messages[1]["content"] == "[[ ## question ## ]]\nWhat is the capital of France?"
     assert messages[2]["content"] == "[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]\n"
@@ -2744,16 +1835,11 @@ def test_chat_adapter_formats_conversation_history():
 def test_chat_adapter_fallback_to_json_adapter_on_exception():
     signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
     adapter = ChatAdapter()
-
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
-        # Mock returning a response compatible with JSONAdapter but not ChatAdapter
         mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="{'answer': 'Paris'}"))],
-            model="openai/gpt-4o-mini",
+            choices=[Choices(message=Message(content="{'answer': 'Paris'}"))], model="openai/gpt-4o-mini"
         )
-
         lm = LM("openai/gpt-4o-mini")
-
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall") as mock_json_adapter_acall:
             asyncio.run(
                 adapter.acall(
@@ -2765,8 +1851,6 @@ def test_chat_adapter_fallback_to_json_adapter_on_exception():
                 )
             )
             mock_json_adapter_acall.assert_called_once()
-
-        # The parse should succeed
         result = asyncio.run(
             adapter.acall(
                 lm=lm, config={}, task_spec=signature, demos=[], inputs={"question": "What is the capital of France?"}
@@ -2786,11 +1870,9 @@ def test_chat_adapter_fallback_preserves_native_function_calling_flag():
 
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="nonsense"))],
-            model="openai/gpt-4o-mini",
+            choices=[Choices(message=Message(content="nonsense"))], model="openai/gpt-4o-mini"
         )
         lm = LM("openai/gpt-4o-mini")
-
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall", new=fake_json_adapter_acall):
             result = asyncio.run(
                 adapter.acall(
@@ -2801,7 +1883,6 @@ def test_chat_adapter_fallback_preserves_native_function_calling_flag():
                     inputs={"question": "What is the capital of France?"},
                 )
             )
-
     assert result == [{"answer": "Paris"}]
     assert seen["use_native_function_calling"] is False
 
@@ -2809,16 +1890,12 @@ def test_chat_adapter_fallback_preserves_native_function_calling_flag():
 def test_chat_adapter_respects_use_json_adapter_fallback_flag():
     signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
     adapter = ChatAdapter(use_json_adapter_fallback=False)
-
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="nonsense"))],
-            model="openai/gpt-4o-mini",
+            choices=[Choices(message=Message(content="nonsense"))], model="openai/gpt-4o-mini"
         )
-
         lm = LM("openai/gpt-4o-mini")
-
-        with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall") as mock_json_adapter_acall:  # noqa: SIM117
+        with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall") as mock_json_adapter_acall:
             with pytest.raises(AdapterParseError):
                 asyncio.run(
                     adapter.acall(
@@ -2836,23 +1913,16 @@ def test_chat_adapter_respects_use_json_adapter_fallback_flag():
 async def test_chat_adapter_fallback_to_json_adapter_on_exception_async():
     signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
     adapter = ChatAdapter()
-
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
-        # Mock returning a response compatible with JSONAdapter but not ChatAdapter
         mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="{'answer': 'Paris'}"))],
-            model="openai/gpt-4o-mini",
+            choices=[Choices(message=Message(content="{'answer': 'Paris'}"))], model="openai/gpt-4o-mini"
         )
-
         lm = LM("openai/gpt-4o-mini")
-
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall") as mock_json_adapter_acall:
             await adapter.acall(
                 lm=lm, config={}, task_spec=signature, demos=[], inputs={"question": "What is the capital of France?"}
             )
             mock_json_adapter_acall.assert_called_once()
-
-        # The parse should succeed
         result = await adapter.acall(
             lm=lm, config={}, task_spec=signature, demos=[], inputs={"question": "What is the capital of France?"}
         )
@@ -2871,16 +1941,13 @@ async def test_chat_adapter_async_fallback_preserves_native_function_calling_fla
 
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="nonsense"))],
-            model="openai/gpt-4o-mini",
+            choices=[Choices(message=Message(content="nonsense"))], model="openai/gpt-4o-mini"
         )
         lm = LM("openai/gpt-4o-mini")
-
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall", new=fake_json_adapter_acall):
             result = await adapter.acall(
                 lm=lm, config={}, task_spec=signature, demos=[], inputs={"question": "What is the capital of France?"}
             )
-
     assert result == [{"answer": "Paris"}]
     assert seen["use_native_function_calling"] is False
 
@@ -2900,10 +1967,7 @@ def test_chat_adapter_toolcalls_native_function_calling():
         return f"The weather in {city} is sunny"
 
     tools = [Tool(get_weather, description="Get the weather for a city")]
-
     adapter = JSONAdapter(use_native_function_calling=True)
-
-    # Case 1: Tool calls are present in the response, while content is None.
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
@@ -2921,7 +1985,7 @@ def test_chat_adapter_toolcalls_native_function_calling():
                             )
                         ],
                     ),
-                ),
+                )
             ],
             model="openai/gpt-4o-mini",
         )
@@ -2934,24 +1998,15 @@ def test_chat_adapter_toolcalls_native_function_calling():
                 inputs={"question": "What is the weather in Paris?", "tools": tools},
             )
         )
-
         assert result[0]["tool_calls"] == ToolCalls(
             tool_calls=[
-                ToolCalls.ToolCall(
-                    id="call_pQm8ajtSMxgA0nrzK2ivFmxG",
-                    name="get_weather",
-                    args={"city": "Paris"},
-                )
+                ToolCalls.ToolCall(id="call_pQm8ajtSMxgA0nrzK2ivFmxG", name="get_weather", args={"city": "Paris"})
             ]
         )
-        # `answer` is not present, so we set it to None
         assert result[0]["answer"] is None
-
-    # Case 2: Tool calls are not present in the response, while content is present.
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="{'answer': 'Paris'}"))],
-            model="openai/gpt-4o-mini",
+            choices=[Choices(message=Message(content="{'answer': 'Paris'}"))], model="openai/gpt-4o-mini"
         )
         result = asyncio.run(
             adapter.acall(
@@ -2980,11 +2035,8 @@ def test_chat_adapter_toolcalls_vague_match():
         return f"The weather in {city} is sunny"
 
     tools = [Tool(get_weather, description="Get the weather for a city")]
-
     adapter = ChatAdapter()
-
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
-        # Case 1: tool_calls field is a list of dicts
         mock_completion.return_value = ModelResponse(
             choices=[
                 Choices(
@@ -3007,9 +2059,7 @@ def test_chat_adapter_toolcalls_vague_match():
         assert result[0]["tool_calls"] == ToolCalls(
             tool_calls=[ToolCalls.ToolCall(name="get_weather", args={"city": "Paris"})]
         )
-
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
-        # Case 2: tool_calls field is a single dict with "name" and "args" keys
         mock_completion.return_value = ModelResponse(
             choices=[
                 Choices(
@@ -3044,7 +2094,6 @@ def test_chat_adapter_native_reasoning():
         instructions="Given the fields `question`, produce the fields `reasoning`, `answer`.",
     )
     adapter = ChatAdapter()
-
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
@@ -3052,7 +2101,7 @@ def test_chat_adapter_native_reasoning():
                     message=Message(
                         content="[[ ## answer ## ]]\nParis\n[[ ## completion ## ]]",
                         reasoning_content="Step-by-step thinking about the capital of France",
-                    ),
+                    )
                 )
             ],
             model="anthropic/claude-3-7-sonnet-20250219",
@@ -3064,7 +2113,6 @@ def test_chat_adapter_native_reasoning():
             {"question": "What is the capital of France?"},
         )
         assert "reasoning" not in modified_signature.output_fields
-
         result = asyncio.run(
             adapter.acall(
                 lm=LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low"),
@@ -3078,24 +2126,15 @@ def test_chat_adapter_native_reasoning():
 
 
 def test_chat_adapter_parses_float_with_underscores():
-    """
-    This test verifies that ChatAdapter can parse float numbers with underscores.
-    After json-repair version 0.54.1, floats like "123_456.789" are treated as normal float numbers.
-    """
 
     class Score(pydantic.BaseModel):
         score: float
 
     MySignature = make_task_spec(
-        {
-            "question": FieldSpec.input("question"),
-            "score": FieldSpec.output("score", type_=Score),
-        },
+        {"question": FieldSpec.input("question"), "score": FieldSpec.output("score", type_=Score)},
         instructions="Given the fields `question`, produce the fields `score`.",
     )
     adapter = ChatAdapter()
-
-    # Simulate a response with a float number containing underscores
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
@@ -3103,13 +2142,10 @@ def test_chat_adapter_parses_float_with_underscores():
             ],
             model="openai/gpt-4o-mini",
         )
-
         lm = LM("openai/gpt-4o-mini")
         result = asyncio.run(
             adapter.acall(lm=lm, config={}, task_spec=MySignature, demos=[], inputs={"question": "What is the score?"})
         )
-
-        # The underscore-separated float should be parsed as a normal float
         assert result[0]["score"].score == 123456.789
 
 
@@ -3124,39 +2160,15 @@ def test_format_system_message():
     )
     adapter = ChatAdapter()
     system_message = adapter.format_system_message(MySignature)
-    expected_system_message = """Your input fields are:
-1. `question` (str):
-Your output fields are:
-1. `answers` (list[str]):\x20
-2. `scores` (list[float]):
-All interactions will be structured in the following way, with the appropriate values filled in.
-
-[[ ## question ## ]]
-{question}
-
-[[ ## answers ## ]]
-{answers}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "string"}}
-
-[[ ## scores ## ]]
-{scores}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "number"}}
-
-[[ ## completed ## ]]
-In adhering to this structure, your objective is:\x20
-        Answer the question with multiple answers and scores"""
+    expected_system_message = 'Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answers` (list[str]): \n2. `scores` (list[float]):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answers ## ]]\n{answers}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "string"}}\n\n[[ ## scores ## ]]\n{scores}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "number"}}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Answer the question with multiple answers and scores'
     assert system_message == expected_system_message
 
 
 def test_null_content_raises_adapter_parse_error():
-    """When the LM returns content=None with no tool calls (e.g. content filter),
-    the adapter should raise AdapterParseError instead of silently returning None fields."""
     from dspy.utils.exceptions import AdapterParseError
 
     lm = LM("openai/gpt-4o-mini")
-    response = ModelResponse(
-        choices=[Choices(message=Message(content=None))],
-        model="openai/gpt-4o-mini",
-    )
-
+    response = ModelResponse(choices=[Choices(message=Message(content=None))], model="openai/gpt-4o-mini")
     with settings.context(lm=lm), mock.patch("litellm.acompletion", new_callable=mock.AsyncMock, return_value=response):
         cot = ChainOfThought(ts("question -> answer"))
         with pytest.raises(AdapterParseError):
@@ -3164,15 +2176,10 @@ def test_null_content_raises_adapter_parse_error():
 
 
 def test_empty_string_content_raises_adapter_parse_error():
-    """Same as above but with empty string content."""
     from dspy.utils.exceptions import AdapterParseError
 
     lm = LM("openai/gpt-4o-mini")
-    response = ModelResponse(
-        choices=[Choices(message=Message(content=""))],
-        model="openai/gpt-4o-mini",
-    )
-
+    response = ModelResponse(choices=[Choices(message=Message(content=""))], model="openai/gpt-4o-mini")
     with settings.context(lm=lm), mock.patch("litellm.acompletion", new_callable=mock.AsyncMock, return_value=response):
         cot = ChainOfThought(ts("question -> answer"))
         with pytest.raises(AdapterParseError):
@@ -3180,8 +2187,6 @@ def test_empty_string_content_raises_adapter_parse_error():
 
 
 def test_tool_call_with_null_content_does_not_raise():
-    """Tool-call-only responses legitimately have content=None.
-    _call_postprocess must NOT raise when tool_calls are present."""
     adapter = ChatAdapter(use_native_function_calling=True)
     task_spec = make_task_spec(
         {
@@ -3192,7 +2197,6 @@ def test_tool_call_with_null_content_does_not_raise():
         },
         instructions="Given the fields `question`, `tools`, produce the fields `answer`, `tool_calls`.",
     )
-
     outputs = [
         {
             "text": None,
@@ -3201,7 +2205,6 @@ def test_tool_call_with_null_content_does_not_raise():
             ],
         }
     ]
-
     result = adapter._call_postprocess(
         processed_task_spec=task_spec,
         original_task_spec=task_spec,
@@ -3215,7 +2218,6 @@ def test_tool_call_with_null_content_does_not_raise():
 
 
 def test_tool_call_with_unstructured_content_does_not_raise():
-    """Provider tool calls are authoritative even when content is not adapter-formatted."""
     adapter = ChatAdapter(use_native_function_calling=True)
     original_task_spec = make_task_spec(
         {
@@ -3236,7 +2238,6 @@ def test_tool_call_with_unstructured_content_does_not_raise():
             "reasoning_content": "I need a search result.",
         }
     ]
-
     result = adapter._call_postprocess(
         processed_task_spec=processed_task_spec,
         original_task_spec=original_task_spec,
@@ -3244,7 +2245,6 @@ def test_tool_call_with_unstructured_content_does_not_raise():
         _lm=DummyLM([{}]),
         _config={},
     )
-
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
     assert result[0]["next_thought"] == Reasoning(content="I need a search result.")
 
@@ -3269,7 +2269,6 @@ def test_tool_call_with_structured_content_preserves_other_outputs():
             ],
         }
     ]
-
     result = adapter._call_postprocess(
         processed_task_spec=processed_task_spec,
         original_task_spec=original_task_spec,
@@ -3277,7 +2276,6 @@ def test_tool_call_with_structured_content_preserves_other_outputs():
         _lm=DummyLM([{}]),
         _config={},
     )
-
     assert result[0]["answer"] == "I should use a tool."
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
 
@@ -3292,7 +2290,6 @@ def test_provider_tool_calls_preserve_id_and_repair_arguments():
         },
         instructions="Given the fields `question`, `tools`, produce the fields `tool_calls`.",
     )
-
     outputs = [
         {
             "text": None,
@@ -3305,7 +2302,6 @@ def test_provider_tool_calls_preserve_id_and_repair_arguments():
             ],
         }
     ]
-
     result = adapter._call_postprocess(
         processed_task_spec=task_spec,
         original_task_spec=task_spec,
@@ -3313,13 +2309,13 @@ def test_provider_tool_calls_preserve_id_and_repair_arguments():
         _lm=DummyLM([{}]),
         _config={},
     )
-
     assert result[0]["tool_calls"] == ToolCalls(
         tool_calls=[ToolCalls.ToolCall(id="call_from_responses", name="search", args={"query": "cats"})]
     )
 
 
 def test_native_response_type_without_parse_lm_output_raises():
+
     class OpaqueType(DSPyType):
         label: str
 
@@ -3328,10 +2324,7 @@ def test_native_response_type_without_parse_lm_output_raises():
             return self.label
 
     OpaqueSignature = make_task_spec(
-        {
-            "question": FieldSpec.input("question"),
-            "answer": FieldSpec.output("answer", type_=OpaqueType),
-        },
+        {"question": FieldSpec.input("question"), "answer": FieldSpec.output("answer", type_=OpaqueType)},
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
     adapter = ChatAdapter(native_response_types=[OpaqueType])

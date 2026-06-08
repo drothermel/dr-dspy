@@ -18,13 +18,12 @@ def _embedder(texts: list[str]) -> object:
 
 
 def test_query_retriever_protocol_documents_direct_call_shape() -> None:
+
     def search(retriever: QueryRetriever[str, Prediction], query: str) -> Prediction:
         return retriever(query)
 
     retriever = Embeddings(corpus=["alpha", "beta", "gamma"], embedder=_embedder, k=1)
-
     result = search(retriever, "alpha")
-
     assert result.passages == ["alpha"]
 
 
@@ -44,7 +43,6 @@ def test_databricks_rm_import_handles_missing_sdk_parent(monkeypatch: pytest.Mon
         raise AssertionError(f"unexpected module lookup: {name}")
 
     monkeypatch.setattr(databricks_rm, "find_spec", missing_parent_package)
-
     assert databricks_rm._is_databricks_sdk_installed() is False
 
 
@@ -58,18 +56,17 @@ def test_databricks_rm_direct_call_preserves_prediction_shape(monkeypatch: pytes
                 ["low", "Low score", 0.1, "a"],
                 ["high", "High score", 0.9, "b"],
                 ["mid", "Middle score", 0.5, "c"],
-            ],
+            ]
         },
     }
 
     def fake_query_via_requests(**kwargs: object) -> dict[str, object]:
         assert kwargs["query_text"] == "example query"
         assert kwargs["k"] == 2
-        return response  # ty:ignore[invalid-return-type]
+        return response
 
     monkeypatch.setattr(databricks_rm, "_databricks_sdk_installed", False)
     monkeypatch.setattr(databricks_rm.DatabricksRM, "_query_via_requests", staticmethod(fake_query_via_requests))
-
     auth_value = "not-a-secret"
     retriever = databricks_rm.DatabricksRM(
         databricks_index_name="index",
@@ -79,12 +76,10 @@ def test_databricks_rm_direct_call_preserves_prediction_shape(monkeypatch: pytes
         text_column_name="text",
         k=2,
     )
-
     result = retriever("example query")
-
-    assert result.docs == ["High score", "Middle score"]  # ty:ignore[unresolved-attribute]
-    assert result.doc_ids == ["high", "mid"]  # ty:ignore[unresolved-attribute]
-    assert result.extra_columns == [{"score": 0.9, "source": "b"}, {"score": 0.5, "source": "c"}]  # ty:ignore[unresolved-attribute]
+    assert result.docs == ["High score", "Middle score"]
+    assert result.doc_ids == ["high", "mid"]
+    assert result.extra_columns == [{"score": 0.9, "source": "b"}, {"score": 0.5, "source": "c"}]
 
 
 def test_weaviate_rm_direct_call_preserves_long_text_shape() -> None:
@@ -103,7 +98,7 @@ def test_weaviate_rm_direct_call_preserves_long_text_shape() -> None:
                 objects=[
                     SimpleNamespace(properties={"content": "First passage"}),
                     SimpleNamespace(properties={"content": "Second passage"}),
-                ],
+                ]
             )
 
     class FakeCollection:
@@ -124,9 +119,7 @@ def test_weaviate_rm_direct_call_preserves_long_text_shape() -> None:
 
     collection = FakeCollection()
     retriever = WeaviateRM("collection", weaviate_client=FakeClient(collection), k=1)
-
     result = retriever("question")
-
     assert [passage.long_text for passage in result] == ["First passage", "Second passage"]
     assert collection.query.query_text == "question"
     assert collection.query.limit == 1

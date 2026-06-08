@@ -125,7 +125,6 @@ def test_example_to_dict():
 
 
 def test_example_to_dict_with_history():
-    """Test that Example.to_dict() properly serializes History objects."""
     history = History(
         messages=[
             {"question": "What is the capital of France?", "answer": "Paris"},
@@ -133,22 +132,15 @@ def test_example_to_dict_with_history():
         ]
     )
     example = Example(question="Test question", history=history, answer="Test answer")
-
     result = example.to_dict()
-
-    # Verify the result is a dictionary
     assert isinstance(result, dict)
     assert "history" in result
-
-    # Verify history is serialized to a dict (not a History object)
     assert isinstance(result["history"], dict)
     assert "messages" in result["history"]
     assert result["history"]["messages"] == [
         {"question": "What is the capital of France?", "answer": "Paris"},
         {"question": "What is the capital of Germany?", "answer": "Berlin"},
     ]
-
-    # Verify JSON serialization works
     import json
 
     json_str = json.dumps(result)

@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 class InferRules(BootstrapFewShot):
     def __init__(self, num_candidates=10, num_rules=10, num_threads=None, teacher_settings=None, **kwargs) -> None:
         super().__init__(teacher_settings=teacher_settings, **kwargs)
-
         self.num_candidates = num_candidates
         self.num_rules = num_rules
         self.num_threads = num_threads
@@ -30,45 +29,32 @@ class InferRules(BootstrapFewShot):
     async def compile(self, student, *, teacher=None, trainset, valset=None):
         if valset is None:
             train_size = int(0.5 * len(trainset))
-            trainset, valset = trainset[:train_size], trainset[train_size:]
-
+            trainset, valset = (trainset[:train_size], trainset[train_size:])
         await super().compile(student, teacher=teacher, trainset=trainset)
-
         original_program = self.student.deepcopy()
         all_predictors = [p for p in original_program.predictors() if hasattr(p, "task_spec")]
         instructions_list = [get_task_spec(p).instructions for p in all_predictors]
-
         best_score = -math.inf
         best_program = None
-
         for candidate_idx in range(self.num_candidates):
             candidate_program = original_program.deepcopy()
             candidate_predictors = [p for p in candidate_program.predictors() if hasattr(p, "task_spec")]
-
             for i, predictor in enumerate(candidate_predictors):
                 set_task_spec(
-                    predictor=predictor,
-                    task_spec=get_task_spec(predictor).with_instructions(instructions_list[i]),
+                    predictor=predictor, task_spec=get_task_spec(predictor).with_instructions(instructions_list[i])
                 )
-
             for i, predictor in enumerate(candidate_predictors):
                 rules = await self.induce_natural_language_rules(predictor=predictor, trainset=trainset)
                 set_task_spec(
-                    predictor=predictor,
-                    task_spec=get_task_spec(predictor).with_instructions(instructions_list[i]),
+                    predictor=predictor, task_spec=get_task_spec(predictor).with_instructions(instructions_list[i])
                 )
                 self.update_program_instructions(predictor=predictor, natural_language_rules=rules)
-
             score = await self.evaluate_program(program=candidate_program, dataset=valset)
-
             if score > best_score:
                 best_score = score
                 best_program = candidate_program
-
             logger.info(f"Evaluated Candidate {candidate_idx + 1} with score {score}. Current best score: {best_score}")
-
         logger.info(f"Final best score: {best_score}")
-
         return best_program
 
     async def induce_natural_language_rules(self, predictor, trainset):
@@ -88,8 +74,7 @@ class InferRules(BootstrapFewShot):
                     demos = demos[:-1]
                 else:
                     raise RuntimeError(
-                        "Failed to generate natural language rules since a single example couldn't fit in the model's "
-                        "context window."
+                        "Failed to generate natural language rules since a single example couldn't fit in the model's context window."
                     ) from e
 
     def update_program_instructions(self, predictor, natural_language_rules) -> None:
@@ -97,8 +82,7 @@ class InferRules(BootstrapFewShot):
         set_task_spec(
             predictor=predictor,
             task_spec=task_spec.with_instructions(
-                f"{task_spec.instructions}\n\n"
-                f"Please adhere to the following rules when making your prediction:\n{natural_language_rules}"
+                f"{task_spec.instructions}\n\nPlease adhere to the following rules when making your prediction:\n{natural_language_rules}"
             ),
         )
 
@@ -107,13 +91,12 @@ class InferRules(BootstrapFewShot):
         for demo in demos:
             input_fields = {k: v for k, v in demo.items() if k in task_spec.input_fields}
             output_fields = {k: v for k, v in demo.items() if k in task_spec.output_fields}
-            input_text = "\n".join(f"{k}: {v}" for k, v in input_fields.items())
-            output_text = "\n".join(f"{k}: {v}" for k, v in output_fields.items())
+            input_text = "\n".join((f"{k}: {v}" for k, v in input_fields.items()))
+            output_text = "\n".join((f"{k}: {v}" for k, v in output_fields.items()))
             examples_text += f"Input Fields:\n{input_text}\n\n=========\nOutput Fields:\n{output_text}\n\n"
         return examples_text
 
     def get_predictor_demos(self, trainset, predictor):
-        # TODO: Consider how this handled "incomplete" demos.
         task_spec = get_task_spec(predictor)
         return [
             {
@@ -142,16 +125,10 @@ def _rules_induction_task_spec(num_rules):
         {
             "examples_text": input_field("examples_text", str, desc="Text containing examples"),
             "natural_language_rules": output_field(
-                "natural_language_rules",
-                str,
-                desc="Induced natural language rules",
+                "natural_language_rules", str, desc="Induced natural language rules"
             ),
         },
-        instructions=(
-            f"Given a set of examples, extract a list of {num_rules} concise and non-redundant natural language "
-            "rules that provide clear guidance for performing the task. All rules should be actionable for a "
-            "well-specified scope of examples of this general kind of task."
-        ),
+        instructions=f"Given a set of examples, extract a list of {num_rules} concise and non-redundant natural language rules that provide clear guidance for performing the task. All rules should be actionable for a well-specified scope of examples of this general kind of task.",
         name="framework.infer_rules.induction",
     )
 
@@ -165,9 +142,7 @@ class RulesInductionProgram(Module):
 
     async def aforward(self, examples_text):
         with settings.context(**self.teacher_settings):
-            # Generate rules with a fresh rollout and non-zero temperature.
             lm = settings.lm.copy(temperature=1.0)
             with optimizer_lm_context(lm=lm, phase="infer_rules.induction", lm_role="teacher"):
                 rules = (await self.rules_induction(examples_text=examples_text)).natural_language_rules
-
         return rules.strip()

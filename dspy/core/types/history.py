@@ -1,5 +1,3 @@
-"""Normalized LM types — history serialization helpers."""
-
 from __future__ import annotations
 
 import json
@@ -39,7 +37,7 @@ def _history_request_messages_as_openai(request: LMRequest) -> list[dict[str, An
             content_parts = [part for part in message.parts if not isinstance(part, LMToolCallPart)]
             item: dict[str, Any] = {
                 "role": "assistant",
-                "content": _history_message_parts_as_openai_content(content_parts) if content_parts else None,  # ty:ignore[invalid-argument-type]
+                "content": _history_message_parts_as_openai_content(content_parts) if content_parts else None,
             }
             if tool_calls:
                 item["tool_calls"] = [_history_tool_call_as_openai(call) for call in tool_calls]
@@ -51,10 +49,7 @@ def _history_request_messages_as_openai(request: LMRequest) -> list[dict[str, An
             if result.name is not None:
                 item["name"] = result.name
         else:
-            item = {
-                "role": message.role,
-                "content": _history_message_parts_as_openai_content(message.parts),
-            }
+            item = {"role": message.role, "content": _history_message_parts_as_openai_content(message.parts)}
         if message.name is not None and "name" not in item:
             item["name"] = message.name
         messages.append(item)
@@ -62,13 +57,7 @@ def _history_request_messages_as_openai(request: LMRequest) -> list[dict[str, An
 
 
 def _history_tool_call_as_openai(call: LMToolCallPart) -> dict[str, Any]:
-    data: dict[str, Any] = {
-        "type": "function",
-        "function": {
-            "name": call.name,
-            "arguments": json.dumps(call.args),
-        },
-    }
+    data: dict[str, Any] = {"type": "function", "function": {"name": call.name, "arguments": json.dumps(call.args)}}
     if call.id is not None:
         data["id"] = call.id
     return data
@@ -112,14 +101,11 @@ def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
             input_audio["file_id"] = part.file_id
         elif part.path is not None:
             input_audio["path"] = part.path
-        return {
-            "type": "input_audio",
-            "input_audio": input_audio,
-        }
+        return {"type": "input_audio", "input_audio": input_audio}
     if isinstance(part, LMVideoPart):
         video = {"media_type": part.media_type}
         if part.data is not None:
-            video["data"] = _history_part_source(part)  # ty:ignore[invalid-assignment]
+            video["data"] = _history_part_source(part)
         elif part.url is not None:
             video["url"] = part.url
         elif part.file_id is not None:
@@ -130,12 +116,12 @@ def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
     if isinstance(part, LMDocumentPart):
         data = {"type": "document"}
         if part.source is not None:
-            data["source"] = part.source  # ty:ignore[invalid-assignment]
+            data["source"] = part.source
         else:
-            data["source"] = _history_part_source(part)  # ty:ignore[invalid-assignment]
+            data["source"] = _history_part_source(part)
             data["media_type"] = part.media_type
         if part.citations:
-            data["citations"] = part.citations  # ty:ignore[invalid-assignment]
+            data["citations"] = part.citations
         if part.title is not None:
             data["title"] = part.title
         if part.context is not None:

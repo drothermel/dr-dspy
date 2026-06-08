@@ -1,13 +1,3 @@
-"""
-Compatibility layer for magicattr that works with Python 3.14+
-
-This module provides a patched version of magicattr's functionality
-that is compatible with Python 3.14's removal of ast.Num and ast.Str.
-
-Based on magicattr 0.1.6 by Jairus Martin (MIT License)
-https://github.com/frmdstryr/magicattr
-"""
-
 import ast
 import sys
 from functools import reduce
@@ -17,9 +7,6 @@ _STRING_TYPE = str
 
 
 def get(obj, attr, **kwargs):
-    """A getattr that supports nested lookups on objects, dicts, lists, and
-    any combination in between.
-    """
     for chunk in _parse(attr):
         try:
             obj = _lookup(obj=obj, node=chunk)
@@ -31,9 +18,6 @@ def get(obj, attr, **kwargs):
 
 
 def set(obj, attr, val) -> None:
-    """A setattr that supports nested lookups on objects, dicts, lists, and
-    any combination in between.
-    """
     obj, attr_or_key, is_subscript = lookup(obj=obj, attr=attr)
     if is_subscript:
         obj[attr_or_key] = val
@@ -42,9 +26,6 @@ def set(obj, attr, val) -> None:
 
 
 def delete(obj, attr) -> None:
-    """A delattr that supports deletion of a nested lookups on objects,
-    dicts, lists, and any combination in between.
-    """
     obj, attr_or_key, is_subscript = lookup(obj=obj, attr=attr)
     if is_subscript:
         del obj[attr_or_key]
@@ -53,9 +34,6 @@ def delete(obj, attr) -> None:
 
 
 def lookup(obj, attr):
-    """Like get but instead of returning the final value it returns the
-    object and action that will be done.
-    """
     nodes = tuple(_parse(attr))
     if len(nodes) > 1:
         obj = reduce(_lookup, nodes[:-1], obj)
@@ -63,16 +41,15 @@ def lookup(obj, attr):
     else:
         node = nodes[0]
     if isinstance(node, ast.Attribute):
-        return obj, node.attr, False
+        return (obj, node.attr, False)
     if isinstance(node, ast.Subscript):
-        return obj, _lookup_subscript_value(node.slice), True
+        return (obj, _lookup_subscript_value(node.slice), True)
     if isinstance(node, ast.Name):
-        return obj, node.id, False
+        return (obj, node.id, False)
     raise NotImplementedError("Node is not supported: %s" % node)
 
 
 def _parse(attr):
-    """Parse and validate an attr string"""
     if not isinstance(attr, _STRING_TYPE):
         raise TypeError("Attribute name must be a string")
     nodes = ast.parse(attr).body
@@ -82,40 +59,25 @@ def _parse(attr):
 
 
 def _lookup_subscript_value(node):
-    """Lookup the value of ast node on the object.
-
-    Compatible with Python 3.14+ which removed ast.Num and ast.Str
-    """
-    if isinstance(node, ast.Index):  # ty:ignore[deprecated]
+    if isinstance(node, ast.Index):
         node = node.value
-
-    # Python 3.14+ uses ast.Constant for all constants
     if isinstance(node, ast.Constant):
         return node.value
-
-    # Fallback for older Python versions
     if sys.version_info < (3, 14):
-        # Handle numeric indexes
-        if hasattr(ast, "Num") and isinstance(node, ast.Num):  # ty:ignore[deprecated]
+        if hasattr(ast, "Num") and isinstance(node, ast.Num):
             return node.n
-        # Handle string keys
-        if hasattr(ast, "Str") and isinstance(node, ast.Str):  # ty:ignore[deprecated]
+        if hasattr(ast, "Str") and isinstance(node, ast.Str):
             return node.s
-
-    # Handle negative indexes
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
         operand = node.operand
         if isinstance(operand, ast.Constant):
             return -operand.value
-        # Fallback for older Python
-        if sys.version_info < (3, 14) and hasattr(ast, "Num") and isinstance(operand, ast.Num):  # ty:ignore[deprecated]
+        if sys.version_info < (3, 14) and hasattr(ast, "Num") and isinstance(operand, ast.Num):
             return -operand.n
-
     raise NotImplementedError("Subscript node is not supported: %s" % ast.dump(node))
 
 
 def _lookup(obj, node):
-    """Lookup the given ast node on the object."""
     if isinstance(node, ast.Attribute):
         return getattr(obj, node.attr)
     if isinstance(node, ast.Subscript):

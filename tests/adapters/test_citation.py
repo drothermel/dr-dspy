@@ -20,12 +20,12 @@ def test_citation_validate_input():
     assert citation.end_char_index == 23
     assert citation.type == "char_location"
     assert citation.supported_text == "The Earth orbits the Sun."
-
     with pytest.raises(pydantic.ValidationError):
-        Citations.Citation(cited_text="text")  # ty: ignore[missing-argument]
+        Citations.Citation(cited_text="text")
 
 
 def test_citations_in_nested_type():
+
     class Wrapper(pydantic.BaseModel):
         citations: Citations
 
@@ -67,9 +67,7 @@ def test_citation_format():
         end_char_index=21,
         supported_text="The sky is blue.",
     )
-
     formatted = citation.format()
-
     assert formatted["type"] == "char_location"
     assert formatted["cited_text"] == "The sky is blue."
     assert formatted["document_index"] == 0
@@ -99,9 +97,7 @@ def test_citations_format():
             ),
         ]
     )
-
     formatted = citations.format()
-
     assert isinstance(formatted, list)
     assert len(formatted) == 2
     assert formatted[0]["cited_text"] == "First citation"
@@ -120,9 +116,7 @@ def test_citations_from_dict_list():
             "supported_text": "The sky was blue yesterday.",
         }
     ]
-
     citations = Citations.from_dict_list(citations_data)
-
     assert len(citations.citations) == 1
     assert citations.citations[0].cited_text == "The sky is blue"
     assert citations.citations[0].document_title == "Weather Guide"
@@ -142,7 +136,6 @@ def test_citations_postprocessing():
         instructions="Test signature with citations.",
     )
     adapter = ChatAdapter(native_response_types=[Citations])
-
     response = LMResponse(
         model="anthropic/claude-3-5-sonnet-20241022",
         outputs=[
@@ -159,11 +152,10 @@ def test_citations_postprocessing():
                             "supported_text": "The sky is blue",
                         },
                     ),
-                ],
+                ]
             )
         ],
     )
-
     result = adapter._call_postprocess(
         CitationSignature.delete("citations"),
         CitationSignature,
@@ -171,7 +163,6 @@ def test_citations_postprocessing():
         LM(model="anthropic/claude-3-5-sonnet-20241022"),
         LMConfig(),
     )
-
     assert len(result) == 1
     assert "citations" in result[0]
     assert isinstance(result[0]["citations"], Citations)

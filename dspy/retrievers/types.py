@@ -7,12 +7,6 @@ ResultT = TypeVar("ResultT", covariant=True)
 
 
 class QueryRetriever(Protocol[QueryT, ResultT]):
-    """Structural protocol for direct-call query retrievers.
-
-    Implementations may expose additional optional query parameters and may return
-    retriever-specific result shapes.
-    """
-
     k: int
 
     def __call__(self, query: QueryT, /) -> ResultT: ...

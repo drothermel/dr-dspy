@@ -25,7 +25,6 @@ def _provider_tool_call_to_tool_call_dict(tool_call: object) -> dict[str, Any]:
             if isinstance(raw_arguments, str):
                 args = json_repair.loads(raw_arguments)
         return {"id": tool_call.id, "name": tool_call.name, "args": args}
-
     function = _provider_value(value=tool_call, key="function", default={}) or {}
     arguments = _provider_value(value=function, key="arguments", default={})
     if isinstance(arguments, str):
@@ -34,7 +33,6 @@ def _provider_tool_call_to_tool_call_dict(tool_call: object) -> dict[str, Any]:
         parsed_arguments = arguments
     else:
         parsed_arguments = {}
-
     return {
         "id": _provider_value(value=tool_call, key="id") or _provider_value(value=tool_call, key="call_id"),
         "name": _provider_value(value=function, key="name") or _provider_value(value=tool_call, key="name"),
@@ -45,14 +43,13 @@ def _provider_tool_call_to_tool_call_dict(tool_call: object) -> dict[str, Any]:
 def _tool_calls_from_message(message: dict[str, Any]) -> tuple[str | None, ToolCalls | None]:
     for name, value in message.items():
         if isinstance(value, ToolCalls) or (isinstance(value, dict) and "tool_calls" in value):
-            return name, ToolCalls.model_validate(value)
-    return None, None
+            return (name, ToolCalls.model_validate(value))
+    return (None, None)
 
 
 def _tool_result_content(value: object) -> str:
     if isinstance(value, str):
         return value
-
     return json.dumps(serialize_for_json(cast("Any", value)), ensure_ascii=False)
 
 

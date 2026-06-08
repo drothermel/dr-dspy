@@ -1,5 +1,3 @@
-"""Synthesize Pydantic models from TaskSpec instances for JSON-schema tooling."""
-
 from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field, create_model
@@ -17,19 +15,16 @@ def get_dspy_field_type(field: FieldInfo) -> Literal["input", "output"]:
 
 
 def task_spec_input_field_infos(spec: TaskSpec) -> dict[str, FieldInfo]:
-    """Return Pydantic FieldInfo objects for a TaskSpec's input fields."""
     model = task_spec_to_pydantic_model(spec)
     return {name: model.model_fields[name] for name in spec.input_fields}
 
 
 def task_spec_output_field_infos(spec: TaskSpec) -> dict[str, FieldInfo]:
-    """Return Pydantic FieldInfo objects for a TaskSpec's output fields."""
     model = task_spec_to_pydantic_model(spec)
     return {name: model.model_fields[name] for name in spec.output_fields}
 
 
 def task_spec_to_pydantic_model(spec: TaskSpec) -> type[BaseModel]:
-    """Build a dynamic Pydantic model mirroring a TaskSpec's fields and metadata."""
     field_defs: dict[str, Any] = {}
     for field in (*spec.inputs, *spec.outputs):
         json_schema_extra: dict[str, Any] = {
@@ -41,10 +36,7 @@ def task_spec_to_pydantic_model(spec: TaskSpec) -> type[BaseModel]:
             json_schema_extra[IS_TYPE_UNDEFINED] = True
         if field.constraints:
             json_schema_extra["constraints"] = field.constraints
-        field_kwargs: dict[str, Any] = {
-            "json_schema_extra": json_schema_extra,
-            "description": field.desc,
-        }
+        field_kwargs: dict[str, Any] = {"json_schema_extra": json_schema_extra, "description": field.desc}
         if field.role == "input" and field.has_default:
             field_kwargs["default"] = field.default
         field_defs[field.name] = (field.type_, Field(**field_kwargs))

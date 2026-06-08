@@ -16,11 +16,10 @@ def _hide_litellm(monkeypatch):
     def find_spec(name, *args: object, **kwargs: object):
         if name == "litellm" or name.startswith("litellm."):
             return None
-        return real_find_spec(name, *args, **kwargs)  # ty:ignore[invalid-argument-type]
+        return real_find_spec(name, *args, **kwargs)
 
     monkeypatch.setattr(importlib.util, "find_spec", find_spec)
     monkeypatch.delitem(sys.modules, "litellm", raising=False)
-
     from dspy.clients._litellm import get_litellm
 
     get_litellm.cache_clear()
@@ -28,32 +27,24 @@ def _hide_litellm(monkeypatch):
 
 def test_import_dspy_does_not_import_litellm(monkeypatch):
     monkeypatch.delitem(sys.modules, "litellm", raising=False)
-
     _ = LM
     _ = Embedder
-
     assert "litellm" not in sys.modules
 
 
 def test_lm_litellm_use_raises_helpful_error_without_litellm(monkeypatch):
-
     _hide_litellm(monkeypatch)
-
     with pytest.raises(ImportError) as exc_info:
         _ = LM("openai/gpt-4o-mini").supports_function_calling
-
     msg = str(exc_info.value)
     assert "[litellm]" in msg
     assert "dspy.clients.lm.LM" in msg
 
 
 def test_embedder_litellm_use_raises_helpful_error_without_litellm(monkeypatch):
-
     _hide_litellm(monkeypatch)
-
     with pytest.raises(ImportError) as exc_info:
         asyncio.run(Embedder("openai/text-embedding-3-small")(["hello"]))
-
     msg = str(exc_info.value)
     assert "[litellm]" in msg
     assert "dspy.clients.embedding.Embedder" in msg
@@ -61,7 +52,6 @@ def test_embedder_litellm_use_raises_helpful_error_without_litellm(monkeypatch):
 
 def test_concurrent_lm_first_use_materializes_litellm_once():
     pytest.importorskip("litellm")
-
     from dspy.clients._litellm import get_litellm
 
     original_litellm = sys.modules.pop("litellm", None)
@@ -77,7 +67,6 @@ def test_concurrent_lm_first_use_materializes_litellm_once():
 
         with ThreadPoolExecutor(max_workers=threads) as executor:
             results = list(executor.map(supports_function_calling, range(threads)))
-
         assert len(results) == threads
         assert all(isinstance(result, bool) for result in results)
     finally:

@@ -5,16 +5,14 @@ from dspy.adapters.types.document import Document
 
 
 def test_document_validate_input():
-    # Create a `Document` instance with valid data.
     doc = Document(data="The Earth orbits the Sun.")
     assert doc.data == "The Earth orbits the Sun."
-
     with pytest.raises(pydantic.ValidationError):
-        # Try to create a `Document` instance with invalid type.
-        Document(data=123)  # ty: ignore[invalid-argument-type]
+        Document(data=123)
 
 
 def test_document_in_nested_type():
+
     class Wrapper(pydantic.BaseModel):
         document: Document
 
@@ -38,12 +36,9 @@ def test_document_with_all_fields():
 
 def test_document_format():
     doc = Document(data="The sky is blue.", title="Color Facts", media_type="text/plain")
-
     formatted = doc.format()
-
     assert isinstance(formatted, list)
     assert len(formatted) == 1
-
     doc_block = formatted[0]
     assert doc_block["type"] == "document"
     assert doc_block["source"]["type"] == "text"

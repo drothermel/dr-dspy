@@ -1,5 +1,3 @@
-"""Normalized LM types — message assembly helpers for requests."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -19,15 +17,12 @@ def _coerce_message(value: dict[str, Any] | LMMessage) -> LMMessage:
 
 
 def _messages_from_items(items: tuple[Any, ...], *, prompt: str | None = None) -> tuple[list[LMMessage], list[Any]]:
-    # TODO: Normalize DSPy-specific LM(...) objects in the LM call layer before building LMRequest.
     if prompt is not None:
         items = (prompt, *items)
     if not items:
         items = ("",)
-
     if len(items) == 1 and _is_message_sequence(items[0]):
         items = tuple(items[0])
-
     from dspy.core.types.response import LMResponse
 
     if all(isinstance(item, (LMMessage, LMResponse)) for item in items):
@@ -36,11 +31,10 @@ def _messages_from_items(items: tuple[Any, ...], *, prompt: str | None = None) -
             if isinstance(item, LMMessage):
                 messages.append(item)
             else:
-                messages.extend(_messages_from_response(item))  # ty:ignore[invalid-argument-type]
-        return messages, []
-
+                messages.extend(_messages_from_response(item))
+        return (messages, [])
     parts = [_coerce_part(item) for item in items]
-    return [LMMessage(role="user", parts=parts)], []
+    return ([LMMessage(role="user", parts=parts)], [])
 
 
 def _messages_from_response(response: LMResponse) -> list[LMMessage]:

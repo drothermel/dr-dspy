@@ -30,23 +30,22 @@ def test_basic_initialization():
 
 def test_tool_from_function():
     tool = Tool(dummy_function, description="A dummy function for testing.")
-
     assert tool.name == "dummy_function"
-    assert "A dummy function for testing" in tool.desc  # ty:ignore[unsupported-operator]
-    assert "x" in tool.args  # ty:ignore[unsupported-operator]
-    assert "y" in tool.args  # ty:ignore[unsupported-operator]
-    assert tool.args["x"]["type"] == "integer"  # ty:ignore[not-subscriptable]
-    assert tool.args["y"]["type"] == "string"  # ty:ignore[not-subscriptable]
-    assert tool.args["y"]["default"] == "hello"  # ty:ignore[not-subscriptable]
+    assert "A dummy function for testing" in tool.desc
+    assert "x" in tool.args
+    assert "y" in tool.args
+    assert tool.args["x"]["type"] == "integer"
+    assert tool.args["y"]["type"] == "string"
+    assert tool.args["y"]["default"] == "hello"
 
 
 def test_tool_from_class():
+
     class Foo:
         def __init__(self, user_id: str):
             self.user_id = user_id
 
         def __call__(self, a: int, b: int) -> int:
-            """Add two numbers."""
             return a + b
 
     tool = Tool(Foo("123"), description="Add two numbers.")
@@ -57,36 +56,31 @@ def test_tool_from_class():
 
 def test_tool_from_function_with_pydantic():
     tool = Tool(dummy_with_pydantic, description="A dummy function that accepts a Pydantic model.")
-
     assert tool.name == "dummy_with_pydantic"
-    assert "model" in tool.args  # ty:ignore[unsupported-operator]
-    assert tool.args["model"]["type"] == "object"  # ty:ignore[not-subscriptable]
-    assert "field1" in tool.args["model"]["properties"]  # ty:ignore[not-subscriptable]
-    assert "field2" in tool.args["model"]["properties"]  # ty:ignore[not-subscriptable]
-    assert tool.args["model"]["properties"]["field1"]["default"] == "hello"  # ty:ignore[not-subscriptable]
+    assert "model" in tool.args
+    assert tool.args["model"]["type"] == "object"
+    assert "field1" in tool.args["model"]["properties"]
+    assert "field2" in tool.args["model"]["properties"]
+    assert tool.args["model"]["properties"]["field1"]["default"] == "hello"
 
 
 def test_tool_from_function_with_pydantic_nesting():
     tool = Tool(complex_dummy_function, description="Process user profile with complex nested structure.")
-
     assert tool.name == "complex_dummy_function"
-
-    assert "profile" in tool.args  # ty:ignore[unsupported-operator]
-    assert "priority" in tool.args  # ty:ignore[unsupported-operator]
-    assert "notes" in tool.args  # ty:ignore[unsupported-operator]
-    assert tool.args["profile"]["type"] == "object"  # ty:ignore[not-subscriptable]
-    assert tool.args["profile"]["properties"]["user_id"]["type"] == "integer"  # ty:ignore[not-subscriptable]
-    assert tool.args["profile"]["properties"]["name"]["type"] == "string"  # ty:ignore[not-subscriptable]
-    assert tool.args["profile"]["properties"]["age"]["anyOf"] == [{"type": "integer"}, {"type": "null"}]  # ty:ignore[not-subscriptable]
-    assert tool.args["profile"]["properties"]["contact"]["type"] == "object"  # ty:ignore[not-subscriptable]
-    assert tool.args["profile"]["properties"]["contact"]["properties"]["email"]["type"] == "string"  # ty:ignore[not-subscriptable]
-
-    # Reference should be resolved for nested pydantic models
-    assert "$defs" not in str(tool.args["notes"])  # ty:ignore[not-subscriptable]
-    assert tool.args["notes"]["anyOf"][0]["type"] == "array"  # ty:ignore[not-subscriptable]
-    assert tool.args["notes"]["anyOf"][0]["items"]["type"] == "object"  # ty:ignore[not-subscriptable]
-    assert tool.args["notes"]["anyOf"][0]["items"]["properties"]["content"]["type"] == "string"  # ty:ignore[not-subscriptable]
-    assert tool.args["notes"]["anyOf"][0]["items"]["properties"]["author"]["type"] == "string"  # ty:ignore[not-subscriptable]
+    assert "profile" in tool.args
+    assert "priority" in tool.args
+    assert "notes" in tool.args
+    assert tool.args["profile"]["type"] == "object"
+    assert tool.args["profile"]["properties"]["user_id"]["type"] == "integer"
+    assert tool.args["profile"]["properties"]["name"]["type"] == "string"
+    assert tool.args["profile"]["properties"]["age"]["anyOf"] == [{"type": "integer"}, {"type": "null"}]
+    assert tool.args["profile"]["properties"]["contact"]["type"] == "object"
+    assert tool.args["profile"]["properties"]["contact"]["properties"]["email"]["type"] == "string"
+    assert "$defs" not in str(tool.args["notes"])
+    assert tool.args["notes"]["anyOf"][0]["type"] == "array"
+    assert tool.args["notes"]["anyOf"][0]["items"]["type"] == "object"
+    assert tool.args["notes"]["anyOf"][0]["items"]["properties"]["content"]["type"] == "string"
+    assert tool.args["notes"]["anyOf"][0]["items"]["properties"]["author"]["type"] == "string"
 
 
 @requires_jsonschema
@@ -107,73 +101,58 @@ def test_tool_with_pydantic_callable():
 @requires_jsonschema
 def test_invalid_function_call():
     tool = Tool(dummy_function, description="A dummy function for testing.")
-    with pytest.raises(ValueError):  # noqa: PT011
+    with pytest.raises(ValueError):
         tool(x="not an integer", y="hello")
 
 
 def test_parameter_desc():
     tool = Tool(dummy_function, description="A dummy function for testing.", arg_desc={"x": "The x parameter"})
-    assert tool.args["x"]["description"] == "The x parameter"  # ty:ignore[not-subscriptable]
+    assert tool.args["x"]["description"] == "The x parameter"
 
 
 def test_tool_with_default_args_without_type_hints():
+
     def foo(x=100):
         return x
 
     tool = Tool(foo, description="Return x.")
-    assert tool.args["x"]["default"] == 100  # ty:ignore[not-subscriptable]
-    assert not hasattr(tool.args["x"], "type")  # ty:ignore[not-subscriptable]
+    assert tool.args["x"]["default"] == 100
+    assert not hasattr(tool.args["x"], "type")
 
 
 @requires_jsonschema
 def test_tool_call_parses_args():
     tool = Tool(dummy_with_pydantic, description="A dummy function that accepts a Pydantic model.")
-
-    args = {
-        "model": {
-            "field1": "hello",
-            "field2": 123,
-        }
-    }
-
+    args = {"model": {"field1": "hello", "field2": 123}}
     result = tool(**args)
     assert result == "hello 123"
 
 
 @requires_jsonschema
 def test_tool_call_parses_nested_list_of_pydantic_model():
+
     def dummy_function(x: list[list[DummyModel]]):
         return x
 
     tool = Tool(dummy_function, description="A dummy function for testing.")
-    args = {
-        "x": [
-            [
-                {
-                    "field1": "hello",
-                    "field2": 123,
-                }
-            ]
-        ]
-    }
-
+    args = {"x": [[{"field1": "hello", "field2": 123}]]}
     result = tool(**args)
     assert result == [[DummyModel(field1="hello", field2=123)]]
 
 
 @requires_jsonschema
 def test_tool_call_kwarg():
+
     def fn(x: int, **kwargs: object):
         return kwargs
 
     tool = Tool(fn, description="Accept kwargs.")
-
     assert tool(x=1, y=2, z=3) == {"y": 2, "z": 3}
 
 
 def test_tool_str():
+
     def add(x: int, y: int = 0) -> int:
-        """Add two integers."""
         return x + y
 
     tool = Tool(add, description="Add two integers.")
@@ -187,17 +166,14 @@ def test_tool_str():
 @pytest.mark.asyncio
 async def test_async_tool_from_function():
     tool = Tool(async_dummy_function, description="An async dummy function for testing.")
-
     assert tool.name == "async_dummy_function"
-    assert "An async dummy function for testing" in tool.desc  # ty:ignore[unsupported-operator]
-    assert "x" in tool.args  # ty:ignore[unsupported-operator]
-    assert "y" in tool.args  # ty:ignore[unsupported-operator]
-    assert tool.args["x"]["type"] == "integer"  # ty:ignore[not-subscriptable]
-    assert tool.args["y"]["type"] == "string"  # ty:ignore[not-subscriptable]
-    assert tool.args["y"]["default"] == "hello"  # ty:ignore[not-subscriptable]
-
-    # Test async call
-    result = await tool.acall(x=42, y="hello")  # ty:ignore[invalid-await]
+    assert "An async dummy function for testing" in tool.desc
+    assert "x" in tool.args
+    assert "y" in tool.args
+    assert tool.args["x"]["type"] == "integer"
+    assert tool.args["y"]["type"] == "string"
+    assert tool.args["y"]["default"] == "hello"
+    result = await tool.acall(x=42, y="hello")
     assert result == "hello 42"
 
 
@@ -205,20 +181,15 @@ async def test_async_tool_from_function():
 @pytest.mark.asyncio
 async def test_async_tool_with_pydantic():
     tool = Tool(async_dummy_with_pydantic, description="An async dummy function that accepts a Pydantic model.")
-
     assert tool.name == "async_dummy_with_pydantic"
-    assert "model" in tool.args  # ty:ignore[unsupported-operator]
-    assert tool.args["model"]["type"] == "object"  # ty:ignore[not-subscriptable]
-    assert "field1" in tool.args["model"]["properties"]  # ty:ignore[not-subscriptable]
-    assert "field2" in tool.args["model"]["properties"]  # ty:ignore[not-subscriptable]
-
-    # Test async call with pydantic model
+    assert "model" in tool.args
+    assert tool.args["model"]["type"] == "object"
+    assert "field1" in tool.args["model"]["properties"]
+    assert "field2" in tool.args["model"]["properties"]
     model = DummyModel(field1="test", field2=123)
-    result = await tool.acall(model=model)  # ty:ignore[invalid-await]
+    result = await tool.acall(model=model)
     assert result == "test 123"
-
-    # Test async call with dict
-    result = await tool.acall(model={"field1": "test", "field2": 123})  # ty:ignore[invalid-await]
+    result = await tool.acall(model={"field1": "test", "field2": 123})
     assert result == "test 123"
 
 
@@ -228,7 +199,6 @@ async def test_async_tool_with_complex_pydantic():
     tool = Tool(
         async_complex_dummy_function, description="Process user profile with complex nested structure asynchronously."
     )
-
     profile = UserProfile(
         user_id=1,
         name="Test User",
@@ -240,8 +210,7 @@ async def test_async_tool_with_complex_pydantic():
             ],
         ),
     )
-
-    result = await tool.acall(profile=profile, priority=1, notes=[Note(content="Test note", author="Test author")])  # ty:ignore[invalid-await]
+    result = await tool.acall(profile=profile, priority=1, notes=[Note(content="Test note", author="Test author")])
     assert result["user_id"] == 1
     assert result["name"] == "Test User"
     assert result["priority"] == 1
@@ -253,41 +222,31 @@ async def test_async_tool_with_complex_pydantic():
 @pytest.mark.asyncio
 async def test_async_tool_invalid_call():
     tool = Tool(async_dummy_function, description="An async dummy function for testing.")
-    with pytest.raises(ValueError):  # noqa: PT011
-        await tool.acall(x="not an integer", y="hello")  # ty:ignore[invalid-await]
+    with pytest.raises(ValueError):
+        await tool.acall(x="not an integer", y="hello")
 
 
 @requires_jsonschema
 @pytest.mark.asyncio
 async def test_async_tool_with_kwargs():
+
     async def fn(x: int, **kwargs: object):
         return kwargs
 
     tool = Tool(fn, description="Accept kwargs.")
-
-    result = await tool.acall(x=1, y=2, z=3)  # ty:ignore[invalid-await]
+    result = await tool.acall(x=1, y=2, z=3)
     assert result == {"y": 2, "z": 3}
 
 
 @requires_jsonschema
 @pytest.mark.asyncio
 async def test_async_concurrent_calls():
-    """Test that multiple async tools can run concurrently."""
     tool = Tool(async_dummy_function, description="An async dummy function for testing.")
-
-    # Create multiple concurrent calls
     tasks = [tool.acall(x=i, y=f"hello{i}") for i in range(5)]
-
-    # Run them concurrently and measure time
     start_time = asyncio.get_event_loop().time()
-    results = await asyncio.gather(*tasks)  # ty:ignore[no-matching-overload]
+    results = await asyncio.gather(*tasks)
     end_time = asyncio.get_event_loop().time()
-
-    # Verify results, `asyncio.gather` returns results in the order of the tasks
     assert results == [f"hello{i} {i}" for i in range(5)]
-
-    # Check that it ran concurrently (should take ~0.1s, not ~0.5s)
-    # We use 0.3s as threshold to account for some overhead
     assert end_time - start_time < 0.3
 
 
@@ -295,10 +254,9 @@ async def test_async_concurrent_calls():
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_async_tool_call_in_sync_mode():
     tool = Tool(async_dummy_function, description="An async dummy function for testing.")
-    with settings.context(allow_tool_async_sync_conversion=False):  # noqa: SIM117
-        with pytest.raises(ValueError, match=r".*acall.*allow_tool_async_sync_conversion.*"):
+    with settings.context(allow_tool_async_sync_conversion=False):
+        with pytest.raises(ValueError, match=".*acall.*allow_tool_async_sync_conversion.*"):
             result = tool(x=1, y="hello")
-
     with settings.context(allow_tool_async_sync_conversion=True):
         result = tool(x=1, y="hello")
         assert result == "hello 1"

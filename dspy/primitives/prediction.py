@@ -4,25 +4,10 @@ from dspy.primitives.example import Example
 
 
 class Prediction(Example):
-    """A prediction object that contains the output of a DSPy module.
-
-    Prediction inherits from Example.
-
-    To allow feedback-augmented scores, Prediction supports comparison operations
-    (<, >, <=, >=) for Predictions with a `score` field. The comparison operations
-    compare the 'score' values as floats. For equality comparison, Predictions are equal
-    if their underlying data stores are equal (inherited from Example).
-
-    Arithmetic operations (+, /, etc.) are also supported for Predictions with a 'score'
-    field, operating on the score value.
-    """
-
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
         del self._demos
         del self._input_keys
-
         self._completions = None
         self._lm_usage = None
 
@@ -37,16 +22,13 @@ class Prediction(Example):
         obj = cls()
         obj._completions = Completions(list_or_dict, task_spec=task_spec)
         obj._store = {k: v[0] for k, v in obj._completions.items()}
-
         return obj
 
     @override
     def __repr__(self) -> str:
-        store_repr = ",\n    ".join(f"{k}={v!r}" for k, v in self._store.items())
-
+        store_repr = ",\n    ".join((f"{k}={v!r}" for k, v in self._store.items()))
         if self._completions is None or len(self._completions) == 1:
             return f"Prediction(\n    {store_repr}\n)"
-
         num_completions = len(self._completions)
         return f"Prediction(\n    {store_repr},\n    completions=Completions(...)\n) ({num_completions - 1} completions omitted)"
 
@@ -123,7 +105,6 @@ class Prediction(Example):
 class Completions:
     def __init__(self, list_or_dict, task_spec=None) -> None:
         self.task_spec = task_spec
-
         if isinstance(list_or_dict, list):
             kwargs = {}
             for arg in list_or_dict:
@@ -131,13 +112,10 @@ class Completions:
                     kwargs.setdefault(k, []).append(v)
         else:
             kwargs = list_or_dict
-
         assert all(isinstance(v, list) for v in kwargs.values()), "All values must be lists"
-
         if kwargs:
             length = len(next(iter(kwargs.values())))
             assert all(len(v) == length for v in kwargs.values()), "All lists must have the same length"
-
         self._completions = kwargs
 
     def items(self):
@@ -147,9 +125,7 @@ class Completions:
         if isinstance(key, int):
             if key < 0 or key >= len(self):
                 raise IndexError("Index out of range")
-
             return Prediction(**{k: v[key] for k, v in self._completions.items()})
-
         return self._completions[key]
 
     def __getattr__(self, name):
@@ -157,7 +133,6 @@ class Completions:
             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
         if name in self._completions:
             return self._completions[name]
-
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
     def __len__(self) -> int:
@@ -168,7 +143,7 @@ class Completions:
 
     @override
     def __repr__(self) -> str:
-        items_repr = ",\n    ".join(f"{k}={v!r}" for k, v in self._completions.items())
+        items_repr = ",\n    ".join((f"{k}={v!r}" for k, v in self._completions.items()))
         return f"Completions(\n    {items_repr}\n)"
 
     @override

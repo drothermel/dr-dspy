@@ -23,9 +23,7 @@ def test_citation_extraction_from_lm_response():
             }
         )
     )
-
     citations = extract_citations_from_choice(mock_choice)
-
     assert citations is not None
     assert len(citations) == 1
     assert citations[0].text == "The sky is blue"

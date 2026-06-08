@@ -1,5 +1,3 @@
-"""Normalized LM types — LM messages."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -17,13 +15,10 @@ from dspy.core.types.parts import (
 
 
 class LMMessage(BaseModel):
-    """A role-attributed sequence of LM parts."""
-
     role: str
     parts: list[LMPart]
     name: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
-
     model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="before")
@@ -38,11 +33,7 @@ class LMMessage(BaseModel):
                 call_id = data.pop("tool_call_id", None)
                 name = data.pop("name", None)
                 data["parts"] = [
-                    LMToolResultPart(
-                        call_id=call_id,
-                        name=name,
-                        content=_parts_from_openai_content(content),
-                    )
+                    LMToolResultPart(call_id=call_id, name=name, content=_parts_from_openai_content(content))
                 ]
             elif "parts" not in data:
                 parts = _parts_from_openai_content(data.pop("content", None)) if "content" in data else []

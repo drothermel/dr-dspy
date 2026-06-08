@@ -65,21 +65,15 @@ class GRPO(FinetuneTeleprompter):
         self.report_train_scores = report_train_scores
         self.failure_score = failure_score
         self.format_failure_score = format_failure_score
-
         assert failure_score > format_failure_score, (
             "failure_score must be greater than format_failure_score since the range [format_failure_score, failure_score] is used to provide dspy formatting rewards"
         )
-
         if self.use_train_as_val:
             assert report_train_scores, "If use_train_as_val is True, report_train_scores must be True."
-
         assert exclude_demos, "exclude_demos==False is not supported yet. Please set it to True."
         assert multitask, (
             "independent GRPO training jobs for each predictor in the student program is not supported yet. Please set multitask=True."
         )
-
-        # The backend will be called with a batch of (num_dspy_examples_per_grpo_step * num_rollouts_per_grpo_step * num_predictors) per training set if multitask is True
-        # If multitask is False, the backend will be called with a batch of (num_dspy_examples_per_grpo_step * num_rollouts_per_grpo_step) per training job
         self.variably_invoked_predictor_grouping_mode = variably_invoked_predictor_grouping_mode
         if variably_invoked_predictor_grouping_mode == "fill":
             assert variably_invoked_predictor_fill_strategy is not None, (
@@ -89,7 +83,6 @@ class GRPO(FinetuneTeleprompter):
                 "variably_invoked_predictor_fill_strategy must be either 'randint' or 'max'"
             )
         self.variably_invoked_predictor_fill_strategy = variably_invoked_predictor_fill_strategy
-
         self.shuffled_trainset_ids = []
         self.epoch = -1
         self.id_freqs = Counter()
@@ -104,14 +97,12 @@ class GRPO(FinetuneTeleprompter):
         num_samples_per_input: int,
         pred_signature_hash_to_ind: dict[int, int],
     ) -> None:
-        # At this point, trace_data: list[example_idx -> list[teacher_idx -> [num_samples_per_input * Dict(example, prediction, trace, example_ind, score)]]]
         assert len(trace_data) == len(subsample_training_dataset), (
             f"Trace data length {len(trace_data)} does not match the number of examples {len(subsample_training_dataset)}"
         )
         assert len(trace_data[0]) == num_teachers, (
             f"Trace data length {len(trace_data[0])} does not match the number of teachers {num_teachers}"
         )
-        # TODO(GRPO Team): Ideally, once the dspy format issue is fixed, this change should be reverted back to being a normal assert.
         if len(trace_data[0][0]) == 0:
             logger.warning(
                 f"Trace data for example {0} and teacher {0} is empty. This is likely due to all examples in the training set input, resulting in the model generating output not following the dspy response format."
@@ -125,7 +116,6 @@ class GRPO(FinetuneTeleprompter):
             assert len(trace_data[0][0][0]["trace"][0]) == 3, (
                 f"Trace tuple length {len(trace_data[0][0][0]['trace'][0])} does not match the expected length 3"
             )
-
         for example_data in trace_data:
             for teacher_data in example_data:
                 for sample in teacher_data:
@@ -137,9 +127,7 @@ class GRPO(FinetuneTeleprompter):
             pass
         else:
             return
-
         if valset is not None:
-            # Validation set provided by user
             assert not self.use_train_as_val, "If valset is provided, use_train_as_val must be False."
             assert isinstance(self.num_steps_for_val, int) and self.num_steps_for_val > 0, (
                 "num_steps_for_val must be a positive integer."
@@ -153,9 +141,8 @@ class GRPO(FinetuneTeleprompter):
                     devset=valset + trainset,
                     num_threads=self.num_threads,
                     display_progress=True,
-                    provide_traceback=False,  # TODO(GRPO Team): Confirm validation traceback and max_errors policy for GRPO evaluations.
-                    max_errors=len(valset)
-                    * 10,  # TODO(GRPO Team): Confirm validation traceback and max_errors policy for GRPO evaluations.
+                    provide_traceback=False,
+                    max_errors=len(valset) * 10,
                     failure_score=self.failure_score,
                 )
                 if step_idx == -1:
@@ -186,9 +173,8 @@ class GRPO(FinetuneTeleprompter):
                     devset=valset,
                     num_threads=self.num_threads,
                     display_progress=True,
-                    provide_traceback=False,  # TODO(GRPO Team): Confirm validation traceback and max_errors policy for GRPO evaluations.
-                    max_errors=len(valset)
-                    * 10,  # TODO(GRPO Team): Confirm validation traceback and max_errors policy for GRPO evaluations.
+                    provide_traceback=False,
+                    max_errors=len(valset) * 10,
                     failure_score=self.failure_score,
                 )
                 if step_idx == -1:
@@ -204,65 +190,57 @@ class GRPO(FinetuneTeleprompter):
                     logger.info(
                         f"Student program validation set score after training step {step_idx + 1}/{self.num_train_steps}: {valset_evaluation.score}"
                     )
-        else:
-            # No validation set provided by user
-            if self.report_train_scores:
-                assert self.use_train_as_val, (
-                    "If report_train_scores is True, use_train_as_val must be True when valset is not provided explicitly."
-                )
-                assert isinstance(self.num_steps_for_val, int) and self.num_steps_for_val > 0, (
-                    "num_steps_for_val must be a positive integer."
-                )
-                if step_idx == -1:
-                    logger.info("Using trainset as validation set.")
-                valset_evaluator = Evaluate(
-                    devset=trainset,
-                    num_threads=self.num_threads,
-                    display_progress=True,
-                    provide_traceback=False,  # TODO(GRPO Team): Confirm validation traceback and max_errors policy for GRPO evaluations.
-                    max_errors=len(trainset)
-                    * 10,  # TODO(GRPO Team): Confirm validation traceback and max_errors policy for GRPO evaluations.
-                    failure_score=self.failure_score,
-                )
-                if step_idx == -1:
-                    logger.info("Evaluating the student program on the validation set before training loop...")
-                else:
-                    logger.info(
-                        f"Evaluating the student program on the validation set after training step {step_idx + 1}/{self.num_train_steps}"
-                    )
-                valset_evaluation = await valset_evaluator(student, metric=self.metric)
-                if step_idx == -1:
-                    logger.info(f"Student program training set score before training loop: {valset_evaluation.score}")
-                else:
-                    logger.info(
-                        f"Student program training set score after training step {step_idx + 1}/{self.num_train_steps}: {valset_evaluation.score}"
-                    )
+        elif self.report_train_scores:
+            assert self.use_train_as_val, (
+                "If report_train_scores is True, use_train_as_val must be True when valset is not provided explicitly."
+            )
+            assert isinstance(self.num_steps_for_val, int) and self.num_steps_for_val > 0, (
+                "num_steps_for_val must be a positive integer."
+            )
+            if step_idx == -1:
+                logger.info("Using trainset as validation set.")
+            valset_evaluator = Evaluate(
+                devset=trainset,
+                num_threads=self.num_threads,
+                display_progress=True,
+                provide_traceback=False,
+                max_errors=len(trainset) * 10,
+                failure_score=self.failure_score,
+            )
+            if step_idx == -1:
+                logger.info("Evaluating the student program on the validation set before training loop...")
             else:
-                # No valset provided, and not using train as val
-                assert not self.use_train_as_val, "If report_train_scores is False, use_train_as_val must be False."
-                if step_idx == -1:
-                    logger.info("Not using any validation set and not reporting train scores.")
+                logger.info(
+                    f"Evaluating the student program on the validation set after training step {step_idx + 1}/{self.num_train_steps}"
+                )
+            valset_evaluation = await valset_evaluator(student, metric=self.metric)
+            if step_idx == -1:
+                logger.info(f"Student program training set score before training loop: {valset_evaluation.score}")
+            else:
+                logger.info(
+                    f"Student program training set score after training step {step_idx + 1}/{self.num_train_steps}: {valset_evaluation.score}"
+                )
+        else:
+            assert not self.use_train_as_val, "If report_train_scores is False, use_train_as_val must be False."
+            if step_idx == -1:
+                logger.info("Not using any validation set and not reporting train scores.")
 
     def update_shuffled_trainset(self, original_trainset) -> None:
         self.shuffled_trainset_ids = list(range(len(original_trainset)))
         self.rng.shuffle(self.shuffled_trainset_ids)
         for id in self.shuffled_trainset_ids:
             self.id_freqs[id] += 1
-
-        num_to_pad = self.num_dspy_examples_per_grpo_step - (
-            len(original_trainset) % self.num_dspy_examples_per_grpo_step
+        num_to_pad = (
+            self.num_dspy_examples_per_grpo_step - len(original_trainset) % self.num_dspy_examples_per_grpo_step
         )
         if num_to_pad > 0:
-            # Select ids based on least frequent ids
             for _ in range(num_to_pad):
                 selected_id = self.id_freqs.most_common()[::-1][0][0]
                 self.shuffled_trainset_ids.append(selected_id)
                 self.id_freqs[selected_id] += 1
 
     def select_training_sample_and_update_shuffled_trainset(
-        self,
-        original_trainset: list[Example],
-        train_step_idx: int,
+        self, original_trainset: list[Example], train_step_idx: int
     ) -> list[Example]:
         base_idx = train_step_idx * self.num_dspy_examples_per_grpo_step
         curr_epoch = 0 if self.epoch == -1 else base_idx // len(self.shuffled_trainset_ids)
@@ -270,14 +248,12 @@ class GRPO(FinetuneTeleprompter):
             logger.info(f"Updating shuffled trainset for epoch {curr_epoch}...")
             self.epoch = curr_epoch
             self.update_shuffled_trainset(original_trainset)
-
         assert len(self.shuffled_trainset_ids) >= self.num_dspy_examples_per_grpo_step, (
             f"Shuffled trainset length {len(self.shuffled_trainset_ids)} is less than num_dspy_examples_per_grpo_step {self.num_dspy_examples_per_grpo_step}"
         )
         assert len(self.shuffled_trainset_ids) % self.num_dspy_examples_per_grpo_step == 0, (
             f"Shuffled trainset length {len(self.shuffled_trainset_ids)} is not divisible by num_dspy_examples_per_grpo_step {self.num_dspy_examples_per_grpo_step}"
         )
-
         base_idx = base_idx % len(self.shuffled_trainset_ids)
         end_idx = base_idx + self.num_dspy_examples_per_grpo_step
         assert end_idx <= len(self.shuffled_trainset_ids), (
@@ -299,13 +275,10 @@ class GRPO(FinetuneTeleprompter):
             "Starting the GRPO compilation process... The LM(s) for the student program will be updated in place at the end of the training."
         )
         logger.info("Validating the inputs...")
-
         assert len(trainset) > 0, "Training set is empty. Please provide a non-empty training set."
-
         if len(trainset) < self.num_dspy_examples_per_grpo_step:
             logger.warning(
-                f"Number of training examples {len(trainset)} is less than the number of examples per GRPO step {self.num_dspy_examples_per_grpo_step}. "
-                "Repeating the training set to fill the GRPO step. This could lead to overfitting and training instability."
+                f"Number of training examples {len(trainset)} is less than the number of examples per GRPO step {self.num_dspy_examples_per_grpo_step}. Repeating the training set to fill the GRPO step. This could lead to overfitting and training instability."
             )
             multiplier = (self.num_dspy_examples_per_grpo_step + len(trainset) - 1) // len(trainset)
             if multiplier > 1:
@@ -313,43 +286,22 @@ class GRPO(FinetuneTeleprompter):
                     f"Repeating the training set {multiplier} times to fill the GRPO step. This could lead to overfitting and training instability."
                 )
                 trainset = trainset * multiplier
-
-        # TODO(GRPO Team): Following checks are for unimplemented features.
-        # Consider if we want to eventually implement them or remove. We don't
-        # yet support:
-        # * multitask == False
-        # * student program with multiple predictor LMs
-        # The main reason for these is that we update the LMs in place. If these
-        # LMs are shared between the different predictors of the student
-        # program and we have multitask == False, we need to decide which steps
-        # will use new LM copies and we need to ensure our decision is
-        # consistent with any teacher LMs that share the same LMs.
-        # TODO(GRPO Team): We want to make it possible to continue GRPO runs in
-        # the future by saving the state of the GRPO run in the event of a
-        # process failure.
         if not self.multitask:
             raise ValueError(
-                "Independent GRPO training jobs for each predictor in the student program "
-                "are not supported yet. Please set multitask=True."
+                "Independent GRPO training jobs for each predictor in the student program are not supported yet. Please set multitask=True."
             )
-
         student_lms = {id(pred.lm) for pred in student.predictors()}
         assert len(student_lms) == 1, (
-            f"Student program has multiple LMs: {student_lms}. "
-            "GRPO only supports student programs with a single LM."
-            "You can set the LM for a program with `program.set_lm(...)`"
+            f"Student program has multiple LMs: {student_lms}. GRPO only supports student programs with a single LM.You can set the LM for a program with `program.set_lm(...)`"
         )
-
         if self.use_train_as_val:
             assert valset is None, "If use_train_as_val is True, valset must be None."
-
         logger.info("Preparing the student program...")
         all_predictors_have_lms(student)
         pred_signature_hash_to_ind = {
             get_task_spec(pred).fingerprint(): ind for ind, pred in enumerate(student.predictors())
         }
         num_student_predictors = len(student.predictors())
-
         logging.info(
             "Preparing the teacher program(s)... We will ensure that the provided programs have the same program structure as the student program."
         )
@@ -359,26 +311,18 @@ class GRPO(FinetuneTeleprompter):
         for t in teachers:
             assert_structural_equivalency(program1=student, program2=t)
             all_predictors_have_lms(t)
-
         assert student in teachers, (
             f"Student program {student} is not in the list of teachers {teachers}. Please provide the student program as one of the teachers. Alternatively, you can leave the teacher argument as None, and the student program will be used as the teacher program."
         )
         assert self.num_rollouts_per_grpo_step % len(teachers) == 0, (
-            f"The GRPO group size (num_rollouts_per_grpo_step) {self.num_rollouts_per_grpo_step} is not divisible by the number of teachers {len(teachers)}. "
-            "This is required to ensure that each teacher gets the same number of examples."
-            "Please provide a number of examples that is divisible by the number of teachers."
+            f"The GRPO group size (num_rollouts_per_grpo_step) {self.num_rollouts_per_grpo_step} is not divisible by the number of teachers {len(teachers)}. This is required to ensure that each teacher gets the same number of examples.Please provide a number of examples that is divisible by the number of teachers."
         )
         num_samples_per_input = self.num_rollouts_per_grpo_step // len(teachers)
-
         for pred in student.predictors():
             train_kwargs = self.train_kwargs[pred.lm]
             train_kwargs = {} if train_kwargs is None else train_kwargs
             train_kwargs["num_generations"] = self.num_rollouts_per_grpo_step
             self.train_kwargs[pred.lm] = train_kwargs
-
-        # We need to have a separate job for each unique LM x the data
-        # collection strategy. This properly handles all combinations of
-        # multitask and predictor LMs
         logger.info("Preparing the GRPO training job(s)...")
         grpo_training_jobs = {}
         for pred_ind, pred in enumerate(student.predictors()):
@@ -388,24 +332,15 @@ class GRPO(FinetuneTeleprompter):
                 train_kwargs = self.train_kwargs[pred.lm]
                 job = pred.lm.reinforce(train_kwargs=train_kwargs)
                 grpo_training_jobs[job_key] = job
-
         await self.report_validation_metrics(
-            student=student,
-            trainset=trainset,
-            valset=valset,
-            logger=logger,
-            step_idx=-1,
+            student=student, trainset=trainset, valset=valset, logger=logger, step_idx=-1
         )
-
-        # Queue of GRPO groups per training job; key is (LM, data_key)
         group_queues = {}
         logger.info("Starting the GRPO training loop...")
         for train_step_idx in range(self.num_train_steps):
             logger.info(f"GRPO training step {train_step_idx + 1}/{self.num_train_steps}...")
-
             subsample_training_dataset = self.select_training_sample_and_update_shuffled_trainset(
-                original_trainset=trainset,
-                train_step_idx=train_step_idx,
+                original_trainset=trainset, train_step_idx=train_step_idx
             )
 
             def _any_available_for_step() -> bool:
@@ -417,9 +352,8 @@ class GRPO(FinetuneTeleprompter):
                         return True
                 return False
 
-            while not _any_available_for_step():  # noqa: ASYNC110
+            while not _any_available_for_step():
                 await asyncio.sleep(1)
-
             logger.info("Bootstrapping data...")
             trace_data = [[[] for _ in range(len(teachers))] for _ in range(len(subsample_training_dataset))]
             for tind, teacher in enumerate(teachers):
@@ -431,7 +365,7 @@ class GRPO(FinetuneTeleprompter):
                     dataset=subsample_training_dataset_repeated,
                     metric=self.metric,
                     num_threads=self.num_threads,
-                    raise_on_error=False,  # TODO(GRPO Team): Set raise_on_error=True after DSPy format failures can be scored instead of dropped.
+                    raise_on_error=False,
                     capture_failed_parses=True,
                     failure_score=self.failure_score,
                     format_failure_score=self.format_failure_score,
@@ -441,8 +375,6 @@ class GRPO(FinetuneTeleprompter):
                     example_ind_in_subsample = data_dict["example_ind"] % len(subsample_training_dataset)
                     data_dict["example_ind"] = example_ind_in_subsample
                     trace_data[example_ind_in_subsample][tind].append(data_dict)
-
-            # At this point, trace_data: list[example_idx -> list[teacher_idx -> [num_samples_per_input * Dict(example, prediction, trace, example_ind, score)]]]
             self.validate_trace_data_and_log_issues(
                 trace_data=trace_data,
                 subsample_training_dataset=subsample_training_dataset,
@@ -450,30 +382,23 @@ class GRPO(FinetuneTeleprompter):
                 num_samples_per_input=num_samples_per_input,
                 pred_signature_hash_to_ind=pred_signature_hash_to_ind,
             )
-
             logger.info("Preparing the training data batch from bootstrapped examples for GRPO...")
             train_batch_per_predictor: list[list[GRPORolloutGroup]] = [[] for _ in range(num_student_predictors)]
             for pred_id in range(num_student_predictors):
                 for example_ind, example_data in enumerate(trace_data):
-                    # TODO(Lakshya, Omar, Noah): Discuss what to do with the same module being invoked multiple
-                    # times within a single Example.
                     predictor_example_invocations: list[list[tuple]] = []
-
                     for teacher_data in example_data:
                         for sample in teacher_data:
                             assert sample["example_ind"] == example_ind, (
                                 f"Example index {sample['example_ind']} does not match the expected index {example_ind}"
                             )
-
                             trace_instances_for_current_pred = [
                                 (*t, sample["score"])
                                 for t in sample["trace"]
                                 if get_task_spec(t[0]).fingerprint()
                                 == get_task_spec(student.predictors()[pred_id]).fingerprint()
                             ]
-
                             predictor_example_invocations.append(trace_instances_for_current_pred)
-
                     if len(predictor_example_invocations) == 0:
                         logger.warning(
                             f"Skipping example {example_ind} for predictor {pred_id} as it has no invocations. This is likely due to all examples in the training set input, resulting in the model generating output not following the dspy response format."
@@ -483,7 +408,6 @@ class GRPO(FinetuneTeleprompter):
                         logger.warning(
                             f"Number of predictor example invocations {len(predictor_example_invocations)} does not match the expected batch size {self.num_rollouts_per_grpo_step}. This is likely due to all examples in the training set input, resulting in the model generating output not following the dspy response format."
                         )
-
                     min_len = min(
                         [len(predictor_example_invocations[i]) for i in range(len(predictor_example_invocations))]
                     )
@@ -495,16 +419,15 @@ class GRPO(FinetuneTeleprompter):
                             f"Skipping example {example_ind} for predictor {pred_id} as it has no invocations."
                         )
                         continue
-
                     if self.variably_invoked_predictor_grouping_mode == "truncate":
                         predictor_example_invocations = [
                             invocation[:min_len] for invocation in predictor_example_invocations
                         ]
                     elif self.variably_invoked_predictor_grouping_mode == "fill":
                         if self.variably_invoked_predictor_fill_strategy == "randint":
-                            selector = lambda l: self.rng.choice(l)  # noqa: E731, E741
+                            selector = lambda l: self.rng.choice(l)
                         else:
-                            selector = lambda l: l[-1]  # noqa: E731, E741
+                            selector = lambda l: l[-1]
                         predictor_example_invocations = [
                             invocation + [selector(invocation) for _ in range(max_len - len(invocation))]
                             for invocation in predictor_example_invocations
@@ -516,9 +439,7 @@ class GRPO(FinetuneTeleprompter):
                     max_len = max(
                         [len(predictor_example_invocations[i]) for i in range(len(predictor_example_invocations))]
                     )
-
                     example_training_data: list[GRPORolloutGroup] = [[] for _ in range(max_len)]
-
                     for group_idx in range(max_len):
                         for rollout_idx in range(len(predictor_example_invocations)):
                             trace_instance = predictor_example_invocations[rollout_idx][group_idx]
@@ -527,12 +448,13 @@ class GRPO(FinetuneTeleprompter):
                                 get_task_spec(trace_instance[0]).fingerprint()
                             )
                             assert trace_pred_id == pred_id
-
                             predictor = trace_instance[0]
                             pred_lm = predictor.lm
                             from dspy.compile.resolve import resolve_adapter
 
-                            configured_adapter = self.adapter[pred_lm] if isinstance(self.adapter, dict) else self.adapter
+                            configured_adapter = (
+                                self.adapter[pred_lm] if isinstance(self.adapter, dict) else self.adapter
+                            )
                             adapter, _ = resolve_adapter(
                                 configured_adapter or settings.adapter,
                                 transparency=settings.get("transparency", "strict"),
@@ -540,20 +462,14 @@ class GRPO(FinetuneTeleprompter):
                             assert isinstance(adapter, ChatAdapter), (
                                 f"Adapter {adapter} is not a ChatAdapter. GRPO training is not supported for this adapter."
                             )
-                            # TODO(Lakshya): Currently we exclude demos from the training data
-                            # TODO(GRPO Team): Use build_call_data_from_trace (from bootstrap_finetune) instead of
-                            # dealing with the message formatting ourselves.
                             from dspy.clients.openai_format import message_to_openai_chat
 
                             inp_messages = [
                                 message_to_openai_chat(message)
                                 for message in adapter.format(
-                                    task_spec=get_task_spec(trace_instance[0]),
-                                    inputs=trace_instance[1],
-                                    demos=[],  # TODO: Add support for demos
+                                    task_spec=get_task_spec(trace_instance[0]), inputs=trace_instance[1], demos=[]
                                 )
                             ]
-
                             if isinstance(trace_instance[2], FailedPrediction):
                                 score = trace_instance[2].format_reward or self.format_failure_score
                                 example_training_data[group_idx].append(
@@ -577,13 +493,11 @@ class GRPO(FinetuneTeleprompter):
                                     task_spec=get_task_spec(trace_instance[0]),
                                     inputs=trace_instance[1],
                                     outputs=trace_instance[2],
-                                    demos=[],  # TODO: Add support for demos
+                                    demos=[],
                                 )["messages"]
-
                                 assert all_messages[:-1] == inp_messages, (
                                     f"Input messages {inp_messages} do not match the expected messages {all_messages[:-1]}"
                                 )
-
                                 example_training_data[group_idx].append(
                                     cast(
                                         "GRPOChatData",
@@ -597,15 +511,12 @@ class GRPO(FinetuneTeleprompter):
                                         },
                                     )
                                 )
-
                     train_batch_per_predictor[pred_id].extend(example_training_data)
-
             if not any(train_batch_per_predictor):
                 logger.warning(
                     "No training data found for this training step. This means that the model did not generate valid formatted responses for any of the examples in the training set. This is a critical error. Please check the model and the training set."
                 )
                 continue
-
             for predictor_train_batch in train_batch_per_predictor:
                 for grpo_train_group in predictor_train_batch:
                     if len(grpo_train_group) != self.num_rollouts_per_grpo_step:
@@ -619,21 +530,6 @@ class GRPO(FinetuneTeleprompter):
                         logger.warning(
                             f"GRPOGroup has no diversity. This could be due to low temperature or a low number of rollouts. The GRPOGroup is {grpo_train_group}."
                         )
-
-            # We now run the GRPO step. Notes:
-            # * The job here has a reference to a particular M that's attached
-            #   to the student program. We update the .model field of this LM
-            #   inside the job, which also updates the LM in the student program
-            #   since these point to the same reference (along with any teacher
-            #   program that shares the same LM).
-            # * TODO(GRPO Team): This is inconsistent with how
-            #   BootstrapFinetune works, which creates new LM instances post
-            #   training. We should decide whether the LMs should be updated in
-            #   place or new LMs should be created, and standardize our approach
-            #   for both. If we decide to create new LMs, we should find a way
-            #   to update self.adapter and self.train_kwargs accordingly, in
-            #   addition to updating any teacher programs that share the same
-            #   LM.
             logger.info("Invoking GRPO training step...")
             for (lm_for_job, data_key), job in grpo_training_jobs.items():
                 train_data: list[GRPORolloutGroup] = (
@@ -643,38 +539,29 @@ class GRPO(FinetuneTeleprompter):
                 )
                 for group in train_data:
                     if len(group) != self.num_rollouts_per_grpo_step:
-                        # TODO(GRPO Team): This is very undesirable. This occurs only because in some of the generations, the model does not follow the correct dspy format.
-                        # The ideal solution is to identify the full response string in that predictor's group, and then assign a high-negative (user-configurable) reward to that group.
                         while len(group) < self.num_rollouts_per_grpo_step:
                             group.extend(group[: min(self.num_rollouts_per_grpo_step - len(group), len(group))])
                     assert len(group) == self.num_rollouts_per_grpo_step, (
                         f"Number of completions {len(group)} does not match the expected number self.num_rollouts_per_grpo_step={self.num_rollouts_per_grpo_step}"
                     )
-
                 grpo_status: GRPOStatus = job.get_status()
                 pending_batch_ids = grpo_status["pending_batch_ids"]
                 available_batch_ids = list(set(pending_batch_ids) - set(self.fulfilled_batch_ids))
                 if not available_batch_ids:
                     continue
-
                 job_key = (lm_for_job, data_key)
                 q = group_queues.setdefault(job_key, deque())
-
-                # Refill strategy: add randomized copies of current train_data until we can satisfy all batch_ids
                 if len(q) < len(available_batch_ids) and len(train_data) > 0:
                     need = len(available_batch_ids) - len(q)
                     while need > 0:
-                        # Shuffle by sampling without replacement
                         shuffled = self.rng.sample(train_data, k=len(train_data))
                         q.extend(shuffled)
                         need -= len(shuffled)
-
                 final_train_data: list[GRPOGroup] = []
                 for bid in available_batch_ids:
                     if q:
                         grp = q.popleft()
                     else:
-                        # Fallback: choose randomly from current train_data (or flattened pool) if queue underflows
                         fallback_pool = (
                             train_data
                             if len(train_data) > 0
@@ -684,28 +571,17 @@ class GRPO(FinetuneTeleprompter):
                             continue
                         grp = self.rng.choice(fallback_pool)
                     final_train_data.append({"batch_id": bid, "group": grp})
-
                 if not final_train_data:
                     continue
-
                 self.fulfilled_batch_ids.extend([item["batch_id"] for item in final_train_data])
-
                 job.step(train_data=final_train_data, train_data_format=TrainDataFormat.GRPO_CHAT)
-
             logger.info(f"GRPO training step {train_step_idx + 1}/{self.num_train_steps} completed.")
-
             await self.report_validation_metrics(
-                student=student,
-                trainset=trainset,
-                valset=valset,
-                logger=logger,
-                step_idx=train_step_idx,
+                student=student, trainset=trainset, valset=valset, logger=logger, step_idx=train_step_idx
             )
-
         logger.info("Done with the iterations! Retrieving the final model(s)...")
         for job in grpo_training_jobs.values():
             job.terminate()
-
         logger.info("GRPO compiler has finished compiling the student program")
         student._compiled = True
         return student

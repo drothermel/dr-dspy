@@ -17,34 +17,7 @@ logger = logging.getLogger(__name__)
 
 class GenerateEnhancedMultimodalInstructionTaskSpec(TaskSpec):
     name: str = "framework.gepa.multimodal_instruction"
-    instructions: str = (
-        "I provided an assistant with instructions to perform a task involving visual content, but the assistant's "
-        "performance needs improvement based on the examples and feedback below.\n\n"
-        "Your task is to write a better instruction for the assistant that addresses the specific issues identified in "
-        "the feedback, with particular attention to how visual and textual information should be analyzed and "
-        "integrated.\n\n"
-        "## Analysis Steps:\n"
-        "1. **Read the inputs carefully** and identify both the visual and textual input formats, understanding how "
-        "they work together\n"
-        "2. **Read all the assistant responses and corresponding feedback** to understand what went wrong with visual "
-        "analysis, text processing, or their integration\n"
-        "3. **Identify visual analysis patterns** - what visual features, relationships, or details are important for "
-        "this task\n"
-        "4. **Identify domain-specific knowledge** about both visual and textual aspects, as this information may not "
-        "be available to the assistant in the future\n"
-        "5. **Look for successful visual-textual integration strategies** and include these patterns in the "
-        "instruction\n"
-        "6. **Address specific visual analysis issues** mentioned in the feedback\n\n"
-        "## Instruction Requirements:\n"
-        "- **Clear task definition** explaining how to process both visual and textual inputs\n"
-        "- **Visual analysis guidance** specific to this task (what to look for, how to describe, what features matter)\n"
-        "- **Integration strategies** for combining visual observations with textual information\n"
-        "- **Domain-specific knowledge** about visual concepts, terminology, or relationships\n"
-        "- **Error prevention guidance** for common visual analysis mistakes shown in the feedback\n"
-        "- **Precise, actionable language** for both visual and textual processing\n\n"
-        "Focus on creating an instruction that helps the assistant properly analyze visual content, integrate it with "
-        "textual information, and avoid the specific visual analysis mistakes shown in the examples."
-    )
+    instructions: str = "I provided an assistant with instructions to perform a task involving visual content, but the assistant's performance needs improvement based on the examples and feedback below.\n\nYour task is to write a better instruction for the assistant that addresses the specific issues identified in the feedback, with particular attention to how visual and textual information should be analyzed and integrated.\n\n## Analysis Steps:\n1. **Read the inputs carefully** and identify both the visual and textual input formats, understanding how they work together\n2. **Read all the assistant responses and corresponding feedback** to understand what went wrong with visual analysis, text processing, or their integration\n3. **Identify visual analysis patterns** - what visual features, relationships, or details are important for this task\n4. **Identify domain-specific knowledge** about both visual and textual aspects, as this information may not be available to the assistant in the future\n5. **Look for successful visual-textual integration strategies** and include these patterns in the instruction\n6. **Address specific visual analysis issues** mentioned in the feedback\n\n## Instruction Requirements:\n- **Clear task definition** explaining how to process both visual and textual inputs\n- **Visual analysis guidance** specific to this task (what to look for, how to describe, what features matter)\n- **Integration strategies** for combining visual observations with textual information\n- **Domain-specific knowledge** about visual concepts, terminology, or relationships\n- **Error prevention guidance** for common visual analysis mistakes shown in the feedback\n- **Precise, actionable language** for both visual and textual processing\n\nFocus on creating an instruction that helps the assistant properly analyze visual content, integrate it with textual information, and avoid the specific visual analysis mistakes shown in the examples."
     inputs: tuple[FieldSpec, ...] = (
         input_field(
             "current_instruction",
@@ -54,95 +27,44 @@ class GenerateEnhancedMultimodalInstructionTaskSpec(TaskSpec):
         input_field(
             "examples_with_feedback",
             str,
-            desc="Task examples with visual content showing inputs, assistant outputs, and feedback. "
-            "Pay special attention to feedback about visual analysis accuracy, visual-textual integration, "
-            "and any domain-specific visual knowledge that the assistant missed.",
+            desc="Task examples with visual content showing inputs, assistant outputs, and feedback. Pay special attention to feedback about visual analysis accuracy, visual-textual integration, and any domain-specific visual knowledge that the assistant missed.",
         ),
     )
     outputs: tuple[FieldSpec, ...] = (
         output_field(
             "improved_instruction",
             str,
-            desc="A better instruction for the assistant that addresses visual analysis issues, provides "
-            "clear guidance on how to process and integrate visual and textual information, includes "
-            "necessary visual domain knowledge, and prevents the visual analysis mistakes shown in the examples.",
+            desc="A better instruction for the assistant that addresses visual analysis issues, provides clear guidance on how to process and integrate visual and textual information, includes necessary visual domain knowledge, and prevents the visual analysis mistakes shown in the examples.",
         ),
     )
 
 
 class SingleComponentMultiModalProposer(Module):
-    """
-    Module for proposing improved instructions based on feedback.
-    """
-
     def __init__(self) -> None:
         super().__init__()
         self.propose_instruction = Predict(GenerateEnhancedMultimodalInstructionTaskSpec())
 
     async def aforward(self, current_instruction: str, reflective_dataset: list[ReflectiveExample]) -> str:
-        """
-        Generate an improved instruction based on current instruction and feedback examples.
-
-        Args:
-            current_instruction: The current instruction that needs improvement
-            reflective_dataset: List of examples with inputs, outputs, and feedback
-                               May contain Image objects in inputs
-
-        Returns:
-            str: Improved instruction text
-        """
-        # Format examples with enhanced pattern recognition
         formatted_examples, image_map = self._format_examples_with_pattern_analysis(reflective_dataset)
-
-        # Build kwargs for the prediction call
-        predict_kwargs = {
-            "current_instruction": current_instruction,
-            "examples_with_feedback": formatted_examples,
-        }
-
-        # Create a rich multimodal examples_with_feedback that includes both text and images
+        predict_kwargs = {"current_instruction": current_instruction, "examples_with_feedback": formatted_examples}
         predict_kwargs["examples_with_feedback"] = self._create_multimodal_examples(
             formatted_text=formatted_examples, image_map=image_map
         )
-
-        # Use current dspy LM settings (GEPA will pass reflection_lm via context)
         result = await self.propose_instruction(**predict_kwargs)
-
         return result.improved_instruction
 
     def _format_examples_with_pattern_analysis(
         self, reflective_dataset: list[ReflectiveExample]
     ) -> tuple[str, dict[int, list[Type]]]:
-        """
-        Format examples with pattern analysis and feedback categorization.
-
-        Returns:
-            tuple: (formatted_text_with_patterns, image_map)
-        """
-        # First, use the existing proven formatting approach
         formatted_examples, image_map = self._format_examples_for_instruction_generation(reflective_dataset)
-
-        # Enhanced analysis: categorize feedback patterns
         feedback_analysis = self._analyze_feedback_patterns(reflective_dataset)
-
-        # Add pattern analysis to the formatted examples
         if feedback_analysis["summary"]:
             pattern_summary = self._create_pattern_summary(feedback_analysis)
             enhanced_examples = f"{pattern_summary}\n\n{formatted_examples}"
-            return enhanced_examples, image_map
-
-        return formatted_examples, image_map
+            return (enhanced_examples, image_map)
+        return (formatted_examples, image_map)
 
     def _analyze_feedback_patterns(self, reflective_dataset: list[ReflectiveExample]) -> dict[str, Any]:
-        """
-        Analyze feedback patterns to provide better context for instruction generation.
-
-        Categorizes feedback into:
-        - Error patterns: Common mistakes and their types
-        - Success patterns: What worked well and should be preserved/emphasized
-        - Domain knowledge gaps: Missing information that should be included
-        - Task-specific guidance: Specific requirements or edge cases
-        """
         analysis = {
             "error_patterns": [],
             "success_patterns": [],
@@ -150,73 +72,49 @@ class SingleComponentMultiModalProposer(Module):
             "task_specific_guidance": [],
             "summary": "",
         }
-
-        # Simple pattern recognition - could be enhanced further
         for example in reflective_dataset:
             feedback = example.get("Feedback", "").lower()
-
-            # Identify error patterns
             if any(error_word in feedback for error_word in ["incorrect", "wrong", "error", "failed", "missing"]):
                 analysis["error_patterns"].append(feedback)
-
-            # Identify success patterns
             if any(
                 success_word in feedback for success_word in ["correct", "good", "accurate", "well", "successfully"]
             ):
                 analysis["success_patterns"].append(feedback)
-
-            # Identify domain knowledge needs
             if any(
                 knowledge_word in feedback
                 for knowledge_word in ["should know", "domain", "specific", "context", "background"]
             ):
                 analysis["domain_knowledge_gaps"].append(feedback)
-
-        # Create summary if patterns were found
         if any(analysis[key] for key in ["error_patterns", "success_patterns", "domain_knowledge_gaps"]):
             analysis["summary"] = (
                 f"Patterns identified: {len(analysis['error_patterns'])} error(s), {len(analysis['success_patterns'])} success(es), {len(analysis['domain_knowledge_gaps'])} knowledge gap(s)"
             )
-
         return analysis
 
     def _create_pattern_summary(self, feedback_analysis: dict[str, Any]) -> str:
-        """Create a summary of feedback patterns to help guide instruction generation."""
-
         summary_parts = ["## Feedback Pattern Analysis\n"]
-
         if feedback_analysis["error_patterns"]:
             summary_parts.append(f"**Common Issues Found ({len(feedback_analysis['error_patterns'])} examples):**")
             summary_parts.append("Focus on preventing these types of mistakes in the new instruction.\n")
-
         if feedback_analysis["success_patterns"]:
             summary_parts.append(
                 f"**Successful Approaches Found ({len(feedback_analysis['success_patterns'])} examples):**"
             )
             summary_parts.append("Build on these successful strategies in the new instruction.\n")
-
         if feedback_analysis["domain_knowledge_gaps"]:
             summary_parts.append(
                 f"**Domain Knowledge Needs Identified ({len(feedback_analysis['domain_knowledge_gaps'])} examples):**"
             )
             summary_parts.append("Include this specialized knowledge in the new instruction.\n")
-
         return "\n".join(summary_parts)
 
     def _format_examples_for_instruction_generation(
         self, reflective_dataset: list[ReflectiveExample]
     ) -> tuple[str, dict[int, list[Type]]]:
-        """
-        Format examples using GEPA's markdown structure while preserving image objects.
-
-        Returns:
-            tuple: (formatted_text, image_map) where image_map maps example_index -> list[images]
-        """
 
         def render_value_with_images(value, level=3, example_images=None):
             if example_images is None:
                 example_images = []
-
             if isinstance(value, Type):
                 image_idx = len(example_images) + 1
                 example_images.append(value)
@@ -242,64 +140,41 @@ class SingleComponentMultiModalProposer(Module):
         def convert_sample_to_markdown_with_images(sample, example_num):
             example_images = []
             s = f"# Example {example_num}\n"
-
             for key, val in sample.items():
                 s += f"## {key}\n"
                 s += render_value_with_images(val, level=3, example_images=example_images)
-
-            return s, example_images
+            return (s, example_images)
 
         formatted_parts = []
         image_map = {}
-
         for i, example_data in enumerate(reflective_dataset):
             formatted_example, example_images = convert_sample_to_markdown_with_images(
                 sample=example_data, example_num=i + 1
             )
             formatted_parts.append(formatted_example)
-
             if example_images:
                 image_map[i] = example_images
-
         formatted_text = "\n\n".join(formatted_parts)
-
         if image_map:
             total_images = sum(len(imgs) for imgs in image_map.values())
             formatted_text = (
-                f"The examples below include visual content ({total_images} images total). "
-                "Please analyze both the text and visual elements when suggesting improvements.\n\n" + formatted_text
+                f"The examples below include visual content ({total_images} images total). Please analyze both the text and visual elements when suggesting improvements.\n\n"
+                + formatted_text
             )
-
-        return formatted_text, image_map
+        return (formatted_text, image_map)
 
     def _create_multimodal_examples(self, formatted_text: str, image_map: dict[int, list[Type]]) -> Any:
-        """
-        Create a multimodal input that contains both text and images for the reflection LM.
-
-        Args:
-            formatted_text: The formatted text with image placeholders
-            image_map: Dictionary mapping example_index -> list[images] for structured access
-        """
         if not image_map:
             return formatted_text
-
-        # Collect all images from all examples
         all_images = []
         for example_images in image_map.values():
             all_images.extend(example_images)
-
         multimodal_content: list[Any] = [formatted_text]
         multimodal_content.extend(cast("list[Any]", all_images))
         return multimodal_content
 
 
 class MultiModalInstructionProposer(ProposalFn):
-    """GEPA-compatible multimodal instruction proposer.
-
-    This class handles multimodal inputs (like Image) during GEPA optimization by using
-    a single-component proposer for each component that needs to be updated.
-    """
-
     def __init__(self) -> None:
         self.single_proposer = SingleComponentMultiModalProposer()
 
@@ -312,9 +187,7 @@ class MultiModalInstructionProposer(ProposalFn):
     ) -> dict[str, str]:
         return asyncio.run(
             self._propose(
-                candidate=candidate,
-                reflective_dataset=reflective_dataset,
-                components_to_update=components_to_update,
+                candidate=candidate, reflective_dataset=reflective_dataset, components_to_update=components_to_update
             )
         )
 
@@ -325,20 +198,12 @@ class MultiModalInstructionProposer(ProposalFn):
         components_to_update: list[str],
     ) -> dict[str, str]:
         updated_components = {}
-
         for component_name in components_to_update:
             if component_name in candidate and component_name in reflective_dataset:
                 current_instruction = candidate[component_name]
                 component_reflective_data = cast("list[ReflectiveExample]", reflective_dataset[component_name])
-
-                # Call the single-instruction proposer.
-                #
-                # In the future, proposals could consider multiple components instructions,
-                # instead of just the current instruction, for more holistic instruction proposals.
                 new_instruction = await self.single_proposer(
                     current_instruction=current_instruction, reflective_dataset=component_reflective_data
                 )
-
                 updated_components[component_name] = new_instruction
-
         return updated_components

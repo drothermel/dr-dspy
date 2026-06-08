@@ -62,11 +62,9 @@ class MIPROv2(Teleprompter):
         self.metric_threshold = metric_threshold
         self.seed = seed
         self.rng = None
-
         if not self.prompt_model or not self.task_model:
             raise ValueError(
-                "Either provide both prompt_model and task_model or set a default LM through "
-                "settings.configure(lm=...) from dspy.dsp.utils.settings."
+                "Either provide both prompt_model and task_model or set a default LM through settings.configure(lm=...) from dspy.dsp.utils.settings."
             )
 
     @override
@@ -92,73 +90,39 @@ class MIPROv2(Teleprompter):
         provide_traceback: bool | None = None,
     ) -> Any:
         effective_max_errors = self.max_errors if self.max_errors is not None else settings.max_errors
-
         effective_max_bootstrapped_demos = (
             max_bootstrapped_demos if max_bootstrapped_demos is not None else self.max_bootstrapped_demos
         )
         effective_max_labeled_demos = max_labeled_demos if max_labeled_demos is not None else self.max_labeled_demos
-
-        zeroshot_opt = (effective_max_bootstrapped_demos == 0) and (effective_max_labeled_demos == 0)
-
-        # If auto is None, and num_trials is not provided (but num_candidates is), raise an error that suggests a good num_trials value
+        zeroshot_opt = effective_max_bootstrapped_demos == 0 and effective_max_labeled_demos == 0
         if self.auto is None and (self.num_candidates is not None and num_trials is None):
             raise ValueError(
                 f"If auto is None, num_trials must also be provided. Given num_candidates={self.num_candidates}, we'd recommend setting num_trials to ~{set_num_trials_from_num_candidates(optimizer=self, program=student, zeroshot_opt=zeroshot_opt, num_candidates=self.num_candidates)}."
             )
-
-        # If auto is None, and num_candidates or num_trials is None, raise an error
         if self.auto is None and (self.num_candidates is None or num_trials is None):
             raise ValueError("If auto is None, num_candidates must also be provided.")
-
-        # If auto is provided, and either num_candidates or num_trials is not None, raise an error
         if self.auto is not None and (self.num_candidates is not None or num_trials is not None):
             raise ValueError(
                 "If auto is not None, num_candidates and num_trials cannot be set, since they would be overridden by the auto settings. Please either set auto to None, or do not specify num_candidates and num_trials."
             )
-
         seed = seed or self.seed
         set_random_seeds(self, seed)
-
         trainset, valset = set_and_validate_datasets(trainset, valset)
-
         num_instruct_candidates = (
             self.num_instruct_candidates if self.num_instruct_candidates is not None else self.num_candidates
         )
         num_fewshot_candidates = (
             self.num_fewshot_candidates if self.num_fewshot_candidates is not None else self.num_candidates
         )
-
-        # Set hyperparameters based on run mode (if set)
-        (
-            num_trials,
-            valset,
-            minibatch,
-            num_instruct_candidates,
-            num_fewshot_candidates,
-        ) = set_hyperparams_from_run_mode(
-            self,
-            student,
-            num_trials,
-            minibatch,
-            zeroshot_opt,
-            valset,
-            num_instruct_candidates,
-            num_fewshot_candidates,
+        num_trials, valset, minibatch, num_instruct_candidates, num_fewshot_candidates = set_hyperparams_from_run_mode(
+            self, student, num_trials, minibatch, zeroshot_opt, valset, num_instruct_candidates, num_fewshot_candidates
         )
-
         if self.auto:
             print_auto_run_settings(
-                self,
-                num_trials,
-                minibatch,
-                valset,
-                num_fewshot_candidates,
-                num_instruct_candidates,
+                self, num_trials, minibatch, valset, num_fewshot_candidates, num_instruct_candidates
             )
-
         if minibatch and minibatch_size > len(valset):
             raise ValueError(f"Minibatch size cannot exceed the size of the valset. Valset size: {len(valset)}.")
-
         program = student.deepcopy()
         evaluate = Evaluate(
             devset=valset,
@@ -169,9 +133,7 @@ class MIPROv2(Teleprompter):
             display_progress=True,
             provide_traceback=provide_traceback,
         )
-
         with optimizer_lm_context(lm=self.task_model, phase="mipro.bootstrap", lm_role="task_model"):
-            # Step 1: Bootstrap few-shot examples
             demo_candidates = await bootstrap_fewshot_examples(
                 self,
                 program,
@@ -184,8 +146,6 @@ class MIPROv2(Teleprompter):
                 max_errors=effective_max_errors,
                 metric_threshold=self.metric_threshold,
             )
-
-        # Step 2: Propose instruction candidates
         instruction_candidates = await propose_instructions(
             self,
             program,
@@ -198,13 +158,9 @@ class MIPROv2(Teleprompter):
             fewshot_aware_proposer,
             num_instruct_candidates=num_instruct_candidates,
         )
-
-        # If zero-shot, discard demos
         if zeroshot_opt:
             demo_candidates = None
-
         with optimizer_lm_context(lm=self.task_model, phase="mipro.optimize", lm_role="task_model"):
-            # Step 3: Find optimal prompt parameters
             return await optimize_prompt_parameters(
                 self,
                 program,

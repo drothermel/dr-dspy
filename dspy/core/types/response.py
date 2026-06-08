@@ -1,5 +1,3 @@
-"""Normalized LM types — LM responses and history entries."""
-
 from __future__ import annotations
 
 import json
@@ -35,12 +33,6 @@ from dspy.core.types.request import LMRequest
 
 
 class LMUsage(BaseModel):
-    """Token and timing usage for one LM request.
-
-    Both DSPy token names and provider token names are populated because both
-    are existing user-visible history/usage interfaces.
-    """
-
     input_tokens: int | None = None
     output_tokens: int | None = None
     total_tokens: int | None = None
@@ -52,7 +44,6 @@ class LMUsage(BaseModel):
     input_audio_tokens: int | None = None
     output_audio_tokens: int | None = None
     details: dict[str, Any] = Field(default_factory=dict)
-
     model_config = ConfigDict(extra="allow")
 
     @model_validator(mode="after")
@@ -65,14 +56,12 @@ class LMUsage(BaseModel):
             self.prompt_tokens = self.input_tokens
         if self.completion_tokens is None and self.output_tokens is not None:
             self.completion_tokens = self.output_tokens
-        if self.total_tokens is None and self.input_tokens is not None and self.output_tokens is not None:
+        if self.total_tokens is None and self.input_tokens is not None and (self.output_tokens is not None):
             self.total_tokens = self.input_tokens + self.output_tokens
         return self
 
 
 class LMOutput(BaseModel):
-    """One generated candidate in an LM response."""
-
     parts: list[LMPart] = Field(default_factory=list)
     finish_reason: str | None = None
     truncated: bool = False
@@ -80,7 +69,6 @@ class LMOutput(BaseModel):
     provider_output: Any | None = Field(default=None, exclude=True)
     provider_data: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
-
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     @model_validator(mode="before")
@@ -137,7 +125,7 @@ class LMOutput(BaseModel):
     def to_value(self) -> Any:
         values = [_part_to_value(part) for part in self.parts]
         values = [value for value in values if value is not None]
-        if len(values) == 1 and isinstance(values[0], str) and self.logprobs is None:
+        if len(values) == 1 and isinstance(values[0], str) and (self.logprobs is None):
             return values[0]
         return values
 
@@ -161,8 +149,6 @@ def _requires_output_dict(output: LMOutput) -> bool:
 
 
 class LMResponse(BaseModel):
-    """The normalized result of one LM request."""
-
     model: str | None = None
     outputs: list[LMOutput] = Field(min_length=1)
     usage: LMUsage | dict[str, Any] | None = None
@@ -171,7 +157,6 @@ class LMResponse(BaseModel):
     provider_response: Any | None = Field(default=None, exclude=True)
     provider_data: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
-
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     @model_validator(mode="before")
@@ -192,13 +177,7 @@ class LMResponse(BaseModel):
         cost: float | None = None,
         **kwargs: Any,
     ) -> LMResponse:
-        return cls(
-            model=model,
-            outputs=[LMOutput(parts=[LMTextPart(text=text)])],
-            usage=usage,
-            cost=cost,
-            **kwargs,
-        )
+        return cls(model=model, outputs=[LMOutput(parts=[LMTextPart(text=text)])], usage=usage, cost=cost, **kwargs)
 
     @override
     def __iter__(self):
@@ -275,14 +254,11 @@ class LMResponse(BaseModel):
 
 
 class LMHistoryEntry(BaseModel):
-    """A typed record of one LM request and response."""
-
     request: LMRequest
     response: LMResponse
     timestamp: str
     uuid: str
     model_type: str | None = None
-
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     @property
@@ -331,7 +307,6 @@ class LMHistoryEntry(BaseModel):
         return repr(self)
 
     def to_dict(self, *, mode: str = "python", exclude_none: bool = False, **kwargs: Any) -> dict[str, Any]:
-        """Return this history entry as a plain dictionary."""
         if kwargs:
             return self.model_dump(mode=mode, exclude_none=exclude_none, **kwargs)
         data = {

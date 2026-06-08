@@ -9,13 +9,11 @@ pytestmark = pytest.mark.extra
 
 
 def mock_example(question: str, answer: str) -> Example:
-    """Creates a mock DSP example with specified question and answer."""
     return Example(question=question, answer=answer).with_inputs("question")
 
 
 @pytest.fixture
 def setup_knn() -> KNN:
-    """Sets up a KNN instance with a mocked vectorizer for testing."""
     trainset = [
         mock_example("What is the capital of France?", "Paris"),
         mock_example("What is the largest ocean?", "Pacific"),
@@ -25,7 +23,6 @@ def setup_knn() -> KNN:
 
 
 def test_knn_initialization(setup_knn):
-    """Tests the KNN initialization and checks if the trainset vectors are correctly created."""
     import numpy as np
 
     knn = setup_knn
@@ -35,18 +32,16 @@ def test_knn_initialization(setup_knn):
 
 
 def test_knn_query(setup_knn):
-    """Tests the KNN query functionality for retrieving the nearest neighbors."""
     knn = setup_knn
-    query = {"question": "What is 3+3?"}  # A query close to "What is 2+2?"
+    query = {"question": "What is 3+3?"}
     nearest_samples = knn(**query)
     assert len(nearest_samples) == 2, "Incorrect number of nearest samples returned"
     assert nearest_samples[0].answer == "4", "Incorrect nearest sample returned"
 
 
 def test_knn_query_specificity(setup_knn):
-    """Tests the KNN query functionality for specificity of returned examples."""
     knn = setup_knn
-    query = {"question": "What is the capital of Germany?"}  # A query close to "What is the capital of France?"
+    query = {"question": "What is the capital of Germany?"}
     nearest_samples = knn(**query)
     assert len(nearest_samples) == 2, "Incorrect number of nearest samples returned"
     assert "Paris" in [sample.answer for sample in nearest_samples], "Expected Paris to be a nearest sample answer"

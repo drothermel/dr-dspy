@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     import optuna
 
     from dspy.teleprompt.mipro.optimizer import MIPROv2
-
 logger = logging.getLogger(__name__)
 
 
@@ -39,7 +38,6 @@ def log_minibatch_eval(
     trial_logs[trial_num]["mb_score"] = score
     trial_logs[trial_num]["total_eval_calls_so_far"] = total_eval_calls
     trial_logs[trial_num]["mb_program"] = candidate_program.deepcopy()
-
     logger.info(f"Score: {score} on minibatch of size {batch_size} with parameters {chosen_params}.")
     minibatch_scores = ", ".join([f"{s['score']}" for s in score_data if not s["full_eval"]])
     logger.info(f"Minibatch scores so far: {'[' + minibatch_scores + ']'}")
@@ -71,7 +69,6 @@ def log_normal_eval(
     trial_logs[trial_num]["full_eval_score"] = score
     trial_logs[trial_num]["total_eval_calls_so_far"] = total_eval_calls
     trial_logs[trial_num]["full_eval_program"] = candidate_program.deepcopy()
-
     logger.info(f"Score: {score} with parameters {chosen_params}.")
     full_eval_scores = ", ".join([f"{s['score']}" for s in score_data if s["full_eval"]])
     logger.info(f"Scores so far: {'[' + full_eval_scores + ']'}")
@@ -89,7 +86,6 @@ def select_and_insert_instructions_and_demos(
 ) -> tuple[list[str], dict[str, int]]:
     chosen_params = []
     raw_chosen_params = {}
-
     for i, predictor in enumerate(candidate_program.predictors()):
         instruction_idx = trial.suggest_categorical(f"{i}_predictor_instruction", range(len(instruction_candidates[i])))
         selected_instruction = instruction_candidates[i][instruction_idx]
@@ -104,8 +100,7 @@ def select_and_insert_instructions_and_demos(
             trial_logs[trial_num][f"{i}_predictor_demos"] = demos_idx
             chosen_params.append(f"Predictor {i}: Few-Shot Set {demos_idx}")
             raw_chosen_params[f"{i}_predictor_demos"] = demos_idx
-
-    return chosen_params, raw_chosen_params
+    return (chosen_params, raw_chosen_params)
 
 
 async def perform_full_evaluation(
@@ -128,9 +123,7 @@ async def perform_full_evaluation(
     from dspy.teleprompt.mipro.search import get_param_distributions, import_optuna
 
     optuna = import_optuna()
-
     logger.info(f"===== Trial {trial_num + 1} / {adjusted_num_trials} - Full Evaluation =====")
-
     highest_mean_program, mean_score, combo_key, params = get_program_with_highest_avg_score(
         param_score_dict=param_score_dict, fully_evaled_param_combos=fully_evaled_param_combos
     )
@@ -145,36 +138,23 @@ async def perform_full_evaluation(
         )
     ).score
     score_data.append({"score": full_eval_score, "program": highest_mean_program, "full_eval": True})
-
     trial = optuna.trial.create_trial(
         params=params,
         distributions=get_param_distributions(
-            program=best_program,
-            instruction_candidates=instruction_candidates,
-            demo_candidates=demo_candidates,
+            program=best_program, instruction_candidates=instruction_candidates, demo_candidates=demo_candidates
         ),
         value=full_eval_score,
     )
     study.add_trial(trial)
-
-    # Log full evaluation results
-    fully_evaled_param_combos[combo_key] = {
-        "program": highest_mean_program,
-        "score": full_eval_score,
-    }
+    fully_evaled_param_combos[combo_key] = {"program": highest_mean_program, "score": full_eval_score}
     total_eval_calls += len(valset)
     trial_logs[trial_num + 1] = {}
     trial_logs[trial_num + 1]["total_eval_calls_so_far"] = total_eval_calls
     trial_logs[trial_num + 1]["full_eval_program_path"] = save_candidate_program(
-        program=highest_mean_program,
-        log_dir=optimizer.log_dir,
-        trial_num=trial_num + 1,
-        note="full_eval",
+        program=highest_mean_program, log_dir=optimizer.log_dir, trial_num=trial_num + 1, note="full_eval"
     )
     trial_logs[trial_num + 1]["full_eval_program"] = highest_mean_program
     trial_logs[trial_num + 1]["full_eval_score"] = full_eval_score
-
-    # Update best score and program if necessary
     if full_eval_score > best_score:
         logger.info(f"{GREEN}New best full eval score!{ENDC} Score: {full_eval_score}")
         best_score = full_eval_score
@@ -185,5 +165,4 @@ async def perform_full_evaluation(
     logger.info(f"Best full score so far: {best_score}")
     logger.info(len(f"===== Full Eval {len(fully_evaled_param_combos) + 1} =====") * "=")
     logger.info("\n")
-
-    return best_score, best_program, total_eval_calls
+    return (best_score, best_program, total_eval_calls)

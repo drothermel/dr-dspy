@@ -6,7 +6,6 @@ from typing_extensions import override
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
 from dspy.clients.lm import LM
 from dspy.clients.openai_format import message_to_openai_chat
 from dspy.core.types import LMRequest, LMResponse
@@ -20,8 +19,6 @@ def request_prompt(request: LMRequest) -> str | None:
 
 
 class SpyLM(LM):
-    """LM test double that records typed requests and returns canned text."""
-
     def __init__(
         self,
         *args: Any,
@@ -39,7 +36,6 @@ class SpyLM(LM):
         messages = [message_to_openai_chat(message) for message in request.messages]
         kwargs = {**self.kwargs, **request.config.model_dump(exclude_none=True)}
         self.calls.append({"prompt": request_prompt(request), "messages": messages, "kwargs": kwargs})
-
         if isinstance(self.response_text, str):
             text = self.response_text
         elif self.response_text is not None:
@@ -48,5 +44,4 @@ class SpyLM(LM):
             text = "{'answer':'100%'}"
         else:
             text = "[[ ## answer ## ]]\n100%!"
-
         return LMResponse.from_text(text, model=request.model)

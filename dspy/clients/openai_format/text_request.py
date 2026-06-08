@@ -7,14 +7,12 @@ from dspy.core.types import LMMessage, LMRequest, LMTextPart
 
 
 def to_openai_text_request(request: LMRequest) -> dict[str, Any]:
-    """Convert a normalized DSPy request into text-completion kwargs."""
     data = {"model": request.model, "prompt": messages_to_text_prompt(request.messages)}
     data.update(text_config_kwargs(request.config))
     return data
 
 
 def messages_to_text_prompt(messages: list[LMMessage]) -> str:
-    """Flatten text-only messages into the prompt used by text completions."""
     chunks = []
     for message in messages:
         texts = []

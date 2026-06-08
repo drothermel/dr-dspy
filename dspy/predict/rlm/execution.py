@@ -21,18 +21,14 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
     from dspy.predict.rlm.module import RLM
-
 logger = logging.getLogger(__name__)
 
 
 def get_output_fields_info(rlm: RLM) -> list[dict]:
-    """Get output field info for sandbox registration."""
     fields = []
     for name, field in rlm.task_spec.output_fields.items():
         annotation = field.type_
         field_info = {"name": name}
-        # Only include type for simple types that work in function signatures
-        # Complex types like Literal, Union, etc. are not included
         if annotation in SIMPLE_TYPES:
             field_info["type"] = annotation.__name__
         fields.append(field_info)
@@ -40,7 +36,6 @@ def get_output_fields_info(rlm: RLM) -> list[dict]:
 
 
 def build_variables(rlm: RLM, **input_args: Any) -> list[REPLVariable]:
-    """Build REPLVariable list from input arguments with field metadata."""
     variables = []
     input_field_infos = task_spec_input_field_infos(rlm.task_spec)
     for name, value in input_args.items():
@@ -60,29 +55,18 @@ def format_output(output: str) -> str:
 
 
 def validate_inputs(rlm: RLM, input_args: dict[str, Any]) -> None:
-    """Raise ValueError if required input fields are missing."""
     missing = set(rlm.task_spec.input_fields.keys()) - set(input_args.keys())
     if missing:
         raise ValueError(f"Missing required inputs: {sorted(missing)}")
 
 
-def prepare_serializable_vars(
-    input_args: dict[str, Any],
-    repl: CodeInterpreter,
-) -> dict[str, Any]:
-    """Inject SandboxSerializable values into the interpreter.
-
-    For each SandboxSerializable value in input_args, serializes it and
-    executes setup + assignment code in the interpreter. Returns the
-    remaining non-serializable args (for per-iteration use).
-    """
+def prepare_serializable_vars(input_args: dict[str, Any], repl: CodeInterpreter) -> dict[str, Any]:
     repl.start()
     regular_args = {}
     for name, value in input_args.items():
         if not isinstance(value, SandboxSerializable):
             regular_args[name] = value
             continue
-
         payload = value.to_sandbox()
         setup = value.sandbox_setup()
         raw_var_name = f"_raw_{name}"
@@ -95,64 +79,37 @@ def prepare_serializable_vars(
             except UnicodeDecodeError:
                 encoded_var_name = f"{raw_var_name}_base64"
                 payload_vars[encoded_var_name] = base64.b64encode(payload).decode("ascii")
-                code_lines.extend(
-                    [
-                        "import base64",
-                        f"{raw_var_name} = base64.b64decode({encoded_var_name})",
-                    ]
-                )
+                code_lines.extend(["import base64", f"{raw_var_name} = base64.b64decode({encoded_var_name})"])
         else:
             payload_vars[raw_var_name] = str(payload)
-
         if setup:
             code_lines.append(setup)
         code_lines.append(assignment)
         repl.execute("\n".join(code_lines), variables=payload_vars)
-
     return regular_args
 
 
 def prepare_execution_tools(rlm: RLM) -> dict[str, Callable]:
-    """Create fresh LLM tools and merge with user-provided tools."""
     execution_tools = make_llm_tools(rlm)
-    # Extract underlying functions from Tool objects for the interpreter
     execution_tools.update({name: tool.func for name, tool in rlm._user_tools.items()})
     return execution_tools
 
 
-def inject_execution_context(
-    rlm: RLM,
-    interpreter: CodeInterpreter,
-    execution_tools: dict[str, Callable],
-) -> None:
-    """Inject execution tools and output fields into an interpreter.
-
-    This ensures llm_query, llm_query_batched, and typed FINAL signatures are available,
-    even for user-provided interpreters. Each forward() call gets fresh tools with a
-    fresh call counter, so we must inject on every execution.
-    """
+def inject_execution_context(rlm: RLM, interpreter: CodeInterpreter, execution_tools: dict[str, Callable]) -> None:
     interpreter.tools.update(execution_tools)
     if hasattr(interpreter, "output_fields"):
         cast("Any", interpreter).output_fields = get_output_fields_info(rlm)
-    # Reset registration flag to force re-registration with fresh tools
     if hasattr(interpreter, "_tools_registered"):
         cast("Any", interpreter)._tools_registered = False
 
 
 @contextmanager
-def interpreter_context(
-    rlm: RLM,
-    execution_tools: dict[str, Callable],
-) -> Iterator[CodeInterpreter]:
-    """Yield interpreter, creating PythonInterpreter if none provided at init."""
+def interpreter_context(rlm: RLM, execution_tools: dict[str, Callable]) -> Iterator[CodeInterpreter]:
     if rlm._interpreter is not None:
         inject_execution_context(rlm, rlm._interpreter, execution_tools)
         yield rlm._interpreter
     else:
-        repl = PythonInterpreter(
-            tools=execution_tools,
-            output_fields=get_output_fields_info(rlm),
-        )
+        repl = PythonInterpreter(tools=execution_tools, output_fields=get_output_fields_info(rlm))
         try:
             yield repl
         finally:
@@ -160,20 +117,11 @@ def interpreter_context(
 
 
 def extract_fallback(
-    rlm: RLM,
-    variables: list[REPLVariable],
-    history: REPLHistory,
-    output_field_names: list[str],
+    rlm: RLM, variables: list[REPLVariable], history: REPLHistory, output_field_names: list[str]
 ) -> Prediction:
-    """Use extract module to get final output when max iterations reached."""
     logger.warning("RLM reached max iterations, using extract to get final output")
-
     variables_info = [variable.format() for variable in variables]
-    extract_pred = rlm.extract(
-        variables_info=variables_info,
-        repl_history=history,
-    )
-
+    extract_pred = rlm.extract(variables_info=variables_info, repl_history=history)
     return Prediction(
         trajectory=[e.model_dump() for e in history],
         final_reasoning="Extract forced final output",
@@ -182,20 +130,11 @@ def extract_fallback(
 
 
 async def aextract_fallback(
-    rlm: RLM,
-    variables: list[REPLVariable],
-    history: REPLHistory,
-    output_field_names: list[str],
+    rlm: RLM, variables: list[REPLVariable], history: REPLHistory, output_field_names: list[str]
 ) -> Prediction:
-    """Use extract module when max iterations reached."""
     logger.warning("RLM reached max iterations, using extract to get final output")
-
     variables_info = [variable.format() for variable in variables]
-    extract_pred = await rlm.extract(
-        variables_info=variables_info,
-        repl_history=history,
-    )
-
+    extract_pred = await rlm.extract(variables_info=variables_info, repl_history=history)
     return Prediction(
         trajectory=[e.model_dump() for e in history],
         final_reasoning="Extract forced final output",
@@ -204,29 +143,17 @@ async def aextract_fallback(
 
 
 def process_final_output(
-    rlm: RLM,
-    result: FinalOutput,
-    output_field_names: list[str],
+    rlm: RLM, result: FinalOutput, output_field_names: list[str]
 ) -> tuple[dict[str, Any] | None, str | None]:
-    """Validate and parse FinalOutput. Returns (parsed_outputs, None) or (None, error)."""
     raw_output = result.output
-
-    # Validate raw_output is a dict
     if not isinstance(raw_output, dict):
         return (
             None,
             f"[Error] FINAL returned {type(raw_output).__name__}, expected dict with fields: {output_field_names}",
         )
-
-    # Validate all required output fields are present
     missing = set(output_field_names) - set(raw_output.keys())
     if missing:
-        return (
-            None,
-            f"[Error] Missing output fields: {sorted(missing)}. Use SUBMIT({', '.join(output_field_names)})",
-        )
-
-    # Parse and validate each output field
+        return (None, f"[Error] Missing output fields: {sorted(missing)}. Use SUBMIT({', '.join(output_field_names)})")
     parsed_outputs = {}
     type_errors = []
     for name in output_field_names:
@@ -236,72 +163,35 @@ def process_final_output(
             parsed_outputs[name] = parse_value(raw_output[name], annotation)
         except (ValueError, pydantic.ValidationError) as e:
             type_errors.append(
-                f"{name}: expected {annotation.__name__ if hasattr(annotation, '__name__') else annotation}, "
-                f"got {type(raw_output[name]).__name__}: {e}"
+                f"{name}: expected {(annotation.__name__ if hasattr(annotation, '__name__') else annotation)}, got {type(raw_output[name]).__name__}: {e}"
             )
-
     if type_errors:
-        return None, "[Type Error] " + "; ".join(type_errors)
-
-    return parsed_outputs, None
+        return (None, "[Type Error] " + "; ".join(type_errors))
+    return (parsed_outputs, None)
 
 
 def process_execution_result(
-    rlm: RLM,
-    pred: Prediction,
-    code: str,
-    result: Any,
-    history: REPLHistory,
-    output_field_names: list[str],
+    rlm: RLM, pred: Prediction, code: str, result: Any, history: REPLHistory, output_field_names: list[str]
 ) -> Prediction | REPLHistory:
-    """Process interpreter result, returning Prediction if final, else updated history.
-
-    This shared helper reduces duplication between sync and async execution paths.
-
-    Args:
-        pred: The prediction containing reasoning and code attributes
-        code: Code to record in history (already stripped when possible)
-        result: Result from interpreter.execute() - FinalOutput, list, str, or error string
-        history: Current REPL history
-        output_field_names: List of expected output field names
-
-    Returns:
-        Prediction if FINAL was called successfully, else updated REPLHistory
-    """
-    # Handle error strings from caught exceptions
     if isinstance(result, str) and result.startswith("[Error]"):
         output = format_output(result)
         return history.append(reasoning=pred.reasoning, code=code, output=output)
-
-    # Handle FINAL output
     if isinstance(result, FinalOutput):
         parsed_outputs, error = process_final_output(rlm, result, output_field_names)
-
         if error:
             return history.append(reasoning=pred.reasoning, code=code, output=error)
-
         final_history = history.append(reasoning=pred.reasoning, code=code, output=f"FINAL: {parsed_outputs}")
         return Prediction(
-            **(parsed_outputs or {}),
-            trajectory=[e.model_dump() for e in final_history],
-            final_reasoning=pred.reasoning,
+            **parsed_outputs or {}, trajectory=[e.model_dump() for e in final_history], final_reasoning=pred.reasoning
         )
-
-    # Format non-final result as output
     output = "\n".join(map(str, result)) if isinstance(result, list) else str(result) if result else ""
-
     output = format_output(output)
     if rlm.verbose:
         logger.info(REPLEntry.format_output(output, rlm.max_output_chars))
     return history.append(reasoning=pred.reasoning, code=code, output=output)
 
 
-def execute_code(
-    repl: CodeInterpreter,
-    code: str,
-    input_args: dict[str, Any],
-) -> Any:
-    """Execute code in the interpreter, returning the result or an error string."""
+def execute_code(repl: CodeInterpreter, code: str, input_args: dict[str, Any]) -> Any:
     try:
         return repl.execute(code, variables=dict(input_args))
     except (CodeInterpreterError, SyntaxError) as e:
@@ -317,18 +207,14 @@ def execute_iteration(
     input_args: dict[str, Any],
     output_field_names: list[str],
 ) -> Prediction | REPLHistory:
-    """Execute one iteration. Returns Prediction if done, else updated REPLHistory."""
     variables_info = [variable.format() for variable in variables]
     action = rlm.generate_action(
-        variables_info=variables_info,
-        repl_history=history,
-        iteration=f"{iteration + 1}/{rlm.max_iterations}",
+        variables_info=variables_info, repl_history=history, iteration=f"{iteration + 1}/{rlm.max_iterations}"
     )
     if rlm.verbose:
         logger.info(
             f"RLM iteration {iteration + 1}/{rlm.max_iterations}\nReasoning: {action.reasoning}\nCode:\n{action.code}"
         )
-
     try:
         code = _strip_code_fences(action.code)
     except SyntaxError as e:
@@ -348,18 +234,14 @@ async def aexecute_iteration(
     input_args: dict[str, Any],
     output_field_names: list[str],
 ) -> Prediction | REPLHistory:
-    """Execute one iteration."""
     variables_info = [variable.format() for variable in variables]
     pred = await rlm.generate_action(
-        variables_info=variables_info,
-        repl_history=history,
-        iteration=f"{iteration + 1}/{rlm.max_iterations}",
+        variables_info=variables_info, repl_history=history, iteration=f"{iteration + 1}/{rlm.max_iterations}"
     )
     if rlm.verbose:
         logger.info(
             f"RLM iteration {iteration + 1}/{rlm.max_iterations}\nReasoning: {pred.reasoning}\nCode:\n{pred.code}"
         )
-
     try:
         code = _strip_code_fences(pred.code)
     except SyntaxError as e:

@@ -15,17 +15,12 @@ from tests.task_spec.helpers import ts
 
 @pytest.fixture(autouse=True)
 def reset_settings():
-    # Make sure the settings are reset after each test
     original_settings = settings.copy()
-
     yield
-
     settings.configure(**original_settings)
 
 
 class MyCallback(BaseCallback):
-    """A simple callback that records the calls."""
-
     def __init__(self):
         self.calls = []
 
@@ -34,7 +29,7 @@ class MyCallback(BaseCallback):
         self.calls.append({"handler": "on_module_start", "instance": instance, "inputs": inputs})
 
     @override
-    def on_module_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
+    def on_module_end(self, call_id, outputs, exception):
         self.calls.append({"handler": "on_module_end", "outputs": outputs, "exception": exception})
 
     @override
@@ -42,7 +37,7 @@ class MyCallback(BaseCallback):
         self.calls.append({"handler": "on_lm_start", "instance": instance, "inputs": inputs})
 
     @override
-    def on_lm_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
+    def on_lm_end(self, call_id, outputs, exception):
         self.calls.append({"handler": "on_lm_end", "outputs": outputs, "exception": exception})
 
     @override
@@ -50,7 +45,7 @@ class MyCallback(BaseCallback):
         self.calls.append({"handler": "on_adapter_format_start", "instance": instance, "inputs": inputs})
 
     @override
-    def on_adapter_format_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
+    def on_adapter_format_end(self, call_id, outputs, exception):
         self.calls.append({"handler": "on_adapter_format_end", "outputs": outputs, "exception": exception})
 
     @override
@@ -58,7 +53,7 @@ class MyCallback(BaseCallback):
         self.calls.append({"handler": "on_adapter_parse_start", "instance": instance, "inputs": inputs})
 
     @override
-    def on_adapter_parse_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
+    def on_adapter_parse_end(self, call_id, outputs, exception):
         self.calls.append({"handler": "on_adapter_parse_end", "outputs": outputs, "exception": exception})
 
     @override
@@ -66,20 +61,16 @@ class MyCallback(BaseCallback):
         self.calls.append({"handler": "on_tool_start", "instance": instance, "inputs": inputs})
 
     @override
-    def on_tool_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
+    def on_tool_end(self, call_id, outputs, exception):
         self.calls.append({"handler": "on_tool_end", "outputs": outputs, "exception": exception})
 
 
 @pytest.mark.parametrize(
     ("args", "kwargs"),
-    [
-        ([1, "2", 3.0], {}),
-        ([1, "2"], {"z": 3.0}),
-        ([1], {"y": "2", "z": 3.0}),
-        ([], {"x": 1, "y": "2", "z": 3.0}),
-    ],
+    [([1, "2", 3.0], {}), ([1, "2"], {"z": 3.0}), ([1], {"y": "2", "z": 3.0}), ([], {"x": 1, "y": "2", "z": 3.0})],
 )
 def test_callback_injection(args, kwargs):
+
     class Target(Module):
         @with_callbacks
         def forward(self, x: int, y: str, z: float) -> int:
@@ -88,12 +79,9 @@ def test_callback_injection(args, kwargs):
 
     callback = MyCallback()
     settings.configure(callbacks=[callback])
-
     target = Target()
     result = target.forward(*args, **kwargs)
-
     assert result == 6
-
     assert len(callback.calls) == 2
     assert callback.calls[0]["handler"] == "on_module_start"
     assert callback.calls[0]["inputs"] == {"x": 1, "y": "2", "z": 3.0}
@@ -102,6 +90,7 @@ def test_callback_injection(args, kwargs):
 
 
 def test_callback_injection_local():
+
     class Target(Module):
         @with_callbacks
         def forward(self, x: int, y: str, z: float) -> int:
@@ -109,28 +98,22 @@ def test_callback_injection_local():
             return x + int(y) + int(z)
 
     callback = MyCallback()
-
     target_1 = Target(callbacks=[callback])
     result = target_1.forward(1, "2", 3.0)
-
     assert result == 6
-
     assert len(callback.calls) == 2
     assert callback.calls[0]["handler"] == "on_module_start"
     assert callback.calls[0]["inputs"] == {"x": 1, "y": "2", "z": 3.0}
     assert callback.calls[1]["handler"] == "on_module_end"
     assert callback.calls[1]["outputs"] == 6
-
     callback.calls = []
-
     target_2 = Target()
     result = target_2.forward(1, "2", 3.0)
-
-    # Other instance should not trigger the callback
     assert not callback.calls
 
 
 def test_callback_error_handling():
+
     class Target(Module):
         @with_callbacks
         def forward(self, x: int, y: str, z: float) -> int:
@@ -139,12 +122,9 @@ def test_callback_error_handling():
 
     callback = MyCallback()
     settings.configure(callbacks=[callback])
-
     target = Target()
-
     with pytest.raises(ValueError, match="Error"):
         target.forward(1, "2", 3.0)
-
     assert len(callback.calls) == 2
     assert callback.calls[0]["handler"] == "on_module_start"
     assert callback.calls[1]["handler"] == "on_module_end"
@@ -152,6 +132,7 @@ def test_callback_error_handling():
 
 
 def test_multiple_callbacks():
+
     class Target(Module):
         @with_callbacks
         def forward(self, x: int, y: str, z: float) -> int:
@@ -161,12 +142,9 @@ def test_multiple_callbacks():
     callback_1 = MyCallback()
     callback_2 = MyCallback()
     settings.configure(callbacks=[callback_1, callback_2])
-
     target = Target()
     result = target.forward(1, "2", 3.0)
-
     assert result == 6
-
     assert len(callback_1.calls) == 2
     assert len(callback_2.calls) == 2
 
@@ -174,15 +152,12 @@ def test_multiple_callbacks():
 def test_callback_complex_module():
     callback = MyCallback()
     settings.configure(
-        lm=DummyLM({"How are you?": {"answer": "test output", "reasoning": "No more responses"}}),
-        callbacks=[callback],
+        lm=DummyLM({"How are you?": {"answer": "test output", "reasoning": "No more responses"}}), callbacks=[callback]
     )
-
-    cot = ChainOfThought(ts("question -> answer"), n=3)  # ty:ignore[invalid-argument-type]
+    cot = ChainOfThought(ts("question -> answer"), n=3)
     result = asyncio.run(cot(question="How are you?"))
     assert result["answer"] == "test output"
     assert result["reasoning"] == "No more responses"
-
     assert len(callback.calls) == 14
     assert [call["handler"] for call in callback.calls] == [
         "on_module_start",
@@ -191,7 +166,6 @@ def test_callback_complex_module():
         "on_adapter_format_end",
         "on_lm_start",
         "on_lm_end",
-        # Parsing will run per output (n=3)
         "on_adapter_parse_start",
         "on_adapter_parse_end",
         "on_adapter_parse_start",
@@ -207,14 +181,12 @@ def test_callback_complex_module():
 async def test_callback_async_module():
     callback = MyCallback()
     with settings.context(
-        lm=DummyLM({"How are you?": {"answer": "test output", "reasoning": "No more responses"}}),
-        callbacks=[callback],
+        lm=DummyLM({"How are you?": {"answer": "test output", "reasoning": "No more responses"}}), callbacks=[callback]
     ):
-        cot = ChainOfThought(ts("question -> answer"), n=3)  # ty:ignore[invalid-argument-type]
+        cot = ChainOfThought(ts("question -> answer"), n=3)
         result = await cot.acall(question="How are you?")
     assert result["answer"] == "test output"
     assert result["reasoning"] == "No more responses"
-
     assert len(callback.calls) == 14
     assert [call["handler"] for call in callback.calls] == [
         "on_module_start",
@@ -223,7 +195,6 @@ async def test_callback_async_module():
         "on_adapter_format_end",
         "on_lm_start",
         "on_lm_end",
-        # Parsing will run per output (n=3)
         "on_adapter_parse_start",
         "on_adapter_parse_end",
         "on_adapter_parse_start",
@@ -240,11 +211,9 @@ def test_tool_calls():
     settings.configure(callbacks=[callback])
 
     def tool_1(query: str) -> str:
-        """A dummy tool function."""
         return "result 1"
 
     def tool_2(query: str) -> str:
-        """Another dummy tool function."""
         return "result 2"
 
     class MyModule(Module):
@@ -252,12 +221,11 @@ def test_tool_calls():
             self.tools = [Tool(tool_1, description="Tool one."), Tool(tool_2, description="Tool two.")]
 
         async def aforward(self, query: str) -> str:
-            query = self.tools[0](query=query)  # ty:ignore[invalid-assignment]
-            return self.tools[1](query=query)  # ty:ignore[invalid-return-type]
+            query = self.tools[0](query=query)
+            return self.tools[1](query=query)
 
     module = MyModule()
     result = asyncio.run(module("query"))
-
     assert result == "result 2"
     assert len(callback.calls) == 6
     assert [call["handler"] for call in callback.calls] == [
@@ -271,7 +239,7 @@ def test_tool_calls():
 
 
 def test_active_id():
-    # Test the call ID is generated and handled properly
+
     class CustomCallback(BaseCallback):
         def __init__(self):
             self.parent_call_ids = []
@@ -298,12 +266,9 @@ def test_active_id():
 
     callback = CustomCallback()
     settings.configure(callbacks=[callback])
-
     parent = Parent()
     asyncio.run(parent())
-
     assert len(callback.call_ids) == 3
-    # All three calls should have different call ids
     assert len(set(callback.call_ids)) == 3
     parent_call_id = callback.call_ids[0]
     assert callback.parent_call_ids == [None, parent_call_id, parent_call_id]

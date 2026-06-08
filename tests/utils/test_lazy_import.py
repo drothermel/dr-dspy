@@ -18,13 +18,9 @@ def test_is_available_false_for_missing():
 def test_is_available_does_not_import_module(monkeypatch):
     import sys
 
-    # Use a stdlib module that dspy never imports, so we can deterministically
-    # observe whether is_available() triggers an import as a side effect.
     target = "mailbox"
     monkeypatch.delitem(sys.modules, target, raising=False)
-    # is_available is @functools.cache'd; clear so we actually exercise find_spec.
     is_available.cache_clear()
-
     assert is_available(target) is True
     assert target not in sys.modules
 
@@ -45,14 +41,8 @@ def test_require_is_safe_under_concurrent_first_use(tmp_path, monkeypatch):
     monkeypatch.syspath_prepend(tmp_path)
     monkeypatch.delitem(sys.modules, module_name, raising=False)
     (tmp_path / f"{module_name}.py").write_text(
-        "import pathlib\n"
-        "import time\n"
-        "time.sleep(0.1)\n"
-        f"path = pathlib.Path({str(counter_path)!r})\n"
-        "path.write_text(path.read_text() + '1' if path.exists() else '1')\n"
-        "value = 42\n"
+        f"import pathlib\nimport time\ntime.sleep(0.1)\npath = pathlib.Path({str(counter_path)!r})\npath.write_text(path.read_text() + '1' if path.exists() else '1')\nvalue = 42\n"
     )
-
     threads = 8
     barrier = threading.Barrier(threads)
 
@@ -62,7 +52,6 @@ def test_require_is_safe_under_concurrent_first_use(tmp_path, monkeypatch):
 
     with ThreadPoolExecutor(max_workers=threads) as executor:
         assert list(executor.map(read_value, range(threads))) == [42] * threads
-
     assert counter_path.read_text() == "1"
 
 
@@ -71,10 +60,8 @@ def test_require_assignment_updates_materialized_module(tmp_path, monkeypatch):
     monkeypatch.syspath_prepend(tmp_path)
     monkeypatch.delitem(sys.modules, module_name, raising=False)
     (tmp_path / f"{module_name}.py").write_text("value = 1\n")
-
     mod = require(module_name)
     mod.value = 2
-
     assert sys.modules[module_name].value == 2
 
 
@@ -101,7 +88,6 @@ def test_require_stub_uses_install_hint_for_litellm(monkeypatch):
     find_spec = importlib.util.find_spec
     monkeypatch.delitem(sys.modules, "litellm", raising=False)
     monkeypatch.setattr(importlib.util, "find_spec", lambda module: None if module == "litellm" else find_spec(module))
-
     stub = require("litellm", feature="dspy.clients.lm.LM")
     with pytest.raises(ImportError) as exc_info:
         _ = stub.something
@@ -126,16 +112,13 @@ def test_require_stub_falls_back_to_module_name():
 
 def test_install_hints_match_pyproject_extras(pytestconfig):
     try:
-        import tomllib  # ty:ignore[unresolved-import]
-    except ModuleNotFoundError:  # Python 3.10
-        import tomli as tomllib  # ty:ignore[unresolved-import]
-
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
     pyproject = pytestconfig.rootpath / "pyproject.toml"
     data = tomllib.loads(pyproject.read_text())
     extras = set(data["project"]["optional-dependencies"])
-
     for module, hint in _INSTALL_HINTS.items():
         assert hint in extras, (
-            f"_INSTALL_HINTS[{module!r}] = {hint!r} is not a declared extra in "
-            f"pyproject.toml (declared: {sorted(extras)})"
+            f"_INSTALL_HINTS[{module!r}] = {hint!r} is not a declared extra in pyproject.toml (declared: {sorted(extras)})"
         )

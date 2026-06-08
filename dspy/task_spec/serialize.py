@@ -1,5 +1,3 @@
-"""Serialization helpers for TaskSpec instances."""
-
 from typing import Any, get_args, get_origin
 
 from dspy.task_spec.field_spec import _UNSET, FieldSpec, input_field, output_field
@@ -25,11 +23,7 @@ def field_spec_to_dict(field: FieldSpec) -> dict[str, Any]:
 
 def field_spec_from_dict(data: dict[str, Any], *, custom_types: dict[str, type] | None = None) -> FieldSpec:
     type_ = _type_from_str(data["type"], custom_types=custom_types)
-    common = {
-        "desc": data["desc"],
-        "prefix": data["prefix"],
-        "constraints": data.get("constraints"),
-    }
+    common = {"desc": data["desc"], "prefix": data["prefix"], "constraints": data.get("constraints")}
     if data["role"] == "input":
         return input_field(
             data["name"],
@@ -56,7 +50,6 @@ def _type_to_str(type_annotation: Any) -> str:
 def _type_from_str(type_str: str, *, custom_types: dict[str, type] | None = None) -> Any:
     if custom_types and type_str in custom_types:
         return custom_types[type_str]
-
     builtins_map = {
         "builtins.str": str,
         "builtins.int": int,
@@ -73,7 +66,6 @@ def _type_from_str(type_str: str, *, custom_types: dict[str, type] | None = None
     }
     if type_str in builtins_map:
         return builtins_map[type_str]
-
     if "[" in type_str and type_str.endswith("]"):
         origin_str, args_str = type_str.split("[", 1)
         args_str = args_str[:-1]
@@ -81,7 +73,6 @@ def _type_from_str(type_str: str, *, custom_types: dict[str, type] | None = None
         arg_parts = _split_generic_args(args_str)
         args = tuple(_type_from_str(part.strip(), custom_types=custom_types) for part in arg_parts)
         return origin[args]
-
     if type_str.startswith("builtins.") or "." in type_str:
         module_name, _, qualname = type_str.partition(".")
         if module_name == "builtins":
@@ -93,12 +84,10 @@ def _type_from_str(type_str: str, *, custom_types: dict[str, type] | None = None
         for part in qualname.split("."):
             obj = getattr(obj, part)
         return obj
-
     if custom_types:
         for key, value in custom_types.items():
             if _type_to_str(value) == type_str or key == type_str:
                 return value
-
     return str
 
 

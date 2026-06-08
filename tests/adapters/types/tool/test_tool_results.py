@@ -7,13 +7,9 @@ def test_tool_call_results_from_tool_calls_and_values():
         ToolCalls.ToolCall(id="call_1", name="search", args={"query": "hello"}),
         ToolCalls.ToolCall(id="call_2", name="fetch", args={"url": "https://example.com"}),
     ]
-
     results = ToolCallResults.from_tool_calls_and_values(
-        tool_calls,
-        [{"items": [1, 2]}, "failed"],
-        is_errors=[False, True],
+        tool_calls, [{"items": [1, 2]}, "failed"], is_errors=[False, True]
     )
-
     assert results.tool_call_results[0].call_id == "call_1"
     assert results.tool_call_results[0].name == "search"
     assert results.tool_call_results[0].value == {"items": [1, 2]}
@@ -26,16 +22,11 @@ def test_tool_call_results_from_tool_calls_and_values():
 
 def test_tool_call_results_history_serialization_round_trip():
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "hello"})
-    results = ToolCallResults.from_tool_calls_and_values(
-        [tool_call],
-        [{"answer": "world"}],
-    )
+    results = ToolCallResults.from_tool_calls_and_values([tool_call], [{"answer": "world"}])
     tool_calls = ToolCalls(tool_calls=[tool_call], tool_call_results=results)
-
     history = History(messages=[{"tool_calls": tool_calls}])
     dumped = history.model_dump(mode="json")
     restored = History.model_validate(dumped)
-
     assert dumped == {
         "messages": [
             {

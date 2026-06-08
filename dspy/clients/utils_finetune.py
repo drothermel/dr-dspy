@@ -52,11 +52,11 @@ class GRPOGroup(TypedDict):
 
 class GRPOStatus(TypedDict):
     job_id: str
-    status: str | None = None  # ty:ignore[invalid-typed-dict-statement]
+    status: str | None = None
     current_model: str
     checkpoints: dict[str, str]
-    last_checkpoint: str | None = None  # ty:ignore[invalid-typed-dict-statement]
-    pending_batch_ids: list[int] = []  # ty:ignore[invalid-typed-dict-statement]  # noqa: RUF012 dynamic typing/lint migration for scoped ty adoption
+    last_checkpoint: str | None = None
+    pending_batch_ids: list[int] = []
 
 
 def infer_data_format(adapter: "Adapter") -> str:
@@ -79,15 +79,11 @@ def write_lines(file_path, data) -> None:
             f.write(orjson.dumps(item) + b"\n")
 
 
-def save_data(
-    data: list[dict[str, Any]],
-) -> str:
+def save_data(data: list[dict[str, Any]]) -> str:
     from dspy.utils.hasher import Hasher
 
-    # Assign a unique name to the file based on the data hash
     hash = Hasher.hash(data)
     file_name = f"{hash}.jsonl"
-
     finetune_dir = get_finetune_directory()
     file_path = os.path.join(finetune_dir, file_name)
     file_path = os.path.abspath(file_path)
@@ -97,10 +93,7 @@ def save_data(
     return file_path
 
 
-def validate_data_format(
-    data: list[dict[str, Any]],
-    data_format: TrainDataFormat,
-) -> None:
+def validate_data_format(data: list[dict[str, Any]], data_format: TrainDataFormat) -> None:
     find_err_funcs = {
         TrainDataFormat.CHAT: find_data_error_chat,
         TrainDataFormat.COMPLETION: find_data_errors_completion,
@@ -108,11 +101,9 @@ def validate_data_format(
     err = f"Data format {data_format} is not supported."
     assert data_format in find_err_funcs, err
     find_err_func = find_err_funcs[data_format]
-
     if not isinstance(data, list):
         err = f"Data is not a list. Found data type: {type(data)}"
         raise ValueError(err)
-
     data_dict_errors = []
     for ind, data_dict in enumerate(data):
         err = f"Not a dictionary -- found data type: {type(data_dict)}"
@@ -121,47 +112,38 @@ def validate_data_format(
         if err:
             err_dict = {"index": ind, "error": err}
             data_dict_errors.append(err_dict)
-
     if data_dict_errors:
         finetune_dir = get_finetune_directory()
         log_path = os.path.join(finetune_dir, "data_format_errors.log")
         log_path = os.path.abspath(log_path)
         write_lines(file_path=log_path, data=data_dict_errors)
-
         err = f"Data format errors found.  For more details, see the log file: {log_path}"
         raise ValueError(err)
 
 
 def find_data_errors_completion(data_dict: dict[str, str]) -> str | None:
     keys = ["prompt", "completion"]
-
     assert isinstance(data_dict, dict)
     expected_keys = sorted(keys)
     found_keys = sorted(data_dict.keys())
     if set(expected_keys) != set(found_keys):
         return f"Expected Keys: {expected_keys}; Found Keys: {found_keys}"
-
     for key in keys:
         if not isinstance(data_dict[key], str):
             return f"Expected `{key}` to be of type `str`. Found: {type(data_dict[key])}"
     return None
 
 
-# Following functions are modified from the OpenAI cookbook:
-# https://cookbook.openai.com/examples/chat_finetuning_data_prep
 def find_data_error_chat(messages: dict[str, Any]) -> str | None:
     assert isinstance(messages, dict)
-
     expected_keys = ["messages"]
     found_keys = sorted(messages.keys())
     if set(expected_keys) != set(found_keys):
         return f"Expected Keys: {expected_keys}; Found Keys: {found_keys}"
-
     if not isinstance(messages["messages"], list):
         return f"The value of the `messages` key should be a list instance. Found: {type(messages['messages'])}"
-
     for ind, message in enumerate(messages["messages"]):
-        err = find_data_error_chat_message(message)  # ty:ignore[invalid-argument-type]
+        err = find_data_error_chat_message(message)
         if err:
             return f"Error in message at index {ind}: {err}"
     return None
@@ -169,17 +151,14 @@ def find_data_error_chat(messages: dict[str, Any]) -> str | None:
 
 def find_data_error_chat_message(message: dict[str, Any]) -> str | None:
     assert isinstance(message, dict)
-
     message_keys = sorted(["role", "content"])
     found_keys = sorted(message.keys())
     if set(message_keys) != set(found_keys):
         return f"Expected Keys: {message_keys}; Found Keys: {found_keys}"
-
     expected_roles = sorted(["assistant", "system", "user"])
     found_role = message["role"]
     if found_role not in expected_roles:
         return f"Expected Roles: {expected_roles}; Found Role: {found_role}"
-
     if not isinstance(message["content"], str):
         return f"Expected Content Type: `str`; Found Content Type: {type(message['content'])}"
     return None

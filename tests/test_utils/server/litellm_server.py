@@ -31,10 +31,10 @@ class DSPyTestModel(CustomLLM):
             "tool_use": None,
             "usage": {"completion_tokens": 0, "prompt_tokens": 0, "total_tokens": 0},
         }
-        return generic_streaming_chunk  # type: ignore
+        return generic_streaming_chunk
 
     @override
-    async def astreaming(self, *args: object, **kwargs: object) -> AsyncIterator[GenericStreamingChunk]:  # ty:ignore[invalid-method-override]
+    async def astreaming(self, *args: object, **kwargs: object) -> AsyncIterator[GenericStreamingChunk]:
         generic_streaming_chunk: GenericStreamingChunk = {
             "finish_reason": "stop",
             "index": 0,
@@ -57,9 +57,6 @@ def _get_mock_llm_response(request_kwargs):
 
 
 def _throw_exception_based_on_content_if_applicable(request_kwargs):
-    """
-    Throws an exception, for testing purposes, based on the content of the request message.
-    """
     model = request_kwargs["model"]
     content = request_kwargs["messages"][0]["content"]
     if "429" in content:
@@ -79,14 +76,8 @@ def _append_request_to_log_file(completion_kwargs):
             "Server logs file path is not defined! Please set the path using the"
             + f" {LITELLM_TEST_SERVER_LOG_FILE_PATH_ENV_VAR} environment variable."
         )
-
     with open(log_file_path, "a") as f:
-        log_blob = (
-            {
-                "model": completion_kwargs["model"],
-                "messages": completion_kwargs["messages"],
-            },
-        )
+        log_blob = ({"model": completion_kwargs["model"], "messages": completion_kwargs["messages"]},)
         json.dump(log_blob, f)
         f.write("\n")
 

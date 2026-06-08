@@ -21,8 +21,6 @@ def _test_settings_config() -> dict:
 
 @pytest.fixture(autouse=True)
 def clear_settings() -> Iterator[None]:
-    """Ensure each test gets fresh DSPy settings with transparency disabled."""
-
     import dspy.dsp.utils.settings as settings_module
 
     settings.configure(**_test_settings_config())
@@ -38,15 +36,9 @@ def anyio_backend():
     return "asyncio"
 
 
-# Taken from: https://gist.github.com/justinmklam/b2aca28cb3a6896678e2e2927c6b6a38
 def pytest_addoption(parser):
     for flag in SKIP_DEFAULT_FLAGS:
-        parser.addoption(
-            f"--{flag}",
-            action="store_true",
-            default=False,
-            help=f"run {flag} tests",
-        )
+        parser.addoption(f"--{flag}", action="store_true", default=False, help=f"run {flag} tests")
 
 
 def pytest_configure(config):
@@ -58,7 +50,6 @@ def pytest_collection_modifyitems(config, items):
     for flag in SKIP_DEFAULT_FLAGS:
         if config.getoption(f"--{flag}"):
             continue
-
         skip_mark = pytest.mark.skip(reason=f"need --{flag} option to run")
         for item in items:
             if flag in item.keywords:
@@ -69,5 +60,5 @@ def pytest_collection_modifyitems(config, items):
 def lm_for_test():
     model = os.environ.get("LM_FOR_TEST", None)
     if model is None:
-        pytest.skip("LM_FOR_TEST is not set in the environment variables")  # ty: ignore[too-many-positional-arguments]
+        pytest.skip("LM_FOR_TEST is not set in the environment variables")
     return model

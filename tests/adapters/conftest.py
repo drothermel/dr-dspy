@@ -11,16 +11,13 @@ from dspy.utils.dummies import DummyLM
 try:
     from litellm.utils import Choices, Message, ModelResponse
 except ImportError:
-    Choices = Message = ModelResponse = None  # ty:ignore[invalid-assignment]
+    Choices = Message = ModelResponse = None
 
 
 def default_model_response(content: str = "", *, model: str = "openai/gpt-4o-mini"):
     if ModelResponse is None:
         raise RuntimeError("litellm is required for adapter LM mock helpers")
-    return ModelResponse(
-        choices=[Choices(message=Message(content=content))],
-        model=model,
-    )
+    return ModelResponse(choices=[Choices(message=Message(content=content))], model=model)
 
 
 def litellm_request_messages(call_args) -> list[dict]:
@@ -28,16 +25,10 @@ def litellm_request_messages(call_args) -> list[dict]:
 
 
 class StopAdapterCallCapture(BaseException):
-    """Stop adapter execution after capturing the LM call.
-
-    The exact-format tests assert the adapter-to-LM boundary: the messages and
-    keyword arguments passed to the LM. Raising here avoids needing to craft a
-    parseable LM response for every signature under test.
-    """
+    pass
 
 
 def captured_lm_kwargs(request: LMRequest) -> dict:
-    """Return the OpenAI-shaped kwargs the typed LM boundary would send."""
     data = to_openai_chat_request(request)
     data.pop("model", None)
     data.pop("messages", None)
@@ -47,10 +38,7 @@ def captured_lm_kwargs(request: LMRequest) -> dict:
 class CapturingLM(BaseLM):
     def __init__(self, source_lm=None):
         source_lm = source_lm or DummyLM([{}])
-        super().__init__(
-            model=source_lm.model,
-            model_type=source_lm.model_type,
-        )
+        super().__init__(model=source_lm.model, model_type=source_lm.model_type)
         self.source_lm = source_lm
         self.calls = []
         for key in ("reasoning", "reasoning_effort"):
@@ -91,38 +79,23 @@ async def _format_messages_and_lm_kwargs(*, adapter, task_spec, demos, inputs, c
     capturing_lm = CapturingLM(lm)
     with contextlib.suppress(StopAdapterCallCapture):
         await adapter.acall(
-            lm=capturing_lm,
-            config=coerce_lm_config(config),
-            task_spec=task_spec,
-            demos=demos,
-            inputs=inputs,
+            lm=capturing_lm, config=coerce_lm_config(config), task_spec=task_spec, demos=demos, inputs=inputs
         )
-
     assert len(capturing_lm.calls) == 1
     call = capturing_lm.calls[0]
     request = call["request"]
-    return (
-        [message_to_openai_chat(message) for message in request.messages],
-        captured_lm_kwargs(request),
-    )
+    return ([message_to_openai_chat(message) for message in request.messages], captured_lm_kwargs(request))
 
 
 def format_messages_and_lm_kwargs(*, adapter, task_spec, demos, inputs, config=None, lm=None, lm_kwargs=None):
     return asyncio.run(
         _format_messages_and_lm_kwargs(
-            adapter=adapter,
-            task_spec=task_spec,
-            demos=demos,
-            inputs=inputs,
-            config=config,
-            lm=lm,
-            lm_kwargs=lm_kwargs,
+            adapter=adapter, task_spec=task_spec, demos=demos, inputs=inputs, config=config, lm=lm, lm_kwargs=lm_kwargs
         )
     )
 
 
 def adapter_format_as_openai(*, adapter, task_spec, demos, inputs):
-    """Return OpenAI-chat-shaped messages from adapter.format()."""
     return [
         message_to_openai_chat(message) for message in adapter.format(task_spec=task_spec, demos=demos, inputs=inputs)
     ]

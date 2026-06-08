@@ -67,15 +67,9 @@ def test_predict_lm_call_appends_jsonl(tmp_path, monkeypatch):
     monkeypatch.setenv("DSPY_LOG_DIR", str(tmp_path))
     json_adapter = JSONAdapter()
     lm = DummyLM([{"answer": "42"}], adapter=json_adapter)
-    settings.configure(
-        lm=lm,
-        adapter=json_adapter,
-        transparency="strict",
-        run_log_enabled=True,
-    )
+    settings.configure(lm=lm, adapter=json_adapter, transparency="strict", run_log_enabled=True)
     predict = Predict(SampleTaskSpec())
     asyncio.run(predict(question="2+2"))
-
     calls_files = list(Path(tmp_path).rglob("calls.jsonl"))
     assert len(calls_files) == 1
     record = json.loads(calls_files[0].read_text(encoding="utf-8").strip())

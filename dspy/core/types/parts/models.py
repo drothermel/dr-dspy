@@ -1,5 +1,3 @@
-"""Normalized LM content part models."""
-
 from __future__ import annotations
 
 from typing import Annotated, Any, Literal
@@ -9,17 +7,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class LMBasePart(BaseModel):
-    """A single content item in an LM message or output."""
-
     type: str
     metadata: dict[str, Any] = Field(default_factory=dict)
-
     model_config = ConfigDict(extra="forbid")
 
 
 class LMSourcePart(LMBasePart):
-    """Content from exactly one provider-addressable source."""
-
     media_type: str
     data: str | None = None
     url: str | None = None
@@ -33,42 +26,27 @@ class LMSourcePart(LMBasePart):
 
 
 class LMTextPart(LMBasePart):
-    """Text content."""
-
     type: Literal["text"] = "text"
     text: str
 
 
 class LMImagePart(LMSourcePart):
-    """Image content from data, a URL, a file ID, or a local path."""
-
     type: Literal["image"] = "image"
     media_type: str = "image/png"
     detail: Literal["low", "high", "auto"] | None = None
 
 
 class LMAudioPart(LMSourcePart):
-    """Audio content from data, a URL, a file ID, or a local path."""
-
     type: Literal["audio"] = "audio"
     media_type: str = "audio/wav"
 
 
 class LMVideoPart(LMSourcePart):
-    """Video content from data, a URL, a file ID, or a local path."""
-
     type: Literal["video"] = "video"
     media_type: str = "video/mp4"
 
 
 class LMDocumentPart(LMBasePart):
-    """Semantic source/document content, optionally citation-enabled.
-
-    Documents are source material: text, PDFs, reports, contracts, or other
-    provider-addressable evidence that benefits from title/context/citation
-    semantics. Use `LMBinaryPart` for opaque attachments or arbitrary bytes.
-    """
-
     type: Literal["document"] = "document"
     media_type: str = "application/pdf"
     data: str | None = None
@@ -93,39 +71,12 @@ class LMDocumentPart(LMBasePart):
 
 
 class LMBinaryPart(LMSourcePart):
-    """Opaque binary content from data, a URL, a file ID, or a local path."""
-
     type: Literal["binary"] = "binary"
     media_type: str = "application/octet-stream"
     filename: str | None = None
 
 
 class LMToolCallPart(LMBasePart):
-    """A model request to call a tool.
-
-    Use `ToolCall(...)` as a shorter alias when constructing
-    assistant messages by hand.
-
-    Args:
-        id: Provider call ID, when the backend uses one.
-        name: Name of the tool to call.
-        args: JSON-like arguments for the tool.
-        provider_data: Raw provider fields to keep with the tool call.
-
-    Examples:
-        ```python
-        from dspy.core.types import Assistant, ToolCall
-
-        assistant = Assistant(
-            ToolCall(
-                id="call_1",
-                name="search",
-                args={"query": "DSPy"},
-            )
-        )
-        ```
-    """
-
     type: Literal["tool_call"] = "tool_call"
     id: str | None = None
     name: str
@@ -134,8 +85,6 @@ class LMToolCallPart(LMBasePart):
 
 
 class LMToolResultPart(LMBasePart):
-    """A tool execution result sent back to a model."""
-
     type: Literal["tool_result"] = "tool_result"
     call_id: str | None = None
     name: str | None = None
@@ -159,16 +108,12 @@ class LMToolResultPart(LMBasePart):
 
 
 class LMThinkingPart(LMBasePart):
-    """Reasoning or thinking content returned by a model."""
-
     type: Literal["thinking"] = "thinking"
     text: str
     redacted: bool = False
 
 
 class LMCitationPart(LMBasePart):
-    """A source citation returned by a model."""
-
     type: Literal["citation"] = "citation"
     text: str | None = None
     title: str | None = None
@@ -177,21 +122,17 @@ class LMCitationPart(LMBasePart):
 
     @model_validator(mode="after")
     def validate_has_content(self) -> LMCitationPart:
-        if self.text is None and self.title is None and self.url is None:
+        if self.text is None and self.title is None and (self.url is None):
             raise ValueError("LMCitationPart requires at least one of text, title, or url.")
         return self
 
 
 class LMRefusalPart(LMBasePart):
-    """A model refusal."""
-
     type: Literal["refusal"] = "refusal"
     text: str
 
 
 class LMOpaquePart(LMBasePart):
-    """Provider-native content block preserved verbatim for round-trip."""
-
     type: Literal["opaque"] = "opaque"
     block: dict[str, Any]
 
@@ -221,7 +162,7 @@ def _validate_one_source(part: Any) -> None:
     if len(sources) != 1:
         raise ValueError(f"{class_name} requires exactly one of data, url, file_id, or path.")
     name, value = next(iter(sources.items()))
-    if isinstance(value, str) and not value:
+    if isinstance(value, str) and (not value):
         raise ValueError(f"{class_name}.{name} must be non-empty.")
 
 

@@ -1,7 +1,3 @@
-"""
-Shared fixtures for RLM tests.
-"""
-
 from contextlib import contextmanager
 
 from typing_extensions import override
@@ -24,11 +20,6 @@ class FailingSubLM(BaseLM):
 
 
 def make_mock_predictor(responses: list[dict]):
-    """Factory for mock predictors with scripted responses.
-
-    Args:
-        responses: List of dicts with keys like 'reasoning', 'code'.
-    """
 
     class MockPredictor:
         def __init__(self):
@@ -49,7 +40,6 @@ def make_mock_predictor(responses: list[dict]):
 
 @contextmanager
 def dummy_lm_context(responses: list[dict]):
-    """Context manager for DummyLM setup."""
     from dspy.utils.dummies import DummyLM
 
     lm = DummyLM(responses)
@@ -57,25 +47,19 @@ def dummy_lm_context(responses: list[dict]):
         yield lm
 
 
-# Common test tools
 def echo_tool(text: str = "") -> str:
-    """Echo the input text."""
     return f"Echo: {text}"
 
 
 def add_tool(a: int = 0, b: int = 0) -> str:
-    """Add two numbers."""
     return str(a + b)
 
 
 def multiply_tool(a: int = 0, b: int = 0) -> str:
-    """Multiply two numbers."""
     return str(a * b)
 
 
 class _StubSerializable(SandboxSerializable):
-    """Stub serializable used to exercise RLM integration."""
-
     def __init__(self, data: str = "stub_data"):
         self.data = data
 
@@ -97,8 +81,6 @@ class _StubSerializable(SandboxSerializable):
 
 
 class _BinarySerializable(SandboxSerializable):
-    """Serializable that emits non-UTF8 bytes to exercise binary payload path."""
-
     @override
     def sandbox_setup(self) -> str:
         return ""

@@ -23,16 +23,11 @@ def test_eval_candidate_program_full_trainset():
     candidate_program = DummyModule()
     evaluate = AsyncMock(return_value=0)
     batch_size = 10
-
     result = asyncio.run(
         eval_candidate_program(
-            batch_size=batch_size,
-            trainset=trainset,
-            candidate_program=candidate_program,
-            evaluate=evaluate,
+            batch_size=batch_size, trainset=trainset, candidate_program=candidate_program, evaluate=evaluate
         )
     )
-
     evaluate.assert_awaited_once()
     assert evaluate.await_args is not None
     _, called_kwargs = evaluate.await_args
@@ -46,16 +41,11 @@ def test_eval_candidate_program_minibatch():
     candidate_program = DummyModule()
     evaluate = AsyncMock(return_value=0)
     batch_size = 3
-
     result = asyncio.run(
         eval_candidate_program(
-            batch_size=batch_size,
-            trainset=trainset,
-            candidate_program=candidate_program,
-            evaluate=evaluate,
+            batch_size=batch_size, trainset=trainset, candidate_program=candidate_program, evaluate=evaluate
         )
     )
-
     evaluate.assert_awaited_once()
     assert evaluate.await_args is not None
     _, called_kwargs = evaluate.await_args
@@ -69,55 +59,38 @@ def test_eval_candidate_program_failure():
     candidate_program = DummyModule()
     evaluate = AsyncMock(side_effect=ValueError("Error"))
     batch_size = 3
-
     result = asyncio.run(
         eval_candidate_program(
-            batch_size=batch_size,
-            trainset=trainset,
-            candidate_program=candidate_program,
-            evaluate=evaluate,
+            batch_size=batch_size, trainset=trainset, candidate_program=candidate_program, evaluate=evaluate
         )
     )
-
     assert result.score == 0.0
 
 
 def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled():
-    """Verify that metric_threshold is passed to BootstrapFewShot for the unshuffled (seed=-1) case.
-
-    Regression test for https://github.com/stanfordnlp/dspy/issues/9308
-    """
     student = DummyModule()
-    student.predictor = Predict(ts("input -> output"))  # ty:ignore[unresolved-attribute]
+    student.predictor = Predict(ts("input -> output"))
     trainset = [Example(input="test", output="test").with_inputs("input")]
-
     lm = DummyLM([{"output": "test"}])
     settings.configure(lm=lm)
-
     with patch("dspy.teleprompt.utils.BootstrapFewShot") as MockBootstrap:
         mock_instance = Mock()
         mock_instance.compile = AsyncMock(return_value=student)
         MockBootstrap.return_value = mock_instance
-
         asyncio.run(
             create_n_fewshot_demo_sets(
                 student=student,
-                num_candidate_sets=4,  # -3, -2, -1, 0 → hits seed=-1
+                num_candidate_sets=4,
                 trainset=trainset,
                 max_labeled_demos=1,
                 max_bootstrapped_demos=1,
-                metric=lambda ex, pred, trace=None: 1.0,  # noqa: ARG005
+                metric=lambda ex, pred, trace=None: 1.0,
                 teacher_settings={},
                 metric_threshold=0.9,
             )
         )
-
-        # Find the call where seed == -1 (unshuffled few-shot)
-        # BootstrapFewShot should be called at least twice: once for seed=-1, once for seed>=0
         calls = MockBootstrap.call_args_list
         assert len(calls) >= 1, "BootstrapFewShot was never called"
-
-        # Every BootstrapFewShot call should include metric_threshold
         for call in calls:
             _, kwargs = call
             assert "metric_threshold" in kwargs, f"metric_threshold missing from BootstrapFewShot call: {kwargs}"

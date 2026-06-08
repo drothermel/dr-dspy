@@ -9,10 +9,7 @@ from dspy.teleprompt.utils import optimizer_lm_context
 
 class ObservationSummarizerTaskSpec(TaskSpec):
     name: str = "framework.propose.observation_summarizer"
-    instructions: str = (
-        "Given a series of observations I have made about my dataset, please summarize them into a brief 2-3 sentence "
-        "summary which highlights only the most important details."
-    )
+    instructions: str = "Given a series of observations I have made about my dataset, please summarize them into a brief 2-3 sentence summary which highlights only the most important details."
     inputs: tuple[FieldSpec, ...] = (
         input_field("observations", str, desc="Observations I have made about my dataset"),
     )
@@ -27,31 +24,16 @@ class ObservationSummarizerTaskSpec(TaskSpec):
 
 class DatasetDescriptorTaskSpec(TaskSpec):
     name: str = "framework.propose.dataset_descriptor"
-    instructions: str = (
-        "Given several examples from a dataset please write observations about trends that hold for most or all of "
-        "the samples. Some areas you may consider in your observations: topics, content, syntax, conciseness, etc. "
-        "It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be "
-        "afraid to be creative"
-    )
+    instructions: str = "Given several examples from a dataset please write observations about trends that hold for most or all of the samples. Some areas you may consider in your observations: topics, content, syntax, conciseness, etc. It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative"
     inputs: tuple[FieldSpec, ...] = (input_field("examples", str, desc="Sample data points from the dataset"),)
     outputs: tuple[FieldSpec, ...] = (
-        output_field(
-            "observations",
-            str,
-            desc="Somethings that holds true for most or all of the data you observed",
-        ),
+        output_field("observations", str, desc="Somethings that holds true for most or all of the data you observed"),
     )
 
 
 class DatasetDescriptorWithPriorObservationsTaskSpec(TaskSpec):
     name: str = "framework.propose.dataset_descriptor_with_prior"
-    instructions: str = (
-        "Given several examples from a dataset please write observations about trends that hold for most or all of the "
-        "samples. I will also provide you with a few observations I have already made. Please add your own observations "
-        "or if you feel the observations are comprehensive say 'COMPLETE'. Some areas you may consider in your "
-        "observations: topics, content, syntax, conciceness, etc. It will be useful to make an educated guess as to the "
-        "nature of the task this dataset will enable. Don't be afraid to be creative"
-    )
+    instructions: str = "Given several examples from a dataset please write observations about trends that hold for most or all of the samples. I will also provide you with a few observations I have already made. Please add your own observations or if you feel the observations are comprehensive say 'COMPLETE'. Some areas you may consider in your observations: topics, content, syntax, conciceness, etc. It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative"
     inputs: tuple[FieldSpec, ...] = (
         input_field("examples", str, desc="Sample data points from the dataset"),
         input_field("prior_observations", str, desc="Some prior observations I made about the data"),
@@ -66,8 +48,7 @@ class DatasetDescriptorWithPriorObservationsTaskSpec(TaskSpec):
 
 
 def order_input_keys_in_string(unordered_repr):
-    """Sort input_keys={...} repr fragments for deterministic dataset summaries."""
-    pattern = r"input_keys=\{([^\}]+)\}"
+    pattern = "input_keys=\\{([^\\}]+)\\}"
 
     def reorder_keys(match) -> str:
         keys_str = match.group(1)
@@ -87,10 +68,8 @@ async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model
             examples=order_input_keys_in_string(trainset[0:upper_lim].__repr__())
         )
     observations = observation["observations"]
-
     if log_file:
         log_file.write("PRODUCING DATASET SUMMARY\n")
-
     skips = 0
     try:
         max_calls = 10
@@ -113,13 +92,11 @@ async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model
                     break
                 continue
             observations += output["observations"]
-
             if log_file:
                 log_file.write(f"observations {observations}\n")
     except Exception:
         if verbose:
             pass
-
     if prompt_model:
         with optimizer_lm_context(lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model"):
             summary = await Predict(ObservationSummarizerTaskSpec(), n=1, temperature=1.0)(observations=observations)
@@ -129,8 +106,6 @@ async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model
         pass
     if log_file:
         log_file.write(f"summary: {summary}\n")
-
     if verbose:
         pass
-
     return strip_prefix(summary.summary)

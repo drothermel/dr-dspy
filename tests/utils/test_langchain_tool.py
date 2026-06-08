@@ -5,8 +5,7 @@ from typing import Any, cast
 import pytest
 
 if importlib.util.find_spec("langchain_core") is None:
-    pytest.skip("langchain_core is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
-
+    pytest.skip("langchain_core is not installed", allow_module_level=True)
 from pydantic import BaseModel
 
 from dspy.utils.langchain_tool import convert_langchain_tool
@@ -19,7 +18,6 @@ async def test_convert_custom_simple_tool():
 
     @tool
     def add(a: int, b: int) -> int:
-        """Add two numbers."""
         return a + b
 
     converted_tool = convert_langchain_tool(add)
@@ -45,7 +43,6 @@ async def test_convert_custom_tool_with_custom_class():
 
     @tool
     def get_age(profile: Profile) -> int:
-        """Get the age of the profile."""
         return profile.age
 
     converted_tool = convert_langchain_tool(get_age)

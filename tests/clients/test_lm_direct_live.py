@@ -1,13 +1,3 @@
-"""Live coverage for the experimental direct LM call interface.
-
-These tests exercise provider behavior that cannot be verified with the mocked unit tests in `test_lm.py`: typed
-message turns, tool-call transcripts, and reusing an `LMResponse` as an assistant turn across chat and Responses API
-providers.
-
-They are intentionally flat rather than parametrized so each test can be run individually from an editor or notebook-like
-workflow. Each test skips unless the required provider credential is available.
-"""
-
 import os
 from typing import Any
 
@@ -20,7 +10,7 @@ from dspy.core.types import Assistant, LMRequest, LMResponse, System, ToolCall, 
 def _require_env(*keys: str) -> None:
     missing = [key for key in keys if not os.getenv(key)]
     if missing:
-        pytest.skip(f"Missing live LM credentials: {', '.join(missing)}")  # ty: ignore[too-many-positional-arguments]
+        pytest.skip(f"Missing live LM credentials: {', '.join(missing)}")
 
 
 def _text(response: LMResponse) -> str:
@@ -36,13 +26,7 @@ def _request(lm: LM, *items: object, prompt: str | None = None, **kwargs: Any) -
 @pytest.mark.llm_call
 def test_live_openai_chat_direct_system_user_assistant_multiturn():
     _require_env("OPENAI_API_KEY")
-
-    lm = LM(
-        os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-5.5"),
-        model_type="chat",
-        max_completion_tokens=64,
-    )
-
+    lm = LM(os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-5.5"), model_type="chat", max_completion_tokens=64)
     response = lm(
         _request(
             lm,
@@ -52,7 +36,6 @@ def test_live_openai_chat_direct_system_user_assistant_multiturn():
             User("Now reply with exactly: beta"),
         )
     )
-
     assert "beta" in _text(response).lower()
     assert response.output.finish_reason is not None
 
@@ -60,13 +43,7 @@ def test_live_openai_chat_direct_system_user_assistant_multiturn():
 @pytest.mark.llm_call
 def test_live_openai_chat_direct_tool_call_transcript():
     _require_env("OPENAI_API_KEY")
-
-    lm = LM(
-        os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-4o-mini"),
-        model_type="chat",
-        max_tokens=64,
-    )
-
+    lm = LM(os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-4o-mini"), model_type="chat", max_tokens=64)
     response = lm(
         _request(
             lm,
@@ -77,7 +54,6 @@ def test_live_openai_chat_direct_tool_call_transcript():
             User("Answer with the temperature string from the tool result."),
         )
     )
-
     text = _text(response).lower()
     assert "22" in text
     assert "c" in text
@@ -86,23 +62,11 @@ def test_live_openai_chat_direct_tool_call_transcript():
 @pytest.mark.llm_call
 def test_live_openai_chat_direct_reuse_lm_response_as_assistant_turn():
     _require_env("OPENAI_API_KEY")
-
-    lm = LM(
-        os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-4o-mini"),
-        model_type="chat",
-        max_tokens=64,
-    )
-
+    lm = LM(os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-4o-mini"), model_type="chat", max_tokens=64)
     first = lm(_request(lm, User("Reply with exactly: DSPy")))
     follow_up = lm(
-        _request(
-            lm,
-            User("Reply with exactly: DSPy"),
-            first,
-            User("Repeat the previous assistant answer exactly."),
-        )
+        _request(lm, User("Reply with exactly: DSPy"), first, User("Repeat the previous assistant answer exactly."))
     )
-
     assert "dspy" in _text(first).lower()
     assert "dspy" in _text(follow_up).lower()
 
@@ -110,14 +74,12 @@ def test_live_openai_chat_direct_reuse_lm_response_as_assistant_turn():
 @pytest.mark.llm_call
 def test_live_openai_responses_direct_system_user_assistant_multiturn():
     _require_env("OPENAI_API_KEY")
-
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_OPENAI_RESPONSES", "openai/gpt-4.1-mini"),
         model_type="responses",
         temperature=1.0,
         max_tokens=16000,
     )
-
     response = lm(
         _request(
             lm,
@@ -127,21 +89,18 @@ def test_live_openai_responses_direct_system_user_assistant_multiturn():
             User("Now reply with exactly: beta"),
         )
     )
-
     assert "beta" in _text(response).lower()
 
 
 @pytest.mark.llm_call
 def test_live_openai_responses_direct_tool_call_transcript():
     _require_env("OPENAI_API_KEY")
-
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_OPENAI_RESPONSES", "openai/gpt-4.1-mini"),
         model_type="responses",
         temperature=1.0,
         max_tokens=16000,
     )
-
     response = lm(
         _request(
             lm,
@@ -152,7 +111,6 @@ def test_live_openai_responses_direct_tool_call_transcript():
             User("Answer with the temperature string from the tool result."),
         )
     )
-
     text = _text(response).lower()
     assert "22" in text
     assert "c" in text
@@ -161,24 +119,16 @@ def test_live_openai_responses_direct_tool_call_transcript():
 @pytest.mark.llm_call
 def test_live_openai_responses_direct_reuse_lm_response_as_assistant_turn():
     _require_env("OPENAI_API_KEY")
-
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_OPENAI_RESPONSES", "openai/gpt-4.1-mini"),
         model_type="responses",
         temperature=1.0,
         max_tokens=16000,
     )
-
     first = lm(_request(lm, User("Reply with exactly: DSPy")))
     follow_up = lm(
-        _request(
-            lm,
-            User("Reply with exactly: DSPy"),
-            first,
-            User("Repeat the previous assistant answer exactly."),
-        )
+        _request(lm, User("Reply with exactly: DSPy"), first, User("Repeat the previous assistant answer exactly."))
     )
-
     assert "dspy" in _text(first).lower()
     assert "dspy" in _text(follow_up).lower()
 
@@ -186,13 +136,9 @@ def test_live_openai_responses_direct_reuse_lm_response_as_assistant_turn():
 @pytest.mark.llm_call
 def test_live_anthropic_chat_direct_system_user_assistant_multiturn():
     _require_env("ANTHROPIC_API_KEY")
-
     lm = LM(
-        os.getenv("LM_FOR_TEST_DIRECT_ANTHROPIC", "anthropic/claude-3-5-haiku-latest"),
-        model_type="chat",
-        max_tokens=64,
+        os.getenv("LM_FOR_TEST_DIRECT_ANTHROPIC", "anthropic/claude-3-5-haiku-latest"), model_type="chat", max_tokens=64
     )
-
     response = lm(
         _request(
             lm,
@@ -202,20 +148,15 @@ def test_live_anthropic_chat_direct_system_user_assistant_multiturn():
             User("Now reply with exactly: beta"),
         )
     )
-
     assert "beta" in _text(response).lower()
 
 
 @pytest.mark.llm_call
 def test_live_anthropic_chat_direct_tool_call_transcript():
     _require_env("ANTHROPIC_API_KEY")
-
     lm = LM(
-        os.getenv("LM_FOR_TEST_DIRECT_ANTHROPIC", "anthropic/claude-3-5-haiku-latest"),
-        model_type="chat",
-        max_tokens=64,
+        os.getenv("LM_FOR_TEST_DIRECT_ANTHROPIC", "anthropic/claude-3-5-haiku-latest"), model_type="chat", max_tokens=64
     )
-
     response = lm(
         _request(
             lm,
@@ -226,7 +167,6 @@ def test_live_anthropic_chat_direct_tool_call_transcript():
             User("Answer with the temperature string from the tool result."),
         )
     )
-
     text = _text(response).lower()
     assert "22" in text
     assert "c" in text
@@ -235,23 +175,13 @@ def test_live_anthropic_chat_direct_tool_call_transcript():
 @pytest.mark.llm_call
 def test_live_anthropic_chat_direct_reuse_lm_response_as_assistant_turn():
     _require_env("ANTHROPIC_API_KEY")
-
     lm = LM(
-        os.getenv("LM_FOR_TEST_DIRECT_ANTHROPIC", "anthropic/claude-3-5-haiku-latest"),
-        model_type="chat",
-        max_tokens=64,
+        os.getenv("LM_FOR_TEST_DIRECT_ANTHROPIC", "anthropic/claude-3-5-haiku-latest"), model_type="chat", max_tokens=64
     )
-
     first = lm(_request(lm, User("Reply with exactly: DSPy")))
     follow_up = lm(
-        _request(
-            lm,
-            User("Reply with exactly: DSPy"),
-            first,
-            User("Repeat the previous assistant answer exactly."),
-        )
+        _request(lm, User("Reply with exactly: DSPy"), first, User("Repeat the previous assistant answer exactly."))
     )
-
     assert "dspy" in _text(first).lower()
     assert "dspy" in _text(follow_up).lower()
 
@@ -259,13 +189,7 @@ def test_live_anthropic_chat_direct_reuse_lm_response_as_assistant_turn():
 @pytest.mark.llm_call
 def test_live_gemini_chat_direct_system_user_assistant_multiturn():
     _require_env("GEMINI_API_KEY")
-
-    lm = LM(
-        os.getenv("LM_FOR_TEST_DIRECT_GEMINI", "gemini/gemini-2.0-flash"),
-        model_type="chat",
-        max_tokens=64,
-    )
-
+    lm = LM(os.getenv("LM_FOR_TEST_DIRECT_GEMINI", "gemini/gemini-2.0-flash"), model_type="chat", max_tokens=64)
     response = lm(
         _request(
             lm,
@@ -275,20 +199,13 @@ def test_live_gemini_chat_direct_system_user_assistant_multiturn():
             User("Now reply with exactly: beta"),
         )
     )
-
     assert "beta" in _text(response).lower()
 
 
 @pytest.mark.llm_call
 def test_live_gemini_chat_direct_tool_call_transcript():
     _require_env("GEMINI_API_KEY")
-
-    lm = LM(
-        os.getenv("LM_FOR_TEST_DIRECT_GEMINI", "gemini/gemini-2.0-flash"),
-        model_type="chat",
-        max_tokens=64,
-    )
-
+    lm = LM(os.getenv("LM_FOR_TEST_DIRECT_GEMINI", "gemini/gemini-2.0-flash"), model_type="chat", max_tokens=64)
     response = lm(
         _request(
             lm,
@@ -299,7 +216,6 @@ def test_live_gemini_chat_direct_tool_call_transcript():
             User("Answer with the temperature string from the tool result."),
         )
     )
-
     text = _text(response).lower()
     assert "22" in text
     assert "c" in text
@@ -308,22 +224,10 @@ def test_live_gemini_chat_direct_tool_call_transcript():
 @pytest.mark.llm_call
 def test_live_gemini_chat_direct_reuse_lm_response_as_assistant_turn():
     _require_env("GEMINI_API_KEY")
-
-    lm = LM(
-        os.getenv("LM_FOR_TEST_DIRECT_GEMINI", "gemini/gemini-2.0-flash"),
-        model_type="chat",
-        max_tokens=64,
-    )
-
+    lm = LM(os.getenv("LM_FOR_TEST_DIRECT_GEMINI", "gemini/gemini-2.0-flash"), model_type="chat", max_tokens=64)
     first = lm(_request(lm, User("Reply with exactly: DSPy")))
     follow_up = lm(
-        _request(
-            lm,
-            User("Reply with exactly: DSPy"),
-            first,
-            User("Repeat the previous assistant answer exactly."),
-        )
+        _request(lm, User("Reply with exactly: DSPy"), first, User("Repeat the previous assistant answer exactly."))
     )
-
     assert "dspy" in _text(first).lower()
     assert "dspy" in _text(follow_up).lower()

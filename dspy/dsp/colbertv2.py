@@ -5,52 +5,33 @@ import requests
 
 from dspy.dsp.utils.utils import dotdict
 
-# TODO: Support resolving hosted ColBERT index names to service URLs instead of requiring callers to pass url/port.
-
 
 class ColBERTv2:
-    """Wrapper for the ColBERTv2 Retrieval."""
-
-    def __init__(
-        self,
-        url: str = "http://0.0.0.0",
-        port: str | int | None = None,
-        post_requests: bool = False,
-    ) -> None:
+    def __init__(self, url: str = "http://0.0.0.0", port: str | int | None = None, post_requests: bool = False) -> None:
         self.post_requests = post_requests
         self.url = f"{url}:{port}" if port else url
 
-    def __call__(
-        self,
-        query: str,
-        k: int = 10,
-        simplify: bool = False,
-    ) -> list[str] | list[dotdict]:
+    def __call__(self, query: str, k: int = 10, simplify: bool = False) -> list[str] | list[dotdict]:
         if self.post_requests:
             topk: list[dict[str, Any]] = colbertv2_post_request(url=self.url, query=query, k=k)
         else:
             topk: list[dict[str, Any]] = colbertv2_get_request(url=self.url, query=query, k=k)
-
         if simplify:
             return [psg["long_text"] for psg in topk]
-
         return [dotdict(psg) for psg in topk]
 
 
 def colbertv2_get_request(url: str, query: str, k: int):
     assert k <= 100, "Only k <= 100 is supported for the hosted ColBERTv2 server at the moment."
-
     payload = {"query": query, "k": k}
     res = requests.get(url, params=payload, timeout=10)
     res.raise_for_status()
-
     res_json = res.json()
     if res_json.get("error"):
         error_message = res_json.get("message", "Unknown error")
         raise ValueError(f"ColBERTv2 server returned an error: {error_message}")
     if "topk" not in res_json:
         raise ValueError(f"ColBERTv2 server returned an unexpected response: {res_json}")
-
     topk = res_json["topk"][:k]
     topk = [{**d, "long_text": d["text"]} for d in topk]
     return topk[:k]
@@ -61,44 +42,31 @@ def colbertv2_post_request(url: str, query: str, k: int):
     payload = {"query": query, "k": k}
     res = requests.post(url, json=payload, headers=headers, timeout=10)
     res.raise_for_status()
-
     res_json = res.json()
     if res_json.get("error"):
         error_message = res_json.get("message", "Unknown error")
         raise ValueError(f"ColBERTv2 server returned an error: {error_message}")
     if "topk" not in res_json:
         raise ValueError(f"ColBERTv2 server returned an unexpected response: {res_json}")
-
     return res_json["topk"][:k]
 
 
 class ColBERTv2RetrieverLocal:
     def __init__(self, passages: list[str], colbert_config: Any = None, load_only: bool = False) -> None:
-        """Colbertv2 retriever module
-
-        Args:
-            passages (list[str]): list of passages
-            colbert_config (ColBERTConfig, optional): colbert config for building and searching. Defaults to None.
-            load_only (bool, optional): whether to load the index or build and then load. Defaults to False.
-        """
         assert colbert_config is not None, (
             "Please pass a valid colbert_config, which you can import from colbert.infra.config import ColBERTConfig and modify it"
         )
         self.colbert_config = colbert_config
-
         assert self.colbert_config.checkpoint is not None, (
             "Please pass a valid checkpoint like colbert-ir/colbertv2.0, which you can modify in the ColBERTConfig with attribute name checkpoint"
         )
         self.passages = passages
-
         assert self.colbert_config.index_name is not None, (
             "Please pass a valid index_name, which you can modify in the ColBERTConfig with attribute name index_name"
         )
         self.passages = passages
-
         if not load_only:
             self.build_index()
-
         self.searcher = self.get_index()
 
     def build_index(self) -> None:
@@ -107,7 +75,6 @@ class ColBERTv2RetrieverLocal:
         infra = importlib.import_module("colbert.infra")
         Run = infra.Run
         RunConfig = infra.RunConfig
-
         with Run().context(RunConfig(nranks=self.colbert_config.nranks, experiment=self.colbert_config.experiment)):
             indexer = Indexer(checkpoint=self.colbert_config.checkpoint, config=self.colbert_config)
             indexer.index(name=self.colbert_config.index_name, collection=self.passages, overwrite=True)
@@ -118,7 +85,6 @@ class ColBERTv2RetrieverLocal:
         infra = importlib.import_module("colbert.infra")
         Run = infra.Run
         RunConfig = infra.RunConfig
-
         with Run().context(RunConfig(experiment=self.colbert_config.experiment)):
             return Searcher(index=self.colbert_config.index_name, collection=self.passages)
 
@@ -127,7 +93,6 @@ class ColBERTv2RetrieverLocal:
 
     def forward(self, query: str, k: int = 7, **kwargs):
         torch = importlib.import_module("torch")
-
         filtered_pids: list[int] = kwargs.get("filtered_pids") or []
         if filtered_pids:
             assert isinstance(filtered_pids, list) and all(isinstance(pid, int) for pid in filtered_pids), (
@@ -144,19 +109,13 @@ class ColBERTv2RetrieverLocal:
         else:
             searcher_results = self.searcher.search(query, k=k)
         results = []
-        for pid, rank, score in zip(*searcher_results, strict=False):  # noqa: B007
+        for pid, rank, score in zip(*searcher_results, strict=False):
             results.append(dotdict({"long_text": self.searcher.collection[pid], "score": score, "pid": pid}))
         return results
 
 
 class ColBERTv2RerankerLocal:
     def __init__(self, colbert_config: Any = None, checkpoint: str = "bert-base-uncased") -> None:
-        """_summary_
-
-        Args:
-            colbert_config (ColBERTConfig, optional): Colbert config. Defaults to None.
-            checkpoint_name (str, optional): checkpoint for embeddings. Defaults to 'bert-base-uncased'.
-        """
         self.colbert_config = colbert_config
         self.checkpoint = checkpoint
         self.colbert_config.checkpoint = checkpoint
@@ -167,7 +126,6 @@ class ColBERTv2RerankerLocal:
     def forward(self, query: str, passages: list[str] | None = None):
         passages = passages or []
         assert len(passages) > 0, "Passages should not be empty"
-
         import numpy as np
 
         colbert = importlib.import_module("colbert")
@@ -179,7 +137,6 @@ class ColBERTv2RerankerLocal:
         doc_tokenizer = DocTokenizer(self.colbert_config)
         query_ids, query_masks = query_tokenizer.tensorize([query])
         doc_ids, doc_masks = doc_tokenizer.tensorize(passages)
-
         col = ColBERT(self.checkpoint, self.colbert_config)
         q = col.query(query_ids, query_masks)
         doc_ids, doc_masks = col.doc(doc_ids, doc_masks, keep_dims="return_mask")

@@ -4,15 +4,11 @@ logger = logging.getLogger(__name__)
 
 
 def configure_litellm_logging(level: str = "ERROR") -> None:
-    """Configure LiteLLM logging to the specified level."""
-    # Litellm uses a global logger called `verbose_logger` to control all loggings.
     from dspy.clients._litellm import get_litellm
 
     litellm = get_litellm(feature="LiteLLM logging")
     verbose_logger = litellm._logging.verbose_logger
-
     numeric_logging_level = getattr(logging, level)
-
     verbose_logger.setLevel(numeric_logging_level)
     for h in verbose_logger.handlers:
         h.setLevel(numeric_logging_level)

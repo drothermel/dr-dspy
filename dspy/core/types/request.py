@@ -1,5 +1,3 @@
-"""Normalized LM types — normalized LM requests."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -22,15 +20,6 @@ from dspy.core.types.parts import LMPart
 
 @dataclass
 class LMRequestPatch:
-    """A partial normalized LM request contributed while rendering a DSPy call.
-
-    `LMRequest` is the complete object a `LanguageModel` receives. A patch is
-    the smaller, composable unit that DSPy type strategies can contribute while
-    an adapter is still building that request: extra messages, extra parts,
-    native tools, native config, or signature fields that should be hidden from
-    the outer adapter's ordinary text/JSON/XML rendering.
-    """
-
     messages: list[LMMessage] = dataclass_field(default_factory=list)
     system_parts: list[LMPart] = dataclass_field(default_factory=list)
     user_parts: list[LMPart] = dataclass_field(default_factory=list)
@@ -42,7 +31,6 @@ class LMRequestPatch:
     metadata: dict[str, Any] = dataclass_field(default_factory=dict)
 
     def merge(self, other: LMRequestPatch) -> LMRequestPatch:
-        """Return a new patch containing this patch followed by `other`."""
         return LMRequestPatch(
             messages=[*self.messages, *other.messages],
             system_parts=[*self.system_parts, *other.system_parts],
@@ -57,14 +45,11 @@ class LMRequestPatch:
 
 
 class LMRequest(BaseModel):
-    """A normalized request passed to a `LanguageModel`."""
-
     model: str
     messages: list[LMMessage]
     tools: list[LMToolSpec] = Field(default_factory=list)
     config: LMConfig = Field(default_factory=LMConfig)
     metadata: dict[str, Any] = Field(default_factory=dict)
-
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     @classmethod
@@ -80,14 +65,12 @@ class LMRequest(BaseModel):
     ) -> LMRequest:
         if messages is not None and (items or prompt is not None):
             raise ValueError("Pass messages or direct-call inputs, not both.")
-
         collected_tools: list[Any] = list(tools or [])
         if messages is not None:
             normalized_messages = [_coerce_message(message) for message in messages]
         else:
             normalized_messages, positional_tools = _messages_from_items(items, prompt=prompt)
             collected_tools.extend(positional_tools)
-
         config = LMConfig(**_lm_config_data_from_kwargs(kwargs))
         return cls(
             model=model,
@@ -108,13 +91,6 @@ class LMRequest(BaseModel):
         return cls.from_call(model=model, prompt=prompt, messages=messages, **kwargs)
 
     def with_config_overrides(self, **kwargs: Any) -> LMRequest:
-        """Return a copy with explicit request config overrides applied.
-
-        Only fields implied by the supplied keyword arguments are changed. This
-        preserves existing grouped config such as `cache`, `prompt_cache`,
-        `tool_choice`, `reasoning`, `stop`, and provider-specific
-        `extensions` when an unrelated setting is overridden.
-        """
         if not kwargs:
             return self
         merged = _merge_config_overrides(self.config, kwargs)

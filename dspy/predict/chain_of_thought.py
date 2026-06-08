@@ -10,27 +10,12 @@ if TYPE_CHECKING:
 
 
 class ChainOfThought(Module):
-    def __init__(
-        self,
-        task_spec: TaskSpec,
-        **config: dict[str, Any],
-    ) -> None:
-        """
-        A module that reasons step by step in order to predict the output of a task.
-
-        Args:
-            task_spec: The task spec for the module.
-            **config: The configuration for the module.
-        """
+    def __init__(self, task_spec: TaskSpec, **config: dict[str, Any]) -> None:
         super().__init__()
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"ChainOfThought requires a TaskSpec instance, got {type(task_spec).__name__}.")
         extended_task_spec = task_spec.prepend(
-            output_field(
-                "reasoning",
-                Reasoning,
-                desc="Step-by-step reasoning before producing the final outputs.",
-            ),
+            output_field("reasoning", Reasoning, desc="Step-by-step reasoning before producing the final outputs.")
         )
         callbacks = cast("list[BaseCallback] | None", config.pop("callbacks", None))
         self.task_spec = task_spec
