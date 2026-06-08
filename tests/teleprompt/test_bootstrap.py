@@ -2,7 +2,6 @@ import asyncio
 
 import pytest
 
-from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
@@ -23,7 +22,7 @@ trainset = [examples[0]]
 valset = [examples[1]]
 
 
-def test_bootstrap_initialization():
+def test_bootstrap_initialization(make_run):
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
     assert bootstrap.metric == simple_metric, "Metric not correctly initialized"
 
@@ -37,32 +36,32 @@ class SimpleModule(Module):
         return await self.predictor(**kwargs)
 
 
-def test_compile_with_predict_instances():
+def test_compile_with_predict_instances(make_run):
     student = SimpleModule(ts("input -> output"))
     teacher = SimpleModule(ts("input -> output"))
     lm = DummyLM(["Initial thoughts", "Finish[blue]"])
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
-    compiled_student = asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset))
+    compiled_student = asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset, run=run))
     assert compiled_student is not None, "Failed to compile student"
     assert hasattr(compiled_student, "_compiled") and compiled_student._compiled, "Student compilation flag not set"
 
 
-def test_bootstrap_effectiveness():
+def test_bootstrap_effectiveness(make_run):
     student = SimpleModule(ts("input -> output"))
     teacher = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "blue"}, {"output": "Ring-ding-ding-ding-dingeringeding!"}], follow_examples=True)
-    settings.configure(lm=lm, trace=[])
+    run = make_run(lm=lm, trace=[])
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
-    compiled_student = asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset))
+    compiled_student = asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset, run=run))
     assert len(compiled_student.predictor.demos) == 1
     assert compiled_student.predictor.demos[0].input == trainset[0].input
     assert compiled_student.predictor.demos[0].output == trainset[0].output
-    prediction = asyncio.run(compiled_student(input=trainset[0].input))
+    prediction = asyncio.run(compiled_student(input=trainset[0].input, run=run))
     assert prediction.output == trainset[0].output
 
 
-def test_error_handling_during_bootstrap():
+def test_error_handling_during_bootstrap(make_run):
 
     class BuggyModule(Module):
         def __init__(self, signature):
@@ -75,17 +74,17 @@ def test_error_handling_during_bootstrap():
     student = SimpleModule(ts("input -> output"))
     teacher = BuggyModule(ts("input -> output"))
     lm = DummyLM([{"output": "Initial thoughts"}])
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1, max_errors=1)
     with pytest.raises(RuntimeError, match="Simulated error"):
-        asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset))
+        asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset, run=run))
 
 
-def test_validation_set_usage():
+def test_validation_set_usage(make_run):
     student = SimpleModule(ts("input -> output"))
     teacher = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "Initial thoughts"}, {"output": "Finish[blue]"}])
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
-    compiled_student = asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset))
+    compiled_student = asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset, run=run))
     assert len(compiled_student.predictor.demos) >= len(valset), "Validation set not used in compiled student demos"

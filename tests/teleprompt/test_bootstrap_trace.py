@@ -10,7 +10,6 @@ except ImportError:
     pytest.skip("litellm is not installed", allow_module_level=True)
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
-from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
@@ -19,7 +18,7 @@ from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, bootstrap_trace_data
 
 
-def test_bootstrap_trace_data():
+def test_bootstrap_trace_data(make_run):
     string_to_int_task_spec = make_task_spec(
         {"text": FieldSpec.input("text", str), "number": FieldSpec.output("number", int)},
         instructions="Convert a string number to integer",
@@ -36,7 +35,7 @@ def test_bootstrap_trace_data():
     def exact_match_metric(example, prediction, trace=None):
         return example.number == prediction.number
 
-    settings.configure(lm=LM(model="openai/gpt-4o-mini"), adapter=JSONAdapter())
+    run = make_run(lm=LM(model="openai/gpt-4o-mini"), adapter=JSONAdapter())
     successful_responses = [
         ModelResponse(
             choices=[Choices(message=Message(content='```json\n{"number": 1}\n```'))], model="openai/gpt-4o-mini"
@@ -71,6 +70,7 @@ def test_bootstrap_trace_data():
                 num_threads=1,
                 raise_on_error=False,
                 capture_failed_parses=True,
+                run=run,
             )
         )
     assert len(results) == 5, f"Expected 5 results, got {len(results)}"
@@ -98,8 +98,11 @@ def test_bootstrap_trace_data():
             assert len(trace_entry) == 3, "Trace entry should have 3 elements"
 
 
-def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch):
+def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch, make_run):
     from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
+    from dspy.utils.dummies import DummyLM
+
+    run = make_run(lm=DummyLM([{}]))
 
     class DummyProgram(Module):
         async def aforward(self, **kwargs: object):
@@ -122,7 +125,7 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch):
     monkeypatch.setattr(bootstrap_trace_module, "Evaluate", DummyEvaluate)
     asyncio.run(
         bootstrap_trace_module.bootstrap_trace_data(
-            program=DummyProgram(), dataset=[], callback_metadata={"disable_logging": True}
+            program=DummyProgram(), dataset=[], callback_metadata={"disable_logging": True}, run=run
         )
     )
     assert captured_metadata["value"] == {"disable_logging": True}

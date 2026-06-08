@@ -21,7 +21,7 @@ from dspy.clients.lm import LM
 from dspy.primitives.example import Example
 from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.task_spec.pydantic_bridge import task_spec_output_field_infos
-from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs
+from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs, make_adapter_run
 from tests.task_spec.helpers import ts
 
 
@@ -235,6 +235,7 @@ def test_xml_adapter_with_code():
         instructions="Generate code to answer the question",
     )
     adapter = XMLAdapter()
+    lm = LM(model="openai/gpt-4o-mini")
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content='<code>print("Hello, world!")</code>'))],
@@ -242,11 +243,12 @@ def test_xml_adapter_with_code():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini"),
+                lm=lm,
                 config={},
                 task_spec=CodeGeneration,
                 demos=[],
                 inputs={"question": "Write a python program to print 'Hello, world!'"},
+                run=make_adapter_run(lm=lm, adapter=adapter),
             )
         )
         assert result[0]["code"].code == 'print("Hello, world!")'

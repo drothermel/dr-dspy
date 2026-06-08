@@ -9,7 +9,7 @@ async def _run_bounded(items, fn, **kwargs):
     return await run_bounded(items=items, fn=fn, **kwargs)
 
 
-def test_worker_independence():
+def test_worker_independence(make_run):
 
     async def task(item):
         return item * 2
@@ -19,7 +19,7 @@ def test_worker_independence():
     assert results == [2, 4, 6, 8, 10]
 
 
-def test_parallel_execution_speed():
+def test_parallel_execution_speed(make_run):
     import time
 
     async def task(item):
@@ -33,7 +33,7 @@ def test_parallel_execution_speed():
     assert end_time - start_time < len(data)
 
 
-def test_max_errors_handling():
+def test_max_errors_handling(make_run):
 
     async def task(item):
         if item == 3:
@@ -45,7 +45,7 @@ def test_max_errors_handling():
         asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=3, max_errors=1))
 
 
-def test_max_errors_not_met():
+def test_max_errors_not_met(make_run):
 
     async def task(item):
         if item == 3:
@@ -57,7 +57,7 @@ def test_max_errors_not_met():
     assert results == [1, 2, None, 4, 5]
 
 
-def test_run_bounded_tracks_failed_indices_and_exceptions():
+def test_run_bounded_tracks_failed_indices_and_exceptions(make_run):
 
     async def task(item):
         if item == 3:
@@ -77,7 +77,7 @@ def test_run_bounded_tracks_failed_indices_and_exceptions():
     assert str(stats.exceptions_map[4]) == "test error for 5"
 
 
-def test_sequential_execution():
+def test_sequential_execution(make_run):
 
     async def task(item):
         return item * 2
@@ -87,7 +87,7 @@ def test_sequential_execution():
     assert results == [2, 4, 6, 8, 10]
 
 
-def test_sequential_max_errors_not_met():
+def test_sequential_max_errors_not_met(make_run):
 
     async def task(item):
         if item == 3:
@@ -99,7 +99,7 @@ def test_sequential_max_errors_not_met():
     assert results == [1, 2, None, 4, 5]
 
 
-def test_sequential_max_errors_exceeded():
+def test_sequential_max_errors_exceeded(make_run):
 
     async def task(item):
         if item == 3:

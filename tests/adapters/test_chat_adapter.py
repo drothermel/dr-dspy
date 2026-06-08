@@ -30,13 +30,17 @@ from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
 from dspy.clients.openai_format import provider_tool_call_to_part
 from dspy.core.types import LMOutput, LMPart, LMResponse, LMTextPart, LMThinkingPart
-from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.utils.exceptions import AdapterParseError
-from tests.adapters.conftest import adapter_format_as_openai, default_model_response, format_messages_and_lm_kwargs
+from tests.adapters.conftest import (
+    adapter_format_as_openai,
+    default_model_response,
+    format_messages_and_lm_kwargs,
+    make_adapter_run,
+)
 from tests.task_spec.helpers import ts
 
 
@@ -108,7 +112,12 @@ def test_chat_adapter_sync_call():
     lm = DummyLM([{"answer": "Paris"}])
     result = asyncio.run(
         adapter.acall(
-            lm=lm, config={}, task_spec=signature, demos=[], inputs={"question": "What is the capital of France?"}
+            lm=lm,
+            config={},
+            task_spec=signature,
+            demos=[],
+            inputs={"question": "What is the capital of France?"},
+            run=make_adapter_run(lm=lm, adapter=adapter),
         )
     )
     assert result == [{"answer": "Paris"}]
@@ -120,7 +129,12 @@ async def test_chat_adapter_async_call():
     adapter = ChatAdapter()
     lm = DummyLM([{"answer": "Paris"}])
     result = await adapter.acall(
-        lm=lm, config={}, task_spec=signature, demos=[], inputs={"question": "What is the capital of France?"}
+        lm=lm,
+        config={},
+        task_spec=signature,
+        demos=[],
+        inputs={"question": "What is the capital of France?"},
+        run=make_adapter_run(lm=lm, adapter=adapter),
     )
     assert result == [{"answer": "Paris"}]
 
@@ -1514,7 +1528,7 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
     assert lm_kwargs == expected_lm_kwargs
 
 
-def test_chat_adapter_with_pydantic_models():
+def test_chat_adapter_with_pydantic_models(make_run):
 
     class DogClass(pydantic.BaseModel):
         dog_breeds: list[str] = pydantic.Field(description="List of the breeds of dogs")
@@ -1560,7 +1574,7 @@ def test_chat_adapter_with_pydantic_models():
     assert "How many non-dog pets does John have?" in user_content
 
 
-def test_chat_adapter_signature_information():
+def test_chat_adapter_signature_information(make_run):
     TestSignature = make_task_spec(
         {
             "input1": FieldSpec.input("input1", desc="String Input"),
@@ -1570,12 +1584,10 @@ def test_chat_adapter_signature_information():
         instructions="Given the fields `input1`, `input2`, produce the fields `output`.",
     )
     program = Predict(TestSignature)
-    with (
-        settings.context(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter()),
-        mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion,
-    ):
+    run = make_run(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter())
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = default_model_response("[[ ## output ## ]]\nok\n\n[[ ## completed ## ]]")
-        asyncio.run(program.acall(input1="Test", input2=11))
+        asyncio.run(program.acall(input1="Test", input2=11, run=run))
         mock_completion.assert_called_once()
         _, call_kwargs = mock_completion.call_args
         assert len(call_kwargs["messages"]) == 2
@@ -1756,6 +1768,7 @@ def test_chat_adapter_with_code():
         instructions="Generate code to answer the question",
     )
     adapter = ChatAdapter()
+    lm = LM(model="openai/gpt-4o-mini")
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content='[[ ## code ## ]]\nprint("Hello, world!")'))],
@@ -1763,11 +1776,12 @@ def test_chat_adapter_with_code():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini"),
+                lm=lm,
                 config={},
                 task_spec=CodeGeneration,
                 demos=[],
                 inputs={"question": "Write a python program to print 'Hello, world!'"},
+                run=make_adapter_run(lm=lm, adapter=adapter),
             )
         )
         assert result[0]["code"].code == 'print("Hello, world!")'
@@ -1848,6 +1862,7 @@ def test_chat_adapter_toolcalls_native_function_calling():
 
     tools = [Tool(get_weather, description="Get the weather for a city")]
     adapter = JSONAdapter(use_native_function_calling=True)
+    lm = LM(model="openai/gpt-4o-mini")
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
@@ -1871,11 +1886,12 @@ def test_chat_adapter_toolcalls_native_function_calling():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini"),
+                lm=lm,
                 config={},
                 task_spec=MySignature,
                 demos=[],
                 inputs={"question": "What is the weather in Paris?", "tools": tools},
+                run=make_adapter_run(lm=lm, adapter=adapter),
             )
         )
         assert result[0]["tool_calls"] == ToolCalls(
@@ -1890,11 +1906,12 @@ def test_chat_adapter_toolcalls_native_function_calling():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini"),
+                lm=lm,
                 config={},
                 task_spec=MySignature,
                 demos=[],
                 inputs={"question": "What is the weather in Paris?", "tools": tools},
+                run=make_adapter_run(lm=lm, adapter=adapter),
             )
         )
         assert result[0]["answer"] == "Paris"
@@ -1916,6 +1933,7 @@ def test_chat_adapter_toolcalls_vague_match():
 
     tools = [Tool(get_weather, description="Get the weather for a city")]
     adapter = ChatAdapter()
+    lm = LM(model="openai/gpt-4o-mini")
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
@@ -1929,11 +1947,12 @@ def test_chat_adapter_toolcalls_vague_match():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini"),
+                lm=lm,
                 config={},
                 task_spec=MySignature,
                 demos=[],
                 inputs={"question": "What is the weather in Paris?", "tools": tools},
+                run=make_adapter_run(lm=lm, adapter=adapter),
             )
         )
         assert result[0]["tool_calls"] == ToolCalls(
@@ -1952,11 +1971,12 @@ def test_chat_adapter_toolcalls_vague_match():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini"),
+                lm=lm,
                 config={},
                 task_spec=MySignature,
                 demos=[],
                 inputs={"question": "What is the weather in Paris?", "tools": tools},
+                run=make_adapter_run(lm=lm, adapter=adapter),
             )
         )
         assert result[0]["tool_calls"] == ToolCalls(
@@ -1974,6 +1994,7 @@ def test_chat_adapter_native_reasoning():
         instructions="Given the fields `question`, produce the fields `reasoning`, `answer`.",
     )
     adapter = ChatAdapter()
+    lm = LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low")
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
@@ -1987,7 +2008,7 @@ def test_chat_adapter_native_reasoning():
             model="anthropic/claude-3-7-sonnet-20250219",
         )
         modified_signature, _, _ = adapter._call_preprocess(
-            LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low"),
+            lm,
             {},
             MySignature,
             {"question": "What is the capital of France?"},
@@ -1995,17 +2016,18 @@ def test_chat_adapter_native_reasoning():
         assert "reasoning" not in modified_signature.output_fields
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low"),
+                lm=lm,
                 config={},
                 task_spec=MySignature,
                 demos=[],
                 inputs={"question": "What is the capital of France?"},
+                run=make_adapter_run(lm=lm, adapter=adapter),
             )
         )
         assert result[0]["reasoning"] == Reasoning(content="Step-by-step thinking about the capital of France")
 
 
-def test_chat_adapter_parses_float_with_underscores():
+def test_chat_adapter_parses_float_with_underscores(make_run):
 
     class Score(pydantic.BaseModel):
         score: float
@@ -2024,12 +2046,19 @@ def test_chat_adapter_parses_float_with_underscores():
         )
         lm = LM("openai/gpt-4o-mini")
         result = asyncio.run(
-            adapter.acall(lm=lm, config={}, task_spec=MySignature, demos=[], inputs={"question": "What is the score?"})
+            adapter.acall(
+                lm=lm,
+                config={},
+                task_spec=MySignature,
+                demos=[],
+                inputs={"question": "What is the score?"},
+                run=make_adapter_run(lm=lm, adapter=adapter),
+            )
         )
         assert result[0]["score"].score == 123456.789
 
 
-def test_format_system_message():
+def test_format_system_message(make_run):
     MySignature = make_task_spec(
         {
             "question": FieldSpec.input("question"),
@@ -2044,26 +2073,28 @@ def test_format_system_message():
     assert system_message == expected_system_message
 
 
-def test_null_content_raises_adapter_parse_error():
+def test_null_content_raises_adapter_parse_error(make_run):
     from dspy.utils.exceptions import AdapterParseError
 
     lm = LM("openai/gpt-4o-mini")
     response = ModelResponse(choices=[Choices(message=Message(content=None))], model="openai/gpt-4o-mini")
-    with settings.context(lm=lm), mock.patch("litellm.acompletion", new_callable=mock.AsyncMock, return_value=response):
+    run = make_run(lm=lm)
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock, return_value=response):
         cot = ChainOfThought(ts("question -> answer"))
         with pytest.raises(AdapterParseError):
-            asyncio.run(cot.acall(question="test"))
+            asyncio.run(cot.acall(question="test", run=run))
 
 
-def test_empty_string_content_raises_adapter_parse_error():
+def test_empty_string_content_raises_adapter_parse_error(make_run):
     from dspy.utils.exceptions import AdapterParseError
 
     lm = LM("openai/gpt-4o-mini")
     response = ModelResponse(choices=[Choices(message=Message(content=""))], model="openai/gpt-4o-mini")
-    with settings.context(lm=lm), mock.patch("litellm.acompletion", new_callable=mock.AsyncMock, return_value=response):
+    run = make_run(lm=lm)
+    with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock, return_value=response):
         cot = ChainOfThought(ts("question -> answer"))
         with pytest.raises(AdapterParseError):
-            asyncio.run(cot.acall(question="test"))
+            asyncio.run(cot.acall(question="test", run=run))
 
 
 def test_tool_call_with_null_content_does_not_raise():
@@ -2208,7 +2239,15 @@ def test_native_response_type_without_parse_lm_output_raises():
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
     adapter = ChatAdapter(native_response_types=[OpaqueType])
+    lm = DummyLM([{}])
     with pytest.raises(TypeError, match="parse_lm_output"):
         asyncio.run(
-            adapter.acall(lm=DummyLM([{}]), config={}, task_spec=OpaqueSignature, demos=[], inputs={"question": "test"})
+            adapter.acall(
+                lm=lm,
+                config={},
+                task_spec=OpaqueSignature,
+                demos=[],
+                inputs={"question": "test"},
+                run=make_adapter_run(lm=lm, adapter=adapter),
+            )
         )

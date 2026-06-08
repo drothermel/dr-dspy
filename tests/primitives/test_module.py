@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
@@ -25,17 +24,18 @@ class HopModule(Module):
             ts("query -> answer", instructions=default_task_instructions(inputs=("query",), outputs=("answer",)))
         )
 
-    async def aforward(self, question):
-        query = (await self.predict1(question=question)).query
-        return await self.predict2(query=query)
+    async def aforward(self, question, **kwargs):
+        run = kwargs.get("run")
+        query = (await self.predict1(question=question, run=run)).query
+        return await self.predict2(query=query, run=run)
 
 
-def test_module_initialization():
+def test_module_initialization(make_run):
     module = Module()
     assert module._compiled is False, "Module _compiled attribute should be False upon initialization"
 
 
-def test_named_predictors():
+def test_named_predictors(make_run):
     module = HopModule()
     named_preds = module.named_predictors()
     assert len(named_preds) == 2, "Should identify correct number of Predict instances"
@@ -45,17 +45,17 @@ def test_named_predictors():
     )
 
 
-def test_predictors():
+def test_predictors(make_run):
     module = HopModule()
     preds = module.predictors()
     assert len(preds) == 2, "Should return correct number of Predict instances"
     assert all(isinstance(p, Predict) for p in preds), "All returned items should be instances of PredictMock"
 
 
-def test_forward():
+def test_forward(make_run):
     program = HopModule()
-    settings.configure(lm=DummyLM({"What is 1+1?": {"query": "let me check"}, "let me check": {"answer": "2"}}))
-    result = asyncio.run(program(question="What is 1+1?")).answer
+    run = make_run(lm=DummyLM({"What is 1+1?": {"query": "let me check"}, "let me check": {"answer": "2"}}))
+    result = asyncio.run(program(question="What is 1+1?", run=run)).answer
     assert result == "2"
 
 

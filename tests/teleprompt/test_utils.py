@@ -1,7 +1,6 @@
 import asyncio
 from unittest.mock import AsyncMock, Mock, patch
 
-from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
@@ -19,14 +18,19 @@ class DummyModule(Module):
         pass
 
 
-def test_eval_candidate_program_full_trainset():
+def test_eval_candidate_program_full_trainset(make_run):
     trainset = [1, 2, 3, 4, 5]
     candidate_program = DummyModule()
     evaluate = AsyncMock(return_value=0)
     batch_size = 10
+    run = make_run(lm=DummyLM([{}]))
     result = asyncio.run(
         eval_candidate_program(
-            batch_size=batch_size, trainset=trainset, candidate_program=candidate_program, evaluate=evaluate
+            batch_size=batch_size,
+            trainset=trainset,
+            candidate_program=candidate_program,
+            evaluate=evaluate,
+            run=run,
         )
     )
     evaluate.assert_awaited_once()
@@ -37,14 +41,19 @@ def test_eval_candidate_program_full_trainset():
     assert result == 0
 
 
-def test_eval_candidate_program_minibatch():
+def test_eval_candidate_program_minibatch(make_run):
     trainset = [1, 2, 3, 4, 5]
     candidate_program = DummyModule()
     evaluate = AsyncMock(return_value=0)
     batch_size = 3
+    run = make_run(lm=DummyLM([{}]))
     result = asyncio.run(
         eval_candidate_program(
-            batch_size=batch_size, trainset=trainset, candidate_program=candidate_program, evaluate=evaluate
+            batch_size=batch_size,
+            trainset=trainset,
+            candidate_program=candidate_program,
+            evaluate=evaluate,
+            run=run,
         )
     )
     evaluate.assert_awaited_once()
@@ -55,25 +64,30 @@ def test_eval_candidate_program_minibatch():
     assert result == 0
 
 
-def test_eval_candidate_program_failure():
+def test_eval_candidate_program_failure(make_run):
     trainset = [1, 2, 3, 4, 5]
     candidate_program = DummyModule()
     evaluate = AsyncMock(side_effect=ValueError("Error"))
     batch_size = 3
+    run = make_run(lm=DummyLM([{}]))
     result = asyncio.run(
         eval_candidate_program(
-            batch_size=batch_size, trainset=trainset, candidate_program=candidate_program, evaluate=evaluate
+            batch_size=batch_size,
+            trainset=trainset,
+            candidate_program=candidate_program,
+            evaluate=evaluate,
+            run=run,
         )
     )
     assert result.score == 0.0
 
 
-def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled():
+def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled(make_run):
     student = DummyModule()
     student.predictor = Predict(ts("input -> output"))
     trainset = [Example(input="test", output="test").with_inputs("input")]
     lm = DummyLM([{"output": "test"}])
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     with patch("dspy.teleprompt.demo_sets.BootstrapFewShot") as MockBootstrap:
         mock_instance = Mock()
         mock_instance.compile = AsyncMock(return_value=student)
@@ -86,7 +100,7 @@ def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled():
                 max_labeled_demos=1,
                 max_bootstrapped_demos=1,
                 metric=lambda ex, pred, trace=None: 1.0,
-                teacher_settings={},
+                run=run,
                 metric_threshold=0.9,
             )
         )

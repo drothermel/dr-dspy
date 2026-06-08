@@ -59,7 +59,9 @@ def order_input_keys_in_string(unordered_repr):
     return re.sub(pattern, reorder_keys, unordered_repr)
 
 
-async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model, run: RunContext, log_file=None, verbose=False):
+async def create_dataset_summary(
+    *, trainset, view_data_batch_size, prompt_model, run: RunContext, log_file=None, verbose=False
+):
     if verbose:
         pass
     upper_lim = min(len(trainset), view_data_batch_size)

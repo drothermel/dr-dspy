@@ -177,7 +177,12 @@ async def optimize_prompt_parameters(
     logger.info(f"== Trial {1} / {adjusted_num_trials} - Full Evaluation of Default Program ==")
     default_score = (
         await eval_candidate_program(
-            batch_size=len(valset), trainset=valset, candidate_program=program, evaluate=evaluate, run=run, rng=optimizer.rng
+            batch_size=len(valset),
+            trainset=valset,
+            candidate_program=program,
+            evaluate=evaluate,
+            run=run,
+            rng=optimizer.rng,
         )
     ).score
     logger.info(f"Default program score: {default_score}\n")

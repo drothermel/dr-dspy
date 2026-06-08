@@ -3,7 +3,6 @@ import asyncio
 import pytest
 
 from dspy.adapters.types.tool import Tool
-from dspy.dsp.utils.settings import settings
 from dspy.predict.code_act import CodeAct
 from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.utils.dummies import DummyLM
@@ -32,7 +31,7 @@ def add(a: float, b: float) -> float:
 ADD_TOOL = Tool(add, description="Add two numbers.")
 
 
-def test_codeact_code_generation():
+def test_codeact_code_generation(make_run):
     lm = DummyLM(
         [
             {
@@ -43,9 +42,9 @@ def test_codeact_code_generation():
             {"reasoning": "Reason_B", "answer": "2"},
         ]
     )
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     program = CodeAct(BasicQA, tools=[ADD_TOOL])
-    res = asyncio.run(program(question="What is 1+1?"))
+    res = asyncio.run(program(question="What is 1+1?", run=run))
     assert res.answer == "2"
     assert res.trajectory == {"code_output_0": '"2\\n"', "generated_code_0": "result = add(1,1)\nprint(result)"}
     assert program.interpreter.deno_process is None
@@ -59,7 +58,7 @@ def extract_maximum_minimum(input_list: str) -> dict[str, float]:
 EXTRACT_TOOL = Tool(extract_maximum_minimum, description="Extract maximum and minimum from a comma-separated list.")
 
 
-def test_codeact_support_multiple_fields():
+def test_codeact_support_multiple_fields(make_run):
     lm = DummyLM(
         [
             {
@@ -70,9 +69,9 @@ def test_codeact_support_multiple_fields():
             {"reasoning": "Reason_B", "maximum": "6", "minimum": "2"},
         ]
     )
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     program = CodeAct(ExtremumFinder, tools=[EXTRACT_TOOL])
-    res = asyncio.run(program(input_list="2, 3, 5, 6"))
+    res = asyncio.run(program(input_list="2, 3, 5, 6", run=run))
     assert res.maximum == "6"
     assert res.minimum == "2"
     assert res.trajectory == {
@@ -82,7 +81,7 @@ def test_codeact_support_multiple_fields():
     assert program.interpreter.deno_process is None
 
 
-def test_codeact_code_parse_failure():
+def test_codeact_code_parse_failure(make_run):
     lm = DummyLM(
         [
             {"reasoning": "Reason_A", "generated_code": "```python\nparse(error\n```", "finished": False},
@@ -94,9 +93,9 @@ def test_codeact_code_parse_failure():
             {"reasoning": "Reason_B", "answer": "2"},
         ]
     )
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     program = CodeAct(BasicQA, tools=[ADD_TOOL])
-    res = asyncio.run(program(question="What is 1+1?"))
+    res = asyncio.run(program(question="What is 1+1?", run=run))
     assert res.answer == "2"
     assert res.trajectory == {
         "generated_code_0": "parse(error",
@@ -107,7 +106,7 @@ def test_codeact_code_parse_failure():
     assert program.interpreter.deno_process is None
 
 
-def test_codeact_code_execution_failure():
+def test_codeact_code_execution_failure(make_run):
     lm = DummyLM(
         [
             {"reasoning": "Reason_A", "generated_code": "```python\nunknown+1\n```", "finished": False},
@@ -119,9 +118,9 @@ def test_codeact_code_execution_failure():
             {"reasoning": "Reason_B", "answer": "2"},
         ]
     )
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     program = CodeAct(BasicQA, tools=[ADD_TOOL])
-    res = asyncio.run(program(question="What is 1+1?"))
+    res = asyncio.run(program(question="What is 1+1?", run=run))
     assert res.answer == "2"
     assert res.trajectory == {
         "generated_code_0": "unknown+1",

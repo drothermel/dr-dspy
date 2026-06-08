@@ -47,7 +47,12 @@ async def propose_instructions(
     )
     logger.info(f"\nProposing N={num_instruct_candidates} instructions...\n")
     instruction_candidates = await proposer.propose_instructions_for_program(
-        trainset=trainset, program=program, demo_candidates=demo_candidates, N=num_instruct_candidates, trial_logs={}, run=run
+        trainset=trainset,
+        program=program,
+        demo_candidates=demo_candidates,
+        N=num_instruct_candidates,
+        trial_logs={},
+        run=run,
     )
     for i, pred in enumerate(program.predictors()):
         logger.info(f"Proposed Instructions for Predictor {i}:\n")

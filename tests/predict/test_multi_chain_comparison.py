@@ -1,6 +1,5 @@
 import asyncio
 
-from dspy.dsp.utils.settings import settings
 from dspy.predict.multi_chain_comparison import MultiChainComparison
 from dspy.primitives.prediction import Prediction
 from dspy.task_spec import FieldSpec, make_task_spec
@@ -22,11 +21,11 @@ completions = [
 ]
 
 
-def test_basic_example():
+def test_basic_example(make_run):
     compare_answers = MultiChainComparison(BasicQA)
     question = "What is the color of the sky?"
     lm = DummyLM([{"rationale": "my rationale", "answer": "blue"}])
-    settings.configure(lm=lm)
-    final_pred = asyncio.run(compare_answers(completions, question=question))
+    run = make_run(lm=lm)
+    final_pred = asyncio.run(compare_answers(completions, question=question, run=run))
     assert final_pred.rationale == "my rationale"
     assert final_pred.answer == "blue"

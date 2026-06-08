@@ -1,47 +1,46 @@
 import asyncio
 
-from dspy.dsp.utils.settings import settings
 from dspy.evaluate.auto_evaluation import CompleteAndGrounded, SemanticF1
 from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
 from dspy.utils.dummies import DummyLM
 
 
-def test_semantic_f1_returns_prediction_without_trace():
-    settings.configure(lm=DummyLM([{"reasoning": "Comparing the responses", "precision": 1.0, "recall": 1.0}]))
+def test_semantic_f1_returns_prediction_without_trace(make_run):
+    run = make_run(lm=DummyLM([{"reasoning": "Comparing the responses", "precision": 1.0, "recall": 1.0}]))
     example = Example(question="What is 1+1?", response="2")
     pred = Prediction(response="2")
     metric = SemanticF1()
-    result = asyncio.run(metric(example, pred))
+    result = asyncio.run(metric(example, pred, run=run))
     assert isinstance(result, Prediction)
     assert hasattr(result, "score")
     assert isinstance(result.score, (int, float, bool))
 
 
-def test_semantic_f1_returns_prediction_with_trace():
-    settings.configure(lm=DummyLM([{"reasoning": "Comparing the responses", "precision": 1.0, "recall": 1.0}]))
+def test_semantic_f1_returns_prediction_with_trace(make_run):
+    run = make_run(lm=DummyLM([{"reasoning": "Comparing the responses", "precision": 1.0, "recall": 1.0}]))
     example = Example(question="What is 1+1?", response="2")
     pred = Prediction(response="2")
     metric = SemanticF1(threshold=0.5)
-    result = asyncio.run(metric(example, pred, trace=True))
+    result = asyncio.run(metric(example, pred, trace=True, run=run))
     assert isinstance(result, Prediction)
     assert hasattr(result, "score")
     assert isinstance(result.score, bool)
 
 
-def test_semantic_f1_score_value():
-    settings.configure(lm=DummyLM([{"reasoning": "Comparing the responses", "precision": 0.8, "recall": 0.6}]))
+def test_semantic_f1_score_value(make_run):
+    run = make_run(lm=DummyLM([{"reasoning": "Comparing the responses", "precision": 0.8, "recall": 0.6}]))
     example = Example(question="test", response="answer")
     pred = Prediction(response="response")
     metric = SemanticF1()
-    result = asyncio.run(metric(example, pred))
+    result = asyncio.run(metric(example, pred, run=run))
     expected_f1 = 2 * (0.8 * 0.6) / (0.8 + 0.6)
     assert isinstance(result, Prediction)
     assert abs(result.score - expected_f1) < 0.001
 
 
-def test_complete_and_grounded_returns_prediction_without_trace():
-    settings.configure(
+def test_complete_and_grounded_returns_prediction_without_trace(make_run):
+    run = make_run(
         lm=DummyLM(
             [
                 {
@@ -63,14 +62,14 @@ def test_complete_and_grounded_returns_prediction_without_trace():
     example = Example(question="What is 1+1?", response="2")
     pred = Prediction(response="2", context="context")
     metric = CompleteAndGrounded()
-    result = asyncio.run(metric(example, pred))
+    result = asyncio.run(metric(example, pred, run=run))
     assert isinstance(result, Prediction)
     assert hasattr(result, "score")
     assert isinstance(result.score, (int, float, bool))
 
 
-def test_complete_and_grounded_returns_prediction_with_trace():
-    settings.configure(
+def test_complete_and_grounded_returns_prediction_with_trace(make_run):
+    run = make_run(
         lm=DummyLM(
             [
                 {
@@ -92,14 +91,14 @@ def test_complete_and_grounded_returns_prediction_with_trace():
     example = Example(question="What is 1+1?", response="2")
     pred = Prediction(response="2", context="context")
     metric = CompleteAndGrounded(threshold=0.7)
-    result = asyncio.run(metric(example, pred, trace=True))
+    result = asyncio.run(metric(example, pred, trace=True, run=run))
     assert isinstance(result, Prediction)
     assert hasattr(result, "score")
     assert isinstance(result.score, bool)
 
 
-def test_semantic_f1_prediction_can_be_compared():
-    settings.configure(
+def test_semantic_f1_prediction_can_be_compared(make_run):
+    run = make_run(
         lm=DummyLM(
             [
                 {"reasoning": "Comparing first response", "precision": 0.8, "recall": 0.6},
@@ -110,10 +109,10 @@ def test_semantic_f1_prediction_can_be_compared():
     metric = SemanticF1()
     example1 = Example(question="test1", response="answer1")
     pred1 = Prediction(response="response1")
-    result1 = asyncio.run(metric(example1, pred1))
+    result1 = asyncio.run(metric(example1, pred1, run=run))
     example2 = Example(question="test2", response="answer2")
     pred2 = Prediction(response="response2")
-    result2 = asyncio.run(metric(example2, pred2))
+    result2 = asyncio.run(metric(example2, pred2, run=run))
     assert isinstance(result1, Prediction)
     assert isinstance(result2, Prediction)
     assert result2.score > result1.score

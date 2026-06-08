@@ -11,6 +11,7 @@ from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
+from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 from dspy.utils.annotation import experimental
 from dspy.utils.exceptions import AdapterParseError, ContextWindowExceededError
@@ -81,13 +82,14 @@ class ReActV2(Module):
         return make_task_spec(fields, instructions=instructions)
 
     async def aforward(self, **input_args):
+        run = resolve_run(run=input_args.pop("run", None), bound_run=self.run)
         max_iters = input_args.pop("max_iters", self.max_iters)
         history = _coerce_history(input_args.pop("history", None))
         pending_inputs = {name: input_args[name] for name in self.task_spec.input_fields if name in input_args}
         break_reason = "max_iters"
         for turn_index in range(max_iters):
             try:
-                pred = await self.react(history=history, tools=list(self.tools.values()), **pending_inputs)
+                pred = await self.react(history=history, tools=list(self.tools.values()), **pending_inputs, run=run)
                 tool_calls = _coerce_tool_calls(getattr(pred, "tool_calls", None))
             except (AdapterParseError, ValueError) as err:
                 logger.warning("Ending ReActV2 loop after parse failure: %s", _fmt_exc(err))
@@ -109,7 +111,7 @@ class ReActV2(Module):
             pending_inputs = {}
             if final_outputs is not None:
                 return Prediction(**final_outputs, history=history, termination_reason="submit")
-        return await self._forced_submit(history, pending_inputs, break_reason, max_iters)
+        return await self._forced_submit(history, pending_inputs, break_reason, max_iters, run=run)
 
     def _execute_tool_calls(self, tool_calls: ToolCalls) -> tuple[ToolCallResults, dict[str, Any] | None]:
         values = []
@@ -148,7 +150,13 @@ class ReActV2(Module):
         return event
 
     async def _forced_submit(
-        self, history: History, pending_inputs: dict[str, Any], break_reason: str, turn_index: int
+        self,
+        history: History,
+        pending_inputs: dict[str, Any],
+        break_reason: str,
+        turn_index: int,
+        *,
+        run: RunContext,
     ) -> Prediction:
         try:
             pred = await self.react(
@@ -156,6 +164,7 @@ class ReActV2(Module):
                 tools=list(self.tools.values()),
                 config={"tool_choice": {"mode": "required", "allowed": ["submit"]}, "reasoning": None},
                 **pending_inputs,
+                run=run,
             )
             tool_calls = _ensure_tool_call_ids(_coerce_tool_calls(getattr(pred, "tool_calls", None)), turn_index)
         except (AdapterParseError, ValueError, ContextWindowExceededError) as err:

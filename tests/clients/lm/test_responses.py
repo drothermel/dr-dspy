@@ -17,7 +17,7 @@ from dspy.utils.usage_tracker import track_usage
 from tests.clients.lm.conftest import _request, make_response
 
 
-def test_responses_api():
+def test_responses_api(make_run):
     api_response = make_response(
         output_blocks=[
             ResponseOutputMessage(
@@ -38,21 +38,21 @@ def test_responses_api():
     )
     with mock.patch("litellm.aresponses", autospec=True, return_value=api_response) as dspy_responses:
         lm = LM(model="openai/gpt-5-mini", model_type="responses", temperature=1.0, max_tokens=16000)
-        lm_result = asyncio.run(lm(_request(lm, prompt="openai query")))
+        lm_result = asyncio.run(lm(_request(lm, prompt="openai query"), run=make_run(lm=lm)))
         assert lm_result.text == "This is a test answer from responses API."
         assert lm_result.reasoning_content == "This is a dummy reasoning."
         dspy_responses.assert_called_once()
         assert dspy_responses.call_args.kwargs["model"] == "openai/gpt-5-mini"
 
 
-def test_lm_replaces_system_with_developer_role():
+def test_lm_replaces_system_with_developer_role(make_run):
     with mock.patch("dspy.clients.lm.alitellm_responses_completion", return_value={"choices": []}) as mock_completion:
         lm = LM("openai/gpt-4o-mini", model_type="responses", use_developer_role=True)
-        asyncio.run(lm(_request(lm, messages=[{"role": "system", "content": "hi"}])))
+        asyncio.run(lm(_request(lm, messages=[{"role": "system", "content": "hi"}]), run=make_run(lm=lm)))
         assert mock_completion.call_args.kwargs["request"]["input"][0]["role"] == "developer"
 
 
-def test_responses_api_tool_calls(litellm_test_server):
+def test_responses_api_tool_calls(litellm_test_server, make_run):
     api_base, _ = litellm_test_server
     expected_tool_call = {
         "type": "function_call",
@@ -65,7 +65,7 @@ def test_responses_api_tool_calls(litellm_test_server):
     api_response = make_response(output_blocks=[expected_tool_call])
     with mock.patch("litellm.aresponses", autospec=True, return_value=api_response) as dspy_responses:
         lm = LM(model="openai/dspy-test-model", api_base=api_base, api_key="fakekey", model_type="responses")
-        lm_result = asyncio.run(lm(_request(lm, prompt="openai query")))
+        lm_result = asyncio.run(lm(_request(lm, prompt="openai query"), run=make_run(lm=lm)))
         tool_call = lm_result.outputs[0].tool_calls[0]
         assert tool_call.name == expected_tool_call["name"]
         assert tool_call.args == {"city": "Paris"}
@@ -74,12 +74,12 @@ def test_responses_api_tool_calls(litellm_test_server):
         assert dspy_responses.call_args.kwargs["model"] == "openai/dspy-test-model"
 
 
-def test_reasoning_effort_responses_api():
+def test_reasoning_effort_responses_api(make_run):
     with mock.patch("litellm.aresponses", mock.AsyncMock(return_value={"choices": []})) as mock_responses:
         lm = LM(
             model="openai/gpt-5", model_type="responses", reasoning={"effort": "low"}, max_tokens=16000, temperature=1.0
         )
-        asyncio.run(lm(_request(lm, prompt="openai query")))
+        asyncio.run(lm(_request(lm, prompt="openai query"), run=make_run(lm=lm)))
         call_kwargs = mock_responses.call_args.kwargs
         assert "reasoning_effort" not in call_kwargs
         assert call_kwargs["reasoning"]["effort"] == "low"
@@ -201,7 +201,7 @@ def test_responses_api_converts_files_correctly():
     assert content[0]["filename"] == "report.pdf"
 
 
-def test_responses_api_preserves_multi_message_structure():
+def test_responses_api_preserves_multi_message_structure(make_run):
     from dspy.clients.lm import _convert_chat_request_to_responses_request
 
     request = {
@@ -226,7 +226,7 @@ def test_responses_api_preserves_multi_message_structure():
     assert result["input"][3]["content"] == [{"type": "input_text", "text": "And 3+3?"}]
 
 
-def test_responses_api_with_image_input():
+def test_responses_api_with_image_input(make_run):
     api_response = make_response(
         output_blocks=[
             ResponseOutputMessage(
@@ -254,7 +254,7 @@ def test_responses_api_with_image_input():
                 ],
             }
         ]
-        lm_result = asyncio.run(lm(_request(lm, messages=messages)))
+        lm_result = asyncio.run(lm(_request(lm, messages=messages), run=make_run(lm=lm)))
         assert lm_result.text == "This is a test answer with image input."
         dspy_responses.assert_called_once()
         call_args = dspy_responses.call_args.kwargs
@@ -268,7 +268,7 @@ def test_responses_api_with_image_input():
         )
 
 
-def test_responses_api_with_pydantic_model_input():
+def test_responses_api_with_pydantic_model_input(make_run):
     api_response = make_response(
         output_blocks=[
             ResponseOutputMessage(
@@ -293,7 +293,9 @@ def test_responses_api_with_pydantic_model_input():
         number: int
 
     with mock.patch("litellm.aresponses", autospec=True, return_value=api_response) as dspy_responses:
-        lm_result = asyncio.run(lm(_request(lm, prompt="What is a good test answer?", response_format=TestModel)))
+        lm_result = asyncio.run(
+            lm(_request(lm, prompt="What is a good test answer?", response_format=TestModel), run=make_run(lm=lm))
+        )
     TestModel.model_validate_json(lm_result.text)
     dspy_responses.assert_called_once()
     call_args = dspy_responses.call_args.kwargs
@@ -306,7 +308,8 @@ def test_responses_api_with_pydantic_model_input():
     }
 
 
-def test_responses_api_with_none_usage():
+def test_responses_api_with_none_usage(make_run):
+
     api_response = ResponsesAPIResponse(
         id="resp_1",
         created_at=0.0,
@@ -341,15 +344,16 @@ def test_responses_api_with_none_usage():
     )
     with mock.patch("litellm.aresponses", autospec=True, return_value=api_response):
         lm = LM(model="openai/gpt-5-mini", model_type="responses", temperature=1.0, max_tokens=16000)
-        with track_usage() as tracker:
-            result = asyncio.run(lm(_request(lm, prompt="test query")))
+        run = make_run(lm=lm)
+        with track_usage(run) as tracker:
+            result = asyncio.run(lm(_request(lm, prompt="test query"), run=run))
         assert result.text == "Partial response that was truncated"
         assert lm.history[-1].usage == {}
         assert tracker.get_total_tokens() == {}
 
 
 @pytest.mark.asyncio
-async def test_responses_api_with_none_usage_async():
+async def test_responses_api_with_none_usage_async(make_run):
     api_response = ResponsesAPIResponse(
         id="resp_1",
         created_at=0.0,
@@ -384,8 +388,9 @@ async def test_responses_api_with_none_usage_async():
     )
     with mock.patch("litellm.aresponses", autospec=True, return_value=api_response):
         lm = LM(model="openai/gpt-5-mini", model_type="responses", temperature=1.0, max_tokens=16000)
-        with track_usage() as tracker:
-            result = await lm.acall(_request(lm, prompt="test query"))
+        run = make_run(lm=lm)
+        with track_usage(run) as tracker:
+            result = await lm.acall(_request(lm, prompt="test query"), run=run)
         assert result.text == "Partial async response"
         assert lm.history[-1].usage == {}
         assert tracker.get_total_tokens() == {}

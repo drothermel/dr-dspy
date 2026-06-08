@@ -48,9 +48,9 @@ class SemanticF1(Module):
         else:
             self.module = ChainOfThought(SemanticRecallPrecisionTaskSpec())
 
-    async def aforward(self, example, pred, trace=None):
+    async def aforward(self, example, pred, trace=None, *, run):
         scores = await self.module(
-            question=example.question, ground_truth=example.response, system_response=pred.response
+            question=example.question, ground_truth=example.response, system_response=pred.response, run=run
         )
         score = f1_score(precision=scores.precision, recall=scores.recall)
         return Prediction(score=score if trace is None else score >= self.threshold)
@@ -101,12 +101,12 @@ class CompleteAndGrounded(Module):
         self.completeness_module = ChainOfThought(AnswerCompletenessTaskSpec())
         self.groundedness_module = ChainOfThought(AnswerGroundednessTaskSpec())
 
-    async def aforward(self, example, pred, trace=None):
+    async def aforward(self, example, pred, trace=None, *, run):
         completeness = await self.completeness_module(
-            question=example.question, ground_truth=example.response, system_response=pred.response
+            question=example.question, ground_truth=example.response, system_response=pred.response, run=run
         )
         groundedness = await self.groundedness_module(
-            question=example.question, retrieved_context=pred.context, system_response=pred.response
+            question=example.question, retrieved_context=pred.context, system_response=pred.response, run=run
         )
         score = f1_score(precision=groundedness.groundedness, recall=completeness.completeness)
         return Prediction(score=score if trace is None else score >= self.threshold)

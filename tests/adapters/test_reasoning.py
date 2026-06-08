@@ -3,12 +3,11 @@ import asyncio
 import pytest
 
 from dspy.adapters.types.reasoning import Reasoning
-from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from tests.task_spec.helpers import ts
 
 
-def test_reasoning_basic_operations():
+def test_reasoning_basic_operations(make_run):
     reasoning = Reasoning(content="Hello World")
     assert str(reasoning) == "Hello World"
     assert repr(reasoning) == "'Hello World'"
@@ -27,7 +26,7 @@ def test_reasoning_basic_operations():
     assert chars[0] == "H"
 
 
-def test_reasoning_concatenation():
+def test_reasoning_concatenation(make_run):
     reasoning = Reasoning(content="Hello")
     result1 = reasoning + " World"
     assert result1 == "Hello World"
@@ -41,7 +40,7 @@ def test_reasoning_concatenation():
     assert result3.content == "Hello World"
 
 
-def test_reasoning_string_methods():
+def test_reasoning_string_methods(make_run):
     reasoning = Reasoning(content="  Hello World  ")
     assert reasoning.strip() == "Hello World"
     assert reasoning.lower() == "  hello world  "
@@ -58,13 +57,13 @@ def test_reasoning_string_methods():
     assert reasoning.strip().join(["a", "b", "c"]) == "aHello WorldbHello Worldc"
 
 
-def test_reasoning_with_chain_of_thought():
+def test_reasoning_with_chain_of_thought(make_run):
     from dspy.utils.dummies import DummyLM
 
     lm = DummyLM([{"reasoning": "Let me think step by step", "answer": "42"}])
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     cot = ChainOfThought(ts("question -> answer"))
-    result = asyncio.run(cot.acall(question="What is the answer?"))
+    result = asyncio.run(cot.acall(question="What is the answer?", run=run))
     assert isinstance(result.reasoning, Reasoning)
     assert result.reasoning.strip() == "Let me think step by step"
     assert result.reasoning.lower() == "let me think step by step"

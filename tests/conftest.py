@@ -1,34 +1,51 @@
-import copy
 import os
-from collections.abc import Iterator
 
 import pytest
 
-from dspy.dsp.utils.settings import settings
 from tests.test_utils.server import litellm_test_server, read_litellm_test_server_request_logs  # noqa: F401
 
 SKIP_DEFAULT_FLAGS = ["reliability", "extra", "llm_call", "deno"]
 
 
-def _test_settings_config() -> dict:
-    from dspy.dsp.utils.settings import DEFAULT_CONFIG
+@pytest.fixture
+def json_adapter():
+    from dspy.adapters.json_adapter import JSONAdapter
 
-    test_config = copy.deepcopy(DEFAULT_CONFIG)
-    test_config["run_log_enabled"] = False
-    test_config["transparency"] = "off"
-    return test_config
+    return JSONAdapter()
 
 
-@pytest.fixture(autouse=True)
-def clear_settings() -> Iterator[None]:
-    import dspy.dsp.utils.settings as settings_module
+@pytest.fixture
+def run(make_run):
+    from dspy.utils.dummies import DummyLM
 
-    settings.configure(**_test_settings_config())
-    try:
-        yield
-    finally:
-        settings.configure(**_test_settings_config())
-        settings_module.config_owner_async_task = None
+    return make_run(lm=DummyLM([{}]))
+
+
+@pytest.fixture
+def make_run():
+    def _make_run(lm, adapter=None, **kwargs):
+        from dspy.adapters.chat_adapter import ChatAdapter
+        from dspy.runtime import RunContext, TelemetryConfig
+
+        adapter = adapter or ChatAdapter()
+        base_telemetry = TelemetryConfig(transparency="off", run_log_enabled=False)
+        telemetry = kwargs.pop("telemetry", None)
+        if telemetry is None:
+            merged_telemetry = base_telemetry
+        elif isinstance(telemetry, TelemetryConfig):
+            merged_telemetry = base_telemetry.model_copy(update=telemetry.model_dump(exclude_unset=True))
+        else:
+            merged_telemetry = base_telemetry.model_copy(update=telemetry)
+        init_run_log = kwargs.pop("init_run_log", merged_telemetry.run_log_enabled)
+        return RunContext.create(
+            lm=lm,
+            adapter=adapter,
+            telemetry=merged_telemetry,
+            init_run_log=init_run_log,
+            **kwargs,
+        )
+
+    return _make_run
 
 
 @pytest.fixture

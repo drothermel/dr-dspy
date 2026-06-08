@@ -1,6 +1,5 @@
 import asyncio
 
-from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
@@ -21,7 +20,7 @@ trainset = [
 ]
 
 
-def test_signature_optimizer_initialization():
+def test_signature_optimizer_initialization(make_run):
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
     assert optimizer.metric == simple_metric, "Metric not correctly initialized"
     assert optimizer.breadth == 2, "Breadth not correctly initialized"
@@ -38,9 +37,9 @@ class SimpleModule(Module):
         return await self.predictor(**kwargs)
 
 
-def test_signature_optimizer_optimization_process():
+def test_signature_optimizer_optimization_process(make_run):
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
-    settings.configure(
+    run = make_run(
         lm=DummyLM(
             [
                 {
@@ -52,15 +51,17 @@ def test_signature_optimizer_optimization_process():
     )
     student = SimpleModule(ts("input -> output"))
     optimized_student = asyncio.run(
-        optimizer.compile(student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False})
+        optimizer.compile(
+            student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False}, run=run
+        )
     )
     assert optimized_student is not student, "Optimization did not modify the student"
 
 
-def test_signature_optimizer_statistics_tracking():
+def test_signature_optimizer_statistics_tracking(make_run):
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
     optimizer.track_stats = True
-    settings.configure(
+    run = make_run(
         lm=DummyLM(
             [
                 {
@@ -72,13 +73,15 @@ def test_signature_optimizer_statistics_tracking():
     )
     student = SimpleModule(ts("input -> output"))
     optimized_student = asyncio.run(
-        optimizer.compile(student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False})
+        optimizer.compile(
+            student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False}, run=run
+        )
     )
     assert hasattr(optimized_student, "total_calls"), "Total calls statistic not tracked"
     assert hasattr(optimized_student, "results_best"), "Best results statistics not tracked"
 
 
-def test_optimization_and_output_verification():
+def test_optimization_and_output_verification(make_run):
     lm = DummyLM(
         [
             {"proposed_instruction": "Optimized Prompt", "proposed_prefix_for_output_field": "Optimized Prefix"},
@@ -91,19 +94,21 @@ def test_optimization_and_output_verification():
             {"reasoning": "france", "output": "Paris"},
         ]
     )
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
     student = SimpleModule(ts("input -> output"))
     optimized_student = asyncio.run(
-        optimizer.compile(student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False})
+        optimizer.compile(
+            student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False}, run=run
+        )
     )
     test_input = "What is the capital of France?"
-    prediction = asyncio.run(optimized_student(input=test_input))
+    prediction = asyncio.run(optimized_student(input=test_input, run=run))
     assert prediction.output == "Paris"
 
 
-def test_statistics_tracking_during_optimization():
-    settings.configure(
+def test_statistics_tracking_during_optimization(make_run):
+    run = make_run(
         lm=DummyLM(
             [{"proposed_instruction": "Optimized Prompt", "proposed_prefix_for_output_field": "Optimized Prefix"}]
         )
@@ -112,7 +117,9 @@ def test_statistics_tracking_during_optimization():
     optimizer.track_stats = True
     student = SimpleModule(ts("input -> output"))
     optimized_student = asyncio.run(
-        optimizer.compile(student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False})
+        optimizer.compile(
+            student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False}, run=run
+        )
     )
     assert hasattr(optimized_student, "total_calls"), "Optimizer did not track total metric calls"
     assert optimized_student.total_calls > 0, "Optimizer reported no metric calls"

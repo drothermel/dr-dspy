@@ -4,7 +4,6 @@ from typing_extensions import override
 
 from dspy.clients.base_lm import BaseLM
 from dspy.core.types import LMRequest, LMResponse
-from dspy.dsp.utils.settings import settings
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.sandbox_serializable import SandboxSerializable
 
@@ -39,12 +38,12 @@ def make_mock_predictor(responses: list[dict]):
 
 
 @contextmanager
-def dummy_lm_context(responses: list[dict]):
+def dummy_lm_context(responses: list[dict], make_run):
     from dspy.utils.dummies import DummyLM
 
     lm = DummyLM(responses)
-    with settings.context(lm=lm):
-        yield lm
+    run = make_run(lm=lm)
+    yield lm
 
 
 def echo_tool(text: str = "") -> str:

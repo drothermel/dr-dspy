@@ -165,6 +165,8 @@ class GenerateModuleInstruction(Module):
         data_summary,
         num_demos_in_context=3,
         tip=None,
+        *,
+        run,
     ):
 
         def gather_examples_from_sets(candidate_sets, max_examples):
@@ -197,7 +199,9 @@ class GenerateModuleInstruction(Module):
             try:
                 program_description = strip_prefix(
                     (
-                        await self.describe_program(program_code=self.program_code_string, program_example=task_demos)
+                        await self.describe_program(
+                            program_code=self.program_code_string, program_example=task_demos, run=run
+                        )
                     ).program_description
                 )
                 if self.verbose:
@@ -219,6 +223,7 @@ class GenerateModuleInstruction(Module):
                         program_example=task_demos,
                         module=module_code,
                         max_depth=10,
+                        run=run,
                     )
                 ).module_description
             except Exception:
@@ -237,6 +242,7 @@ class GenerateModuleInstruction(Module):
             tip=tip,
             basic_instruction=basic_instruction,
             previous_instructions=previous_instructions,
+            run=run,
         )
         proposed_instruction = strip_prefix(instruct.proposed_instruction)
         return Prediction(proposed_instruction=proposed_instruction)

@@ -99,9 +99,7 @@ class DataLoader(Dataset):
     def from_rm(self, run: RunContext, num_samples: int, fields: list[str], input_keys: list[str]) -> list[Example]:
         rm = run.retrieval
         if rm is None:
-            raise ValueError(
-                "Retrieval module not found. Pass retrieval=... when creating RunContext."
-            )
+            raise ValueError("Retrieval module not found. Pass retrieval=... when creating RunContext.")
         try:
             return _rows_to_examples(
                 rows=cast("Iterable[Mapping[str, object]]", rm.get_objects(num_samples=num_samples, fields=fields)),

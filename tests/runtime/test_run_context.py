@@ -1,7 +1,7 @@
 import pytest
 
 from dspy.adapters.json_adapter import JSONAdapter
-from dspy.runtime import ExecutionConfig, RunContext, TelemetryConfig, resolve_run
+from dspy.runtime import RunContext, TelemetryConfig, resolve_run
 from dspy.utils.dummies import DummyLM
 
 
@@ -74,6 +74,22 @@ def test_resolve_run_uses_bound_run():
 def test_resolve_run_raises_when_missing():
     with pytest.raises(RuntimeError, match="RunContext"):
         resolve_run(run=None, bound_run=None)
+
+
+def test_default_telemetry_config():
+    run = RunContext.create(lm=DummyLM([{"answer": "ok"}]), adapter=JSONAdapter(), init_run_log=False)
+    assert run.telemetry.transparency == "strict"
+    assert run.telemetry.run_log_enabled is True
+
+
+def test_fork_callbacks_and_trace():
+    lm = DummyLM([{"answer": "ok"}])
+    adapter = JSONAdapter()
+    run = RunContext.create(lm=lm, adapter=adapter, callbacks=[lambda x: x], init_run_log=False)
+    forked = run.fork(lm=DummyLM([{"answer": "other"}]), callbacks=[], trace=[1])
+    assert len(forked.callbacks) == 0
+    assert forked.trace == [1]
+    assert len(run.callbacks) == 1
 
 
 def test_default_execution_config():

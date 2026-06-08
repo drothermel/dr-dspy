@@ -204,7 +204,9 @@ class SIMBA(Teleprompter):
                 f"Batch {batch_idx + 1}: Evaluating {len(system_candidates)} programs on {self.bsize} examples."
             )
             exec_pairs = [
-                (wrap_program(program=sys, metric=self.metric, run=run), ex) for sys in system_candidates for ex in batch
+                (wrap_program(program=sys, metric=self.metric, run=run), ex)
+                for sys in system_candidates
+                for ex in batch
             ]
             outputs = cast("list[dict[str, Any]]", await run_parallel(exec_pairs))
             assert len(outputs) == len(exec_pairs) == len(system_candidates) * self.bsize
@@ -234,7 +236,9 @@ class SIMBA(Teleprompter):
         candidate_programs = [winning_programs[i].deepcopy() for i in program_idxs]
         logger.info(f"VALIDATION: Evaluating {len(candidate_programs)} programs on the full trainset.")
         exec_pairs = [
-            (wrap_program(program=sys, metric=self.metric, run=run), ex) for sys in candidate_programs for ex in trainset
+            (wrap_program(program=sys, metric=self.metric, run=run), ex)
+            for sys in candidate_programs
+            for ex in trainset
         ]
         outputs = cast("list[dict[str, Any]]", await run_parallel(exec_pairs))
         scores = []

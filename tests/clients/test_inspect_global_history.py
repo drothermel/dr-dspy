@@ -17,7 +17,6 @@ from dspy.core.types import (
     ToolCall,
     User,
 )
-from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.utils.dummies import DummyLM
 from dspy.utils.inspect_history import pretty_print_history
@@ -30,12 +29,12 @@ def clear_history():
     return
 
 
-def test_inspect_history_basic(capsys):
+def test_inspect_history_basic(capsys, make_run):
     lm = DummyLM([{"response": "Hello"}, {"response": "How are you?"}])
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     predictor = Predict(ts("query: str -> response: str"))
-    asyncio.run(predictor.acall(query="Hi"))
-    asyncio.run(predictor.acall(query="What's up?"))
+    asyncio.run(predictor.acall(query="Hi", run=run))
+    asyncio.run(predictor.acall(query="What's up?", run=run))
     history = GLOBAL_HISTORY
     assert len(history) > 0
     assert isinstance(history, list)
@@ -43,7 +42,7 @@ def test_inspect_history_basic(capsys):
     assert all(entry.messages for entry in history)
 
 
-def test_inspect_history_renders_message_tool_calls():
+def test_inspect_history_renders_message_tool_calls(make_run):
     out = StringIO()
     history = [
         LMHistoryEntry(
@@ -73,7 +72,7 @@ def test_inspect_history_renders_message_tool_calls():
     assert "cat result" in text
 
 
-def test_inspect_history_renders_output_tool_calls_without_text():
+def test_inspect_history_renders_output_tool_calls_without_text(make_run):
     out = StringIO()
     history = [
         LMHistoryEntry(
@@ -107,13 +106,13 @@ def test_inspect_history_renders_output_tool_calls_without_text():
     assert 'search: {"query": "dogs"}' in text
 
 
-def test_inspect_history_with_n(capsys):
+def test_inspect_history_with_n(capsys, make_run):
     lm = DummyLM([{"response": "One"}, {"response": "Two"}, {"response": "Three"}])
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     predictor = Predict(ts("query: str -> response: str"))
-    asyncio.run(predictor.acall(query="First"))
-    asyncio.run(predictor.acall(query="Second"))
-    asyncio.run(predictor.acall(query="Third"))
+    asyncio.run(predictor.acall(query="First", run=run))
+    asyncio.run(predictor.acall(query="Second", run=run))
+    asyncio.run(predictor.acall(query="Third", run=run))
     inspect_history(n=2)
     out, _err = capsys.readouterr()
     assert "First" not in out
@@ -121,21 +120,21 @@ def test_inspect_history_with_n(capsys):
     assert "Third" in out
 
 
-def test_inspect_empty_history(capsys):
+def test_inspect_empty_history(capsys, make_run):
     lm = DummyLM([])
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     inspect_history()
     history = GLOBAL_HISTORY
     assert len(history) == 0
     assert isinstance(history, list)
 
 
-def test_inspect_history_n_larger_than_history(capsys):
+def test_inspect_history_n_larger_than_history(capsys, make_run):
     lm = DummyLM([{"response": "First"}, {"response": "Second"}])
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     predictor = Predict(ts("query: str -> response: str"))
-    asyncio.run(predictor.acall(query="Query 1"))
-    asyncio.run(predictor.acall(query="Query 2"))
+    asyncio.run(predictor.acall(query="Query 1", run=run))
+    asyncio.run(predictor.acall(query="Query 2", run=run))
     inspect_history(n=5)
     history = GLOBAL_HISTORY
     assert len(history) == 2

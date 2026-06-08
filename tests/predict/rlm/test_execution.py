@@ -8,6 +8,7 @@ from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
 from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
 from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
+from dspy.utils.dummies import DummyLM
 from tests.mock_interpreter import MockInterpreter
 from tests.predict.rlm.conftest import make_mock_predictor
 from tests.task_spec.helpers import ts
@@ -136,34 +137,34 @@ class TestREPLTypes:
         assert "100 characters omitted" in formatted
         assert "200 chars" in formatted
 
-    def test_repl_entry_format_no_truncation(self):
+    def test_repl_entry_format_no_truncation(self, make_run):
         output = "a" * 50
         entry = REPLEntry(code="print('a')", output=output)
         formatted = entry.format(index=0, max_output_chars=100)
         assert output in formatted
         assert "omitted" not in formatted
 
-    def test_repl_history_threads_max_output_chars(self):
+    def test_repl_history_threads_max_output_chars(self, make_run):
         h = REPLHistory(max_output_chars=50)
         h2 = h.append(code="print(1)", output="a" * 100)
         assert h2.max_output_chars == 50
         formatted = h2.format()
         assert "50 characters omitted" in formatted
 
-    def test_repl_variable_from_value(self):
+    def test_repl_variable_from_value(self, make_run):
         var = REPLVariable.from_value("test", "hello world")
         assert var.name == "test"
         assert var.type_name == "str"
         assert var.total_length == 11
         assert "hello world" in var.preview
 
-    def test_repl_variable_truncation(self):
+    def test_repl_variable_truncation(self, make_run):
         var = REPLVariable.from_value("big", "a" * 500 + "b" * 500, preview_chars=50)
         assert var.preview.startswith("a" * 25)
         assert var.preview.endswith("b" * 25)
         assert "..." in var.preview
 
-    def test_repl_variable_with_field_info(self):
+    def test_repl_variable_with_field_info(self, make_run):
         spec = make_task_spec(
             {
                 "query": FieldSpec.input(
@@ -182,7 +183,7 @@ class TestREPLTypes:
         assert "Description: The user's question" in formatted
         assert "Constraints:" in formatted
 
-    def test_repl_variable_without_field_info(self):
+    def test_repl_variable_without_field_info(self, make_run):
         var = REPLVariable.from_value("data", [1, 2, 3])
         assert var.desc == ""
         assert var.constraints == ""
@@ -190,7 +191,7 @@ class TestREPLTypes:
         assert "Description:" not in formatted
         assert "Constraints:" not in formatted
 
-    def test_build_variables_includes_field_metadata(self):
+    def test_build_variables_includes_field_metadata(self, make_run):
         QASig = make_task_spec(
             {
                 "context": FieldSpec.input("context", desc="Background information"),
@@ -209,16 +210,17 @@ class TestREPLTypes:
 
 
 class TestRLMCallMethod:
-    def test_call_executes_rlm(self):
+    def test_call_executes_rlm(self, make_run):
         mock = MockInterpreter(responses=[FinalOutput({"answer": "42"})])
         rlm = RLM(ts("query -> answer"), max_iterations=3, interpreter=mock)
         rlm.generate_action = make_mock_predictor([{"reasoning": "Return answer", "code": 'SUBMIT("42")'}])
-        result = asyncio.run(rlm(query="What is the answer?"))
+        run = make_run(lm=DummyLM([{}]))
+        result = asyncio.run(rlm(query="What is the answer?", run=run))
         assert result.answer == "42"
 
 
 class TestRLMMaxIterationsFallback:
-    def test_max_iterations_triggers_extract(self):
+    def test_max_iterations_triggers_extract(self, make_run):
         mock = MockInterpreter(responses=["exploring...", "still exploring...", "more exploring..."])
         rlm = RLM(ts("query -> answer"), max_iterations=3, interpreter=mock)
         rlm.generate_action = make_mock_predictor(
@@ -229,13 +231,14 @@ class TestRLMMaxIterationsFallback:
             ]
         )
         rlm.extract = make_mock_predictor([{"answer": "extracted_answer"}])
-        result = asyncio.run(rlm(query="test"))
+        run = make_run(lm=DummyLM([{}]))
+        result = asyncio.run(rlm(query="test", run=run))
         assert result.answer == "extracted_answer"
         assert result.final_reasoning == "Extract forced final output"
 
 
 class TestRLMToolExceptions:
-    def test_tool_exception_returns_error_in_output(self):
+    def test_tool_exception_returns_error_in_output(self, make_run):
 
         def failing_tool() -> str:
             raise RuntimeError("Tool failed!")
@@ -255,10 +258,11 @@ class TestRLMToolExceptions:
                 {"reasoning": "Recover", "code": 'SUBMIT("recovered")'},
             ]
         )
-        result = asyncio.run(rlm(query="test"))
+        run = make_run(lm=DummyLM([{}]))
+        result = asyncio.run(rlm(query="test", run=run))
         assert result.answer == "recovered"
 
-    def test_runtime_error_history_uses_stripped_code(self):
+    def test_runtime_error_history_uses_stripped_code(self, make_run):
         mock = MockInterpreter(
             responses=[CodeInterpreterError("NameError: name 'x' is not defined"), FinalOutput({"answer": "recovered"})]
         )
@@ -269,12 +273,13 @@ class TestRLMToolExceptions:
                 {"reasoning": "Recover", "code": 'SUBMIT("recovered")'},
             ]
         )
-        result = asyncio.run(rlm(query="test"))
+        run = make_run(lm=DummyLM([{}]))
+        result = asyncio.run(rlm(query="test", run=run))
         assert result.answer == "recovered"
         first_step = result.trajectory[0]
         assert first_step["code"] == "print(x)"
 
-    def test_syntax_error_from_execute_is_recoverable(self):
+    def test_syntax_error_from_execute_is_recoverable(self, make_run):
         mock = MockInterpreter(responses=[SyntaxError("invalid syntax"), FinalOutput({"answer": "recovered"})])
         rlm = RLM(ts("query -> answer"), max_iterations=5, interpreter=mock)
         rlm.generate_action = make_mock_predictor(
@@ -283,11 +288,12 @@ class TestRLMToolExceptions:
                 {"reasoning": "Recover", "code": 'SUBMIT("recovered")'},
             ]
         )
-        result = asyncio.run(rlm(query="test"))
+        run = make_run(lm=DummyLM([{}]))
+        result = asyncio.run(rlm(query="test", run=run))
         assert result.answer == "recovered"
         assert result.trajectory[0]["output"].startswith("[Error] invalid syntax")
 
-    def test_syntax_error_from_strip_code_fences_is_recoverable(self):
+    def test_syntax_error_from_strip_code_fences_is_recoverable(self, make_run):
         mock = MockInterpreter(responses=[FinalOutput({"answer": "recovered"})])
         rlm = RLM(ts("query -> answer"), max_iterations=5, interpreter=mock)
         rlm.generate_action = make_mock_predictor(
@@ -296,31 +302,34 @@ class TestRLMToolExceptions:
                 {"reasoning": "Recover", "code": 'SUBMIT("recovered")'},
             ]
         )
-        result = asyncio.run(rlm(query="test"))
+        run = make_run(lm=DummyLM([{}]))
+        result = asyncio.run(rlm(query="test", run=run))
         assert result.answer == "recovered"
         assert result.trajectory[0]["output"].startswith("[Error]")
 
 
 class TestRLMAsyncMock:
     @pytest.mark.asyncio
-    async def test_aforward_basic(self):
+    async def test_aforward_basic(self, make_run):
         mock = MockInterpreter(responses=[FinalOutput({"answer": "42"})])
         rlm = RLM(ts("query -> answer"), max_iterations=3, interpreter=mock)
         rlm.generate_action = make_mock_predictor([{"reasoning": "Return answer", "code": 'SUBMIT("42")'}])
-        result = await rlm.aforward(query="What is the answer?")
+        run = make_run(lm=DummyLM([{}]))
+        result = await rlm.aforward(query="What is the answer?", run=run)
         assert result.answer == "42"
 
     @pytest.mark.asyncio
-    async def test_aforward_int_output_mock(self):
+    async def test_aforward_int_output_mock(self, make_run):
         mock = MockInterpreter(responses=[FinalOutput({"count": 42})])
         rlm = RLM(ts("query -> count: int"), max_iterations=3, interpreter=mock)
         rlm.generate_action = make_mock_predictor([{"reasoning": "Return count", "code": "SUBMIT(42)"}])
-        result = await rlm.aforward(query="count items")
+        run = make_run(lm=DummyLM([{}]))
+        result = await rlm.aforward(query="count items", run=run)
         assert result.count == 42
         assert isinstance(result.count, int)
 
     @pytest.mark.asyncio
-    async def test_aforward_multi_iteration_mock(self):
+    async def test_aforward_multi_iteration_mock(self, make_run):
         mock = MockInterpreter(responses=["explored data", FinalOutput({"answer": "done"})])
         rlm = RLM(ts("query -> answer"), max_iterations=5, interpreter=mock)
         rlm.generate_action = make_mock_predictor(
@@ -329,7 +338,8 @@ class TestRLMAsyncMock:
                 {"reasoning": "Now finish", "code": 'SUBMIT("done")'},
             ]
         )
-        result = await rlm.aforward(query="test")
+        run = make_run(lm=DummyLM([{}]))
+        result = await rlm.aforward(query="test", run=run)
         assert result.answer == "done"
 
 
@@ -344,18 +354,20 @@ class TestRLMTypeCoercionMock:
             ("answer", "Literal['yes', 'no']", "yes", 'SUBMIT("yes")', "yes"),
         ],
     )
-    def test_type_coercion(self, output_field, output_type, final_value, code, expected):
+    def test_type_coercion(self, output_field, output_type, final_value, code, expected, make_run):
         mock = MockInterpreter(responses=[FinalOutput({output_field: final_value})])
         rlm = RLM(ts(f"query -> {output_field}: {output_type}"), max_iterations=3, interpreter=mock)
         rlm.generate_action = make_mock_predictor([{"reasoning": "Return value", "code": code}])
-        result = asyncio.run(rlm(query="test"))
+        run = make_run(lm=DummyLM([{}]))
+        result = asyncio.run(rlm(query="test", run=run))
         assert getattr(result, output_field) == expected
 
-    def test_type_error_retries(self):
+    def test_type_error_retries(self, make_run):
         mock = MockInterpreter(responses=[FinalOutput({"answer": "maybe"}), FinalOutput({"answer": "yes"})])
         rlm = RLM(ts("query -> answer: Literal['yes', 'no']"), max_iterations=5, interpreter=mock)
         rlm.generate_action = make_mock_predictor(
             [{"reasoning": "Try maybe", "code": 'SUBMIT("maybe")'}, {"reasoning": "Try yes", "code": 'SUBMIT("yes")'}]
         )
-        result = asyncio.run(rlm(query="is it yes?"))
+        run = make_run(lm=DummyLM([{}]))
+        result = asyncio.run(rlm(query="is it yes?", run=run))
         assert result.answer == "yes"

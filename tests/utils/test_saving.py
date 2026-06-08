@@ -5,7 +5,6 @@ from unittest.mock import patch
 import pytest
 from typing_extensions import override
 
-from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
@@ -19,7 +18,7 @@ from tests.task_spec.helpers import ts
 QA_TASK_SPEC = ts("question->answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",)))
 
 
-def test_save_predict(tmp_path):
+def test_save_predict(tmp_path, make_run):
     predict = Predict(QA_TASK_SPEC)
     predict.save(tmp_path, save_program=True)
     assert (tmp_path / "metadata.json").exists()
@@ -29,7 +28,7 @@ def test_save_predict(tmp_path):
     assert predict.task_spec.equals(loaded_predict.task_spec)
 
 
-def test_save_custom_model(tmp_path):
+def test_save_custom_model(tmp_path, make_run):
 
     class CustomModel(Module):
         def __init__(self):
@@ -45,7 +44,7 @@ def test_save_custom_model(tmp_path):
         assert predictor.task_spec.equals(loaded_predictor.task_spec)
 
 
-def test_save_model_with_custom_signature(tmp_path):
+def test_save_model_with_custom_signature(tmp_path, make_run):
     import datetime
 
     MySignature = make_task_spec(
@@ -68,9 +67,9 @@ def test_save_model_with_custom_signature(tmp_path):
 
 
 @pytest.mark.extra
-def test_save_compiled_model(tmp_path):
+def test_save_compiled_model(tmp_path, make_run):
     predict = Predict(QA_TASK_SPEC)
-    settings.configure(lm=DummyLM([{"answer": "blue"}, {"answer": "white"}] * 10))
+    run = make_run(lm=DummyLM([{"answer": "blue"}, {"answer": "white"}] * 10))
     trainset = [
         {"question": "What is the color of the sky?", "answer": "blue"},
         {"question": "What is the color of the ocean?", "answer": "blue"},
@@ -83,7 +82,7 @@ def test_save_compiled_model(tmp_path):
         return True
 
     optimizer = BootstrapFewShot(max_bootstrapped_demos=4, max_labeled_demos=4, max_rounds=5, metric=dummy_metric)
-    compiled_predict = asyncio.run(optimizer.compile(predict, trainset=trainset))
+    compiled_predict = asyncio.run(optimizer.compile(predict, trainset=trainset, run=run))
     compiled_predict.save(tmp_path, save_program=True)
     loaded_predict = load(tmp_path, allow_pickle=True)
     assert compiled_predict.demos == loaded_predict.demos

@@ -77,7 +77,6 @@ class ReAct(Module):
 
     async def aforward(self, **input_args):
         run = resolve_run(run=input_args.pop("run", None), bound_run=self.run)
-        input_args["run"] = run
         trajectory = {}
         max_iters = input_args.pop("max_iters", self.max_iters)
         for idx in range(max_iters):

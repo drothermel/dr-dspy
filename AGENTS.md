@@ -72,27 +72,33 @@ Field descriptions must be explicit under strict transparency (placeholder `${fi
 
 ## Strict transparency and audit logging
 
-`transparency` defaults to `"strict"`. Configure explicit LM and adapter settings before running modules:
+`transparency` defaults to `"strict"`. Create an explicit `RunContext` and pass `run=` to module, evaluation, and optimizer calls:
 
 ```python
+import asyncio
+
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
-from dspy.dsp.utils.settings import settings
+from dspy.runtime import RunContext, TelemetryConfig
 
-settings.configure(
+run = RunContext.create(
     lm=LM("openai/gpt-4o-mini", temperature=0.0, max_tokens=4000, cache=False),
     adapter=JSONAdapter(),
+    init_run_log=False,
 )
+result = asyncio.run(program(question="What is DSPy?", run=run))
 ```
 
-Opt down for legacy behavior: `settings.configure(transparency="off")`.
+Opt down for legacy behavior: `TelemetryConfig(transparency="off", run_log_enabled=False)` on `RunContext.create`.
 
 Environment variables:
 
 - `DSPY_LOG_DIR` — root directory for run logs (default: `logs/` relative to cwd)
 - `DSPY_RUN_ID` — experiment bucket name (default: `default_run`)
 
-Each `settings.configure(...)` creates `{DSPY_LOG_DIR}/{DSPY_RUN_ID}/{timestamp}/` with `run.json` and append-only `calls.jsonl` for every LM call.
+Each `RunContext.create(...)` with `run_log_enabled=True` creates `{DSPY_LOG_DIR}/{DSPY_RUN_ID}/{timestamp}/` with `run.json` and append-only `calls.jsonl` for every LM call.
+
+See `docs/migration/runcontext.md` for the full settings → RunContext translation table.
 
 Optimizer/bootstrap teacher contexts must include a configured `adapter` (use `optimizer_lm_context` from `dspy.teleprompt.utils`).
 

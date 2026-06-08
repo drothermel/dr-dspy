@@ -61,8 +61,9 @@ async def bootstrap_trace_data(
 
     async def patched_aforward(program_to_use: Module, **kwargs):
         item_run = run.fork(trace=[])
+        call_kwargs = {k: v for k, v in kwargs.items() if k != "run"}
         try:
-            return (await original_aforward(**kwargs, run=item_run), list(item_run.trace))
+            return (await original_aforward(**call_kwargs, run=item_run), list(item_run.trace))
         except AdapterParseError as e:
             completion_str = e.lm_response
             parsed_result = e.parsed_result

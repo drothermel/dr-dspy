@@ -118,7 +118,9 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 )
         results: dict[str, str] = {}
         proposer = Predict(FrameworkGepaInstructionProposalTaskSpec())
-        with optimizer_lm_context(self.run, lm=reflection_lm, phase="gepa.reflection", lm_role="reflection_lm") as opt_run:
+        with optimizer_lm_context(
+            self.run, lm=reflection_lm, phase="gepa.reflection", lm_role="reflection_lm"
+        ) as opt_run:
             for name in components_to_update:
                 base_instruction = candidate[name]
                 dataset_with_feedback = reflective_dataset[name]
@@ -265,7 +267,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 if isinstance(outputs, FailedPrediction):
                     from dspy.compile.resolve import resolve_adapter
 
-                    adapter, _ = resolve_adapter(settings.adapter, transparency=settings.get("transparency", "strict"))
+                    adapter, _ = resolve_adapter(self.run.adapter, transparency=self.run.telemetry.transparency)
                     structure_instruction = ""
                     for message in adapter.format(task_spec=get_task_spec(module), demos=[], inputs={}):
                         structure_instruction += message.role + ": " + (message.text or "") + "\n"

@@ -13,7 +13,7 @@ from tests.task_spec.helpers import ts
 @pytest.mark.parametrize(
     "demo_candidates", [None, [[[Example(question="What is the capital of France?", answer="Paris")]]]]
 )
-def test_propose_instructions_for_program(demo_candidates):
+def test_propose_instructions_for_program(demo_candidates, make_run):
     prompt_model = DummyLM([{"proposed_instruction": "instruction"}] * 10)
     program = Predict(ts("question -> answer"))
     trainset = []
@@ -25,9 +25,10 @@ def test_propose_instructions_for_program(demo_candidates):
         use_dataset_summary=False,
         program_aware=False,
     )
+    run = make_run(lm=prompt_model)
     result = asyncio.run(
         proposer.propose_instructions_for_program(
-            trainset=trainset, program=program, demo_candidates=demo_candidates, trial_logs={}, N=1
+            trainset=trainset, program=program, demo_candidates=demo_candidates, trial_logs={}, N=1, run=run
         )
     )
     assert isinstance(result, dict)
@@ -39,7 +40,7 @@ def test_propose_instructions_for_program(demo_candidates):
 @pytest.mark.parametrize(
     "demo_candidates", [None, [[[Example(question="What is the capital of France?", answer="Paris")]]]]
 )
-def test_propose_instruction_for_predictor(demo_candidates):
+def test_propose_instruction_for_predictor(demo_candidates, make_run):
 
     class TrackingDummyLM(DummyLM):
         @override
@@ -52,6 +53,7 @@ def test_propose_instruction_for_predictor(demo_candidates):
     proposer = GroundedProposer(
         prompt_model=prompt_model, program=program, trainset=[], verbose=False, init_temperature=0.7
     )
+    run = make_run(lm=prompt_model)
     result = asyncio.run(
         proposer.propose_instruction_for_predictor(
             program=program,
@@ -61,6 +63,7 @@ def test_propose_instruction_for_predictor(demo_candidates):
             demo_set_i=0,
             trial_logs={},
             tip=None,
+            run=run,
         )
     )
     assert result == "instruction"

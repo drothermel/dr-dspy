@@ -7,7 +7,6 @@ import pydantic
 import pytest
 
 from dspy.adapters.types.file import File, encode_file_to_dict
-from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
@@ -51,16 +50,16 @@ def count_messages_with_file_pattern(messages):
     return count_patterns(messages, pattern)
 
 
-def setup_predictor(spec, expected_output):
+def setup_predictor(spec, expected_output, make_run):
     lm = DummyLM([expected_output])
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     if isinstance(spec, str):
         task_spec = ts(spec)
     elif isinstance(spec, TaskSpec):
         task_spec = spec
     else:
         raise TypeError(f"Expected str or TaskSpec, got {type(spec).__name__}")
-    return (Predict(task_spec), lm)
+    return Predict(task_spec), lm, run
 
 
 def test_file_from_local_path(sample_text_file):
@@ -112,18 +111,18 @@ def test_file_from_file_id_with_filename():
     assert file_obj.filename == "document.pdf"
 
 
-def test_file_from_dict_with_file_data():
+def test_file_from_dict_with_file_data(make_run):
     file_obj = File(file_data="data:text/plain;base64,dGVzdA==", filename="test.txt")
     assert file_obj.file_data == "data:text/plain;base64,dGVzdA=="
     assert file_obj.filename == "test.txt"
 
 
-def test_file_from_dict_with_file_id():
+def test_file_from_dict_with_file_id(make_run):
     file_obj = File(file_id="file-xyz789")
     assert file_obj.file_id == "file-xyz789"
 
 
-def test_file_format_with_file_data():
+def test_file_format_with_file_data(make_run):
     file_obj = File.from_bytes(b"test", filename="test.txt")
     formatted = file_obj.format()
     assert isinstance(formatted, list)
@@ -134,14 +133,14 @@ def test_file_format_with_file_data():
     assert "filename" in formatted[0]["file"]
 
 
-def test_file_format_with_file_id():
+def test_file_format_with_file_id(make_run):
     file_obj = File.from_file_id("file-123")
     formatted = file_obj.format()
     assert formatted[0]["type"] == "file"
     assert formatted[0]["file"]["file_id"] == "file-123"
 
 
-def test_file_repr_with_file_data():
+def test_file_repr_with_file_data(make_run):
     file_obj = File.from_bytes(b"Test content", filename="test.txt")
     repr_str = repr(file_obj)
     assert "DATA_URI" in repr_str
@@ -149,91 +148,91 @@ def test_file_repr_with_file_data():
     assert "filename='test.txt'" in repr_str
 
 
-def test_file_repr_with_file_id():
+def test_file_repr_with_file_id(make_run):
     file_obj = File.from_file_id("file-abc", filename="doc.pdf")
     repr_str = repr(file_obj)
     assert "file_id='file-abc'" in repr_str
     assert "filename='doc.pdf'" in repr_str
 
 
-def test_file_str():
+def test_file_str(make_run):
     file_obj = File.from_bytes(b"test")
     str_repr = str(file_obj)
     assert str_repr.startswith('[{"type": "file",')
     assert str_repr.endswith("}]")
 
 
-def test_encode_file_to_dict_from_path(sample_text_file):
+def test_encode_file_to_dict_from_path(sample_text_file, make_run):
     result = encode_file_to_dict(sample_text_file)
     assert "file_data" in result
     assert result["file_data"].startswith("data:text/plain;base64,")
     assert "filename" in result
 
 
-def test_encode_file_to_dict_from_bytes():
+def test_encode_file_to_dict_from_bytes(make_run):
     result = encode_file_to_dict(b"test content")
     assert "file_data" in result
     assert result["file_data"].startswith("data:application/octet-stream;base64,")
 
 
-def test_invalid_file_string():
+def test_invalid_file_string(make_run):
     with pytest.raises(ValueError, match="Unrecognized"):
         encode_file_to_dict("https://this_is_not_a_file_path")
 
 
-def test_invalid_dict():
+def test_invalid_dict(make_run):
     with pytest.raises(ValueError, match="must contain at least one"):
         File(invalid="dict")
 
 
-def test_file_in_signature(sample_text_file):
+def test_file_in_signature(sample_text_file, make_run):
     signature = "document: File -> summary: str"
     expected = {"summary": "This is a summary"}
-    predictor, lm = setup_predictor(signature, expected)
+    predictor, lm, run = setup_predictor(signature, expected, make_run)
     file_obj = File.from_path(sample_text_file)
-    result = asyncio.run(predictor(document=file_obj))
+    result = asyncio.run(predictor(document=file_obj, run=run))
     assert result.summary == "This is a summary"
     assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 1
 
 
-def test_file_list_in_signature(sample_text_file):
+def test_file_list_in_signature(sample_text_file, make_run):
     FileListSignature = make_task_spec(
         {"documents": FieldSpec.input("documents", type_=list[File]), "summary": FieldSpec.output("summary")},
         instructions="Summarize documents.",
         name="FileListSignature",
     )
     expected = {"summary": "Multiple files"}
-    predictor, lm = setup_predictor(FileListSignature, expected)
+    predictor, lm, run = setup_predictor(FileListSignature, expected, make_run)
     files = [File.from_path(sample_text_file), File.from_file_id("file-123")]
-    result = asyncio.run(predictor(documents=files))
+    result = asyncio.run(predictor(documents=files, run=run))
     assert result.summary == "Multiple files"
     assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 2
 
 
-def test_optional_file_field():
+def test_optional_file_field(make_run):
     OptionalFileSignature = make_task_spec(
         {"document": FieldSpec.input("document", type_=File | None), "output": FieldSpec.output("output")},
         instructions="Process optional file.",
         name="OptionalFileSignature",
     )
-    predictor, lm = setup_predictor(OptionalFileSignature, {"output": "Hello"})
-    result = asyncio.run(predictor(document=None))
+    predictor, lm, run = setup_predictor(OptionalFileSignature, {"output": "Hello"}, make_run)
+    result = asyncio.run(predictor(document=None, run=run))
     assert result.output == "Hello"
     assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 0
 
 
-def test_save_load_file_signature(sample_text_file):
+def test_save_load_file_signature(sample_text_file, make_run):
     signature = "document: File -> summary: str"
     file_obj = File.from_path(sample_text_file)
     examples = [Example(document=file_obj, summary="Test summary")]
-    predictor, lm = setup_predictor(signature, {"summary": "A summary"})
+    predictor, lm, run = setup_predictor(signature, {"summary": "A summary"}, make_run)
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
+    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False, run=run))
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(ts("document: File -> summary: str"))
         loaded_predictor.load(temp_file.name)
-    asyncio.run(loaded_predictor(document=File.from_file_id("file-test")))
+    asyncio.run(loaded_predictor(document=File.from_file_id("file-test"), run=make_run(lm=lm)))
     assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 2
 
 

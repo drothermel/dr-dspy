@@ -9,7 +9,6 @@ import dspy.adapters.base as adapter_base
 import dspy.adapters.utils as adapter_utils
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool
-from dspy.dsp.utils.settings import settings
 from dspy.predict.react import ReAct
 from dspy.primitives.prediction import Prediction
 from dspy.task_spec import FieldSpec, make_task_spec
@@ -28,7 +27,7 @@ def test_react_requires_tool_instances():
         ReAct(ts("question -> answer"), tools=[search])
 
 
-def test_tool_observation_preserves_custom_type():
+def test_tool_observation_preserves_custom_type(make_run):
     pytest.importorskip("PIL.Image")
     from PIL import Image as PILImage
 
@@ -54,16 +53,16 @@ def test_tool_observation_preserves_custom_type():
         ],
         adapter=adapter,
     )
-    settings.configure(lm=lm, adapter=adapter)
+    run = make_run(lm=lm, adapter=adapter)
     react = ReAct(ts("question -> answer"), tools=[Tool(make_images, description="Create images.")])
-    asyncio.run(react(question="Draw me something red"))
+    asyncio.run(react(question="Draw me something red", run=run))
     sigs_with_obs = [sig for sig, inputs in captured_calls if "observation_0" in inputs]
     assert sigs_with_obs, "Expected ReAct to format a trajectory containing observation_0"
     observation_content = lm.history[1].messages_as_openai[1]["content"]
     assert sum(1 for part in observation_content if isinstance(part, dict) and part.get("type") == "image_url") == 2
 
 
-def test_tool_calling_with_pydantic_args():
+def test_tool_calling_with_pydantic_args(make_run):
 
     class CalendarEvent(BaseModel):
         name: str
@@ -115,13 +114,14 @@ def test_tool_calling_with_pydantic_args():
             },
         ]
     )
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     outputs = asyncio.run(
         react(
             participant_name="Alice",
             event_info=CalendarEvent(
                 name="Science Fair", date="Friday", participants={"Alice": "female", "Bob": "male"}
             ),
+            run=run,
         )
     )
     assert outputs.invitation_letter == "It's my honor to invite Alice to the Science Fair event on Friday."
@@ -145,7 +145,7 @@ def test_tool_calling_with_pydantic_args():
     assert outputs.trajectory == expected_trajectory
 
 
-def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(monkeypatch):
+def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(monkeypatch, make_run):
 
     def get_user_info(name: str):
         return {"name": name}
@@ -183,14 +183,14 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
             },
         ]
     )
-    with settings.context(lm=lm):
-        result = asyncio.run(react(user_request="Help me, my name is Adam"))
+    run = make_run(lm=lm)
+    result = asyncio.run(react(user_request="Help me, my name is Adam", run=run))
     assert result.process_result == "Resolved Adam's request."
     assert result.trajectory["tool_name_0"] == "get_user_info"
     assert result.trajectory["tool_args_0"] == {"name": "Adam"}
 
 
-def test_tool_calling_without_typehint():
+def test_tool_calling_without_typehint(make_run):
 
     def foo(a, b):
         return a + b
@@ -203,8 +203,8 @@ def test_tool_calling_without_typehint():
             {"reasoning": "I added the numbers successfully", "c": 3},
         ]
     )
-    settings.configure(lm=lm)
-    outputs = asyncio.run(react(a=1, b=2))
+    run = make_run(lm=lm)
+    outputs = asyncio.run(react(a=1, b=2, run=run))
     expected_trajectory = {
         "thought_0": "I need to add two numbers.",
         "tool_name_0": "foo",
@@ -218,7 +218,9 @@ def test_tool_calling_without_typehint():
     assert outputs.trajectory == expected_trajectory
 
 
-def test_trajectory_truncation():
+def test_trajectory_truncation(make_run):
+
+    run = make_run(lm=DummyLM([{}]))
 
     def echo(text: str) -> str:
         return f"Echoed: {text}"
@@ -245,14 +247,14 @@ def test_trajectory_truncation():
         return Prediction(output_text="Final output")
 
     react.extract = mock_extract
-    result = asyncio.run(react(input_text="test input"))
+    result = asyncio.run(react(input_text="test input", run=run))
     assert "thought_0" not in result.trajectory
     assert "thought_2" in result.trajectory
     assert result.output_text == "Final output"
 
 
 @pytest.mark.asyncio
-async def test_context_window_exceeded_after_retries():
+async def test_context_window_exceeded_after_retries(make_run):
 
     def echo(text: str) -> str:
         return f"Echoed: {text}"
@@ -270,7 +272,8 @@ async def test_context_window_exceeded_after_retries():
 
     react.react = mock_react
     react.extract = mock_extract
-    result = await react(input_text="test input")
+    run = make_run(lm=DummyLM([{}]))
+    result = await react(input_text="test input", run=run)
     assert result.trajectory == {}
     assert result.output_text == "Fallback output"
     assert len(extract_calls) == 1
@@ -278,7 +281,7 @@ async def test_context_window_exceeded_after_retries():
     assert "trajectory" in extract_calls[0]
 
 
-def test_error_retry():
+def test_error_retry(make_run):
 
     def foo(a, b):
         raise Exception("tool error")
@@ -291,8 +294,8 @@ def test_error_retry():
             {"reasoning": "I added the numbers successfully", "c": 3},
         ]
     )
-    settings.configure(lm=lm)
-    outputs = asyncio.run(react(a=1, b=2, max_iters=2))
+    run = make_run(lm=lm)
+    outputs = asyncio.run(react(a=1, b=2, max_iters=2, run=run))
     traj = outputs.trajectory
     control_expected = {
         "thought_0": "I need to add two numbers.",
@@ -310,7 +313,7 @@ def test_error_retry():
 
 
 @pytest.mark.asyncio
-async def test_async_tool_calling_with_pydantic_args():
+async def test_async_tool_calling_with_pydantic_args(make_run):
 
     class CalendarEvent(BaseModel):
         name: str
@@ -362,13 +365,12 @@ async def test_async_tool_calling_with_pydantic_args():
             },
         ]
     )
-    with settings.context(lm=lm):
-        outputs = await react.acall(
-            participant_name="Alice",
-            event_info=CalendarEvent(
-                name="Science Fair", date="Friday", participants={"Alice": "female", "Bob": "male"}
-            ),
-        )
+    run = make_run(lm=lm)
+    outputs = await react.acall(
+        participant_name="Alice",
+        event_info=CalendarEvent(name="Science Fair", date="Friday", participants={"Alice": "female", "Bob": "male"}),
+        run=run,
+    )
     assert outputs.invitation_letter == "It's my honor to invite Alice to the Science Fair event on Friday."
     expected_trajectory = {
         "thought_0": "I need to write an invitation letter for Alice to the Science Fair event.",
@@ -391,7 +393,7 @@ async def test_async_tool_calling_with_pydantic_args():
 
 
 @pytest.mark.asyncio
-async def test_async_error_retry():
+async def test_async_error_retry(make_run):
 
     async def foo(a, b):
         raise Exception("tool error")
@@ -404,8 +406,8 @@ async def test_async_error_retry():
             {"reasoning": "I added the numbers successfully", "c": 3},
         ]
     )
-    with settings.context(lm=lm):
-        outputs = await react.acall(a=1, b=2, max_iters=2)
+    run = make_run(lm=lm)
+    outputs = await react.acall(a=1, b=2, max_iters=2, run=run)
     traj = outputs.trajectory
     control_expected = {
         "thought_0": "I need to add two numbers.",

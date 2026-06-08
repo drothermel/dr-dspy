@@ -107,8 +107,9 @@ class ProgramOfThought(Module):
             return (None, str(e))
 
     async def aforward(self, **kwargs):
+        run = kwargs.get("run")
         input_kwargs = {field_name: kwargs[field_name] for field_name in self.input_fields}
-        code_data = await self.code_generate(**input_kwargs)
+        code_data = await self.code_generate(**input_kwargs, run=run)
         output = None
         code, error = self._parse_code(code_data)
         if not error:
@@ -120,12 +121,12 @@ class ProgramOfThought(Module):
                 self.interpreter.shutdown()
                 raise RuntimeError(f"Max hops reached. Failed to run ProgramOfThought: {error}")
             input_kwargs.update({"previous_code": code, "error": error})
-            code_data = await self.code_regenerate(**input_kwargs)
+            code_data = await self.code_regenerate(**input_kwargs, run=run)
             code, error = self._parse_code(code_data)
             if not error:
                 output, error = self._execute_code(code)
             hop += 1
         input_kwargs.update({"final_generated_code": code, "code_output": output})
-        output_gen_result = await self.generate_output(**input_kwargs)
+        output_gen_result = await self.generate_output(**input_kwargs, run=run)
         self.interpreter.shutdown()
         return output_gen_result

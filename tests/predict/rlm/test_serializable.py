@@ -8,6 +8,7 @@ from dspy.predict.rlm import RLM
 from dspy.primitives.code_interpreter import FinalOutput
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.primitives.sandbox_serializable import SandboxSerializable
+from dspy.utils.dummies import DummyLM
 from tests.mock_interpreter import MockInterpreter
 from tests.predict.rlm.conftest import _BinarySerializable, _StubSerializable, make_mock_predictor
 from tests.task_spec.helpers import ts
@@ -24,7 +25,7 @@ class TestBuildVariablesWithSerializable:
         assert "test query" in query_var.preview
         assert "import json" in data_var.desc
 
-    def test_regular_values_unchanged(self):
+    def test_regular_values_unchanged(self, make_run):
         rlm = RLM(ts("context -> answer"))
         variables = rlm._build_variables(context="plain text")
         assert len(variables) == 1
@@ -33,7 +34,7 @@ class TestBuildVariablesWithSerializable:
 
 
 class TestPrepareSerializableVars:
-    def test_separates_serializable_from_regular(self):
+    def test_separates_serializable_from_regular(self, make_run):
         mock = MockInterpreter(responses=["", FinalOutput({"answer": "42"})])
         rlm = RLM(ts("data, query -> answer"), max_iterations=3, interpreter=mock)
         stub = _StubSerializable("payload")
@@ -47,7 +48,7 @@ class TestPrepareSerializableVars:
         assert "import json" in code
         assert "_raw_data" in variables
 
-    def test_no_serializable_returns_all(self):
+    def test_no_serializable_returns_all(self, make_run):
         mock = MockInterpreter(responses=[FinalOutput({"answer": "42"})])
         rlm = RLM(ts("query -> answer"), max_iterations=3, interpreter=mock)
         rlm._inject_execution_context(mock, rlm._prepare_execution_tools())
@@ -55,7 +56,7 @@ class TestPrepareSerializableVars:
         assert regular == {"query": "hello"}
         assert mock.call_count == 0
 
-    def test_binary_payload_uses_base64_transport(self):
+    def test_binary_payload_uses_base64_transport(self, make_run):
         mock = MockInterpreter(responses=[""])
         rlm = RLM(ts("data, query -> answer"), interpreter=mock)
         payload = _BinarySerializable()
@@ -66,7 +67,7 @@ class TestPrepareSerializableVars:
         assert "_raw_data = base64.b64decode(_raw_data_base64)" in code
         assert variables["_raw_data_base64"] == base64.b64encode(b"\xff\xfe\xfd").decode("ascii")
 
-    def test_large_payload_not_inlined_in_code(self):
+    def test_large_payload_not_inlined_in_code(self, make_run):
         mock = MockInterpreter(responses=[""])
         rlm = RLM(ts("data, query -> answer"), interpreter=mock)
         large_text = "x" * (2 * 1024 * 1024)
@@ -96,12 +97,13 @@ class TestPrepareSerializableVars:
         assert large_text not in code
         assert len(code) < 1000
 
-    def test_forward_with_serializable(self):
+    def test_forward_with_serializable(self, make_run):
         mock = MockInterpreter(responses=["", FinalOutput({"answer": "done"})])
         rlm = RLM(ts("data, query -> answer"), max_iterations=3, interpreter=mock)
         rlm.generate_action = make_mock_predictor([{"reasoning": "Done", "code": 'SUBMIT("done")'}])
         stub = _StubSerializable("test_payload")
-        result = asyncio.run(rlm(data=stub, query="test"))
+        run = make_run(lm=DummyLM([{}]))
+        result = asyncio.run(rlm(data=stub, query="test", run=run))
         assert result.answer == "done"
         assert mock.call_count == 2
 

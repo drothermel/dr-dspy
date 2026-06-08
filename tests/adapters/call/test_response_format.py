@@ -2,7 +2,7 @@ import pytest
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
-from tests.adapters.conftest import CapturingLM, StopAdapterCallCapture
+from tests.adapters.conftest import CapturingLM, StopAdapterCallCapture, make_adapter_run
 from tests.task_spec.helpers import ts
 
 
@@ -18,6 +18,7 @@ async def test_json_adapter_passes_structured_output_when_supported():
             task_spec=signature,
             demos=[],
             inputs={"question": "hi"},
+            run=make_adapter_run(lm=lm, adapter=adapter),
         )
     request = lm.calls[0]["request"]
     response_format = request.config.response_format
@@ -38,6 +39,13 @@ async def test_json_adapter_uses_json_object_mode_without_response_schema_suppor
 
     lm = NoSchemaLM(source_lm)
     with pytest.raises(StopAdapterCallCapture):
-        await adapter.acall(lm=lm, config={}, task_spec=signature, demos=[], inputs={"question": "hi"})
+        await adapter.acall(
+            lm=lm,
+            config={},
+            task_spec=signature,
+            demos=[],
+            inputs={"question": "hi"},
+            run=make_adapter_run(lm=lm, adapter=adapter),
+        )
     request = lm.calls[0]["request"]
     assert request.config.response_format == {"type": "json_object"}

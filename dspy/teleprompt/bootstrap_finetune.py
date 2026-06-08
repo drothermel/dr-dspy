@@ -125,7 +125,9 @@ class BootstrapFinetune(FinetuneTeleprompter):
             logger.info(f"Job {ind + 1}/{num_jobs} is done")
         return key_to_lm
 
-    def _prepare_finetune_data(self, trace_data: list[dict[str, Any]], lm: LM, pred_ind: int | None, *, run: RunContext):
+    def _prepare_finetune_data(
+        self, trace_data: list[dict[str, Any]], lm: LM, pred_ind: int | None, *, run: RunContext
+    ):
         if self.metric:
             logger.info(f"Collected data for {len(trace_data)} examples")
             trace_data = [d for d in trace_data if d["score"]]
@@ -134,9 +136,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
         from dspy.compile.resolve import resolve_adapter
 
         configured_adapter = self.adapter[lm] if isinstance(self.adapter, dict) else self.adapter
-        adapter, _ = resolve_adapter(
-            configured_adapter or run.adapter, transparency=run.telemetry.transparency
-        )
+        adapter, _ = resolve_adapter(configured_adapter or run.adapter, transparency=run.telemetry.transparency)
         data_format = infer_data_format(adapter)
         for item in trace_data:
             for pred_ind, _ in enumerate(item["trace"]):

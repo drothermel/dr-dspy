@@ -37,7 +37,9 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         self.max_labeled_demos = max_labeled_demos
 
     @override
-    async def compile(self, student, *, teacher=None, trainset, run: RunContext, valset=None, restrict=None, labeled_sample=True):
+    async def compile(
+        self, student, *, teacher=None, trainset, run: RunContext, valset=None, restrict=None, labeled_sample=True
+    ):
         self.trainset = trainset
         self.valset = valset or trainset
         effective_max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors

@@ -97,11 +97,11 @@ def mock_bt_dependencies():
         yield (mock_eval, mock_launch, mock_kill)
 
 
-def test_bettertogether_import():
+def test_bettertogether_import(make_run):
     assert BetterTogether is not None, "Failed to import BetterTogether"
 
 
-def test_bettertogether_initialization_default():
+def test_bettertogether_initialization_default(make_run):
     optimizer = BetterTogether(metric=simple_metric)
     assert optimizer.metric == simple_metric, "Metric not correctly initialized"
     assert "p" in optimizer.optimizers, "Default 'p' optimizer not created"
@@ -112,7 +112,7 @@ def test_bettertogether_initialization_default():
     assert isinstance(optimizer.optimizers["w"], BootstrapFinetune), "Default 'w' should be BootstrapFinetune"
 
 
-def test_bettertogether_initialization_custom():
+def test_bettertogether_initialization_custom(make_run):
     custom_p = BootstrapFewShotWithRandomSearch(metric=simple_metric)
     custom_w = BootstrapFinetune(metric=simple_metric)
     optimizer = BetterTogether(metric=simple_metric, p=custom_p, w=custom_w)
@@ -120,7 +120,7 @@ def test_bettertogether_initialization_custom():
     assert optimizer.optimizers["w"] is custom_w, "Custom 'w' optimizer not set"
 
 
-def test_bettertogether_initialization_invalid_optimizer():
+def test_bettertogether_initialization_invalid_optimizer(make_run):
     try:
         BetterTogether(metric=simple_metric, p="not_a_teleprompter")
         raise AssertionError("Should have raised TypeError for invalid optimizer")
@@ -128,7 +128,7 @@ def test_bettertogether_initialization_invalid_optimizer():
         assert "must be a Teleprompter" in str(e)
 
 
-def test_strategy_validation():
+def test_strategy_validation(make_run):
     optimizer = BetterTogether(metric=simple_metric)
     valid_strategies = ["p", "w", "p -> w", "w -> p", "p -> w -> p"]
     for strategy in valid_strategies:
@@ -140,11 +140,12 @@ def test_strategy_validation():
         optimizer._prepare_strategy("")
 
 
-def test_compile_basic():
+def test_compile_basic(make_run):
     from dspy.teleprompt.teleprompt import Teleprompter
 
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "blue"}, {"output": "4"}])
+    run = make_run(lm=lm)
     student.set_lm(lm)
 
     class MockTeleprompter(Teleprompter):
@@ -162,37 +163,41 @@ def test_compile_basic():
         mock_eval.return_value = Mock(score=0.8)
         with patch("dspy.teleprompt.bettertogether.launch_lms"):
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
-                compiled = asyncio.run(optimizer.compile(student, trainset=trainset, valset=valset, strategy="p"))
+                compiled = asyncio.run(
+                    optimizer.compile(student, trainset=trainset, valset=valset, strategy="p", run=run)
+                )
     assert compiled is not None, "Compilation returned None"
     assert hasattr(compiled, "candidate_programs"), "Missing candidate_programs attribute"
     assert hasattr(compiled, "flag_compilation_error_occurred"), "Missing flag_compilation_error_occurred attribute"
     assert mock_p.compile_called, "Mock optimizer compile was not called"
 
 
-def test_trainset_validation():
+def test_trainset_validation(make_run):
     optimizer = BetterTogether(metric=simple_metric)
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
+    run = make_run(lm=lm)
     student.set_lm(lm)
     try:
-        asyncio.run(optimizer.compile(student, trainset=[], valset=valset))
+        asyncio.run(optimizer.compile(student, trainset=[], valset=valset, run=run))
         raise AssertionError("Should have raised ValueError for empty trainset")
     except ValueError as e:
         assert "cannot be empty" in str(e).lower()
 
 
-def test_valset_ratio_validation():
+def test_valset_ratio_validation(make_run):
     optimizer = BetterTogether(metric=simple_metric)
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
+    run = make_run(lm=lm)
     student.set_lm(lm)
     try:
-        asyncio.run(optimizer.compile(student, trainset=trainset, valset_ratio=1.0))
+        asyncio.run(optimizer.compile(student, trainset=trainset, valset_ratio=1.0, run=run))
         raise AssertionError("Should have raised ValueError for valset_ratio >= 1")
     except ValueError as e:
         assert "must be in range [0, 1)" in str(e)
     try:
-        asyncio.run(optimizer.compile(student, trainset=trainset, valset_ratio=-0.1))
+        asyncio.run(optimizer.compile(student, trainset=trainset, valset_ratio=-0.1, run=run))
         raise AssertionError("Should have raised ValueError for valset_ratio < 0")
     except ValueError as e:
         assert "must be in range [0, 1)" in str(e)
@@ -219,7 +224,8 @@ def test_student_in_optimizer_compile_args():
         assert "not allowed" in str(e).lower()
 
 
-def test_compile_args_passed_to_optimizer(student_with_lm, mock_bt_dependencies):
+def test_compile_args_passed_to_optimizer(student_with_lm, mock_bt_dependencies, make_run):
+    run = make_run(lm=student_with_lm.get_lm())
     mock_eval, _, _ = mock_bt_dependencies
     mock_eval.return_value = Mock(score=0.9)
     mock_p = CapturingOptimizer()
@@ -227,7 +233,12 @@ def test_compile_args_passed_to_optimizer(student_with_lm, mock_bt_dependencies)
     custom_args = {"num_trials": 20, "max_bootstrapped_demos": 8}
     asyncio.run(
         optimizer.compile(
-            student_with_lm, trainset=trainset, valset=valset, strategy="p", optimizer_compile_args={"p": custom_args}
+            student_with_lm,
+            trainset=trainset,
+            valset=valset,
+            strategy="p",
+            optimizer_compile_args={"p": custom_args},
+            run=run,
         )
     )
     assert mock_p.received_kwargs is not None, "Optimizer compile was not called"
@@ -237,11 +248,12 @@ def test_compile_args_passed_to_optimizer(student_with_lm, mock_bt_dependencies)
     assert mock_p.received_kwargs["max_bootstrapped_demos"] == 8, "max_bootstrapped_demos value incorrect"
 
 
-def test_compile_args_multi_optimizer_strategy():
+def test_compile_args_multi_optimizer_strategy(make_run):
     from dspy.teleprompt.teleprompt import Teleprompter
 
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
+    run = make_run(lm=lm)
     student.set_lm(lm)
 
     class PromptOptimizer(Teleprompter):
@@ -278,6 +290,7 @@ def test_compile_args_multi_optimizer_strategy():
                             valset=valset,
                             strategy="p -> w",
                             optimizer_compile_args=compile_args,
+                            run=run,
                         )
                     )
     assert mock_p.received_kwargs is not None, "Optimizer 'p' compile was not called"
@@ -290,11 +303,12 @@ def test_compile_args_multi_optimizer_strategy():
     assert mock_w.received_kwargs.get("num_trials") is None, "Optimizer 'w' should not receive 'p' args"
 
 
-def test_compile_args_override_global_params():
+def test_compile_args_override_global_params(make_run):
     from dspy.teleprompt.teleprompt import Teleprompter
 
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
+    run = make_run(lm=lm)
     student.set_lm(lm)
 
     class CapturingTeleprompter(Teleprompter):
@@ -324,6 +338,7 @@ def test_compile_args_override_global_params():
                         teacher=None,
                         strategy="p",
                         optimizer_compile_args=compile_args,
+                        run=run,
                     )
                 )
     assert mock_p.received_kwargs["trainset"] == override_trainset, (
@@ -339,11 +354,12 @@ def test_compile_args_override_global_params():
     assert mock_p.received_kwargs["valset"] != valset, "Override valset should differ from global valset"
 
 
-def test_trainset_shuffling_between_steps():
+def test_trainset_shuffling_between_steps(make_run):
     from dspy.teleprompt.teleprompt import Teleprompter
 
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
+    run = make_run(lm=lm)
     student.set_lm(lm)
     trainsets_received = []
 
@@ -368,6 +384,7 @@ def test_trainset_shuffling_between_steps():
                             valset=valset,
                             strategy="p -> w",
                             shuffle_trainset_between_steps=True,
+                            run=run,
                         )
                     )
     assert len(trainsets_received) == 2, "Should have received trainset twice (for p and w)"
@@ -379,11 +396,12 @@ def test_trainset_shuffling_between_steps():
     )
 
 
-def test_strategy_execution_order():
+def test_strategy_execution_order(make_run):
     from dspy.teleprompt.teleprompt import Teleprompter
 
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
+    run = make_run(lm=lm)
     student.set_lm(lm)
     execution_log = []
 
@@ -409,18 +427,21 @@ def test_strategy_execution_order():
         with patch("dspy.teleprompt.bettertogether.launch_lms"):
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
-                    asyncio.run(optimizer.compile(student, trainset=trainset, valset=valset, strategy="p -> w -> p"))
+                    asyncio.run(
+                        optimizer.compile(student, trainset=trainset, valset=valset, strategy="p -> w -> p", run=run)
+                    )
     assert len(execution_log) == 3, "Should have executed 3 optimization steps"
     assert execution_log[0] == ("p", ["p"]), "First step should be 'p'"
     assert execution_log[1] == ("w", ["p", "w"]), "Second step should be 'w' receiving output from 'p'"
     assert execution_log[2] == ("p", ["p", "w", "p"]), "Third step should be 'p' receiving output from 'w'"
 
 
-def test_lm_lifecycle_management():
+def test_lm_lifecycle_management(make_run):
     from dspy.teleprompt.teleprompt import Teleprompter
 
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
+    run = make_run(lm=lm)
     student.set_lm(lm)
 
     class SimpleOptimizer(Teleprompter):
@@ -436,16 +457,19 @@ def test_lm_lifecycle_management():
         with patch("dspy.teleprompt.bettertogether.launch_lms") as mock_launch:
             with patch("dspy.teleprompt.bettertogether.kill_lms") as mock_kill:
                 with patch.object(optimizer, "_models_changed", return_value=True):
-                    asyncio.run(optimizer.compile(student, trainset=trainset, valset=valset, strategy="p -> w"))
+                    asyncio.run(
+                        optimizer.compile(student, trainset=trainset, valset=valset, strategy="p -> w", run=run)
+                    )
     assert mock_launch.called, "launch_lms should be called when models change"
     assert mock_kill.called, "kill_lms should be called when models change"
 
 
-def test_error_handling_returns_best_program():
+def test_error_handling_returns_best_program(make_run):
     from dspy.teleprompt.teleprompt import Teleprompter
 
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
+    run = make_run(lm=lm)
     student.set_lm(lm)
 
     class SuccessfulOptimizer(Teleprompter):
@@ -469,7 +493,7 @@ def test_error_handling_returns_best_program():
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
                     result = asyncio.run(
-                        optimizer.compile(student, trainset=trainset, valset=valset, strategy="p -> w")
+                        optimizer.compile(student, trainset=trainset, valset=valset, strategy="p -> w", run=run)
                     )
     assert result is not None, "Should return a program even if a step fails"
     assert hasattr(result, "flag_compilation_error_occurred"), "Should have error flag"
@@ -485,7 +509,8 @@ def test_error_handling_returns_best_program():
         (None, "w_optimized", "Without valset: returns latest program (w)"),
     ],
 )
-def test_program_selection(student_with_lm, test_valset, expected_marker, test_description):
+def test_program_selection(student_with_lm, test_valset, expected_marker, test_description, make_run):
+    run = make_run(lm=student_with_lm.get_lm())
     mock_p = MarkedOptimizer("p_optimized")
     mock_w = MarkedOptimizer("w_optimized")
     optimizer = BetterTogether(metric=simple_metric, p=mock_p, w=mock_w)
@@ -496,13 +521,16 @@ def test_program_selection(student_with_lm, test_valset, expected_marker, test_d
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
                     result = asyncio.run(
-                        optimizer.compile(student_with_lm, trainset=trainset, valset=test_valset, strategy="p -> w")
+                        optimizer.compile(
+                            student_with_lm, trainset=trainset, valset=test_valset, strategy="p -> w", run=run
+                        )
                     )
     assert hasattr(result, "marker"), "Result should have marker"
     assert result.marker == expected_marker, test_description
 
 
-def test_candidate_programs_structure(student_with_lm):
+def test_candidate_programs_structure(student_with_lm, make_run):
+    run = make_run(lm=student_with_lm.get_lm())
     mock_p = MarkedOptimizer("p")
     mock_w = MarkedOptimizer("w")
     optimizer = BetterTogether(metric=simple_metric, p=mock_p, w=mock_w)
@@ -512,7 +540,7 @@ def test_candidate_programs_structure(student_with_lm):
             with patch("dspy.teleprompt.bettertogether.kill_lms"):
                 with patch.object(optimizer, "_models_changed", return_value=False):
                     result = asyncio.run(
-                        optimizer.compile(student_with_lm, trainset=trainset, valset=valset, strategy="p -> w")
+                        optimizer.compile(student_with_lm, trainset=trainset, valset=valset, strategy="p -> w", run=run)
                     )
     assert hasattr(result, "candidate_programs"), "Result should have candidate_programs attribute"
     candidates = result.candidate_programs
@@ -533,22 +561,26 @@ def test_candidate_programs_structure(student_with_lm):
     assert baseline[0]["score"] == 0.5, "Baseline should have score 0.5"
 
 
-def test_empty_valset_handling(student_with_lm):
+def test_empty_valset_handling(student_with_lm, make_run):
+    run = make_run(lm=student_with_lm.get_lm())
     mock_p = MarkedOptimizer("optimized")
     optimizer = BetterTogether(metric=simple_metric, p=mock_p)
     with patch("dspy.teleprompt.bettertogether.launch_lms"), patch("dspy.teleprompt.bettertogether.kill_lms"):
         with patch.object(optimizer, "_models_changed", return_value=False):
-            result = asyncio.run(optimizer.compile(student_with_lm, trainset=trainset, valset=[], strategy="p"))
+            result = asyncio.run(
+                optimizer.compile(student_with_lm, trainset=trainset, valset=[], strategy="p", run=run)
+            )
     assert hasattr(result, "marker"), "Result should have marker"
     assert result.marker == "optimized", "Should return the latest program when valset is empty list"
     assert hasattr(result, "candidate_programs"), "Should have candidate_programs"
     student2 = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
+    run = make_run(lm=lm)
     student2.set_lm(lm)
     mock_p2 = MarkedOptimizer("optimized")
     optimizer2 = BetterTogether(metric=simple_metric, p=mock_p2)
     with patch("dspy.teleprompt.bettertogether.launch_lms"), patch("dspy.teleprompt.bettertogether.kill_lms"):
         with patch.object(optimizer2, "_models_changed", return_value=False):
-            result2 = asyncio.run(optimizer2.compile(student2, trainset=trainset, valset=None, strategy="p"))
+            result2 = asyncio.run(optimizer2.compile(student2, trainset=trainset, valset=None, strategy="p", run=run))
     assert hasattr(result2, "marker"), "Result2 should have marker"
     assert result2.marker == "optimized", "Should return the latest program when valset is None"

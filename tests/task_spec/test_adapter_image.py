@@ -10,7 +10,6 @@ import requests
 from PIL import Image as PILImage
 
 from dspy.adapters.types.image import Image, encode_image
-from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
@@ -71,16 +70,16 @@ def count_messages_with_image_url_pattern(messages):
         return 0
 
 
-def setup_predictor(spec, expected_output):
+def setup_predictor(spec, expected_output, make_run):
     lm = DummyLM([expected_output])
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     if isinstance(spec, str):
         task_spec = ts(spec)
     elif isinstance(spec, TaskSpec):
         task_spec = spec
     else:
         raise TypeError(f"Expected str or TaskSpec, got {type(spec).__name__}")
-    return (Predict(task_spec), lm)
+    return Predict(task_spec), lm, run
 
 
 @pytest.mark.parametrize(
@@ -118,12 +117,12 @@ def setup_predictor(spec, expected_output):
         },
     ],
 )
-def test_basic_image_operations(test_case):
-    predictor, lm = setup_predictor(test_case["signature"], test_case["expected"])
+def test_basic_image_operations(test_case, make_run):
+    predictor, lm, run = setup_predictor(test_case["signature"], test_case["expected"], make_run)
     inputs = {
         k: Image(v) if isinstance(v, str) and k in ["image", "ui_image"] else v for k, v in test_case["inputs"].items()
     }
-    result = asyncio.run(predictor(**inputs))
+    result = asyncio.run(predictor(**inputs, run=run))
     output_field = next(f for f in ["probabilities", "generated_code", "bboxes", "captions"] if hasattr(result, f))
     assert getattr(result, output_field) == test_case["expected"][test_case["key_output"]]
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
@@ -139,11 +138,17 @@ def test_basic_image_operations(test_case):
     ],
 )
 def test_image_input_formats(
-    request, sample_pil_image, sample_dspy_image_download, sample_dspy_image_no_download, image_input, description
+    request,
+    sample_pil_image,
+    sample_dspy_image_download,
+    sample_dspy_image_no_download,
+    image_input,
+    description,
+    make_run,
 ):
     signature = "image: Image, class_labels: list[str] -> probabilities: dict[str, float]"
     expected = {"probabilities": {"dog": 0.8, "cat": 0.1, "bird": 0.1}}
-    predictor, lm = setup_predictor(signature, expected)
+    predictor, lm, run = setup_predictor(signature, expected, make_run)
     input_map = {
         "pil_image": sample_pil_image,
         "encoded_pil_image": encode_image(sample_pil_image),
@@ -153,30 +158,30 @@ def test_image_input_formats(
     actual_input = input_map[image_input]
     if image_input in ["pil_image", "encoded_pil_image"]:
         pytest.xfail(f"{description} not fully supported without Image coercion")
-    result = asyncio.run(predictor(image=actual_input, class_labels=["dog", "cat", "bird"]))
+    result = asyncio.run(predictor(image=actual_input, class_labels=["dog", "cat", "bird"], run=run))
     assert result.probabilities == expected["probabilities"]
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
 
 
-def test_predictor_save_load(sample_url, sample_pil_image):
+def test_predictor_save_load(sample_url, sample_pil_image, make_run):
     signature = "image: Image -> caption: str"
     examples = [
         Example(image=Image(sample_url), caption="Example 1"),
         Example(image=sample_pil_image, caption="Example 2"),
     ]
-    predictor, lm = setup_predictor(signature, {"caption": "A golden retriever"})
+    predictor, lm, run = setup_predictor(signature, {"caption": "A golden retriever"}, make_run)
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
+    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False, run=run))
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(ts("image: Image -> caption: str"))
         loaded_predictor.load(temp_file.name)
-    asyncio.run(loaded_predictor(image=Image("https://example.com/dog.jpg")))
+    asyncio.run(loaded_predictor(image=Image("https://example.com/dog.jpg"), run=make_run(lm=lm)))
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 2
     assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
 
 
-def test_save_load_complex_default_types():
+def test_save_load_complex_default_types(make_run):
     examples = [
         Example(
             image_list=[Image("https://example.com/dog.jpg"), Image("https://example.com/cat.jpg")], caption="Example 1"
@@ -190,14 +195,14 @@ def test_save_load_complex_default_types():
         instructions="Caption image lists.",
         name="ComplexTypeSignature",
     )
-    predictor, lm = setup_predictor(ComplexTypeSignature, {"caption": "A list of images"})
+    predictor, lm, run = setup_predictor(ComplexTypeSignature, {"caption": "A list of images"}, make_run)
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
+    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False, run=run))
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(ComplexTypeSignature)
         loaded_predictor.load(temp_file.name)
-    result = asyncio.run(loaded_predictor(**examples[0].inputs()))
+    result = asyncio.run(loaded_predictor(**examples[0].inputs(), run=make_run(lm=lm)))
     assert result.caption == "A list of images"
     assert str(lm.history[-1].messages_as_openai).count("'url'") == 4
     assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
@@ -234,7 +239,7 @@ ImageListSignature = make_task_spec(
         },
     ],
 )
-def test_save_load_complex_types(test_case):
+def test_save_load_complex_types(test_case, make_run):
     task_spec = test_case["task_spec"]
     processed_input = {}
     for key, value in test_case["inputs"].items():
@@ -245,21 +250,21 @@ def test_save_load_complex_types(test_case):
         else:
             processed_input[key] = value
     examples = [Example(**processed_input, **test_case["expected"]).with_inputs(*processed_input.keys())]
-    predictor, lm = setup_predictor(task_spec, test_case["expected"])
+    predictor, lm, run = setup_predictor(task_spec, test_case["expected"], make_run)
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
+    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False, run=run))
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(task_spec)
         loaded_predictor.load(temp_file.name)
-    result = asyncio.run(loaded_predictor(**processed_input))
+    result = asyncio.run(loaded_predictor(**processed_input, run=run))
     for key, value in test_case["expected"].items():
         assert getattr(result, key) == value
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == test_case["expected_image_urls"]
     assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
 
 
-def test_save_load_pydantic_model():
+def test_save_load_pydantic_model(make_run):
 
     class ImageModel(pydantic.BaseModel):
         image: Image
@@ -277,9 +282,9 @@ def test_save_load_pydantic_model():
         output="Multiple photos",
     )
     examples = [Example(model_input=model_input, output="Multiple photos").with_inputs("model_input")]
-    predictor, lm = setup_predictor(PydanticSignature, {"output": "Multiple photos"})
+    predictor, lm, run = setup_predictor(PydanticSignature, {"output": "Multiple photos"}, make_run)
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
+    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False, run=run))
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(PydanticSignature)
@@ -289,25 +294,25 @@ def test_save_load_pydantic_model():
             state = json.load(saved_file)
         model_input_type = state["task_spec"]["inputs"][0]["type"]
         loaded_predictor.load_state(state, custom_types={model_input_type: ImageModel})
-    result = asyncio.run(loaded_predictor(model_input=model_input))
+    result = asyncio.run(loaded_predictor(model_input=model_input, run=run))
     assert result.output == "Multiple photos"
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 4
     assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
 
 
-def test_optional_image_field():
+def test_optional_image_field(make_run):
     OptionalImageSignature = make_task_spec(
         {"image": FieldSpec.input("image", type_=Image | None), "output": FieldSpec.output("output")},
         instructions="Process optional image.",
         name="OptionalImageSignature",
     )
-    predictor, lm = setup_predictor(OptionalImageSignature, {"output": "Hello"})
-    result = asyncio.run(predictor(image=None))
+    predictor, lm, run = setup_predictor(OptionalImageSignature, {"output": "Hello"}, make_run)
+    result = asyncio.run(predictor(image=None, run=run))
     assert result.output == "Hello"
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 0
 
 
-def test_pdf_url_support():
+def test_pdf_url_support(make_run):
     pdf_url = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
     pdf_image = Image(pdf_url, download=True)
     assert "data:application/pdf" in pdf_image.url
@@ -320,15 +325,15 @@ def test_pdf_url_support():
         instructions="Summarize PDF documents.",
         name="PDFSignature",
     )
-    predictor, lm = setup_predictor(PDFSignature, {"summary": "This is a dummy PDF"})
-    result = asyncio.run(predictor(document=pdf_image))
+    predictor, lm, run = setup_predictor(PDFSignature, {"summary": "This is a dummy PDF"}, make_run)
+    result = asyncio.run(predictor(document=pdf_image, run=run))
     assert result.summary == "This is a dummy PDF"
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
     messages_str = str(lm.history[-1].messages_as_openai)
     assert "application/pdf" in messages_str
 
 
-def test_different_mime_types():
+def test_different_mime_types(make_run):
     file_urls = {
         "pdf": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
         "image": "https://images.dog.ceo/breeds/dane-great/n02109047_8912.jpg",
@@ -340,7 +345,7 @@ def test_different_mime_types():
         assert ";base64," in encoded
 
 
-def test_mime_type_from_response_headers():
+def test_mime_type_from_response_headers(make_run):
     pdf_url = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
     response = requests.get(pdf_url)
     expected_mime_type = response.headers.get("Content-Type", "")
@@ -350,7 +355,7 @@ def test_mime_type_from_response_headers():
     assert ";base64," in encoded
 
 
-def test_pdf_from_file():
+def test_pdf_from_file(make_run):
     pdf_url = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
     response = requests.get(pdf_url)
     response.raise_for_status()
@@ -369,8 +374,8 @@ def test_pdf_from_file():
             instructions="Summarize PDF from file.",
             name="FilePDFSignature",
         )
-        predictor, lm = setup_predictor(FilePDFSignature, {"summary": "This is a PDF from file"})
-        result = asyncio.run(predictor(document=pdf_image))
+        predictor, lm, run = setup_predictor(FilePDFSignature, {"summary": "This is a PDF from file"}, make_run)
+        result = asyncio.run(predictor(document=pdf_image, run=run))
         assert result.summary == "This is a PDF from file"
         assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
     finally:

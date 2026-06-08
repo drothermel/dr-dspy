@@ -25,14 +25,14 @@ def _hide_litellm(monkeypatch):
     get_litellm.cache_clear()
 
 
-def test_import_dspy_does_not_import_litellm(monkeypatch):
+def test_import_dspy_does_not_import_litellm(monkeypatch, make_run):
     monkeypatch.delitem(sys.modules, "litellm", raising=False)
     _ = LM
     _ = Embedder
     assert "litellm" not in sys.modules
 
 
-def test_lm_litellm_use_raises_helpful_error_without_litellm(monkeypatch):
+def test_lm_litellm_use_raises_helpful_error_without_litellm(monkeypatch, make_run):
     _hide_litellm(monkeypatch)
     with pytest.raises(ImportError) as exc_info:
         _ = LM("openai/gpt-4o-mini").supports_function_calling
@@ -41,7 +41,7 @@ def test_lm_litellm_use_raises_helpful_error_without_litellm(monkeypatch):
     assert "dspy.clients.lm.LM" in msg
 
 
-def test_embedder_litellm_use_raises_helpful_error_without_litellm(monkeypatch):
+def test_embedder_litellm_use_raises_helpful_error_without_litellm(monkeypatch, make_run):
     _hide_litellm(monkeypatch)
     with pytest.raises(ImportError) as exc_info:
         asyncio.run(Embedder("openai/text-embedding-3-small")(["hello"]))

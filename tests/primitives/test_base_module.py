@@ -7,6 +7,8 @@ from unittest.mock import patch
 import pytest
 from typing_extensions import override
 
+from dspy.runtime import TelemetryConfig
+
 try:
     from litellm import Choices, Message, ModelResponse
     from litellm.types.utils import Usage
@@ -14,7 +16,6 @@ except ImportError:
     pytest.skip("litellm is not installed", allow_module_level=True)
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
-from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
@@ -41,7 +42,7 @@ def test_deepcopy_basic():
     assert cot.parameters()[0].__dict__ == cot_copy.parameters()[0].__dict__
 
 
-def test_deepcopy_with_uncopyable_modules():
+def test_deepcopy_with_uncopyable_modules(make_run):
 
     class CustomClass(Module):
         def __init__(self):
@@ -56,7 +57,7 @@ def test_deepcopy_with_uncopyable_modules():
     assert model.parameters()[0].__dict__ == model_copy.parameters()[0].__dict__
 
 
-def test_deepcopy_with_nested_modules():
+def test_deepcopy_with_nested_modules(make_run):
 
     class CustomClass1(Module):
         def __init__(self):
@@ -75,7 +76,7 @@ def test_deepcopy_with_nested_modules():
     assert model.parameters()[0].__dict__ == model_copy.parameters()[0].__dict__
 
 
-def test_save_and_load_with_json(tmp_path):
+def test_save_and_load_with_json(tmp_path, make_run):
     model = ChainOfThought(ts("q -> a"))
     model.predict.task_spec = model.predict.task_spec.with_instructions("You are a helpful assistant.")
     model.predict.demos = [
@@ -96,7 +97,7 @@ def test_save_and_load_with_json(tmp_path):
 
 
 @pytest.mark.extra
-def test_save_and_load_with_pkl(tmp_path):
+def test_save_and_load_with_pkl(tmp_path, make_run):
     import datetime
 
     MySignature = make_task_spec(
@@ -118,17 +119,15 @@ def test_save_and_load_with_pkl(tmp_path):
         {"current_date": datetime.date(2024, 1, 1), "target_date": datetime.date(2024, 1, 6), "date_diff": 5},
     ]
     trainset = [Example(**example).with_inputs("current_date", "target_date") for example in trainset]
-    settings.configure(
-        lm=DummyLM([{"date_diff": "1", "reasoning": "n/a"}, {"date_diff": "2", "reasoning": "n/a"}] * 10)
-    )
+    run = make_run(lm=DummyLM([{"date_diff": "1", "reasoning": "n/a"}, {"date_diff": "2", "reasoning": "n/a"}] * 10))
     cot = ChainOfThought(MySignature)
-    asyncio.run(cot(current_date=datetime.date(2024, 1, 1), target_date=datetime.date(2024, 1, 2)))
+    asyncio.run(cot(current_date=datetime.date(2024, 1, 1), target_date=datetime.date(2024, 1, 2), run=run))
 
     def dummy_metric(example, pred, trace=None):
         return True
 
     optimizer = BootstrapFewShot(max_bootstrapped_demos=4, max_labeled_demos=4, max_rounds=5, metric=dummy_metric)
-    compiled_cot = asyncio.run(optimizer.compile(cot, trainset=trainset))
+    compiled_cot = asyncio.run(optimizer.compile(cot, trainset=trainset, run=run))
     compiled_cot.predict.task_spec = compiled_cot.predict.task_spec.with_instructions("You are a helpful assistant.")
     save_path = tmp_path / "program.pkl"
     compiled_cot.save(save_path)
@@ -138,7 +137,7 @@ def test_save_and_load_with_pkl(tmp_path):
     assert new_cot.predict.demos == compiled_cot.predict.demos
 
 
-def test_save_with_extra_modules(tmp_path):
+def test_save_with_extra_modules(tmp_path, make_run):
     import sys
 
     custom_module_path = tmp_path / "custom_module.py"
@@ -171,7 +170,7 @@ def test_save_with_extra_modules(tmp_path):
             sys.path.remove(str(tmp_path))
 
 
-def test_load_with_version_mismatch(tmp_path):
+def test_load_with_version_mismatch(tmp_path, make_run):
     from dspy.primitives.base_module import logger
 
     save_versions = {"python": "3.9", "dspy": "2.4.0", "cloudpickle": "2.0"}
@@ -210,8 +209,8 @@ def test_load_with_version_mismatch(tmp_path):
 
 
 @pytest.mark.llm_call
-def test_single_module_call_with_usage_tracker(lm_for_test):
-    settings.configure(lm=LM(lm_for_test, temperature=0.0), track_usage=True)
+def test_single_module_call_with_usage_tracker(lm_for_test, make_run):
+    run = make_run(lm=LM(lm_for_test, temperature=0.0), telemetry=TelemetryConfig(track_usage=True))
     predict = ChainOfThought(ts("question -> answer"))
     output = predict(question="What is the capital of France?")
     lm_usage = output.get_lm_usage()
@@ -222,8 +221,8 @@ def test_single_module_call_with_usage_tracker(lm_for_test):
 
 
 @pytest.mark.llm_call
-def test_multi_module_call_with_usage_tracker(lm_for_test):
-    settings.configure(lm=LM(lm_for_test, temperature=0.0), track_usage=True)
+def test_multi_module_call_with_usage_tracker(lm_for_test, make_run):
+    run = make_run(lm=LM(lm_for_test, temperature=0.0), telemetry=TelemetryConfig(track_usage=True))
 
     class MyProgram(Module):
         def __init__(self):
@@ -246,7 +245,7 @@ def test_multi_module_call_with_usage_tracker(lm_for_test):
 
 
 @pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="Skip the test if OPENAI_API_KEY is not set.")
-def test_usage_tracker_in_parallel():
+def test_usage_tracker_in_parallel(make_run):
 
     class MyProgram(Module):
         def __init__(self, lm):
@@ -254,21 +253,21 @@ def test_usage_tracker_in_parallel():
             self.predict1 = ChainOfThought(ts("question -> answer"))
             self.predict2 = ChainOfThought(ts("question, answer -> score"))
 
-        async def aforward(self, question: str) -> Prediction:
-            with settings.context(lm=self.lm):
-                answer = await self.predict1(question=question)
-                return await self.predict2(question=question, answer=answer)
+        async def aforward(self, question: str, *, run) -> Prediction:
+            answer = await self.predict1(question=question, run=run)
+            return await self.predict2(question=question, answer=answer, run=run)
 
-    settings.configure(track_usage=True)
     program1 = MyProgram(lm=LM("openai/gpt-4o-mini"))
     program2 = MyProgram(lm=LM("openai/gpt-3.5-turbo"))
     parallelizer = Parallel()
+    run = make_run(lm=LM("openai/gpt-4o-mini"))
     results = asyncio.run(
         parallelizer(
             [
                 (program1, {"question": "What is the meaning of life?"}),
                 (program2, {"question": "why did a chicken cross the kitchen?"}),
-            ]
+            ],
+            run=run,
         )
     )
     assert results[0].get_lm_usage() is not None
@@ -278,7 +277,7 @@ def test_usage_tracker_in_parallel():
 
 
 @pytest.mark.asyncio
-async def test_usage_tracker_async_parallel():
+async def test_usage_tracker_async_parallel(make_run):
     program = Predict(QUESTION_ANSWER_TASK_SPEC)
     with patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -297,14 +296,14 @@ async def test_usage_tracker_async_parallel():
             ),
             model="openai/gpt-4o-mini",
         )
+        run = make_run(lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter(), telemetry=TelemetryConfig(track_usage=True))
         coroutines = [
-            program.acall(question="What is the capital of France?"),
-            program.acall(question="What is the capital of France?"),
-            program.acall(question="What is the capital of France?"),
-            program.acall(question="What is the capital of France?"),
+            program.acall(question="What is the capital of France?", run=run),
+            program.acall(question="What is the capital of France?", run=run),
+            program.acall(question="What is the capital of France?", run=run),
+            program.acall(question="What is the capital of France?", run=run),
         ]
-        with settings.context(lm=LM("openai/gpt-4o-mini"), track_usage=True, adapter=JSONAdapter()):
-            results = await asyncio.gather(*coroutines)
+        results = await asyncio.gather(*coroutines)
         assert results[0].get_lm_usage() is not None
         assert results[1].get_lm_usage() is not None
         lm_usage0 = results[0].get_lm_usage()["openai/gpt-4o-mini"]
@@ -317,22 +316,23 @@ async def test_usage_tracker_async_parallel():
         assert lm_usage1["total_tokens"] == 1163
 
 
-def test_usage_tracker_no_side_effect():
+def test_usage_tracker_no_side_effect(make_run):
 
     class MyProgram(Module):
         def __init__(self):
             self.predict = Predict(QUESTION_ANSWER_TASK_SPEC)
 
         async def aforward(self, question: str, **kwargs: object) -> str:
-            return (await self.predict(question=question)).answer
+            run = kwargs["run"]
+            return (await self.predict(question=question, run=run)).answer
 
     program = MyProgram()
-    with settings.context(lm=DummyLM([{"answer": "Paris"}]), track_usage=True):
-        result = asyncio.run(program(question="What is the capital of France?"))
+    run = make_run(lm=DummyLM([{"answer": "Paris"}]), telemetry=TelemetryConfig(track_usage=True))
+    result = asyncio.run(program(question="What is the capital of France?", run=run))
     assert result == "Paris"
 
 
-def test_module_history():
+def test_module_history(make_run):
 
     class MyProgram(Module):
         def __init__(self, **kwargs: object):
@@ -340,7 +340,8 @@ def test_module_history():
             self.cot = ChainOfThought(ts("question -> answer"))
 
         async def aforward(self, question: str, **kwargs: object) -> Prediction:
-            return await self.cot(question=question)
+            run = kwargs["run"]
+            return await self.cot(question=question, run=run)
 
     with patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -349,28 +350,26 @@ def test_module_history():
             ],
             model="openai/gpt-4o-mini",
         )
-        settings.configure(lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter())
+        run = make_run(lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter())
         program = MyProgram()
-        asyncio.run(program(question="What is the capital of France?"))
-        asyncio.run(program.cot(question="What is the capital of France?"))
+        asyncio.run(program(question="What is the capital of France?", run=run))
+        asyncio.run(program.cot(question="What is the capital of France?", run=run))
         assert len(program.history) == 1
         assert len(program.cot.history) == 2
         assert len(program.cot.predict.history) == 2
         assert id(program.history[0]) == id(program.cot.history[0])
         assert program.history[0].outputs == ["{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"]
-        settings.configure(disable_history=True)
-        asyncio.run(program(question="What is the capital of France?"))
-        assert len(program.history) == 1
-        assert len(program.cot.history) == 2
-        assert len(program.cot.predict.history) == 2
-        settings.configure(disable_history=False)
-        asyncio.run(program(question="What is the capital of France?"))
+        asyncio.run(program(question="What is the capital of France?", run=run))
         assert len(program.history) == 2
         assert len(program.cot.history) == 3
         assert len(program.cot.predict.history) == 3
+        asyncio.run(program(question="What is the capital of France?", run=run))
+        assert len(program.history) == 3
+        assert len(program.cot.history) == 4
+        assert len(program.cot.predict.history) == 4
 
 
-def test_module_history_with_concurrency():
+def test_module_history_with_concurrency(make_run):
 
     class MyProgram(Module):
         def __init__(self):
@@ -378,20 +377,21 @@ def test_module_history_with_concurrency():
             self.cot = ChainOfThought(ts("question -> answer"))
 
         async def aforward(self, question: str, **kwargs: object) -> Prediction:
-            return await self.cot(question=question)
+            run = kwargs["run"]
+            return await self.cot(question=question, run=run)
 
     with patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="{'reasoning': 'N/A', 'answer': 'Holy crab!'}"))],
             model="openai/gpt-4o-mini",
         )
-        settings.configure(lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter())
+        run = make_run(lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter())
         program = MyProgram()
 
         async def run_concurrent():
             await asyncio.gather(
-                program(question="What is the meaning of life?"),
-                program(question="why did a chicken cross the kitchen?"),
+                program(question="What is the meaning of life?", run=run),
+                program(question="why did a chicken cross the kitchen?", run=run),
             )
 
         asyncio.run(run_concurrent())
@@ -401,7 +401,7 @@ def test_module_history_with_concurrency():
 
 
 @pytest.mark.asyncio
-async def test_module_history_async():
+async def test_module_history_async(make_run):
 
     class MyProgram(Module):
         def __init__(self, **kwargs: object):
@@ -409,7 +409,8 @@ async def test_module_history_async():
             self.cot = ChainOfThought(ts("question -> answer"))
 
         async def aforward(self, question: str, **kwargs: object) -> Prediction:
-            return await self.cot.acall(question=question)
+            run = kwargs["run"]
+            return await self.cot.acall(question=question, run=run)
 
     with patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -419,30 +420,34 @@ async def test_module_history_async():
             model="openai/gpt-4o-mini",
         )
         program = MyProgram()
-        with settings.context(lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter()):
-            await program.acall(question="What is the capital of France?")
-            await program.cot.acall(question="What is the capital of France?")
+        run = make_run(lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter())
+        await program.acall(question="What is the capital of France?", run=run)
+        await program.cot.acall(question="What is the capital of France?", run=run)
         assert len(program.history) == 1
         assert len(program.cot.history) == 2
         assert len(program.cot.predict.history) == 2
         assert id(program.history[0]) == id(program.cot.history[0])
         assert program.history[0].outputs == ["{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"]
-        with settings.context(disable_history=True, lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter()):
-            await program.acall(question="What is the capital of France?")
+        run = make_run(
+            lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter(), telemetry=TelemetryConfig(disable_history=True)
+        )
+        await program.acall(question="What is the capital of France?", run=run)
         assert len(program.history) == 1
         assert len(program.cot.history) == 2
         assert len(program.cot.predict.history) == 2
-        with settings.context(disable_history=False, lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter()):
-            await program.acall(question="What is the capital of France?")
+        run = make_run(
+            lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter(), telemetry=TelemetryConfig(disable_history=False)
+        )
+        await program.acall(question="What is the capital of France?", run=run)
         assert len(program.history) == 2
         assert len(program.cot.history) == 3
         assert len(program.cot.predict.history) == 3
 
 
-def test_forward_direct_call_warning(caplog):
+def test_forward_direct_call_warning(caplog, make_run):
 
     class TestModule(Module):
-        async def aforward(self, x):
+        async def aforward(self, x, **kwargs: object):
             return x
 
     module = TestModule()
@@ -451,13 +456,14 @@ def test_forward_direct_call_warning(caplog):
     assert "directly is discouraged" in caplog.text
 
 
-def test_forward_through_call_no_warning(capsys):
+def test_forward_through_call_no_warning(capsys, make_run):
 
     class TestModule(Module):
-        async def aforward(self, x):
+        async def aforward(self, x, **kwargs: object):
             return x
 
     module = TestModule()
-    asyncio.run(module(x="test"))
+    run = make_run(lm=DummyLM([{}]))
+    asyncio.run(module(x="test", run=run))
     captured = capsys.readouterr()
     assert "directly is discouraged" not in captured.err

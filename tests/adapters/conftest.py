@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 
+import pytest
 from typing_extensions import override
 
 from dspy.clients.base_lm import BaseLM
@@ -67,20 +68,50 @@ class CapturingLM(BaseLM):
         return self.source_lm.supported_params
 
     @override
-    async def __call__(self, request: LMRequest):
+    async def __call__(self, request: LMRequest, *, run):
         self.calls.append({"request": request})
         raise StopAdapterCallCapture
 
 
-async def _format_messages_and_lm_kwargs(*, adapter, task_spec, demos, inputs, config=None, lm=None, lm_kwargs=None):
+def make_adapter_run(*, lm, adapter):
+    from dspy.runtime import RunContext, TelemetryConfig
+
+    return RunContext.create(
+        lm=lm,
+        adapter=adapter,
+        telemetry=TelemetryConfig(transparency="off", run_log_enabled=False),
+        init_run_log=False,
+    )
+
+
+@pytest.fixture
+def adapter_run(make_run):
+    def _adapter_run(lm=None, adapter=None):
+        from dspy.adapters.chat_adapter import ChatAdapter
+
+        return make_run(lm=lm or DummyLM([{}]), adapter=adapter or ChatAdapter())
+
+    return _adapter_run
+
+
+async def _format_messages_and_lm_kwargs(
+    *, adapter, task_spec, demos, inputs, config=None, lm=None, lm_kwargs=None, run=None
+):
     if lm_kwargs is not None:
         if config is not None:
             raise TypeError("Pass either `config` or `lm_kwargs`, not both.")
         config = lm_kwargs
     capturing_lm = CapturingLM(lm)
+    if run is None:
+        run = make_adapter_run(lm=capturing_lm, adapter=adapter)
     with contextlib.suppress(StopAdapterCallCapture):
         await adapter.acall(
-            lm=capturing_lm, config=coerce_lm_config(config), task_spec=task_spec, demos=demos, inputs=inputs
+            lm=capturing_lm,
+            config=coerce_lm_config(config),
+            task_spec=task_spec,
+            demos=demos,
+            inputs=inputs,
+            run=run,
         )
     assert len(capturing_lm.calls) == 1
     call = capturing_lm.calls[0]

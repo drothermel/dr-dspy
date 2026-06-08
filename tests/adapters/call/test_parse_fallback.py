@@ -6,7 +6,7 @@ from dspy.adapters.call.policies.parse_fallback import NoOpParseFallbackPolicy
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.clients.lm import LM
 from dspy.utils.exceptions import AdapterParseError, LMError
-from tests.adapters.conftest import Choices, Message, ModelResponse
+from tests.adapters.conftest import Choices, Message, ModelResponse, make_adapter_run
 from tests.task_spec.helpers import ts
 
 
@@ -26,6 +26,7 @@ async def test_chat_adapter_fallback_to_json_adapter_on_parse_error():
             task_spec=signature,
             demos=[],
             inputs={"question": "What is the capital of France?"},
+            run=make_adapter_run(lm=lm, adapter=adapter),
         )
         assert result == [{"answer": "Paris"}]
         assert mock_completion.call_count == 2
@@ -57,6 +58,7 @@ async def test_chat_adapter_fallback_preserves_native_function_calling_flag():
             task_spec=signature,
             demos=[],
             inputs={"question": "What is the capital of France?"},
+            run=make_adapter_run(lm=lm, adapter=adapter),
         )
     assert result == [{"answer": "Paris"}]
     assert seen["use_native_function_calling"] is False
@@ -79,6 +81,7 @@ async def test_chat_adapter_respects_disabled_parse_fallback():
                 task_spec=signature,
                 demos=[],
                 inputs={"question": "What is the capital of France?"},
+                run=make_adapter_run(lm=lm, adapter=adapter),
             )
         assert mock_completion.call_count == 1
 
@@ -97,5 +100,6 @@ async def test_fallback_does_not_run_on_lm_error():
                 task_spec=signature,
                 demos=[],
                 inputs={"question": "What is the capital of France?"},
+                run=make_adapter_run(lm=lm, adapter=adapter),
             )
         assert mock_completion.call_count == 1

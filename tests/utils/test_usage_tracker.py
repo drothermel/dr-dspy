@@ -5,9 +5,9 @@ from pydantic import BaseModel
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
-from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.parallel import Parallel
+from dspy.runtime import TelemetryConfig
 from dspy.utils.usage_tracker import UsageTracker, track_usage
 from tests.task_spec.helpers import ts
 
@@ -86,7 +86,7 @@ def test_get_total_tokens():
     assert total_usage["gpt-4o-mini"]["completion_tokens_details"]["rejected_prediction_tokens"] == 20
 
 
-def test_track_usage_with_multiple_models():
+def test_track_usage_with_multiple_models(make_run):
     tracker = UsageTracker()
     usage_entries = [
         {
@@ -129,13 +129,13 @@ def test_track_usage_with_multiple_models():
     assert total_usage["gpt-3.5-turbo"]["total_tokens"] == 900
 
 
-def test_track_usage_context_manager(lm_for_test):
+def test_track_usage_context_manager(lm_for_test, make_run):
     lm = LM(lm_for_test, temperature=0.0)
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     predict = ChainOfThought(ts("question -> answer"))
-    with track_usage() as tracker:
-        predict(question="What is the capital of France?")
-        predict(question="What is the capital of Italy?")
+    with track_usage(run) as tracker:
+        asyncio.run(predict(question="What is the capital of France?", run=run))
+        asyncio.run(predict(question="What is the capital of Italy?", run=run))
     assert len(tracker.usage_data) > 0
     assert len(tracker.usage_data[lm_for_test]) == 2
     total_usage = tracker.get_total_tokens()
@@ -312,31 +312,31 @@ def test_merge_usage_entries_with_pydantic_models():
     assert total_usage["gpt-4o-mini"]["completion_tokens_details"]["rejected_prediction_tokens"] == 1
 
 
-def test_parallel_executor_with_usage_tracker():
+def test_parallel_executor_with_usage_tracker(make_run):
     parent_tracker = UsageTracker()
     mock_lm = mock.MagicMock(spec=LM)
     mock_lm.return_value = ['{"answer": "Mocked answer"}']
     mock_lm.kwargs = {}
     mock_lm.model = "openai/gpt-4o-mini"
-    settings.configure(lm=mock_lm, adapter=JSONAdapter())
+    run = make_run(lm=mock_lm, adapter=JSONAdapter())
 
-    async def task1():
-        with settings.context(usage_tracker=UsageTracker()):
-            settings.usage_tracker.add_usage(
-                "openai/gpt-4o-mini", {"prompt_tokens": 50, "completion_tokens": 10, "total_tokens": 60}
-            )
-            return settings.usage_tracker.get_total_tokens()
+    async def task1(**_kwargs: object):
+        worker_run = run.fork(usage_tracker=UsageTracker())
+        worker_run.usage_tracker.add_usage(
+            "openai/gpt-4o-mini", {"prompt_tokens": 50, "completion_tokens": 10, "total_tokens": 60}
+        )
+        return worker_run.usage_tracker.get_total_tokens()
 
-    async def task2():
-        with settings.context(usage_tracker=UsageTracker()):
-            settings.usage_tracker.add_usage(
-                "openai/gpt-4o-mini", {"prompt_tokens": 80, "completion_tokens": 15, "total_tokens": 95}
-            )
-            return settings.usage_tracker.get_total_tokens()
+    async def task2(**_kwargs: object):
+        worker_run = run.fork(usage_tracker=UsageTracker())
+        worker_run.usage_tracker.add_usage(
+            "openai/gpt-4o-mini", {"prompt_tokens": 80, "completion_tokens": 15, "total_tokens": 95}
+        )
+        return worker_run.usage_tracker.get_total_tokens()
 
-    with settings.context(track_usage=True, usage_tracker=parent_tracker):
-        executor = Parallel()
-        results = asyncio.run(executor([(task1, {}), (task2, {})]))
+    run = run.fork(usage_tracker=parent_tracker, telemetry=TelemetryConfig(track_usage=True))
+    executor = Parallel()
+    results = asyncio.run(executor([(task1, {}), (task2, {})], run=run))
     usage1 = results[0]
     usage2 = results[1]
     assert usage1["openai/gpt-4o-mini"]["prompt_tokens"] == 50

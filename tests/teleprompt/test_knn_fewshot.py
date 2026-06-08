@@ -2,7 +2,6 @@ import pytest
 from typing_extensions import override
 
 from dspy.clients.embedding import Embedder
-from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
@@ -25,7 +24,7 @@ def setup_knn_few_shot() -> KNNFewShot:
     return KNNFewShot(k=2, trainset=trainset, vectorizer=Embedder(DummyVectorizer()))
 
 
-def test_knn_few_shot_initialization(setup_knn_few_shot):
+def test_knn_few_shot_initialization(setup_knn_few_shot, make_run):
     knn_few_shot = setup_knn_few_shot
     assert knn_few_shot.KNN.k == 2, "Incorrect k value for KNN"
     assert len(knn_few_shot.KNN.trainset) == 3, "Incorrect trainset size for KNN"
@@ -44,14 +43,14 @@ class SimpleModule(Module):
         return SimpleModule(self.predictor.task_spec)
 
 
-def _test_knn_few_shot_compile(setup_knn_few_shot):
+def _test_knn_few_shot_compile(setup_knn_few_shot, make_run):
     student = SimpleModule(ts("input -> output"))
     teacher = SimpleModule(ts("input -> output"))
     lm = DummyLM(["Madrid", "10"])
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     knn_few_shot = setup_knn_few_shot
     trainset = knn_few_shot.KNN.trainset
-    compiled_student = knn_few_shot.compile(student, teacher=teacher, trainset=trainset, valset=None)
+    compiled_student = knn_few_shot.compile(student, teacher=teacher, trainset=trainset, valset=None, run=run)
     assert len(compiled_student.predictor.demos) == 1
     assert compiled_student.predictor.demos[0].input == trainset[0].input
     assert compiled_student.predictor.demos[0].output == trainset[0].output

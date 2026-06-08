@@ -8,7 +8,6 @@ from dspy.adapters.types.tool import Tool, ToolCalls
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import message_to_openai_chat
 from dspy.core.types import LMOutput, LMRequest, LMResponse, LMToolCallPart
-from dspy.dsp.utils.settings import settings
 from dspy.dsp.utils.utils import dotdict
 from dspy.predict.react_v2 import ReActV2
 from dspy.utils.dummies import DummyLM
@@ -23,13 +22,13 @@ class ReasoningDummyLM(DummyLM):
         return True
 
 
-def test_react_v2_submit_tool_returns_original_output_fields():
+def test_react_v2_submit_tool_returns_original_output_fields(make_run):
     react = ReActV2(ts("question -> answer"), tools=[])
     assert react.tools["submit"](answer="Paris") == {"answer": "Paris"}
     assert "tool_call_results" not in react.react.task_spec.input_fields
 
 
-def test_react_v2_text_mock_lm_loop_records_inputs_once():
+def test_react_v2_text_mock_lm_loop_records_inputs_once(make_run):
 
     def lookup(query: str) -> str:
         return f"found {query}"
@@ -46,10 +45,12 @@ def test_react_v2_text_mock_lm_loop_records_inputs_once():
             },
         ]
     )
-    with settings.context(lm=lm, adapter=ChatAdapter()):
-        pred = asyncio.run(
-            ReActV2(ts("question -> answer"), tools=[Tool(lookup, description="Look up a query.")])(question="cats")
+    run = make_run(lm=lm, adapter=ChatAdapter())
+    pred = asyncio.run(
+        ReActV2(ts("question -> answer"), tools=[Tool(lookup, description="Look up a query.")])(
+            question="cats", run=run
         )
+    )
     assert pred.answer == "found cats"
     assert pred.termination_reason == "submit"
     assert sum("question" in event for event in pred.history.messages) == 1
@@ -58,7 +59,7 @@ def test_react_v2_text_mock_lm_loop_records_inputs_once():
     assert pred.history.messages[0]["tool_calls"].tool_call_results.tool_call_results[0].call_id == "call_0_0"
 
 
-def test_react_v2_continuation_omits_missing_original_inputs():
+def test_react_v2_continuation_omits_missing_original_inputs(make_run):
 
     def lookup(query: str) -> str:
         return f"found {query}"
@@ -75,10 +76,12 @@ def test_react_v2_continuation_omits_missing_original_inputs():
             },
         ]
     )
-    with settings.context(lm=lm, adapter=ChatAdapter()):
-        pred = asyncio.run(
-            ReActV2(ts("question -> answer"), tools=[Tool(lookup, description="Look up a query.")])(question="cats")
+    run = make_run(lm=lm, adapter=ChatAdapter())
+    pred = asyncio.run(
+        ReActV2(ts("question -> answer"), tools=[Tool(lookup, description="Look up a query.")])(
+            question="cats", run=run
         )
+    )
     assert pred.answer == "found cats"
     second_call_messages = lm.history[1].messages_as_openai
     second_current_user_message = second_call_messages[-1]["content"]
@@ -87,7 +90,7 @@ def test_react_v2_continuation_omits_missing_original_inputs():
     assert any("[[ ## question ## ]]\ncats" in message["content"] for message in second_call_messages)
 
 
-def test_react_v2_text_mode_accepts_top_level_tool_arguments():
+def test_react_v2_text_mode_accepts_top_level_tool_arguments(make_run):
 
     def lookup(query: str) -> str:
         return f"found {query}"
@@ -104,16 +107,18 @@ def test_react_v2_text_mode_accepts_top_level_tool_arguments():
             },
         ]
     )
-    with settings.context(lm=lm, adapter=ChatAdapter(use_native_function_calling=False)):
-        pred = asyncio.run(
-            ReActV2(ts("question -> answer"), tools=[Tool(lookup, description="Look up a query.")])(question="cats")
+    run = make_run(lm=lm, adapter=ChatAdapter(use_native_function_calling=False))
+    pred = asyncio.run(
+        ReActV2(ts("question -> answer"), tools=[Tool(lookup, description="Look up a query.")])(
+            question="cats", run=run
         )
+    )
     assert pred.answer == "found cats"
     assert pred.termination_reason == "submit"
     assert pred.history.messages[0]["tool_calls"].tool_calls[0].args == {"query": "cats"}
 
 
-def test_react_v2_text_mode_accepts_wrapped_submit_arguments():
+def test_react_v2_text_mode_accepts_wrapped_submit_arguments(make_run):
     lm = DummyLM(
         [
             {
@@ -122,13 +127,13 @@ def test_react_v2_text_mode_accepts_wrapped_submit_arguments():
             }
         ]
     )
-    with settings.context(lm=lm, adapter=ChatAdapter(use_native_function_calling=False)):
-        pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(question="cats"))
+    run = make_run(lm=lm, adapter=ChatAdapter(use_native_function_calling=False))
+    pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(question="cats", run=run))
     assert pred.answer == "done"
     assert pred.termination_reason == "submit"
 
 
-def test_react_v2_unknown_tool_observation_can_continue():
+def test_react_v2_unknown_tool_observation_can_continue(make_run):
     lm = DummyLM(
         [
             {
@@ -141,8 +146,8 @@ def test_react_v2_unknown_tool_observation_can_continue():
             },
         ]
     )
-    with settings.context(lm=lm, adapter=ChatAdapter()):
-        pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(question="cats"))
+    run = make_run(lm=lm, adapter=ChatAdapter())
+    pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(question="cats", run=run))
     first_result = pred.history.messages[0]["tool_calls"].tool_call_results.tool_call_results[0]
     assert first_result.is_error is True
     assert first_result.call_id == "call_0_0"
@@ -150,7 +155,7 @@ def test_react_v2_unknown_tool_observation_can_continue():
     assert pred.answer == "done"
 
 
-def test_react_v2_accepts_serialized_history_input():
+def test_react_v2_accepts_serialized_history_input(make_run):
     lm = DummyLM(
         [
             {
@@ -159,14 +164,16 @@ def test_react_v2_accepts_serialized_history_input():
             }
         ]
     )
-    with settings.context(lm=lm, adapter=ChatAdapter()):
-        pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(history={"messages": [{"question": "old"}]}))
+    run = make_run(lm=lm, adapter=ChatAdapter())
+    pred = asyncio.run(
+        ReActV2(ts("question -> answer"), tools=[])(history={"messages": [{"question": "old"}]}, run=run)
+    )
     assert pred.answer == "done"
     assert pred.history.messages[0] == {"question": "old"}
     assert all(event for event in pred.history.messages)
 
 
-def test_react_v2_forced_submit_on_empty_tool_calls():
+def test_react_v2_forced_submit_on_empty_tool_calls(make_run):
     lm = ReasoningDummyLM(
         [
             {"next_thought": "No action.", "tool_calls": ToolCalls(tool_calls=[])},
@@ -177,8 +184,8 @@ def test_react_v2_forced_submit_on_empty_tool_calls():
         ]
     )
     lm.kwargs["reasoning_effort"] = "low"
-    with settings.context(lm=lm, adapter=ChatAdapter()):
-        pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(question="cats"))
+    run = make_run(lm=lm, adapter=ChatAdapter())
+    pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(question="cats", run=run))
     assert pred.answer == "forced"
     assert pred.termination_reason == "forced_submit"
     reasoning = lm.history[0].request.config.reasoning
@@ -269,16 +276,18 @@ class ParallelNativeToolLM(BaseLM):
         )
 
 
-def test_react_v2_native_tool_loop_replays_tool_result_with_provider_id():
+def test_react_v2_native_tool_loop_replays_tool_result_with_provider_id(make_run):
 
     def lookup(query: str) -> str:
         return f"found {query}"
 
     lm = NativeToolLM()
-    with settings.context(lm=lm, adapter=ChatAdapter(use_native_function_calling=True)):
-        pred = asyncio.run(
-            ReActV2(ts("question -> answer"), tools=[Tool(lookup, description="Look up a query.")])(question="cats")
+    run = make_run(lm=lm, adapter=ChatAdapter(use_native_function_calling=True))
+    pred = asyncio.run(
+        ReActV2(ts("question -> answer"), tools=[Tool(lookup, description="Look up a query.")])(
+            question="cats", run=run
         )
+    )
     assert pred.answer == "found cats"
     assert pred.history.messages[0]["tool_calls"].tool_calls[0].id == "call_provider_1"
     assert "tool_call_results" not in pred.history.messages[0]
@@ -289,18 +298,19 @@ def test_react_v2_native_tool_loop_replays_tool_result_with_provider_id():
     )
 
 
-def test_react_v2_native_parallel_tool_calls_are_requested_and_replayed():
+def test_react_v2_native_parallel_tool_calls_are_requested_and_replayed(make_run):
 
     def lookup(query: str) -> str:
         return f"found {query}"
 
     lm = ParallelNativeToolLM()
-    with settings.context(lm=lm, adapter=ChatAdapter(use_native_function_calling=True, parallel_tool_calls=True)):
-        pred = asyncio.run(
-            ReActV2(ts("question -> answer"), tools=[Tool(lookup, description="Look up a query.")])(
-                question="cats and dogs"
-            )
+    run = make_run(lm=lm, adapter=ChatAdapter(use_native_function_calling=True, parallel_tool_calls=True))
+    pred = asyncio.run(
+        ReActV2(ts("question -> answer"), tools=[Tool(lookup, description="Look up a query.")])(
+            question="cats and dogs",
+            run=run,
         )
+    )
     assert pred.answer == "found cats and found dogs"
     assert lm.calls[0]["kwargs"]["parallel_tool_calls"] is True
     assert [call.id for call in pred.history.messages[0]["tool_calls"].tool_calls] == [

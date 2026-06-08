@@ -1,6 +1,5 @@
 import asyncio
 
-from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
@@ -22,14 +21,14 @@ def simple_metric(example, prediction, trace=None):
     return example.output == prediction.output
 
 
-def test_basic_workflow():
+def test_basic_workflow(make_run):
     student = SimpleModule(ts("input -> output"))
     teacher = SimpleModule(ts("input -> output"))
     lm = DummyLM(["Initial thoughts", "Finish[blue]"])
-    settings.configure(lm=lm)
+    run = make_run(lm=lm)
     optimizer = BootstrapFewShotWithRandomSearch(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
     trainset = [
         Example(input="What is the color of the sky?", output="blue").with_inputs("input"),
         Example(input="What does the fox say?", output="Ring-ding-ding-ding-dingeringeding!").with_inputs("input"),
     ]
-    asyncio.run(optimizer.compile(student, teacher=teacher, trainset=trainset))
+    asyncio.run(optimizer.compile(student, teacher=teacher, trainset=trainset, run=run))

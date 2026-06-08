@@ -34,6 +34,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
         obj._compiled = False
         obj.callbacks = []
         obj.history = []
+        obj.run = None
 
     def __init__(self, callbacks=None, run: RunContext | None = None) -> None:
         self.callbacks = callbacks or []
@@ -64,9 +65,14 @@ class Module(BaseModule, metaclass=ProgramMeta):
                 with track_usage(run) as usage_tracker:
                     output = await self.aforward(*args, **kwargs)
                 tokens = usage_tracker.get_total_tokens()
+            else:
+                output = await self.aforward(*args, **kwargs)
+                tokens = (
+                    run.usage_tracker.get_total_tokens() if run.telemetry.track_usage and run.usage_tracker else None
+                )
+            if tokens:
                 self._set_lm_usage(tokens, output)
-                return output
-            return await self.aforward(*args, **kwargs)
+            return output
         finally:
             run.caller_modules.pop()
 

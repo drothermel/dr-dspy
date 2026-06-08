@@ -3,7 +3,8 @@ import asyncio
 import pytest
 
 from dspy.adapters.types.tool import Tool
-from dspy.dsp.utils.settings import settings
+from dspy.runtime import ExecutionConfig
+from dspy.utils.dummies import DummyLM
 from tests.adapters.types.tool.conftest import (
     Address,
     ContactInfo,
@@ -252,11 +253,12 @@ async def test_async_concurrent_calls():
 
 @requires_jsonschema
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
-def test_async_tool_call_in_sync_mode():
+def test_async_tool_call_in_sync_mode(make_run):
     tool = Tool(async_dummy_function, description="An async dummy function for testing.")
-    with settings.context(allow_tool_async_sync_conversion=False):
-        with pytest.raises(ValueError, match=".*acall.*allow_tool_async_sync_conversion.*"):
-            result = tool(x=1, y="hello")
-    with settings.context(allow_tool_async_sync_conversion=True):
-        result = tool(x=1, y="hello")
-        assert result == "hello 1"
+    run = make_run(lm=DummyLM([{}]))
+    strict_run = run.fork(execution=ExecutionConfig(allow_tool_async_sync_conversion=False))
+    with pytest.raises(ValueError, match=".*acall.*allow_tool_async_sync_conversion.*"):
+        tool(x=1, y="hello", run=strict_run)
+    permissive_run = run.fork(execution=ExecutionConfig(allow_tool_async_sync_conversion=True))
+    result = tool(x=1, y="hello", run=permissive_run)
+    assert result == "hello 1"

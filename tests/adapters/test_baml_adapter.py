@@ -20,7 +20,7 @@ from dspy.adapters.types.image import Image
 from dspy.adapters.types.tool import Tool
 from dspy.clients.lm import LM
 from dspy.task_spec import FieldSpec, make_task_spec
-from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs
+from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs, make_adapter_run
 from tests.task_spec.helpers import ts
 
 
@@ -367,6 +367,7 @@ def test_baml_adapter_with_code():
         {"task": FieldSpec.input("task"), "code": FieldSpec.output("code", type_=Code)},
         instructions="Given the fields `task`, produce the fields `code`.",
     )
+    lm = LM(model="openai/gpt-4o-mini")
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content='{"code": "print(\\"Generated code\\")"}'))],
@@ -374,11 +375,12 @@ def test_baml_adapter_with_code():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini"),
+                lm=lm,
                 config={},
                 task_spec=CodeGenSignature,
                 demos=[],
                 inputs={"task": "Write a hello world program"},
+                run=make_adapter_run(lm=lm, adapter=adapter),
             )
         )
         assert result[0]["code"].code == 'print("Generated code")'
@@ -452,12 +454,14 @@ async def test_baml_adapter_async_functionality():
             model="openai/gpt-4o",
         )
         adapter = BAMLAdapter()
+        lm = LM(model="openai/gpt-4o")
         result = await adapter.acall(
-            lm=LM(model="openai/gpt-4o"),
+            lm=lm,
             config={},
             task_spec=TestSignature,
             demos=[],
             inputs={"question": "Extract patient info"},
+            run=make_adapter_run(lm=lm, adapter=adapter),
         )
         assert result[0]["patient"].name == "John Doe"
         assert result[0]["patient"].age == 28

@@ -7,7 +7,6 @@ from dspy.clients.databricks import (
 )
 from dspy.clients.lm import LM
 from dspy.core.types import LMRequest
-from dspy.dsp.utils.settings import settings
 
 try:
     from databricks.sdk import WorkspaceClient
@@ -51,7 +50,6 @@ def test_create_finetuning_job():
             ]
         },
     ]
-    settings.experimental = True
     job = TrainingJobDatabricks()
     DatabricksProvider.finetune(
         job=job,
@@ -69,7 +67,6 @@ def test_create_finetuning_job():
 
 
 def test_deploy_finetuned_model():
-    settings.experimental = True
     model_to_deploy = "main.chenmoney.finetuned_model"
     DatabricksProvider.deploy_finetuned_model(model=model_to_deploy, data_format="chat")
     lm = LM(model="databricks/main_chenmoney_finetuned_model")
