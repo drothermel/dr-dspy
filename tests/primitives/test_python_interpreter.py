@@ -647,7 +647,7 @@ def test_enable_read_paths_symlink(tmp_path):
     try:
         link_file.symlink_to(real_file)
     except (OSError, NotImplementedError) as exc:
-        pytest.skip(f"symlink creation unavailable: {exc}")
+        pytest.skip(f"symlink creation unavailable: {exc}")  # ty: ignore[too-many-positional-arguments]
 
     with PythonInterpreter(enable_read_paths=[str(link_file)]) as interp:
         allow_read_arg = next(a for a in interp.deno_command if a.startswith("--allow-read="))

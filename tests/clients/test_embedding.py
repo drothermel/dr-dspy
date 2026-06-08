@@ -6,10 +6,10 @@ import pytest
 try:
     import numpy as np
 except ImportError:
-    pytest.skip("numpy is not installed", allow_module_level=True)
+    pytest.skip("numpy is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 
 if importlib.util.find_spec("litellm") is None:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 
 import dspy.clients as dspy_clients
 from dspy.clients.embedding import Embedder

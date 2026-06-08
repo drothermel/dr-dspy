@@ -14,7 +14,7 @@ try:
     from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
     from litellm.utils import Choices, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from openai import RateLimitError
 from openai.types.responses import ResponseOutputMessage, ResponseReasoningItem
 from openai.types.responses.response_reasoning_item import Summary

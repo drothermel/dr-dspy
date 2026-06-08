@@ -3,7 +3,7 @@ import importlib
 import pytest
 
 if importlib.util.find_spec("langchain_core") is None:
-    pytest.skip(reason="langchain_core is not installed", allow_module_level=True)
+    pytest.skip("langchain_core is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 
 from pydantic import BaseModel
 

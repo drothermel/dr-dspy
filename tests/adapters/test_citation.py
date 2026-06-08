@@ -22,7 +22,7 @@ def test_citation_validate_input():
     assert citation.supported_text == "The Earth orbits the Sun."
 
     with pytest.raises(pydantic.ValidationError):
-        Citations.Citation(cited_text="text")
+        Citations.Citation(cited_text="text")  # ty: ignore[unresolved-attribute]
 
 
 def test_citations_in_nested_type():

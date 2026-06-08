@@ -1,5 +1,6 @@
 import asyncio
 import time
+from typing import Any, cast
 from dataclasses import dataclass
 from unittest import mock
 from unittest.mock import AsyncMock
@@ -51,7 +52,7 @@ async def test_streamify_yields_expected_response_chunks(litellm_test_server):
             input_text: str = InputField()
             output_text: str = OutputField()
 
-        program = streamify(Predict(TestSignature))
+        program: Any = streamify(Predict(TestSignature))
         output_stream1 = program(input_text="Test")
         output_chunks1 = [chunk async for chunk in output_stream1]
         last_chunk1 = output_chunks1[-1]
@@ -83,7 +84,7 @@ async def test_streaming_response_yields_expected_response_chunks(litellm_test_s
             input_text: str = InputField()
             output_text: str = OutputField()
 
-        program = streamify(Predict(TestSignature))
+        program: Any = streamify(Predict(TestSignature))
         output_stream_from_program = streaming_response(program(input_text="Test"))
         output_stream_for_server_response = streaming_response(output_stream_from_program)
         output_chunks = [chunk async for chunk in output_stream_for_server_response]
@@ -105,7 +106,7 @@ async def test_default_status_streaming():
 
     lm = DummyLM([{"answer": "red"}, {"answer": "blue"}])
     with settings.context(lm=lm):
-        program = streamify(MyProgram())
+        program: Any = streamify(MyProgram())
         output = program("sky")
 
         status_messages = []
@@ -143,7 +144,7 @@ async def test_custom_status_streaming():
 
     lm = DummyLM([{"answer": "red"}, {"answer": "blue"}])
     with settings.context(lm=lm):
-        program = streamify(MyProgram(), status_message_provider=MyStatusMessageProvider())
+        program: Any = streamify(MyProgram(), status_message_provider=MyStatusMessageProvider())
         output = program("sky")
 
         status_messages = []
@@ -202,7 +203,7 @@ async def test_concurrent_status_message_providers():
 
     async def run_with_provider1():
         with settings.context(lm=lm):
-            program = streamify(MyProgram(), status_message_provider=MyStatusMessageProvider1())
+            program: Any = streamify(MyProgram(), status_message_provider=MyStatusMessageProvider1())
             output = program("sky")
 
             status_messages = []
@@ -214,7 +215,7 @@ async def test_concurrent_status_message_providers():
 
     async def run_with_provider2():
         with settings.context(lm=lm):
-            program = streamify(MyProgram(), status_message_provider=MyStatusMessageProvider2())
+            program: Any = streamify(MyProgram(), status_message_provider=MyStatusMessageProvider2())
             output = program("ocean")
 
             status_messages = []
@@ -256,7 +257,7 @@ async def test_stream_listener_chat_adapter(lm_for_test):
             return self.predict2(question=x, answer=answer, **kwargs)
 
     my_program = MyProgram()
-    program = streamify(
+    program: Any = streamify(
         my_program,
         stream_listeners=[
             StreamListener(signature_field_name="answer"),
@@ -288,12 +289,12 @@ async def test_default_status_streaming_in_async_program():
             self.predict = Predict("question->answer")
 
         async def acall(self, x: str):
-            question = await self.generate_question.acall(x=x)
+            question = await cast(Any, self.generate_question).acall(x=x)
             return await self.predict.acall(question=question)
 
     lm = DummyLM([{"answer": "red"}, {"answer": "blue"}])
     with settings.context(lm=lm):
-        program = streamify(MyProgram(), is_async_program=True)
+        program: Any = streamify(MyProgram(), is_async_program=True)
         output = program("sky")
 
         status_messages = []
@@ -319,7 +320,7 @@ async def test_stream_listener_json_adapter(lm_for_test):
             return self.predict2(question=x, answer=answer, **kwargs)
 
     my_program = MyProgram()
-    program = streamify(
+    program: Any = streamify(
         my_program,
         stream_listeners=[
             StreamListener(signature_field_name="answer"),
@@ -346,7 +347,7 @@ async def test_stream_listener_json_adapter(lm_for_test):
 @pytest.mark.anyio
 async def test_streaming_handles_space_correctly():
     my_program = Predict("question->answer")
-    program = streamify(
+    program: Any = streamify(
         my_program, stream_listeners=[StreamListener(signature_field_name="answer")]
     )
 
@@ -385,7 +386,7 @@ def test_sync_streaming(lm_for_test):
             return self.predict2(question=x, answer=answer, **kwargs)
 
     my_program = MyProgram()
-    program = streamify(
+    program: Any = streamify(
         my_program,
         stream_listeners=[
             StreamListener(signature_field_name="answer"),
@@ -423,7 +424,7 @@ def test_sync_status_streaming():
 
     lm = DummyLM([{"answer": "red"}, {"answer": "blue"}])
     with settings.context(lm=lm):
-        program = streamify(MyProgram())
+        program: Any = streamify(MyProgram())
         output = program("sky")
         sync_output = apply_sync_streaming(output)
         status_messages = []
@@ -497,7 +498,7 @@ async def test_stream_listener_returns_correct_chunk_chat_adapter():
         return stream_generators.pop(0)()  # return new async generator instance
 
     with mock.patch("litellm.acompletion", side_effect=completion_side_effect):
-        program = streamify(
+        program: Any = streamify(
             MyProgram(),
             stream_listeners=[
                 StreamListener(signature_field_name="answer"),
@@ -603,7 +604,7 @@ async def test_stream_listener_returns_correct_chunk_json_adapter():
     with mock.patch(
         "litellm.acompletion", new_callable=AsyncMock, side_effect=[gpt_4o_mini_stream_1(), gpt_4o_mini_stream_2()]
     ):
-        program = streamify(
+        program: Any = streamify(
             MyProgram(),
             stream_listeners=[
                 StreamListener(signature_field_name="answer"),
@@ -698,7 +699,7 @@ async def test_stream_listener_returns_correct_chunk_chat_adapter_untokenized_st
         yield ModelResponseStream(model="gemini", choices=[StreamingChoices(delta=Delta(content="}\n"))])
 
     with mock.patch("litellm.acompletion", new_callable=AsyncMock, side_effect=[gemini_stream_1(), gemini_stream_2()]):
-        program = streamify(
+        program: Any = streamify(
             MyProgram(),
             stream_listeners=[
                 StreamListener(signature_field_name="answer"),
@@ -768,7 +769,7 @@ async def test_stream_listener_missing_completion_marker_chat_adapter():
         # NO COMPLETION MARKER
 
     with mock.patch("litellm.acompletion", side_effect=incomplete_stream):
-        program = streamify(
+        program: Any = streamify(
             MyProgram(),
             stream_listeners=[
                 StreamListener(signature_field_name="answer"),
@@ -830,7 +831,7 @@ async def test_stream_listener_returns_correct_chunk_json_adapter_untokenized_st
         yield ModelResponseStream(model="gemini", choices=[StreamingChoices(delta=Delta(content="}\n"))])
 
     with mock.patch("litellm.acompletion", new_callable=AsyncMock, side_effect=[gemini_stream_1(), gemini_stream_2()]):
-        program = streamify(
+        program: Any = streamify(
             MyProgram(),
             stream_listeners=[
                 StreamListener(signature_field_name="answer"),
@@ -867,7 +868,7 @@ async def test_status_message_non_blocking():
             Tool(dummy_tool)()
             return Prediction(answer="dummy_tool_output")
 
-    program = streamify(MyProgram(), status_message_provider=StatusMessageProvider())
+    program: Any = streamify(MyProgram(), status_message_provider=StatusMessageProvider())
 
     with mock.patch("litellm.acompletion", new_callable=AsyncMock, side_effect=[dummy_tool]):  # noqa: SIM117
         with settings.context(lm=LM("openai/gpt-4o-mini", cache=False)):
@@ -892,10 +893,10 @@ async def test_status_message_non_blocking_async_program():
 
     class MyProgram(Module):
         async def aforward(self, question, **kwargs: object):
-            await Tool(dummy_tool).acall()
+            await cast(Any, Tool(dummy_tool)).acall()
             return Prediction(answer="dummy_tool_output")
 
-    program = streamify(MyProgram(), status_message_provider=StatusMessageProvider(), is_async_program=True)
+    program: Any = streamify(MyProgram(), status_message_provider=StatusMessageProvider(), is_async_program=True)
 
     with mock.patch("litellm.acompletion", new_callable=AsyncMock, side_effect=[dummy_tool]):  # noqa: SIM117
         with settings.context(lm=LM("openai/gpt-4o-mini", cache=False)):
@@ -923,7 +924,7 @@ async def test_stream_listener_allow_reuse():
             self.predict(question=question, **kwargs)
             return self.predict(question=question, **kwargs)
 
-    program = streamify(
+    program: Any = streamify(
         MyProgram(),
         stream_listeners=[
             StreamListener(signature_field_name="answer", allow_reuse=True),
@@ -1012,7 +1013,7 @@ async def test_stream_listener_returns_correct_chunk_xml_adapter():
         return stream_generators.pop(0)()
 
     with mock.patch("litellm.acompletion", side_effect=completion_side_effect):
-        program = streamify(
+        program: Any = streamify(
             MyProgram(),
             stream_listeners=[
                 StreamListener(signature_field_name="answer"),
@@ -1054,7 +1055,7 @@ async def test_streaming_allows_custom_chunk_types():
             anyio.from_thread.run(send_to_stream)
             return Prediction(answer="dummy output")
 
-    program = streamify(MyProgram())
+    program: Any = streamify(MyProgram())
 
     output = program(question="why did a chicken cross the kitchen?")
     all_chunks = []
@@ -1090,7 +1091,7 @@ async def test_streaming_allows_custom_streamable_type():
         question: str = InputField()
         answer: CustomType = OutputField()
 
-    program = streamify(
+    program: Any = streamify(
         Predict(CustomSignature),
         stream_listeners=[
             StreamListener(signature_field_name="answer"),
@@ -1186,7 +1187,7 @@ async def test_streaming_with_citations():
 
     # Mock the final response choice to include provider_specific_fields with citations
     with mock.patch("litellm.acompletion", return_value=citation_stream()):
-        program = streamify(
+        program: Any = streamify(
             MyProgram(),
             stream_listeners=[
                 StreamListener(signature_field_name="answer"),
@@ -1199,7 +1200,7 @@ async def test_streaming_with_citations():
 
         with settings.context(
             lm=LM("anthropic/claude-3-5-sonnet-20241022", cache=False),
-            adapter=ChatAdapter(native_response_types=[Citations]),
+            adapter=ChatAdapter(native_response_types=[cast(Any, Citations)]),
         ):
             output = program(documents=docs, question="What temperature does water boil?")
             citation_chunks = []
@@ -1216,7 +1217,7 @@ async def test_streaming_with_citations():
             # Test that we received citation chunks from streaming
             assert len(citation_chunks) > 0
             citation_chunk = citation_chunks[0]
-            assert isinstance(citation_chunk.chunk, Citations)
+            assert isinstance(citation_chunk.chunk, cast(Any, Citations))
             assert len(citation_chunk.chunk) == 1
             assert citation_chunk.chunk[0].cited_text == "water boils at 100°C"
             assert citation_chunk.chunk[0].document_title == "Physics Facts"
@@ -1278,7 +1279,7 @@ async def test_chat_adapter_simple_pydantic_streaming():
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=" completed"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=" ## ]]"))])
 
-    program = streamify(
+    program: Any = streamify(
         MyProgram(),
         stream_listeners=[
             StreamListener(signature_field_name="response"),
@@ -1327,7 +1328,7 @@ async def test_chat_adapter_with_generic_type_annotation():
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=" completed"))])
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=" ## ]]"))])
 
-    program = streamify(
+    program: Any = streamify(
         MyProgram(),
         stream_listeners=[
             StreamListener(signature_field_name="response"),
@@ -1377,7 +1378,7 @@ async def test_chat_adapter_nested_pydantic_streaming():
             model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="\n\n[[ ## completed ## ]]"))]
         )
 
-    program = streamify(
+    program: Any = streamify(
         Predict(TestSignature),
         stream_listeners=[
             StreamListener(signature_field_name="response"),
@@ -1432,7 +1433,7 @@ async def test_chat_adapter_mixed_fields_streaming():
             model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="\n\n[[ ## completed ## ]]"))]
         )
 
-    program = streamify(
+    program: Any = streamify(
         Predict(TestSignature),
         stream_listeners=[
             StreamListener(signature_field_name="summary"),
@@ -1485,7 +1486,7 @@ async def test_json_adapter_simple_pydantic_streaming():
             model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="}"))]
         )  # Close main object
 
-    program = streamify(
+    program: Any = streamify(
         Predict(TestSignature),
         stream_listeners=[
             StreamListener(signature_field_name="response"),
@@ -1536,7 +1537,7 @@ async def test_json_adapter_bracket_balance_detection():
             model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="}"))]
         )  # Close main object
 
-    program = streamify(
+    program: Any = streamify(
         Predict(TestSignature),
         stream_listeners=[
             StreamListener(signature_field_name="response"),
@@ -1588,7 +1589,7 @@ async def test_json_adapter_multiple_fields_detection():
             model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content=', "status": "done"}}'))]
         )
 
-    program = streamify(
+    program: Any = streamify(
         Predict(TestSignature),
         stream_listeners=[
             StreamListener(signature_field_name="first"),
@@ -1738,7 +1739,7 @@ async def test_streaming_reasoning_model():
 
     with mock.patch("litellm.acompletion", side_effect=reasoning_stream):  # noqa: SIM117
         with mock.patch("litellm.supports_reasoning", return_value=True):
-            program = streamify(
+            program: Any = streamify(
                 MyProgram(),
                 stream_listeners=[
                     StreamListener(signature_field_name="reasoning"),
@@ -1829,7 +1830,7 @@ async def test_stream_listener_empty_last_chunk_chat_adapter():
         )
 
     with mock.patch("litellm.acompletion", side_effect=mock_stream):
-        program = streamify(
+        program: Any = streamify(
             predict,
             stream_listeners=[
                 StreamListener(signature_field_name="reasoning"),
@@ -1884,7 +1885,7 @@ async def test_stream_listener_empty_last_chunk_json_adapter():
         yield ModelResponseStream(model="gpt-4o-mini", choices=[StreamingChoices(delta=Delta(content="\n}"))])
 
     with mock.patch("litellm.acompletion", side_effect=mock_stream):
-        program = streamify(
+        program: Any = streamify(
             predict,
             stream_listeners=[
                 StreamListener(signature_field_name="reasoning"),
@@ -2024,7 +2025,7 @@ async def test_streaming_reasoning_fallback():
 
     with mock.patch("litellm.acompletion", side_effect=non_reasoning_stream):  # noqa: SIM117
         with mock.patch("litellm.supports_reasoning", return_value=False):
-            program = streamify(
+            program: Any = streamify(
                 MyProgram(),
                 stream_listeners=[
                     StreamListener(signature_field_name="reasoning"),

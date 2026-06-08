@@ -14,7 +14,7 @@ import pytest
 try:
     from litellm import ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from pydantic import BaseModel, HttpUrl
 
 from dspy.adapters.chat_adapter import ChatAdapter

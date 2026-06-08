@@ -1,6 +1,7 @@
 import time
 from concurrent.futures import Future
 from unittest.mock import MagicMock
+from typing import Any
 
 from dspy.utils.unbatchify import Unbatchify
 
@@ -10,20 +11,20 @@ def simple_batch_processor(batch):
     return [item + 1 for item in batch]
 
 
-def submit(self, input_item: any) -> Future:
+def submit(self, input_item: Any) -> Future:
     """Submits an item for processing and returns a Future."""
     future = Future()
     self.input_queue.put((input_item, future))
     return future
 
 
-Unbatchify.submit = submit
+Unbatchify.submit = submit  # ty: ignore[unresolved-attribute]
 
 
 def test_unbatchify_batch_size_trigger():
     """Test that the batch processes exactly when max_batch_size is reached."""
     batch_fn_mock = MagicMock(wraps=simple_batch_processor)
-    unbatcher = Unbatchify(batch_fn=batch_fn_mock, max_batch_size=2, max_wait_time=5.0)
+    unbatcher: Any = Unbatchify(batch_fn=batch_fn_mock, max_batch_size=2, max_wait_time=5.0)
 
     futures = []
     futures.append(unbatcher.submit(10))
@@ -54,7 +55,7 @@ def test_unbatchify_timeout_trigger():
     """Test that the batch processes after max_wait_time."""
     batch_fn_mock = MagicMock(wraps=simple_batch_processor)
     wait_time = 0.15
-    unbatcher = Unbatchify(batch_fn=batch_fn_mock, max_batch_size=5, max_wait_time=wait_time)
+    unbatcher: Any = Unbatchify(batch_fn=batch_fn_mock, max_batch_size=5, max_wait_time=wait_time)
 
     futures = []
     futures.append(unbatcher.submit(100))

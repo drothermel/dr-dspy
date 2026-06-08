@@ -6,7 +6,7 @@ import pytest
 try:
     from litellm import Choices, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
@@ -72,8 +72,8 @@ def test_bootstrap_trace_data():
 
     # Create a side effect that will trigger AdapterParseError on the 3rd call (index 2)
     def completion_side_effect(*args: object, **kwargs: object):
-        call_count = completion_side_effect.call_count
-        completion_side_effect.call_count += 1
+        call_count = completion_side_effect.call_count  # ty: ignore[unresolved-attribute]
+        completion_side_effect.call_count += 1  # ty: ignore[unresolved-attribute]
 
         if call_count in (2, 3):
             # Return malformed responses for both structured-output mode and JSON-mode fallback.
@@ -83,7 +83,7 @@ def test_bootstrap_trace_data():
             )
         return successful_responses[call_count if call_count < 2 else call_count - 2]
 
-    completion_side_effect.call_count = 0
+    completion_side_effect.call_count = 0  # ty: ignore[unresolved-attribute]
 
     with mock.patch("litellm.completion", side_effect=completion_side_effect):
         # Call bootstrap_trace_data

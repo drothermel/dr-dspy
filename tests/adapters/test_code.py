@@ -13,7 +13,7 @@ def test_code_validate_input():
 
     with pytest.raises(ValueError):  # noqa: PT011
         # Try to create a `Code` instance with invalid type.
-        Code["python"](code=123)
+        Code["python"](code=123)  # ty: ignore[invalid-argument-type]
 
     def foo(x):
         return x + 1

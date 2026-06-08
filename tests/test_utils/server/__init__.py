@@ -20,7 +20,7 @@ def litellm_test_server() -> tuple[str, str]:
     server when the test case completes.
     """
     if importlib.util.find_spec("litellm") is None:
-        pytest.skip("litellm is not installed")
+        pytest.skip("litellm is not installed")  # ty: ignore[too-many-positional-arguments]
     if sys.version_info[:2] == (3, 14):
         pytest.skip("Litellm proxy server is not supported on Python 3.14.")
     with tempfile.TemporaryDirectory() as server_log_dir_path:

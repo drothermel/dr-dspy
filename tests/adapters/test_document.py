@@ -11,7 +11,7 @@ def test_document_validate_input():
 
     with pytest.raises(pydantic.ValidationError):
         # Try to create a `Document` instance with invalid type.
-        Document(data=123)
+        Document(data=123)  # ty: ignore[invalid-argument-type]
 
 
 def test_document_in_nested_type():

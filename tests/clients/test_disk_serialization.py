@@ -13,13 +13,13 @@ import pytest
 try:
     import numpy as np
 except ImportError:
-    pytest.skip("numpy is not installed", allow_module_level=True)
+    pytest.skip("numpy is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 
 try:
     from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
     from litellm.types.utils import EmbeddingResponse, ModelResponse, TextCompletionResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from openai.types.responses import ResponseFunctionToolCall, ResponseOutputMessage, ResponseOutputText
 
 from dspy.clients.disk_serialization import (

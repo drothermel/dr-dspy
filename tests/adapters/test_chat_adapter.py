@@ -11,7 +11,7 @@ from dspy.utils.dummies import DummyLM
 try:
     from litellm.utils import ChatCompletionMessageToolCall, Choices, Function, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter

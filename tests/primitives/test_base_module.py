@@ -10,7 +10,7 @@ try:
     from litellm import Choices, Message, ModelResponse
     from litellm.types.utils import Usage
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
