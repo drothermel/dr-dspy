@@ -11,7 +11,7 @@ from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls, tool_from
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 from dspy.utils.annotation import experimental
 from dspy.utils.exceptions import AdapterParseError, ContextWindowExceededError
 
@@ -65,16 +65,16 @@ class ReActV2(Module):
     def _make_react_task_spec(self) -> TaskSpec:
         fields: dict[str, FieldSpec] = {}
         for name, field in self.task_spec.input_fields.items():
-            fields[name] = FieldSpec.input(
+            fields[name] = input_field(
                 name,
                 _optional_annotation(field.type_),
                 desc=field.desc if field.desc != f"${{{name}}}" else None,
             )
 
-        fields["history"] = FieldSpec.input("history", History)
-        fields["tools"] = FieldSpec.input("tools", list[Tool])
-        fields["next_thought"] = FieldSpec.output("next_thought", Reasoning)
-        fields["tool_calls"] = FieldSpec.output("tool_calls", ToolCalls)
+        fields["history"] = input_field("history", History)
+        fields["tools"] = input_field("tools", list[Tool])
+        fields["next_thought"] = output_field("next_thought", Reasoning)
+        fields["tool_calls"] = output_field("tool_calls", ToolCalls)
 
         inputs = ", ".join(f"`{name}`" for name in self.task_spec.input_fields)
         outputs = ", ".join(f"`{name}`" for name in self.task_spec.output_fields)

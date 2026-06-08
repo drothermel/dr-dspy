@@ -1,6 +1,6 @@
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
-from dspy.task_spec import FieldSpec, TaskSpec
+from dspy.task_spec import TaskSpec, input_field, output_field
 
 
 class MultiChainComparison(Module):
@@ -18,7 +18,7 @@ class MultiChainComparison(Module):
         for idx in range(M):
             field_name = f"reasoning_attempt_{idx + 1}"
             extended_task_spec = extended_task_spec.append(
-                FieldSpec.input(
+                input_field(
                     field_name,
                     str,
                     desc="${reasoning attempt}",
@@ -27,7 +27,7 @@ class MultiChainComparison(Module):
             )
 
         extended_task_spec = extended_task_spec.prepend(
-            FieldSpec.output(
+            output_field(
                 "rationale",
                 str,
                 desc="${corrected reasoning}",

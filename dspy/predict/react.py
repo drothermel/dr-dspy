@@ -9,7 +9,7 @@ from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.task_spec import FieldSpec, TaskSpec, default_task_instructions, make_task_spec
+from dspy.task_spec import TaskSpec, default_task_instructions, input_field, make_task_spec, output_field
 from dspy.utils.exceptions import ContextWindowExceededError
 
 logger = logging.getLogger(__name__)
@@ -37,12 +37,15 @@ class ReAct(Module):
             return f"The weather in {city} is sunny."
 
         from dspy.predict.react import ReAct
-        from dspy.task_spec import make_task_spec
+        from dspy.task_spec import TaskSpec, input_field, output_field
 
-        react = ReAct(
-            make_task_spec("question->answer", instructions="Answer the question."),
-            tools=[get_weather],
-        )
+        class QATaskSpec(TaskSpec):
+            name: str = "QA"
+            instructions: str = "Answer the question."
+            inputs: tuple = (input_field("question"),)
+            outputs: tuple = (output_field("answer"),)
+
+        react = ReAct(QATaskSpec(), tools=[get_weather])
         pred = react(question="What is the weather in Tokyo?")
         ```
         """
@@ -90,16 +93,16 @@ class ReAct(Module):
                 dict(task_spec.input_fields),
                 instructions="\n".join(instr),
             )
-            .append(FieldSpec.input("trajectory", str))
-            .append(FieldSpec.output("next_thought", str))
-            .append(FieldSpec.output("next_tool_name", str))
-            .append(FieldSpec.output("next_tool_args", dict[str, Any]))
+            .append(input_field("trajectory", str))
+            .append(output_field("next_thought", str))
+            .append(output_field("next_tool_name", str))
+            .append(output_field("next_tool_args", dict[str, Any]))
         )
 
         fallback_task_spec = make_task_spec(
             {**task_spec.input_fields, **task_spec.output_fields},
             instructions=task_spec.instructions,
-        ).append(FieldSpec.input("trajectory", str))
+        ).append(input_field("trajectory", str))
 
         self.tools = tools_by_name
         self.react = Predict(react_task_spec)

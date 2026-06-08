@@ -6,7 +6,7 @@ from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.code_interpreter import FinalOutput
 from dspy.primitives.module import Module
 from dspy.primitives.python_interpreter import PythonInterpreter
-from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +21,17 @@ class ProgramOfThought(Module):
     from dspy.clients.lm import LM
     from dspy.dsp.utils.settings import settings
     from dspy.predict.program_of_thought import ProgramOfThought
-    from dspy.task_spec import make_task_spec
+    from dspy.task_spec import TaskSpec, input_field, output_field
+
+    class QATaskSpec(TaskSpec):
+        name: str = "QA"
+        instructions: str = "Answer the question."
+        inputs: tuple = (input_field("question"),)
+        outputs: tuple = (output_field("answer"),)
 
     lm = LM('openai/gpt-4o-mini')
     settings.configure(lm=lm)
-    pot = ProgramOfThought(make_task_spec("question -> answer", instructions="Answer the question."))
+    pot = ProgramOfThought(QATaskSpec())
     pot(question="what is 1+1?")
     ```
     """
@@ -62,36 +68,36 @@ class ProgramOfThought(Module):
         fields = dict(self.input_fields)
         fields_for_mode = {
             "generate": {
-                "generated_code": FieldSpec.output(
+                "generated_code": output_field(
                     "generated_code",
                     str,
                     desc="python code that answers the question",
                 ),
             },
             "regenerate": {
-                "previous_code": FieldSpec.input(
+                "previous_code": input_field(
                     "previous_code",
                     str,
                     desc="previously-generated python code that errored",
                 ),
-                "error": FieldSpec.input(
+                "error": input_field(
                     "error",
                     str,
                     desc="error message from previously-generated python code",
                 ),
-                "generated_code": FieldSpec.output(
+                "generated_code": output_field(
                     "generated_code",
                     str,
                     desc="python code that answers the question",
                 ),
             },
             "answer": {
-                "final_generated_code": FieldSpec.input(
+                "final_generated_code": input_field(
                     "final_generated_code",
                     str,
                     desc="python code that answers the question",
                 ),
-                "code_output": FieldSpec.input(
+                "code_output": input_field(
                     "code_output",
                     str,
                     desc="output of previously-generated python code",

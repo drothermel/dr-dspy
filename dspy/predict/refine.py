@@ -110,12 +110,18 @@ class Refine(Module):
             from dspy.dsp.utils.settings import settings
             from dspy.predict.chain_of_thought import ChainOfThought
             from dspy.predict.refine import Refine
-            from dspy.task_spec import make_task_spec
+            from dspy.task_spec import TaskSpec, input_field, output_field
 
             settings.configure(lm=LM("openai/gpt-4o-mini"))
 
+            class QATaskSpec(TaskSpec):
+                name: str = "QA"
+                instructions: str = "Answer the question."
+                inputs: tuple = (input_field("question"),)
+                outputs: tuple = (output_field("answer"),)
+
             # Define a QA module with chain of thought
-            qa = ChainOfThought(make_task_spec("question -> answer", instructions="Answer the question."))
+            qa = ChainOfThought(QATaskSpec())
 
             # Define a reward function that checks for one-word answers
             def one_word_answer(args, pred):
@@ -167,7 +173,7 @@ class Refine(Module):
                             async def acall(self, *, lm, config, task_spec, demos, inputs):
                                 inputs["hint_"] = advice.get(task_spec2name[task_spec], "N/A")  # noqa: B023
                                 task_spec = task_spec.append(
-                                    FieldSpec.input(
+                                    input_field(
                                         "hint_",
                                         str,
                                         desc="A hint to the module from an earlier run",

@@ -54,10 +54,15 @@ class Predict(Module, Parameter):
             module. For example::
 
                 from dspy.predict.predict import Predict
-                from dspy.task_spec import make_task_spec
+                from dspy.task_spec import TaskSpec, input_field, output_field
 
-                qa = make_task_spec("q -> a", instructions="Answer the question.")
-                predict = Predict(qa, rollout_id=1, temperature=1.0)
+                class QATaskSpec(TaskSpec):
+                    name: str = "QA"
+                    instructions: str = "Answer the question."
+                    inputs: tuple = (input_field("q"),)
+                    outputs: tuple = (output_field("a"),)
+
+                predict = Predict(QATaskSpec(), rollout_id=1, temperature=1.0)
                 result = await predict(q="What is 1 + 52?", config={"rollout_id": 2, "temperature": 1.0})
     """
 
@@ -65,7 +70,7 @@ class Predict(Module, Parameter):
         if isinstance(task_spec, str):
             raise TypeError(
                 "Predict requires a TaskSpec instance, not a string. "
-                "Use make_task_spec(...) to create one from a spec string."
+                "Use a TaskSpec subclass or make_task_spec(...) to create one."
             )
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"Predict requires a TaskSpec instance, got {type(task_spec).__name__}.")

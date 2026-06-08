@@ -8,7 +8,7 @@ from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.module import Module
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.utils import get_task_spec, set_task_spec
 
@@ -140,8 +140,8 @@ class InferRules(BootstrapFewShot):
 def _rules_induction_task_spec(num_rules):
     return make_task_spec(
         {
-            "examples_text": FieldSpec.input("examples_text", str, desc="Text containing examples"),
-            "natural_language_rules": FieldSpec.output(
+            "examples_text": input_field("examples_text", str, desc="Text containing examples"),
+            "natural_language_rules": output_field(
                 "natural_language_rules",
                 str,
                 desc="Induced natural language rules",

@@ -61,7 +61,7 @@ class Avatar(Module):
         for field_name in list(self.input_fields.keys())[::-1]:
             field = self.input_fields[field_name]
             actor_task_spec = actor_task_spec.prepend(
-                FieldSpec.input(field_name, field.type_, desc=field.desc, prefix=field.prefix),
+                input_field(field_name, field.type_, desc=field.desc, prefix=field.prefix),
             )
 
         self.verbose = verbose
@@ -73,14 +73,14 @@ class Avatar(Module):
     def _promote_output_to_input(self, task_spec: TaskSpec, name: str, *, type_) -> TaskSpec:
         field = task_spec.output_fields[name]
         return task_spec.delete(name).append(
-            FieldSpec.input(name, type_, desc=field.desc, prefix=field.prefix),
+            input_field(name, type_, desc=field.desc, prefix=field.prefix),
         )
 
     def _update_task_spec(self, idx: int, omit_action: bool = False) -> None:
         task_spec = self.actor.task_spec
         task_spec = self._promote_output_to_input(task_spec, f"action_{idx}", type_=Action)
         task_spec = task_spec.append(
-            FieldSpec.input(
+            input_field(
                 f"result_{idx}",
                 str,
                 desc=f"{get_number_with_suffix(idx)} result",
@@ -91,11 +91,11 @@ class Avatar(Module):
         if omit_action:
             for field_name, field in self.output_fields.items():
                 task_spec = task_spec.append(
-                    FieldSpec.output(field_name, field.type_, desc=field.desc, prefix=field.prefix),
+                    output_field(field_name, field.type_, desc=field.desc, prefix=field.prefix),
                 )
         else:
             task_spec = task_spec.append(
-                FieldSpec.output(
+                output_field(
                     f"action_{idx + 1}",
                     Action,
                     desc=f"{get_number_with_suffix(idx + 1)} action to taken",

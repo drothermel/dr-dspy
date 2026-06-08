@@ -11,7 +11,7 @@ from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import build_lm_message
 from dspy.clients.base_lm import BaseLM
 from dspy.core.types import LMConfig, LMMessage, LMRequest, LMToolCallPart, merge_lm_request_config
-from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
+from dspy.task_spec import TaskSpec, input_field, make_task_spec
 from dspy.task_spec.formatting import get_field_spec_description_string
 from dspy.utils.exceptions import AdapterParseError, LMError
 
@@ -252,7 +252,7 @@ class TwoStepAdapter(Adapter):
             A new TaskSpec with a text input field and all output fields
         """
         new_fields = {
-            "text": FieldSpec.input("text"),
+            "text": input_field("text"),
             **dict(original_task_spec.output_fields),
         }
 

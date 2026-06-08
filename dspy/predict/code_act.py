@@ -11,7 +11,7 @@ from dspy.predict.program_of_thought import ProgramOfThought
 from dspy.predict.react import ReAct
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
-from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
+from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
 
 logger = logging.getLogger(__name__)
 
@@ -39,13 +39,19 @@ class CodeAct(ReAct, ProgramOfThought):
         Examples:
             ```python
             from dspy.predict import CodeAct
-            from dspy.task_spec import make_task_spec
+            from dspy.task_spec import TaskSpec, input_field, output_field
             def factorial(n):
                 if n == 1:
                     return 1
                 return n * factorial(n-1)
 
-            act = CodeAct(make_task_spec("n->factorial", instructions="Compute factorial."), tools=[factorial])
+            class FactorialTaskSpec(TaskSpec):
+                name: str = "Factorial"
+                instructions: str = "Compute factorial."
+                inputs: tuple = (input_field("n"),)
+                outputs: tuple = (output_field("factorial"),)
+
+            act = CodeAct(FactorialTaskSpec(), tools=[factorial])
             act(n=5) # 120
             ```
         """
@@ -71,16 +77,16 @@ class CodeAct(ReAct, ProgramOfThought):
                 dict(task_spec.input_fields),
                 instructions="\n".join(instructions),
             )
-            .append(FieldSpec.input("trajectory", str))
+            .append(input_field("trajectory", str))
             .append(
-                FieldSpec.output(
+                output_field(
                     "generated_code",
                     str,
                     desc="Python code that when executed, produces output relevant to answering the question",
                 ),
             )
             .append(
-                FieldSpec.output(
+                output_field(
                     "finished",
                     bool,
                     desc="a boolean flag to determine if the process is done",
@@ -91,7 +97,7 @@ class CodeAct(ReAct, ProgramOfThought):
         extract_task_spec = make_task_spec(
             {**task_spec.input_fields, **task_spec.output_fields},
             instructions=task_spec.instructions,
-        ).append(FieldSpec.input("trajectory", str))
+        ).append(input_field("trajectory", str))
 
         self.tools: dict[str, Tool] = tools_by_name
         self.codeact = Predict(codeact_task_spec)

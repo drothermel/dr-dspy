@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, cast
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
-from dspy.task_spec import FieldSpec, TaskSpec
+from dspy.task_spec import TaskSpec, output_field
 
 if TYPE_CHECKING:
     from dspy.utils.callback import BaseCallback
@@ -26,7 +26,7 @@ class ChainOfThought(Module):
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"ChainOfThought requires a TaskSpec instance, got {type(task_spec).__name__}.")
         extended_task_spec = task_spec.prepend(
-            FieldSpec.output("reasoning", Reasoning, desc="${reasoning}"),
+            output_field("reasoning", Reasoning, desc="${reasoning}"),
         )
         callbacks = cast("list[BaseCallback] | None", config.pop("callbacks", None))
         self.task_spec = task_spec

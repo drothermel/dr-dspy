@@ -94,44 +94,44 @@ def generate_instruction_task_spec(
 ):
     fields: dict[str, FieldSpec] = {}
     if use_dataset_summary:
-        fields["dataset_description"] = FieldSpec.input(
+        fields["dataset_description"] = input_field(
             "dataset_description",
             str,
             desc="A description of the dataset that we are using.",
         )
     if program_aware:
-        fields["program_code"] = FieldSpec.input(
+        fields["program_code"] = input_field(
             "program_code",
             str,
             desc="Language model program designed to solve a particular task.",
         )
-        fields["program_description"] = FieldSpec.input(
+        fields["program_description"] = input_field(
             "program_description",
             str,
             desc="Summary of the task the program is designed to solve, and how it goes about solving it.",
         )
-        fields["module"] = FieldSpec.input("module", str, desc="The module to create an instruction for.")
-        fields["module_description"] = FieldSpec.input(
+        fields["module"] = input_field("module", str, desc="The module to create an instruction for.")
+        fields["module_description"] = input_field(
             "module_description",
             str,
             desc="Description of the module to create an instruction for.",
         )
     if use_task_demos:
-        fields["task_demos"] = FieldSpec.input("task_demos", str, desc="Example inputs/outputs of our module.")
+        fields["task_demos"] = input_field("task_demos", str, desc="Example inputs/outputs of our module.")
     if use_instruct_history:
-        fields["previous_instructions"] = FieldSpec.input(
+        fields["previous_instructions"] = input_field(
             "previous_instructions",
             str,
             desc="Previous instructions we've attempted, along with their associated scores.",
         )
-    fields["basic_instruction"] = FieldSpec.input("basic_instruction", str, desc="Basic instruction.")
+    fields["basic_instruction"] = input_field("basic_instruction", str, desc="Basic instruction.")
     if use_tip:
-        fields["tip"] = FieldSpec.input(
+        fields["tip"] = input_field(
             "tip",
             str,
             desc="A suggestion for how to go about generating the new instruction.",
         )
-    fields["proposed_instruction"] = FieldSpec.output(
+    fields["proposed_instruction"] = output_field(
         "proposed_instruction",
         str,
         desc="Propose an instruction that will be used to prompt a Language Model to perform this task.",

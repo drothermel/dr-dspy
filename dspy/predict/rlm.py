@@ -29,7 +29,7 @@ from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
 from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
-from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
+from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
 from dspy.utils.annotation import experimental
 
@@ -316,27 +316,27 @@ class RLM(Module):
 
         action_sig = make_task_spec(
             {
-                "variables_info": FieldSpec.input(
+                "variables_info": input_field(
                     "variables_info",
                     str,
                     desc="Metadata about the variables available in the REPL",
                 ),
-                "repl_history": FieldSpec.input(
+                "repl_history": input_field(
                     "repl_history",
                     REPLHistory,
                     desc="Previous REPL code executions and their outputs",
                 ),
-                "iteration": FieldSpec.input(
+                "iteration": input_field(
                     "iteration",
                     str,
                     desc="Current iteration number (1-indexed) out of max_iterations",
                 ),
-                "reasoning": FieldSpec.output(
+                "reasoning": output_field(
                     "reasoning",
                     str,
                     desc="Think step-by-step: what do you know? What remains? Plan your next action.",
                 ),
-                "code": FieldSpec.output(
+                "code": output_field(
                     "code",
                     str,
                     desc="Python code to execute. Use markdown code block format: ```python\\n<code>\\n```",
@@ -367,12 +367,12 @@ class RLM(Module):
 
         extract_sig = make_task_spec(
             {
-                "variables_info": FieldSpec.input(
+                "variables_info": input_field(
                     "variables_info",
                     str,
                     desc="Metadata about the variables available in the REPL",
                 ),
-                "repl_history": FieldSpec.input(
+                "repl_history": input_field(
                     "repl_history",
                     REPLHistory,
                     desc="Your REPL interactions so far",
