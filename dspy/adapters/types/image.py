@@ -1,7 +1,6 @@
 import base64
 import io
 import mimetypes
-import warnings
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, cast
@@ -41,7 +40,6 @@ class Image(Type):
             - ``str``: HTTP(S)/GS URL or local file path
             - ``bytes``: raw image bytes
             - ``PIL.Image.Image``: a PIL image instance
-            - ``dict`` with a single ``{"url": value}`` entry (legacy form)
             - already encoded data URI
 
         download:
@@ -55,14 +53,7 @@ class Image(Type):
         """
 
         if url is not None and "url" not in data:
-            # Support a positional argument while allowing ``url=`` in **data.
-            if isinstance(url, dict) and set(url.keys()) == {"url"}:
-                url = cast("dict[str, object]", url)
-                # Legacy dict form from previous model validator.
-                data["url"] = url["url"]
-            else:
-                # ``url`` may be a string, bytes, or a PIL image.
-                data["url"] = url
+            data["url"] = url
 
         if "url" in data:
             # Normalize any accepted input into a base64 data URI or plain URL.
@@ -78,33 +69,6 @@ class Image(Type):
         except Exception as e:
             raise ValueError(f"Failed to format image for DSPy: {e}") from e
         return [{"type": "image_url", "image_url": {"url": image_url}}]
-
-    @classmethod
-    def from_url(cls, url: str, download: bool = False) -> "Image":
-        warnings.warn(
-            "Image.from_url is deprecated; use Image(url) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return cls(url, download=download)
-
-    @classmethod
-    def from_file(cls, file_path: str) -> "Image":
-        warnings.warn(
-            "Image.from_file is deprecated; use Image(file_path) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return cls(file_path)
-
-    @classmethod
-    def from_PIL(cls, pil_image: object) -> "Image":  # noqa: N802
-        warnings.warn(
-            "Image.from_PIL is deprecated; use Image(pil_image) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return cls(pil_image)
 
     @override
     def __str__(self) -> str:

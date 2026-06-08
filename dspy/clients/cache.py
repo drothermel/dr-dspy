@@ -215,8 +215,6 @@ def request_cache(
     cache_arg_name: str | None = None,
     ignored_args_for_cache_key: list[str] | None = None,
     enable_memory_cache: bool = True,
-    *,  # everything after this is keyword-only
-    maxsize: int | None = None,  # legacy / no-op
 ):
     """
     Decorator for applying caching to a function based on the request argument.
@@ -229,12 +227,6 @@ def request_cache(
             written to on new data.
     """
     ignored_args_for_cache_key = ignored_args_for_cache_key or ["api_key", "api_base", "base_url"]
-    if maxsize is not None:
-        logger.warning(
-            "[DEPRECATION] `maxsize` is deprecated and no longer does anything; "
-            "the cache is now handled internally by `dspy.cache`. "
-            "This parameter will be removed in a future release.",
-        )
 
     def decorator(fn):
         @wraps(fn)

@@ -466,20 +466,6 @@ def test_image_repr():
     assert "base64" in str(pil_image)
 
 
-def test_from_methods_warn(tmp_path):
-    """Deprecated from_* methods emit warnings"""
-    tmp_file = tmp_path / "test.png"
-    tmp_file.write_bytes(b"pngdata")
-
-    with pytest.warns(DeprecationWarning):  # noqa: PT030
-        Image.from_url("https://example.com/dog.jpg")
-    with pytest.warns(DeprecationWarning):  # noqa: PT030
-        Image.from_file(str(tmp_file))
-    sample_pil = PILImage.new("RGB", (10, 10), color="blue")
-    with pytest.warns(DeprecationWarning):  # noqa: PT030
-        Image.from_PIL(sample_pil)
-
-
 def test_invalid_string_format():
     """Test that invalid string formats raise a ValueError"""
     invalid_string = "this_is_not_a_url_or_file"

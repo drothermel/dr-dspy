@@ -127,16 +127,8 @@ class MIPROv2(Teleprompter):
         view_data_batch_size: int = 10,
         tip_aware_proposer: bool = True,
         fewshot_aware_proposer: bool = True,
-        requires_permission_to_run: bool | None = None,  # deprecated
         provide_traceback: bool | None = None,
     ) -> Any:
-        if not requires_permission_to_run:
-            logger.warning("'requires_permission_to_run' is deprecated and will be removed in a future version.")
-        elif requires_permission_to_run:
-            raise ValueError(
-                "User confirmation is removed from MIPROv2. Please remove the 'requires_permission_to_run' argument."
-            )
-
         effective_max_errors = self.max_errors if self.max_errors is not None else settings.max_errors
 
         effective_max_bootstrapped_demos = (
