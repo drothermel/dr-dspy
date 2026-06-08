@@ -23,6 +23,12 @@ class CacheValidationDataclass:
     value: int
 
 
+def _close_cache(cache: Cache) -> None:
+    disk_cache = getattr(cache, "disk_cache", None)
+    if isinstance(disk_cache, FanoutCache):
+        disk_cache.close()
+
+
 @pytest.fixture
 def cache_config(tmp_path):
     """Default cache configuration."""
@@ -38,13 +44,17 @@ def cache_config(tmp_path):
 @pytest.fixture
 def cache(cache_config):
     """Create a cache instance with the default configuration."""
-    return Cache(**cache_config)
+    cache = Cache(**cache_config)
+    try:
+        yield cache
+    finally:
+        _close_cache(cache)
 
 
 @pytest.fixture
 def restricted_cache(tmp_path):
     """Create a cache instance with restricted pickle deserialization."""
-    return Cache(
+    cache = Cache(
         enable_disk_cache=True,
         enable_memory_cache=True,
         disk_cache_dir=str(tmp_path / "restricted"),
@@ -52,6 +62,10 @@ def restricted_cache(tmp_path):
         memory_max_entries=100,
         restrict_pickle=True,
     )
+    try:
+        yield cache
+    finally:
+        _close_cache(cache)
 
 
 def test_initialization(tmp_path):
@@ -76,8 +90,11 @@ def test_initialization(tmp_path):
         disk_size_limit_bytes=1024,
         memory_max_entries=0,
     )
-    assert isinstance(disk_cache.disk_cache, FanoutCache)
-    assert disk_cache.memory_cache == {}
+    try:
+        assert isinstance(disk_cache.disk_cache, FanoutCache)
+        assert disk_cache.memory_cache == {}
+    finally:
+        _close_cache(disk_cache)
 
     # Test disabled cache
     disabled_cache = Cache(
@@ -420,18 +437,21 @@ def test_registered_dataclass_roundtrip_in_restricted_mode(tmp_path):
         restrict_pickle=True,
         safe_types=[CacheValidationDataclass],
     )
-    request = {
-        "model": "test",
-        "prompt": "registered_dataclass_test",
-        "payload": CacheValidationDataclass(name="request", value=1),
-    }
-    response = CacheValidationDataclass(name="hello", value=3)
+    try:
+        request = {
+            "model": "test",
+            "prompt": "registered_dataclass_test",
+            "payload": CacheValidationDataclass(name="request", value=1),
+        }
+        response = CacheValidationDataclass(name="hello", value=3)
 
-    cache.put(request, response)
-    result = cache.get(request)
+        cache.put(request, response)
+        result = cache.get(request)
 
-    assert isinstance(result, CacheValidationDataclass)
-    assert result == response
+        assert isinstance(result, CacheValidationDataclass)
+        assert result == response
+    finally:
+        _close_cache(cache)
 
 
 def test_configure_cache_registers_safe_types(tmp_path):
@@ -453,6 +473,7 @@ def test_configure_cache_registers_safe_types(tmp_path):
         assert isinstance(result, CacheValidationDataclass)
         assert result == response
     finally:
+        _close_cache(dspy_clients.DSPY_CACHE)
         dspy_clients.DSPY_CACHE = original_cache
 
 
@@ -466,23 +487,28 @@ def test_corrupt_disk_entries_return_none(tmp_path):
         disk_cache_dir=str(tmp_path),
         restrict_pickle=True,
     )
-    request = {"model": "test", "prompt": "will_be_corrupted"}
-    cache.put(request, {"value": "good"})
-    key = cache.cache_key(request)
+    try:
+        request = {"model": "test", "prompt": "will_be_corrupted"}
+        cache.put(request, {"value": "good"})
+        key = cache.cache_key(request)
 
-    # Corrupt the pickle blob in the SQLite database
-    for shard_id in range(16):
-        db_path = os.path.join(str(tmp_path), f"{shard_id:03d}", "cache.db")
-        if not os.path.exists(db_path):
-            continue
-        conn = sqlite3.connect(db_path)
-        row = conn.execute("SELECT rowid, value FROM Cache WHERE key = ?", (key,)).fetchone()
-        if row:
-            conn.execute("UPDATE Cache SET value = X'DEADBEEF' WHERE rowid = ?", (row[0],))
-            conn.commit()
-        conn.close()
+        # Corrupt the pickle blob in the SQLite database
+        for shard_id in range(16):
+            db_path = os.path.join(str(tmp_path), f"{shard_id:03d}", "cache.db")
+            if not os.path.exists(db_path):
+                continue
+            conn = sqlite3.connect(db_path)
+            try:
+                row = conn.execute("SELECT rowid, value FROM Cache WHERE key = ?", (key,)).fetchone()
+                if row:
+                    conn.execute("UPDATE Cache SET value = X'DEADBEEF' WHERE rowid = ?", (row[0],))
+                    conn.commit()
+            finally:
+                conn.close()
 
-    assert cache.get(request) is None
+        assert cache.get(request) is None
+    finally:
+        _close_cache(cache)
 
 
 def test_restricted_and_unrestricted_share_wire_format(tmp_path):
@@ -494,15 +520,22 @@ def test_restricted_and_unrestricted_share_wire_format(tmp_path):
         enable_disk_cache=True, enable_memory_cache=False,
         disk_cache_dir=shared_dir, disk_size_limit_bytes=1024 * 1024,
     )
-    unrestricted.put(request, {"value": "hello"})
-    unrestricted.disk_cache.close()
+    try:
+        unrestricted.put(request, {"value": "hello"})
+    finally:
+        _close_cache(unrestricted)
 
     restricted = Cache(
-        enable_disk_cache=True, enable_memory_cache=False,
-        disk_cache_dir=shared_dir, disk_size_limit_bytes=1024 * 1024,
+        enable_disk_cache=True,
+        enable_memory_cache=False,
+        disk_cache_dir=shared_dir,
+        disk_size_limit_bytes=1024 * 1024,
         restrict_pickle=True,
     )
-    assert restricted.get(request) == {"value": "hello"}
+    try:
+        assert restricted.get(request) == {"value": "hello"}
+    finally:
+        _close_cache(restricted)
 
 
 @dataclass
