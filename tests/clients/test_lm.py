@@ -472,7 +472,13 @@ def _request(
     messages=None,
     **kwargs: Any,
 ) -> LMRequest:
-    return LMRequest.from_call(model=lm.model, items=items, prompt=prompt, messages=messages, **{**lm.kwargs, **kwargs})
+    return LMRequest.from_call(
+        model=lm.model,
+        items=items,
+        prompt=prompt,
+        messages=messages,
+        **kwargs,
+    )
 
 
 def test_base_lm_requires_lm_request():

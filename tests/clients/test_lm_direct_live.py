@@ -30,7 +30,7 @@ def _text(response: LMResponse) -> str:
 
 
 def _request(lm: LM, *items: object, prompt: str | None = None, **kwargs: Any) -> LMRequest:
-    return LMRequest.from_call(model=lm.model, items=items, prompt=prompt, **{**lm.kwargs, **kwargs})
+    return LMRequest.from_call(model=lm.model, items=items, prompt=prompt, **kwargs)
 
 
 @pytest.mark.llm_call

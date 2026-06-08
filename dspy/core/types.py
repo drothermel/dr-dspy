@@ -481,6 +481,9 @@ def _merge_config_overrides(config: LMConfig, kwargs: dict[str, Any]) -> LMConfi
 
 def _coerce_from_call_config_kwargs(kwargs: Mapping[str, Any]) -> dict[str, Any]:
     data = dict(kwargs)
+    if "rollout_id" in data:
+        rollout_id = data.pop("rollout_id")
+        data["cache"] = LMCacheConfig.from_value(data.get("cache"), rollout_id=rollout_id)
     cache = data.get("cache")
     if isinstance(cache, bool):
         data["cache"] = LMCacheConfig(enabled=cache)
@@ -488,6 +491,28 @@ def _coerce_from_call_config_kwargs(kwargs: Mapping[str, Any]) -> dict[str, Any]
     if isinstance(prompt_cache, bool):
         data["prompt_cache"] = LMPromptCacheConfig(enabled=prompt_cache)
     return data
+
+
+def _lm_config_data_from_kwargs(raw: Mapping[str, Any]) -> dict[str, Any]:
+    """Extract LMConfig fields from a loose kwargs mapping.
+
+    Provider-only settings such as ``api_base`` and ``api_key`` are ignored so
+    callers can spread ``lm.kwargs`` into ``LMRequest.from_call`` safely.
+    """
+    if not raw:
+        return {}
+
+    data = dict(raw)
+    if "max_completion_tokens" in data and "max_tokens" not in data:
+        data["max_tokens"] = data.pop("max_completion_tokens")
+
+    data = _coerce_from_call_config_kwargs(data)
+    field_names = set(LMConfig.model_fields) - {"extensions"}
+    filtered = {key: value for key, value in data.items() if key in field_names and value is not None}
+    extensions = data.get("extensions")
+    if isinstance(extensions, Mapping):
+        filtered["extensions"] = dict(extensions)
+    return filtered
 
 
 def coerce_lm_config(value: LMConfig | Mapping[str, Any] | None = None) -> LMConfig:
@@ -499,16 +524,7 @@ def coerce_lm_config(value: LMConfig | Mapping[str, Any] | None = None) -> LMCon
 
 
 def lm_defaults_config(lm: Any) -> LMConfig:
-    raw = getattr(lm, "kwargs", None) or {}
-    if not raw:
-        return LMConfig()
-
-    field_names = set(LMConfig.model_fields) - {"extensions"}
-    data = {key: value for key, value in raw.items() if key in field_names and value is not None}
-    extensions = raw.get("extensions")
-    if isinstance(extensions, Mapping):
-        data["extensions"] = dict(extensions)
-    return LMConfig(**data)
+    return LMConfig(**_lm_config_data_from_kwargs(getattr(lm, "kwargs", None) or {}))
 
 
 def merge_lm_request_config(lm: Any, config: LMConfig | None = None) -> LMConfig:
@@ -583,7 +599,7 @@ class LMRequest(BaseModel):
             normalized_messages, positional_tools = _messages_from_items(items, prompt=prompt)
             collected_tools.extend(positional_tools)
 
-        config = LMConfig.from_kwargs(**_coerce_from_call_config_kwargs(kwargs))
+        config = LMConfig(**_lm_config_data_from_kwargs(kwargs))
         return cls(
             model=model,
             messages=normalized_messages,

@@ -16,20 +16,18 @@ class MultiChainComparison(Module):
         *_, self.last_key = signature.output_fields.keys()
 
         for idx in range(M):
+            field_name = f"reasoning_attempt_{idx + 1}"
             signature = signature.append(
-                f"reasoning_attempt_{idx + 1}",
-                InputField(
-                    prefix=f"Student Attempt #{idx + 1}:",
-                    desc="${reasoning attempt}",
-                ),
-            )
+                field_name,
+                InputField(desc="${reasoning attempt}"),
+            ).with_updated_fields(field_name, prefix=f"Student Attempt #{idx + 1}:")
 
         signature = signature.prepend(
             "rationale",
-            OutputField(
-                prefix="Accurate Reasoning: Thank you everyone. Let's now holistically",
-                desc="${corrected reasoning}",
-            ),
+            OutputField(desc="${corrected reasoning}"),
+        ).with_updated_fields(
+            "rationale",
+            prefix="Accurate Reasoning: Thank you everyone. Let's now holistically",
         )
 
         self.predict = Predict(signature, temperature=temperature, **config)
