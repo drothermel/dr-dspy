@@ -7,8 +7,8 @@ from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 from typing_extensions import override
 
-from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.clients.base_lm import BaseLM
+from dspy.compile.resolve import resolve_adapter, resolve_lm_config
 from dspy.core.types import _merge_lm_config, coerce_lm_config
 from dspy.dsp.utils.settings import settings
 from dspy.predict.parameter import Parameter
@@ -18,6 +18,7 @@ from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
 from dspy.task_spec.task_spec import TaskSpec
 from dspy.utils.callback import BaseCallback
 from dspy.utils.constants import IS_TYPE_UNDEFINED
+from dspy.utils.transparency import reset_active_call_metadata, set_active_call_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -214,15 +215,6 @@ class Predict(Module, Parameter):
                 f"LM must be an instance of `dspy.clients.base_lm.BaseLM`, not {type(lm)}. Received `lm={lm}`."
             )
 
-        # If temperature is unset or <=0.15, and n > 1, set temperature to 0.7 to keep randomness.
-        temperature = config.temperature if config.temperature is not None else lm.kwargs.get("temperature")
-        num_generations = (
-            config.n if config.n is not None else lm.kwargs.get("n") or lm.kwargs.get("num_generations") or 1
-        )
-
-        if (temperature is None or temperature <= 0.15) and num_generations > 1:
-            config = config.model_copy(update={"temperature": 0.7})
-
         if "prediction" in kwargs and (
             isinstance(kwargs["prediction"], dict)
             and kwargs["prediction"].get("type") == "content"
@@ -292,14 +284,24 @@ class Predict(Module, Parameter):
     async def aforward(self, **kwargs):
         lm, config, task_spec, demos, kwargs = self._forward_preprocess(**kwargs)
 
-        adapter = settings.adapter or ChatAdapter()
-        completions = await adapter.acall(
-            lm=lm,
-            config=config,
-            task_spec=task_spec,
-            demos=demos,
-            inputs=kwargs,
+        transparency = settings.get("transparency", "strict")
+        adapter, _adapter_notes = resolve_adapter(settings.adapter, transparency=transparency)
+        config, _provenance = resolve_lm_config(lm, config)
+        metadata_token = set_active_call_metadata(
+            module=type(self).__name__,
+            phase="predict",
+            lm_role="default",
         )
+        try:
+            completions = await adapter.acall(
+                lm=lm,
+                config=config,
+                task_spec=task_spec,
+                demos=demos,
+                inputs=kwargs,
+            )
+        finally:
+            reset_active_call_metadata(metadata_token)
         return self._forward_postprocess(completions, task_spec, **kwargs)
 
     def update_config(self, **kwargs) -> None:

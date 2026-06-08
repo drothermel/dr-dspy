@@ -119,7 +119,7 @@ def _merge_lm_config(left: LMConfig | None, right: LMConfig | None) -> LMConfig 
     if right is None:
         return left
 
-    data = left.model_dump()
+    data = left.model_dump(exclude_none=True)
     extensions = {**left.extensions}
     for key in right.model_fields_set:
         value = getattr(right, key)

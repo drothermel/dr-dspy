@@ -41,9 +41,15 @@ _DEFAULT_NATIVE_RESPONSE_TYPES = [Citations, Reasoning]
 
 
 class ToolCallResultsTaskSpec(TaskSpec):
-    name: str = "ToolCallResults"
+    name: str = "framework.adapter.tool_call_results"
     instructions: str = "Tool call results from conversation history."
-    inputs: tuple[FieldSpec, ...] = (input_field("tool_call_results", type_=ToolCallResults),)
+    inputs: tuple[FieldSpec, ...] = (
+        input_field(
+            "tool_call_results",
+            type_=ToolCallResults,
+            desc="Serialized tool call results appended to the conversation history.",
+        ),
+    )
     outputs: tuple[FieldSpec, ...] = ()
 
 
@@ -187,7 +193,7 @@ class Adapter:
         elif lm.kwargs.get("reasoning_effort") is not None:
             reasoning_effort = lm.kwargs["reasoning_effort"]
         else:
-            reasoning_effort = "low"
+            reasoning_effort = None
 
         if reasoning_effort is None or not lm.supports_reasoning:
             return task_spec
@@ -299,13 +305,48 @@ class Adapter:
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
+        from dspy.compile.resolve import resolve_call, resolve_lm_config
+        from dspy.core.types.history import _history_request_messages_as_openai
+        from dspy.dsp.utils.settings import settings
+        from dspy.utils.transparency import (
+            ACTIVE_CALL_METADATA,
+            ACTIVE_COMPILED_CALL,
+            validate_compiled_call,
+        )
+
         resolved_config = coerce_lm_config(config)
+        original_field_names = set(task_spec.fields.keys())
         processed_task_spec, tools, resolved_config = self._call_preprocess(
             lm=lm, config=resolved_config, task_spec=task_spec, inputs=inputs
         )
+        mutations = [
+            f"removed field {name}"
+            for name in sorted(original_field_names - set(processed_task_spec.fields.keys()))
+        ]
         messages = self.format(task_spec=processed_task_spec, demos=demos, inputs=inputs)
         request = self._render_request(lm=lm, config=resolved_config, tools=tools, messages=messages)
-        response = await self._call_lm(lm=lm, request=request)
+        merged_config, provenance = resolve_lm_config(lm, resolved_config)
+        metadata = ACTIVE_CALL_METADATA.get()
+        compiled = resolve_call(
+            lm=lm,
+            adapter=self,
+            task_spec=task_spec,
+            processed_task_spec=processed_task_spec,
+            config=merged_config,
+            config_provenance=provenance,
+            messages=_history_request_messages_as_openai(request),
+            task_spec_mutations=mutations,
+            module=metadata.get("module", type(self).__name__),
+            phase=metadata.get("phase", "adapter"),
+            lm_role=metadata.get("lm_role", "default"),
+        )
+        transparency = settings.get("transparency", "strict")
+        validate_compiled_call(compiled, transparency)
+        token = ACTIVE_COMPILED_CALL.set(compiled)
+        try:
+            response = await self._call_lm(lm=lm, request=request)
+        finally:
+            ACTIVE_COMPILED_CALL.reset(token)
         return self._call_postprocess(
             processed_task_spec=processed_task_spec,
             original_task_spec=task_spec,
