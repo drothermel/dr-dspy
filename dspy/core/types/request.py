@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from dspy.core.types.coercion import _coerce_message, _coerce_tool_spec, _messages_from_items
 from dspy.core.types.config import (
     LMConfig,
     LMToolSpec,
@@ -13,7 +14,6 @@ from dspy.core.types.config import (
     _merge_config_overrides,
     _merge_lm_config,
 )
-from dspy.core.types.conversation import _coerce_message, _coerce_tool_spec, _messages_from_items
 from dspy.core.types.messages import LMMessage
 from dspy.core.types.parts import LMPart
 

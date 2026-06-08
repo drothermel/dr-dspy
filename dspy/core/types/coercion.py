@@ -1,19 +1,33 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from dspy.core.types.config import LMToolSpec
 from dspy.core.types.messages import LMMessage
 from dspy.core.types.parts import _coerce_part
-
-if TYPE_CHECKING:
-    from dspy.core.types.response import LMResponse
 
 
 def _coerce_message(value: dict[str, Any] | LMMessage) -> LMMessage:
     if isinstance(value, LMMessage):
         return value
     return LMMessage(**value)
+
+
+def _is_lm_response(value: Any) -> bool:
+    outputs = getattr(value, "outputs", None)
+    if not isinstance(outputs, list) or not outputs:
+        return False
+    return all(hasattr(output, "parts") for output in outputs)
+
+
+def _messages_from_response(response: Any) -> list[LMMessage]:
+    return [LMMessage(role="assistant", parts=output.parts) for output in response.outputs]
+
+
+def _is_message_sequence(value: Any) -> bool:
+    return isinstance(value, (list, tuple)) and all(
+        isinstance(item, LMMessage) or _is_lm_response(item) for item in value
+    )
 
 
 def _messages_from_items(items: tuple[Any, ...], *, prompt: str | None = None) -> tuple[list[LMMessage], list[Any]]:
@@ -23,28 +37,18 @@ def _messages_from_items(items: tuple[Any, ...], *, prompt: str | None = None) -
         items = ("",)
     if len(items) == 1 and _is_message_sequence(items[0]):
         items = tuple(items[0])
-    from dspy.core.types.response import LMResponse
 
-    if all(isinstance(item, (LMMessage, LMResponse)) for item in items):
+    if all(isinstance(item, LMMessage) or _is_lm_response(item) for item in items):
         messages: list[LMMessage] = []
         for item in items:
             if isinstance(item, LMMessage):
                 messages.append(item)
             else:
                 messages.extend(_messages_from_response(item))
-        return (messages, [])
+        return messages, []
+
     parts = [_coerce_part(item) for item in items]
-    return ([LMMessage(role="user", parts=parts)], [])
-
-
-def _messages_from_response(response: LMResponse) -> list[LMMessage]:
-    return [LMMessage(role="assistant", parts=output.parts) for output in response.outputs]
-
-
-def _is_message_sequence(value: Any) -> bool:
-    from dspy.core.types.response import LMResponse
-
-    return isinstance(value, (list, tuple)) and all(isinstance(item, (LMMessage, LMResponse)) for item in value)
+    return [LMMessage(role="user", parts=parts)], []
 
 
 def _coerce_tool_spec(tool: Any) -> LMToolSpec:

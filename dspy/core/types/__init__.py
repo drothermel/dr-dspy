@@ -1,4 +1,5 @@
 from dspy.core.types.builders import Assistant, Developer, System, ToolCall, ToolResult, User
+from dspy.core.types.coercion import _coerce_tool_spec
 from dspy.core.types.config import (
     LMConfig,
     LMPromptCacheConfig,
@@ -10,7 +11,6 @@ from dspy.core.types.config import (
     lm_defaults_config,
     merge_lm_request_config,
 )
-from dspy.core.types.conversation import _coerce_tool_spec
 from dspy.core.types.messages import LMMessage
 from dspy.core.types.parts import (
     LMAudioPart,
