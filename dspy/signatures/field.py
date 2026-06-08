@@ -5,19 +5,11 @@ import pydantic
 from dspy.utils.constants import IS_TYPE_UNDEFINED
 
 # DSPy-specific field arguments are stored separately from Pydantic Field arguments. If Pydantic adds one of these names, this list will need explicit conflict handling.
-DSPY_FIELD_ARG_NAMES = ["desc", "prefix", "format", "parser", "__dspy_field_type", IS_TYPE_UNDEFINED]
+DSPY_FIELD_ARG_NAMES = ["desc", "prefix", "__dspy_field_type", IS_TYPE_UNDEFINED]
 
 _DEPRECATED_FIELD_ARGS = {
     "prefix": (
         "The 'prefix' argument in InputField/OutputField is deprecated and has no effect in DSPy. "
-        "It will be removed in a future version."
-    ),
-    "format": (
-        "The 'format' argument in InputField/OutputField is deprecated and has no effect in DSPy. "
-        "It will be removed in a future version."
-    ),
-    "parser": (
-        "The 'parser' argument in InputField/OutputField is deprecated and has no effect in DSPy. "
         "It will be removed in a future version."
     ),
 }
