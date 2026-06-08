@@ -9,35 +9,15 @@ from typing_extensions import override
 from dspy.adapters.types.base_type import Type
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.gepa.gepa_utils import ReflectiveExample
 
 logger = logging.getLogger(__name__)
 
 
-GENERATE_ENHANCED_MULTIMODAL_INSTRUCTION_TASK_SPEC = make_task_spec(
-    {
-        "current_instruction": FieldSpec.input(
-            "current_instruction",
-            str,
-            desc="The current instruction that was provided to the assistant to perform the multimodal task",
-        ),
-        "examples_with_feedback": FieldSpec.input(
-            "examples_with_feedback",
-            str,
-            desc="Task examples with visual content showing inputs, assistant outputs, and feedback. "
-            "Pay special attention to feedback about visual analysis accuracy, visual-textual integration, "
-            "and any domain-specific visual knowledge that the assistant missed.",
-        ),
-        "improved_instruction": FieldSpec.output(
-            "improved_instruction",
-            str,
-            desc="A better instruction for the assistant that addresses visual analysis issues, provides "
-            "clear guidance on how to process and integrate visual and textual information, includes "
-            "necessary visual domain knowledge, and prevents the visual analysis mistakes shown in the examples.",
-        ),
-    },
-    instructions=(
+class GenerateEnhancedMultimodalInstructionTaskSpec(TaskSpec):
+    name: str = "GenerateEnhancedMultimodalInstructionFromFeedback"
+    instructions: str = (
         "I provided an assistant with instructions to perform a task involving visual content, but the assistant's "
         "performance needs improvement based on the examples and feedback below.\n\n"
         "Your task is to write a better instruction for the assistant that addresses the specific issues identified in "
@@ -64,9 +44,30 @@ GENERATE_ENHANCED_MULTIMODAL_INSTRUCTION_TASK_SPEC = make_task_spec(
         "- **Precise, actionable language** for both visual and textual processing\n\n"
         "Focus on creating an instruction that helps the assistant properly analyze visual content, integrate it with "
         "textual information, and avoid the specific visual analysis mistakes shown in the examples."
-    ),
-    name="GenerateEnhancedMultimodalInstructionFromFeedback",
-)
+    )
+    inputs: tuple[FieldSpec, ...] = (
+        input_field(
+            "current_instruction",
+            str,
+            desc="The current instruction that was provided to the assistant to perform the multimodal task",
+        ),
+        input_field(
+            "examples_with_feedback",
+            str,
+            desc="Task examples with visual content showing inputs, assistant outputs, and feedback. "
+            "Pay special attention to feedback about visual analysis accuracy, visual-textual integration, "
+            "and any domain-specific visual knowledge that the assistant missed.",
+        ),
+    )
+    outputs: tuple[FieldSpec, ...] = (
+        output_field(
+            "improved_instruction",
+            str,
+            desc="A better instruction for the assistant that addresses visual analysis issues, provides "
+            "clear guidance on how to process and integrate visual and textual information, includes "
+            "necessary visual domain knowledge, and prevents the visual analysis mistakes shown in the examples.",
+        ),
+    )
 
 
 class SingleComponentMultiModalProposer(Module):
@@ -76,7 +77,7 @@ class SingleComponentMultiModalProposer(Module):
 
     def __init__(self) -> None:
         super().__init__()
-        self.propose_instruction = Predict(GENERATE_ENHANCED_MULTIMODAL_INSTRUCTION_TASK_SPEC)
+        self.propose_instruction = Predict(GenerateEnhancedMultimodalInstructionTaskSpec())
 
     async def aforward(self, current_instruction: str, reflective_dataset: list[ReflectiveExample]) -> str:
         """

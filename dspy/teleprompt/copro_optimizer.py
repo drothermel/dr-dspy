@@ -7,7 +7,7 @@ from typing_extensions import override
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.predict import Predict
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.utils import get_task_spec, set_task_spec
 
@@ -38,55 +38,57 @@ Note that this teleprompter takes in the following parameters:
                 These statistics will be returned as attributes of the best program.
 """
 
-BASIC_GENERATE_INSTRUCTION_TASK_SPEC = make_task_spec(
-    {
-        "basic_instruction": FieldSpec.input(
+
+class BasicGenerateInstructionTaskSpec(TaskSpec):
+    name: str = "BasicGenerateInstruction"
+    instructions: str = (
+        "You are an instruction optimizer for large language models. I will give you a ``signature`` of fields "
+        "(inputs and outputs) in English. Your task is to propose an instruction that will lead a good language model "
+        "to perform the task well. Don't be afraid to be creative."
+    )
+    inputs: tuple[FieldSpec, ...] = (
+        input_field(
             "basic_instruction",
             str,
             desc="The initial instructions before optimization",
         ),
-        "proposed_instruction": FieldSpec.output(
+    )
+    outputs: tuple[FieldSpec, ...] = (
+        output_field(
             "proposed_instruction",
             str,
             desc="The improved instructions for the language model",
         ),
-        "proposed_prefix_for_output_field": FieldSpec.output(
+        output_field(
             "proposed_prefix_for_output_field",
             str,
             desc="The string at the end of the prompt, which will help the model start solving the task",
         ),
-    },
-    instructions=(
-        "You are an instruction optimizer for large language models. I will give you a ``signature`` of fields "
-        "(inputs and outputs) in English. Your task is to propose an instruction that will lead a good language model "
-        "to perform the task well. Don't be afraid to be creative."
-    ),
-    name="BasicGenerateInstruction",
-)
+    )
 
-GENERATE_INSTRUCTION_GIVEN_ATTEMPTS_TASK_SPEC = make_task_spec(
-    {
-        "attempted_instructions": FieldSpec.input("attempted_instructions", str),
-        "proposed_instruction": FieldSpec.output(
-            "proposed_instruction",
-            str,
-            desc="The improved instructions for the language model",
-        ),
-        "proposed_prefix_for_output_field": FieldSpec.output(
-            "proposed_prefix_for_output_field",
-            str,
-            desc="The string at the end of the prompt, which will help the model start solving the task",
-        ),
-    },
-    instructions=(
+
+class GenerateInstructionGivenAttemptsTaskSpec(TaskSpec):
+    name: str = "GenerateInstructionGivenAttempts"
+    instructions: str = (
         "You are an instruction optimizer for large language models. I will give some task instructions I've tried, "
         "along with their corresponding validation scores. The instructions are arranged in increasing order based on "
         "their scores, where higher scores indicate better quality.\n\n"
         "Your task is to propose a new instruction that will lead a good language model to perform the task even "
         "better. Don't be afraid to be creative."
-    ),
-    name="GenerateInstructionGivenAttempts",
-)
+    )
+    inputs: tuple[FieldSpec, ...] = (input_field("attempted_instructions", str),)
+    outputs: tuple[FieldSpec, ...] = (
+        output_field(
+            "proposed_instruction",
+            str,
+            desc="The improved instructions for the language model",
+        ),
+        output_field(
+            "proposed_prefix_for_output_field",
+            str,
+            desc="The string at the end of the prompt, which will help the model start solving the task",
+        ),
+    )
 
 
 class COPRO(Teleprompter):
@@ -181,13 +183,13 @@ class COPRO(Teleprompter):
             if self.prompt_model:
                 with settings.context(lm=self.prompt_model):
                     instruct = await Predict(
-                        BASIC_GENERATE_INSTRUCTION_TASK_SPEC,
+                        BasicGenerateInstructionTaskSpec(),
                         n=self.breadth - 1,
                         temperature=self.init_temperature,
                     )(basic_instruction=basic_instruction)
             else:
                 instruct = await Predict(
-                    BASIC_GENERATE_INSTRUCTION_TASK_SPEC,
+                    BasicGenerateInstructionTaskSpec(),
                     n=self.breadth - 1,
                     temperature=self.init_temperature,
                 )(basic_instruction=basic_instruction)
@@ -327,13 +329,13 @@ class COPRO(Teleprompter):
                 if self.prompt_model:
                     with settings.context(lm=self.prompt_model):
                         instr = await Predict(
-                            GENERATE_INSTRUCTION_GIVEN_ATTEMPTS_TASK_SPEC,
+                            GenerateInstructionGivenAttemptsTaskSpec(),
                             n=self.breadth,
                             temperature=self.init_temperature,
                         )(attempted_instructions=attempts)
                 else:
                     instr = await Predict(
-                        GENERATE_INSTRUCTION_GIVEN_ATTEMPTS_TASK_SPEC,
+                        GenerateInstructionGivenAttemptsTaskSpec(),
                         n=self.breadth,
                         temperature=self.init_temperature,
                     )(attempted_instructions=attempts)

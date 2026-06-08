@@ -10,7 +10,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.formatting import get_field_spec_description_string
 from dspy.teleprompt.utils import get_task_spec, set_task_spec
 
@@ -166,7 +166,7 @@ async def append_a_rule(bucket, system, **kwargs) -> bool:
     }
 
     with settings.context(trace=[], lm=prompt_model):
-        advice_program = Predict(OFFER_FEEDBACK_TASK_SPEC)
+        advice_program = Predict(SimbaOfferFeedbackTaskSpec())
         advice = (await advice_program(**kwargs)).module_advice
 
     for name, predictor in system.named_predictors():
@@ -179,82 +179,9 @@ async def append_a_rule(bucket, system, **kwargs) -> bool:
     return True
 
 
-OFFER_FEEDBACK_TASK_SPEC = make_task_spec(
-    {
-        "program_code": FieldSpec.input("program_code", str, desc="The code of the program that we are analyzing"),
-        "modules_defn": FieldSpec.input(
-            "modules_defn",
-            str,
-            desc="The definition of each module in the program, including its I/O",
-        ),
-        "program_inputs": FieldSpec.input(
-            "program_inputs", str, desc="The inputs to the program that we are analyzing"
-        ),
-        "oracle_metadata": FieldSpec.input(
-            "oracle_metadata",
-            str,
-            desc="Any (hidden) metadata about the training set instance we're analyzing",
-        ),
-        "worse_program_trajectory": FieldSpec.input(
-            "worse_program_trajectory",
-            str,
-            desc="The trajectory of the program's execution, showing each module's I/O",
-        ),
-        "worse_program_outputs": FieldSpec.input(
-            "worse_program_outputs",
-            str,
-            desc="The outputs of the program that we are analyzing",
-        ),
-        "worse_reward_value": FieldSpec.input(
-            "worse_reward_value",
-            float,
-            desc="The reward value assigned to the program's outputs",
-        ),
-        "worse_reward_info": FieldSpec.input(
-            "worse_reward_info",
-            str,
-            desc="Additional information that might be helpful to understanding the assigned reward value.",
-        ),
-        "better_program_trajectory": FieldSpec.input(
-            "better_program_trajectory",
-            str,
-            desc="The trajectory of the program's execution, showing each module's I/O",
-        ),
-        "better_program_outputs": FieldSpec.input(
-            "better_program_outputs",
-            str,
-            desc="The outputs of the program that we are analyzing",
-        ),
-        "better_reward_value": FieldSpec.input(
-            "better_reward_value",
-            float,
-            desc="The reward value assigned to the program's outputs",
-        ),
-        "better_reward_info": FieldSpec.input(
-            "better_reward_info",
-            str,
-            desc="Additional information that might be helpful to understanding the assigned reward value.",
-        ),
-        "module_names": FieldSpec.input(
-            "module_names",
-            list[str],
-            desc="The names of the modules in the program, for which we seek advice",
-        ),
-        "discussion": FieldSpec.output(
-            "discussion",
-            str,
-            desc="Discussing blame of where each module went wrong, if it did",
-        ),
-        "module_advice": FieldSpec.output(
-            "module_advice",
-            dict[str, str],
-            desc="For each module, describe very concretely: If the module receives ${description of input or patterns "
-            "therein}, then it should ${description of content, behavior, or strategies to adopt and/or others to avoid}. "
-            "Basically, your advice be such that if the module has access to your tip, it would be much more likely to act "
-            "like the successful trajectory rather than the lower-scoring trajectory.",
-        ),
-    },
-    instructions=(
+class SimbaOfferFeedbackTaskSpec(TaskSpec):
+    name: str = "OfferFeedback"
+    instructions: str = (
         "You will be given two trajectories of an LLM-driven program's execution. Your goal is to help the program's "
         "modules build up experience on how to maximize the reward value assigned to the program's outputs if it were "
         "to receive similar inputs in the future.\n\n"
@@ -266,9 +193,81 @@ OFFER_FEEDBACK_TASK_SPEC = make_task_spec(
         "- Rely on contrasting the behavior of the worse trajectory against the better trajectory in making "
         "recommendations.\n"
         "- Ensure each unique module name appears exactly once as a key in the advice dictionary."
-    ),
-    name="OfferFeedback",
-)
+    )
+    inputs: tuple[FieldSpec, ...] = (
+        input_field("program_code", str, desc="The code of the program that we are analyzing"),
+        input_field(
+            "modules_defn",
+            str,
+            desc="The definition of each module in the program, including its I/O",
+        ),
+        input_field("program_inputs", str, desc="The inputs to the program that we are analyzing"),
+        input_field(
+            "oracle_metadata",
+            str,
+            desc="Any (hidden) metadata about the training set instance we're analyzing",
+        ),
+        input_field(
+            "worse_program_trajectory",
+            str,
+            desc="The trajectory of the program's execution, showing each module's I/O",
+        ),
+        input_field(
+            "worse_program_outputs",
+            str,
+            desc="The outputs of the program that we are analyzing",
+        ),
+        input_field(
+            "worse_reward_value",
+            float,
+            desc="The reward value assigned to the program's outputs",
+        ),
+        input_field(
+            "worse_reward_info",
+            str,
+            desc="Additional information that might be helpful to understanding the assigned reward value.",
+        ),
+        input_field(
+            "better_program_trajectory",
+            str,
+            desc="The trajectory of the program's execution, showing each module's I/O",
+        ),
+        input_field(
+            "better_program_outputs",
+            str,
+            desc="The outputs of the program that we are analyzing",
+        ),
+        input_field(
+            "better_reward_value",
+            float,
+            desc="The reward value assigned to the program's outputs",
+        ),
+        input_field(
+            "better_reward_info",
+            str,
+            desc="Additional information that might be helpful to understanding the assigned reward value.",
+        ),
+        input_field(
+            "module_names",
+            list[str],
+            desc="The names of the modules in the program, for which we seek advice",
+        ),
+    )
+    outputs: tuple[FieldSpec, ...] = (
+        output_field(
+            "discussion",
+            str,
+            desc="Discussing blame of where each module went wrong, if it did",
+        ),
+        output_field(
+            "module_advice",
+            dict[str, str],
+            desc="For each module, describe very concretely: If the module receives ${description of input or patterns "
+            "therein}, then it should ${description of content, behavior, or strategies to adopt and/or others to avoid}. "
+            "Basically, your advice be such that if the module has access to your tip, it would be much more likely to act "
+            "like the successful trajectory rather than the lower-scoring trajectory.",
+        ),
+    )
 
 
 def inspect_modules(program):

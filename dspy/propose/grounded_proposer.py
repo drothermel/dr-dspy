@@ -15,7 +15,7 @@ from dspy.propose.utils import (
     get_dspy_source_code,
     strip_prefix,
 )
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 from dspy.teleprompt.utils import get_prompt_model, get_task_spec
 
 logger = logging.getLogger(__name__)
@@ -33,53 +33,56 @@ TIPS = {
 }
 
 
-DESCRIBE_PROGRAM_TASK_SPEC = make_task_spec(
-    {
-        "program_code": FieldSpec.input(
+class DescribeProgramTaskSpec(TaskSpec):
+    name: str = "DescribeProgram"
+    instructions: str = (
+        "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe what "
+        "type of task this program appears to be designed to solve, and how it appears to work."
+    )
+    inputs: tuple[FieldSpec, ...] = (
+        input_field(
             "program_code",
             str,
             desc="Pseudocode for a language model program designed to solve a particular task.",
         ),
-        "program_example": FieldSpec.input("program_example", str, desc="An example of the program in use."),
-        "program_description": FieldSpec.output(
+        input_field("program_example", str, desc="An example of the program in use."),
+    )
+    outputs: tuple[FieldSpec, ...] = (
+        output_field(
             "program_description",
             str,
             desc="Describe what task the program is designed to solve, and how it goes about solving this task.",
         ),
-    },
-    instructions=(
-        "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe what "
-        "type of task this program appears to be designed to solve, and how it appears to work."
-    ),
-    name="DescribeProgram",
-)
+    )
 
-DESCRIBE_MODULE_TASK_SPEC = make_task_spec(
-    {
-        "program_code": FieldSpec.input(
+
+class DescribeModuleTaskSpec(TaskSpec):
+    name: str = "DescribeModule"
+    instructions: str = (
+        "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe the "
+        "purpose of one of the specified module in this pipeline."
+    )
+    inputs: tuple[FieldSpec, ...] = (
+        input_field(
             "program_code",
             str,
             desc="Pseudocode for a language model program designed to solve a particular task.",
         ),
-        "program_example": FieldSpec.input("program_example", str, desc="An example of the program in use."),
-        "program_description": FieldSpec.input(
+        input_field("program_example", str, desc="An example of the program in use."),
+        input_field(
             "program_description",
             str,
             desc="Summary of the task the program is designed to solve, and how it goes about solving it.",
         ),
-        "module": FieldSpec.input("module", str, desc="The module in the program that we want to describe."),
-        "module_description": FieldSpec.output(
+        input_field("module", str, desc="The module in the program that we want to describe."),
+    )
+    outputs: tuple[FieldSpec, ...] = (
+        output_field(
             "module_description",
             str,
             desc="Description of the module's role in the broader program.",
         ),
-    },
-    instructions=(
-        "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe the "
-        "purpose of one of the specified module in this pipeline."
-    ),
-    name="DescribeModule",
-)
+    )
 
 
 def generate_instruction_task_spec(
@@ -181,8 +184,8 @@ class GenerateModuleInstruction(Module):
         self.verbose = verbose
 
         self.program_code_string = program_code_string
-        self.describe_program = Predict(DESCRIBE_PROGRAM_TASK_SPEC)
-        self.describe_module = Predict(DESCRIBE_MODULE_TASK_SPEC)
+        self.describe_program = Predict(DescribeProgramTaskSpec())
+        self.describe_module = Predict(DescribeModuleTaskSpec())
         self.generate_module_instruction = generate_instruction_class(
             use_dataset_summary=use_dataset_summary,
             program_aware=program_aware,

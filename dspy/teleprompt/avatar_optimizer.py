@@ -11,7 +11,7 @@ from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.utils import get_task_spec, set_task_spec
 
@@ -24,27 +24,9 @@ class EvalResult(BaseModel):
     actions: list[ActionOutput] | None = None
 
 
-COMPARATOR_TASK_SPEC = make_task_spec(
-    {
-        "instruction": FieldSpec.input("instruction", str, desc="Instruction for the actor to execute the task"),
-        "actions": FieldSpec.input("actions", list[str], desc="Actions actor can take to complete the task"),
-        "pos_input_with_metrics": FieldSpec.input(
-            "pos_input_with_metrics",
-            list[EvalResult],
-            desc="Positive inputs along with their score on a evaluation metric and actions taken",
-        ),
-        "neg_input_with_metrics": FieldSpec.input(
-            "neg_input_with_metrics",
-            list[EvalResult],
-            desc="Negative inputs along with their score on a evaluation metric and actions taken",
-        ),
-        "feedback": FieldSpec.output(
-            "feedback",
-            str,
-            desc="Feedback for the actor to improve the performance of negative inputs",
-        ),
-    },
-    instructions=(
+class ComparatorTaskSpec(TaskSpec):
+    name: str = "Comparator"
+    instructions: str = (
         "After executing the given actions on user inputs using the given instruction, some inputs have yielded good, "
         "results, while others have not. I'll provide you the inputs along with their, corresponding evaluation "
         "metrics:\n\n"
@@ -53,29 +35,33 @@ COMPARATOR_TASK_SPEC = make_task_spec(
         "not.\n"
         "(2) Then, review the computational logic for any inconsistencies in the previous actions.\n"
         "(3) Lastly, specify the modification in tools used that can lead to improved performance on the negative inputs."
-    ),
-    name="Comparator",
-)
-
-FEEDBACK_BASED_INSTRUCTION_TASK_SPEC = make_task_spec(
-    {
-        "previous_instruction": FieldSpec.input(
-            "previous_instruction",
-            str,
-            desc="Previous instruction for the actor to execute the task",
+    )
+    inputs: tuple[FieldSpec, ...] = (
+        input_field("instruction", str, desc="Instruction for the actor to execute the task"),
+        input_field("actions", list[str], desc="Actions actor can take to complete the task"),
+        input_field(
+            "pos_input_with_metrics",
+            list[EvalResult],
+            desc="Positive inputs along with their score on a evaluation metric and actions taken",
         ),
-        "feedback": FieldSpec.input(
+        input_field(
+            "neg_input_with_metrics",
+            list[EvalResult],
+            desc="Negative inputs along with their score on a evaluation metric and actions taken",
+        ),
+    )
+    outputs: tuple[FieldSpec, ...] = (
+        output_field(
             "feedback",
             str,
             desc="Feedback for the actor to improve the performance of negative inputs",
         ),
-        "new_instruction": FieldSpec.output(
-            "new_instruction",
-            str,
-            desc="New instruction for the actor to execute the task",
-        ),
-    },
-    instructions=(
+    )
+
+
+class FeedbackBasedInstructionTaskSpec(TaskSpec):
+    name: str = "FeedbackBasedInstruction"
+    instructions: str = (
         "There is a task that needs to be completed for which one can use multiple tools to achieve the desired "
         "outcome. A group's performance was evaluated on a dataset of inputs, the inputs that did well are positive "
         "inputs, and the inputs that did not do well are negative inputs.\n\n"
@@ -87,9 +73,26 @@ FEEDBACK_BASED_INSTRUCTION_TASK_SPEC = make_task_spec(
         "Make sure that the new instruction talks about how to use the tools effectively and should be no more than 3 "
         "paragraphs long. The previous instruction contains general guidelines that you must retain in the new "
         "instruction."
-    ),
-    name="FeedbackBasedInstruction",
-)
+    )
+    inputs: tuple[FieldSpec, ...] = (
+        input_field(
+            "previous_instruction",
+            str,
+            desc="Previous instruction for the actor to execute the task",
+        ),
+        input_field(
+            "feedback",
+            str,
+            desc="Feedback for the actor to improve the performance of negative inputs",
+        ),
+    )
+    outputs: tuple[FieldSpec, ...] = (
+        output_field(
+            "new_instruction",
+            str,
+            desc="New instruction for the actor to execute the task",
+        ),
+    )
 
 
 class _AvatarEvalModule(Module):
@@ -129,8 +132,8 @@ class AvatarOptimizer(Teleprompter):
         self.max_positive_inputs = max_positive_inputs or DEFAULT_MAX_EXAMPLES
         self.max_negative_inputs = max_negative_inputs or DEFAULT_MAX_EXAMPLES
 
-        self.comparator = Predict(COMPARATOR_TASK_SPEC)
-        self.feedback_instruction = Predict(FEEDBACK_BASED_INSTRUCTION_TASK_SPEC)
+        self.comparator = Predict(ComparatorTaskSpec())
+        self.feedback_instruction = Predict(FeedbackBasedInstructionTaskSpec())
 
     async def process_example(self, actor, example, return_outputs):
         actor = deepcopy(actor)
