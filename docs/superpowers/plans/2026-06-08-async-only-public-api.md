@@ -243,7 +243,7 @@ uv run pytest tests/clients/ tests/adapters/ -q
 uv run ruff check --fix && uv run ty check --fix && uv run ruff format
 ```
 
-- [x] **Commit Phase 2** (pending hash below)
+- [x] **Commit Phase 2** (`45ca2d0c`)
 
 ```bash
 git commit -m "$(cat <<'EOF'
