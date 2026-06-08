@@ -661,7 +661,7 @@ uv run ruff format
 uv run pytest tests/ -q --ignore=tests/reliability
 ```
 
-- [x] **Commit Phase 7** (`pending`)
+- [x] **Commit Phase 7** (`ec3564b6`)
 
 ```bash
 git commit -m "$(cat <<'EOF'
