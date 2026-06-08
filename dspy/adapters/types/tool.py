@@ -10,6 +10,7 @@ from pydantic import BaseModel, TypeAdapter, create_model
 from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
+from dspy.core.types import LMToolSpec
 from dspy.dsp.utils.settings import settings
 from dspy.utils.lazy_import import require
 
@@ -177,20 +178,19 @@ class Tool(Type):
     def format(self) -> str:
         return str(self)
 
-    def format_as_litellm_function_call(self) -> dict[str, object]:
+    def to_lm_tool_spec(self) -> LMToolSpec:
+        if self.name is None:
+            raise ValueError("Tool name is required to produce an LMToolSpec.")
         args_schema = self.args or {}
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.desc,
-                "parameters": {
-                    "type": "object",
-                    "properties": args_schema,
-                    "required": list(args_schema.keys()),
-                },
+        return LMToolSpec(
+            name=self.name,
+            description=self.desc,
+            parameters={
+                "type": "object",
+                "properties": args_schema,
+                "required": list(args_schema.keys()),
             },
-        }
+        )
 
     def _run_async_in_sync(self, coroutine: Coroutine[object, Any, object]) -> object:
         try:

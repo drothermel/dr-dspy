@@ -28,6 +28,8 @@ from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
+from dspy.clients.openai_format import provider_tool_call_to_part
+from dspy.core.types import LMOutput, LMPart, LMResponse, LMTextPart, LMThinkingPart
 from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
@@ -39,8 +41,22 @@ from tests.adapters.conftest import (
     adapter_format_as_openai,
     default_model_response,
     format_messages_and_lm_kwargs,
-    legacy_outputs_to_lm_response,
 )
+
+
+def outputs_to_lm_response(outputs: list[dict]) -> LMResponse:
+    lm_outputs = []
+    for output in outputs:
+        parts: list[LMPart] = []
+        text = output.get("text")
+        if isinstance(text, str):
+            parts.append(LMTextPart(text=text))
+        reasoning = output.get("reasoning_content")
+        if isinstance(reasoning, str):
+            parts.append(LMThinkingPart(text=reasoning))
+        parts.extend(provider_tool_call_to_part(tool_call) for tool_call in output.get("tool_calls") or [])
+        lm_outputs.append(LMOutput(parts=parts, provider_output=output))
+    return LMResponse(model="test", outputs=lm_outputs)
 
 
 @pytest.mark.parametrize(
@@ -2357,7 +2373,7 @@ def test_chat_adapter_formats_image_with_few_shot_examples():
     ]
     messages = adapter_format_as_openai(
         adapter, MySignature, demos, {"image": Image(url="https://example.com/image3.jpg")}
-    )  # ty:ignore[invalid-argument-type]
+    )
 
     # 1 system message, 2 few shot examples (1 user and assistant message for each example), 1 user message
     assert len(messages) == 6
@@ -2420,7 +2436,7 @@ def test_chat_adapter_formats_image_with_few_shot_examples_with_nested_images():
 
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = ChatAdapter()
-    messages = adapter_format_as_openai(adapter, MySignature, demos, {"image": image_wrapper_2})  # ty:ignore[invalid-argument-type]
+    messages = adapter_format_as_openai(adapter, MySignature, demos, {"image": image_wrapper_2})
 
     assert len(messages) == 4
 
@@ -2971,7 +2987,7 @@ def test_tool_call_with_null_content_does_not_raise():
     result = adapter._call_postprocess(
         cast("type[Signature]", sig_cls),
         cast("type[Signature]", sig_cls),
-        legacy_outputs_to_lm_response(outputs),
+        outputs_to_lm_response(outputs),
         DummyLM([{}]),
         {},
     )
@@ -3000,7 +3016,7 @@ def test_tool_call_with_unstructured_content_does_not_raise():
     result = adapter._call_postprocess(
         processed_sig,
         cast("type[Signature]", original_sig),
-        legacy_outputs_to_lm_response(outputs),
+        outputs_to_lm_response(outputs),
         DummyLM([{}]),
         {},
     )
@@ -3025,7 +3041,7 @@ def test_tool_call_with_structured_content_preserves_other_outputs():
     result = adapter._call_postprocess(
         processed_sig,
         cast("type[Signature]", original_sig),
-        legacy_outputs_to_lm_response(outputs),
+        outputs_to_lm_response(outputs),
         DummyLM([{}]),
         {},
     )
@@ -3054,7 +3070,7 @@ def test_provider_tool_calls_preserve_id_and_repair_arguments():
     result = adapter._call_postprocess(
         cast("type[Signature]", sig_cls),
         cast("type[Signature]", sig_cls),
-        legacy_outputs_to_lm_response(outputs),
+        outputs_to_lm_response(outputs),
         DummyLM([{}]),
         {},
     )

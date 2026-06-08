@@ -1106,7 +1106,7 @@ def test_json_adapter_formats_image_with_few_shot_examples():
     ]
     messages = adapter_format_as_openai(
         adapter, MySignature, demos, {"image": Image(url="https://example.com/image3.jpg")}
-    )  # ty:ignore[invalid-argument-type]
+    )
 
     # 1 system message, 2 few shot examples (1 user and assistant message for each example), 1 user message
     assert len(messages) == 6
@@ -1197,7 +1197,7 @@ def test_json_adapter_formats_image_with_few_shot_examples_with_nested_images():
 
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = JSONAdapter()
-    messages = adapter_format_as_openai(adapter, MySignature, demos, {"image": image_wrapper_2})  # ty:ignore[invalid-argument-type]
+    messages = adapter_format_as_openai(adapter, MySignature, demos, {"image": image_wrapper_2})
 
     assert len(messages) == 4
 

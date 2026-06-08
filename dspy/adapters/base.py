@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, cast, get_args, get_origin
 
 import json_repair
@@ -15,6 +16,7 @@ from dspy.adapters.utils import build_lm_message, serialize_for_json
 from dspy.core.types import (
     LMConfig,
     LMMessage,
+    LMReasoningConfig,
     LMRequest,
     LMResponse,
     LMToolCallPart,
@@ -29,7 +31,7 @@ from dspy.signatures.signature import Signature, make_signature
 from dspy.utils.exceptions import AdapterParseError
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
 
     from dspy.clients.base_lm import BaseLM
     from dspy.utils.callback import BaseCallback
@@ -125,7 +127,7 @@ class Adapter:
                 input_tools = inputs[tool_call_input_field_name]
                 input_tools = input_tools if isinstance(input_tools, list) else [input_tools]
 
-                tools = [_coerce_tool_spec(tool.format_as_litellm_function_call()) for tool in input_tools]
+                tools = [_coerce_tool_spec(tool) for tool in input_tools]
                 if self.parallel_tool_calls is not None:
                     if config.tool_choice is None:
                         config = config.model_copy(
@@ -143,18 +145,59 @@ class Adapter:
                 signature = signature.delete(tool_call_output_field_name)
                 signature = signature.delete(tool_call_input_field_name)
 
-        # TODO(adapters-plan): Built-in/native response planning should move out
-        # of `Type.adapt_to_native_lm_feature()` and into adapter-owned planning
-        # renderers. Keep this compatibility hook for this boundary-only PR.
         for name, field in signature.output_fields.items():
-            if (
+            if not (
                 isinstance(field.annotation, type)
                 and field.annotation in self.native_response_types
                 and issubclass(field.annotation, Type)
             ):
-                signature = field.annotation.adapt_to_native_lm_feature(signature, name, lm, config)
+                continue
+            if field.annotation is Reasoning:
+                signature = self._adapt_reasoning_native(signature, name, lm, config)
+            elif field.annotation is Citations:
+                signature = self._adapt_citations_native(signature, name, lm)
+            else:
+                signature = signature.delete(name)
 
         return signature, tools, config
+
+    def _adapt_reasoning_native(
+        self,
+        signature: type[Signature],
+        field_name: str,
+        lm: BaseLM,
+        config: LMConfig,
+    ) -> type[Signature]:
+        if "reasoning" in config.model_fields_set and config.reasoning is None:
+            return signature
+
+        if config.reasoning is not None and config.reasoning.effort is not None:
+            reasoning_effort = config.reasoning.effort
+        elif isinstance(lm.kwargs.get("reasoning"), Mapping):
+            reasoning_effort = lm.kwargs["reasoning"].get("effort")
+        elif lm.kwargs.get("reasoning_effort") is not None:
+            reasoning_effort = lm.kwargs["reasoning_effort"]
+        else:
+            reasoning_effort = "low"
+
+        if reasoning_effort is None or not lm.supports_reasoning:
+            return signature
+
+        if "gpt-5" in lm.model and lm.model_type == "chat":
+            return signature
+
+        config.reasoning = LMReasoningConfig(effort=reasoning_effort)
+        return signature.delete(field_name)
+
+    def _adapt_citations_native(
+        self,
+        signature: type[Signature],
+        field_name: str,
+        lm: BaseLM,
+    ) -> type[Signature]:
+        if lm.model.startswith("anthropic/"):
+            return signature.delete(field_name)
+        return signature
 
     def _call_postprocess(
         self,
@@ -198,9 +241,6 @@ class Adapter:
                 tool_calls = [_provider_tool_call_to_tool_call_dict(tool_call) for tool_call in tool_calls]
                 value[tool_call_output_field_name] = ToolCalls.from_dict_list(tool_calls)
 
-            # TODO(adapter-types): Once `Type.parse_lm_output(context, output)` is
-            # the real normalized hook, this should not call the legacy
-            # provider-shaped `parse_lm_response()` directly.
             for name, field in original_signature.output_fields.items():
                 if (
                     isinstance(field.annotation, type)

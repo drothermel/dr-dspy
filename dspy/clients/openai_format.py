@@ -37,6 +37,7 @@ from dspy.core.types import (
     LMDocumentPart,
     LMImagePart,
     LMMessage,
+    LMOpaquePart,
     LMOutput,
     LMRefusalPart,
     LMRequest,
@@ -248,7 +249,7 @@ def parts_to_openai_content(parts: list[Any]) -> str | list[dict[str, Any]]:
     OpenAI accepts a bare string for the common single-text case. Mixed content
     becomes a list of content blocks.
     """
-    if len(parts) == 1 and isinstance(parts[0], LMTextPart) and "legacy_content_block" not in parts[0].metadata:
+    if len(parts) == 1 and isinstance(parts[0], LMTextPart):
         return parts[0].text
     blocks: list[dict[str, Any]] = []
     for part in parts:
@@ -258,9 +259,8 @@ def parts_to_openai_content(parts: list[Any]) -> str | list[dict[str, Any]]:
 
 def part_to_openai_blocks(part: Any) -> list[dict[str, Any]]:
     """Convert one DSPy part into one or more OpenAI content blocks."""
-    legacy_block = getattr(part, "metadata", {}).get("legacy_content_block")
-    if legacy_block is not None:
-        return [dict(legacy_block)]
+    if isinstance(part, LMOpaquePart):
+        return [dict(part.block)]
     if isinstance(part, LMTextPart):
         return [{"type": "text", "text": part.text}]
     if isinstance(part, LMImagePart):

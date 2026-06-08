@@ -13,9 +13,6 @@ if TYPE_CHECKING:
 
     from litellm import ModelResponseStream
 
-    from dspy.clients.base_lm import BaseLM
-    from dspy.signatures.signature import Signature
-
 
 @experimental(version="3.0.4")
 class Citations(Type):
@@ -187,20 +184,6 @@ class Citations(Type):
     def __getitem__(self, index: int) -> Citation:
         """Allow indexing into citations."""
         return self.citations[index]
-
-    @classmethod
-    @override
-    def adapt_to_native_lm_feature(
-        cls,
-        signature: type[Signature],
-        field_name: str,
-        lm: BaseLM,
-        config: Any,
-    ) -> type[Signature]:
-        _ = config
-        if lm.model.startswith("anthropic/"):
-            return signature.delete(field_name)
-        return signature
 
     @classmethod
     @override

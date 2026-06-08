@@ -1095,11 +1095,6 @@ async def test_streaming_allows_custom_streamable_type():
 
         @classmethod
         @override
-        def adapt_to_native_lm_feature(cls, signature, field_name, lm, config):
-            return signature.delete(field_name)
-
-        @classmethod
-        @override
         def parse_stream_chunk(cls, chunk):
             return CustomType(message=chunk.choices[0].delta.content)
 

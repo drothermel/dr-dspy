@@ -1,19 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, cast
 
 import pydantic
 from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
-from dspy.core.types import LMConfig, LMReasoningConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-
-    from dspy.clients.base_lm import BaseLM
-    from dspy.signatures.signature import Signature
 
 
 class Reasoning(Type):
@@ -50,45 +45,6 @@ class Reasoning(Type):
             return {"content": data["content"]}
 
         raise ValueError(f"Received invalid value for `dspy.Reasoning`: {data}")
-
-    @classmethod
-    @override
-    def adapt_to_native_lm_feature(
-        cls,
-        signature: type[Signature],
-        field_name: str,
-        lm: BaseLM,
-        config: LMConfig,
-    ) -> type[Signature]:
-        if "reasoning" in config.model_fields_set and config.reasoning is None:
-            return signature
-
-        if config.reasoning is not None and config.reasoning.effort is not None:
-            reasoning_effort = config.reasoning.effort
-        elif isinstance(lm.kwargs.get("reasoning"), Mapping):
-            reasoning_effort = lm.kwargs["reasoning"].get("effort")
-        elif lm.kwargs.get("reasoning_effort") is not None:
-            reasoning_effort = lm.kwargs["reasoning_effort"]
-        else:
-            # Turn on the native reasoning explicitly if Reasoning field is present in the signature and no explicit
-            # reasoning effort is set in `config` or `lm.kwargs`.
-            reasoning_effort = "low"
-
-        if reasoning_effort is None or not lm.supports_reasoning:
-            # If users explicitly set reasoning effort to None or the LM doesn't support reasoning, we don't enable
-            # native reasoning.
-            return signature
-
-        if "gpt-5" in lm.model and lm.model_type == "chat":
-            # There is a caveat of Litellm as 1.79.0 that when using the chat completion API on GPT-5 family models,
-            # the reasoning content is not available in the response. As a workaround, we don't enable the native
-            # reasoning feature for GPT-5 family models when using the chat completion API.
-            # Litellm issue: https://github.com/BerriAI/litellm/issues/14748
-            return signature
-
-        config.reasoning = LMReasoningConfig(effort=reasoning_effort)
-        # Delete the reasoning field from the signature to use the native reasoning feature.
-        return signature.delete(field_name)
 
     @classmethod
     @override

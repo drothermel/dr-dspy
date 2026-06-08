@@ -26,6 +26,7 @@ __all__ = [
     "LMDocumentPart",
     "LMImagePart",
     "LMMessage",
+    "LMOpaquePart",
     "LMOutput",
     "LMPart",
     "LMPromptCacheConfig",
@@ -229,6 +230,13 @@ class LMRefusalPart(LMBasePart):
     text: str
 
 
+class LMOpaquePart(LMBasePart):
+    """Provider-native content block preserved verbatim for round-trip."""
+
+    type: Literal["opaque"] = "opaque"
+    block: dict[str, Any]
+
+
 LMPart = Annotated[
     LMTextPart
     | LMImagePart
@@ -240,7 +248,8 @@ LMPart = Annotated[
     | LMToolResultPart
     | LMThinkingPart
     | LMCitationPart
-    | LMRefusalPart,
+    | LMRefusalPart
+    | LMOpaquePart,
     Field(discriminator="type"),
 ]
 
@@ -1533,9 +1542,8 @@ def _history_message_parts_as_openai_content(parts: list[LMPart]) -> str | list[
 
 
 def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
-    legacy_block = getattr(part, "metadata", {}).get("legacy_content_block")
-    if legacy_block is not None:
-        return dict(legacy_block)
+    if isinstance(part, LMOpaquePart):
+        return dict(part.block)
     if isinstance(part, LMTextPart):
         return {"type": "text", "text": part.text}
     if isinstance(part, LMImagePart):
@@ -1671,6 +1679,7 @@ def _coerce_part(value: Any) -> LMPart:
             LMThinkingPart,
             LMCitationPart,
             LMRefusalPart,
+            LMOpaquePart,
         ),
     ):
         return value
@@ -1713,7 +1722,7 @@ def _parts_from_openai_content(content: Any) -> list[LMPart]:
             video = item.get("video", {})
             parts.append(_media_dict_to_video_part(video))
         elif isinstance(item, dict):
-            parts.append(LMTextPart(text="", metadata={"legacy_content_block": item}))
+            parts.append(LMOpaquePart(block=item))
         else:
             parts.append(_coerce_part(item))
     return parts

@@ -8,9 +8,7 @@ import pydantic
 if TYPE_CHECKING:
     from litellm import ModelResponseStream
 
-    from dspy.clients.base_lm import BaseLM
-    from dspy.core.types import LMConfig, LMOutput, LMPart
-    from dspy.signatures.signature import Signature
+    from dspy.core.types import LMOutput, LMPart
 
 
 class Type(pydantic.BaseModel):
@@ -100,32 +98,6 @@ class Type(pydantic.BaseModel):
         if isinstance(formatted, list):
             return json.dumps(formatted, ensure_ascii=False)
         return formatted
-
-    @classmethod
-    def adapt_to_native_lm_feature(
-        cls,
-        signature: type[Signature],
-        field_name: str,
-        lm: BaseLM,
-        config: LMConfig,
-    ) -> type[Signature]:
-        """Adapt the custom type to the native LM feature if possible.
-
-        When the LM and configuration supports the related native LM feature, e.g., native tool calling, native
-        reasoning, etc., we adapt the signature and `config` to enable the native LM feature.
-
-        Args:
-            signature: The DSPy signature for the LM call.
-            field_name: The name of the field in the signature to adapt to the native LM feature.
-            lm: The LM instance.
-            config: The generation controls for the LM call, subject to in-place updates if adaptation is required.
-
-        Returns:
-            The adapted signature. If the custom type is not natively supported by the LM, return the original
-            signature.
-        """
-        _ = (field_name, lm, config)
-        return signature
 
     @classmethod
     def is_streamable(cls) -> bool:

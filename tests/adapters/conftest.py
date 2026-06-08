@@ -4,7 +4,7 @@ from typing_extensions import override
 
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import message_to_openai_chat, to_openai_chat_request
-from dspy.core.types import LMRequest, LMResponse, coerce_lm_config
+from dspy.core.types import LMRequest, coerce_lm_config
 from dspy.utils.dummies import DummyLM
 
 try:
@@ -46,24 +46,6 @@ def captured_lm_kwargs(request: LMRequest) -> dict:
         if request.config.cache.rollout_id is not None:
             data["rollout_id"] = request.config.cache.rollout_id
     return data
-
-
-def legacy_outputs_to_lm_response(outputs: list[dict]) -> LMResponse:
-    from dspy.clients.openai_format import provider_tool_call_to_part
-    from dspy.core.types import LMOutput, LMPart, LMTextPart, LMThinkingPart
-
-    lm_outputs = []
-    for output in outputs:
-        parts: list[LMPart] = []
-        text = output.get("text")
-        if isinstance(text, str):
-            parts.append(LMTextPart(text=text))
-        reasoning = output.get("reasoning_content")
-        if isinstance(reasoning, str):
-            parts.append(LMThinkingPart(text=reasoning))
-        parts.extend(provider_tool_call_to_part(tool_call) for tool_call in output.get("tool_calls") or [])
-        lm_outputs.append(LMOutput(parts=parts, provider_output=output))
-    return LMResponse(model="test", outputs=lm_outputs)
 
 
 class CapturingLM(BaseLM):
