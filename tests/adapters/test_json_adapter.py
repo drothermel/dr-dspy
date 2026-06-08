@@ -820,7 +820,7 @@ def test_json_adapter_with_structured_outputs_does_not_mutate_original_signature
     with mock.patch("litellm.completion"):
         program(input1="Test input")
 
-    assert program.signature.output_fields == TestSignature.output_fields
+    assert program.signature.output_fields == TestSignature.output_fields  # ty:ignore[unresolved-attribute]
 
 
 def test_json_adapter_sync_call():
@@ -998,7 +998,7 @@ def test_json_adapter_formats_image_with_few_shot_examples():
             text="This is another test image",
         ),
     ]
-    messages = adapter.format(MySignature, demos, {"image": Image(url="https://example.com/image3.jpg")})
+    messages = adapter.format(MySignature, demos, {"image": Image(url="https://example.com/image3.jpg")})  # ty:ignore[invalid-argument-type]
 
     # 1 system message, 2 few shot examples (1 user and assistant message for each example), 1 user message
     assert len(messages) == 6
@@ -1089,7 +1089,7 @@ def test_json_adapter_formats_image_with_few_shot_examples_with_nested_images():
 
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = JSONAdapter()
-    messages = adapter.format(MySignature, demos, {"image": image_wrapper_2})
+    messages = adapter.format(MySignature, demos, {"image": image_wrapper_2})  # ty:ignore[invalid-argument-type]
 
     assert len(messages) == 4
 
@@ -1643,7 +1643,7 @@ def test_json_adapter_with_responses_api():
         object="response",
         output=[
             ResponseOutputMessage(
-                id="msg_1", type="message", role="assistant", status="completed", content=[{"type": "output_text", "text": '{"answer": "Washington, D.C."}', "annotations": []}],
+                id="msg_1", type="message", role="assistant", status="completed", content=[{"type": "output_text", "text": '{"answer": "Washington, D.C."}', "annotations": []}],  # ty:ignore[invalid-argument-type]
             ),
         ],
         metadata={},

@@ -454,7 +454,7 @@ def test_gpt_5_chat_not_reasoning_model():
 
 def test_base_lm_init_uses_lm_defaults_and_isolates_callback_list():
     callbacks = [object()]
-    lm = BaseLM("custom-model", callbacks=callbacks)
+    lm = BaseLM("custom-model", callbacks=callbacks)  # ty:ignore[invalid-argument-type]
 
     assert lm.kwargs == {"temperature": None, "max_tokens": None}
     assert lm.num_retries == 3
@@ -567,7 +567,7 @@ def test_base_lm_default_call_keeps_legacy_outputs():
 def test_base_lm_experimental_call_returns_lm_response_through_legacy_bridge():
     class CustomLM(BaseLM):
         def __init__(self, *args: object, **kwargs: object):
-            super().__init__(*args, **kwargs)
+            super().__init__(*args, **kwargs)  # ty:ignore[invalid-argument-type]
             self.seen = None
 
         def forward(self, prompt=None, messages=None, **kwargs: object):
@@ -585,11 +585,11 @@ def test_base_lm_experimental_call_returns_lm_response_through_legacy_bridge():
     assert isinstance(response, LMResponse)
     assert response.text == "Hi!"
     assert response.output.finish_reason == "stop"
-    assert lm.seen["prompt"] == "Query"
-    assert lm.seen["messages"] is None
-    assert lm.seen["kwargs"]["temperature"] == 0.2
-    assert lm.seen["kwargs"]["cache"] is True
-    assert lm.seen["kwargs"]["rollout_id"] == 7
+    assert lm.seen["prompt"] == "Query"  # ty:ignore[not-subscriptable]
+    assert lm.seen["messages"] is None  # ty:ignore[not-subscriptable]
+    assert lm.seen["kwargs"]["temperature"] == 0.2  # ty:ignore[not-subscriptable]
+    assert lm.seen["kwargs"]["cache"] is True  # ty:ignore[not-subscriptable]
+    assert lm.seen["kwargs"]["rollout_id"] == 7  # ty:ignore[not-subscriptable]
 
 
 def test_base_lm_explicit_lm_request_returns_lm_response_without_experimental():
@@ -638,7 +638,7 @@ def test_base_lm_typed_forward_contract_uses_lm_request():
     class CustomLM(BaseLM):
         forward_contract = "typed_lm"
 
-        def forward(self, request):
+        def forward(self, request):  # ty:ignore[invalid-method-override]
             assert isinstance(request, LMRequest)
             return LMResponse.from_text(f"model={request.model}; text={request.messages[0].text}")
 
@@ -655,7 +655,7 @@ def test_base_lm_typed_forward_contract_rejects_non_lm_response_at_call_time():
     class CustomLM(BaseLM):
         forward_contract = "typed_lm"
 
-        def forward(self, request):
+        def forward(self, request):  # ty:ignore[invalid-method-override]
             return ["not typed"]
 
     with pytest.raises(TypeError, match="forward_contract='typed_lm'"):
@@ -686,11 +686,11 @@ class _TypedContractLM(BaseLM):
     forward_contract = "typed_lm"
 
     def __init__(self, *args: object, outputs: list[str], **kwargs: object):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)  # ty:ignore[invalid-argument-type]
         self.outputs = outputs
         self.requests = []
 
-    def forward(self, request):
+    def forward(self, request):  # ty:ignore[invalid-method-override]
         assert isinstance(request, LMRequest)
         self.requests.append(request)
         return LMResponse.from_text(self.outputs[len(self.requests) - 1], model=request.model)
@@ -867,16 +867,16 @@ def test_base_lm_copy_is_shallow_runtime_copy_with_isolated_dspy_state():
 
     callback = object()
     client = object()
-    lm = CustomLM(model="custom-model", callbacks=[callback], temperature=0.1)
-    lm.client = client
-    lm.extra_state = {"mutable": []}
+    lm = CustomLM(model="custom-model", callbacks=[callback], temperature=0.1)  # ty:ignore[invalid-argument-type]
+    lm.client = client  # ty:ignore[unresolved-attribute]
+    lm.extra_state = {"mutable": []}  # ty:ignore[unresolved-attribute]
     lm.history = [{"prompt": "original"}]
 
     copied_lm = lm.copy(temperature=0.2, rollout_id=1)
 
     assert copied_lm is not lm
     assert copied_lm.client is client
-    assert copied_lm.extra_state is lm.extra_state
+    assert copied_lm.extra_state is lm.extra_state  # ty:ignore[unresolved-attribute]
     assert copied_lm.history == []
     assert copied_lm.history is not lm.history
     assert copied_lm.callbacks == [callback]
@@ -1165,7 +1165,7 @@ def test_responses_api():
             ResponseOutputMessage(
                 id="msg_1", type="message", role="assistant", status="completed", content=[
                         {"type": "output_text", "text": "This is a test answer from responses API.", "annotations": []}
-                    ],
+                    ],  # ty:ignore[invalid-argument-type]
             ),
             ResponseReasoningItem(
                 id="reasoning_1", type="reasoning", summary=[Summary(type="summary_text", text="This is a dummy reasoning.")],
@@ -1510,7 +1510,7 @@ def test_responses_api_with_image_input():
             ResponseOutputMessage(
                 id="msg_1", type="message", role="assistant", status="completed", content=[
                         {"type": "output_text", "text": "This is a test answer with image input.", "annotations": []}
-                    ],
+                    ],  # ty:ignore[invalid-argument-type]
             ),
         ]
     )
@@ -1570,7 +1570,7 @@ def test_responses_api_with_pydantic_model_input():
                             "text": '{"answer" : "This is a good test answer", "number" : 42}',
                             "annotations": [],
                         }
-                    ],
+                    ],  # ty:ignore[invalid-argument-type]
             ),
         ]
     )
@@ -1614,7 +1614,7 @@ def test_responses_api_with_none_usage():
         id="resp_1",
         created_at=0.0,
         error=None,
-        incomplete_details={"reason": "max_output_tokens"},
+        incomplete_details={"reason": "max_output_tokens"},  # ty:ignore[invalid-argument-type]
         instructions=None,
         model="openai/gpt-5-mini",
         object="response",
@@ -1622,7 +1622,7 @@ def test_responses_api_with_none_usage():
             ResponseOutputMessage(
                 id="msg_1", type="message", role="assistant", status="incomplete", content=[
                         {"type": "output_text", "text": "Partial response that was truncated", "annotations": []}
-                    ],
+                    ],  # ty:ignore[invalid-argument-type]
             ),
         ],
         metadata={},
@@ -1665,7 +1665,7 @@ async def test_responses_api_with_none_usage_async():
         id="resp_1",
         created_at=0.0,
         error=None,
-        incomplete_details={"reason": "max_output_tokens"},
+        incomplete_details={"reason": "max_output_tokens"},  # ty:ignore[invalid-argument-type]
         instructions=None,
         model="openai/gpt-5-mini",
         object="response",
@@ -1673,7 +1673,7 @@ async def test_responses_api_with_none_usage_async():
             ResponseOutputMessage(
                 id="msg_1", type="message", role="assistant", status="incomplete", content=[
                         {"type": "output_text", "text": "Partial async response", "annotations": []}
-                    ],
+                    ],  # ty:ignore[invalid-argument-type]
             ),
         ],
         metadata={},

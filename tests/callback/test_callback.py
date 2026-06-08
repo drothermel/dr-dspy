@@ -29,31 +29,31 @@ class MyCallback(BaseCallback):
     def on_module_start(self, call_id, instance, inputs):
         self.calls.append({"handler": "on_module_start", "instance": instance, "inputs": inputs})
 
-    def on_module_end(self, call_id, outputs, exception):
+    def on_module_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
         self.calls.append({"handler": "on_module_end", "outputs": outputs, "exception": exception})
 
     def on_lm_start(self, call_id, instance, inputs):
         self.calls.append({"handler": "on_lm_start", "instance": instance, "inputs": inputs})
 
-    def on_lm_end(self, call_id, outputs, exception):
+    def on_lm_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
         self.calls.append({"handler": "on_lm_end", "outputs": outputs, "exception": exception})
 
     def on_adapter_format_start(self, call_id, instance, inputs):
         self.calls.append({"handler": "on_adapter_format_start", "instance": instance, "inputs": inputs})
 
-    def on_adapter_format_end(self, call_id, outputs, exception):
+    def on_adapter_format_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
         self.calls.append({"handler": "on_adapter_format_end", "outputs": outputs, "exception": exception})
 
     def on_adapter_parse_start(self, call_id, instance, inputs):
         self.calls.append({"handler": "on_adapter_parse_start", "instance": instance, "inputs": inputs})
 
-    def on_adapter_parse_end(self, call_id, outputs, exception):
+    def on_adapter_parse_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
         self.calls.append({"handler": "on_adapter_parse_end", "outputs": outputs, "exception": exception})
 
     def on_tool_start(self, call_id, instance, inputs):
         self.calls.append({"handler": "on_tool_start", "instance": instance, "inputs": inputs})
 
-    def on_tool_end(self, call_id, outputs, exception):
+    def on_tool_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
         self.calls.append({"handler": "on_tool_end", "outputs": outputs, "exception": exception})
 
 
@@ -165,7 +165,7 @@ def test_callback_complex_module():
         callbacks=[callback],
     )
 
-    cot = ChainOfThought("question -> answer", n=3)
+    cot = ChainOfThought("question -> answer", n=3)  # ty:ignore[invalid-argument-type]
     result = cot(question="How are you?")
     assert result["answer"] == "test output"
     assert result["reasoning"] == "No more responses"
@@ -196,7 +196,7 @@ async def test_callback_async_module():
         lm=DummyLM({"How are you?": {"answer": "test output", "reasoning": "No more responses"}}),
         callbacks=[callback],
     ):
-        cot = ChainOfThought("question -> answer", n=3)
+        cot = ChainOfThought("question -> answer", n=3)  # ty:ignore[invalid-argument-type]
         result = await cot.acall(question="How are you?")
     assert result["answer"] == "test output"
     assert result["reasoning"] == "No more responses"
@@ -238,8 +238,8 @@ def test_tool_calls():
             self.tools = [Tool(tool_1), Tool(tool_2)]
 
         def forward(self, query: str) -> str:
-            query = self.tools[0](query=query)
-            return self.tools[1](query=query)
+            query = self.tools[0](query=query)  # ty:ignore[invalid-assignment]
+            return self.tools[1](query=query)  # ty:ignore[invalid-return-type]
 
     module = MyModule()
     result = module("query")

@@ -9,7 +9,7 @@ def test_answer_exact_match_string():
         answer="2",
     ).with_inputs("question")
     pred = Predict("question -> answer")
-    pred.answer = "2"
+    pred.answer = "2"  # ty:ignore[unresolved-attribute]
     assert answer_exact_match(example, pred)
 
 
@@ -19,7 +19,7 @@ def test_answer_exact_match_list():
         answer=["2", "two"],
     ).with_inputs("question")
     pred = Predict("question -> answer")
-    pred.answer = "2"
+    pred.answer = "2"  # ty:ignore[unresolved-attribute]
     assert answer_exact_match(example, pred)
 
 
@@ -29,5 +29,5 @@ def test_answer_exact_match_no_match():
         answer="2",
     ).with_inputs("question")
     pred = Predict("question -> answer")
-    pred.answer = "3"
+    pred.answer = "3"  # ty:ignore[unresolved-attribute]
     assert not answer_exact_match(example, pred)

@@ -46,9 +46,9 @@ class Person:
 )
 def test_magicattr_get(key, value):
     obj = Test()
-    obj.t = obj
-    obj.a.append(obj)
-    obj.b["w"] = obj
+    obj.t = obj  # ty:ignore[unresolved-attribute]
+    obj.a.append(obj)  # ty:ignore[invalid-argument-type]
+    obj.b["w"] = obj  # ty:ignore[invalid-assignment]
 
     assert magicattr.get(obj, key) == value
 

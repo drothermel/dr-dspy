@@ -35,7 +35,7 @@ from dspy.utils.dummies import DummyLM
 
 class CustomStateLM(BaseLM):
     def __init__(self, model, *, deployment: str, **kwargs: object):
-        super().__init__(model=model, **kwargs)
+        super().__init__(model=model, **kwargs)  # ty:ignore[invalid-argument-type]
         self.deployment = deployment
 
     def dump_state(self):
@@ -44,7 +44,7 @@ class CustomStateLM(BaseLM):
         return state
 
     @classmethod
-    def load_state(cls, state):
+    def load_state(cls, state):  # ty:ignore[invalid-method-override]
         state = dict(state)
         state.pop(LM_CLASS_STATE_KEY, None)
         return cls(**state)
@@ -59,13 +59,13 @@ def test_initialization_with_string_signature():
     signature_string = "input1, input2 -> output"
     predict = Predict(signature_string)
     expected_instruction = "Given the fields `input1`, `input2`, produce the fields `output`."
-    assert predict.signature.instructions == expected_instruction
-    assert predict.signature.instructions == Signature(signature_string).instructions
+    assert predict.signature.instructions == expected_instruction  # ty:ignore[unresolved-attribute]
+    assert predict.signature.instructions == Signature(signature_string).instructions  # ty:ignore[too-many-positional-arguments, unresolved-attribute]
 
 
 def test_reset_method():
     predict_instance = Predict("input -> output")
-    predict_instance.lm = "modified"
+    predict_instance.lm = "modified"  # ty:ignore[invalid-assignment]
     predict_instance.traces = ["trace"]
     predict_instance.train = ["train"]
     predict_instance.demos = ["demo"]
@@ -102,7 +102,7 @@ def test_lm_after_dump_and_load_state():
     dumped_state = predict_instance.dump_state()
     new_instance = Predict("input -> output")
     new_instance.load_state(dumped_state)
-    assert new_instance.lm.dump_state() == expected_lm_state
+    assert new_instance.lm.dump_state() == expected_lm_state  # ty:ignore[unresolved-attribute]
 
 
 def test_base_lm_dump_state_ignores_internal_class_marker_kwarg():
@@ -159,11 +159,11 @@ def test_call_method():
 
 
 def test_instructions_after_dump_and_load_state():
-    predict_instance = Predict(Signature("input -> output", "original instructions"))
+    predict_instance = Predict(Signature("input -> output", "original instructions"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
     dumped_state = predict_instance.dump_state()
-    new_instance = Predict(Signature("input -> output", "new instructions"))
+    new_instance = Predict(Signature("input -> output", "new instructions"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
     new_instance.load_state(dumped_state)
-    assert new_instance.signature.instructions == "original instructions"
+    assert new_instance.signature.instructions == "original instructions"  # ty:ignore[unresolved-attribute]
 
 
 def test_demos_after_dump_and_load_state():
@@ -270,10 +270,10 @@ def test_signature_fields_after_dump_and_load_state(tmp_path):
         sentiment = OutputField(desc="I am a malicious output!", prefix="I am a prefix!")
 
     new_instance = Predict(CustomSignature2)
-    assert new_instance.signature.dump_state() != original_instance.signature.dump_state()
+    assert new_instance.signature.dump_state() != original_instance.signature.dump_state()  # ty:ignore[unresolved-attribute]
     # After loading, the fields should be the same.
     new_instance.load(file_path)
-    assert new_instance.signature.dump_state() == original_instance.signature.dump_state()
+    assert new_instance.signature.dump_state() == original_instance.signature.dump_state()  # ty:ignore[unresolved-attribute]
 
 
 @pytest.mark.parametrize("filename", ["model.json", "model.pkl"])
@@ -431,7 +431,7 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
             super().__init__({"choices": []})
 
     with patch("litellm.completion", return_value=FakeResp()) as completion_mock:
-        loaded_predict.lm.forward(prompt="hello", cache=False)
+        loaded_predict.lm.forward(prompt="hello", cache=False)  # ty:ignore[unresolved-attribute]
 
     assert completion_mock.call_count == 1
     assert completion_mock.call_args.kwargs.get(endpoint_override_key) != override_url
@@ -469,7 +469,7 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
     safe_loaded_predict.load(file_path)
     with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:  # noqa: SIM117
         with patch("litellm.completion", return_value=FakeResp()) as completion_mock:
-            safe_loaded_predict.lm.forward(prompt="hello", cache=False)
+            safe_loaded_predict.lm.forward(prompt="hello", cache=False)  # ty:ignore[unresolved-attribute]
 
     assert completion_mock.called
     assert not batch_completion_mock.called
@@ -477,7 +477,7 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
     opt_in_loaded_predict = Predict("q->a")
     opt_in_loaded_predict.load(file_path, allow_unsafe_lm_state=True)
     with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:
-        opt_in_loaded_predict.lm.forward(prompt="hello", cache=False)
+        opt_in_loaded_predict.lm.forward(prompt="hello", cache=False)  # ty:ignore[unresolved-attribute]
 
     opt_in_deployments = batch_completion_mock.call_args.kwargs["deployments"]
     assert opt_in_deployments[0]["api_base"] == override_url
@@ -512,7 +512,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     opt_in_loaded_predict = Predict("q->a")
     opt_in_loaded_predict.load(file_path, allow_unsafe_lm_state=True)
     with patch("litellm.text_completion", return_value=FakeResp()) as text_completion_mock:
-        opt_in_loaded_predict.lm.forward(prompt="hello", cache=False)
+        opt_in_loaded_predict.lm.forward(prompt="hello", cache=False)  # ty:ignore[unresolved-attribute]
 
     assert text_completion_mock.call_args.kwargs["api_base"] == override_url
     assert text_completion_mock.call_args.kwargs["api_key"] == env_api_key
@@ -520,7 +520,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     safe_loaded_predict = Predict("q->a")
     safe_loaded_predict.load(file_path)
     with patch("litellm.text_completion", return_value=FakeResp()) as text_completion_mock:
-        safe_loaded_predict.lm.forward(prompt="hello", cache=False)
+        safe_loaded_predict.lm.forward(prompt="hello", cache=False)  # ty:ignore[unresolved-attribute]
 
     # In the safe path, the key still comes from the environment, but the serialized endpoint override does not.
     assert text_completion_mock.call_args.kwargs["api_key"] == env_api_key
@@ -725,7 +725,7 @@ def test_load_state_chaining():
 def test_call_predict_with_chat_history(adapter_type):
     class SpyLM(LM):
         def __init__(self, *args: object, return_json=False, **kwargs: object):
-            super().__init__(*args, **kwargs)
+            super().__init__(*args, **kwargs)  # ty:ignore[invalid-argument-type]
             self.calls = []
             self.return_json = return_json
 
@@ -818,7 +818,7 @@ async def test_lm_usage_with_async():
         await asyncio.sleep(1)
         return await original_aforward(**kwargs)
 
-    program.aforward = types.MethodType(patched_aforward, program)
+    program.aforward = types.MethodType(patched_aforward, program)  # ty:ignore[invalid-assignment]
 
     with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True), patch(
         "litellm.acompletion",
@@ -879,7 +879,7 @@ def test_error_message_on_invalid_lm_setup():
 def test_field_constraints(adapter_type):
     class SpyLM(LM):
         def __init__(self, *args: object, return_json=False, **kwargs: object):
-            super().__init__(*args, **kwargs)
+            super().__init__(*args, **kwargs)  # ty:ignore[invalid-argument-type]
             self.calls = []
             self.return_json = return_json
 
@@ -970,7 +970,7 @@ def test_dump_state_pydantic_non_primitive_types():
 
     website_info = WebsiteInfo(
         name="Example",
-        url="https://www.example.com",
+        url="https://www.example.com",  # ty:ignore[invalid-argument-type]
         description="Test website",
         created_at=datetime(2021, 1, 1, 12, 0, 0),
     )
@@ -1731,8 +1731,8 @@ def test_custom_signature_types(caplog, enable_type_warnings):
         class Query(pydantic.BaseModel):
             text: str
 
-    signature = Signature("query: MyContainer.Query -> answer")
-    predict_instance = Predict(signature)
+    signature = Signature("query: MyContainer.Query -> answer")  # ty:ignore[too-many-positional-arguments]
+    predict_instance = Predict(signature)  # ty:ignore[invalid-argument-type]
 
     # Create an instance of the Query model
     query_instance = MyContainer.Query(text="What is the capital of France?")

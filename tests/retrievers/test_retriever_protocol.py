@@ -65,7 +65,7 @@ def test_databricks_rm_direct_call_preserves_prediction_shape(monkeypatch: pytes
     def fake_query_via_requests(**kwargs: object) -> dict[str, object]:
         assert kwargs["query_text"] == "example query"
         assert kwargs["k"] == 2
-        return response
+        return response  # ty:ignore[invalid-return-type]
 
     monkeypatch.setattr(databricks_rm, "_databricks_sdk_installed", False)
     monkeypatch.setattr(databricks_rm.DatabricksRM, "_query_via_requests", staticmethod(fake_query_via_requests))
@@ -82,9 +82,9 @@ def test_databricks_rm_direct_call_preserves_prediction_shape(monkeypatch: pytes
 
     result = retriever("example query")
 
-    assert result.docs == ["High score", "Middle score"]
-    assert result.doc_ids == ["high", "mid"]
-    assert result.extra_columns == [{"score": 0.9, "source": "b"}, {"score": 0.5, "source": "c"}]
+    assert result.docs == ["High score", "Middle score"]  # ty:ignore[unresolved-attribute]
+    assert result.doc_ids == ["high", "mid"]  # ty:ignore[unresolved-attribute]
+    assert result.extra_columns == [{"score": 0.9, "source": "b"}, {"score": 0.5, "source": "c"}]  # ty:ignore[unresolved-attribute]
 
 
 def test_weaviate_rm_direct_call_preserves_long_text_shape() -> None:
@@ -123,7 +123,7 @@ def test_weaviate_rm_direct_call_preserves_long_text_shape() -> None:
             self.collections = FakeCollections(collection)
 
     collection = FakeCollection()
-    retriever = WeaviateRM("collection", weaviate_client=FakeClient(collection), k=1)
+    retriever = WeaviateRM("collection", weaviate_client=FakeClient(collection), k=1)  # ty:ignore[invalid-argument-type]
 
     result = retriever("question")
 

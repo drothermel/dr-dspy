@@ -23,7 +23,7 @@ def add(a: int, b: int) -> int:
 @mcp.tool()
 def hello(names: list[str]) -> str:
     """Greet people"""
-    return [f"Hello, {name}!" for name in names]
+    return [f"Hello, {name}!" for name in names]  # ty:ignore[invalid-return-type]
 
 
 @mcp.tool()

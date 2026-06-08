@@ -50,26 +50,26 @@ def test_reasoning_concatenation():
 def test_reasoning_string_methods():
     reasoning = Reasoning(content="  Hello World  ")
 
-    assert reasoning.strip() == "Hello World"
+    assert reasoning.strip() == "Hello World"  # ty:ignore[call-non-callable]
 
-    assert reasoning.lower() == "  hello world  "
-    assert reasoning.upper() == "  HELLO WORLD  "
+    assert reasoning.lower() == "  hello world  "  # ty:ignore[call-non-callable]
+    assert reasoning.upper() == "  HELLO WORLD  "  # ty:ignore[call-non-callable]
 
-    assert reasoning.strip().split() == ["Hello", "World"]
-    assert reasoning.strip().split(" ") == ["Hello", "World"]
+    assert reasoning.strip().split() == ["Hello", "World"]  # ty:ignore[call-non-callable]
+    assert reasoning.strip().split(" ") == ["Hello", "World"]  # ty:ignore[call-non-callable]
 
-    assert reasoning.replace("World", "Python") == "  Hello Python  "
+    assert reasoning.replace("World", "Python") == "  Hello Python  "  # ty:ignore[call-non-callable]
 
-    assert reasoning.strip().startswith("Hello")
-    assert reasoning.strip().endswith("World")
-    assert not reasoning.strip().startswith("World")
+    assert reasoning.strip().startswith("Hello")  # ty:ignore[call-non-callable]
+    assert reasoning.strip().endswith("World")  # ty:ignore[call-non-callable]
+    assert not reasoning.strip().startswith("World")  # ty:ignore[call-non-callable]
 
-    assert reasoning.find("World") == 8
-    assert reasoning.find("xyz") == -1
+    assert reasoning.find("World") == 8  # ty:ignore[call-non-callable]
+    assert reasoning.find("xyz") == -1  # ty:ignore[call-non-callable]
 
-    assert reasoning.count("l") == 3
+    assert reasoning.count("l") == 3  # ty:ignore[call-non-callable]
 
-    assert reasoning.strip().join(["a", "b", "c"]) == "aHello WorldbHello Worldc"
+    assert reasoning.strip().join(["a", "b", "c"]) == "aHello WorldbHello Worldc"  # ty:ignore[call-non-callable]
 
 
 def test_reasoning_with_chain_of_thought():

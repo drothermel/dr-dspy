@@ -1078,16 +1078,16 @@ def test_chat_adapter_nonnative_strips_native_tool_kwargs():
 
 
 def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
-    python_code = Code["python"]
+    python_code = Code["python"]  # ty:ignore[invalid-argument-type]
 
     class CodeSignature(Signature):
         question: str = InputField()
         reasoning: Reasoning = OutputField()
-        code: python_code = OutputField()
+        code: python_code = OutputField()  # ty:ignore[invalid-type-form]
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(),
         CodeSignature,
-        [{"question": "Q1", "reasoning": Reasoning(content="Think"), "code": python_code(code="print('hi')")}],
+        [{"question": "Q1", "reasoning": Reasoning(content="Think"), "code": python_code(code="print('hi')")}],  # ty:ignore[unknown-argument]
         {"question": "Q2"},
     )
 
@@ -2151,7 +2151,7 @@ def test_chat_adapter_formats_image_with_few_shot_examples():
             text="This is another test image",
         ),
     ]
-    messages = adapter.format(MySignature, demos, {"image": Image(url="https://example.com/image3.jpg")})
+    messages = adapter.format(MySignature, demos, {"image": Image(url="https://example.com/image3.jpg")})  # ty:ignore[invalid-argument-type]
 
     # 1 system message, 2 few shot examples (1 user and assistant message for each example), 1 user message
     assert len(messages) == 6
@@ -2214,7 +2214,7 @@ def test_chat_adapter_formats_image_with_few_shot_examples_with_nested_images():
 
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = ChatAdapter()
-    messages = adapter.format(MySignature, demos, {"image": image_wrapper_2})
+    messages = adapter.format(MySignature, demos, {"image": image_wrapper_2})  # ty:ignore[invalid-argument-type]
 
     assert len(messages) == 4
 
@@ -2745,13 +2745,13 @@ def test_tool_call_with_null_content_does_not_raise():
     """Tool-call-only responses legitimately have content=None.
     _call_postprocess must NOT raise when tool_calls are present."""
     adapter = ChatAdapter(use_native_function_calling=True)
-    sig_cls = Signature("question, tools: list[Tool] -> answer, tool_calls: ToolCalls")
+    sig_cls = Signature("question, tools: list[Tool] -> answer, tool_calls: ToolCalls")  # ty:ignore[too-many-positional-arguments]
 
     outputs = [{"text": None, "tool_calls": [
         {"function": {"name": "search", "arguments": '{"query": "test"}'}, "id": "call_1", "type": "function"}
     ]}]
 
-    result = adapter._call_postprocess(sig_cls, sig_cls, outputs, None, {})
+    result = adapter._call_postprocess(sig_cls, sig_cls, outputs, None, {})  # ty:ignore[invalid-argument-type]
     assert result is not None
     assert len(result) == 1
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
@@ -2761,7 +2761,7 @@ def test_tool_call_with_unstructured_content_does_not_raise():
     """Provider tool calls are authoritative even when content is not adapter-formatted."""
     adapter = ChatAdapter(use_native_function_calling=True)
     original_sig = Signature(
-        "question, tools: list[Tool] -> next_thought: Reasoning, tool_calls: ToolCalls"
+        "question, tools: list[Tool] -> next_thought: Reasoning, tool_calls: ToolCalls"  # ty:ignore[too-many-positional-arguments]
     )
     processed_sig = original_sig.delete("tools").delete("tool_calls").delete("next_thought")
     outputs = [
@@ -2774,7 +2774,7 @@ def test_tool_call_with_unstructured_content_does_not_raise():
         }
     ]
 
-    result = adapter._call_postprocess(processed_sig, original_sig, outputs, None, {})
+    result = adapter._call_postprocess(processed_sig, original_sig, outputs, None, {})  # ty:ignore[invalid-argument-type]
 
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
     assert result[0]["next_thought"] == Reasoning(content="I need a search result.")
@@ -2782,7 +2782,7 @@ def test_tool_call_with_unstructured_content_does_not_raise():
 
 def test_tool_call_with_structured_content_preserves_other_outputs():
     adapter = ChatAdapter(use_native_function_calling=True)
-    original_sig = Signature("question, tools: list[Tool] -> answer, tool_calls: ToolCalls")
+    original_sig = Signature("question, tools: list[Tool] -> answer, tool_calls: ToolCalls")  # ty:ignore[too-many-positional-arguments]
     processed_sig = original_sig.delete("tools").delete("tool_calls")
     outputs = [
         {
@@ -2793,7 +2793,7 @@ def test_tool_call_with_structured_content_preserves_other_outputs():
         }
     ]
 
-    result = adapter._call_postprocess(processed_sig, original_sig, outputs, None, {})
+    result = adapter._call_postprocess(processed_sig, original_sig, outputs, None, {})  # ty:ignore[invalid-argument-type]
 
     assert result[0]["answer"] == "I should use a tool."
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
@@ -2801,7 +2801,7 @@ def test_tool_call_with_structured_content_preserves_other_outputs():
 
 def test_provider_tool_calls_preserve_id_and_repair_arguments():
     adapter = ChatAdapter(use_native_function_calling=True)
-    sig_cls = Signature("question, tools: list[Tool] -> tool_calls: ToolCalls")
+    sig_cls = Signature("question, tools: list[Tool] -> tool_calls: ToolCalls")  # ty:ignore[too-many-positional-arguments]
 
     outputs = [
         {
@@ -2816,7 +2816,7 @@ def test_provider_tool_calls_preserve_id_and_repair_arguments():
         }
     ]
 
-    result = adapter._call_postprocess(sig_cls, sig_cls, outputs, None, {})
+    result = adapter._call_postprocess(sig_cls, sig_cls, outputs, None, {})  # ty:ignore[invalid-argument-type]
 
     assert result[0]["tool_calls"] == ToolCalls(
         tool_calls=[

@@ -43,7 +43,7 @@ def test_compile_with_predict_instances():
     student = SimpleModule("input -> output")
     teacher = SimpleModule("input -> output")
 
-    lm = DummyLM(["Initial thoughts", "Finish[blue]"])
+    lm = DummyLM(["Initial thoughts", "Finish[blue]"])  # ty:ignore[invalid-argument-type]
     settings.configure(lm=lm)
 
     # Initialize BootstrapFewShot and compile the student

@@ -1,5 +1,5 @@
 import random
-from typing import Protocol
+from typing import Protocol, cast
 
 import tqdm
 
@@ -15,8 +15,9 @@ class GSM8K:
         self.do_shuffle = False
 
         from datasets import load_dataset
+        from datasets import DatasetDict
 
-        dataset = load_dataset("gsm8k", "main")
+        dataset = cast(DatasetDict, load_dataset("gsm8k", "main"))
 
         hf_official_train = dataset["train"]
         hf_official_test = dataset["test"]
@@ -68,19 +69,20 @@ class GSM8K:
 
 
 def parse_integer_answer(answer: str, only_first_line: bool = True) -> int:
+    parsed_answer = 0
     try:
         if only_first_line:
             answer = answer.strip().split("\n")[0]
 
-        answer = [token for token in answer.split() if any(c.isdigit() for c in token)][-1]
-        answer = answer.split(".")[0]
-        answer = "".join([c for c in answer if c.isdigit()])
-        answer = int(answer)
+        answer_token = [token for token in answer.split() if any(c.isdigit() for c in token)][-1]
+        answer_token = answer_token.split(".")[0]
+        answer_digits = "".join(c for c in answer_token if c.isdigit())
+        parsed_answer = int(answer_digits)
 
     except (ValueError, IndexError):
-        answer = 0
+        parsed_answer = 0
 
-    return answer
+    return parsed_answer
 
 
 def gsm8k_metric(gold: HasAnswer, pred: HasAnswer, trace: object | None = None) -> bool:

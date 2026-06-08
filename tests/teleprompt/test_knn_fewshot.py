@@ -52,7 +52,7 @@ def _test_knn_few_shot_compile(setup_knn_few_shot):
     teacher = SimpleModule("input -> output")  # Assuming teacher uses the same module type
 
     # Setup DummyLM with a response for a query similar to one of the training examples
-    lm = DummyLM(["Madrid", "10"])
+    lm = DummyLM(["Madrid", "10"])  # ty:ignore[invalid-argument-type]
     settings.configure(lm=lm)  # Responses for the capital of Spain and the result of 5+5)
 
     knn_few_shot = setup_knn_few_shot

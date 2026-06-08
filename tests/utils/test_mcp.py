@@ -5,7 +5,7 @@ import pytest
 
 from dspy.utils.mcp import convert_mcp_tool
 
-if importlib.util.find_spec("mcp") is None:
+if importlib.util.find_spec("mcp") is None:  # ty:ignore[possibly-missing-submodule]
     pytest.skip("mcp is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 
 
@@ -33,7 +33,7 @@ async def test_convert_mcp_tool():
             "a": "No description provided. (Required)",
             "b": "No description provided. (Required)",
         }
-        assert await add_tool.acall(a=1, b=2) == "3"
+        assert await add_tool.acall(a=1, b=2) == "3"  # ty:ignore[invalid-await]
 
         # Check hello
         hello_tool = convert_mcp_tool(session, response.tools[1])
@@ -42,7 +42,7 @@ async def test_convert_mcp_tool():
         assert hello_tool.args == {"names": {"title": "Names", "type": "array", "items": {"type": "string"}}}
         assert hello_tool.arg_types == {"names": list}
         assert hello_tool.arg_desc == {"names": "No description provided. (Required)"}
-        assert await hello_tool.acall(names=["Bob", "Tom"]) == ["Hello, Bob!", "Hello, Tom!"]
+        assert await hello_tool.acall(names=["Bob", "Tom"]) == ["Hello, Bob!", "Hello, Tom!"]  # ty:ignore[invalid-await]
 
         # Check error handling
         error_tool = convert_mcp_tool(session, response.tools[2])
@@ -51,7 +51,7 @@ async def test_convert_mcp_tool():
         with pytest.raises(
             RuntimeError, match="Failed to call a MCP tool: Error executing tool wrong_tool: error!"
         ):
-            await error_tool.acall()
+            await error_tool.acall()  # ty:ignore[invalid-await]
 
         # Check nested Pydantic arg
         nested_pydantic_tool = convert_mcp_tool(session, response.tools[3])
@@ -84,7 +84,7 @@ async def test_convert_mcp_tool():
             },
             "account_id": "123",
         }
-        result = await nested_pydantic_tool.acall(account=account_in_json)
+        result = await nested_pydantic_tool.acall(account=account_in_json)  # ty:ignore[invalid-await]
         assert result == "Bob"
 
         # Check no input parameter current_datetime tool
@@ -94,4 +94,4 @@ async def test_convert_mcp_tool():
         assert current_datetime_tool.args == {}
         assert current_datetime_tool.arg_types == {}
         assert current_datetime_tool.arg_desc == {}
-        assert await current_datetime_tool.acall() == "2025-07-23T09:10:10.0+00:00"
+        assert await current_datetime_tool.acall() == "2025-07-23T09:10:10.0+00:00"  # ty:ignore[invalid-await]

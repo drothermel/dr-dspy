@@ -1,4 +1,6 @@
 import random
+from collections.abc import Sequence
+from typing import overload, cast
 
 from dspy.datasets.dataset import Dataset
 
@@ -145,8 +147,24 @@ all_colors = [
 
 
 class Colors(Dataset):
-    def __init__(self, sort_by_suffix: bool = True, *args: object, **kwargs: object) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        sort_by_suffix: bool = True,
+        train_seed: int = 0,
+        train_size: int | None = None,
+        eval_seed: int = 0,
+        dev_size: int | None = None,
+        test_size: int | None = None,
+        input_keys: list[str] | None = None,
+    ) -> None:
+        super().__init__(
+            train_seed=train_seed,
+            train_size=train_size,
+            eval_seed=eval_seed,
+            dev_size=dev_size,
+            test_size=test_size,
+            input_keys=input_keys,
+        )
 
         self.sort_by_suffix = sort_by_suffix
         colors = self.sorted_by_suffix(all_colors)
@@ -156,19 +174,28 @@ class Colors(Dataset):
         )  # chosen to ensure that similar colors aren't repeated between train and dev
         train_colors, dev_colors = colors[:train_size], colors[train_size:]
 
-        self._train = [{"color": color} for color in train_colors]
-        self._dev = [{"color": color} for color in dev_colors]
+        train_rows = [{"color": color} for color in train_colors]
+        dev_rows = [{"color": color} for color in dev_colors]
+        self._train = train_rows
+        self._dev = dev_rows
 
-        random.Random(0).shuffle(self._train)
-        random.Random(0).shuffle(self._dev)
+        random.Random(0).shuffle(train_rows)
+        random.Random(0).shuffle(dev_rows)
 
-    def sorted_by_suffix(self, colors: list[str] | list[dict[str, str]]) -> list[str] | list[dict[str, str]]:
+    @overload
+    def sorted_by_suffix(self, colors: Sequence[str]) -> list[str]: ...
+
+    @overload
+    def sorted_by_suffix(self, colors: Sequence[dict[str, str]]) -> list[dict[str, str]]: ...
+
+    def sorted_by_suffix(self, colors: Sequence[str] | Sequence[dict[str, str]]) -> list[str] | list[dict[str, str]]:
         if not self.sort_by_suffix:
-            return colors
+            return cast(list[str] | list[dict[str, str]], list(colors))
+
+        if not colors:
+            return cast(list[str] | list[dict[str, str]], list(colors))
 
         if isinstance(colors[0], str):
-            sorted_colors = sorted(colors, key=lambda x: x[::-1])
+            return cast(list[str], sorted(colors, key=lambda x: x[::-1]))
         else:
-            sorted_colors = sorted(colors, key=lambda x: x["color"][::-1])
-
-        return sorted_colors
+            return cast(list[dict[str, str]], sorted(colors, key=lambda x: x["color"][::-1]))

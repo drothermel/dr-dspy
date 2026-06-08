@@ -220,7 +220,7 @@ def test_xml_adapter_formats_nested_images():
 
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = XMLAdapter()
-    messages = adapter.format(MySignature, demos, {"image": image_wrapper_2})
+    messages = adapter.format(MySignature, demos, {"image": image_wrapper_2})  # ty:ignore[invalid-argument-type]
 
     assert len(messages) == 4
 

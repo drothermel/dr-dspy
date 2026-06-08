@@ -29,8 +29,8 @@ from dspy.utils.saving import load
 
 
 def test_deepcopy_basic():
-    signature = Signature("q -> a")
-    cot = ChainOfThought(signature)
+    signature = Signature("q -> a")  # ty:ignore[too-many-positional-arguments]
+    cot = ChainOfThought(signature)  # ty:ignore[invalid-argument-type]
     cot_copy = cot.deepcopy()
     assert len(cot.parameters()) == len(cot_copy.parameters())
     # Parameters should be different objects with the same values.
@@ -42,7 +42,7 @@ def test_deepcopy_with_uncopyable_modules():
     class CustomClass(Module):
         def __init__(self):
             self.lock = threading.Lock()  # Non-copyable object.
-            self.cot = ChainOfThought(Signature("q -> a"))
+            self.cot = ChainOfThought(Signature("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
 
     model = CustomClass()
     model_copy = model.deepcopy()
@@ -58,7 +58,7 @@ def test_deepcopy_with_nested_modules():
     class CustomClass1(Module):
         def __init__(self):
             self.lock = threading.Lock()  # Non-copyable object.
-            self.cot = ChainOfThought(Signature("q -> a"))
+            self.cot = ChainOfThought(Signature("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
 
     class CustomClass2(Module):
         def __init__(self):
@@ -75,8 +75,8 @@ def test_deepcopy_with_nested_modules():
 
 
 def test_save_and_load_with_json(tmp_path):
-    model = ChainOfThought(Signature("q -> a"))
-    model.predict.signature = model.predict.signature.with_instructions("You are a helpful assistant.")
+    model = ChainOfThought(Signature("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
+    model.predict.signature = model.predict.signature.with_instructions("You are a helpful assistant.")  # ty:ignore[unresolved-attribute]
     model.predict.demos = [
         Example(q="What is the capital of France?", a="Paris", reasoning="n/a").with_inputs("q"),
         # Nested example
@@ -91,7 +91,7 @@ def test_save_and_load_with_json(tmp_path):
     ]
     save_path = tmp_path / "model.json"
     model.save(save_path)
-    new_model = ChainOfThought(Signature("q -> a"))
+    new_model = ChainOfThought(Signature("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
     new_model.load(save_path)
 
     assert str(new_model.predict.signature) == str(model.predict.signature)
@@ -166,7 +166,7 @@ class MyModule(Module):
     # Add the tmp_path to Python path so we can import the module
     sys.path.insert(0, str(tmp_path))
     try:
-        import custom_module
+        import custom_module  # ty:ignore[unresolved-import]
 
         cot = custom_module.MyModule()
 
@@ -182,7 +182,7 @@ class MyModule(Module):
             load(tmp_path, allow_pickle=True)
 
         sys.path.insert(0, str(tmp_path))
-        import custom_module
+        import custom_module  # ty:ignore[unresolved-import]
 
         cot.save(
             tmp_path,

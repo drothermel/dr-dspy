@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 import queue
 import random
 from pathlib import Path
@@ -27,7 +28,6 @@ def env_worker(inq: MessageQueue, outq: MessageQueue) -> None:
         import io
         from contextlib import redirect_stderr, redirect_stdout
 
-        import alfworld.agents.environment as environment
         import yaml
     except ImportError as err:
         raise ImportError(
@@ -37,6 +37,7 @@ def env_worker(inq: MessageQueue, outq: MessageQueue) -> None:
 
     buf = io.StringIO()
     config_path = Path(__file__).resolve().parent / "base_config.yml"
+    environment = importlib.import_module("alfworld.agents.environment")
 
     with config_path.open() as f:
         config = yaml.safe_load(f)
@@ -46,7 +47,10 @@ def env_worker(inq: MessageQueue, outq: MessageQueue) -> None:
 
     env = None
     while True:
-        cmd, data = inq.get()
+        message = inq.get()
+        if not isinstance(message, tuple) or len(message) != 2:
+            raise TypeError(f"Invalid message received by env worker: {message!r}")
+        cmd, data = message
         if cmd == "init":
             env = base_env.init_env(batch_size=1)
             env.skip(data)
@@ -81,15 +85,15 @@ class EnvPool:
         self.available = queue.Queue()
 
         try:
-            import multiprocess as mp
+            mp = importlib.import_module("multiprocess")
         except ImportError as err:
             raise ImportError("multiprocess is not installed. " "Please install it via `pip install multiprocess`.") from err
 
         # Must call set_start_method('spawn') here, before creating any processes
         with contextlib.suppress(RuntimeError):
-            mp.set_start_method("spawn", force=True)
+            getattr(mp, "set_start_method")("spawn", force=True)
 
-        ctx = mp.get_context("spawn")
+        ctx = getattr(mp, "get_context")("spawn")
         for i in range(size):
             inq = ctx.Queue()
             outq = ctx.Queue()

@@ -29,7 +29,7 @@ class DSPyTestModel(CustomLLM):
         }
         return generic_streaming_chunk  # type: ignore
 
-    async def astreaming(self, *args: object, **kwargs: object) -> AsyncIterator[GenericStreamingChunk]:
+    async def astreaming(self, *args: object, **kwargs: object) -> AsyncIterator[GenericStreamingChunk]:  # ty:ignore[invalid-method-override]
         generic_streaming_chunk: GenericStreamingChunk = {
             "finish_reason": "stop",
             "index": 0,

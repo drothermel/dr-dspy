@@ -24,7 +24,7 @@ def clear_settings(tmp_path: Path) -> Iterator[None]:
     """Ensure each test gets fresh DSPy settings and an isolated cache."""
 
     original_cache = dspy_clients.DSPY_CACHE
-    dspy_clients.configure_cache(disk_cache_dir=tmp_path / ".dspy_cache")
+    dspy_clients.configure_cache(disk_cache_dir=tmp_path / ".dspy_cache")  # ty:ignore[invalid-argument-type]
     try:
         yield
     finally:

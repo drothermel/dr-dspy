@@ -53,12 +53,12 @@ class _Outer:
 
 
 def _allowed_for(*types: object):
-    return frozenset((cls.__module__, cls.__qualname__) for cls in types)
+    return frozenset((cls.__module__, cls.__qualname__) for cls in types)  # ty:ignore[unresolved-attribute]
 
 
 def _roundtrip(value, allowed=None):
     """Pickle then restricted-unpickle."""
-    return _restricted_load(io.BytesIO(pickle.dumps(value)), allowed or set())
+    return _restricted_load(io.BytesIO(pickle.dumps(value)), allowed or set())  # ty:ignore[invalid-argument-type]
 
 
 # -- roundtrip tests (through diskcache) --
@@ -112,7 +112,7 @@ def _assert_cached_tool_call_normalizes(directory):
     assert part.name == "get_weather"
     assert part.args == {"city": "SF"}
     assert part.provider_data["function"]["name"] == "get_weather"
-    assert lm_response.usage.total_tokens == 3
+    assert lm_response.usage.total_tokens == 3  # ty:ignore[unresolved-attribute]
 
 
 def _write_responses_function_call_cache(directory):
@@ -161,7 +161,7 @@ def _assert_cached_responses_function_call_normalizes(directory):
     assert part.name == "get_weather"
     assert part.args == {"city": "SF"}
     assert part.provider_data["call_id"] == "call_1"
-    assert lm_response.usage.total_tokens == 3
+    assert lm_response.usage.total_tokens == 3  # ty:ignore[unresolved-attribute]
 
 
 _SUBPROCESS_CASES = {
@@ -236,7 +236,7 @@ def test_embedding_response_roundtrip(tmp_path):
     cache = _make_cache(str(tmp_path), set())
     response = EmbeddingResponse(
         data=[{"embedding": [0.1, 0.2], "index": 0, "object": "embedding"}],
-        model="m", usage={"prompt_tokens": 1, "total_tokens": 1},
+        model="m", usage={"prompt_tokens": 1, "total_tokens": 1},  # ty:ignore[invalid-argument-type]
     )
     cache["k"] = response
     result = cache["k"]
@@ -354,7 +354,7 @@ def test_numpy_ctypeslib_blocked():
         b"."                            # STOP
     )
     with pytest.raises(DeserializationError):
-        _restricted_load(io.BytesIO(payload), set())
+        _restricted_load(io.BytesIO(payload), set())  # ty:ignore[invalid-argument-type]
 
 
 # -- _restricted_load unit tests --
@@ -362,7 +362,7 @@ def test_numpy_ctypeslib_blocked():
 def test_restricted_load_rejects_unknown_type():
     data = pickle.dumps(_UnlistedModel(value=1))
     with pytest.raises(DeserializationError, match="not in the safe_types allowlist"):
-        _restricted_load(io.BytesIO(data), set())
+        _restricted_load(io.BytesIO(data), set())  # ty:ignore[invalid-argument-type]
 
 
 def test_corrupt_pickle_raises_deserialization_error():
@@ -370,7 +370,7 @@ def test_corrupt_pickle_raises_deserialization_error():
     data = pickle.dumps({"key": "value"})
     corrupted = data[:5] + b"nope" + data[9:]
     with pytest.raises(DeserializationError, match="Corrupt cache entry"):
-        _restricted_load(io.BytesIO(corrupted), set())
+        _restricted_load(io.BytesIO(corrupted), set())  # ty:ignore[invalid-argument-type]
 
 
 def test_nested_class_safe_types(tmp_path):
@@ -400,7 +400,7 @@ def test_all_cached_lm_types_roundtrip():
         ),
         EmbeddingResponse(
             data=[{"embedding": [0.1], "index": 0, "object": "embedding"}],
-            model="m", usage={"prompt_tokens": 1, "total_tokens": 1},
+            model="m", usage={"prompt_tokens": 1, "total_tokens": 1},  # ty:ignore[invalid-argument-type]
         ),
     ]
     for value in test_values:

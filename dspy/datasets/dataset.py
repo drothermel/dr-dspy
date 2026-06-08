@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from dspy.dsp.utils.utils import dotdict
 from dspy.primitives.example import Example
@@ -28,6 +28,12 @@ class Dataset:
         self.test_size = test_size
         self.test_seed = eval_seed
         self.input_keys = input_keys or []
+        self._train: list[dict[str, object]] | list[dict[str, str]] | list[Example] | None = None
+        self._dev: list[dict[str, object]] | list[dict[str, str]] | list[Example] | None = None
+        self._test: list[dict[str, object]] | list[dict[str, str]] | list[Example] | None = None
+        self._train_cache: list[Example] | None = None
+        self._dev_cache: list[Example] | None = None
+        self._test_cache: list[Example] | None = None
 
         self.do_shuffle = True
 
@@ -48,35 +54,51 @@ class Dataset:
         self.test_size = test_size or self.test_size
         self.test_seed = eval_seed or self.test_seed
 
-        if hasattr(self, "_train_"):
-            del self._train_
-
-        if hasattr(self, "_dev_"):
-            del self._dev_
-
-        if hasattr(self, "_test_"):
-            del self._test_
+        self._train_cache = None
+        self._dev_cache = None
+        self._test_cache = None
 
     @property
     def train(self) -> list[Example]:
-        if not hasattr(self, "_train_"):
-            self._train_ = self._shuffle_and_sample("train", self._train, self.train_size, self.train_seed)
+        if self._train_cache is None:
+            if self._train is None:
+                raise ValueError("Train split has not been initialized.")
+            self._train_cache = self._shuffle_and_sample(
+                "train",
+                cast("Iterable[dict[str, object]]", self._train),
+                self.train_size,
+                self.train_seed,
+            )
 
-        return self._train_
+        return self._train_cache
 
     @property
     def dev(self) -> list[Example]:
-        if not hasattr(self, "_dev_"):
-            self._dev_ = self._shuffle_and_sample("dev", self._dev, self.dev_size, self.dev_seed)
+        if self._dev_cache is None:
+            if self._dev is None:
+                raise ValueError("Dev split has not been initialized.")
+            self._dev_cache = self._shuffle_and_sample(
+                "dev",
+                cast("Iterable[dict[str, object]]", self._dev),
+                self.dev_size,
+                self.dev_seed,
+            )
 
-        return self._dev_
+        return self._dev_cache
 
     @property
     def test(self) -> list[Example]:
-        if not hasattr(self, "_test_"):
-            self._test_ = self._shuffle_and_sample("test", self._test, self.test_size, self.test_seed)
+        if self._test_cache is None:
+            if self._test is None:
+                raise ValueError("Test split has not been initialized.")
+            self._test_cache = self._shuffle_and_sample(
+                "test",
+                cast("Iterable[dict[str, object]]", self._test),
+                self.test_size,
+                self.test_seed,
+            )
 
-        return self._test_
+        return self._test_cache
 
     def _shuffle_and_sample(
         self, split: str, data: Iterable[dict[str, object]], size: int | None, seed: int = 0

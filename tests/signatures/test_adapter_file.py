@@ -159,14 +159,14 @@ def test_file_str():
 def test_encode_file_to_dict_from_path(sample_text_file):
     result = encode_file_to_dict(sample_text_file)
     assert "file_data" in result
-    assert result["file_data"].startswith("data:text/plain;base64,")
+    assert result["file_data"].startswith("data:text/plain;base64,")  # ty:ignore[unresolved-attribute]
     assert "filename" in result
 
 
 def test_encode_file_to_dict_from_bytes():
     result = encode_file_to_dict(b"test content")
     assert "file_data" in result
-    assert result["file_data"].startswith("data:application/octet-stream;base64,")
+    assert result["file_data"].startswith("data:application/octet-stream;base64,")  # ty:ignore[unresolved-attribute]
 
 
 def test_invalid_file_string():
@@ -176,7 +176,7 @@ def test_invalid_file_string():
 
 def test_invalid_dict():
     with pytest.raises(ValueError, match="must contain at least one"):
-        File(invalid="dict")
+        File(invalid="dict")  # ty:ignore[unknown-argument]
 
 
 def test_file_in_signature(sample_text_file):
@@ -264,12 +264,12 @@ def test_file_path_not_found():
 
 def test_file_custom_mime_type(sample_text_file):
     file_obj = File.from_path(sample_text_file, mime_type="text/custom")
-    assert file_obj.file_data.startswith("data:text/custom;base64,")
+    assert file_obj.file_data.startswith("data:text/custom;base64,")  # ty:ignore[unresolved-attribute]
 
 
 def test_file_from_bytes_custom_mime():
     file_obj = File.from_bytes(b"audio data", mime_type="audio/mp3")
-    assert file_obj.file_data.startswith("data:audio/mp3;base64,")
+    assert file_obj.file_data.startswith("data:audio/mp3;base64,")  # ty:ignore[unresolved-attribute]
 
 
 def test_file_data_uri_in_format():

@@ -10,7 +10,7 @@ def test_grpo_dataset_shuffler():
 
     trainset_instances = []
     for i in range(4):
-        trainset_instances.append(grpo.select_training_sample_and_update_shuffled_trainset(dataset, i))
+        trainset_instances.append(grpo.select_training_sample_and_update_shuffled_trainset(dataset, i))  # ty:ignore[invalid-argument-type]
         assert len(trainset_instances[-1]) == 3
         assert set(trainset_instances[-1]) == set(dataset)
 
@@ -24,7 +24,7 @@ def test_grpo_dataset_shuffler_with_num_ex_per_step_less_dataset():
 
     trainset_instances = []
     for i in range(15):
-        trainset_instances.append(grpo.select_training_sample_and_update_shuffled_trainset(dataset, i))
+        trainset_instances.append(grpo.select_training_sample_and_update_shuffled_trainset(dataset, i))  # ty:ignore[invalid-argument-type]
         assert len(trainset_instances[-1]) == 2
 
     from collections import Counter
@@ -47,7 +47,7 @@ def test_grpo_dataset_shuffler_with_num_ex_per_step_greater_dataset():
 
     trainset_instances = []
     for i in range(6):
-        trainset_instances.append(grpo.select_training_sample_and_update_shuffled_trainset(dataset, i))
+        trainset_instances.append(grpo.select_training_sample_and_update_shuffled_trainset(dataset, i))  # ty:ignore[invalid-argument-type]
         assert len(trainset_instances[-1]) == 5
 
     from collections import Counter

@@ -28,7 +28,7 @@ def test_basic_workflow():
         [
             "Initial thoughts",
             "Finish[blue]",  # Expected output for both training and validation
-        ]
+        ]  # ty:ignore[invalid-argument-type]
     )
     settings.configure(lm=lm)
 

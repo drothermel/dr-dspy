@@ -14,7 +14,7 @@ from dspy.clients.lm import LM
 from dspy.dsp.utils.settings import settings
 
 try:
-    from databricks.sdk import WorkspaceClient
+    from databricks.sdk import WorkspaceClient  # ty:ignore[unresolved-import]
 
     WorkspaceClient()
 except (ImportError, Exception):
@@ -23,7 +23,7 @@ except (ImportError, Exception):
 
 
 def test_create_directory_in_databricks_unity_catalog():
-    from databricks.sdk import WorkspaceClient
+    from databricks.sdk import WorkspaceClient  # ty:ignore[unresolved-import]
 
     w = WorkspaceClient()
 
@@ -70,7 +70,7 @@ def test_create_finetuning_job():
         job=job,
         model="meta-llama/Llama-3.2-1B",
         train_data=fake_training_data,
-        data_format="chat",
+        data_format="chat",  # ty:ignore[unknown-argument]
         train_kwargs={
             "train_data_path": "/Volumes/main/chenmoney/testing/dspy_testing",
             "register_to": "main.chenmoney.finetuned_model",
@@ -78,7 +78,7 @@ def test_create_finetuning_job():
             "skip_deploy": True,
         },
     )
-    assert job.finetuning_run.status.display_name is not None
+    assert job.finetuning_run.status.display_name is not None  # ty:ignore[unresolved-attribute]
 
 
 def test_deploy_finetuned_model():
@@ -87,7 +87,7 @@ def test_deploy_finetuned_model():
 
     DatabricksProvider.deploy_finetuned_model(
         model=model_to_deploy,
-        data_format="chat",
+        data_format="chat",  # ty:ignore[invalid-argument-type]
     )
 
     lm = LM(model="databricks/main_chenmoney_finetuned_model")

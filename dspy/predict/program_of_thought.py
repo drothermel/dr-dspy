@@ -38,11 +38,14 @@ class ProgramOfThought(Module):
             interpreter: PythonInterpreter instance to use. If None, a new one is instantiated.
         """
         super().__init__()
-        self.signature = signature = ensure_signature(signature)
+        resolved_signature = ensure_signature(signature)
+        if resolved_signature is None:
+            raise ValueError(f"Invalid signature: {signature!r}")
+        self.signature: type[Signature] = resolved_signature
         self.max_iters = max_iters
 
-        self.input_fields = signature.input_fields
-        self.output_fields = signature.output_fields
+        self.input_fields = resolved_signature.input_fields
+        self.output_fields = resolved_signature.output_fields
 
         self.code_generate = ChainOfThought(
             Signature(

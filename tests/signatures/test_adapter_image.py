@@ -159,7 +159,7 @@ def test_image_input_formats(
     actual_input = input_map[image_input]
     # TODO: Support PIL/base64 inputs without requiring callers to pre-coerce them to Image, then remove this xfail.
     if image_input in ["pil_image", "encoded_pil_image"]:
-        pytest.xfail(f"{description} not fully supported without Image coercion")
+        pytest.xfail(f"{description} not fully supported without Image coercion")  # ty:ignore[too-many-positional-arguments]
 
     result = predictor(image=actual_input, class_labels=["dog", "cat", "bird"])
     assert result.probabilities == expected["probabilities"]

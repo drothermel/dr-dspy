@@ -131,17 +131,17 @@ class TestRLMInitialization:
         assert rlm.generate_action is not None
         assert rlm.extract is not None
         assert rlm.tools == {}  # No user tools provided
-        assert "context" in rlm.signature.input_fields
-        assert "query" in rlm.signature.input_fields
-        assert "answer" in rlm.signature.output_fields
+        assert "context" in rlm.signature.input_fields  # ty:ignore[unresolved-attribute]
+        assert "query" in rlm.signature.input_fields  # ty:ignore[unresolved-attribute]
+        assert "answer" in rlm.signature.output_fields  # ty:ignore[unresolved-attribute]
 
     def test_custom_signature(self):
         """Test RLM with custom signature."""
         rlm = RLM("document, question -> summary, key_facts", max_iterations=5)
-        assert "document" in rlm.signature.input_fields
-        assert "question" in rlm.signature.input_fields
-        assert "summary" in rlm.signature.output_fields
-        assert "key_facts" in rlm.signature.output_fields
+        assert "document" in rlm.signature.input_fields  # ty:ignore[unresolved-attribute]
+        assert "question" in rlm.signature.input_fields  # ty:ignore[unresolved-attribute]
+        assert "summary" in rlm.signature.output_fields  # ty:ignore[unresolved-attribute]
+        assert "key_facts" in rlm.signature.output_fields  # ty:ignore[unresolved-attribute]
 
     def test_custom_tools(self):
         """Test RLM with custom tools."""
@@ -184,7 +184,7 @@ class TestRLMInitialization:
             return "result"
 
         with pytest.raises(TypeError, match="tools must be a list, not a dict"):
-            RLM("context -> answer", tools={"my_tool": my_tool})
+            RLM("context -> answer", tools={"my_tool": my_tool})  # ty:ignore[invalid-argument-type]
 
     def test_optional_parameters(self):
         """Test RLM optional parameters and their defaults."""
@@ -327,7 +327,7 @@ class TestRLMFormatting:
         """Test action signature includes iteration input field."""
         rlm = RLM("context -> answer")
         action_sig = rlm.generate_action.signature
-        assert "iteration" in action_sig.input_fields
+        assert "iteration" in action_sig.input_fields  # ty:ignore[unresolved-attribute]
 
     def test_format_output(self):
         """Test output formatting."""
@@ -625,13 +625,13 @@ class TestRLMDynamicSignature:
         action_sig = rlm.generate_action.signature
 
         # Required input/output fields
-        assert "variables_info" in action_sig.input_fields
-        assert "repl_history" in action_sig.input_fields
-        assert "reasoning" in action_sig.output_fields
-        assert "code" in action_sig.output_fields
+        assert "variables_info" in action_sig.input_fields  # ty:ignore[unresolved-attribute]
+        assert "repl_history" in action_sig.input_fields  # ty:ignore[unresolved-attribute]
+        assert "reasoning" in action_sig.output_fields  # ty:ignore[unresolved-attribute]
+        assert "code" in action_sig.output_fields  # ty:ignore[unresolved-attribute]
 
         # Instructions mention key tools and variables
-        instructions = action_sig.instructions
+        instructions = action_sig.instructions  # ty:ignore[unresolved-attribute]
         assert "llm_query" in instructions
         assert "llm_query_batched" in instructions
         assert "SUBMIT" in instructions
@@ -644,11 +644,11 @@ class TestRLMDynamicSignature:
         """Test extract signature has required fields for all outputs."""
         rlm = RLM("document, question -> summary, key_facts, confidence")
         extract_sig = rlm.extract.signature
-        assert "variables_info" in extract_sig.input_fields
-        assert "repl_history" in extract_sig.input_fields
-        assert "summary" in extract_sig.output_fields
-        assert "key_facts" in extract_sig.output_fields
-        assert "confidence" in extract_sig.output_fields
+        assert "variables_info" in extract_sig.input_fields  # ty:ignore[unresolved-attribute]
+        assert "repl_history" in extract_sig.input_fields  # ty:ignore[unresolved-attribute]
+        assert "summary" in extract_sig.output_fields  # ty:ignore[unresolved-attribute]
+        assert "key_facts" in extract_sig.output_fields  # ty:ignore[unresolved-attribute]
+        assert "confidence" in extract_sig.output_fields  # ty:ignore[unresolved-attribute]
 
 
 # ============================================================================
@@ -767,7 +767,7 @@ print(f"Sum: {sum_result}, Product: {prod_result}")
             items = items or []
             return [f"processed_{item}" for item in items]
 
-        with PythonInterpreter(tools={"batch_process": batch_process}) as interp:
+        with PythonInterpreter(tools={"batch_process": batch_process}) as interp:  # ty:ignore[invalid-argument-type]
             result = interp.execute("""
 results = batch_process(items=["a", "b", "c"])
 print(f"Type: {type(results).__name__}")
@@ -784,7 +784,7 @@ print(f"All: {results}")
         def get_info() -> dict:
             return {"name": "test", "count": 42}
 
-        with PythonInterpreter(tools={"get_info": get_info}) as interp:
+        with PythonInterpreter(tools={"get_info": get_info}) as interp:  # ty:ignore[invalid-argument-type]
             result = interp.execute("""
 info = get_info()
 print(f"Type: {type(info).__name__}")

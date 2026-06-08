@@ -204,7 +204,7 @@ except Exception as e:
 def test_tools_dict_is_copied():
     """Test that tools dict is defensively copied, not stored by reference."""
     tools = {"my_tool": lambda: "result"}
-    sandbox = PythonInterpreter(tools=tools)
+    sandbox = PythonInterpreter(tools=tools)  # ty:ignore[invalid-argument-type]
 
     # Modify the original dict after construction
     tools["new_tool"] = lambda: "new"
@@ -240,7 +240,7 @@ def test_serialize_set_mixed_types():
 def test_deno_command_dict_raises_type_error():
     """Test that passing a dict as deno_command raises TypeError."""
     with pytest.raises(TypeError, match="deno_command must be a list"):
-        PythonInterpreter(deno_command={"invalid": "dict"})
+        PythonInterpreter(deno_command={"invalid": "dict"})  # ty:ignore[invalid-argument-type]
 
 
 # =============================================================================
@@ -384,7 +384,7 @@ def test_tool_async_def_function():
         await asyncio.sleep(0)
         return f"answer:{query}"
 
-    with PythonInterpreter(tools={"slow_search": slow_search}) as sandbox:
+    with PythonInterpreter(tools={"slow_search": slow_search}) as sandbox:  # ty:ignore[invalid-argument-type]
         result = sandbox.execute("slow_search(query='hello')")
         assert result == "answer:hello"
 
@@ -396,7 +396,7 @@ def test_tool_async_def_raises_propagates():
         await asyncio.sleep(0)
         raise ValueError(f"boom:{x}")
 
-    with PythonInterpreter(tools={"failing_async": failing_async}) as sandbox:
+    with PythonInterpreter(tools={"failing_async": failing_async}) as sandbox:  # ty:ignore[invalid-argument-type]
         result = sandbox.execute(
             "try:\n"
             "    failing_async(7)\n"
@@ -483,7 +483,7 @@ def test_submit_wrong_arg_count():
 def test_extract_parameters():
     """Test that _extract_parameters correctly extracts function signatures."""
 
-    def example_fn(required: str, optional: int = 5, untyped=None) -> str:
+    def example_fn(required: str, optional: int = 5, untyped=None) -> str:  # ty:ignore[empty-body]
         pass
 
     sandbox = PythonInterpreter()
@@ -498,7 +498,7 @@ def test_extract_parameters():
 def test_extract_parameters_complex_types():
     """Test that _extract_parameters handles complex types gracefully."""
 
-    def complex_fn(items: list | None = None, data: dict[str, int] | None = None) -> list:
+    def complex_fn(items: list | None = None, data: dict[str, int] | None = None) -> list:  # ty:ignore[empty-body]
         pass
 
     sandbox = PythonInterpreter()

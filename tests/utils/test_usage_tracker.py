@@ -132,7 +132,7 @@ def test_track_usage_with_multiple_models():
     ]
 
     for entry in usage_entries:
-        tracker.add_usage(entry["model"], entry["usage"])
+        tracker.add_usage(entry["model"], entry["usage"])  # ty:ignore[invalid-argument-type]
 
     total_usage = tracker.get_total_tokens()
     assert "gpt-4o-mini" in total_usage
@@ -226,7 +226,7 @@ def test_merge_usage_entries_with_none_values():
     ]
 
     for entry in usage_entries:
-        tracker.add_usage(entry["model"], entry["usage"])
+        tracker.add_usage(entry["model"], entry["usage"])  # ty:ignore[invalid-argument-type]
 
     total_usage = tracker.get_total_tokens()
 
@@ -325,7 +325,7 @@ def test_merge_usage_entries_with_pydantic_models():
     ]
 
     for entry in usage_entries:
-        tracker.add_usage(entry["model"], entry["usage"])
+        tracker.add_usage(entry["model"], entry["usage"])  # ty:ignore[invalid-argument-type]
 
     total_usage = tracker.get_total_tokens()
 

@@ -102,7 +102,7 @@ class Citations(Type):
     citations: list[Citation]
 
     @classmethod
-    def from_dict_list(cls, citations_dicts: list[dict[str, Any]]) -> Citations:  # ty: ignore[invalid-type-form]
+    def from_dict_list(cls, citations_dicts: list[dict[str, Any]]) -> Citations:
         """Convert a list of dictionaries to a Citations instance.
 
         Args:

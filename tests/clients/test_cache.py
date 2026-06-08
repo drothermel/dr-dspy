@@ -125,7 +125,7 @@ def test_invalid_cache_initialization():
             enable_memory_cache=True,
             disk_cache_dir="",
             disk_size_limit_bytes=0,
-            memory_max_entries=None,
+            memory_max_entries=None,  # ty:ignore[invalid-argument-type]
         )
 
 
@@ -548,5 +548,5 @@ def test_safe_types_rejects_non_types(tmp_path):
             enable_memory_cache=False,
             disk_cache_dir=str(tmp_path),
             restrict_pickle=True,
-            safe_types=["not_a_type"],
+            safe_types=["not_a_type"],  # ty:ignore[invalid-argument-type]
         )

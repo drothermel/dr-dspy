@@ -25,10 +25,10 @@ def test_tool_observation_preserves_custom_type():
     class SpyChatAdapter(ChatAdapter):
         def format_user_message_content(self, signature, inputs, *args: object, **kwargs: object):
             captured_calls.append((signature, dict(inputs)))
-            return super().format_user_message_content(signature, inputs, *args, **kwargs)
+            return super().format_user_message_content(signature, inputs, *args, **kwargs)  # ty:ignore[invalid-argument-type]
 
     def make_images():
-        return Image("https://example.com/test.png"), Image(Image.new("RGB", (100, 100), "red"))
+        return Image("https://example.com/test.png"), Image(Image.new("RGB", (100, 100), "red"))  # ty:ignore[call-non-callable]
 
 
     adapter = SpyChatAdapter()
@@ -50,7 +50,7 @@ def test_tool_observation_preserves_custom_type():
     )
     settings.configure(lm=lm, adapter=adapter)
 
-    react = ReAct("question -> answer", tools=[make_images])
+    react = ReAct("question -> answer", tools=[make_images])  # ty:ignore[invalid-argument-type]
     react(question="Draw me something red")
 
     sigs_with_obs = [sig for sig, inputs in captured_calls if "observation_0" in inputs]
@@ -147,7 +147,7 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
         process_result: str = OutputField()
 
     react = ReAct(CustomerService, tools=[get_user_info])
-    problem_annotation = react.react.signature.output_fields["next_tool_args"].annotation
+    problem_annotation = react.react.signature.output_fields["next_tool_args"].annotation  # ty:ignore[unresolved-attribute]
 
     def guarded_issubclass(cls, class_or_tuple):
         if cls == problem_annotation:
@@ -189,7 +189,7 @@ def test_tool_calling_without_typehint():
         """Add two numbers."""
         return a + b
 
-    react = ReAct("a, b -> c:int", tools=[foo])
+    react = ReAct("a, b -> c:int", tools=[foo])  # ty:ignore[invalid-argument-type]
     lm = DummyLM(
         [
             {"next_thought": "I need to add two numbers.", "next_tool_name": "foo", "next_tool_args": {"a": 1, "b": 2}},
@@ -222,7 +222,7 @@ def test_trajectory_truncation():
         return f"Echoed: {text}"
 
     # Create ReAct instance with our echo tool
-    react = ReAct("input_text -> output_text", tools=[echo])
+    react = ReAct("input_text -> output_text", tools=[echo])  # ty:ignore[invalid-argument-type]
 
     # Mock react.react to simulate multiple tool calls
     call_count = 0
@@ -244,8 +244,8 @@ def test_trajectory_truncation():
         # The 4th call finishes
         return Prediction(next_thought="Final thought", next_tool_name="finish", next_tool_args={})
 
-    react.react = mock_react
-    react.extract = lambda **kwargs: Prediction(output_text="Final output")  # noqa: ARG005
+    react.react = mock_react  # ty:ignore[invalid-assignment]
+    react.extract = lambda **kwargs: Prediction(output_text="Final output")  # noqa: ARG005  # ty:ignore[invalid-assignment]
 
     # Call forward and get the result
     result = react(input_text="test input")
@@ -261,7 +261,7 @@ async def test_context_window_exceeded_after_retries():
     def echo(text: str) -> str:
         return f"Echoed: {text}"
 
-    react = ReAct("input_text -> output_text", tools=[echo])
+    react = ReAct("input_text -> output_text", tools=[echo])  # ty:ignore[invalid-argument-type]
 
     def mock_react(**kwargs: object):
         raise ContextWindowExceededError
@@ -273,8 +273,8 @@ async def test_context_window_exceeded_after_retries():
         extract_calls.append(kwargs)
         return Prediction(output_text="Fallback output")
 
-    react.react = mock_react
-    react.extract = mock_extract
+    react.react = mock_react  # ty:ignore[invalid-assignment]
+    react.extract = mock_extract  # ty:ignore[invalid-assignment]
 
     result = react(input_text="test input")
     assert result.trajectory == {}
@@ -293,7 +293,7 @@ async def test_context_window_exceeded_after_retries():
         async_extract_calls.append(kwargs)
         return Prediction(output_text="Fallback output")
 
-    react.react.acall = mock_react_async
+    react.react.acall = mock_react_async  # ty:ignore[invalid-assignment]
     react.extract.acall = mock_extract_async
 
     result = await react.acall(input_text="test input")
@@ -310,7 +310,7 @@ def test_error_retry():
         raise Exception("tool error")
 
     # --- program under test -------------------------------------------------
-    react = ReAct("a, b -> c:int", tools=[foo])
+    react = ReAct("a, b -> c:int", tools=[foo])  # ty:ignore[invalid-argument-type]
     lm = DummyLM(
         [
             {
@@ -436,7 +436,7 @@ async def test_async_error_retry():
     async def foo(a, b):
         raise Exception("tool error")
 
-    react = ReAct("a, b -> c:int", tools=[foo])
+    react = ReAct("a, b -> c:int", tools=[foo])  # ty:ignore[invalid-argument-type]
     lm = DummyLM(
         [
             {

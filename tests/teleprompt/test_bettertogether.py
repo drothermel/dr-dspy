@@ -57,7 +57,7 @@ class MarkedOptimizer(Teleprompter):
 
     def compile(self, student, **kwargs: object):
         prog = SimpleModule("input -> output")
-        prog.marker = self.marker
+        prog.marker = self.marker  # ty:ignore[unresolved-attribute]
         return prog
 
 
@@ -144,7 +144,7 @@ def test_bettertogether_initialization_invalid_optimizer():
     try:
         BetterTogether(
             metric=simple_metric,
-            p="not_a_teleprompter"  # Invalid type
+            p="not_a_teleprompter"  # Invalid type  # ty:ignore[invalid-argument-type]
         )
         raise AssertionError("Should have raised TypeError for invalid optimizer")
     except TypeError as e:
@@ -503,9 +503,9 @@ def test_strategy_execution_order():
             # Create a new student with a marker to track the optimization path
             optimized = SimpleModule("input -> output")
             if not hasattr(student, "optimization_path"):
-                optimized.optimization_path = [self.name]
+                optimized.optimization_path = [self.name]  # ty:ignore[unresolved-attribute]
             else:
-                optimized.optimization_path = student.optimization_path + [self.name]
+                optimized.optimization_path = student.optimization_path + [self.name]  # ty:ignore[unresolved-attribute]
             execution_log.append((self.name, optimized.optimization_path.copy()))
             return optimized
 
@@ -578,7 +578,7 @@ def test_error_handling_returns_best_program():
     class SuccessfulOptimizer(Teleprompter):
         def compile(self, student, **kwargs: object):
             optimized = SimpleModule("input -> output")
-            optimized.step_name = "p_success"
+            optimized.step_name = "p_success"  # ty:ignore[unresolved-attribute]
             return optimized
 
     class FailingOptimizer(Teleprompter):

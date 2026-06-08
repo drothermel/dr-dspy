@@ -6,13 +6,24 @@ from dspy.datasets.dataset import Dataset
 class HotPotQA(Dataset):
     def __init__(
         self,
-        *args: object,
+        train_seed: int = 0,
+        train_size: int | None = None,
+        eval_seed: int = 0,
+        dev_size: int | None = None,
+        test_size: int | None = None,
+        input_keys: list[str] | None = None,
         only_hard_examples: bool = True,
         keep_details: bool | str = "dev_titles",
         unofficial_dev: bool = True,
-        **kwargs: object,
     ) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__(
+            train_seed=train_seed,
+            train_size=train_size,
+            eval_seed=eval_seed,
+            dev_size=dev_size,
+            test_size=test_size,
+            input_keys=input_keys,
+        )
         if not only_hard_examples:
             raise ValueError(
                 "Care must be taken when adding support for easy examples."
@@ -45,14 +56,16 @@ class HotPotQA(Dataset):
         rng = random.Random(0)
         rng.shuffle(official_train)
 
-        self._train = official_train[: len(official_train) * 75 // 100]
+        train_split = official_train[: len(official_train) * 75 // 100]
+        self._train = train_split
 
         if unofficial_dev:
-            self._dev = official_train[len(official_train) * 75 // 100 :]
+            dev_split = official_train[len(official_train) * 75 // 100 :]
+            self._dev = dev_split
         else:
             self._dev = None
 
-        for example in self._train:
+        for example in train_split:
             if keep_details == "dev_titles":
                 del example["gold_titles"]
 

@@ -48,80 +48,80 @@ def test_all_fields_have_prefix():
         input = InputField(prefix="Modified:")
         output = OutputField()
 
-    assert TestSignature.input_fields["input"].json_schema_extra["prefix"] == "Modified:"
-    assert TestSignature.output_fields["output"].json_schema_extra["prefix"] == "Output:"
+    assert TestSignature.input_fields["input"].json_schema_extra["prefix"] == "Modified:"  # ty:ignore[not-subscriptable]
+    assert TestSignature.output_fields["output"].json_schema_extra["prefix"] == "Output:"  # ty:ignore[not-subscriptable]
 
 
 def test_signature_parsing():
-    signature = Signature("input1, input2 -> output")
-    assert "input1" in signature.input_fields
-    assert "input2" in signature.input_fields
-    assert "output" in signature.output_fields
+    signature = Signature("input1, input2 -> output")  # ty:ignore[too-many-positional-arguments]
+    assert "input1" in signature.input_fields  # ty:ignore[unresolved-attribute]
+    assert "input2" in signature.input_fields  # ty:ignore[unresolved-attribute]
+    assert "output" in signature.output_fields  # ty:ignore[unresolved-attribute]
 
 
 def test_duplicate_input_output_field_names_raise():
     with pytest.raises(ValueError, match="distinct names"):
-        Signature("value -> value")
+        Signature("value -> value")  # ty:ignore[too-many-positional-arguments]
 
 
 def test_with_signature():
-    signature1 = Signature("input1, input2 -> output")
+    signature1 = Signature("input1, input2 -> output")  # ty:ignore[too-many-positional-arguments]
     signature2 = signature1.with_instructions("This is a test")
     assert signature2.instructions == "This is a test"
     assert signature1 is not signature2, "The type should be immutable"
 
 
 def test_with_updated_field():
-    signature1 = Signature("input1, input2 -> output")
-    signature2 = signature1.with_updated_fields("input1", prefix="Modified:")
-    assert signature2.input_fields["input1"].json_schema_extra["prefix"] == "Modified:"
-    assert signature1.input_fields["input1"].json_schema_extra["prefix"] == "Input 1:"
+    signature1 = Signature("input1, input2 -> output")  # ty:ignore[too-many-positional-arguments]
+    signature2 = signature1.with_updated_fields("input1", prefix="Modified:")  # ty:ignore[invalid-argument-type]
+    assert signature2.input_fields["input1"].json_schema_extra["prefix"] == "Modified:"  # ty:ignore[not-subscriptable]
+    assert signature1.input_fields["input1"].json_schema_extra["prefix"] == "Input 1:"  # ty:ignore[unresolved-attribute]
     assert signature1 is not signature2, "The type should be immutable"
-    for key in signature1.fields:
+    for key in signature1.fields:  # ty:ignore[unresolved-attribute]
         if key != "input1":
-            assert signature1.fields[key].json_schema_extra == signature2.fields[key].json_schema_extra
-    assert signature1.instructions == signature2.instructions
+            assert signature1.fields[key].json_schema_extra == signature2.fields[key].json_schema_extra  # ty:ignore[unresolved-attribute]
+    assert signature1.instructions == signature2.instructions  # ty:ignore[unresolved-attribute]
 
 
 def test_empty_signature():
     with pytest.raises(ValueError):  # noqa: PT011
-        Signature("")
+        Signature("")  # ty:ignore[too-many-positional-arguments]
 
 
 def test_instructions_signature():
     with pytest.raises(ValueError):  # noqa: PT011
-        Signature("")
+        Signature("")  # ty:ignore[too-many-positional-arguments]
 
 
 def test_signature_instructions():
-    sig1 = Signature("input1 -> output1", instructions="This is a test")
-    assert sig1.instructions == "This is a test"
-    sig2 = Signature("input1 -> output1", "This is a test")
-    assert sig2.instructions == "This is a test"
+    sig1 = Signature("input1 -> output1", instructions="This is a test")  # ty:ignore[too-many-positional-arguments, unknown-argument]
+    assert sig1.instructions == "This is a test"  # ty:ignore[unresolved-attribute]
+    sig2 = Signature("input1 -> output1", "This is a test")  # ty:ignore[too-many-positional-arguments]
+    assert sig2.instructions == "This is a test"  # ty:ignore[unresolved-attribute]
 
 
 def test_signature_instructions_none():
-    sig1 = Signature("a, b -> c")
-    assert sig1.instructions == "Given the fields `a`, `b`, produce the fields `c`."
+    sig1 = Signature("a, b -> c")  # ty:ignore[too-many-positional-arguments]
+    assert sig1.instructions == "Given the fields `a`, `b`, produce the fields `c`."  # ty:ignore[unresolved-attribute]
 
 
 def test_signature_from_dict():
     signature = Signature(
-        {"input1": InputField(), "input2": InputField(), "output": OutputField()})
+        {"input1": InputField(), "input2": InputField(), "output": OutputField()})  # ty:ignore[too-many-positional-arguments]
     for k in ["input1", "input2", "output"]:
-        assert k in signature.fields
-        assert signature.fields[k].annotation == str
+        assert k in signature.fields  # ty:ignore[unresolved-attribute]
+        assert signature.fields[k].annotation == str  # ty:ignore[unresolved-attribute]
 
 
 def test_signature_equality():
-    sig1 = Signature("input1 -> output1")
-    sig2 = Signature("input1 -> output1")
+    sig1 = Signature("input1 -> output1")  # ty:ignore[too-many-positional-arguments]
+    sig2 = Signature("input1 -> output1")  # ty:ignore[too-many-positional-arguments]
     assert sig1.equals(sig2)
 
 
 def test_signature_inequality():
-    sig1 = Signature("input1 -> output1")
-    sig2 = Signature("input2 -> output2")
+    sig1 = Signature("input1 -> output1")  # ty:ignore[too-many-positional-arguments]
+    sig2 = Signature("input2 -> output2")  # ty:ignore[too-many-positional-arguments]
     assert not sig1.equals(sig2)
 
 
@@ -134,8 +134,8 @@ def test_equality_format():
 
 
 def test_signature_reverse():
-    sig = Signature("input1 -> output1")
-    assert sig.signature == "input1 -> output1"
+    sig = Signature("input1 -> output1")  # ty:ignore[too-many-positional-arguments]
+    assert sig.signature == "input1 -> output1"  # ty:ignore[unresolved-attribute]
 
 
 def test_insert_field_at_various_positions():
@@ -178,8 +178,8 @@ def test_infer_prefix():
 
 
 def test_insantiating():
-    sig = Signature("input -> output")
-    assert issubclass(sig, Signature)
+    sig = Signature("input -> output")  # ty:ignore[too-many-positional-arguments]
+    assert issubclass(sig, Signature)  # ty:ignore[invalid-argument-type]
     assert sig.__name__ == "StringSignature"
     value = sig(input="test", output="test")
     assert isinstance(value, sig)
@@ -192,7 +192,7 @@ def test_insantiating2():
 
     assert issubclass(SubSignature, Signature)
     assert SubSignature.__name__ == "SubSignature"
-    value = SubSignature(input="test", output="test")
+    value = SubSignature(input="test", output="test")  # ty:ignore[unknown-argument]
     assert isinstance(value, SubSignature)
 
 
@@ -248,47 +248,47 @@ def test_dump_and_load_state():
     assert loaded_signature.dump_state() == expected
     # CustomSignature2 should not have been modified.
     assert CustomSignature2.instructions == "I am a malicious instruction."
-    assert CustomSignature2.fields["sentence"].json_schema_extra["desc"] == "I am an malicious input!"
-    assert CustomSignature2.fields["sentiment"].json_schema_extra["prefix"] == "Sentiment:"
+    assert CustomSignature2.fields["sentence"].json_schema_extra["desc"] == "I am an malicious input!"  # ty:ignore[not-subscriptable]
+    assert CustomSignature2.fields["sentiment"].json_schema_extra["prefix"] == "Sentiment:"  # ty:ignore[not-subscriptable]
 
 
 def test_typed_signatures_basic_types():
-    sig = Signature("input1: int, input2: str -> output: float")
-    assert "input1" in sig.input_fields
-    assert sig.input_fields["input1"].annotation == int
-    assert "input2" in sig.input_fields
-    assert sig.input_fields["input2"].annotation == str
-    assert "output" in sig.output_fields
-    assert sig.output_fields["output"].annotation == float
+    sig = Signature("input1: int, input2: str -> output: float")  # ty:ignore[too-many-positional-arguments]
+    assert "input1" in sig.input_fields  # ty:ignore[unresolved-attribute]
+    assert sig.input_fields["input1"].annotation == int  # ty:ignore[unresolved-attribute]
+    assert "input2" in sig.input_fields  # ty:ignore[unresolved-attribute]
+    assert sig.input_fields["input2"].annotation == str  # ty:ignore[unresolved-attribute]
+    assert "output" in sig.output_fields  # ty:ignore[unresolved-attribute]
+    assert sig.output_fields["output"].annotation == float  # ty:ignore[unresolved-attribute]
 
 
 def test_typed_signatures_generics():
     sig = Signature(
-        "input_list: list[int], input_dict: dict[str, float] -> output_tuple: tuple[str, int]")
-    assert "input_list" in sig.input_fields
-    assert sig.input_fields["input_list"].annotation == list[int]
-    assert "input_dict" in sig.input_fields
-    assert sig.input_fields["input_dict"].annotation == dict[str, float]
-    assert "output_tuple" in sig.output_fields
-    assert sig.output_fields["output_tuple"].annotation == tuple[str, int]
+        "input_list: list[int], input_dict: dict[str, float] -> output_tuple: tuple[str, int]")  # ty:ignore[too-many-positional-arguments]
+    assert "input_list" in sig.input_fields  # ty:ignore[unresolved-attribute]
+    assert sig.input_fields["input_list"].annotation == list[int]  # ty:ignore[unresolved-attribute]
+    assert "input_dict" in sig.input_fields  # ty:ignore[unresolved-attribute]
+    assert sig.input_fields["input_dict"].annotation == dict[str, float]  # ty:ignore[unresolved-attribute]
+    assert "output_tuple" in sig.output_fields  # ty:ignore[unresolved-attribute]
+    assert sig.output_fields["output_tuple"].annotation == tuple[str, int]  # ty:ignore[unresolved-attribute]
 
 
 def test_typed_signatures_unions_and_optionals():
     sig = Signature(
-        "input_opt: Optional[str], input_union: Union[int, None] -> output_union: Union[int, str]")
-    assert "input_opt" in sig.input_fields
+        "input_opt: Optional[str], input_union: Union[int, None] -> output_union: Union[int, str]")  # ty:ignore[too-many-positional-arguments]
+    assert "input_opt" in sig.input_fields  # ty:ignore[unresolved-attribute]
     # Optional[str] is actually Union[str, None]
     # Depending on the environment, it might resolve to Union[str, None] or Optional[str], either is correct.
     # We'll just check for a Union containing str and NoneType:
-    input_opt_annotation = sig.input_fields["input_opt"].annotation
+    input_opt_annotation = sig.input_fields["input_opt"].annotation  # ty:ignore[unresolved-attribute]
     assert input_opt_annotation == Optional[str] or (
         getattr(input_opt_annotation, "__origin__", None) is Union
         and str in input_opt_annotation.__args__
         and type(None) in input_opt_annotation.__args__
     )
 
-    assert "input_union" in sig.input_fields
-    input_union_annotation = sig.input_fields["input_union"].annotation
+    assert "input_union" in sig.input_fields  # ty:ignore[unresolved-attribute]
+    input_union_annotation = sig.input_fields["input_union"].annotation  # ty:ignore[unresolved-attribute]
     assert (
         getattr(input_union_annotation, "__origin__", None) is Union
     )
@@ -299,8 +299,8 @@ def test_typed_signatures_unions_and_optionals():
         type(None) in input_union_annotation.__args__
     )
 
-    assert "output_union" in sig.output_fields
-    output_union_annotation = sig.output_fields["output_union"].annotation
+    assert "output_union" in sig.output_fields  # ty:ignore[unresolved-attribute]
+    output_union_annotation = sig.output_fields["output_union"].annotation  # ty:ignore[unresolved-attribute]
     assert (
         getattr(output_union_annotation, "__origin__", None) is Union
     )
@@ -313,17 +313,17 @@ def test_typed_signatures_unions_and_optionals():
 
 
 def test_typed_signatures_any():
-    sig = Signature("input_any: Any -> output_any: Any")
-    assert "input_any" in sig.input_fields
-    assert sig.input_fields["input_any"].annotation == Any
-    assert "output_any" in sig.output_fields
-    assert sig.output_fields["output_any"].annotation == Any
+    sig = Signature("input_any: Any -> output_any: Any")  # ty:ignore[too-many-positional-arguments]
+    assert "input_any" in sig.input_fields  # ty:ignore[unresolved-attribute]
+    assert sig.input_fields["input_any"].annotation == Any  # ty:ignore[unresolved-attribute]
+    assert "output_any" in sig.output_fields  # ty:ignore[unresolved-attribute]
+    assert sig.output_fields["output_any"].annotation == Any  # ty:ignore[unresolved-attribute]
 
 
 def test_typed_signatures_nested():
     sig = Signature(
-        "input_nested: list[Union[str, int]] -> output_nested: Tuple[int, Optional[float], list[str]]")
-    input_nested_ann = sig.input_fields["input_nested"].annotation
+        "input_nested: list[Union[str, int]] -> output_nested: Tuple[int, Optional[float], list[str]]")  # ty:ignore[too-many-positional-arguments]
+    input_nested_ann = sig.input_fields["input_nested"].annotation  # ty:ignore[unresolved-attribute]
     assert getattr(input_nested_ann, "__origin__", None) is list
     assert len(input_nested_ann.__args__) == 1
     union_arg = input_nested_ann.__args__[0]
@@ -331,7 +331,7 @@ def test_typed_signatures_nested():
     assert str in union_arg.__args__
     assert int in union_arg.__args__
 
-    output_nested_ann = sig.output_fields["output_nested"].annotation
+    output_nested_ann = sig.output_fields["output_nested"].annotation  # ty:ignore[unresolved-attribute]
     assert getattr(output_nested_ann, "__origin__", None) is tuple
     assert output_nested_ann.__args__[0] == int
     # The second arg is Optional[float], which is Union[float, None]
@@ -351,20 +351,20 @@ def test_typed_signatures_from_dict():
         "input_dict_int": (dict[str, int], InputField()),
         "output_tup": (tuple[int, float], OutputField()),
     }
-    sig = Signature(fields)
-    assert "input_str_list" in sig.input_fields
-    assert sig.input_fields["input_str_list"].annotation == list[str]
-    assert "input_dict_int" in sig.input_fields
-    assert sig.input_fields["input_dict_int"].annotation == dict[str, int]
-    assert "output_tup" in sig.output_fields
-    assert sig.output_fields["output_tup"].annotation == tuple[int, float]
+    sig = Signature(fields)  # ty:ignore[too-many-positional-arguments]
+    assert "input_str_list" in sig.input_fields  # ty:ignore[unresolved-attribute]
+    assert sig.input_fields["input_str_list"].annotation == list[str]  # ty:ignore[unresolved-attribute]
+    assert "input_dict_int" in sig.input_fields  # ty:ignore[unresolved-attribute]
+    assert sig.input_fields["input_dict_int"].annotation == dict[str, int]  # ty:ignore[unresolved-attribute]
+    assert "output_tup" in sig.output_fields  # ty:ignore[unresolved-attribute]
+    assert sig.output_fields["output_tup"].annotation == tuple[int, float]  # ty:ignore[unresolved-attribute]
 
 
 def test_typed_signatures_complex_combinations():
     sig = Signature(
-        "input_complex: dict[str, list[Optional[Tuple[int, str]]]] -> output_complex: Union[list[str], dict[str, Any]]"
+        "input_complex: dict[str, list[Optional[Tuple[int, str]]]] -> output_complex: Union[list[str], dict[str, Any]]"  # ty:ignore[too-many-positional-arguments]
     )
-    input_complex_ann = sig.input_fields["input_complex"].annotation
+    input_complex_ann = sig.input_fields["input_complex"].annotation  # ty:ignore[unresolved-attribute]
     assert getattr(input_complex_ann, "__origin__", None) is dict
     key_arg, value_arg = input_complex_ann.__args__
     assert key_arg == str
@@ -378,7 +378,7 @@ def test_typed_signatures_complex_combinations():
     assert getattr(tuple_type, "__origin__", None) is tuple
     assert tuple_type.__args__ == (int, str)
 
-    output_complex_ann = sig.output_fields["output_complex"].annotation
+    output_complex_ann = sig.output_fields["output_complex"].annotation  # ty:ignore[unresolved-attribute]
     assert getattr(output_complex_ann, "__origin__", None) is Union
     assert len(output_complex_ann.__args__) == 2
     possible_args = set(output_complex_ann.__args__)
@@ -397,15 +397,15 @@ def test_typed_signatures_complex_combinations():
 
 def test_make_signature_from_string():
     sig = Signature(
-        "input1: int, input2: dict[str, int] -> output1: list[str], output2: Union[int, str]")
-    assert "input1" in sig.input_fields
-    assert sig.input_fields["input1"].annotation == int
-    assert "input2" in sig.input_fields
-    assert sig.input_fields["input2"].annotation == dict[str, int]
-    assert "output1" in sig.output_fields
-    assert sig.output_fields["output1"].annotation == list[str]
-    assert "output2" in sig.output_fields
-    assert sig.output_fields["output2"].annotation == Union[int, str]
+        "input1: int, input2: dict[str, int] -> output1: list[str], output2: Union[int, str]")  # ty:ignore[too-many-positional-arguments]
+    assert "input1" in sig.input_fields  # ty:ignore[unresolved-attribute]
+    assert sig.input_fields["input1"].annotation == int  # ty:ignore[unresolved-attribute]
+    assert "input2" in sig.input_fields  # ty:ignore[unresolved-attribute]
+    assert sig.input_fields["input2"].annotation == dict[str, int]  # ty:ignore[unresolved-attribute]
+    assert "output1" in sig.output_fields  # ty:ignore[unresolved-attribute]
+    assert sig.output_fields["output1"].annotation == list[str]  # ty:ignore[unresolved-attribute]
+    assert "output2" in sig.output_fields  # ty:ignore[unresolved-attribute]
+    assert sig.output_fields["output2"].annotation == Union[int, str]  # ty:ignore[unresolved-attribute]
 
 
 def test_signature_field_with_constraints():
@@ -415,13 +415,13 @@ def test_signature_field_with_constraints():
         outputs2: int = OutputField(ge=5, le=10)
 
     assert "outputs1" in MySignature.output_fields
-    output1_constraints = MySignature.output_fields["outputs1"].json_schema_extra["constraints"]
+    output1_constraints = MySignature.output_fields["outputs1"].json_schema_extra["constraints"]  # ty:ignore[not-subscriptable]
 
     assert "minimum length: 5" in output1_constraints
     assert "maximum length: 10" in output1_constraints
 
     assert "outputs2" in MySignature.output_fields
-    output2_constraints = MySignature.output_fields["outputs2"].json_schema_extra["constraints"]
+    output2_constraints = MySignature.output_fields["outputs2"].json_schema_extra["constraints"]  # ty:ignore[not-subscriptable]
     assert "greater than or equal to: 5" in output2_constraints
     assert "less than or equal to: 10" in output2_constraints
 
@@ -431,59 +431,59 @@ def test_basic_custom_type():
         value: str
 
     test_signature = Signature(
-        "input: CustomType -> output: str",
-        custom_types={"CustomType": CustomType}
+        "input: CustomType -> output: str",  # ty:ignore[too-many-positional-arguments]
+        custom_types={"CustomType": CustomType}  # ty:ignore[unknown-argument]
     )
 
-    assert test_signature.input_fields["input"].annotation == CustomType
+    assert test_signature.input_fields["input"].annotation == CustomType  # ty:ignore[unresolved-attribute]
 
     lm = DummyLM([{"output": "processed"}])
     settings.configure(lm=lm)
 
     custom_obj = CustomType(value="test")
-    pred = Predict(test_signature)(input=custom_obj)
+    pred = Predict(test_signature)(input=custom_obj)  # ty:ignore[invalid-argument-type]
     assert pred.output == "processed"
 
 
 def test_custom_type_from_different_module():
     from pathlib import Path
 
-    test_signature = Signature("input: Path -> output: str")
-    assert test_signature.input_fields["input"].annotation == Path
+    test_signature = Signature("input: Path -> output: str")  # ty:ignore[too-many-positional-arguments]
+    assert test_signature.input_fields["input"].annotation == Path  # ty:ignore[unresolved-attribute]
 
     lm = DummyLM([{"output": "/test/path"}])
     settings.configure(lm=lm)
 
     path_obj = Path("/test/path")
-    pred = Predict(test_signature)(input=path_obj)
+    pred = Predict(test_signature)(input=path_obj)  # ty:ignore[invalid-argument-type]
     assert pred.output == "/test/path"
 
 def test_pep604_union_type_inline():
     sig = Signature(
-        "input1: str | None, input2: None | int -> output_union: int | str"
+        "input1: str | None, input2: None | int -> output_union: int | str"  # ty:ignore[too-many-positional-arguments]
     )
 
     # input1 and input2 test that both 'T | None' and 'None | T' are interpreted as Optional types,
     # regardless of the order of None in the union expression.
 
-    assert "input1" in sig.input_fields
-    input1_annotation = sig.input_fields["input1"].annotation
+    assert "input1" in sig.input_fields  # ty:ignore[unresolved-attribute]
+    input1_annotation = sig.input_fields["input1"].annotation  # ty:ignore[unresolved-attribute]
     assert input1_annotation == Optional[str] or (
         getattr(input1_annotation, "__origin__", None) is Union
         and str in input1_annotation.__args__
         and type(None) in input1_annotation.__args__
     )
 
-    assert "input2" in sig.input_fields
-    input2_annotation = sig.input_fields["input2"].annotation
+    assert "input2" in sig.input_fields  # ty:ignore[unresolved-attribute]
+    input2_annotation = sig.input_fields["input2"].annotation  # ty:ignore[unresolved-attribute]
     assert input2_annotation == Optional[int] or (
         getattr(input2_annotation, "__origin__", None) is Union
         and int in input2_annotation.__args__
         and type(None) in input2_annotation.__args__
     )
 
-    assert "output_union" in sig.output_fields
-    output_union_annotation = sig.output_fields["output_union"].annotation
+    assert "output_union" in sig.output_fields  # ty:ignore[unresolved-attribute]
+    output_union_annotation = sig.output_fields["output_union"].annotation  # ty:ignore[unresolved-attribute]
     assert (
         getattr(output_union_annotation, "__origin__", None) is Union
     )
@@ -496,23 +496,23 @@ def test_pep604_union_type_inline():
 
 
 def test_pep604_union_type_inline_equivalence():
-    sig1 = Signature("input: str | None -> output: int | str")
-    sig2 = Signature("input: Optional[str] -> output: Union[int, str]")
+    sig1 = Signature("input: str | None -> output: int | str")  # ty:ignore[too-many-positional-arguments]
+    sig2 = Signature("input: Optional[str] -> output: Union[int, str]")  # ty:ignore[too-many-positional-arguments]
 
     # PEP 604 union types in inline signatures should be equivalent to Optional and Union types
     assert sig1.equals(sig2)
 
     # Check that the annotations are equivalent
-    assert sig1.input_fields["input"].annotation == sig2.input_fields["input"].annotation
-    assert sig1.output_fields["output"].annotation == sig2.output_fields["output"].annotation
+    assert sig1.input_fields["input"].annotation == sig2.input_fields["input"].annotation  # ty:ignore[unresolved-attribute]
+    assert sig1.output_fields["output"].annotation == sig2.output_fields["output"].annotation  # ty:ignore[unresolved-attribute]
 
 
 def test_pep604_union_type_inline_nested():
     sig = Signature(
-        "input: str | (int | float) | None -> output: str"
+        "input: str | (int | float) | None -> output: str"  # ty:ignore[too-many-positional-arguments]
     )
-    assert "input" in sig.input_fields
-    input_annotation = sig.input_fields["input"].annotation
+    assert "input" in sig.input_fields  # ty:ignore[unresolved-attribute]
+    input_annotation = sig.input_fields["input"].annotation  # ty:ignore[unresolved-attribute]
 
     # Check for the correct union: Union[str, int, float, NoneType]
     assert getattr(input_annotation, "__origin__", None) is Union
@@ -585,18 +585,18 @@ def test_pep604_union_type_with_custom_types():
         value: str
 
     sig = Signature(
-        "input: CustomType | None -> output: int | str",
-        custom_types={"CustomType": CustomType}
+        "input: CustomType | None -> output: int | str",  # ty:ignore[too-many-positional-arguments]
+        custom_types={"CustomType": CustomType}  # ty:ignore[unknown-argument]
     )
 
-    assert sig.input_fields["input"].annotation == Union[CustomType, None]
-    assert sig.output_fields["output"].annotation == Union[int, str]
+    assert sig.input_fields["input"].annotation == Union[CustomType, None]  # ty:ignore[unresolved-attribute]
+    assert sig.output_fields["output"].annotation == Union[int, str]  # ty:ignore[unresolved-attribute]
 
     lm = DummyLM([{"output": "processed"}])
     settings.configure(lm=lm)
 
     custom_obj = CustomType(value="test")
-    pred = Predict(sig)(input=custom_obj)
+    pred = Predict(sig)(input=custom_obj)  # ty:ignore[invalid-argument-type]
     assert pred.output == "processed"
 
 

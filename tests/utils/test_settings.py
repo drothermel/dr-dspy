@@ -201,7 +201,7 @@ async def test_dspy_configure_allowance_async():
 
     await asyncio.gather(foo1(), foo2(), foo3())
 
-    foo4()
+    foo4()  # ty:ignore[unused-awaitable]
 
 
 def test_dspy_settings_save_load(tmp_path):
@@ -245,7 +245,7 @@ def callback(x):
     # Add the tmp_path to Python path so we can import the module
     sys.path.insert(0, str(tmp_path))
     try:
-        import custom_module
+        import custom_module  # ty:ignore[unresolved-import]
 
         settings.configure(callbacks=[custom_module.callback])
 

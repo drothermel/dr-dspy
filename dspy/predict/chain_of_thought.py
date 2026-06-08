@@ -29,6 +29,8 @@ class ChainOfThought(Module):
         """
         super().__init__()
         signature = ensure_signature(signature)
+        if signature is None:
+            raise ValueError(f"Invalid signature: {signature!r}")
         desc = "${reasoning}"
         rationale_field_type = rationale_field.annotation if rationale_field else rationale_field_type
         rationale_field = rationale_field if rationale_field else OutputField(desc=desc)

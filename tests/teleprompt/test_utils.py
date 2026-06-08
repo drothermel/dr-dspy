@@ -62,7 +62,7 @@ def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled():
     Regression test for https://github.com/stanfordnlp/dspy/issues/9308
     """
     student = DummyModule()
-    student.predictor = Predict("input -> output")
+    student.predictor = Predict("input -> output")  # ty:ignore[unresolved-attribute]
     trainset = [Example(input="test", output="test").with_inputs("input")]
 
     lm = DummyLM([{"output": "test"}])

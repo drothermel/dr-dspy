@@ -40,14 +40,14 @@ def _history_entry(message: LMMessage) -> LMHistoryEntry:
 def test_message_content_and_tool_calls_normalize_for_dspy_history_surface():
     message = LMMessage(
         role="assistant",
-        content="Use search.",
+        content="Use search.",  # ty:ignore[unknown-argument]
         tool_calls=[
             {
                 "id": "call_1",
                 "function": {"name": "search", "arguments": '{"query": "dspy"}'},
             }
-        ],
-    )
+        ],  # ty:ignore[unknown-argument]
+    )  # ty:ignore[missing-argument]
 
     assert message.text == "Use search."
     assert [part for part in message.parts if isinstance(part, LMToolCallPart)] == [
@@ -69,9 +69,9 @@ def test_message_content_and_tool_calls_normalize_for_dspy_history_surface():
 
 
 def test_tool_result_content_none_normalizes_to_empty_parts():
-    assert LMToolResultPart(content=None).content == []
+    assert LMToolResultPart(content=None).content == []  # ty:ignore[invalid-argument-type]
 
-    message = LMMessage(role="tool", content=None, tool_call_id="call_1", name="search")
+    message = LMMessage(role="tool", content=None, tool_call_id="call_1", name="search")  # ty:ignore[missing-argument, unknown-argument]
     result = message.parts[0]
 
     assert isinstance(result, LMToolResultPart)
@@ -91,13 +91,13 @@ def test_audio_content_accepts_url_and_history_preserves_url():
                 "type": "input_audio",
                 "input_audio": {"url": "https://example.com/audio.wav", "format": "wav"},
             }
-        ],
-    )
+        ],  # ty:ignore[unknown-argument]
+    )  # ty:ignore[missing-argument]
 
     audio = message.parts[0]
     assert isinstance(audio, LMAudioPart)
     assert audio.url == "https://example.com/audio.wav"
-    assert _history_entry(message).messages[0]["content"][0]["input_audio"] == {
+    assert _history_entry(message).messages[0]["content"][0]["input_audio"] == {  # ty:ignore[not-subscriptable]
         "format": "wav",
         "url": "https://example.com/audio.wav",
     }
@@ -111,8 +111,8 @@ def test_audio_content_defaults_null_format_to_wav():
                 "type": "input_audio",
                 "input_audio": {"url": "https://example.com/audio.wav", "format": None},
             }
-        ],
-    )
+        ],  # ty:ignore[unknown-argument]
+    )  # ty:ignore[missing-argument]
 
     audio = message.parts[0]
 
@@ -122,16 +122,16 @@ def test_audio_content_defaults_null_format_to_wav():
 
 def test_image_content_requires_mapping_with_url():
     with pytest.raises(TypeError, match="Image content block"):
-        LMMessage(role="user", content=[{"type": "image_url", "image_url": "https://example.com/image.png"}])
+        LMMessage(role="user", content=[{"type": "image_url", "image_url": "https://example.com/image.png"}])  # ty:ignore[missing-argument, unknown-argument]
 
     with pytest.raises(ValueError, match="requires url"):
-        LMMessage(role="user", content=[{"type": "image_url", "image_url": {}}])
+        LMMessage(role="user", content=[{"type": "image_url", "image_url": {}}])  # ty:ignore[missing-argument, unknown-argument]
 
 
 def test_video_data_round_trips_through_history_messages():
     message = User(LMVideoPart(data="YWJj", media_type="video/mp4"))
-    content = _history_entry(message).messages[0]["content"][0]
-    round_tripped = LMMessage(role="user", content=[content]).parts[0]
+    content = _history_entry(message).messages[0]["content"][0]  # ty:ignore[not-subscriptable]
+    round_tripped = LMMessage(role="user", content=[content]).parts[0]  # ty:ignore[missing-argument, unknown-argument]
 
     assert content == {
         "type": "video",
@@ -151,11 +151,11 @@ def test_document_source_url_stays_url_and_round_trips_through_history_messages(
                 "source": "https://example.com/report.pdf",
                 "title": "Report",
             }
-        ],
-    )
+        ],  # ty:ignore[unknown-argument]
+    )  # ty:ignore[missing-argument]
     document = message.parts[0]
-    content = _history_entry(message).messages[0]["content"][0]
-    round_tripped = LMMessage(role="user", content=[content]).parts[0]
+    content = _history_entry(message).messages[0]["content"][0]  # ty:ignore[not-subscriptable]
+    round_tripped = LMMessage(role="user", content=[content]).parts[0]  # ty:ignore[missing-argument, unknown-argument]
 
     assert isinstance(document, LMDocumentPart)
     assert document.url == "https://example.com/report.pdf"
@@ -193,14 +193,14 @@ def test_lm_kwargs_aliases_normalize_for_existing_dspy_lm_callers():
         provider_flag=True,
     )
 
-    assert config.reasoning.effort == "high"
-    assert config.reasoning.summary == "auto"
-    assert config.tool_choice.mode == "auto"
-    assert config.tool_choice.parallel is False
-    assert config.cache.enabled is True
-    assert config.cache.rollout_id == 7
-    assert config.prompt_cache.enabled is True
-    assert config.prompt_cache.key == "prompt-cache"
+    assert config.reasoning.effort == "high"  # ty:ignore[unresolved-attribute]
+    assert config.reasoning.summary == "auto"  # ty:ignore[unresolved-attribute]
+    assert config.tool_choice.mode == "auto"  # ty:ignore[unresolved-attribute]
+    assert config.tool_choice.parallel is False  # ty:ignore[unresolved-attribute]
+    assert config.cache.enabled is True  # ty:ignore[unresolved-attribute]
+    assert config.cache.rollout_id == 7  # ty:ignore[unresolved-attribute]
+    assert config.prompt_cache.enabled is True  # ty:ignore[unresolved-attribute]
+    assert config.prompt_cache.key == "prompt-cache"  # ty:ignore[unresolved-attribute]
     assert config.extensions == {"provider_flag": True}
 
 

@@ -145,12 +145,12 @@ def test_tool_from_function():
     tool = Tool(dummy_function)
 
     assert tool.name == "dummy_function"
-    assert "A dummy function for testing" in tool.desc
-    assert "x" in tool.args
-    assert "y" in tool.args
-    assert tool.args["x"]["type"] == "integer"
-    assert tool.args["y"]["type"] == "string"
-    assert tool.args["y"]["default"] == "hello"
+    assert "A dummy function for testing" in tool.desc  # ty:ignore[unsupported-operator]
+    assert "x" in tool.args  # ty:ignore[unsupported-operator]
+    assert "y" in tool.args  # ty:ignore[unsupported-operator]
+    assert tool.args["x"]["type"] == "integer"  # ty:ignore[not-subscriptable]
+    assert tool.args["y"]["type"] == "string"  # ty:ignore[not-subscriptable]
+    assert tool.args["y"]["default"] == "hello"  # ty:ignore[not-subscriptable]
 
 
 def test_tool_from_class():
@@ -172,11 +172,11 @@ def test_tool_from_function_with_pydantic():
     tool = Tool(dummy_with_pydantic)
 
     assert tool.name == "dummy_with_pydantic"
-    assert "model" in tool.args
-    assert tool.args["model"]["type"] == "object"
-    assert "field1" in tool.args["model"]["properties"]
-    assert "field2" in tool.args["model"]["properties"]
-    assert tool.args["model"]["properties"]["field1"]["default"] == "hello"
+    assert "model" in tool.args  # ty:ignore[unsupported-operator]
+    assert tool.args["model"]["type"] == "object"  # ty:ignore[not-subscriptable]
+    assert "field1" in tool.args["model"]["properties"]  # ty:ignore[not-subscriptable]
+    assert "field2" in tool.args["model"]["properties"]  # ty:ignore[not-subscriptable]
+    assert tool.args["model"]["properties"]["field1"]["default"] == "hello"  # ty:ignore[not-subscriptable]
 
 
 def test_tool_from_function_with_pydantic_nesting():
@@ -184,22 +184,22 @@ def test_tool_from_function_with_pydantic_nesting():
 
     assert tool.name == "complex_dummy_function"
 
-    assert "profile" in tool.args
-    assert "priority" in tool.args
-    assert "notes" in tool.args
-    assert tool.args["profile"]["type"] == "object"
-    assert tool.args["profile"]["properties"]["user_id"]["type"] == "integer"
-    assert tool.args["profile"]["properties"]["name"]["type"] == "string"
-    assert tool.args["profile"]["properties"]["age"]["anyOf"] == [{"type": "integer"}, {"type": "null"}]
-    assert tool.args["profile"]["properties"]["contact"]["type"] == "object"
-    assert tool.args["profile"]["properties"]["contact"]["properties"]["email"]["type"] == "string"
+    assert "profile" in tool.args  # ty:ignore[unsupported-operator]
+    assert "priority" in tool.args  # ty:ignore[unsupported-operator]
+    assert "notes" in tool.args  # ty:ignore[unsupported-operator]
+    assert tool.args["profile"]["type"] == "object"  # ty:ignore[not-subscriptable]
+    assert tool.args["profile"]["properties"]["user_id"]["type"] == "integer"  # ty:ignore[not-subscriptable]
+    assert tool.args["profile"]["properties"]["name"]["type"] == "string"  # ty:ignore[not-subscriptable]
+    assert tool.args["profile"]["properties"]["age"]["anyOf"] == [{"type": "integer"}, {"type": "null"}]  # ty:ignore[not-subscriptable]
+    assert tool.args["profile"]["properties"]["contact"]["type"] == "object"  # ty:ignore[not-subscriptable]
+    assert tool.args["profile"]["properties"]["contact"]["properties"]["email"]["type"] == "string"  # ty:ignore[not-subscriptable]
 
     # Reference should be resolved for nested pydantic models
-    assert "$defs" not in str(tool.args["notes"])
-    assert tool.args["notes"]["anyOf"][0]["type"] == "array"
-    assert tool.args["notes"]["anyOf"][0]["items"]["type"] == "object"
-    assert tool.args["notes"]["anyOf"][0]["items"]["properties"]["content"]["type"] == "string"
-    assert tool.args["notes"]["anyOf"][0]["items"]["properties"]["author"]["type"] == "string"
+    assert "$defs" not in str(tool.args["notes"])  # ty:ignore[not-subscriptable]
+    assert tool.args["notes"]["anyOf"][0]["type"] == "array"  # ty:ignore[not-subscriptable]
+    assert tool.args["notes"]["anyOf"][0]["items"]["type"] == "object"  # ty:ignore[not-subscriptable]
+    assert tool.args["notes"]["anyOf"][0]["items"]["properties"]["content"]["type"] == "string"  # ty:ignore[not-subscriptable]
+    assert tool.args["notes"]["anyOf"][0]["items"]["properties"]["author"]["type"] == "string"  # ty:ignore[not-subscriptable]
 
 
 @requires_jsonschema
@@ -226,7 +226,7 @@ def test_invalid_function_call():
 
 def test_parameter_desc():
     tool = Tool(dummy_function, arg_desc={"x": "The x parameter"})
-    assert tool.args["x"]["description"] == "The x parameter"
+    assert tool.args["x"]["description"] == "The x parameter"  # ty:ignore[not-subscriptable]
 
 
 def test_tool_with_default_args_without_type_hints():
@@ -234,8 +234,8 @@ def test_tool_with_default_args_without_type_hints():
         return x
 
     tool = Tool(foo)
-    assert tool.args["x"]["default"] == 100
-    assert not hasattr(tool.args["x"], "type")
+    assert tool.args["x"]["default"] == 100  # ty:ignore[not-subscriptable]
+    assert not hasattr(tool.args["x"], "type")  # ty:ignore[not-subscriptable]
 
 
 @requires_jsonschema
@@ -302,15 +302,15 @@ async def test_async_tool_from_function():
     tool = Tool(async_dummy_function)
 
     assert tool.name == "async_dummy_function"
-    assert "An async dummy function for testing" in tool.desc
-    assert "x" in tool.args
-    assert "y" in tool.args
-    assert tool.args["x"]["type"] == "integer"
-    assert tool.args["y"]["type"] == "string"
-    assert tool.args["y"]["default"] == "hello"
+    assert "An async dummy function for testing" in tool.desc  # ty:ignore[unsupported-operator]
+    assert "x" in tool.args  # ty:ignore[unsupported-operator]
+    assert "y" in tool.args  # ty:ignore[unsupported-operator]
+    assert tool.args["x"]["type"] == "integer"  # ty:ignore[not-subscriptable]
+    assert tool.args["y"]["type"] == "string"  # ty:ignore[not-subscriptable]
+    assert tool.args["y"]["default"] == "hello"  # ty:ignore[not-subscriptable]
 
     # Test async call
-    result = await tool.acall(x=42, y="hello")
+    result = await tool.acall(x=42, y="hello")  # ty:ignore[invalid-await]
     assert result == "hello 42"
 
 
@@ -320,18 +320,18 @@ async def test_async_tool_with_pydantic():
     tool = Tool(async_dummy_with_pydantic)
 
     assert tool.name == "async_dummy_with_pydantic"
-    assert "model" in tool.args
-    assert tool.args["model"]["type"] == "object"
-    assert "field1" in tool.args["model"]["properties"]
-    assert "field2" in tool.args["model"]["properties"]
+    assert "model" in tool.args  # ty:ignore[unsupported-operator]
+    assert tool.args["model"]["type"] == "object"  # ty:ignore[not-subscriptable]
+    assert "field1" in tool.args["model"]["properties"]  # ty:ignore[not-subscriptable]
+    assert "field2" in tool.args["model"]["properties"]  # ty:ignore[not-subscriptable]
 
     # Test async call with pydantic model
     model = DummyModel(field1="test", field2=123)
-    result = await tool.acall(model=model)
+    result = await tool.acall(model=model)  # ty:ignore[invalid-await]
     assert result == "test 123"
 
     # Test async call with dict
-    result = await tool.acall(model={"field1": "test", "field2": 123})
+    result = await tool.acall(model={"field1": "test", "field2": 123})  # ty:ignore[invalid-await]
     assert result == "test 123"
 
 
@@ -352,7 +352,7 @@ async def test_async_tool_with_complex_pydantic():
         ),
     )
 
-    result = await tool.acall(profile=profile, priority=1, notes=[Note(content="Test note", author="Test author")])
+    result = await tool.acall(profile=profile, priority=1, notes=[Note(content="Test note", author="Test author")])  # ty:ignore[invalid-await]
     assert result["user_id"] == 1
     assert result["name"] == "Test User"
     assert result["priority"] == 1
@@ -365,7 +365,7 @@ async def test_async_tool_with_complex_pydantic():
 async def test_async_tool_invalid_call():
     tool = Tool(async_dummy_function)
     with pytest.raises(ValueError):  # noqa: PT011
-        await tool.acall(x="not an integer", y="hello")
+        await tool.acall(x="not an integer", y="hello")  # ty:ignore[invalid-await]
 
 
 @requires_jsonschema
@@ -376,7 +376,7 @@ async def test_async_tool_with_kwargs():
 
     tool = Tool(fn)
 
-    result = await tool.acall(x=1, y=2, z=3)
+    result = await tool.acall(x=1, y=2, z=3)  # ty:ignore[invalid-await]
     assert result == {"y": 2, "z": 3}
 
 
@@ -391,7 +391,7 @@ async def test_async_concurrent_calls():
 
     # Run them concurrently and measure time
     start_time = asyncio.get_event_loop().time()
-    results = await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks)  # ty:ignore[no-matching-overload]
     end_time = asyncio.get_event_loop().time()
 
     # Verify results, `asyncio.gather` returns results in the order of the tasks
@@ -564,13 +564,13 @@ def test_tool_call_results_can_round_trip_as_native_tool_result_message():
     results = ToolCallResults.from_tool_calls_and_values([tool_call], ['{"items": ["cat"]}'])
     result = results.tool_call_results[0]
 
-    message = LMMessage(role="tool", tool_call_id=result.call_id, name=result.name, content=result.value)
+    message = LMMessage(role="tool", tool_call_id=result.call_id, name=result.name, content=result.value)  # ty:ignore[missing-argument, unknown-argument]
 
     assert len(message.parts) == 1
     assert isinstance(message.parts[0], LMToolResultPart)
     assert message.parts[0].call_id == "call_1"
     assert message.parts[0].name == "search"
-    assert message.parts[0].content[0].text == '{"items": ["cat"]}'
+    assert message.parts[0].content[0].text == '{"items": ["cat"]}'  # ty:ignore[unresolved-attribute]
 
     request = LMRequest(model="test-model", messages=[message])
     assert to_openai_chat_request(request)["messages"] == [

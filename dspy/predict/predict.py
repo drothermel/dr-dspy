@@ -59,7 +59,10 @@ class Predict(Module, Parameter):
     def __init__(self, signature: str | type[Signature], callbacks: list[BaseCallback] | None = None, **config) -> None:
         super().__init__(callbacks=callbacks)
         self.stage = random.randbytes(8).hex()
-        self.signature = ensure_signature(signature)
+        resolved_signature = ensure_signature(signature)
+        if resolved_signature is None:
+            raise ValueError(f"Invalid signature: {signature!r}")
+        self.signature: type[Signature] = resolved_signature
         self.config = config
         self.reset()
 
@@ -143,6 +146,8 @@ class Predict(Module, Parameter):
     def _forward_preprocess(self, **kwargs):
         assert "new_signature" not in kwargs, "new_signature is no longer a valid keyword argument."
         signature = ensure_signature(kwargs.pop("signature", self.signature))
+        if signature is None:
+            raise ValueError("Invalid signature provided to Predict.")
         demos = kwargs.pop("demos", self.demos)
         config = {**self.config, **kwargs.pop("config", {})}
 

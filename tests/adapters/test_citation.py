@@ -22,7 +22,7 @@ def test_citation_validate_input():
     assert citation.supported_text == "The Earth orbits the Sun."
 
     with pytest.raises(pydantic.ValidationError):
-        Citations.Citation(cited_text="text")  # ty: ignore[unresolved-attribute]
+        Citations.Citation(cited_text="text")  # ty: ignore[missing-argument]
 
 
 def test_citations_in_nested_type():
@@ -155,7 +155,7 @@ def test_citations_postprocessing():
     result = adapter._call_postprocess(
         CitationSignature.delete("citations"),
         CitationSignature,
-        outputs,
+        outputs,  # ty:ignore[invalid-argument-type]
         LM(model="anthropic/claude-3-5-sonnet-20241022"),
         lm_kwargs={},
     )

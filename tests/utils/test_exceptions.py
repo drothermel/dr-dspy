@@ -85,7 +85,7 @@ def test_adapter_parse_error_basic():
     signature = make_signature("question->answer1, answer2")
     lm_response = "[[ ## answer1 ## ]]\nanswer1"
 
-    error = AdapterParseError(adapter_name=adapter_name, signature=signature, lm_response=lm_response)
+    error = AdapterParseError(adapter_name=adapter_name, signature=signature, lm_response=lm_response)  # ty:ignore[invalid-argument-type]
 
     assert isinstance(error, DSPyError)
     assert error.code == "adapter_parse_error"
@@ -107,7 +107,7 @@ def test_adapter_parse_error_with_message():
     lm_response = "[[ ## answer1 ## ]]\nanswer1"
     message = "Critical error, please fix!"
 
-    error = AdapterParseError(adapter_name=adapter_name, signature=signature, lm_response=lm_response, message=message)
+    error = AdapterParseError(adapter_name=adapter_name, signature=signature, lm_response=lm_response, message=message)  # ty:ignore[invalid-argument-type]
 
     assert error.adapter_name == adapter_name
     assert error.signature == signature
@@ -129,7 +129,7 @@ def test_adapter_parse_error_with_parsed_result():
     parsed_result = {"answer1": "value1"}
 
     error = AdapterParseError(
-        adapter_name=adapter_name, signature=signature, lm_response=lm_response, parsed_result=parsed_result
+        adapter_name=adapter_name, signature=signature, lm_response=lm_response, parsed_result=parsed_result  # ty:ignore[invalid-argument-type]
     )
 
     error_message = str(error)

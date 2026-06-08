@@ -26,10 +26,10 @@ async def test_asyncify():
         sleep(wait)
         return 42
 
-    ask_the_question = asyncify(the_answer_to_life_the_universe_and_everything)
+    ask_the_question = asyncify(the_answer_to_life_the_universe_and_everything)  # ty:ignore[invalid-argument-type]
 
     async def run_n_tasks(n: int, wait: float):
-        await asyncio.gather(*[ask_the_question(wait) for _ in range(n)])
+        await asyncio.gather(*[ask_the_question(wait) for _ in range(n)])  # ty:ignore[missing-argument]
 
     async def verify_asyncify(capacity: int, number_of_tasks: int, wait: float = 0.5):
         with settings.context(async_max_workers=capacity):

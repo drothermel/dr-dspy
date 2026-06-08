@@ -14,7 +14,7 @@ LITELLM_TEST_SERVER_LOG_FILE_PATH_ENV_VAR = "LITELLM_TEST_SERVER_LOG_FILE_PATH"
 
 
 @pytest.fixture
-def litellm_test_server() -> tuple[str, str]:
+def litellm_test_server() -> tuple[str, str]:  # ty:ignore[invalid-return-type]
     """
     Start a LiteLLM test server for a DSPy integration test case, and tear down the
     server when the test case completes.

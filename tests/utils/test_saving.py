@@ -56,7 +56,7 @@ def test_save_model_with_custom_signature(tmp_path):
         date_diff: int = OutputField(desc="The difference in days between the current_date and the target_date")
 
     predict = Predict(MySignature)
-    predict.signature = predict.signature.with_instructions("You are a helpful assistant.")
+    predict.signature = predict.signature.with_instructions("You are a helpful assistant.")  # ty:ignore[unresolved-attribute]
     predict.save(tmp_path, save_program=True)
 
     loaded_predict = load(tmp_path, allow_pickle=True)

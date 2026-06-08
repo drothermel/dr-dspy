@@ -81,40 +81,40 @@ def test_empty_module():
 
 def test_single_level():
     module = Module()
-    module.sub = Module()
+    module.sub = Module()  # ty:ignore[unresolved-attribute]
     expected = [("self", module), ("self.sub", module.sub)]
     assert list(module.named_sub_modules()) == expected
 
 
 def test_multiple_levels():
     module = Module()
-    module.sub = Module()
-    module.sub.subsub = Module()
+    module.sub = Module()  # ty:ignore[unresolved-attribute]
+    module.sub.subsub = Module()  # ty:ignore[unresolved-attribute]
     expected = [("self", module), ("self.sub", module.sub), ("self.sub.subsub", module.sub.subsub)]
     assert list(module.named_sub_modules()) == expected
 
 
 def test_multiple_sub_modules():
     module = Module()
-    module.sub1 = Module()
-    module.sub2 = Module()
+    module.sub1 = Module()  # ty:ignore[unresolved-attribute]
+    module.sub2 = Module()  # ty:ignore[unresolved-attribute]
     expected = [("self", module), ("self.sub1", module.sub1), ("self.sub2", module.sub2)]
     assert sorted(module.named_sub_modules()) == sorted(expected)
 
 
 def test_non_base_module_attributes():
     module = Module()
-    module.sub = Module()
-    module.not_a_sub = "Not a self"
+    module.sub = Module()  # ty:ignore[unresolved-attribute]
+    module.not_a_sub = "Not a self"  # ty:ignore[unresolved-attribute]
     expected = [("self", module), ("self.sub", module.sub)]
     assert list(module.named_sub_modules()) == expected
 
 
 def test_complex_module_traversal():
     root = Module()
-    root.sub_module = Module()
-    root.sub_module.nested_list = [Module(), {"key": Module()}]
-    root.sub_module.nested_tuple = (Module(), [Module(), Module()])
+    root.sub_module = Module()  # ty:ignore[unresolved-attribute]
+    root.sub_module.nested_list = [Module(), {"key": Module()}]  # ty:ignore[unresolved-attribute]
+    root.sub_module.nested_tuple = (Module(), [Module(), Module()])  # ty:ignore[unresolved-attribute]
     expected_names = {
         "self",
         "self.sub_module",
@@ -133,10 +133,10 @@ def test_complex_module_traversal():
 
 def test_complex_module_traversal_with_same_module():
     root = Module()
-    root.sub_module = Module()
-    root.sub_module.nested_list = [Module(), {"key": Module()}]
+    root.sub_module = Module()  # ty:ignore[unresolved-attribute]
+    root.sub_module.nested_list = [Module(), {"key": Module()}]  # ty:ignore[unresolved-attribute]
     same_module = Module()
-    root.sub_module.nested_tuple = (Module(), [same_module, same_module])
+    root.sub_module.nested_tuple = (Module(), [same_module, same_module])  # ty:ignore[unresolved-attribute]
     expected_names = {
         "self",
         "self.sub_module",
@@ -154,19 +154,19 @@ def test_complex_module_traversal_with_same_module():
 
 def test_complex_module_set_attribute_by_name():
     root = Module()
-    root.sub_module = Module()
-    root.sub_module.nested_list = [Module(), {"key": Module()}]
+    root.sub_module = Module()  # ty:ignore[unresolved-attribute]
+    root.sub_module.nested_list = [Module(), {"key": Module()}]  # ty:ignore[unresolved-attribute]
     same_module = Module()
-    root.sub_module.nested_tuple = (Module(), [same_module, same_module])
+    root.sub_module.nested_tuple = (Module(), [same_module, same_module])  # ty:ignore[unresolved-attribute]
 
     set_attribute_by_name(root, "test_attrib", True)
     assert root.test_attrib is True
     set_attribute_by_name(root, "sub_module.test_attrib", True)
     assert root.sub_module.test_attrib is True
     set_attribute_by_name(root, "sub_module.nested_list[0].test_attrib", True)
-    assert root.sub_module.nested_list[0].test_attrib is True
+    assert root.sub_module.nested_list[0].test_attrib is True  # ty:ignore[unresolved-attribute]
     set_attribute_by_name(root, "sub_module.nested_list[1]['key'].test_attrib", True)
-    assert root.sub_module.nested_list[1]["key"].test_attrib is True
+    assert root.sub_module.nested_list[1]["key"].test_attrib is True  # ty:ignore[not-subscriptable]
     set_attribute_by_name(root, "sub_module.nested_tuple[0].test_attrib", True)
     assert root.sub_module.nested_tuple[0].test_attrib is True
     set_attribute_by_name(root, "sub_module.nested_tuple[1][0].test_attrib", True)
@@ -197,13 +197,13 @@ def test_load_dspy_program_cross_version():
     `ReAct` program.
     """
     path = Path(__file__).parent / "resources" / "saved_program.json"
-    loaded_react = ReAct("question->answer", tools=[])
+    loaded_react = ReAct("question->answer", tools=[])  # ty:ignore[invalid-argument-type]
     loaded_react.load(path)
     assert (
         "Imagine you are a detective racing against time to solve a high-profile"
-        in loaded_react.react.signature.instructions
+        in loaded_react.react.signature.instructions  # ty:ignore[unresolved-attribute]
     )
-    assert "Given the very verbose fields `question`" in loaded_react.extract.predict.signature.instructions
+    assert "Given the very verbose fields `question`" in loaded_react.extract.predict.signature.instructions  # ty:ignore[unresolved-attribute]
 
     assert len(loaded_react.react.demos) == 2
     assert len(loaded_react.extract.predict.demos) == 2

@@ -102,7 +102,7 @@ def test_construct_result_df():
         (devset[1], {"answer": "4"}, 100.0),
         (devset[2], {"answer": "-1"}, 0.0),
     ]
-    result_df = ev._construct_result_table(results, answer_exact_match.__name__)
+    result_df = ev._construct_result_table(results, answer_exact_match.__name__)  # ty:ignore[invalid-argument-type]
     pd.testing.assert_frame_equal(
         result_df,
         pd.DataFrame(
@@ -284,13 +284,13 @@ def test_evaluate_callback():
     )
     result = ev(program)
     assert result.score == 100.0
-    assert callback.start_call_inputs["program"] == program
+    assert callback.start_call_inputs["program"] == program  # ty:ignore[not-subscriptable]
     assert callback.start_call_count == 1
-    assert callback.end_call_outputs.score == 100.0
+    assert callback.end_call_outputs.score == 100.0  # ty:ignore[unresolved-attribute]
     assert callback.end_call_count == 1
 
 def test_evaluation_result_repr():
-    result = EvaluationResult(score=100.0, results=[(new_example("What is 1+1?", "2"), {"answer": "2"}, 100.0)])
+    result = EvaluationResult(score=100.0, results=[(new_example("What is 1+1?", "2"), {"answer": "2"}, 100.0)])  # ty:ignore[invalid-argument-type]
     assert repr(result) == "EvaluationResult(score=100.0, results=<list of 1 results>)"
 
 
