@@ -1,6 +1,6 @@
 import random
 from collections.abc import Sequence
-from typing import overload, cast
+from typing import cast, overload
 
 from dspy.datasets.dataset import Dataset
 
@@ -190,12 +190,11 @@ class Colors(Dataset):
 
     def sorted_by_suffix(self, colors: Sequence[str] | Sequence[dict[str, str]]) -> list[str] | list[dict[str, str]]:
         if not self.sort_by_suffix:
-            return cast(list[str] | list[dict[str, str]], list(colors))
+            return cast("list[str] | list[dict[str, str]]", list(colors))
 
         if not colors:
-            return cast(list[str] | list[dict[str, str]], list(colors))
+            return cast("list[str] | list[dict[str, str]]", list(colors))
 
         if isinstance(colors[0], str):
-            return cast(list[str], sorted(colors, key=lambda x: x[::-1]))
-        else:
-            return cast(list[dict[str, str]], sorted(colors, key=lambda x: x["color"][::-1]))
+            return cast("list[str]", sorted(colors, key=lambda x: x[::-1]))
+        return cast("list[dict[str, str]]", sorted(colors, key=lambda x: x["color"][::-1]))

@@ -174,7 +174,7 @@ def streamify(
     else:
         predict_id_to_listener = {}
 
-    program_fn = cast(Any, program)
+    program_fn = cast("Any", program)
     if is_async_program:
         program_fn = program_fn.acall
     elif not iscoroutinefunction(program):

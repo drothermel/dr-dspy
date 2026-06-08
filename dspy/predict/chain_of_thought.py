@@ -33,10 +33,10 @@ class ChainOfThought(Module):
         if signature is None:
             raise ValueError(f"Invalid signature: {signature!r}")
         desc = "${reasoning}"
-        rationale_field_type = cast(type, rationale_field.annotation) if rationale_field else rationale_field_type
+        rationale_field_type = cast("type", rationale_field.annotation) if rationale_field else rationale_field_type
         rationale_field = rationale_field if rationale_field else OutputField(desc=desc)
         extended_signature = signature.prepend(name="reasoning", field=rationale_field, type_=rationale_field_type)
-        callbacks = cast(list[BaseCallback] | None, config.pop("callbacks", None))
+        callbacks = cast("list[BaseCallback] | None", config.pop("callbacks", None))
         self.predict = Predict(extended_signature, callbacks=callbacks, **config)
 
     def forward(self, **kwargs):

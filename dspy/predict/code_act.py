@@ -1,6 +1,7 @@
 import inspect
 import logging
 from collections.abc import Callable
+from typing import Any, cast
 
 from dspy.adapters.types.tool import Tool
 from dspy.predict.chain_of_thought import ChainOfThought
@@ -12,11 +13,10 @@ from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import (
     Signature,
+    _field_infos_to_signature_fields,
     ensure_signature,
     make_signature,
-    _field_infos_to_signature_fields,
 )
-from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class CodeAct(ReAct, ProgramOfThought):
 
         codeact_signature = (
             make_signature(
-                cast(Any, _field_infos_to_signature_fields(self.signature.input_fields)),
+                cast("Any", _field_infos_to_signature_fields(self.signature.input_fields)),
                 "\n".join(instructions),
             )
             .append("trajectory", InputField(), type_=str)
@@ -74,7 +74,7 @@ class CodeAct(ReAct, ProgramOfThought):
         )
 
         extract_signature = make_signature(
-            cast(Any, _field_infos_to_signature_fields({**self.signature.input_fields, **self.signature.output_fields})),
+            cast("Any", _field_infos_to_signature_fields({**self.signature.input_fields, **self.signature.output_fields})),
             self.signature.instructions,
         ).append("trajectory", InputField(), type_=str)
 

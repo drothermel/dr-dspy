@@ -31,9 +31,9 @@ class ProgramMeta(type):
             # Guarantee existence of critical attributes if ``__init__`` didn't
             # create them.
             if not hasattr(obj, "callbacks"):
-                setattr(obj, "callbacks", [])
+                obj.callbacks = []
             if not hasattr(obj, "history"):
-                setattr(obj, "history", [])
+                obj.history = []
         return obj
 
 

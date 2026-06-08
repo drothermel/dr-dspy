@@ -1,9 +1,10 @@
-import random
 import importlib
+import random
 import re
 from typing import Protocol, cast
 
 from datasets import DatasetDict
+
 from dspy.primitives.example import Example
 
 
@@ -15,7 +16,7 @@ class MATH:
     def __init__(self, subset: str) -> None:
         from datasets import load_dataset
 
-        ds = cast(DatasetDict, load_dataset("DigitalLearningGmbH/MATH-lighteval", subset))
+        ds = cast("DatasetDict", load_dataset("DigitalLearningGmbH/MATH-lighteval", subset))
 
         # NOTE: Defaults to sub-splitting MATH's 'test' split into train/dev/test, presuming that current
         # LMs are trained on MATH's train. Makes no difference for gpt-4o-mini, but might for other models.
@@ -33,7 +34,7 @@ class MATH:
 
     def metric(self, example: HasAnswer, pred: HasAnswer, _trace: object | None = None) -> bool:
         try:
-            math_equivalence = cast(MathEquivalenceModule, importlib.import_module("math_equivalence"))
+            math_equivalence = cast("MathEquivalenceModule", importlib.import_module("math_equivalence"))
         except ImportError as err:
             raise ImportError("MATH's metric requires `pip install git+https://github.com/hendrycks/math.git`") from err
 

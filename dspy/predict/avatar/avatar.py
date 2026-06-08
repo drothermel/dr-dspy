@@ -59,7 +59,7 @@ class Avatar(Module):
         self.actor_clone = deepcopy(self.actor)
 
     def _get_field(self, field_info: FieldInfo):
-        extra = cast(dict[str, Any], field_info.json_schema_extra or {})
+        extra = cast("dict[str, Any]", field_info.json_schema_extra or {})
         if extra["__dspy_field_type"] == "input":
             return InputField(
                 desc=extra["desc"],

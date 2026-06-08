@@ -91,9 +91,9 @@ class EnvPool:
 
         # Must call set_start_method('spawn') here, before creating any processes
         with contextlib.suppress(RuntimeError):
-            getattr(mp, "set_start_method")("spawn", force=True)
+            mp.set_start_method("spawn", force=True)
 
-        ctx = getattr(mp, "get_context")("spawn")
+        ctx = mp.get_context("spawn")
         for i in range(size):
             inq = ctx.Queue()
             outq = ctx.Queue()

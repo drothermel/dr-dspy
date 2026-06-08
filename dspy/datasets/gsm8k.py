@@ -14,10 +14,9 @@ class GSM8K:
     def __init__(self) -> None:
         self.do_shuffle = False
 
-        from datasets import load_dataset
-        from datasets import DatasetDict
+        from datasets import DatasetDict, load_dataset
 
-        dataset = cast(DatasetDict, load_dataset("gsm8k", "main"))
+        dataset = cast("DatasetDict", load_dataset("gsm8k", "main"))
 
         hf_official_train = dataset["train"]
         hf_official_test = dataset["test"]

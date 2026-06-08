@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Callable
-from typing import Any, Literal
+from typing import Any, cast
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool
@@ -12,11 +12,10 @@ from dspy.primitives.prediction import Prediction
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import (
     Signature,
+    _field_infos_to_signature_fields,
     ensure_signature,
     make_signature,
-    _field_infos_to_signature_fields,
 )
-from typing import cast
 from dspy.utils.exceptions import ContextWindowExceededError
 
 logger = logging.getLogger(__name__)
@@ -91,7 +90,7 @@ class ReAct(Module):
 
         react_signature = (
             make_signature(
-                cast(Any, _field_infos_to_signature_fields(signature.input_fields)),
+                cast("Any", _field_infos_to_signature_fields(signature.input_fields)),
                 "\n".join(instr),
             )
             .append("trajectory", InputField(), type_=str)
@@ -101,7 +100,7 @@ class ReAct(Module):
         )
 
         fallback_signature = make_signature(
-            cast(Any, _field_infos_to_signature_fields({**signature.input_fields, **signature.output_fields})),
+            cast("Any", _field_infos_to_signature_fields({**signature.input_fields, **signature.output_fields})),
             signature.instructions,
         ).append("trajectory", InputField(), type_=str)
 
@@ -155,7 +154,7 @@ class ReAct(Module):
 
             try:
                 tool = self.tools[pred.next_tool_name]
-                trajectory[f"observation_{idx}"] = await cast(Any, tool).acall(**pred.next_tool_args)
+                trajectory[f"observation_{idx}"] = await cast("Any", tool).acall(**pred.next_tool_args)
             except Exception as err:
                 trajectory[f"observation_{idx}"] = f"Execution error in {pred.next_tool_name}: {_fmt_exc(err)}"
 

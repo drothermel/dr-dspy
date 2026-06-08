@@ -1,6 +1,6 @@
 import inspect
-import linecache
 import json
+import linecache
 import re
 
 from dspy.primitives.module import Module

@@ -415,7 +415,7 @@ def old_getfile(object):
     if inspect.isclass(object):
         if hasattr(object, "__module__"):
             module = sys.modules.get(object.__module__)
-            module_file = getattr(cast(Any, module), "__file__", None) if module is not None else None
+            module_file = getattr(cast("Any", module), "__file__", None) if module is not None else None
             if module_file:
                 return module_file
             if object.__module__ == "__main__":
@@ -454,4 +454,4 @@ def new_getfile(object):
     raise TypeError(f"Source for {object!r} not found")
 
 
-inspect.getfile = cast(Any, new_getfile)
+inspect.getfile = cast("Any", new_getfile)

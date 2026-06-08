@@ -1,7 +1,7 @@
 import time
 from concurrent.futures import Future
-from unittest.mock import MagicMock
 from typing import Any
+from unittest.mock import MagicMock
 
 from dspy.utils.unbatchify import Unbatchify
 

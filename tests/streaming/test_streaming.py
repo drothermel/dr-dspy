@@ -1,7 +1,7 @@
 import asyncio
 import time
-from typing import Any, cast
 from dataclasses import dataclass
+from typing import Any, cast
 from unittest import mock
 from unittest.mock import AsyncMock
 
@@ -289,7 +289,7 @@ async def test_default_status_streaming_in_async_program():
             self.predict = Predict("question->answer")
 
         async def acall(self, x: str):
-            question = await cast(Any, self.generate_question).acall(x=x)
+            question = await cast("Any", self.generate_question).acall(x=x)
             return await self.predict.acall(question=question)
 
     lm = DummyLM([{"answer": "red"}, {"answer": "blue"}])
@@ -894,7 +894,7 @@ async def test_status_message_non_blocking_async_program():
 
     class MyProgram(Module):
         async def aforward(self, question, **kwargs: object):
-            await cast(Any, Tool(dummy_tool)).acall()
+            await cast("Any", Tool(dummy_tool)).acall()
             return Prediction(answer="dummy_tool_output")
 
     program: Any = streamify(MyProgram(), status_message_provider=StatusMessageProvider(), is_async_program=True)
@@ -1203,7 +1203,7 @@ async def test_streaming_with_citations():
 
         with settings.context(
             lm=LM("anthropic/claude-3-5-sonnet-20241022", cache=False),
-            adapter=ChatAdapter(native_response_types=[cast(Any, Citations)]),
+            adapter=ChatAdapter(native_response_types=[cast("Any", Citations)]),
         ):
             output = program(documents=docs, question="What temperature does water boil?")
             citation_chunks = []
@@ -1220,7 +1220,7 @@ async def test_streaming_with_citations():
             # Test that we received citation chunks from streaming
             assert len(citation_chunks) > 0
             citation_chunk = citation_chunks[0]
-            assert isinstance(citation_chunk.chunk, cast(Any, Citations))
+            assert isinstance(citation_chunk.chunk, cast("Any", Citations))
             assert len(citation_chunk.chunk) == 1
             assert citation_chunk.chunk[0].cited_text == "water boils at 100°C"
             assert citation_chunk.chunk[0].document_title == "Physics Facts"

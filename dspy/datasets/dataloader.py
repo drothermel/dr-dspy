@@ -45,16 +45,15 @@ class DataLoader(Dataset):
         if not isinstance(input_keys, tuple):
             raise TypeError("Invalid input keys provided. Please provide a tuple of input keys.")
 
-        from datasets import DatasetDict
-        from datasets import load_dataset
+        from datasets import DatasetDict, load_dataset
 
         dataset = load_dataset(dataset_name, *args, **kwargs)
 
         if isinstance(dataset, list) and isinstance(kwargs.get("split"), list):
-            split_names = cast(list[str], kwargs["split"])
+            split_names = cast("list[str]", kwargs["split"])
             return {
                 split_name: _rows_to_examples(
-                    cast(Iterable[Mapping[str, object]], split_rows),
+                    cast("Iterable[Mapping[str, object]]", split_rows),
                     fields,
                     input_keys,
                 )
@@ -67,7 +66,7 @@ class DataLoader(Dataset):
                 for split_name, rows in dataset.items()
             }
 
-        return _rows_to_examples(cast(Iterable[Mapping[str, object]], dataset), fields, input_keys)
+        return _rows_to_examples(cast("Iterable[Mapping[str, object]]", dataset), fields, input_keys)
 
     def from_csv(
         self,
@@ -79,7 +78,7 @@ class DataLoader(Dataset):
 
         loaded_dataset: Any = load_dataset("csv", data_files=file_path)
         dataset = loaded_dataset["train"]
-        return _rows_to_examples(cast(Iterable[Mapping[str, object]], dataset), fields, input_keys)
+        return _rows_to_examples(cast("Iterable[Mapping[str, object]]", dataset), fields, input_keys)
 
     def from_pandas(
         self,
@@ -104,7 +103,7 @@ class DataLoader(Dataset):
 
         loaded_dataset: Any = load_dataset("json", data_files=file_path)
         dataset = loaded_dataset["train"]
-        return _rows_to_examples(cast(Iterable[Mapping[str, object]], dataset), fields, input_keys)
+        return _rows_to_examples(cast("Iterable[Mapping[str, object]]", dataset), fields, input_keys)
 
     def from_parquet(
         self,
@@ -116,14 +115,14 @@ class DataLoader(Dataset):
 
         loaded_dataset: Any = load_dataset("parquet", data_files=file_path)
         dataset = loaded_dataset["train"]
-        return _rows_to_examples(cast(Iterable[Mapping[str, object]], dataset), fields, input_keys)
+        return _rows_to_examples(cast("Iterable[Mapping[str, object]]", dataset), fields, input_keys)
 
     def from_rm(self, num_samples: int, fields: list[str], input_keys: list[str]) -> list[Example]:
         try:
             rm = settings.rm
             try:
                 return _rows_to_examples(
-                    cast(Iterable[Mapping[str, object]], rm.get_objects(num_samples=num_samples, fields=fields)),
+                    cast("Iterable[Mapping[str, object]]", rm.get_objects(num_samples=num_samples, fields=fields)),
                     fields,
                     tuple(input_keys),
                 )

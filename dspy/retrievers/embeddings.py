@@ -181,7 +181,7 @@ class Embeddings:
         if not embeddings_path.exists():
             raise FileNotFoundError(f"Embeddings file not found: {embeddings_path}")
 
-        config = cast(dict[str, Any], srsly.read_json(config_path))
+        config = cast("dict[str, Any]", srsly.read_json(config_path))
 
         required_fields = ["k", "normalize", "corpus", "has_faiss_index"]
         for field in required_fields:
