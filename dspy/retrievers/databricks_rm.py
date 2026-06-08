@@ -248,14 +248,12 @@ class DatabricksRM:
             or a ``dspy.primitives.prediction.Prediction`` object when ``use_with_databricks_agent_framework`` is
             ``False``.
         """
-        if query_type in ["vector", "text"]:
-            # Older versions of DSPy used a `query_type` argument to disambiguate between text
-            # and vector queries, rather than checking the type of the `query` argument. This
-            # differs from the Databricks Vector Search definition of `query_type`, which
-            # specifies the search algorithm to use (e.g. "ANN" or "HYBRID"). To maintain
-            # backwards compatibility with older versions of DSPy, we map the old `query_type`
-            # values to the Databricks Vector Search default query type of "ANN".
-            query_type = "ANN"
+        if query_type in {"vector", "text"}:
+            raise ValueError(
+                "query_type 'vector' and 'text' are no longer supported. Pass a string query for text search "
+                "or a list of floats for vector search, and use Databricks query_type values such as 'ANN' "
+                "or 'HYBRID'."
+            )
 
         if isinstance(query, str):
             query_text = query

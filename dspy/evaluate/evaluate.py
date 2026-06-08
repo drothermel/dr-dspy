@@ -25,28 +25,11 @@ from dspy.utils.callback import with_callbacks
 from dspy.utils.parallelizer import ParallelExecutor
 
 try:
-    ipython_display = importlib.import_module("IPython.display")
-    HTML = ipython_display.HTML
-    display = ipython_display.display
-
+    from IPython.display import HTML as IPythonHTML
+    from IPython.display import display as ipython_display
 except ImportError:
-
-    def display(obj: Any) -> None:
-        """
-        Display the specified Python object in the console.
-
-        :param obj: The Python object to display.
-        """
-        print(obj)  # noqa: T201
-
-    def HTML(x: str) -> str:  # noqa: N802
-        """
-        Obtain the HTML representation of the specified string.
-        """
-        # NB: This method exists purely for code compatibility with the IPython HTML() function in
-        # environments where IPython is not available. In such environments where IPython is not
-        # available, this method will simply return the input string.
-        return x
+    IPythonHTML = None
+    ipython_display = None
 
 
 logger = logging.getLogger(__name__)
@@ -284,7 +267,8 @@ class Evaluate:
         display_dataframe(df_to_display)
 
         if truncated_rows > 0:
-            message = f"""
+            if ipython_display is not None and IPythonHTML is not None:
+                message = f"""
             <div style='
                 text-align: center;
                 font-size: 16px;
@@ -294,7 +278,9 @@ class Evaluate:
                 ... {truncated_rows} more rows not displayed ...
             </div>
             """
-            display(HTML(message))
+                ipython_display(IPythonHTML(message))
+            else:
+                logger.info("%s more rows not displayed", truncated_rows)
 
 
 def prediction_is_dictlike(prediction):
@@ -360,8 +346,8 @@ def display_dataframe(df: "pd.DataFrame") -> None:
     """
     import pandas as pd
 
-    if is_in_ipython_notebook_environment():
-        display(configure_dataframe_for_ipython_notebook_display(df))
+    if is_in_ipython_notebook_environment() and ipython_display is not None:
+        ipython_display(configure_dataframe_for_ipython_notebook_display(df))
     else:
         with pd.option_context(
             "display.max_rows", None, "display.max_columns", None
