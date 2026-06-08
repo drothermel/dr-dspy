@@ -4,24 +4,24 @@ from dspy.predict.avatar.models import Action, ActionOutput, Tool
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 
-ACTOR_TASK_SPEC = make_task_spec(
-    {
-        "goal": FieldSpec.input("goal", str, desc="Task to be accomplished."),
-        "tools": FieldSpec.input("tools", list[str], desc="list of tools to use"),
-        "action_1": FieldSpec.output("action_1", Action, desc="1st action to take."),
-    },
-    instructions=(
+
+class ActorTaskSpec(TaskSpec):
+    name: str = "Actor"
+    instructions: str = (
         "You will be given `Tools` which will be a list of tools to use to accomplish the `Goal`. Given the user "
         "query, your task is to decide which tool to use and what input values to provide.\n\n"
         "You will output action needed to accomplish the `Goal`. `Action` should have a tool to use and the input "
         "query to pass to the tool.\n\n"
         "Note: You can opt to use no tools and provide the final answer directly. You can also one tool multiple "
         "times with different input queries if applicable."
-    ),
-    name="Actor",
-)
+    )
+    inputs: tuple[FieldSpec, ...] = (
+        input_field("goal", str, desc="Task to be accomplished."),
+        input_field("tools", list[str], desc="list of tools to use"),
+    )
+    outputs: tuple[FieldSpec, ...] = (output_field("action_1", Action, desc="1st action to take."),)
 
 
 def get_number_with_suffix(number: int) -> str:
@@ -56,7 +56,7 @@ class Avatar(Module):
         )
 
         self.tools = tools + [self.finish_tool]
-        actor_task_spec = ACTOR_TASK_SPEC
+        actor_task_spec = ActorTaskSpec()
 
         for field_name in list(self.input_fields.keys())[::-1]:
             field = self.input_fields[field_name]
