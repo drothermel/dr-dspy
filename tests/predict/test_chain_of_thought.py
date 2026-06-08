@@ -11,14 +11,16 @@ except ImportError:
 from dspy.clients.lm import LM
 from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.task_spec import default_task_instructions
 from dspy.utils.dummies import DummyLM
+from tests.task_spec.helpers import ts
 
 
 def test_initialization_with_string_signature():
     lm = DummyLM([{"reasoning": "find the number after 1", "answer": "2"}])
     settings.configure(lm=lm)
-    predict = ChainOfThought("question -> answer")
-    assert list(predict.predict.signature.output_fields.keys()) == [
+    predict = ChainOfThought(ts("question -> answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",))))
+    assert list(predict.predict.task_spec.output_fields.keys()) == [
         "reasoning",
         "answer",
     ]
@@ -29,7 +31,7 @@ def test_initialization_with_string_signature():
 async def test_async_chain_of_thought():
     lm = DummyLM([{"reasoning": "find the number after 1", "answer": "2"}])
     with settings.context(lm=lm):
-        program = ChainOfThought("question -> answer")
+        program = ChainOfThought(ts("question -> answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",))))
         result = await program.acall(question="What is 1+1?")
         assert result.answer == "2"
 
@@ -53,7 +55,7 @@ def test_chain_of_thought_with_native_reasoning():
             model="anthropic/claude-3-7-sonnet-20250219",
         )
 
-        cot = ChainOfThought("question -> answer")
+        cot = ChainOfThought(ts("question -> answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",))))
         result = asyncio.run(cot(question="What is the capital of France?"))
         assert result.answer == "Paris"
         assert result.reasoning == "Step-by-step thinking about the capital of France"
@@ -82,7 +84,7 @@ def test_chain_of_thought_with_manual_reasoning():
             model="openai/gpt-4o-mini",
         )
 
-        cot = ChainOfThought("question -> answer")
+        cot = ChainOfThought(ts("question -> answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",))))
         result = asyncio.run(cot(question="What is the capital of France?"))
         assert result.answer == "Paris"
         assert result.reasoning == "Step-by-step thinking about the capital of France"

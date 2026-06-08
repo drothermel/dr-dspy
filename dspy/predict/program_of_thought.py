@@ -1,14 +1,12 @@
 import json
 import logging
 import re
-from typing import Any, cast
 
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.code_interpreter import FinalOutput
 from dspy.primitives.module import Module
 from dspy.primitives.python_interpreter import PythonInterpreter
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature, _field_infos_to_signature_fields, ensure_signature, make_signature
+from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
 
 logger = logging.getLogger(__name__)
 
@@ -23,92 +21,96 @@ class ProgramOfThought(Module):
     from dspy.clients.lm import LM
     from dspy.dsp.utils.settings import settings
     from dspy.predict.program_of_thought import ProgramOfThought
+    from dspy.task_spec import make_task_spec
 
     lm = LM('openai/gpt-4o-mini')
     settings.configure(lm=lm)
-    pot = ProgramOfThought("question -> answer")
+    pot = ProgramOfThought(make_task_spec("question -> answer", instructions="Answer the question."))
     pot(question="what is 1+1?")
     ```
     """
 
     def __init__(
-        self, signature: str | type[Signature], max_iters: int = 3, interpreter: PythonInterpreter | None = None
+        self, task_spec: TaskSpec, max_iters: int = 3, interpreter: PythonInterpreter | None = None
     ) -> None:
         """
         Args:
-            signature: The signature of the module.
+            task_spec: The task spec of the module.
             max_iters: The maximum number of iterations to retry code generation and execution.
             interpreter: PythonInterpreter instance to use. If None, a new one is instantiated.
         """
         super().__init__()
-        resolved_signature = ensure_signature(signature)
-        if resolved_signature is None:
-            raise ValueError(f"Invalid signature: {signature!r}")
-        self.signature: type[Signature] = resolved_signature
+        if not isinstance(task_spec, TaskSpec):
+            raise TypeError(f"ProgramOfThought requires a TaskSpec instance, got {type(task_spec).__name__}.")
+        self.task_spec = task_spec
         self.max_iters = max_iters
 
-        self.input_fields = resolved_signature.input_fields
-        self.output_fields = resolved_signature.output_fields
+        self.input_fields = task_spec.input_fields
+        self.output_fields = task_spec.output_fields
 
         self.code_generate = ChainOfThought(
-            make_signature(
-                signature=cast("Any", _field_infos_to_signature_fields(self._generate_signature("generate").fields)),
-                instructions=self._generate_instruction("generate"),
-            ),
+            make_task_spec(self._mode_fields("generate"), instructions=self._generate_instruction("generate"))
         )
         self.code_regenerate = ChainOfThought(
-            make_signature(
-                signature=cast("Any", _field_infos_to_signature_fields(self._generate_signature("regenerate").fields)),
-                instructions=self._generate_instruction("regenerate"),
-            ),
+            make_task_spec(self._mode_fields("regenerate"), instructions=self._generate_instruction("regenerate"))
         )
         self.generate_output = ChainOfThought(
-            make_signature(
-                signature=cast("Any", _field_infos_to_signature_fields(self._generate_signature("answer").fields)),
-                instructions=self._generate_instruction("answer"),
-            ),
+            make_task_spec(self._mode_fields("answer"), instructions=self._generate_instruction("answer"))
         )
         # PythonInterpreter may raise if the Deno-backed sandbox is unavailable; construct it here so failures surface during module initialization.
         self.interpreter = interpreter or PythonInterpreter()
 
-    def _generate_signature(self, mode):
-        signature_dict = dict(self.input_fields)
+    def _mode_fields(self, mode: str) -> dict[str, FieldSpec]:
+        fields = dict(self.input_fields)
         fields_for_mode = {
             "generate": {
-                "generated_code": OutputField(
+                "generated_code": FieldSpec.output(
+                    "generated_code",
+                    str,
                     desc="python code that answers the question",
                 ),
             },
             "regenerate": {
-                "previous_code": InputField(
+                "previous_code": FieldSpec.input(
+                    "previous_code",
+                    str,
                     desc="previously-generated python code that errored",
                 ),
-                "error": InputField(
+                "error": FieldSpec.input(
+                    "error",
+                    str,
                     desc="error message from previously-generated python code",
                 ),
-                "generated_code": OutputField(
+                "generated_code": FieldSpec.output(
+                    "generated_code",
+                    str,
                     desc="python code that answers the question",
                 ),
             },
             "answer": {
-                "final_generated_code": InputField(
+                "final_generated_code": FieldSpec.input(
+                    "final_generated_code",
+                    str,
                     desc="python code that answers the question",
                 ),
-                "code_output": InputField(
+                "code_output": FieldSpec.input(
+                    "code_output",
+                    str,
                     desc="output of previously-generated python code",
                 ),
-            }
-            | self.signature.output_fields,
+                **self.output_fields,
+            },
         }
-        signature_dict.update(fields_for_mode[mode])
-        return make_signature(cast("Any", _field_infos_to_signature_fields(signature_dict)))
+        fields.update(fields_for_mode[mode])
+        return fields
 
     def _generate_instruction(self, mode):
+        mode_fields = self._mode_fields(mode)
         mode_inputs = ", ".join(
-            [f"`{field_name}`" for field_name in self._generate_signature(mode).input_fields],
+            [f"`{field_name}`" for field_name in mode_fields if mode_fields[field_name].role == "input"],
         )
         mode_outputs = ", ".join(
-            [f"`{field_name}`" for field_name in self._generate_signature(mode).output_fields],
+            [f"`{field_name}`" for field_name in mode_fields if mode_fields[field_name].role == "output"],
         )
         final_outputs = ", ".join(
             [f"`{field_name}`" for field_name in self.output_fields],
@@ -157,7 +159,7 @@ class ProgramOfThought(Module):
             result = self.interpreter.execute(code)
             if isinstance(result, FinalOutput):
                 result = result.output
-            # Serialize interpreter results before passing them back through the answer signature.
+            # Serialize interpreter results before passing them back through the answer task spec.
             output = json.dumps(result)
             return output, None
         except Exception as e:

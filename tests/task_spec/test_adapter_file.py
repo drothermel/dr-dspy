@@ -12,8 +12,10 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
+from dspy.task_spec.bridge import task_spec_from_signature
 from dspy.teleprompt.vanilla import LabeledFewShot
 from dspy.utils.dummies import DummyLM
+from tests.task_spec.helpers import ts
 
 
 @pytest.fixture
@@ -51,10 +53,16 @@ def count_messages_with_file_pattern(messages):
     return count_patterns(messages, pattern)
 
 
-def setup_predictor(signature, expected_output):
+def setup_predictor(spec, expected_output):
     lm = DummyLM([expected_output])
     settings.configure(lm=lm)
-    return Predict(signature), lm
+    if isinstance(spec, str):
+        task_spec = ts(spec)
+    elif isinstance(spec, type):
+        task_spec = task_spec_from_signature(spec)
+    else:
+        task_spec = spec
+    return Predict(task_spec), lm
 
 
 def test_file_from_local_path(sample_text_file):
@@ -232,7 +240,7 @@ def test_save_load_file_signature(sample_text_file):
 
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
-        loaded_predictor = Predict(signature)
+        loaded_predictor = Predict(ts("document: File -> summary: str"))
         loaded_predictor.load(temp_file.name)
 
     asyncio.run(loaded_predictor(document=File.from_file_id("file-test")))

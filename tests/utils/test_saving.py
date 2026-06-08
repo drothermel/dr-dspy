@@ -32,12 +32,11 @@ def test_save_predict(tmp_path):
     assert predict.task_spec.equals(loaded_predict.task_spec)
 
 
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 def test_save_custom_model(tmp_path):
     class CustomModel(Module):
         def __init__(self):
-            self.cot1 = ChainOfThought("question->refined_question")
-            self.cot2 = ChainOfThought("refined_question->answer")
+            self.cot1 = ChainOfThought(ts("question->refined_question"))
+            self.cot2 = ChainOfThought(ts("refined_question->answer"))
 
     model = CustomModel()
     model.save(tmp_path, save_program=True)
@@ -47,7 +46,7 @@ def test_save_custom_model(tmp_path):
 
     assert len(model.predictors()) == len(loaded_model.predictors())
     for predictor, loaded_predictor in zip(model.predictors(), loaded_model.predictors(), strict=False):
-        assert predictor.signature == loaded_predictor.signature
+        assert predictor.task_spec.equals(loaded_predictor.task_spec)
 
 
 def test_save_model_with_custom_signature(tmp_path):

@@ -1,7 +1,6 @@
 import inspect
 import logging
 from collections.abc import Callable
-from typing import Any, cast
 
 from typing_extensions import override
 
@@ -12,13 +11,7 @@ from dspy.predict.program_of_thought import ProgramOfThought
 from dspy.predict.react import ReAct
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import (
-    Signature,
-    _field_infos_to_signature_fields,
-    ensure_signature,
-    make_signature,
-)
+from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +23,7 @@ class CodeAct(ReAct, ProgramOfThought):
 
     def __init__(
         self,
-        signature: str | type[Signature],
+        task_spec: TaskSpec,
         tools: list[Callable],
         max_iters: int = 5,
         interpreter: PythonInterpreter | None = None,
@@ -39,25 +32,26 @@ class CodeAct(ReAct, ProgramOfThought):
         Initializes the CodeAct class with the specified model, temperature, and max tokens.
 
         Args:
-            signature (str | type[Signature]): The signature of the module.
+            task_spec: The task spec of the module.
             tools (list[Callable]): The tool callables to be used. CodeAct only accepts functions and not callable objects.
             max_iters (int): The maximum number of iterations to generate the answer.
             interpreter: PythonInterpreter instance to use. If None, a new one is instantiated.
         Examples:
             ```python
             from dspy.predict import CodeAct
+            from dspy.task_spec import make_task_spec
             def factorial(n):
                 if n == 1:
                     return 1
                 return n * factorial(n-1)
 
-            act = CodeAct("n->factorial", tools=[factorial])
+            act = CodeAct(make_task_spec("n->factorial", instructions="Compute factorial."), tools=[factorial])
             act(n=5) # 120
             ```
         """
-        self.signature = ensure_signature(signature)
-        if self.signature is None:
-            raise ValueError("Invalid signature provided to CodeAct.")
+        if not isinstance(task_spec, TaskSpec):
+            raise TypeError(f"CodeAct requires a TaskSpec instance, got {type(task_spec).__name__}.")
+        self.task_spec = task_spec
         self.max_iters = max_iters
         self.history = []
 
@@ -70,45 +64,45 @@ class CodeAct(ReAct, ProgramOfThought):
                 raise ValueError("Tool name could not be determined.")
             tools_by_name[tool.name] = tool
 
-        instructions = self._build_instructions(self.signature, tools_by_name)
+        instructions = self._build_instructions(task_spec, tools_by_name)
 
-        codeact_signature = (
-            make_signature(
-                signature=cast("Any", _field_infos_to_signature_fields(self.signature.input_fields)),
+        codeact_task_spec = (
+            make_task_spec(
+                dict(task_spec.input_fields),
                 instructions="\n".join(instructions),
             )
-            .append(name="trajectory", field=InputField(), type_=str)
+            .append(FieldSpec.input("trajectory", str))
             .append(
-                name="generated_code",
-                field=OutputField(
-                    desc="Python code that when executed, produces output relevant to answering the question"
+                FieldSpec.output(
+                    "generated_code",
+                    str,
+                    desc="Python code that when executed, produces output relevant to answering the question",
                 ),
-                type_=str,
             )
             .append(
-                name="finished",
-                field=OutputField(desc="a boolean flag to determine if the process is done"),
-                type_=bool,
+                FieldSpec.output(
+                    "finished",
+                    bool,
+                    desc="a boolean flag to determine if the process is done",
+                ),
             )
         )
 
-        extract_signature = make_signature(
-            signature=cast(
-                "Any", _field_infos_to_signature_fields({**self.signature.input_fields, **self.signature.output_fields})
-            ),
-            instructions=self.signature.instructions,
-        ).append(name="trajectory", field=InputField(), type_=str)
+        extract_task_spec = make_task_spec(
+            {**task_spec.input_fields, **task_spec.output_fields},
+            instructions=task_spec.instructions,
+        ).append(FieldSpec.input("trajectory", str))
 
         self.tools: dict[str, Tool] = tools_by_name
-        self.codeact = Predict(codeact_signature)
-        self.extractor = ChainOfThought(extract_signature)
+        self.codeact = Predict(codeact_task_spec)
+        self.extractor = ChainOfThought(extract_task_spec)
         # PythonInterpreter may raise if the Deno-backed sandbox is unavailable; construct it here so failures surface during module initialization.
         self.interpreter = interpreter or PythonInterpreter()
 
-    def _build_instructions(self, signature, tools):
-        instructions = [f"{signature.instructions}\n"] if signature.instructions else []
-        inputs = ", ".join([f"`{k}`" for k in signature.input_fields])
-        outputs = ", ".join([f"`{k}`" for k in signature.output_fields])
+    def _build_instructions(self, task_spec, tools):
+        instructions = [f"{task_spec.instructions}\n"] if task_spec.instructions else []
+        inputs = ", ".join([f"`{k}`" for k in task_spec.input_fields])
+        outputs = ", ".join([f"`{k}`" for k in task_spec.output_fields])
 
         instructions.append(
             f"You are an intelligent agent. For each episode, you will receive the fields {inputs} as input.\n"

@@ -210,7 +210,6 @@ def test_named_parameters_duplicate_references():
     module.named_parameters()
 
 
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 def test_load_state_is_transactional():
     """
     Regression test for https://github.com/stanfordnlp/dspy/issues/9589

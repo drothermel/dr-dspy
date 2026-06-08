@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, cast, get_args
+from typing import TYPE_CHECKING, Any, get_args
 
 import pydantic
 
@@ -11,8 +11,7 @@ from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature, ensure_signature, make_signature
+from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
 from dspy.utils.annotation import experimental
 from dspy.utils.exceptions import AdapterParseError, ContextWindowExceededError
 
@@ -24,11 +23,11 @@ if TYPE_CHECKING:
 
 @experimental
 class ReActV2(Module):
-    def __init__(self, signature: str | type[Signature], tools: list[Callable | Tool], max_iters: int = 20) -> None:
+    def __init__(self, task_spec: TaskSpec, tools: list[Callable | Tool], max_iters: int = 20) -> None:
         super().__init__()
-        self.signature = ensure_signature(signature)
-        if self.signature is None:
-            raise ValueError("Invalid signature provided to ReActV2.")
+        if not isinstance(task_spec, TaskSpec):
+            raise TypeError(f"ReActV2 requires a TaskSpec instance, got {type(task_spec).__name__}.")
+        self.task_spec = task_spec
         self.max_iters = max_iters
 
         user_tools = [tool if isinstance(tool, Tool) else Tool(tool) for tool in tools]
@@ -41,10 +40,10 @@ class ReActV2(Module):
             raise ValueError("`submit` is reserved by ReActV2 as the final-output tool.")
         self.tools["submit"] = self._make_submit_tool()
 
-        self.react = Predict(self._make_react_signature())
+        self.react = Predict(self._make_react_task_spec())
 
     def _make_submit_tool(self) -> Tool:
-        output_fields = self.signature.output_fields
+        output_fields = self.task_spec.output_fields
         output_names = list(output_fields)
 
         def submit(**kwargs):
@@ -53,8 +52,8 @@ class ReActV2(Module):
                 raise ValueError(f"Missing required final output field(s): {', '.join(missing)}")
             return {name: kwargs[name] for name in output_names}
 
-        args = {name: _json_schema_for_annotation(field.annotation) for name, field in output_fields.items()}
-        arg_types = {name: field.annotation for name, field in output_fields.items()}
+        args = {name: _json_schema_for_annotation(field.type_) for name, field in output_fields.items()}
+        arg_types = {name: field.type_ for name, field in output_fields.items()}
         return Tool(
             submit,
             name="submit",
@@ -63,27 +62,26 @@ class ReActV2(Module):
             arg_types=arg_types,
         )
 
-    def _make_react_signature(self) -> type[Signature]:
-        fields = {}
-        for name, field in self.signature.input_fields.items():
-            extra_dict: dict[str, Any] = {}
-            extra_dict |= cast("dict[str, Any]", field.json_schema_extra or {})
-            fields[name] = (
-                _optional_annotation(field.annotation),
-                InputField(desc=extra_dict.get("desc")),
+    def _make_react_task_spec(self) -> TaskSpec:
+        fields: dict[str, FieldSpec] = {}
+        for name, field in self.task_spec.input_fields.items():
+            fields[name] = FieldSpec.input(
+                name,
+                _optional_annotation(field.type_),
+                desc=field.desc if field.desc != f"${{{name}}}" else None,
             )
 
-        fields["history"] = (History, InputField())
-        fields["tools"] = (list[Tool], InputField())
-        fields["next_thought"] = (Reasoning, OutputField())
-        fields["tool_calls"] = (ToolCalls, OutputField())
+        fields["history"] = FieldSpec.input("history", History)
+        fields["tools"] = FieldSpec.input("tools", list[Tool])
+        fields["next_thought"] = FieldSpec.output("next_thought", Reasoning)
+        fields["tool_calls"] = FieldSpec.output("tool_calls", ToolCalls)
 
-        inputs = ", ".join(f"`{name}`" for name in self.signature.input_fields)
-        outputs = ", ".join(f"`{name}`" for name in self.signature.output_fields)
+        inputs = ", ".join(f"`{name}`" for name in self.task_spec.input_fields)
+        outputs = ", ".join(f"`{name}`" for name in self.task_spec.output_fields)
         tool_names = ", ".join(f"`{name}`" for name in self.tools)
         instructions = "\n".join(
             [
-                self.signature.instructions,
+                self.task_spec.instructions,
                 f"You are an Agent. Use the supplied tools to produce {outputs} from {inputs}.",
                 "Call tools when more information is needed.",
                 f"When the final answer is ready, call `submit` with {outputs}.",
@@ -91,12 +89,12 @@ class ReActV2(Module):
             ]
         ).strip()
 
-        return make_signature(signature=fields, instructions=instructions)
+        return make_task_spec(fields, instructions=instructions)
 
     async def aforward(self, **input_args):
         max_iters = input_args.pop("max_iters", self.max_iters)
         history = _coerce_history(input_args.pop("history", None))
-        pending_inputs = {name: input_args[name] for name in self.signature.input_fields if name in input_args}
+        pending_inputs = {name: input_args[name] for name in self.task_spec.input_fields if name in input_args}
 
         break_reason = "max_iters"
         for turn_index in range(max_iters):

@@ -25,6 +25,7 @@ from dspy.primitives.prediction import Prediction
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
 from dspy.task_spec import default_task_instructions
+from dspy.task_spec.bridge import task_spec_from_signature
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.utils.dummies import DummyLM
 from dspy.utils.saving import load
@@ -37,10 +38,8 @@ QUESTION_ANSWER_TASK_SPEC = ts(
 )
 
 
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 def test_deepcopy_basic():
-    signature = Signature("q -> a")  # ty:ignore[too-many-positional-arguments]
-    cot = ChainOfThought(signature)  # ty:ignore[invalid-argument-type]
+    cot = ChainOfThought(ts("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
     cot_copy = cot.deepcopy()
     assert len(cot.parameters()) == len(cot_copy.parameters())
     # Parameters should be different objects with the same values.
@@ -48,12 +47,11 @@ def test_deepcopy_basic():
     assert cot.parameters()[0].__dict__ == cot_copy.parameters()[0].__dict__
 
 
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 def test_deepcopy_with_uncopyable_modules():
     class CustomClass(Module):
         def __init__(self):
             self.lock = threading.Lock()  # Non-copyable object.
-            self.cot = ChainOfThought(Signature("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
+            self.cot = ChainOfThought(ts("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
 
     model = CustomClass()
     model_copy = model.deepcopy()
@@ -65,12 +63,11 @@ def test_deepcopy_with_uncopyable_modules():
     assert model.parameters()[0].__dict__ == model_copy.parameters()[0].__dict__
 
 
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 def test_deepcopy_with_nested_modules():
     class CustomClass1(Module):
         def __init__(self):
             self.lock = threading.Lock()  # Non-copyable object.
-            self.cot = ChainOfThought(Signature("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
+            self.cot = ChainOfThought(ts("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
 
     class CustomClass2(Module):
         def __init__(self):
@@ -86,10 +83,9 @@ def test_deepcopy_with_nested_modules():
     assert model.parameters()[0].__dict__ == model_copy.parameters()[0].__dict__
 
 
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 def test_save_and_load_with_json(tmp_path):
-    model = ChainOfThought(Signature("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
-    model.predict.signature = model.predict.signature.with_instructions("You are a helpful assistant.")
+    model = ChainOfThought(ts("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
+    model.predict.task_spec = model.predict.task_spec.with_instructions("You are a helpful assistant.")
     model.predict.demos = [
         Example(q="What is the capital of France?", a="Paris", reasoning="n/a").with_inputs("q"),
         # Nested example
@@ -104,16 +100,15 @@ def test_save_and_load_with_json(tmp_path):
     ]
     save_path = tmp_path / "model.json"
     model.save(save_path)
-    new_model = ChainOfThought(Signature("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
+    new_model = ChainOfThought(ts("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
     new_model.load(save_path)
 
-    assert str(new_model.predict.signature) == str(model.predict.signature)
+    assert new_model.predict.task_spec.equals(model.predict.task_spec)
     assert new_model.predict.demos[0] == model.predict.demos[0].to_dict()
     assert new_model.predict.demos[1] == model.predict.demos[1].to_dict()
 
 
 @pytest.mark.extra
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 def test_save_and_load_with_pkl(tmp_path):
     import datetime
 
@@ -138,7 +133,7 @@ def test_save_and_load_with_pkl(tmp_path):
         lm=DummyLM([{"date_diff": "1", "reasoning": "n/a"}, {"date_diff": "2", "reasoning": "n/a"}] * 10)
     )
 
-    cot = ChainOfThought(MySignature)
+    cot = ChainOfThought(task_spec_from_signature(MySignature))
     asyncio.run(cot(current_date=datetime.date(2024, 1, 1), target_date=datetime.date(2024, 1, 2)))
 
     def dummy_metric(example, pred, trace=None):
@@ -146,19 +141,18 @@ def test_save_and_load_with_pkl(tmp_path):
 
     optimizer = BootstrapFewShot(max_bootstrapped_demos=4, max_labeled_demos=4, max_rounds=5, metric=dummy_metric)
     compiled_cot = asyncio.run(optimizer.compile(cot, trainset=trainset))
-    compiled_cot.predict.signature = compiled_cot.predict.signature.with_instructions("You are a helpful assistant.")
+    compiled_cot.predict.task_spec = compiled_cot.predict.task_spec.with_instructions("You are a helpful assistant.")
 
     save_path = tmp_path / "program.pkl"
     compiled_cot.save(save_path)
 
-    new_cot = ChainOfThought(MySignature)
+    new_cot = ChainOfThought(task_spec_from_signature(MySignature))
     new_cot.load(save_path, allow_pickle=True)
 
-    assert str(new_cot.predict.signature) == str(compiled_cot.predict.signature)
+    assert str(new_cot.predict.task_spec) == str(compiled_cot.predict.task_spec)
     assert new_cot.predict.demos == compiled_cot.predict.demos
 
 
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 def test_save_with_extra_modules(tmp_path):
     import sys
 
@@ -172,7 +166,7 @@ from dspy.signatures.signature import Signature
 
 class MyModule(Module):
     def __init__(self):
-        self.cot = ChainOfThought(Signature("q -> a"))
+        self.cot = ChainOfThought(ts("q -> a"))
 
     async def aforward(self, q):
         return await self.cot(q=q)
@@ -212,7 +206,7 @@ class MyModule(Module):
         del custom_module
 
         loaded_module = load(tmp_path, allow_pickle=True)
-        assert loaded_module.cot.predict.signature == cot.cot.predict.signature
+        assert loaded_module.cot.predict.task_spec == cot.cot.predict.task_spec
 
     finally:
         # Only need to clean up sys.path
@@ -279,11 +273,10 @@ def test_load_with_version_mismatch(tmp_path):
 
 
 @pytest.mark.llm_call
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 def test_single_module_call_with_usage_tracker(lm_for_test):
     settings.configure(lm=LM(lm_for_test, cache=False, temperature=0.0), track_usage=True)
 
-    predict = ChainOfThought("question -> answer")
+    predict = ChainOfThought(ts("question -> answer"))
     output = predict(question="What is the capital of France?")
 
     lm_usage = output.get_lm_usage()
@@ -301,14 +294,13 @@ def test_single_module_call_with_usage_tracker(lm_for_test):
 
 
 @pytest.mark.llm_call
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 def test_multi_module_call_with_usage_tracker(lm_for_test):
     settings.configure(lm=LM(lm_for_test, cache=False, temperature=0.0), track_usage=True)
 
     class MyProgram(Module):
         def __init__(self):
-            self.predict1 = ChainOfThought("question -> answer")
-            self.predict2 = ChainOfThought("question, answer -> score")
+            self.predict1 = ChainOfThought(ts("question -> answer"))
+            self.predict2 = ChainOfThought(ts("question, answer -> score"))
 
         @override
         def __call__(self, question: str) -> Prediction:
@@ -328,13 +320,12 @@ def test_multi_module_call_with_usage_tracker(lm_for_test):
 
 # TODO: Replace the live OpenAI dependency with a deterministic two-LM fixture before enabling this in CI.
 @pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="Skip the test if OPENAI_API_KEY is not set.")
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 def test_usage_tracker_in_parallel():
     class MyProgram(Module):
         def __init__(self, lm):
             self.lm = lm
-            self.predict1 = ChainOfThought("question -> answer")
-            self.predict2 = ChainOfThought("question, answer -> score")
+            self.predict1 = ChainOfThought(ts("question -> answer"))
+            self.predict2 = ChainOfThought(ts("question, answer -> score"))
 
         async def aforward(self, question: str) -> Prediction:
             with settings.context(lm=self.lm):
@@ -421,12 +412,11 @@ def test_usage_tracker_no_side_effect():
     assert result == "Paris"
 
 
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 def test_module_history():
     class MyProgram(Module):
         def __init__(self, **kwargs: object):
             super().__init__(**kwargs)
-            self.cot = ChainOfThought("question -> answer")
+            self.cot = ChainOfThought(ts("question -> answer"))
 
         async def aforward(self, question: str, **kwargs: object) -> Prediction:
             return await self.cot(question=question)
@@ -472,12 +462,11 @@ def test_module_history():
         assert len(program.cot.predict.history) == 3
 
 
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 def test_module_history_with_concurrency():
     class MyProgram(Module):
         def __init__(self):
             super().__init__()
-            self.cot = ChainOfThought("question -> answer")
+            self.cot = ChainOfThought(ts("question -> answer"))
 
         async def aforward(self, question: str, **kwargs: object) -> Prediction:
             return await self.cot(question=question)
@@ -502,13 +491,12 @@ def test_module_history_with_concurrency():
         assert len(program.cot.predict.history) == 2
 
 
-@pytest.mark.skip(reason="Phase 5: ChainOfThought not yet migrated to TaskSpec")
 @pytest.mark.asyncio
 async def test_module_history_async():
     class MyProgram(Module):
         def __init__(self, **kwargs: object):
             super().__init__(**kwargs)
-            self.cot = ChainOfThought("question -> answer")
+            self.cot = ChainOfThought(ts("question -> answer"))
 
         async def aforward(self, question: str, **kwargs: object) -> Prediction:
             return await self.cot.acall(question=question)

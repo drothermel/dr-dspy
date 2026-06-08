@@ -13,8 +13,10 @@ from dspy.predict.react import ReAct
 from dspy.primitives.prediction import Prediction
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
+from dspy.task_spec.bridge import task_spec_from_signature
 from dspy.utils.dummies import DummyLM
 from dspy.utils.exceptions import ContextWindowExceededError
+from tests.task_spec.helpers import ts
 
 
 @pytest.mark.extra
@@ -26,9 +28,9 @@ def test_tool_observation_preserves_custom_type():
 
     class SpyChatAdapter(ChatAdapter):
         @override
-        def format_user_message_content(self, signature, inputs, *args: object, **kwargs: object):
-            captured_calls.append((signature, dict(inputs)))
-            return super().format_user_message_content(signature, inputs, *args, **kwargs)  # ty:ignore[invalid-argument-type]
+        def format_user_message_content(self, task_spec, inputs, *args: object, **kwargs: object):
+            captured_calls.append((task_spec, dict(inputs)))
+            return super().format_user_message_content(task_spec, inputs, *args, **kwargs)  # ty:ignore[invalid-argument-type]
 
     def make_images():
         return Image("https://example.com/test.png"), Image(Image.new("RGB", (100, 100), "red"))  # ty:ignore[call-non-callable]
@@ -52,7 +54,7 @@ def test_tool_observation_preserves_custom_type():
     )
     settings.configure(lm=lm, adapter=adapter)
 
-    react = ReAct("question -> answer", tools=[make_images])
+    react = ReAct(ts("question -> answer"), tools=[make_images])
     asyncio.run(react(question="Draw me something red"))
 
     sigs_with_obs = [sig for sig, inputs in captured_calls if "observation_0" in inputs]
@@ -78,7 +80,7 @@ def test_tool_calling_with_pydantic_args():
         event_info: CalendarEvent = InputField(desc="The information about the event")
         invitation_letter: str = OutputField(desc="The invitation letter to be sent to the participant")
 
-    react = ReAct(InvitationSignature, tools=[write_invitation_letter])
+    react = ReAct(task_spec_from_signature(InvitationSignature), tools=[write_invitation_letter])
 
     lm = DummyLM(
         [
@@ -150,8 +152,8 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
         user_request: str = InputField()
         process_result: str = OutputField()
 
-    react = ReAct(CustomerService, tools=[get_user_info])
-    problem_annotation = react.react.signature.output_fields["next_tool_args"].annotation
+    react = ReAct(task_spec_from_signature(CustomerService), tools=[get_user_info])
+    problem_annotation = react.react.task_spec.output_fields["next_tool_args"].type_
 
     def guarded_issubclass(cls, class_or_tuple):
         if cls == problem_annotation:
@@ -193,7 +195,7 @@ def test_tool_calling_without_typehint():
         """Add two numbers."""
         return a + b
 
-    react = ReAct("a, b -> c:int", tools=[foo])
+    react = ReAct(ts("a, b -> c:int"), tools=[foo])
     lm = DummyLM(
         [
             {"next_thought": "I need to add two numbers.", "next_tool_name": "foo", "next_tool_args": {"a": 1, "b": 2}},
@@ -226,7 +228,7 @@ def test_trajectory_truncation():
         return f"Echoed: {text}"
 
     # Create ReAct instance with our echo tool
-    react = ReAct("input_text -> output_text", tools=[echo])
+    react = ReAct(ts("input_text -> output_text"), tools=[echo])
 
     # Mock react.react to simulate multiple tool calls
     call_count = 0
@@ -269,7 +271,7 @@ async def test_context_window_exceeded_after_retries():
     def echo(text: str) -> str:
         return f"Echoed: {text}"
 
-    react = ReAct("input_text -> output_text", tools=[echo])
+    react = ReAct(ts("input_text -> output_text"), tools=[echo])
 
     async def mock_react(**kwargs: object):
         raise ContextWindowExceededError
@@ -298,7 +300,7 @@ def test_error_retry():
         raise Exception("tool error")
 
     # --- program under test -------------------------------------------------
-    react = ReAct("a, b -> c:int", tools=[foo])
+    react = ReAct(ts("a, b -> c:int"), tools=[foo])
     lm = DummyLM(
         [
             {
@@ -357,7 +359,7 @@ async def test_async_tool_calling_with_pydantic_args():
         event_info: CalendarEvent = InputField(desc="The information about the event")
         invitation_letter: str = OutputField(desc="The invitation letter to be sent to the participant")
 
-    react = ReAct(InvitationSignature, tools=[write_invitation_letter])
+    react = ReAct(task_spec_from_signature(InvitationSignature), tools=[write_invitation_letter])
 
     lm = DummyLM(
         [
@@ -424,7 +426,7 @@ async def test_async_error_retry():
     async def foo(a, b):
         raise Exception("tool error")
 
-    react = ReAct("a, b -> c:int", tools=[foo])
+    react = ReAct(ts("a, b -> c:int"), tools=[foo])
     lm = DummyLM(
         [
             {

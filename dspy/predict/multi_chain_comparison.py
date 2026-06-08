@@ -1,36 +1,41 @@
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature, ensure_signature
+from dspy.task_spec import FieldSpec, TaskSpec
 
 
 class MultiChainComparison(Module):
-    def __init__(self, signature: str | type[Signature], M=3, temperature=0.7, **config) -> None:  # noqa: N803
+    def __init__(self, task_spec: TaskSpec, M=3, temperature=0.7, **config) -> None:  # noqa: N803
         super().__init__()
 
+        if not isinstance(task_spec, TaskSpec):
+            raise TypeError(f"MultiChainComparison requires a TaskSpec instance, got {type(task_spec).__name__}.")
+
         self.M = M
-        signature = ensure_signature(signature)
-        if signature is None:
-            raise ValueError("Invalid signature provided to MultiChainComparison.")
+        self.task_spec = task_spec
+        *_, self.last_key = task_spec.output_fields.keys()
 
-        *_, self.last_key = signature.output_fields.keys()
-
+        extended_task_spec = task_spec
         for idx in range(M):
             field_name = f"reasoning_attempt_{idx + 1}"
-            signature = signature.append(
-                name=field_name,
-                field=InputField(desc="${reasoning attempt}"),
-            ).with_updated_fields(field_name, prefix=f"Student Attempt #{idx + 1}:")
+            extended_task_spec = extended_task_spec.append(
+                FieldSpec.input(
+                    field_name,
+                    str,
+                    desc="${reasoning attempt}",
+                    prefix=f"Student Attempt #{idx + 1}:",
+                ),
+            )
 
-        signature = signature.prepend(
-            "rationale",
-            OutputField(desc="${corrected reasoning}"),
-        ).with_updated_fields(
-            "rationale",
-            prefix="Accurate Reasoning: Thank you everyone. Let's now holistically",
+        extended_task_spec = extended_task_spec.prepend(
+            FieldSpec.output(
+                "rationale",
+                str,
+                desc="${corrected reasoning}",
+                prefix="Accurate Reasoning: Thank you everyone. Let's now holistically",
+            ),
         )
 
-        self.predict = Predict(signature, temperature=temperature, **config)
+        self.predict = Predict(extended_task_spec, temperature=temperature, **config)
 
     async def aforward(self, completions, **kwargs):
         attempts = []

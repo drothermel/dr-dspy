@@ -9,36 +9,80 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.utils import get_field_description_string
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict, Prediction
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
+from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
 
 from .predict import Module
 
-
-class OfferFeedback(Signature):
-    """
-    In the discussion, assign blame to each module that contributed to the final reward being below the threshold, if
-    any. Then, prescribe concrete advice of how the module should act on its future input when we retry the process, if
-    it were to receive the same or similar inputs. If a module is not to blame, the advice should be N/A.
-    The module will not see its own history, so it needs to rely on entirely concrete and actionable advice from you
-    to avoid the same mistake on the same or similar inputs.
-    """
-
-    program_code: str = InputField(desc="The code of the program that we are analyzing")
-    modules_defn: str = InputField(desc="The definition of each module in the program, including its I/O")
-    program_inputs: str = InputField(desc="The inputs to the program that we are analyzing")
-    program_trajectory: str = InputField(desc="The trajectory of the program's execution, showing each module's I/O")
-    program_outputs: str = InputField(desc="The outputs of the program that we are analyzing")
-    reward_code: str = InputField(desc="The code of the reward function that we are analyzing")
-    target_threshold: float = InputField(desc="The target threshold for the reward function")
-    reward_value: float = InputField(desc="The reward value assigned to the program's outputs")
-    module_names: list[str] = InputField(desc="The names of the modules in the program, for which we seek advice")
-    discussion: str = OutputField(desc="Discussing blame of where each module went wrong, if it did")
-    advice: dict[str, str] = OutputField(
-        desc="For each module, describe very concretely, in this order: the specific scenarios in which it has made "
-        "mistakes in the past and what each mistake was, followed by what it should do differently in that kind of"
-        "scenario in the future. If the module is not to blame, write N/A."
-    )
+OFFER_FEEDBACK_TASK_SPEC = make_task_spec(
+    {
+        "program_code": FieldSpec.input(
+            "program_code",
+            str,
+            desc="The code of the program that we are analyzing",
+        ),
+        "modules_defn": FieldSpec.input(
+            "modules_defn",
+            str,
+            desc="The definition of each module in the program, including its I/O",
+        ),
+        "program_inputs": FieldSpec.input(
+            "program_inputs",
+            str,
+            desc="The inputs to the program that we are analyzing",
+        ),
+        "program_trajectory": FieldSpec.input(
+            "program_trajectory",
+            str,
+            desc="The trajectory of the program's execution, showing each module's I/O",
+        ),
+        "program_outputs": FieldSpec.input(
+            "program_outputs",
+            str,
+            desc="The outputs of the program that we are analyzing",
+        ),
+        "reward_code": FieldSpec.input(
+            "reward_code",
+            str,
+            desc="The code of the reward function that we are analyzing",
+        ),
+        "target_threshold": FieldSpec.input(
+            "target_threshold",
+            float,
+            desc="The target threshold for the reward function",
+        ),
+        "reward_value": FieldSpec.input(
+            "reward_value",
+            float,
+            desc="The reward value assigned to the program's outputs",
+        ),
+        "module_names": FieldSpec.input(
+            "module_names",
+            list[str],
+            desc="The names of the modules in the program, for which we seek advice",
+        ),
+        "discussion": FieldSpec.output(
+            "discussion",
+            str,
+            desc="Discussing blame of where each module went wrong, if it did",
+        ),
+        "advice": FieldSpec.output(
+            "advice",
+            dict[str, str],
+            desc="For each module, describe very concretely, in this order: the specific scenarios in which it has made "
+            "mistakes in the past and what each mistake was, followed by what it should do differently in that kind of"
+            "scenario in the future. If the module is not to blame, write N/A.",
+        ),
+    },
+    instructions=(
+        "In the discussion, assign blame to each module that contributed to the final reward being below the "
+        "threshold, if any. Then, prescribe concrete advice of how the module should act on its future input when we "
+        "retry the process, if it were to receive the same or similar inputs. If a module is not to blame, the advice "
+        "should be N/A. The module will not see its own history, so it needs to rely on entirely concrete and "
+        "actionable advice from you to avoid the same mistake on the same or similar inputs."
+    ),
+    name="OfferFeedback",
+)
 
 
 class Refine(Module):
@@ -72,11 +116,12 @@ class Refine(Module):
             from dspy.dsp.utils.settings import settings
             from dspy.predict.chain_of_thought import ChainOfThought
             from dspy.predict.refine import Refine
+            from dspy.task_spec import make_task_spec
 
             settings.configure(lm=LM("openai/gpt-4o-mini"))
 
             # Define a QA module with chain of thought
-            qa = ChainOfThought("question -> answer")
+            qa = ChainOfThought(make_task_spec("question -> answer", instructions="Answer the question."))
 
             # Define a reward function that checks for one-word answers
             def one_word_answer(args, pred):
@@ -115,7 +160,7 @@ class Refine(Module):
             mod.set_lm(lm_)
 
             predictor2name = {predictor: name for name, predictor in mod.named_predictors()}
-            signature2name = {predictor.signature: name for name, predictor in mod.named_predictors()}
+            task_spec2name = {predictor.task_spec: name for name, predictor in mod.named_predictors()}
             module_names = [name for name, _ in mod.named_predictors()]
 
             try:
@@ -125,14 +170,17 @@ class Refine(Module):
                     else:
 
                         class WrapperAdapter(cast("Any", adapter.__class__)):
-                            async def acall(self, *, lm, config, signature, demos, inputs):
-                                inputs["hint_"] = advice.get(signature2name[signature], "N/A")  # noqa: B023
-                                signature = signature.append(
-                                    name="hint_",
-                                    field=InputField(desc="A hint to the module from an earlier run"),
+                            async def acall(self, *, lm, config, task_spec, demos, inputs):
+                                inputs["hint_"] = advice.get(task_spec2name[task_spec], "N/A")  # noqa: B023
+                                task_spec = task_spec.append(
+                                    FieldSpec.input(
+                                        "hint_",
+                                        str,
+                                        desc="A hint to the module from an earlier run",
+                                    ),
                                 )
                                 return await adapter.acall(
-                                    lm=lm, config=config, signature=signature, demos=demos, inputs=inputs
+                                    lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs
                                 )
 
                         with settings.context(adapter=WrapperAdapter()):
@@ -173,7 +221,7 @@ class Refine(Module):
                     k: v if isinstance(v, str) else orjson.dumps(recursive_mask(v), option=orjson.OPT_INDENT_2).decode()
                     for k, v in advise_kwargs.items()
                 }
-                advice = (await Predict(OfferFeedback)(**advise_kwargs)).advice
+                advice = (await Predict(OFFER_FEEDBACK_TASK_SPEC)(**advise_kwargs)).advice
                 # print(f"Advice for each module: {advice}")
 
             except Exception:
@@ -190,15 +238,23 @@ def inspect_modules(program):
     output = [separator]
 
     for _, (name, predictor) in enumerate(program.named_predictors()):
-        signature = predictor.signature
-        instructions = textwrap.dedent(signature.instructions)
+        task_spec = predictor.task_spec
+        instructions = textwrap.dedent(task_spec.instructions)
         instructions = ("\n" + "\t" * 2).join([""] + instructions.splitlines())
 
         output.append(f"Module {name}")
         output.append("\n\tInput Fields:")
-        output.append(("\n" + "\t" * 2).join([""] + get_field_description_string(signature.input_fields).splitlines()))
+        output.append(
+            ("\n" + "\t" * 2).join(
+                [""] + get_field_description_string(task_spec_input_field_infos(task_spec)).splitlines()
+            )
+        )
         output.append("\tOutput Fields:")
-        output.append(("\n" + "\t" * 2).join([""] + get_field_description_string(signature.output_fields).splitlines()))
+        output.append(
+            ("\n" + "\t" * 2).join(
+                [""] + get_field_description_string(task_spec_output_field_infos(task_spec)).splitlines()
+            )
+        )
         output.append(f"\tOriginal Instructions: {instructions}")
         output.append(separator)
 

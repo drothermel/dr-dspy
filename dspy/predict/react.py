@@ -9,29 +9,23 @@ from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import (
-    Signature,
-    _field_infos_to_signature_fields,
-    ensure_signature,
-    make_signature,
-)
+from dspy.task_spec import FieldSpec, TaskSpec, default_task_instructions, make_task_spec
 from dspy.utils.exceptions import ContextWindowExceededError
 
 logger = logging.getLogger(__name__)
 
 
 class ReAct(Module):
-    def __init__(self, signature: str | type["Signature"], tools: list[Callable], max_iters: int = 20) -> None:
+    def __init__(self, task_spec: TaskSpec, tools: list[Callable], max_iters: int = 20) -> None:
         """
         ReAct stands for "Reasoning and Acting," a popular paradigm for building tool-using agents.
         In this approach, the language model is iteratively provided with a list of tools and has
         to reason about the current situation. The model decides whether to call a tool to gather more
         information or to finish the task based on its reasoning process. The DSPy version of ReAct is
-        generalized to work over any signature, thanks to signature polymorphism.
+        generalized to work over any task spec, thanks to task-spec polymorphism.
 
         Args:
-            signature: The signature of the module, which defines the input and output of the react module.
+            task_spec: The task spec of the module, which defines the input and output of the react module.
             tools (list[Callable]): A list of functions, callable objects, or `dspy.adapters.types.tool.Tool`
                 instances.
             max_iters (int | None): The maximum number of iterations to run. Defaults to 10.
@@ -43,15 +37,19 @@ class ReAct(Module):
             return f"The weather in {city} is sunny."
 
         from dspy.predict.react import ReAct
+        from dspy.task_spec import make_task_spec
 
-        react = ReAct(signature="question->answer", tools=[get_weather])
+        react = ReAct(
+            make_task_spec("question->answer", instructions="Answer the question."),
+            tools=[get_weather],
+        )
         pred = react(question="What is the weather in Tokyo?")
         ```
         """
         super().__init__()
-        self.signature = signature = ensure_signature(signature)
-        if signature is None:
-            raise ValueError("Invalid signature provided to ReAct.")
+        if not isinstance(task_spec, TaskSpec):
+            raise TypeError(f"ReAct requires a TaskSpec instance, got {type(task_spec).__name__}.")
+        self.task_spec = task_spec
         self.max_iters = max_iters
 
         normalized_tools: list[Tool] = [t if isinstance(t, Tool) else Tool(t) for t in tools]
@@ -61,9 +59,9 @@ class ReAct(Module):
                 raise ValueError("Tool name could not be determined.")
             tools_by_name[tool.name] = tool
 
-        inputs = ", ".join([f"`{k}`" for k in signature.input_fields])
-        outputs = ", ".join([f"`{k}`" for k in signature.output_fields])
-        instr = [f"{signature.instructions}\n"] if signature.instructions else []
+        inputs = ", ".join([f"`{k}`" for k in task_spec.input_fields])
+        outputs = ", ".join([f"`{k}`" for k in task_spec.output_fields])
+        instr = [f"{task_spec.instructions}\n"] if task_spec.instructions else []
 
         instr.extend(
             [
@@ -87,32 +85,37 @@ class ReAct(Module):
             instr.append(f"({idx + 1}) {tool}")
         instr.append("When providing `next_tool_args`, the value inside the field must be in JSON format")
 
-        react_signature = (
-            make_signature(
-                signature=cast("Any", _field_infos_to_signature_fields(signature.input_fields)),
+        react_task_spec = (
+            make_task_spec(
+                dict(task_spec.input_fields),
                 instructions="\n".join(instr),
             )
-            .append(name="trajectory", field=InputField(), type_=str)
-            .append(name="next_thought", field=OutputField(), type_=str)
-            .append(name="next_tool_name", field=OutputField(), type_=str)
-            .append(name="next_tool_args", field=OutputField(), type_=dict[str, Any])
+            .append(FieldSpec.input("trajectory", str))
+            .append(FieldSpec.output("next_thought", str))
+            .append(FieldSpec.output("next_tool_name", str))
+            .append(FieldSpec.output("next_tool_args", dict[str, Any]))
         )
 
-        fallback_signature = make_signature(
-            signature=cast(
-                "Any", _field_infos_to_signature_fields({**signature.input_fields, **signature.output_fields})
-            ),
-            instructions=signature.instructions,
-        ).append(name="trajectory", field=InputField(), type_=str)
+        fallback_task_spec = make_task_spec(
+            {**task_spec.input_fields, **task_spec.output_fields},
+            instructions=task_spec.instructions,
+        ).append(FieldSpec.input("trajectory", str))
 
         self.tools = tools_by_name
-        self.react = Predict(react_signature)
-        self.extract = ChainOfThought(fallback_signature)
+        self.react = Predict(react_task_spec)
+        self.extract = ChainOfThought(fallback_task_spec)
 
     def _format_trajectory(self, trajectory: dict[str, Any]):
         adapter = settings.adapter or ChatAdapter()
-        trajectory_signature = make_signature(f"{', '.join(trajectory.keys())} -> x")
-        return adapter.format_user_message_content(trajectory_signature, trajectory)
+        trajectory_keys = ", ".join(trajectory.keys())
+        trajectory_task_spec = make_task_spec(
+            f"{trajectory_keys} -> x",
+            instructions=default_task_instructions(
+                inputs=tuple(trajectory.keys()),
+                outputs=("x",),
+            ),
+        )
+        return adapter.format_user_message_content(task_spec=trajectory_task_spec, inputs=trajectory)
 
     async def aforward(self, **input_args):
         trajectory = {}
@@ -180,43 +183,3 @@ def _fmt_exc(err: BaseException, *, limit: int = 5) -> str:
     import traceback
 
     return "\n" + "".join(traceback.format_exception(type(err), err, err.__traceback__, limit=limit)).strip()
-
-
-"""
-Thoughts and Planned Improvements for ReAct.
-
-TOPIC 01: How Trajectories are Formatted, or rather when they are formatted.
-
-Right now, both sub-modules are invoked with a `trajectory` argument, which is a string formatted in `forward`. Though
-the formatter uses a general adapter.format_fields, the tracing of DSPy only sees the string, not the formatting logic.
-
-What this means is that, in demonstrations, even if the user adjusts the adapter for a fixed program, the demos' format
-will not update accordingly, but the inference-time trajectories will.
-
-One way to fix this is to support `format=fn` in the InputField for "trajectory" in the signatures. But this
-means that care must be taken that the adapter is accessed at `forward` runtime, not signature definition time.
-
-Another potential fix is to more natively support a "variadic" input field, where the input is a list of dictionaries,
-or a big dictionary, and have each adapter format it accordingly.
-
-Trajectories also affect meta-programming modules that view the trace later. It's inefficient O(n^2) to view the
-trace of every module repeating the prefix.
-
-
-TOPIC 03: Simplifying ReAct's __init__ by moving modular logic to the Tool class.
-    * Handling exceptions and error messages.
-    * More cleanly defining the "finish" tool, perhaps as a runtime-defined function?
-
-
-TOPIC 04: Default behavior when the trajectory gets too long.
-
-
-TOPIC 05: Adding more structure around how the instruction is formatted.
-    * Concretely, it's now a string, so an optimizer can and does rewrite it freely.
-    * An alternative would be to add more structure, such that a certain template is fixed but values are variable?
-
-
-TOPIC 06: Idiomatically allowing tools that maintain state across iterations, but not across different `forward` calls.
-    * So the tool would be newly initialized at the start of each `forward` call, but maintain state across iterations.
-    * This is pretty useful for allowing the agent to keep notes or count certain things, etc.
-"""

@@ -29,8 +29,8 @@ from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
 from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature, ensure_signature, make_signature
+from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
+from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
 from dspy.utils.annotation import experimental
 
 if TYPE_CHECKING:
@@ -129,7 +129,7 @@ class RLM(Module):
 
     def __init__(
         self,
-        signature: type[Signature] | str,
+        task_spec: TaskSpec,
         max_iterations: int = 20,
         max_llm_calls: int = 50,
         max_output_chars: int = 10_000,
@@ -140,8 +140,7 @@ class RLM(Module):
     ) -> None:
         """
         Args:
-            signature: Defines inputs and outputs. String like "context, query -> answer"
-                      or a Signature class.
+            task_spec: Defines inputs and outputs as a TaskSpec instance.
             max_iterations: Maximum REPL interaction iterations.
             max_llm_calls: Maximum sub-LLM calls (llm_query/llm_query_batched) per execution.
             max_output_chars: Maximum characters to include from REPL output.
@@ -153,9 +152,9 @@ class RLM(Module):
             interpreter: CodeInterpreter implementation to use. Defaults to PythonInterpreter.
         """
         super().__init__()
-        self.signature = ensure_signature(signature)
-        if self.signature is None:
-            raise ValueError("Invalid signature provided to RLM.")
+        if not isinstance(task_spec, TaskSpec):
+            raise TypeError(f"RLM requires a TaskSpec instance, got {type(task_spec).__name__}.")
+        self.task_spec = task_spec
         self.max_iterations = max_iterations
         self.max_llm_calls = max_llm_calls
         self.max_output_chars = max_output_chars
@@ -166,7 +165,7 @@ class RLM(Module):
         self._validate_tools(self._user_tools)
 
         # Build the action and extract signatures
-        action_sig, extract_sig = self._build_signatures()
+        action_sig, extract_sig = self._build_task_specs()
         self.generate_action = Predict(action_sig)
         self.extract = Predict(extract_sig)
 
@@ -299,60 +298,60 @@ class RLM(Module):
     # Signature Building
     # =========================================================================
 
-    def _build_signatures(self) -> tuple[type[Signature], type[Signature]]:
-        """Build the action and extract signatures from templates."""
-        inputs_str = ", ".join(f"`{n}`" for n in self.signature.input_fields)
+    def _build_task_specs(self) -> tuple[TaskSpec, TaskSpec]:
+        """Build the action and extract task specs from templates."""
+        inputs_str = ", ".join(f"`{n}`" for n in self.task_spec.input_fields)
 
         # Simple names for SUBMIT() examples
-        final_output_names = ", ".join(self.signature.output_fields.keys())
+        final_output_names = ", ".join(self.task_spec.output_fields.keys())
 
-        output_fields = "\n".join(f"- {translate_field_type(n, f)}" for n, f in self.signature.output_fields.items())
+        output_field_infos = task_spec_output_field_infos(self.task_spec)
+        output_fields = "\n".join(
+            f"- {translate_field_type(n, f)}" for n, f in output_field_infos.items()
+        )
 
-        # Include original signature instructions (docstring) if present
-        task_instructions = f"{self.signature.instructions}\n\n" if self.signature.instructions else ""
+        # Include original task instructions if present
+        task_instructions = f"{self.task_spec.instructions}\n\n" if self.task_spec.instructions else ""
 
         # Format tool documentation for user-provided tools
         tool_docs = self._format_tool_docs(self._user_tools)
 
-        action_sig = (
-            make_signature(
-                signature={},
-                instructions=task_instructions
-                + ACTION_INSTRUCTIONS_TEMPLATE.format(
-                    inputs=inputs_str,
-                    final_output_names=final_output_names,
-                    output_fields=output_fields,
-                    max_llm_calls=self.max_llm_calls,
-                )
-                + tool_docs,
-            )
-            .append(
-                name="variables_info",
-                field=InputField(desc="Metadata about the variables available in the REPL"),
-                type_=str,
-            )
-            .append(
-                name="repl_history",
-                field=InputField(desc="Previous REPL code executions and their outputs"),
-                type_=REPLHistory,
-            )
-            .append(
-                name="iteration",
-                field=InputField(desc="Current iteration number (1-indexed) out of max_iterations"),
-                type_=str,
-            )
-            .append(
-                name="reasoning",
-                field=OutputField(desc="Think step-by-step: what do you know? What remains? Plan your next action."),
-                type_=str,
-            )
-            .append(
-                name="code",
-                field=OutputField(
-                    desc="Python code to execute. Use markdown code block format: ```python\\n<code>\\n```"
+        action_sig = make_task_spec(
+            {
+                "variables_info": FieldSpec.input(
+                    "variables_info",
+                    str,
+                    desc="Metadata about the variables available in the REPL",
                 ),
-                type_=str,
+                "repl_history": FieldSpec.input(
+                    "repl_history",
+                    REPLHistory,
+                    desc="Previous REPL code executions and their outputs",
+                ),
+                "iteration": FieldSpec.input(
+                    "iteration",
+                    str,
+                    desc="Current iteration number (1-indexed) out of max_iterations",
+                ),
+                "reasoning": FieldSpec.output(
+                    "reasoning",
+                    str,
+                    desc="Think step-by-step: what do you know? What remains? Plan your next action.",
+                ),
+                "code": FieldSpec.output(
+                    "code",
+                    str,
+                    desc="Python code to execute. Use markdown code block format: ```python\\n<code>\\n```",
+                ),
+            },
+            instructions=task_instructions
+            + ACTION_INSTRUCTIONS_TEMPLATE.format(
+                inputs=inputs_str,
+                final_output_names=final_output_names,
+                output_fields=output_fields,
+                max_llm_calls=self.max_llm_calls,
             )
+            + tool_docs,
         )
 
         # Extract signature: includes the original signature's output fields and task instructions.
@@ -368,15 +367,21 @@ class RLM(Module):
             )
         full_extract_instructions = extended_task_instructions + extract_instructions
 
-        extract_sig = make_signature(
-            signature={**self.signature.output_fields},
+        extract_sig = make_task_spec(
+            {
+                "variables_info": FieldSpec.input(
+                    "variables_info",
+                    str,
+                    desc="Metadata about the variables available in the REPL",
+                ),
+                "repl_history": FieldSpec.input(
+                    "repl_history",
+                    REPLHistory,
+                    desc="Your REPL interactions so far",
+                ),
+                **self.task_spec.output_fields,
+            },
             instructions=full_extract_instructions,
-        )
-        extract_sig = extract_sig.prepend(
-            "repl_history", InputField(desc="Your REPL interactions so far"), type_=REPLHistory
-        )
-        extract_sig = extract_sig.prepend(
-            "variables_info", InputField(desc="Metadata about the variables available in the REPL"), type_=str
         )
 
         return action_sig, extract_sig
@@ -388,8 +393,8 @@ class RLM(Module):
     def _get_output_fields_info(self) -> list[dict]:
         """Get output field info for sandbox registration."""
         fields = []
-        for name, field in self.signature.output_fields.items():
-            annotation = getattr(field, "annotation", str)
+        for name, field in self.task_spec.output_fields.items():
+            annotation = field.type_
             field_info = {"name": name}
             # Only include type for simple types that work in function signatures
             # Complex types like Literal, Union, etc. are not included
@@ -401,8 +406,9 @@ class RLM(Module):
     def _build_variables(self, **input_args: Any) -> list[REPLVariable]:
         """Build REPLVariable list from input arguments with field metadata."""
         variables = []
+        input_field_infos = task_spec_input_field_infos(self.task_spec)
         for name, value in input_args.items():
-            field_info = self.signature.input_fields.get(name)
+            field_info = input_field_infos.get(name)
             if isinstance(value, SandboxSerializable):
                 var = build_repl_variable(value, name, field_info=field_info)
             else:
@@ -417,7 +423,7 @@ class RLM(Module):
 
     def _validate_inputs(self, input_args: dict[str, Any]) -> None:
         """Raise ValueError if required input fields are missing."""
-        missing = set(self.signature.input_fields.keys()) - set(input_args.keys())
+        missing = set(self.task_spec.input_fields.keys()) - set(input_args.keys())
         if missing:
             raise ValueError(f"Missing required inputs: {sorted(missing)}")
 
@@ -560,8 +566,8 @@ class RLM(Module):
         parsed_outputs = {}
         type_errors = []
         for name in output_field_names:
-            field = self.signature.output_fields[name]
-            annotation = getattr(field, "annotation", str)
+            field = self.task_spec.output_fields[name]
+            annotation = field.type_
             try:
                 parsed_outputs[name] = parse_value(raw_output[name], annotation)
             except (ValueError, pydantic.ValidationError) as e:
@@ -736,7 +742,7 @@ class RLM(Module):
         """
         self._validate_inputs(input_args)
 
-        output_field_names = list(self.signature.output_fields.keys())
+        output_field_names = list(self.task_spec.output_fields.keys())
         execution_tools = self._prepare_execution_tools()
         variables = self._build_variables(**input_args)
 

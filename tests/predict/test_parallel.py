@@ -6,6 +6,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.utils.dummies import DummyLM
+from tests.task_spec.helpers import ts
 
 
 def test_parallel_module():
@@ -23,8 +24,8 @@ def test_parallel_module():
     class MyModule(Module):
         def __init__(self):
             super().__init__()
-            self.predictor = Predict("input -> output")
-            self.predictor2 = Predict("input -> output")
+            self.predictor = Predict(ts("input -> output"))
+            self.predictor2 = Predict(ts("input -> output"))
 
             self.parallel = Parallel(num_threads=2)
 
@@ -68,8 +69,8 @@ def test_batch_module():
     class MyModule(Module):
         def __init__(self):
             super().__init__()
-            self.predictor = Predict("input -> output")
-            self.predictor2 = Predict("input -> output, reasoning")
+            self.predictor = Predict(ts("input -> output"))
+            self.predictor2 = Predict(ts("input -> output, reasoning"))
 
             self.parallel = Parallel(num_threads=2)
 
@@ -110,8 +111,8 @@ def test_nested_parallel_module():
     class MyModule(Module):
         def __init__(self):
             super().__init__()
-            self.predictor = Predict("input -> output")
-            self.predictor2 = Predict("input -> output")
+            self.predictor = Predict(ts("input -> output"))
+            self.predictor2 = Predict(ts("input -> output"))
 
             self.parallel = Parallel(num_threads=2)
 
@@ -154,7 +155,7 @@ def test_nested_batch_method():
     class MyModule(Module):
         def __init__(self):
             super().__init__()
-            self.predictor = Predict("input -> output")
+            self.predictor = Predict(ts("input -> output"))
 
         async def aforward(self, input):
             return await self.predictor.batch([Example(input=input).with_inputs("input")] * 2)

@@ -15,8 +15,10 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
+from dspy.task_spec.bridge import task_spec_from_signature
 from dspy.teleprompt.vanilla import LabeledFewShot
 from dspy.utils.dummies import DummyLM
+from tests.task_spec.helpers import ts
 
 
 @pytest.fixture
@@ -73,11 +75,17 @@ def count_messages_with_image_url_pattern(messages):
         return 0
 
 
-def setup_predictor(signature, expected_output):
+def setup_predictor(spec, expected_output):
     """Helper to set up a predictor with DummyLM"""
     lm = DummyLM([expected_output])
     settings.configure(lm=lm)
-    return Predict(signature), lm
+    if isinstance(spec, str):
+        task_spec = ts(spec)
+    elif isinstance(spec, type):
+        task_spec = task_spec_from_signature(spec)
+    else:
+        task_spec = spec
+    return Predict(task_spec), lm
 
 
 @pytest.mark.parametrize(
@@ -180,7 +188,7 @@ def test_predictor_save_load(sample_url, sample_pil_image):
 
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
-        loaded_predictor = Predict(signature)
+        loaded_predictor = Predict(ts("image: Image -> caption: str"))
         loaded_predictor.load(temp_file.name)
 
     asyncio.run(loaded_predictor(image=Image("https://example.com/dog.jpg")))
@@ -210,7 +218,7 @@ def test_save_load_complex_default_types():
 
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
-        loaded_predictor = Predict(ComplexTypeSignature)
+        loaded_predictor = Predict(task_spec_from_signature(ComplexTypeSignature))
         loaded_predictor.load(temp_file.name)
 
     result = asyncio.run(loaded_predictor(**examples[0].inputs()))
@@ -276,7 +284,7 @@ def test_save_load_complex_types(test_case):
     # Test save and load
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
-        loaded_predictor = Predict(signature_cls)
+        loaded_predictor = Predict(task_spec_from_signature(signature_cls))
         loaded_predictor.load(temp_file.name)
 
     # Run prediction
@@ -320,8 +328,13 @@ def test_save_load_pydantic_model():
     # Test save and load
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
-        loaded_predictor = Predict(PydanticSignature)
-        loaded_predictor.load(temp_file.name)
+        loaded_predictor = Predict(task_spec_from_signature(PydanticSignature))
+        import json
+
+        with open(temp_file.name, encoding="utf-8") as saved_file:
+            state = json.load(saved_file)
+        model_input_type = state["task_spec"]["inputs"][0]["type"]
+        loaded_predictor.load_state(state, custom_types={model_input_type: ImageModel})
 
     # Run prediction
     result = asyncio.run(loaded_predictor(model_input=model_input))

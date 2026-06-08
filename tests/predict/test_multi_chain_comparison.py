@@ -5,6 +5,7 @@ from dspy.predict.multi_chain_comparison import MultiChainComparison
 from dspy.primitives.prediction import Prediction
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
+from dspy.task_spec.bridge import task_spec_from_signature
 from dspy.utils.dummies import DummyLM
 
 
@@ -34,7 +35,7 @@ completions = [
 
 def test_basic_example():
     # Pass signature to MultiChainComparison module
-    compare_answers = MultiChainComparison(BasicQA)
+    compare_answers = MultiChainComparison(task_spec_from_signature(BasicQA))
 
     # Call the MultiChainComparison on the completions
     question = "What is the color of the sky?"

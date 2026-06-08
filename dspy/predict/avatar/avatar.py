@@ -1,15 +1,27 @@
 from copy import deepcopy
-from typing import Any, cast
-
-from pydantic.fields import FieldInfo
 
 from dspy.predict.avatar.models import Action, ActionOutput, Tool
-from dspy.predict.avatar.signatures import Actor
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import ensure_signature
+from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
+
+ACTOR_TASK_SPEC = make_task_spec(
+    {
+        "goal": FieldSpec.input("goal", str, desc="Task to be accomplished."),
+        "tools": FieldSpec.input("tools", list[str], desc="list of tools to use"),
+        "action_1": FieldSpec.output("action_1", Action, desc="1st action to take."),
+    },
+    instructions=(
+        "You will be given `Tools` which will be a list of tools to use to accomplish the `Goal`. Given the user "
+        "query, your task is to decide which tool to use and what input values to provide.\n\n"
+        "You will output action needed to accomplish the `Goal`. `Action` should have a tool to use and the input "
+        "query to pass to the tool.\n\n"
+        "Note: You can opt to use no tools and provide the final answer directly. You can also one tool multiple "
+        "times with different input queries if applicable."
+    ),
+    name="Actor",
+)
 
 
 def get_number_with_suffix(number: int) -> str:
@@ -25,16 +37,17 @@ def get_number_with_suffix(number: int) -> str:
 class Avatar(Module):
     def __init__(
         self,
-        signature,
+        task_spec: TaskSpec,
         tools,
         max_iters=3,
         verbose=False,
     ) -> None:
-        self.signature = ensure_signature(signature)
-        if self.signature is None:
-            raise ValueError(f"Invalid signature: {signature!r}")
-        self.input_fields = self.signature.input_fields
-        self.output_fields = self.signature.output_fields
+        if not isinstance(task_spec, TaskSpec):
+            raise TypeError(f"Avatar requires a TaskSpec instance, got {type(task_spec).__name__}.")
+        super().__init__()
+        self.task_spec = task_spec
+        self.input_fields = task_spec.input_fields
+        self.output_fields = task_spec.output_fields
 
         self.finish_tool = Tool(
             tool=None,
@@ -43,66 +56,54 @@ class Avatar(Module):
         )
 
         self.tools = tools + [self.finish_tool]
-        self.actor_signature = Actor
+        actor_task_spec = ACTOR_TASK_SPEC
 
-        for field in list(self.input_fields.keys())[::-1]:
-            self.actor_signature = self.actor_signature.append(
-                field,
-                self._get_field(self.input_fields[field]),
-                type_=self.input_fields[field].annotation,
+        for field_name in list(self.input_fields.keys())[::-1]:
+            field = self.input_fields[field_name]
+            actor_task_spec = actor_task_spec.prepend(
+                FieldSpec.input(field_name, field.type_, desc=field.desc, prefix=field.prefix),
             )
 
         self.verbose = verbose
         self.max_iters = max_iters
-        self.actor = Predict(self.actor_signature)
+        self.actor = Predict(actor_task_spec)
 
         self.actor_clone = deepcopy(self.actor)
 
-    def _get_field(self, field_info: FieldInfo):
-        extra = cast("dict[str, Any]", field_info.json_schema_extra or {})
-        if extra["__dspy_field_type"] == "input":
-            return InputField(
-                desc=extra["desc"],
-            )
-        if extra["__dspy_field_type"] == "output":
-            return OutputField(
-                desc=extra["desc"],
-            )
-        raise ValueError(f"Unknown field type: {extra['__dspy_field_type']}")
-
-    def _update_signature(self, idx: int, omit_action: bool = False) -> None:
-        self.actor.signature = self.actor.signature.with_updated_fields(
-            f"action_{idx}", Action, __dspy_field_type="input"
+    def _promote_output_to_input(self, task_spec: TaskSpec, name: str, *, type_) -> TaskSpec:
+        field = task_spec.output_fields[name]
+        return task_spec.delete(name).append(
+            FieldSpec.input(name, type_, desc=field.desc, prefix=field.prefix),
         )
 
-        self.actor.signature = self.actor.signature.append(
-            f"result_{idx}",
-            InputField(
-                prefix=f"Result {idx}:",
+    def _update_task_spec(self, idx: int, omit_action: bool = False) -> None:
+        task_spec = self.actor.task_spec
+        task_spec = self._promote_output_to_input(task_spec, f"action_{idx}", type_=Action)
+        task_spec = task_spec.append(
+            FieldSpec.input(
+                f"result_{idx}",
+                str,
                 desc=f"{get_number_with_suffix(idx)} result",
-                type_=str,
+                prefix=f"Result {idx}:",
             ),
         )
 
         if omit_action:
-            for field in list(self.output_fields.keys()):
-                self.actor.signature = self.actor.signature.append(
-                    field,
-                    self._get_field(self.output_fields[field]),
-                    type_=self.output_fields[field].annotation,
+            for field_name, field in self.output_fields.items():
+                task_spec = task_spec.append(
+                    FieldSpec.output(field_name, field.type_, desc=field.desc, prefix=field.prefix),
                 )
         else:
-            self.actor.signature = self.actor.signature.append(
-                f"action_{idx + 1}",
-                OutputField(
-                    prefix=f"Action {idx + 1}:",
+            task_spec = task_spec.append(
+                FieldSpec.output(
+                    f"action_{idx + 1}",
+                    Action,
                     desc=f"{get_number_with_suffix(idx + 1)} action to taken",
+                    prefix=f"Action {idx + 1}:",
                 ),
             )
-            self.actor.signature = self.actor.signature.with_updated_fields(
-                f"action_{idx + 1}",
-                Action,
-            )
+
+        self.actor.task_spec = task_spec
 
     def _call_tool(self, tool_name: str, tool_input_query: str) -> str | None:
         for tool in self.tools:
@@ -115,7 +116,7 @@ class Avatar(Module):
             pass
 
         args = {
-            "goal": self.signature.__doc__,
+            "goal": self.task_spec.instructions,
             "tools": [tool.name for tool in self.tools],
         }
 
@@ -144,12 +145,12 @@ class Avatar(Module):
                     ActionOutput(tool_name=tool_name, tool_input_query=tool_input_query, tool_output=tool_output)
                 )
 
-                self._update_signature(idx)
+                self._update_task_spec(idx)
 
                 args[f"action_{idx}"] = action
                 args[f"result_{idx}"] = tool_output
             else:
-                self._update_signature(idx, omit_action=True)
+                self._update_task_spec(idx, omit_action=True)
 
                 args[f"action_{idx}"] = action
                 args[f"result_{idx}"] = "Gathered all information needed to finish the task."
