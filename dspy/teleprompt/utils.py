@@ -3,10 +3,13 @@ import math
 import os
 import random
 import shutil
+from contextlib import contextmanager
 
+from dspy.compile.resolve import resolve_adapter
 from dspy.dsp.utils.settings import settings
 from dspy.primitives.prediction import Prediction
 from dspy.teleprompt.bootstrap import BootstrapFewShot, LabeledFewShot
+from dspy.utils.transparency import reset_active_call_metadata, set_active_call_metadata
 
 """
 This file consists of helper functions for our variety of optimizers.
@@ -287,6 +290,19 @@ def log_token_usage(*, trial_logs, trial_num, model_dict) -> None:
 
 
 ### OTHER UTILS ###
+
+
+@contextmanager
+def optimizer_lm_context(*, lm, adapter=None, phase: str, lm_role: str, **extra):
+    """Temporary settings context for optimizer LM calls with transparency metadata."""
+    transparency = settings.get("transparency", "strict")
+    resolved_adapter, _notes = resolve_adapter(adapter or settings.adapter, transparency=transparency)
+    metadata_token = set_active_call_metadata(phase=phase, lm_role=lm_role, module=extra.pop("module", "optimizer"))
+    with settings.context(lm=lm, adapter=resolved_adapter, **extra):
+        try:
+            yield
+        finally:
+            reset_active_call_metadata(metadata_token)
 
 
 def get_prompt_model(prompt_model):

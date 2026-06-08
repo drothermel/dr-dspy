@@ -114,6 +114,7 @@ class BaseLM:
             if usage:
                 settings.usage_tracker.add_usage(lm=self.model, usage_entry=usage)
 
+        entry = None
         if not settings.disable_history:
             entry = LMHistoryEntry(
                 request=request,
@@ -123,7 +124,70 @@ class BaseLM:
                 model_type=getattr(self, "model_type", None),
             )
             self.update_history(entry)
+
+        if settings.get("run_log_enabled", True):
+            self._append_run_log_entry(request=request, response=response, history_entry=entry)
+
         return response
+
+    def _append_run_log_entry(
+        self,
+        *,
+        request: LMRequest,
+        response: LMResponse,
+        history_entry: LMHistoryEntry | None,
+    ) -> None:
+        from dspy.core.types.history import _history_request_messages_as_openai
+        from dspy.utils.run_log import append_call_record, redact_config, redact_messages
+        from dspy.utils.transparency import ACTIVE_CALL_METADATA, ACTIVE_COMPILED_CALL
+
+        compiled = ACTIVE_COMPILED_CALL.get()
+        metadata = ACTIVE_CALL_METADATA.get()
+        call_id = (
+            compiled.call_id if compiled is not None else (history_entry.uuid if history_entry else str(uuid.uuid4()))
+        )
+        messages = _history_request_messages_as_openai(request)
+        outputs = [
+            {
+                "text": output.text,
+                "tool_calls": [
+                    {"name": call.name, "args": dict(call.args), "id": call.id} for call in (output.tool_calls or [])
+                ],
+                "logprobs": output.logprobs,
+            }
+            for output in response.outputs
+        ]
+        record = {
+            "call_id": call_id,
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "caller": {
+                "module": compiled.module if compiled else metadata.get("module"),
+                "phase": compiled.phase if compiled else metadata.get("phase"),
+                "lm_role": compiled.lm_role if compiled else metadata.get("lm_role"),
+            },
+            "lm": {
+                "model": self.model,
+                "model_type": getattr(self, "model_type", None),
+            },
+            "adapter": {
+                "class": compiled.adapter_class if compiled else None,
+                "notes": compiled.adapter_notes if compiled else [],
+            },
+            "task_spec": compiled.original_task_spec.to_dict() if compiled and compiled.original_task_spec else None,
+            "processed_task_spec": compiled.processed_task_spec.to_dict()
+            if compiled and compiled.processed_task_spec
+            else None,
+            "task_spec_mutations": compiled.task_spec_mutations if compiled else [],
+            "messages": redact_messages(messages),
+            "config": redact_config(request.config.model_dump(exclude_none=True)),
+            "config_provenance": compiled.config_provenance if compiled else {},
+            "response": {
+                "outputs": outputs,
+                "usage": response.usage_as_dict(),
+                "cache_hit": getattr(response, "cache_hit", False),
+            },
+        }
+        append_call_record(record)
 
     async def aforward(self, request: LMRequest) -> LMResponse:
         raise NotImplementedError("Subclasses must implement this method.")
