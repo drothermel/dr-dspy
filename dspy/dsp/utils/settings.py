@@ -1,4 +1,5 @@
 import asyncio
+import importlib
 import contextvars
 import copy
 import logging
@@ -146,11 +147,10 @@ class Settings:
         # We are in an async task. Now check for IPython and allow calling `configure` from IPython.
         in_ipython = False
         try:
-            from IPython import get_ipython
-
+            ipython = importlib.import_module("IPython")
             # get_ipython is a global injected by IPython environments.
             # We check its existence and type to be more robust.
-            in_ipython = get_ipython() is not None
+            in_ipython = ipython.get_ipython() is not None
         except Exception:
             # If `IPython` is not installed or `get_ipython` failed, we are not in an IPython environment.
             in_ipython = False

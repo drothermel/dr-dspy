@@ -1,15 +1,17 @@
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import ensure_signature
+from dspy.signatures.signature import Signature, ensure_signature
 
 
 class MultiChainComparison(Module):
-    def __init__(self, signature, M=3, temperature=0.7, **config) -> None:  # noqa: N803
+    def __init__(self, signature: str | type[Signature], M=3, temperature=0.7, **config) -> None:  # noqa: N803
         super().__init__()
 
         self.M = M
         signature = ensure_signature(signature)
+        if signature is None:
+            raise ValueError("Invalid signature provided to MultiChainComparison.")
 
         *_, self.last_key = signature.output_fields.keys()
 

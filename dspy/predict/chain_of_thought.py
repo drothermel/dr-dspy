@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 from pydantic.fields import FieldInfo
 
@@ -6,6 +6,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.signatures.field import OutputField
 from dspy.signatures.signature import Signature, ensure_signature
+from dspy.utils.callback import BaseCallback
 
 # NOTE: This restores the legacy rationale_field behavior after PR #8822.
 
@@ -32,10 +33,11 @@ class ChainOfThought(Module):
         if signature is None:
             raise ValueError(f"Invalid signature: {signature!r}")
         desc = "${reasoning}"
-        rationale_field_type = rationale_field.annotation if rationale_field else rationale_field_type
+        rationale_field_type = cast(type, rationale_field.annotation) if rationale_field else rationale_field_type
         rationale_field = rationale_field if rationale_field else OutputField(desc=desc)
         extended_signature = signature.prepend(name="reasoning", field=rationale_field, type_=rationale_field_type)
-        self.predict = Predict(extended_signature, **config)
+        callbacks = cast(list[BaseCallback] | None, config.pop("callbacks", None))
+        self.predict = Predict(extended_signature, callbacks=callbacks, **config)
 
     def forward(self, **kwargs):
         return self.predict(**kwargs)

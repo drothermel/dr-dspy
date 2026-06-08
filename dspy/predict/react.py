@@ -10,7 +10,13 @@ from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature, ensure_signature
+from dspy.signatures.signature import (
+    Signature,
+    ensure_signature,
+    make_signature,
+    _field_infos_to_signature_fields,
+)
+from typing import cast
 from dspy.utils.exceptions import ContextWindowExceededError
 
 logger = logging.getLogger(__name__)
@@ -18,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReAct(Module):
-    def __init__(self, signature: type["Signature"], tools: list[Callable], max_iters: int = 20) -> None:
+    def __init__(self, signature: str | type["Signature"], tools: list[Callable], max_iters: int = 20) -> None:
         """
         ReAct stands for "Reasoning and Acting," a popular paradigm for building tool-using agents.
         In this approach, the language model is iteratively provided with a list of tools and has
@@ -46,10 +52,16 @@ class ReAct(Module):
         """
         super().__init__()
         self.signature = signature = ensure_signature(signature)
+        if signature is None:
+            raise ValueError("Invalid signature provided to ReAct.")
         self.max_iters = max_iters
 
-        tools = [t if isinstance(t, Tool) else Tool(t) for t in tools]
-        tools = {tool.name: tool for tool in tools}
+        normalized_tools: list[Tool] = [t if isinstance(t, Tool) else Tool(t) for t in tools]
+        tools_by_name: dict[str, Tool] = {}
+        for tool in normalized_tools:
+            if tool.name is None:
+                raise ValueError("Tool name could not be determined.")
+            tools_by_name[tool.name] = tool
 
         inputs = ", ".join([f"`{k}`" for k in signature.input_fields])
         outputs = ", ".join([f"`{k}`" for k in signature.output_fields])
@@ -66,37 +78,40 @@ class ReAct(Module):
             ]
         )
 
-        tools["finish"] = Tool(
+        tools_by_name["finish"] = Tool(
             func=lambda: "Completed.",
             name="finish",
             desc=f"Marks the task as complete. That is, signals that all information for producing the outputs, i.e. {outputs}, are now available to be extracted.",
             args={},
         )
 
-        for idx, tool in enumerate(tools.values()):
+        for idx, tool in enumerate(tools_by_name.values()):
             instr.append(f"({idx + 1}) {tool}")
         instr.append("When providing `next_tool_args`, the value inside the field must be in JSON format")
 
         react_signature = (
-            Signature({**signature.input_fields}, "\n".join(instr))
+            make_signature(
+                cast(Any, _field_infos_to_signature_fields(signature.input_fields)),
+                "\n".join(instr),
+            )
             .append("trajectory", InputField(), type_=str)
             .append("next_thought", OutputField(), type_=str)
-            .append("next_tool_name", OutputField(), type_=Literal[tuple(tools.keys())])
+            .append("next_tool_name", OutputField(), type_=str)
             .append("next_tool_args", OutputField(), type_=dict[str, Any])
         )
 
-        fallback_signature = Signature(
-            {**signature.input_fields, **signature.output_fields},
+        fallback_signature = make_signature(
+            cast(Any, _field_infos_to_signature_fields({**signature.input_fields, **signature.output_fields})),
             signature.instructions,
         ).append("trajectory", InputField(), type_=str)
 
-        self.tools = tools
+        self.tools = tools_by_name
         self.react = Predict(react_signature)
         self.extract = ChainOfThought(fallback_signature)
 
     def _format_trajectory(self, trajectory: dict[str, Any]):
         adapter = settings.adapter or ChatAdapter()
-        trajectory_signature = Signature(f"{', '.join(trajectory.keys())} -> x")
+        trajectory_signature = make_signature(f"{', '.join(trajectory.keys())} -> x")
         return adapter.format_user_message_content(trajectory_signature, trajectory)
 
     def forward(self, **input_args):
@@ -139,7 +154,8 @@ class ReAct(Module):
             trajectory[f"tool_args_{idx}"] = pred.next_tool_args
 
             try:
-                trajectory[f"observation_{idx}"] = await self.tools[pred.next_tool_name].acall(**pred.next_tool_args)
+                tool = cast(Tool, self.tools[pred.next_tool_name])
+                trajectory[f"observation_{idx}"] = await tool.acall(**pred.next_tool_args)
             except Exception as err:
                 trajectory[f"observation_{idx}"] = f"Execution error in {pred.next_tool_name}: {_fmt_exc(err)}"
 

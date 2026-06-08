@@ -10,7 +10,13 @@ from dspy.predict.react import ReAct
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature, ensure_signature
+from dspy.signatures.signature import (
+    Signature,
+    ensure_signature,
+    make_signature,
+    _field_infos_to_signature_fields,
+)
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -41,31 +47,38 @@ class CodeAct(ReAct, ProgramOfThought):
             ```
         """
         self.signature = ensure_signature(signature)
+        if self.signature is None:
+            raise ValueError("Invalid signature provided to CodeAct.")
         self.max_iters = max_iters
         self.history = []
 
-        tools = [t if isinstance(t, Tool) else Tool(t) for t in tools]
-        if any(
-            not inspect.isfunction(tool.func) for tool in tools
-        ):
+        normalized_tools: list[Tool] = [t if isinstance(t, Tool) else Tool(t) for t in tools]
+        if any(not inspect.isfunction(tool.func) for tool in normalized_tools):
             raise ValueError("CodeAct only accepts functions and not callable objects.")
-        tools = {tool.name: tool for tool in tools}
+        tools_by_name: dict[str, Tool] = {}
+        for tool in normalized_tools:
+            if tool.name is None:
+                raise ValueError("Tool name could not be determined.")
+            tools_by_name[tool.name] = tool
 
-        instructions = self._build_instructions(self.signature, tools)
+        instructions = self._build_instructions(self.signature, tools_by_name)
 
         codeact_signature = (
-            Signature({**self.signature.input_fields}, "\n".join(instructions))
+            make_signature(
+                cast(Any, _field_infos_to_signature_fields(self.signature.input_fields)),
+                "\n".join(instructions),
+            )
             .append("trajectory", InputField(), type_=str)
             .append("generated_code", OutputField(desc="Python code that when executed, produces output relevant to answering the question"), type_=str)
             .append("finished", OutputField(desc="a boolean flag to determine if the process is done"), type_=bool)
         )
 
-        extract_signature = Signature(
-            {**self.signature.input_fields, **self.signature.output_fields},
+        extract_signature = make_signature(
+            cast(Any, _field_infos_to_signature_fields({**self.signature.input_fields, **self.signature.output_fields})),
             self.signature.instructions,
         ).append("trajectory", InputField(), type_=str)
 
-        self.tools: dict[str, Tool] = tools
+        self.tools: dict[str, Tool] = tools_by_name
         self.codeact = Predict(codeact_signature)
         self.extractor = ChainOfThought(extract_signature)
         # PythonInterpreter may raise if the Deno-backed sandbox is unavailable; construct it here so failures surface during module initialization.

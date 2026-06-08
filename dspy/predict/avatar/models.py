@@ -24,4 +24,4 @@ class Action(BaseModel):
 class ActionOutput(BaseModel):
     tool_name: str
     tool_input_query: str
-    tool_output: str
+    tool_output: str | None

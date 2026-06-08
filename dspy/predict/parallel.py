@@ -77,7 +77,9 @@ class Parallel:
         self.failed_examples = []
         self.exceptions = []
 
-    def forward(self, exec_pairs: list[tuple[Any, Example]], num_threads: int | None = None) -> list[Any]:
+    def forward(
+        self, exec_pairs: list[tuple[Any, Example]], num_threads: int | None = None
+    ) -> list[Any] | tuple[list[Any], list[Any], list[Exception]]:
         num_threads = num_threads if num_threads is not None else self.num_threads
 
         executor = ParallelExecutor(

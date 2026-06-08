@@ -1,4 +1,5 @@
 from contextlib import suppress
+import importlib
 from typing import Any
 
 import requests
@@ -92,7 +93,7 @@ colbertv2_post_request = colbertv2_post_request_v2_wrapped
 
 
 class ColBERTv2RetrieverLocal:
-    def __init__(self, passages: list[str], colbert_config=None, load_only: bool = False) -> None:
+    def __init__(self, passages: list[str], colbert_config: Any = None, load_only: bool = False) -> None:
         """Colbertv2 retriever module
 
         Args:
@@ -121,22 +122,22 @@ class ColBERTv2RetrieverLocal:
         self.searcher = self.get_index()
 
     def build_index(self) -> None:
-        with suppress(ImportError):
-            import colbert  # noqa: F401
-
-        from colbert import Indexer
-        from colbert.infra import Run, RunConfig
+        colbert = importlib.import_module("colbert")
+        Indexer = colbert.Indexer
+        infra = importlib.import_module("colbert.infra")
+        Run = infra.Run
+        RunConfig = infra.RunConfig
 
         with Run().context(RunConfig(nranks=self.colbert_config.nranks, experiment=self.colbert_config.experiment)):
             indexer = Indexer(checkpoint=self.colbert_config.checkpoint, config=self.colbert_config)
             indexer.index(name=self.colbert_config.index_name, collection=self.passages, overwrite=True)
 
     def get_index(self):
-        with suppress(ImportError):
-            import colbert  # noqa: F401
-
-        from colbert import Searcher
-        from colbert.infra import Run, RunConfig
+        colbert = importlib.import_module("colbert")
+        Searcher = colbert.Searcher
+        infra = importlib.import_module("colbert.infra")
+        Run = infra.Run
+        RunConfig = infra.RunConfig
 
         with Run().context(RunConfig(experiment=self.colbert_config.experiment)):
             return Searcher(index=self.colbert_config.index_name, collection=self.passages)
@@ -145,10 +146,10 @@ class ColBERTv2RetrieverLocal:
         return self.forward(*args, **kwargs)
 
     def forward(self, query: str, k: int = 7, **kwargs):
-        import torch
+        torch = importlib.import_module("torch")
 
-        if kwargs.get("filtered_pids"):
-            filtered_pids = kwargs.get("filtered_pids")
+        filtered_pids: list[int] = kwargs.get("filtered_pids") or []
+        if filtered_pids:
             assert isinstance(filtered_pids, list) and all(isinstance(pid, int) for pid in filtered_pids), "The filtered pids should be a list of integers"
             device = "cuda" if torch.cuda.is_available() else "cpu"
             searcher_results = self.searcher.search(
@@ -167,9 +168,7 @@ class ColBERTv2RetrieverLocal:
 
 
 class ColBERTv2RerankerLocal:
-    def __init__(self, colbert_config=None, checkpoint: str = "bert-base-uncased") -> None:
-        with suppress(ImportError):
-            import colbert  # noqa: F401
+    def __init__(self, colbert_config: Any = None, checkpoint: str = "bert-base-uncased") -> None:
         """_summary_
 
         Args:
@@ -184,14 +183,14 @@ class ColBERTv2RerankerLocal:
         return self.forward(*args, **kwargs)
 
     def forward(self, query: str, passages: list[str] | None = None):
+        passages = passages or []
         assert len(passages) > 0, "Passages should not be empty"
 
         import numpy as np
-        from colbert.modeling.colbert import ColBERT
-        from colbert.modeling.tokenization.doc_tokenization import DocTokenizer
-        from colbert.modeling.tokenization.query_tokenization import QueryTokenizer
-
-        passages = passages or []
+        colbert = importlib.import_module("colbert")
+        ColBERT = colbert.modeling.colbert.ColBERT
+        DocTokenizer = colbert.modeling.tokenization.doc_tokenization.DocTokenizer
+        QueryTokenizer = colbert.modeling.tokenization.query_tokenization.QueryTokenizer
         self.colbert_config.nway = len(passages)
         query_tokenizer = QueryTokenizer(self.colbert_config, verbose=1)
         doc_tokenizer = DocTokenizer(self.colbert_config)

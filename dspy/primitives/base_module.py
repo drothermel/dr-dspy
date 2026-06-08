@@ -153,7 +153,7 @@ class BaseModule:
     def dump_state(self, json_mode=True):
         return {name: param.dump_state(json_mode=json_mode) for name, param in self.named_parameters()}
 
-    def load_state(self, state, *, allow_unsafe_lm_state=False) -> None:
+    def load_state(self, state, *, allow_unsafe_lm_state=False) -> "BaseModule":
         from dspy.predict.predict import Predict
 
         def _apply(module) -> None:
@@ -165,6 +165,7 @@ class BaseModule:
 
         _apply(self.deepcopy())  # trial run raises before self is touched
         _apply(self)
+        return self
     def save(self, path, save_program=False, modules_to_serialize=None) -> None:
         """Save the module.
 

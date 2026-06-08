@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, get_args
+from typing import TYPE_CHECKING, Any, cast, get_args
 
 import pydantic
 
@@ -12,7 +12,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature, ensure_signature
+from dspy.signatures.signature import Signature, ensure_signature, make_signature
 from dspy.utils.annotation import experimental
 from dspy.utils.exceptions import AdapterParseError, ContextWindowExceededError
 
@@ -24,13 +24,19 @@ if TYPE_CHECKING:
 
 @experimental
 class ReActV2(Module):
-    def __init__(self, signature: type[Signature], tools: list[Callable | Tool], max_iters: int = 20) -> None:
+    def __init__(self, signature: str | type[Signature], tools: list[Callable | Tool], max_iters: int = 20) -> None:
         super().__init__()
         self.signature = ensure_signature(signature)
+        if self.signature is None:
+            raise ValueError("Invalid signature provided to ReActV2.")
         self.max_iters = max_iters
 
         user_tools = [tool if isinstance(tool, Tool) else Tool(tool) for tool in tools]
-        self.tools = {tool.name: tool for tool in user_tools}
+        self.tools = {}
+        for tool in user_tools:
+            if tool.name is None:
+                raise ValueError("Tool name could not be determined.")
+            self.tools[tool.name] = tool
         if "submit" in self.tools:
             raise ValueError("`submit` is reserved by ReActV2 as the final-output tool.")
         self.tools["submit"] = self._make_submit_tool()
@@ -63,9 +69,12 @@ class ReActV2(Module):
     def _make_react_signature(self) -> type[Signature]:
         fields = {}
         for name, field in self.signature.input_fields.items():
+            extra: dict[str, Any] = {}
+            if isinstance(field.json_schema_extra, dict):
+                extra = field.json_schema_extra
             fields[name] = (
                 _optional_annotation(field.annotation),
-                InputField(desc=field.json_schema_extra.get("desc")),
+                InputField(desc=extra.get("desc")),
             )
 
         fields["history"] = (History, InputField())
@@ -86,7 +95,7 @@ class ReActV2(Module):
             ]
         ).strip()
 
-        return Signature(fields, instructions)
+        return make_signature(fields, instructions)
 
     def forward(self, **input_args):
         max_iters = input_args.pop("max_iters", self.max_iters)
@@ -144,7 +153,7 @@ class ReActV2(Module):
                 values.append(value)
                 is_errors.append(False)
                 if tool_call.name == "submit" and isinstance(value, dict):
-                    final_outputs = value
+                    final_outputs = dict(value)
             except Exception as err:
                 values.append(f"Execution error in {tool_call.name}: {_fmt_exc(err)}")
                 is_errors.append(True)

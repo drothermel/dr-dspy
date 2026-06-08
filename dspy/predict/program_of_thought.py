@@ -7,7 +7,8 @@ from dspy.primitives.code_interpreter import FinalOutput
 from dspy.primitives.module import Module
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature, ensure_signature
+from dspy.signatures.signature import Signature, ensure_signature, make_signature, _field_infos_to_signature_fields
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -48,20 +49,20 @@ class ProgramOfThought(Module):
         self.output_fields = resolved_signature.output_fields
 
         self.code_generate = ChainOfThought(
-            Signature(
-                self._generate_signature("generate").fields,
+            make_signature(
+                cast(Any, _field_infos_to_signature_fields(self._generate_signature("generate").fields)),
                 self._generate_instruction("generate"),
             ),
         )
         self.code_regenerate = ChainOfThought(
-            Signature(
-                self._generate_signature("regenerate").fields,
+            make_signature(
+                cast(Any, _field_infos_to_signature_fields(self._generate_signature("regenerate").fields)),
                 self._generate_instruction("regenerate"),
             ),
         )
         self.generate_output = ChainOfThought(
-            Signature(
-                self._generate_signature("answer").fields,
+            make_signature(
+                cast(Any, _field_infos_to_signature_fields(self._generate_signature("answer").fields)),
                 self._generate_instruction("answer"),
             ),
         )
@@ -98,7 +99,7 @@ class ProgramOfThought(Module):
             | self.signature.output_fields,
         }
         signature_dict.update(fields_for_mode[mode])
-        return Signature(signature_dict)
+        return make_signature(cast(Any, _field_infos_to_signature_fields(signature_dict)))
 
     def _generate_instruction(self, mode):
         mode_inputs = ", ".join(

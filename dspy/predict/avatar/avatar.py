@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import Any, cast
 
 from pydantic.fields import FieldInfo
 
@@ -30,6 +31,8 @@ class Avatar(Module):
         verbose=False,
     ) -> None:
         self.signature = ensure_signature(signature)
+        if self.signature is None:
+            raise ValueError(f"Invalid signature: {signature!r}")
         self.input_fields = self.signature.input_fields
         self.output_fields = self.signature.output_fields
 
@@ -56,15 +59,16 @@ class Avatar(Module):
         self.actor_clone = deepcopy(self.actor)
 
     def _get_field(self, field_info: FieldInfo):
-        if field_info.json_schema_extra["__dspy_field_type"] == "input":
+        extra = cast(dict[str, Any], field_info.json_schema_extra or {})
+        if extra["__dspy_field_type"] == "input":
             return InputField(
-                desc=field_info.json_schema_extra["desc"],
+                desc=extra["desc"],
             )
-        if field_info.json_schema_extra["__dspy_field_type"] == "output":
+        if extra["__dspy_field_type"] == "output":
             return OutputField(
-                desc=field_info.json_schema_extra["desc"],
+                desc=extra["desc"],
             )
-        raise ValueError(f"Unknown field type: {field_info.json_schema_extra['__dspy_field_type']}")
+        raise ValueError(f"Unknown field type: {extra['__dspy_field_type']}")
 
     def _update_signature(self, idx: int, omit_action: bool = False) -> None:
         self.actor.signature = self.actor.signature.with_updated_fields(
@@ -100,7 +104,7 @@ class Avatar(Module):
                 Action,
             )
 
-    def _call_tool(self, tool_name: str, tool_input_query: str) -> str:
+    def _call_tool(self, tool_name: str, tool_input_query: str) -> str | None:
         for tool in self.tools:
             if tool.name == tool_name:
                 return tool.tool.run(tool_input_query)

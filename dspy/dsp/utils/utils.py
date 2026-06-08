@@ -97,7 +97,7 @@ def batch(group, bsize, provide_offset=False):
 class dotdict(dict):  # noqa: N801
     def __getattr__(self, key):
         if key.startswith("__") and key.endswith("__"):
-            return super().__getattr__(key)
+            return super().__getattribute__(key)
         try:
             return self[key]
         except KeyError:

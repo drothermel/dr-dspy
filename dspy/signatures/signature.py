@@ -23,7 +23,7 @@ import sys
 import types
 import typing
 from copy import deepcopy
-from typing import Any, Iterator
+from typing import Any, Iterator, overload, cast
 
 from pydantic import BaseModel, Field, create_model
 from pydantic.fields import FieldInfo
@@ -40,6 +40,10 @@ def _default_instructions(cls) -> str:
 
 def _field_infos_to_signature_fields(fields: dict[str, FieldInfo]) -> dict[str, tuple[type, FieldInfo]]:
     return {name: (field.annotation or str, field) for name, field in fields.items()}
+
+
+def _field_info_extra(field: FieldInfo) -> dict[str, Any]:
+    return cast(dict[str, Any], field.json_schema_extra or {})
 
 
 class SignatureMeta(type(BaseModel)):
@@ -209,7 +213,7 @@ class SignatureMeta(type(BaseModel)):
 
     def _validate_fields(cls) -> None:
         for name, field in cls.model_fields.items():
-            extra = field.json_schema_extra or {}
+            extra = _field_info_extra(field)
             field_type = extra.get("__dspy_field_type")
             if field_type not in ["input", "output"]:
                 raise TypeError(
@@ -246,7 +250,7 @@ class SignatureMeta(type(BaseModel)):
         return f"{input_fields} -> {output_fields}"
 
     def _get_fields_with_type(cls, field_type) -> dict[str, FieldInfo]:
-        return {k: v for k, v in cls.model_fields.items() if v.json_schema_extra["__dspy_field_type"] == field_type}
+        return {k: v for k, v in cls.model_fields.items() if _field_info_extra(v)["__dspy_field_type"] == field_type}
 
     def __repr__(cls) -> str:
         """Output a representation of the signature.
@@ -302,7 +306,7 @@ class Signature(BaseModel, metaclass=SignatureMeta):
         return make_signature(_field_infos_to_signature_fields(cls.fields), instructions)
 
     @classmethod
-    def with_updated_fields(cls, name: str, type_: type | None = None, **kwargs: dict[str, Any]) -> type["Signature"]:
+    def with_updated_fields(cls, name: str, type_: type | None = None, **kwargs: Any) -> type["Signature"]:
         """Create a new Signature class with the updated field information.
 
         Returns a new Signature class with the field, name, updated
@@ -320,7 +324,7 @@ class Signature(BaseModel, metaclass=SignatureMeta):
         # Update `fields_copy[name].json_schema_extra` with the new kwargs, on conflicts
         # we use the new value in kwargs.
         fields_copy[name].json_schema_extra = {
-            **fields_copy[name].json_schema_extra,
+            **_field_info_extra(fields_copy[name]),
             **kwargs,
         }
         if type_ is not None:
@@ -461,18 +465,19 @@ class Signature(BaseModel, metaclass=SignatureMeta):
         if type_ is None:
             type_ = str
 
-        input_fields = list(cls.input_fields.items())
-        output_fields = list(cls.output_fields.items())
+        input_fields = list(_field_infos_to_signature_fields(cls.input_fields).items())
+        output_fields = list(_field_infos_to_signature_fields(cls.output_fields).items())
 
         # Choose the list to insert into based on the field type
-        lst = input_fields if field.json_schema_extra["__dspy_field_type"] == "input" else output_fields
+        field_extra = _field_info_extra(field)
+        lst = input_fields if field_extra["__dspy_field_type"] == "input" else output_fields
         # We support negative insert indices
         if index < 0:
             index += len(lst) + 1
         if index < 0 or index > len(lst):
             raise ValueError(
                 f"Invalid index to insert: {index}, index must be in the range of [{len(lst) - 1}, {len(lst)}] for "
-                f"{field.json_schema_extra['__dspy_field_type']} fields, but received: {index}.",
+                f"{field_extra['__dspy_field_type']} fields, but received: {index}.",
             )
         lst.insert(index, (name, (type_, field)))
 
@@ -499,26 +504,39 @@ class Signature(BaseModel, metaclass=SignatureMeta):
         for field in cls.fields:
             state["fields"].append(
                 {
-                    "prefix": cls.fields[field].json_schema_extra["prefix"],
-                    "description": cls.fields[field].json_schema_extra["desc"],
+                    "prefix": _field_info_extra(cls.fields[field])["prefix"],
+                    "description": _field_info_extra(cls.fields[field])["desc"],
                 }
             )
 
         return state
 
     @classmethod
-    def load_state(cls, state):
+    def load_state(cls, state) -> type["Signature"]:
         signature_copy = make_signature(_field_infos_to_signature_fields(deepcopy(cls.fields)), cls.instructions)
 
         signature_copy.instructions = state["instructions"]
         for field, saved_field in zip(signature_copy.fields.values(), state["fields"], strict=False):
-            field.json_schema_extra["prefix"] = saved_field["prefix"]
-            field.json_schema_extra["desc"] = saved_field["description"]
+            field_extra = _field_info_extra(field)
+            field_extra["prefix"] = saved_field["prefix"]
+            field_extra["desc"] = saved_field["description"]
 
         return signature_copy
 
 
-def ensure_signature(signature: str | type[Signature], instructions=None) -> None | type[Signature]:
+@overload
+def ensure_signature(signature: None, instructions=None) -> None: ...
+
+
+@overload
+def ensure_signature(signature: str, instructions=None) -> type[Signature]: ...
+
+
+@overload
+def ensure_signature(signature: type[Signature], instructions=None) -> type[Signature]: ...
+
+
+def ensure_signature(signature: str | type[Signature] | None, instructions=None) -> None | type[Signature]:
     if signature is None:
         return None
     if isinstance(signature, str):
@@ -529,7 +547,7 @@ def ensure_signature(signature: str | type[Signature], instructions=None) -> Non
 
 
 def make_signature(
-    signature: str | dict[str, tuple[type, FieldInfo]],
+    signature: str | dict[str, tuple[type, FieldInfo] | FieldInfo],
     instructions: str | None = None,
     signature_name: str = "StringSignature",
     custom_types: dict[str, type] | None = None,

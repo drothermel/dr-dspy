@@ -1,5 +1,6 @@
 import csv
 import importlib
+import importlib.util
 import json
 import logging
 import types
@@ -22,8 +23,9 @@ from dspy.utils.callback import with_callbacks
 from dspy.utils.parallelizer import ParallelExecutor
 
 try:
-    from IPython.display import HTML
-    from IPython.display import display as display
+    ipython_display = importlib.import_module("IPython.display")
+    HTML = ipython_display.HTML
+    display = ipython_display.display
 
 except ImportError:
 
@@ -160,6 +162,9 @@ class Evaluate:
 
         if callback_metadata:
             logger.debug(f"Evaluate is called with callback metadata: {callback_metadata}")
+
+        if metric is None:
+            raise ValueError("A metric function is required for evaluation.")
 
         tqdm.tqdm._instances.clear()
 
@@ -383,9 +388,8 @@ def is_in_ipython_notebook_environment():
     :return: True if the current environment is an IPython notebook environment, False otherwise.
     """
     try:
-        from IPython import get_ipython
-
+        ipython = importlib.import_module("IPython")
         # This is a best-effort check to see if we are in an IPython notebook environment
-        return "IPKernelApp" in getattr(get_ipython(), "config", {})
+        return "IPKernelApp" in getattr(ipython.get_ipython(), "config", {})
     except ImportError:
         return False

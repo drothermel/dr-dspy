@@ -37,7 +37,7 @@ def majority(prediction_or_completions, normalize=default_normalize, field=None)
     for value in normalized_values_ or normalized_values:
         value_counts[value] = value_counts.get(value, 0) + 1
 
-    majority_value = max(value_counts, key=value_counts.get)
+    majority_value = max(value_counts, key=lambda value: value_counts[value])
 
     for completion in completions:
         if normalize(completion[field]) == majority_value:

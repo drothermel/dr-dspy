@@ -15,7 +15,7 @@ import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pydantic
 
@@ -30,7 +30,7 @@ from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
 from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
 from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature, ensure_signature
+from dspy.signatures.signature import Signature, ensure_signature, make_signature
 from dspy.utils.annotation import experimental
 
 if TYPE_CHECKING:
@@ -155,6 +155,8 @@ class RLM(Module):
         """
         super().__init__()
         self.signature = ensure_signature(signature)
+        if self.signature is None:
+            raise ValueError("Invalid signature provided to RLM.")
         self.max_iterations = max_iterations
         self.max_llm_calls = max_llm_calls
         self.max_output_chars = max_output_chars
@@ -166,8 +168,8 @@ class RLM(Module):
 
         # Build the action and extract signatures
         action_sig, extract_sig = self._build_signatures()
-        self.generate_action = Predict(action_sig)
-        self.extract = Predict(extract_sig)
+        self.generate_action = Predict(cast(type[Signature], action_sig))
+        self.extract = Predict(cast(type[Signature], extract_sig))
 
     # =========================================================================
     # Tool Creation and Validation
@@ -197,7 +199,12 @@ class RLM(Module):
 
         # List of callables/Tools -> normalize to Tool objects
         tool_list = [to_tool(t) for t in tools]
-        return {tool.name: tool for tool in tool_list}
+        tool_map: dict[str, Tool] = {}
+        for tool in tool_list:
+            if tool.name is None:
+                raise ValueError("Tool name could not be determined.")
+            tool_map[tool.name] = tool
+        return tool_map
 
     def _validate_tools(self, tools: dict[str, Tool]) -> None:
         """Validate user-provided tools have valid names."""
@@ -293,7 +300,7 @@ class RLM(Module):
     # Signature Building
     # =========================================================================
 
-    def _build_signatures(self) -> tuple[Signature, Signature]:
+    def _build_signatures(self) -> tuple[type[Signature], type[Signature]]:
         """Build the action and extract signatures from templates."""
         inputs_str = ", ".join(f"`{n}`" for n in self.signature.input_fields)
 
@@ -312,10 +319,16 @@ class RLM(Module):
         tool_docs = self._format_tool_docs(self._user_tools)
 
         action_sig = (
-            Signature({}, task_instructions + ACTION_INSTRUCTIONS_TEMPLATE.format(
-                inputs=inputs_str, final_output_names=final_output_names, output_fields=output_fields,
-                max_llm_calls=self.max_llm_calls,
-            ) + tool_docs)
+            make_signature(
+                {},
+                task_instructions + ACTION_INSTRUCTIONS_TEMPLATE.format(
+                    inputs=inputs_str,
+                    final_output_names=final_output_names,
+                    output_fields=output_fields,
+                    max_llm_calls=self.max_llm_calls,
+                )
+                + tool_docs,
+            )
             .append("variables_info", InputField(desc="Metadata about the variables available in the REPL"), type_=str)
             .append("repl_history", InputField(desc="Previous REPL code executions and their outputs"), type_=REPLHistory)
             .append("iteration", InputField(desc="Current iteration number (1-indexed) out of max_iterations"), type_=str)
@@ -334,7 +347,7 @@ class RLM(Module):
             extended_task_instructions = "The trajectory was generated with the following objective: \n" + task_instructions + "\n"
         full_extract_instructions = extended_task_instructions + extract_instructions
 
-        extract_sig = Signature(
+        extract_sig = make_signature(
             {**self.signature.output_fields},
             full_extract_instructions,
         )
@@ -445,10 +458,10 @@ class RLM(Module):
         """
         interpreter.tools.update(execution_tools)
         if hasattr(interpreter, "output_fields"):
-            interpreter.output_fields = self._get_output_fields_info()
+            setattr(interpreter, "output_fields", self._get_output_fields_info())
         # Reset registration flag to force re-registration with fresh tools
         if hasattr(interpreter, "_tools_registered"):
-            interpreter._tools_registered = False
+            setattr(interpreter, "_tools_registered", False)
 
     @contextmanager
     def _interpreter_context(self, execution_tools: dict[str, Callable]) -> Iterator[CodeInterpreter]:
@@ -565,7 +578,7 @@ class RLM(Module):
                 reasoning=pred.reasoning, code=code, output=f"FINAL: {parsed_outputs}"
             )
             return Prediction(
-                **parsed_outputs,
+                **(parsed_outputs or {}),
                 trajectory=[e.model_dump() for e in final_history],
                 final_reasoning=pred.reasoning,
             )
