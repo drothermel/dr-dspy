@@ -7,9 +7,9 @@ from typing_extensions import override
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.predict import Predict
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
+from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
+from dspy.teleprompt.utils import get_task_spec, set_task_spec
 
 logger = logging.getLogger(__name__)
 
@@ -38,27 +38,55 @@ Note that this teleprompter takes in the following parameters:
                 These statistics will be returned as attributes of the best program.
 """
 
+BASIC_GENERATE_INSTRUCTION_TASK_SPEC = make_task_spec(
+    {
+        "basic_instruction": FieldSpec.input(
+            "basic_instruction",
+            str,
+            desc="The initial instructions before optimization",
+        ),
+        "proposed_instruction": FieldSpec.output(
+            "proposed_instruction",
+            str,
+            desc="The improved instructions for the language model",
+        ),
+        "proposed_prefix_for_output_field": FieldSpec.output(
+            "proposed_prefix_for_output_field",
+            str,
+            desc="The string at the end of the prompt, which will help the model start solving the task",
+        ),
+    },
+    instructions=(
+        "You are an instruction optimizer for large language models. I will give you a ``signature`` of fields "
+        "(inputs and outputs) in English. Your task is to propose an instruction that will lead a good language model "
+        "to perform the task well. Don't be afraid to be creative."
+    ),
+    name="BasicGenerateInstruction",
+)
 
-class BasicGenerateInstruction(Signature):
-    """You are an instruction optimizer for large language models. I will give you a ``signature`` of fields (inputs and outputs) in English. Your task is to propose an instruction that will lead a good language model to perform the task well. Don't be afraid to be creative."""
-
-    basic_instruction = InputField(desc="The initial instructions before optimization")
-    proposed_instruction = OutputField(desc="The improved instructions for the language model")
-    proposed_prefix_for_output_field = OutputField(
-        desc="The string at the end of the prompt, which will help the model start solving the task",
-    )
-
-
-class GenerateInstructionGivenAttempts(Signature):
-    """You are an instruction optimizer for large language models. I will give some task instructions I've tried, along with their corresponding validation scores. The instructions are arranged in increasing order based on their scores, where higher scores indicate better quality.
-
-    Your task is to propose a new instruction that will lead a good language model to perform the task even better. Don't be afraid to be creative."""
-
-    attempted_instructions = InputField()
-    proposed_instruction = OutputField(desc="The improved instructions for the language model")
-    proposed_prefix_for_output_field = OutputField(
-        desc="The string at the end of the prompt, which will help the model start solving the task",
-    )
+GENERATE_INSTRUCTION_GIVEN_ATTEMPTS_TASK_SPEC = make_task_spec(
+    {
+        "attempted_instructions": FieldSpec.input("attempted_instructions", str),
+        "proposed_instruction": FieldSpec.output(
+            "proposed_instruction",
+            str,
+            desc="The improved instructions for the language model",
+        ),
+        "proposed_prefix_for_output_field": FieldSpec.output(
+            "proposed_prefix_for_output_field",
+            str,
+            desc="The string at the end of the prompt, which will help the model start solving the task",
+        ),
+    },
+    instructions=(
+        "You are an instruction optimizer for large language models. I will give some task instructions I've tried, "
+        "along with their corresponding validation scores. The instructions are arranged in increasing order based on "
+        "their scores, where higher scores indicate better quality.\n\n"
+        "Your task is to propose a new instruction that will lead a good language model to perform the task even "
+        "better. Don't be afraid to be creative."
+    ),
+    name="GenerateInstructionGivenAttempts",
+)
 
 
 class COPRO(Teleprompter):
@@ -83,10 +111,10 @@ class COPRO(Teleprompter):
 
     def _check_candidates_equal(self, candidate1, candidate2) -> bool:
         for p1, p2 in zip(candidate1["program"].predictors(), candidate2["program"].predictors(), strict=False):
-            if self._get_signature(p1).instructions != self._get_signature(p2).instructions:
+            if get_task_spec(p1).instructions != get_task_spec(p2).instructions:
                 return False
-            *_, p1_last_field = self._get_signature(p1).fields.values()
-            *_, p2_last_field = self._get_signature(p2).fields.values()
+            *_, p1_last_field = get_task_spec(p1).fields.values()
+            *_, p2_last_field = get_task_spec(p2).fields.values()
             if p1_last_field != p2_last_field:
                 return False
         return True
@@ -111,19 +139,11 @@ class COPRO(Teleprompter):
                 final_candidates.append(c)
         return final_candidates
 
-    def _print_signature(self, predictor) -> None:
-        signature = self._get_signature(predictor)
+    def _print_task_spec(self, predictor) -> None:
+        task_spec = get_task_spec(predictor)
 
-        logger.debug(f"i: {signature.instructions}")
-        logger.debug(f"p: {list(signature.fields.values())[-1].json_schema_extra['prefix']}")
-
-    def _get_signature(self, predictor):
-        assert hasattr(predictor, "signature")
-        return predictor.signature
-
-    def _set_signature(self, predictor, updated_signature) -> None:
-        assert hasattr(predictor, "signature")
-        predictor.signature = updated_signature
+        logger.debug(f"i: {task_spec.instructions}")
+        logger.debug(f"p: {list(task_spec.fields.values())[-1].prefix}")
 
     @override
     async def compile(self, student, *, trainset, eval_kwargs):
@@ -155,19 +175,19 @@ class COPRO(Teleprompter):
         for predictor in module.predictors():
             basic_instruction = None
             basic_prefix = None
-            *_, last_key = self._get_signature(predictor).fields.keys()
-            basic_instruction = self._get_signature(predictor).instructions
-            basic_prefix = self._get_signature(predictor).fields[last_key].json_schema_extra["prefix"]
+            *_, last_key = get_task_spec(predictor).fields.keys()
+            basic_instruction = get_task_spec(predictor).instructions
+            basic_prefix = get_task_spec(predictor).fields[last_key].prefix
             if self.prompt_model:
                 with settings.context(lm=self.prompt_model):
                     instruct = await Predict(
-                        BasicGenerateInstruction,
+                        BASIC_GENERATE_INSTRUCTION_TASK_SPEC,
                         n=self.breadth - 1,
                         temperature=self.init_temperature,
                     )(basic_instruction=basic_instruction)
             else:
                 instruct = await Predict(
-                    BasicGenerateInstruction,
+                    BASIC_GENERATE_INSTRUCTION_TASK_SPEC,
                     n=self.breadth - 1,
                     temperature=self.init_temperature,
                 )(basic_instruction=basic_instruction)
@@ -210,18 +230,18 @@ class COPRO(Teleprompter):
                     )
 
                     # Set this new module with our instruction / prefix
-                    *_, last_key = self._get_signature(p_new).fields.keys()
-                    updated_signature = (
-                        self._get_signature(p_new)
+                    *_, last_key = get_task_spec(p_new).fields.keys()
+                    updated_task_spec = (
+                        get_task_spec(p_new)
                         .with_instructions(instruction)
-                        .with_updated_fields(last_key, prefix=prefix)
+                        .with_updated_field(last_key, prefix=prefix)
                     )
-                    self._set_signature(predictor=p_new, updated_signature=updated_signature)
+                    set_task_spec(predictor=p_new, task_spec=updated_task_spec)
 
                     # Score the instruction / prefix
                     for i, predictor in enumerate(module_clone.predictors()):
                         logger.debug(f"Predictor {i + 1}")
-                        self._print_signature(predictor)
+                        self._print_task_spec(predictor)
                     logger.info(
                         f"At Depth {d + 1}/{self.depth}, Evaluating Prompt Candidate #{c_i + 1}/{len(candidates_)} for "
                         f"Predictor {p_i + 1} of {len(module.predictors())}.",
@@ -260,13 +280,13 @@ class COPRO(Teleprompter):
                 # Now that we've evaluated the candidates, set this predictor to the best performing version
                 # to ensure the next round of scores reflect the best possible version
                 best_candidate = max(evaluated_candidates[id(p_old)].values(), key=lambda candidate: candidate["score"])
-                *_, last_key = self._get_signature(p_old).fields.keys()
-                updated_signature = (
-                    self._get_signature(p_new)
+                *_, last_key = get_task_spec(p_old).fields.keys()
+                updated_task_spec = (
+                    get_task_spec(p_new)
                     .with_instructions(best_candidate["instruction"])
-                    .with_updated_fields(last_key, prefix=best_candidate["prefix"])
+                    .with_updated_field(last_key, prefix=best_candidate["prefix"])
                 )
-                self._set_signature(predictor=p_new, updated_signature=updated_signature)
+                set_task_spec(predictor=p_new, task_spec=updated_task_spec)
 
                 logger.debug(
                     f"Updating Predictor {id(p_old)} to:\ni: {best_candidate['instruction']}\n"
@@ -275,7 +295,7 @@ class COPRO(Teleprompter):
                 logger.debug("Full predictor with update: ")
                 for i, predictor in enumerate(module_clone.predictors()):
                     logger.debug(f"Predictor {i}")
-                    self._print_signature(predictor)
+                    self._print_task_spec(predictor)
 
             if d == self.depth - 1:
                 break
@@ -309,13 +329,13 @@ class COPRO(Teleprompter):
                 if self.prompt_model:
                     with settings.context(lm=self.prompt_model):
                         instr = await Predict(
-                            GenerateInstructionGivenAttempts,
+                            GENERATE_INSTRUCTION_GIVEN_ATTEMPTS_TASK_SPEC,
                             n=self.breadth,
                             temperature=self.init_temperature,
                         )(attempted_instructions=attempts)
                 else:
                     instr = await Predict(
-                        GenerateInstructionGivenAttempts,
+                        GENERATE_INSTRUCTION_GIVEN_ATTEMPTS_TASK_SPEC,
                         n=self.breadth,
                         temperature=self.init_temperature,
                     )(attempted_instructions=attempts)

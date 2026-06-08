@@ -7,6 +7,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.propose.grounded_proposer import GroundedProposer
 from dspy.utils.dummies import DummyLM
+from tests.task_spec.helpers import ts
 
 
 @pytest.mark.parametrize(
@@ -19,7 +20,7 @@ from dspy.utils.dummies import DummyLM
 def test_propose_instructions_for_program(demo_candidates):
     # Set large number here so that lm always returns the same response
     prompt_model = DummyLM([{"proposed_instruction": "instruction"}] * 10)
-    program = Predict("question -> answer")
+    program = Predict(ts("question -> answer"))
     trainset = []
 
     proposer = GroundedProposer(
@@ -56,7 +57,7 @@ def test_propose_instruction_for_predictor(demo_candidates):
             return super().copy(**kwargs)
 
     prompt_model = TrackingDummyLM([{"proposed_instruction": "instruction"}] * 10)
-    program = Predict("question -> answer")
+    program = Predict(ts("question -> answer"))
 
     proposer = GroundedProposer(
         prompt_model=prompt_model,

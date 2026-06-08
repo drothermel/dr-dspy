@@ -16,23 +16,23 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
+from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, bootstrap_trace_data
 
 
 def test_bootstrap_trace_data():
     """Test bootstrap_trace_data function with a single Predict program."""
 
-    # Define signature for string -> int conversion
-    class StringToIntSignature(Signature):
-        """Convert a string number to integer"""
-
-        text: str = InputField()
-        number: int = OutputField()
+    string_to_int_task_spec = make_task_spec(
+        {
+            "text": FieldSpec.input("text", str),
+            "number": FieldSpec.output("number", int),
+        },
+        instructions="Convert a string number to integer",
+    )
 
     # Create program with a single Predict.
-    program = Predict(StringToIntSignature)
+    program = Predict(string_to_int_task_spec)
 
     # Create dummy dataset of size 5
     dataset = [

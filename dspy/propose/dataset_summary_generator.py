@@ -3,43 +3,61 @@ import re
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.propose.utils import strip_prefix
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
+from dspy.task_spec import FieldSpec, make_task_spec
 
+OBSERVATION_SUMMARIZER_TASK_SPEC = make_task_spec(
+    {
+        "observations": FieldSpec.input("observations", str, desc="Observations I have made about my dataset"),
+        "summary": FieldSpec.output(
+            "summary",
+            str,
+            desc="Two to Three sentence summary of only the most significant highlights of my observations",
+        ),
+    },
+    instructions=(
+        "Given a series of observations I have made about my dataset, please summarize them into a brief 2-3 sentence "
+        "summary which highlights only the most important details."
+    ),
+    name="ObservationSummarizer",
+)
 
-class ObservationSummarizer(Signature):
-    """Given a series of observations I have made about my dataset, please summarize them into a brief 2-3 sentence summary which highlights only the most important details."""
+DATASET_DESCRIPTOR_TASK_SPEC = make_task_spec(
+    {
+        "examples": FieldSpec.input("examples", str, desc="Sample data points from the dataset"),
+        "observations": FieldSpec.output(
+            "observations",
+            str,
+            desc="Somethings that holds true for most or all of the data you observed",
+        ),
+    },
+    instructions=(
+        "Given several examples from a dataset please write observations about trends that hold for most or all of "
+        "the samples. Some areas you may consider in your observations: topics, content, syntax, conciseness, etc. "
+        "It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be "
+        "afraid to be creative"
+    ),
+    name="DatasetDescriptor",
+)
 
-    observations = InputField(desc="Observations I have made about my dataset")
-    summary = OutputField(
-        desc="Two to Three sentence summary of only the most significant highlights of my observations"
-    )
-
-
-class DatasetDescriptor(Signature):
-    (
-        """Given several examples from a dataset please write observations about trends that hold for most or all of the samples. """
-        """Some areas you may consider in your observations: topics, content, syntax, conciseness, etc. """
-        """It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative"""
-    )
-
-    examples = InputField(desc="Sample data points from the dataset")
-    observations = OutputField(desc="Somethings that holds true for most or all of the data you observed")
-
-
-class DatasetDescriptorWithPriorObservations(Signature):
-    (
-        """Given several examples from a dataset please write observations about trends that hold for most or all of the samples. """
-        """I will also provide you with a few observations I have already made.  Please add your own observations or if you feel the observations are comprehensive say 'COMPLETE' """
-        """Some areas you may consider in your observations: topics, content, syntax, conciceness, etc. """
-        """It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative"""
-    )
-
-    examples = InputField(desc="Sample data points from the dataset")
-    prior_observations = InputField(desc="Some prior observations I made about the data")
-    observations = OutputField(
-        desc="Somethings that holds true for most or all of the data you observed or COMPLETE if you have nothing to add"
-    )
+DATASET_DESCRIPTOR_WITH_PRIOR_OBSERVATIONS_TASK_SPEC = make_task_spec(
+    {
+        "examples": FieldSpec.input("examples", str, desc="Sample data points from the dataset"),
+        "prior_observations": FieldSpec.input("prior_observations", str, desc="Some prior observations I made about the data"),
+        "observations": FieldSpec.output(
+            "observations",
+            str,
+            desc="Somethings that holds true for most or all of the data you observed or COMPLETE if you have nothing to add",
+        ),
+    },
+    instructions=(
+        "Given several examples from a dataset please write observations about trends that hold for most or all of the "
+        "samples. I will also provide you with a few observations I have already made. Please add your own observations "
+        "or if you feel the observations are comprehensive say 'COMPLETE'. Some areas you may consider in your "
+        "observations: topics, content, syntax, conciceness, etc. It will be useful to make an educated guess as to the "
+        "nature of the task this dataset will enable. Don't be afraid to be creative"
+    ),
+    name="DatasetDescriptorWithPriorObservations",
+)
 
 
 def order_input_keys_in_string(unordered_repr):
@@ -60,7 +78,7 @@ async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model
     upper_lim = min(len(trainset), view_data_batch_size)
     prompt_model = prompt_model if prompt_model else settings.lm
     with settings.context(lm=prompt_model):
-        observation = await Predict(DatasetDescriptor, n=1, temperature=1.0)(
+        observation = await Predict(DATASET_DESCRIPTOR_TASK_SPEC, n=1, temperature=1.0)(
             examples=order_input_keys_in_string(trainset[0:upper_lim].__repr__())
         )
     observations = observation["observations"]
@@ -80,7 +98,7 @@ async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model
                 pass
             upper_lim = min(len(trainset), b + view_data_batch_size)
             with settings.context(lm=prompt_model):
-                output = await Predict(DatasetDescriptorWithPriorObservations, n=1, temperature=1.0)(
+                output = await Predict(DATASET_DESCRIPTOR_WITH_PRIOR_OBSERVATIONS_TASK_SPEC, n=1, temperature=1.0)(
                     prior_observations=observations,
                     examples=order_input_keys_in_string(trainset[b:upper_lim].__repr__()),
                 )
@@ -99,9 +117,9 @@ async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model
 
     if prompt_model:
         with settings.context(lm=prompt_model):
-            summary = await Predict(ObservationSummarizer, n=1, temperature=1.0)(observations=observations)
+            summary = await Predict(OBSERVATION_SUMMARIZER_TASK_SPEC, n=1, temperature=1.0)(observations=observations)
     else:
-        summary = await Predict(ObservationSummarizer, n=1, temperature=1.0)(observations=observations)
+        summary = await Predict(OBSERVATION_SUMMARIZER_TASK_SPEC, n=1, temperature=1.0)(observations=observations)
     if verbose:
         pass
     if log_file:

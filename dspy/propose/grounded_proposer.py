@@ -15,9 +15,8 @@ from dspy.propose.utils import (
     get_dspy_source_code,
     strip_prefix,
 )
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
-from dspy.teleprompt.utils import get_prompt_model, get_signature
+from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.teleprompt.utils import get_prompt_model, get_task_spec
 
 logger = logging.getLogger(__name__)
 
@@ -34,37 +33,113 @@ TIPS = {
 }
 
 
-class DescribeProgram(Signature):
-    """Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe what type of task this program appears to be designed to solve, and how it appears to work."""
+DESCRIBE_PROGRAM_TASK_SPEC = make_task_spec(
+    {
+        "program_code": FieldSpec.input(
+            "program_code",
+            str,
+            desc="Pseudocode for a language model program designed to solve a particular task.",
+        ),
+        "program_example": FieldSpec.input("program_example", str, desc="An example of the program in use."),
+        "program_description": FieldSpec.output(
+            "program_description",
+            str,
+            desc="Describe what task the program is designed to solve, and how it goes about solving this task.",
+        ),
+    },
+    instructions=(
+        "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe what "
+        "type of task this program appears to be designed to solve, and how it appears to work."
+    ),
+    name="DescribeProgram",
+)
 
-    program_code = InputField(
-        desc="Pseudocode for a language model program designed to solve a particular task.",
-    )
-    program_example = InputField(
-        desc="An example of the program in use.",
-    )
-    program_description = OutputField(
-        desc="Describe what task the program is designed to solve, and how it goes about solving this task.",
-    )
+DESCRIBE_MODULE_TASK_SPEC = make_task_spec(
+    {
+        "program_code": FieldSpec.input(
+            "program_code",
+            str,
+            desc="Pseudocode for a language model program designed to solve a particular task.",
+        ),
+        "program_example": FieldSpec.input("program_example", str, desc="An example of the program in use."),
+        "program_description": FieldSpec.input(
+            "program_description",
+            str,
+            desc="Summary of the task the program is designed to solve, and how it goes about solving it.",
+        ),
+        "module": FieldSpec.input("module", str, desc="The module in the program that we want to describe."),
+        "module_description": FieldSpec.output(
+            "module_description",
+            str,
+            desc="Description of the module's role in the broader program.",
+        ),
+    },
+    instructions=(
+        "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe the "
+        "purpose of one of the specified module in this pipeline."
+    ),
+    name="DescribeModule",
+)
 
 
-class DescribeModule(Signature):
-    """Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe the purpose of one of the specified module in this pipeline."""
-
-    program_code = InputField(
-        desc="Pseudocode for a language model program designed to solve a particular task.",
+def generate_instruction_task_spec(
+    use_dataset_summary=True,
+    program_aware=True,
+    use_task_demos=True,
+    use_instruct_history=True,
+    use_tip=True,
+):
+    fields: dict[str, FieldSpec] = {}
+    if use_dataset_summary:
+        fields["dataset_description"] = FieldSpec.input(
+            "dataset_description",
+            str,
+            desc="A description of the dataset that we are using.",
+        )
+    if program_aware:
+        fields["program_code"] = FieldSpec.input(
+            "program_code",
+            str,
+            desc="Language model program designed to solve a particular task.",
+        )
+        fields["program_description"] = FieldSpec.input(
+            "program_description",
+            str,
+            desc="Summary of the task the program is designed to solve, and how it goes about solving it.",
+        )
+        fields["module"] = FieldSpec.input("module", str, desc="The module to create an instruction for.")
+        fields["module_description"] = FieldSpec.input(
+            "module_description",
+            str,
+            desc="Description of the module to create an instruction for.",
+        )
+    if use_task_demos:
+        fields["task_demos"] = FieldSpec.input("task_demos", str, desc="Example inputs/outputs of our module.")
+    if use_instruct_history:
+        fields["previous_instructions"] = FieldSpec.input(
+            "previous_instructions",
+            str,
+            desc="Previous instructions we've attempted, along with their associated scores.",
+        )
+    fields["basic_instruction"] = FieldSpec.input("basic_instruction", str, desc="Basic instruction.")
+    if use_tip:
+        fields["tip"] = FieldSpec.input(
+            "tip",
+            str,
+            desc="A suggestion for how to go about generating the new instruction.",
+        )
+    fields["proposed_instruction"] = FieldSpec.output(
+        "proposed_instruction",
+        str,
+        desc="Propose an instruction that will be used to prompt a Language Model to perform this task.",
     )
-    program_example = InputField(
-        desc="An example of the program in use.",
-    )
-    program_description = InputField(
-        desc="Summary of the task the program is designed to solve, and how it goes about solving it.",
-    )
-    module = InputField(
-        desc="The module in the program that we want to describe.",
-    )
-    module_description = OutputField(
-        desc="Description of the module's role in the broader program.",
+    return make_task_spec(
+        fields,
+        instructions=(
+            "Use the information below to learn about a task that we are trying to solve using calls to an LM, then "
+            "generate a new instruction that will be used to prompt a Language Model to better solve the task."
+        ),
+        name="GenerateSingleModuleInstruction",
     )
 
 
@@ -75,45 +150,15 @@ def generate_instruction_class(
     use_instruct_history=True,
     use_tip=True,
 ):
-    class GenerateSingleModuleInstruction(Signature):
-        """Use the information below to learn about a task that we are trying to solve using calls to an LM, then generate a new instruction that will be used to prompt a Language Model to better solve the task."""
-
-        if use_dataset_summary:
-            dataset_description = InputField(
-                desc="A description of the dataset that we are using.",
-            )
-        if program_aware:
-            program_code = InputField(
-                desc="Language model program designed to solve a particular task.",
-            )
-            program_description = InputField(
-                desc="Summary of the task the program is designed to solve, and how it goes about solving it.",
-            )
-            module = InputField(
-                desc="The module to create an instruction for.",
-            )
-            module_description = InputField(
-                desc="Description of the module to create an instruction for.",
-            )
-        task_demos = InputField(
-            desc="Example inputs/outputs of our module.",
+    return Predict(
+        generate_instruction_task_spec(
+            use_dataset_summary=use_dataset_summary,
+            program_aware=program_aware,
+            use_task_demos=use_task_demos,
+            use_instruct_history=use_instruct_history,
+            use_tip=use_tip,
         )
-        if use_instruct_history:
-            previous_instructions = InputField(
-                desc="Previous instructions we've attempted, along with their associated scores.",
-            )
-        basic_instruction = InputField(
-            desc="Basic instruction.",
-        )
-        if use_tip:
-            tip = InputField(
-                desc="A suggestion for how to go about generating the new instruction.",
-            )
-        proposed_instruction = OutputField(
-            desc="Propose an instruction that will be used to prompt a Language Model to perform this task.",
-        )
-
-    return Predict(GenerateSingleModuleInstruction)
+    )
 
 
 class GenerateModuleInstruction(Module):
@@ -136,8 +181,8 @@ class GenerateModuleInstruction(Module):
         self.verbose = verbose
 
         self.program_code_string = program_code_string
-        self.describe_program = Predict(DescribeProgram)
-        self.describe_module = Predict(DescribeModule)
+        self.describe_program = Predict(DESCRIBE_PROGRAM_TASK_SPEC)
+        self.describe_module = Predict(DESCRIBE_MODULE_TASK_SPEC)
         self.generate_module_instruction = generate_instruction_class(
             use_dataset_summary=use_dataset_summary,
             program_aware=program_aware,
@@ -163,13 +208,13 @@ class GenerateModuleInstruction(Module):
             for candidate_set in candidate_sets:
                 for example in candidate_set:
                     if "augmented" in example:
-                        fields_to_use = get_signature(program.predictors()[pred_i]).fields
+                        fields_to_use = get_task_spec(program.predictors()[pred_i]).fields
                         yield create_example_string(fields=fields_to_use, example=example)
                         count += 1
                         if count >= max_examples:
                             return
 
-        basic_instruction = get_signature(program.predictors()[pred_i]).instructions
+        basic_instruction = get_task_spec(program.predictors()[pred_i]).instructions
         task_demos = ""
 
         if self.use_task_demos:
@@ -204,10 +249,8 @@ class GenerateModuleInstruction(Module):
 
                 inputs = []
                 outputs = []
-                for field_name, field in get_signature(program.predictors()[pred_i]).fields.items():
-                    dspy_field_type = field.json_schema_extra.get("__dspy_field_type")
-
-                    if dspy_field_type == "input":
+                for field_name, field in get_task_spec(program.predictors()[pred_i]).fields.items():
+                    if field.role == "input":
                         inputs.append(field_name)
                     else:
                         outputs.append(field_name)

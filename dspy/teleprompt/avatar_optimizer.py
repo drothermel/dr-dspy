@@ -11,9 +11,9 @@ from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
+from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
+from dspy.teleprompt.utils import get_task_spec, set_task_spec
 
 DEFAULT_MAX_EXAMPLES = 10
 
@@ -24,49 +24,72 @@ class EvalResult(BaseModel):
     actions: list[ActionOutput] | None = None
 
 
-class Comparator(Signature):
-    """After executing the given actions on user inputs using the given instruction, some inputs have yielded good, results, while others have not. I'll provide you the inputs along with their, corresponding evaluation metrics:
+COMPARATOR_TASK_SPEC = make_task_spec(
+    {
+        "instruction": FieldSpec.input("instruction", str, desc="Instruction for the actor to execute the task"),
+        "actions": FieldSpec.input("actions", list[str], desc="Actions actor can take to complete the task"),
+        "pos_input_with_metrics": FieldSpec.input(
+            "pos_input_with_metrics",
+            list[EvalResult],
+            desc="Positive inputs along with their score on a evaluation metric and actions taken",
+        ),
+        "neg_input_with_metrics": FieldSpec.input(
+            "neg_input_with_metrics",
+            list[EvalResult],
+            desc="Negative inputs along with their score on a evaluation metric and actions taken",
+        ),
+        "feedback": FieldSpec.output(
+            "feedback",
+            str,
+            desc="Feedback for the actor to improve the performance of negative inputs",
+        ),
+    },
+    instructions=(
+        "After executing the given actions on user inputs using the given instruction, some inputs have yielded good, "
+        "results, while others have not. I'll provide you the inputs along with their, corresponding evaluation "
+        "metrics:\n\n"
+        "Task:\n"
+        "(1) Firstly, identify and contrast the patterns of inputs that have achieved good results with those that have "
+        "not.\n"
+        "(2) Then, review the computational logic for any inconsistencies in the previous actions.\n"
+        "(3) Lastly, specify the modification in tools used that can lead to improved performance on the negative inputs."
+    ),
+    name="Comparator",
+)
 
-    Task:
-    (1) Firstly, identify and contrast the patterns of inputs that have achieved good results with those that have not.
-    (2) Then, review the computational logic for any inconsistencies in the previous actions.
-    (3) Lastly, specify the modification in tools used that can lead to improved performance on the negative inputs."""
-
-    instruction: str = InputField(
-        desc="Instruction for the actor to execute the task",
-    )
-    actions: list[str] = InputField(
-        desc="Actions actor can take to complete the task",
-    )
-    pos_input_with_metrics: list[EvalResult] = InputField(
-        desc="Positive inputs along with their score on a evaluation metric and actions taken",
-    )
-    neg_input_with_metrics: list[EvalResult] = InputField(
-        desc="Negative inputs along with their score on a evaluation metric and actions taken",
-    )
-    feedback: str = OutputField(
-        desc="Feedback for the actor to improve the performance of negative inputs",
-    )
-
-
-class FeedbackBasedInstruction(Signature):
-    """There is a task that needs to be completed for which one can use multiple tools to achieve the desired outcome. A group's performance was evaluated on a dataset of inputs, the inputs that did well are positive inputs, and the inputs that did not do well are negative inputs.
-
-    You received feedback on how they can better use the tools to improve your performance on the negative inputs. You have been provided with the previous instruction, that they followed to use tools to complete the task, and the feedback on your performance.
-
-    Your task is to incorporate the feedback and generate a detailed instruction for the group to follow to improve their performance on the task.
-
-    Make sure that the new instruction talks about how to use the tools effectively and should be no more than 3 paragraphs long. The previous instruction contains general guidelines that you must retain in the new instruction."""
-
-    previous_instruction: str = InputField(
-        desc="Previous instruction for the actor to execute the task",
-    )
-    feedback: str = InputField(
-        desc="Feedback for the actor to improve the performance of negative inputs",
-    )
-    new_instruction: str = OutputField(
-        desc="New instruction for the actor to execute the task",
-    )
+FEEDBACK_BASED_INSTRUCTION_TASK_SPEC = make_task_spec(
+    {
+        "previous_instruction": FieldSpec.input(
+            "previous_instruction",
+            str,
+            desc="Previous instruction for the actor to execute the task",
+        ),
+        "feedback": FieldSpec.input(
+            "feedback",
+            str,
+            desc="Feedback for the actor to improve the performance of negative inputs",
+        ),
+        "new_instruction": FieldSpec.output(
+            "new_instruction",
+            str,
+            desc="New instruction for the actor to execute the task",
+        ),
+    },
+    instructions=(
+        "There is a task that needs to be completed for which one can use multiple tools to achieve the desired "
+        "outcome. A group's performance was evaluated on a dataset of inputs, the inputs that did well are positive "
+        "inputs, and the inputs that did not do well are negative inputs.\n\n"
+        "You received feedback on how they can better use the tools to improve your performance on the negative "
+        "inputs. You have been provided with the previous instruction, that they followed to use tools to complete the "
+        "task, and the feedback on your performance.\n\n"
+        "Your task is to incorporate the feedback and generate a detailed instruction for the group to follow to "
+        "improve their performance on the task.\n\n"
+        "Make sure that the new instruction talks about how to use the tools effectively and should be no more than 3 "
+        "paragraphs long. The previous instruction contains general guidelines that you must retain in the new "
+        "instruction."
+    ),
+    name="FeedbackBasedInstruction",
+)
 
 
 class _AvatarEvalModule(Module):
@@ -106,8 +129,8 @@ class AvatarOptimizer(Teleprompter):
         self.max_positive_inputs = max_positive_inputs or DEFAULT_MAX_EXAMPLES
         self.max_negative_inputs = max_negative_inputs or DEFAULT_MAX_EXAMPLES
 
-        self.comparator = Predict(Comparator)
-        self.feedback_instruction = Predict(FeedbackBasedInstruction)
+        self.comparator = Predict(COMPARATOR_TASK_SPEC)
+        self.feedback_instruction = Predict(FEEDBACK_BASED_INSTRUCTION_TASK_SPEC)
 
     async def process_example(self, actor, example, return_outputs):
         actor = deepcopy(actor)
@@ -198,9 +221,10 @@ class AvatarOptimizer(Teleprompter):
             if self.max_negative_inputs and len(neg_inputs) > self.max_negative_inputs:
                 neg_inputs = sample(neg_inputs, self.max_negative_inputs)
 
+            actor_task_spec = get_task_spec(best_actor.actor)
             feedback = (
                 await self.comparator(
-                    instruction=best_actor.actor.signature.instructions,
+                    instruction=actor_task_spec.instructions,
                     actions=[str(tool) for tool in best_actor.tools],
                     pos_input_with_metrics=pos_inputs,
                     neg_input_with_metrics=neg_inputs,
@@ -209,14 +233,17 @@ class AvatarOptimizer(Teleprompter):
 
             new_instruction = (
                 await self.feedback_instruction(
-                    previous_instruction=best_actor.actor.signature.instructions, feedback=feedback
+                    previous_instruction=actor_task_spec.instructions, feedback=feedback
                 )
             ).new_instruction
 
             if (self.optimize_for == "max" and best_score < score) or (
                 self.optimize_for == "min" and best_score > score
             ):
-                best_actor.actor.signature = best_actor.actor.signature.with_instructions(new_instruction)
+                set_task_spec(
+                    predictor=best_actor.actor,
+                    task_spec=actor_task_spec.with_instructions(new_instruction),
+                )
                 best_actor.actor_clone = deepcopy(best_actor.actor)
                 best_score = score
 

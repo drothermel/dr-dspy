@@ -9,50 +9,64 @@ from typing_extensions import override
 from dspy.adapters.types.base_type import Type
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
+from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.teleprompt.gepa.gepa_utils import ReflectiveExample
 
 logger = logging.getLogger(__name__)
 
 
-class GenerateEnhancedMultimodalInstructionFromFeedback(Signature):
-    """I provided an assistant with instructions to perform a task involving visual content, but the assistant's performance needs improvement based on the examples and feedback below.
-
-    Your task is to write a better instruction for the assistant that addresses the specific issues identified in the feedback, with particular attention to how visual and textual information should be analyzed and integrated.
-
-    ## Analysis Steps:
-    1. **Read the inputs carefully** and identify both the visual and textual input formats, understanding how they work together
-    2. **Read all the assistant responses and corresponding feedback** to understand what went wrong with visual analysis, text processing, or their integration
-    3. **Identify visual analysis patterns** - what visual features, relationships, or details are important for this task
-    4. **Identify domain-specific knowledge** about both visual and textual aspects, as this information may not be available to the assistant in the future
-    5. **Look for successful visual-textual integration strategies** and include these patterns in the instruction
-    6. **Address specific visual analysis issues** mentioned in the feedback
-
-    ## Instruction Requirements:
-    - **Clear task definition** explaining how to process both visual and textual inputs
-    - **Visual analysis guidance** specific to this task (what to look for, how to describe, what features matter)
-    - **Integration strategies** for combining visual observations with textual information
-    - **Domain-specific knowledge** about visual concepts, terminology, or relationships
-    - **Error prevention guidance** for common visual analysis mistakes shown in the feedback
-    - **Precise, actionable language** for both visual and textual processing
-
-    Focus on creating an instruction that helps the assistant properly analyze visual content, integrate it with textual information, and avoid the specific visual analysis mistakes shown in the examples."""
-
-    current_instruction = InputField(
-        desc="The current instruction that was provided to the assistant to perform the multimodal task"
-    )
-    examples_with_feedback = InputField(
-        desc="Task examples with visual content showing inputs, assistant outputs, and feedback. "
-        "Pay special attention to feedback about visual analysis accuracy, visual-textual integration, "
-        "and any domain-specific visual knowledge that the assistant missed."
-    )
-
-    improved_instruction = OutputField(
-        desc="A better instruction for the assistant that addresses visual analysis issues, provides "
-        "clear guidance on how to process and integrate visual and textual information, includes "
-        "necessary visual domain knowledge, and prevents the visual analysis mistakes shown in the examples."
-    )
+GENERATE_ENHANCED_MULTIMODAL_INSTRUCTION_TASK_SPEC = make_task_spec(
+    {
+        "current_instruction": FieldSpec.input(
+            "current_instruction",
+            str,
+            desc="The current instruction that was provided to the assistant to perform the multimodal task",
+        ),
+        "examples_with_feedback": FieldSpec.input(
+            "examples_with_feedback",
+            str,
+            desc="Task examples with visual content showing inputs, assistant outputs, and feedback. "
+            "Pay special attention to feedback about visual analysis accuracy, visual-textual integration, "
+            "and any domain-specific visual knowledge that the assistant missed.",
+        ),
+        "improved_instruction": FieldSpec.output(
+            "improved_instruction",
+            str,
+            desc="A better instruction for the assistant that addresses visual analysis issues, provides "
+            "clear guidance on how to process and integrate visual and textual information, includes "
+            "necessary visual domain knowledge, and prevents the visual analysis mistakes shown in the examples.",
+        ),
+    },
+    instructions=(
+        "I provided an assistant with instructions to perform a task involving visual content, but the assistant's "
+        "performance needs improvement based on the examples and feedback below.\n\n"
+        "Your task is to write a better instruction for the assistant that addresses the specific issues identified in "
+        "the feedback, with particular attention to how visual and textual information should be analyzed and "
+        "integrated.\n\n"
+        "## Analysis Steps:\n"
+        "1. **Read the inputs carefully** and identify both the visual and textual input formats, understanding how "
+        "they work together\n"
+        "2. **Read all the assistant responses and corresponding feedback** to understand what went wrong with visual "
+        "analysis, text processing, or their integration\n"
+        "3. **Identify visual analysis patterns** - what visual features, relationships, or details are important for "
+        "this task\n"
+        "4. **Identify domain-specific knowledge** about both visual and textual aspects, as this information may not "
+        "be available to the assistant in the future\n"
+        "5. **Look for successful visual-textual integration strategies** and include these patterns in the "
+        "instruction\n"
+        "6. **Address specific visual analysis issues** mentioned in the feedback\n\n"
+        "## Instruction Requirements:\n"
+        "- **Clear task definition** explaining how to process both visual and textual inputs\n"
+        "- **Visual analysis guidance** specific to this task (what to look for, how to describe, what features matter)\n"
+        "- **Integration strategies** for combining visual observations with textual information\n"
+        "- **Domain-specific knowledge** about visual concepts, terminology, or relationships\n"
+        "- **Error prevention guidance** for common visual analysis mistakes shown in the feedback\n"
+        "- **Precise, actionable language** for both visual and textual processing\n\n"
+        "Focus on creating an instruction that helps the assistant properly analyze visual content, integrate it with "
+        "textual information, and avoid the specific visual analysis mistakes shown in the examples."
+    ),
+    name="GenerateEnhancedMultimodalInstructionFromFeedback",
+)
 
 
 class SingleComponentMultiModalProposer(Module):
@@ -62,7 +76,7 @@ class SingleComponentMultiModalProposer(Module):
 
     def __init__(self) -> None:
         super().__init__()
-        self.propose_instruction = Predict(GenerateEnhancedMultimodalInstructionFromFeedback)
+        self.propose_instruction = Predict(GENERATE_ENHANCED_MULTIMODAL_INSTRUCTION_TASK_SPEC)
 
     async def aforward(self, current_instruction: str, reflective_dataset: list[ReflectiveExample]) -> str:
         """

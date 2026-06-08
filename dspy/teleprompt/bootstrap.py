@@ -121,19 +121,11 @@ class BootstrapFewShot(Teleprompter):
             student.named_predictors(), teacher.named_predictors(), strict=False
         ):
             assert name1 == name2, "Student and teacher must have the same program structure."
-            if hasattr(predictor1.signature, "equals"):
-                assert predictor1.signature.equals(
-                    predictor2.signature,
-                ), (
-                    f"Student and teacher must have the same signatures. "
-                    f"{type(predictor1.signature)} != {type(predictor2.signature)}"
-                )
-            else:
-                # fallback in case if .equals is not implemented (e.g. dsp.Prompt)
-                assert predictor1.signature == predictor2.signature, (
-                    f"Student and teacher must have the same signatures. "
-                    f"{type(predictor1.signature)} != {type(predictor2.signature)}"
-                )
+            from dspy.teleprompt.utils import get_task_spec
+
+            assert get_task_spec(predictor1).equals(get_task_spec(predictor2)), (
+                "Student and teacher must have the same task specs."
+            )
             assert id(predictor1) != id(predictor2), "Student and teacher must be different objects."
 
             name2predictor[name1] = None  # dict(student=predictor1, teacher=predictor2)

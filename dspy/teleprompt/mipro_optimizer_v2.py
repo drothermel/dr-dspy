@@ -17,10 +17,10 @@ from dspy.teleprompt.utils import (
     create_n_fewshot_demo_sets,
     eval_candidate_program,
     get_program_with_highest_avg_score,
-    get_signature,
+    get_task_spec,
     print_full_program,
     save_candidate_program,
-    set_signature,
+    set_task_spec,
 )
 
 if TYPE_CHECKING:
@@ -481,7 +481,7 @@ class MIPROv2(Teleprompter):
 
         for i, pred in enumerate(program.predictors()):
             logger.info(f"Proposed Instructions for Predictor {i}:\n")
-            instruction_candidates[i][0] = get_signature(pred).instructions
+            instruction_candidates[i][0] = get_task_spec(pred).instructions
             for j, instruction in enumerate(instruction_candidates[i]):
                 logger.info(f"{j}: {instruction}\n")
             logger.info("\n")
@@ -766,8 +766,8 @@ class MIPROv2(Teleprompter):
                 f"{i}_predictor_instruction", range(len(instruction_candidates[i]))
             )
             selected_instruction = instruction_candidates[i][instruction_idx]
-            updated_signature = get_signature(predictor).with_instructions(selected_instruction)
-            set_signature(predictor=predictor, updated_signature=updated_signature)
+            updated_task_spec = get_task_spec(predictor).with_instructions(selected_instruction)
+            set_task_spec(predictor=predictor, task_spec=updated_task_spec)
             trial_logs[trial_num][f"{i}_predictor_instruction"] = instruction_idx
             chosen_params.append(f"Predictor {i}: Instruction {instruction_idx}")
             raw_chosen_params[f"{i}_predictor_instruction"] = instruction_idx

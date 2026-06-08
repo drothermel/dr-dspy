@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from types import MethodType
-from typing import Any, Callable, TypedDict, cast
+from typing import Any, Callable, TypedDict
 
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
@@ -66,19 +66,21 @@ async def bootstrap_trace_data(
             except AdapterParseError as e:
                 completion_str = e.lm_response
                 parsed_result = e.parsed_result
-                failed_signature = cast("Any", e.signature)
+                failed_task_spec = e.task_spec
                 failed_inputs = kwargs
 
                 present = list(parsed_result.keys()) if parsed_result else None
-                expected = list(failed_signature.output_fields.keys())
+                expected = list(failed_task_spec.output_fields.keys())
+
+                from dspy.teleprompt.utils import get_task_spec
 
                 found_pred = None
                 for pred in program_to_use.predictors():
-                    if pred.signature == failed_signature:
+                    if get_task_spec(pred).equals(failed_task_spec):
                         found_pred = pred
                         break
                 if found_pred is None:
-                    raise ValueError(f"Failed to find the predictor for the failed signature: {failed_signature}")
+                    raise ValueError(f"Failed to find the predictor for the failed task spec: {failed_task_spec}")
 
                 trace = settings.trace.copy()
                 # Trace is Tuple[signature, inputs, prediction outputs]

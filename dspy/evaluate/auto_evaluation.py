@@ -1,37 +1,68 @@
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
+from dspy.task_spec import FieldSpec, make_task_spec
 
+SEMANTIC_RECALL_PRECISION_TASK_SPEC = make_task_spec(
+    {
+        "question": FieldSpec.input("question", str),
+        "ground_truth": FieldSpec.input("ground_truth", str),
+        "system_response": FieldSpec.input("system_response", str),
+        "recall": FieldSpec.output(
+            "recall",
+            float,
+            desc="fraction (out of 1.0) of ground truth covered by the system response",
+        ),
+        "precision": FieldSpec.output(
+            "precision",
+            float,
+            desc="fraction (out of 1.0) of system response covered by the ground truth",
+        ),
+    },
+    instructions=(
+        "Compare a system's response to the ground truth to compute its recall and precision. "
+        "If asked to reason, enumerate key ideas in each response, and whether they are present in the other response."
+    ),
+    name="SemanticRecallPrecision",
+)
 
-class SemanticRecallPrecision(Signature):
-    """
-    Compare a system's response to the ground truth to compute its recall and precision.
-    If asked to reason, enumerate key ideas in each response, and whether they are present in the other response.
-    """
-
-    question: str = InputField()
-    ground_truth: str = InputField()
-    system_response: str = InputField()
-    recall: float = OutputField(desc="fraction (out of 1.0) of ground truth covered by the system response")
-    precision: float = OutputField(desc="fraction (out of 1.0) of system response covered by the ground truth")
-
-
-class DecompositionalSemanticRecallPrecision(Signature):
-    """
-    Compare a system's response to the ground truth to compute recall and precision of key ideas.
-    You will first enumerate key ideas in each response, discuss their overlap, and then report recall and precision.
-    """
-
-    question: str = InputField()
-    ground_truth: str = InputField()
-    system_response: str = InputField()
-    ground_truth_key_ideas: str = OutputField(desc="enumeration of key ideas in the ground truth")
-    system_response_key_ideas: str = OutputField(desc="enumeration of key ideas in the system response")
-    discussion: str = OutputField(desc="discussion of the overlap between ground truth and system response")
-    recall: float = OutputField(desc="fraction (out of 1.0) of ground truth covered by the system response")
-    precision: float = OutputField(desc="fraction (out of 1.0) of system response covered by the ground truth")
+DECOMPOSITIONAL_SEMANTIC_RECALL_PRECISION_TASK_SPEC = make_task_spec(
+    {
+        "question": FieldSpec.input("question", str),
+        "ground_truth": FieldSpec.input("ground_truth", str),
+        "system_response": FieldSpec.input("system_response", str),
+        "ground_truth_key_ideas": FieldSpec.output(
+            "ground_truth_key_ideas",
+            str,
+            desc="enumeration of key ideas in the ground truth",
+        ),
+        "system_response_key_ideas": FieldSpec.output(
+            "system_response_key_ideas",
+            str,
+            desc="enumeration of key ideas in the system response",
+        ),
+        "discussion": FieldSpec.output(
+            "discussion",
+            str,
+            desc="discussion of the overlap between ground truth and system response",
+        ),
+        "recall": FieldSpec.output(
+            "recall",
+            float,
+            desc="fraction (out of 1.0) of ground truth covered by the system response",
+        ),
+        "precision": FieldSpec.output(
+            "precision",
+            float,
+            desc="fraction (out of 1.0) of system response covered by the ground truth",
+        ),
+    },
+    instructions=(
+        "Compare a system's response to the ground truth to compute recall and precision of key ideas. "
+        "You will first enumerate key ideas in each response, discuss their overlap, and then report recall and precision."
+    ),
+    name="DecompositionalSemanticRecallPrecision",
+)
 
 
 def f1_score(precision, recall):
@@ -52,9 +83,9 @@ class SemanticF1(Module):
         self.threshold = threshold
 
         if decompositional:
-            self.module = ChainOfThought(DecompositionalSemanticRecallPrecision)
+            self.module = ChainOfThought(DECOMPOSITIONAL_SEMANTIC_RECALL_PRECISION_TASK_SPEC)
         else:
-            self.module = ChainOfThought(SemanticRecallPrecision)
+            self.module = ChainOfThought(SEMANTIC_RECALL_PRECISION_TASK_SPEC)
 
     async def aforward(self, example, pred, trace=None):
         scores = await self.module(
@@ -68,38 +99,67 @@ class SemanticF1(Module):
 ###########
 
 
-class AnswerCompleteness(Signature):
-    """
-    Estimate the completeness of a system's responses, against the ground truth.
-    You will first enumerate key ideas in each response, discuss their overlap, and then report completeness.
-    """
+ANSWER_COMPLETENESS_TASK_SPEC = make_task_spec(
+    {
+        "question": FieldSpec.input("question", str),
+        "ground_truth": FieldSpec.input("ground_truth", str),
+        "system_response": FieldSpec.input("system_response", str),
+        "ground_truth_key_ideas": FieldSpec.output(
+            "ground_truth_key_ideas",
+            str,
+            desc="enumeration of key ideas in the ground truth",
+        ),
+        "system_response_key_ideas": FieldSpec.output(
+            "system_response_key_ideas",
+            str,
+            desc="enumeration of key ideas in the system response",
+        ),
+        "discussion": FieldSpec.output(
+            "discussion",
+            str,
+            desc="discussion of the overlap between ground truth and system response",
+        ),
+        "completeness": FieldSpec.output(
+            "completeness",
+            float,
+            desc="fraction (out of 1.0) of ground truth covered by the system response",
+        ),
+    },
+    instructions=(
+        "Estimate the completeness of a system's responses, against the ground truth. "
+        "You will first enumerate key ideas in each response, discuss their overlap, and then report completeness."
+    ),
+    name="AnswerCompleteness",
+)
 
-    question: str = InputField()
-    ground_truth: str = InputField()
-    system_response: str = InputField()
-    ground_truth_key_ideas: str = OutputField(desc="enumeration of key ideas in the ground truth")
-    system_response_key_ideas: str = OutputField(desc="enumeration of key ideas in the system response")
-    discussion: str = OutputField(desc="discussion of the overlap between ground truth and system response")
-    completeness: float = OutputField(desc="fraction (out of 1.0) of ground truth covered by the system response")
-
-
-class AnswerGroundedness(Signature):
-    """
-    Estimate the groundedness of a system's responses, against real retrieved documents written by people.
-    You will first enumerate whatever non-trivial or check-worthy claims are made in the system response, and then
-    discuss the extent to which some or all of them can be deduced from the retrieved context and basic commonsense.
-    """
-
-    question: str = InputField()
-    retrieved_context: str = InputField()
-    system_response: str = InputField()
-    system_response_claims: str = OutputField(
-        desc="enumeration of non-trivial or check-worthy claims in the system response"
-    )
-    discussion: str = OutputField(desc="discussion of how supported the claims are by the retrieved context")
-    groundedness: float = OutputField(
-        desc="fraction (out of 1.0) of system response supported by the retrieved context"
-    )
+ANSWER_GROUNDEDNESS_TASK_SPEC = make_task_spec(
+    {
+        "question": FieldSpec.input("question", str),
+        "retrieved_context": FieldSpec.input("retrieved_context", str),
+        "system_response": FieldSpec.input("system_response", str),
+        "system_response_claims": FieldSpec.output(
+            "system_response_claims",
+            str,
+            desc="enumeration of non-trivial or check-worthy claims in the system response",
+        ),
+        "discussion": FieldSpec.output(
+            "discussion",
+            str,
+            desc="discussion of how supported the claims are by the retrieved context",
+        ),
+        "groundedness": FieldSpec.output(
+            "groundedness",
+            float,
+            desc="fraction (out of 1.0) of system response supported by the retrieved context",
+        ),
+    },
+    instructions=(
+        "Estimate the groundedness of a system's responses, against real retrieved documents written by people. "
+        "You will first enumerate whatever non-trivial or check-worthy claims are made in the system response, and then "
+        "discuss the extent to which some or all of them can be deduced from the retrieved context and basic commonsense."
+    ),
+    name="AnswerGroundedness",
+)
 
 
 class CompleteAndGrounded(Module):
@@ -111,8 +171,8 @@ class CompleteAndGrounded(Module):
 
     def __init__(self, threshold=0.66) -> None:
         self.threshold = threshold
-        self.completeness_module = ChainOfThought(AnswerCompleteness)
-        self.groundedness_module = ChainOfThought(AnswerGroundedness)
+        self.completeness_module = ChainOfThought(ANSWER_COMPLETENESS_TASK_SPEC)
+        self.groundedness_module = ChainOfThought(ANSWER_GROUNDEDNESS_TASK_SPEC)
 
     async def aforward(self, example, pred, trace=None):
         completeness = await self.completeness_module(

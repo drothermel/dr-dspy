@@ -23,6 +23,7 @@ from dspy.teleprompt.bootstrap_finetune import (
     assert_structural_equivalency,
 )
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, bootstrap_trace_data
+from dspy.teleprompt.utils import get_task_spec
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,7 @@ class GRPO(FinetuneTeleprompter):
             for teacher_data in example_data:
                 for sample in teacher_data:
                     for t in sample["trace"]:
-                        assert hash(t[0].signature) in pred_signature_hash_to_ind
+                        assert get_task_spec(t[0]).fingerprint() in pred_signature_hash_to_ind
 
     async def report_validation_metrics(self, student, trainset, valset, logger, step_idx=-1) -> None:
         if step_idx == -1 or step_idx == self.num_train_steps - 1 or (step_idx + 1) % self.num_steps_for_val == 0:
@@ -345,7 +346,9 @@ class GRPO(FinetuneTeleprompter):
 
         logger.info("Preparing the student program...")
         all_predictors_have_lms(student)
-        pred_signature_hash_to_ind = {hash(pred.signature): ind for ind, pred in enumerate(student.predictors())}
+        pred_signature_hash_to_ind = {
+            get_task_spec(pred).fingerprint(): ind for ind, pred in enumerate(student.predictors())
+        }
         num_student_predictors = len(student.predictors())
 
         logging.info(
@@ -474,7 +477,8 @@ class GRPO(FinetuneTeleprompter):
                             trace_instances_for_current_pred = [
                                 (*t, sample["score"])
                                 for t in sample["trace"]
-                                if hash(t[0].signature) == hash(student.predictors()[pred_id].signature)
+                                if get_task_spec(t[0]).fingerprint()
+                                == get_task_spec(student.predictors()[pred_id]).fingerprint()
                             ]
 
                             predictor_example_invocations.append(trace_instances_for_current_pred)
@@ -528,7 +532,9 @@ class GRPO(FinetuneTeleprompter):
                         for rollout_idx in range(len(predictor_example_invocations)):
                             trace_instance = predictor_example_invocations[rollout_idx][group_idx]
                             score = trace_instance[3]
-                            trace_pred_id = pred_signature_hash_to_ind.get(hash(trace_instance[0].signature))
+                            trace_pred_id = pred_signature_hash_to_ind.get(
+                                get_task_spec(trace_instance[0]).fingerprint()
+                            )
                             assert trace_pred_id == pred_id
 
                             predictor = trace_instance[0]
@@ -545,7 +551,7 @@ class GRPO(FinetuneTeleprompter):
                             inp_messages = [
                                 message_to_openai_chat(message)
                                 for message in adapter.format(
-                                    signature=trace_instance[0].signature,
+                                    task_spec=get_task_spec(trace_instance[0]),
                                     inputs=trace_instance[1],
                                     demos=[],  # TODO: Add support for demos
                                 )
@@ -571,7 +577,7 @@ class GRPO(FinetuneTeleprompter):
                                 )
                             else:
                                 all_messages = adapter.format_finetune_data(
-                                    signature=trace_instance[0].signature,
+                                    task_spec=get_task_spec(trace_instance[0]),
                                     inputs=trace_instance[1],
                                     outputs=trace_instance[2],
                                     demos=[],  # TODO: Add support for demos

@@ -6,6 +6,7 @@ from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.teleprompt.copro_optimizer import COPRO
 from dspy.utils.dummies import DummyLM
+from tests.task_spec.helpers import ts
 
 
 # Define a simple metric function for testing
@@ -32,10 +33,10 @@ def test_signature_optimizer_initialization():
 
 
 class SimpleModule(Module):
-    def __init__(self, signature):
+    def __init__(self, task_spec):
         super().__init__()
         # COPRO doesn't work with Predict.
-        self.predictor = ChainOfThought(signature)
+        self.predictor = ChainOfThought(task_spec)
 
     async def aforward(self, **kwargs: object):
         return await self.predictor(**kwargs)
@@ -54,7 +55,7 @@ def test_signature_optimizer_optimization_process():
         )
     )
 
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
 
     # Assuming the compile method of COPRO requires a student module, a development set, and evaluation kwargs
     optimized_student = asyncio.run(
@@ -83,7 +84,7 @@ def test_signature_optimizer_statistics_tracking():
             ]
         )
     )
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
     optimized_student = asyncio.run(
         optimizer.compile(student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False})
     )
@@ -112,7 +113,7 @@ def test_optimization_and_output_verification():
     settings.configure(lm=lm)
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
 
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
 
     # Compile the student with the optimizer
     optimized_student = asyncio.run(
@@ -138,7 +139,7 @@ def test_statistics_tracking_during_optimization():
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
     optimizer.track_stats = True  # Enable statistics tracking
 
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
     optimized_student = asyncio.run(
         optimizer.compile(student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False})
     )

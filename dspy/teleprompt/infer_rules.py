@@ -8,9 +8,9 @@ from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.module import Module
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
+from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.teleprompt.bootstrap import BootstrapFewShot
+from dspy.teleprompt.utils import get_task_spec, set_task_spec
 
 logger = logging.getLogger(__name__)
 
@@ -35,22 +35,28 @@ class InferRules(BootstrapFewShot):
         await super().compile(student, teacher=teacher, trainset=trainset)
 
         original_program = self.student.deepcopy()
-        all_predictors = [p for p in original_program.predictors() if hasattr(p, "signature")]
-        instructions_list = [p.signature.instructions for p in all_predictors]
+        all_predictors = [p for p in original_program.predictors() if hasattr(p, "task_spec")]
+        instructions_list = [get_task_spec(p).instructions for p in all_predictors]
 
         best_score = -math.inf
         best_program = None
 
         for candidate_idx in range(self.num_candidates):
             candidate_program = original_program.deepcopy()
-            candidate_predictors = [p for p in candidate_program.predictors() if hasattr(p, "signature")]
+            candidate_predictors = [p for p in candidate_program.predictors() if hasattr(p, "task_spec")]
 
             for i, predictor in enumerate(candidate_predictors):
-                predictor.signature.instructions = instructions_list[i]
+                set_task_spec(
+                    predictor=predictor,
+                    task_spec=get_task_spec(predictor).with_instructions(instructions_list[i]),
+                )
 
             for i, predictor in enumerate(candidate_predictors):
                 rules = await self.induce_natural_language_rules(predictor=predictor, trainset=trainset)
-                predictor.signature.instructions = instructions_list[i]
+                set_task_spec(
+                    predictor=predictor,
+                    task_spec=get_task_spec(predictor).with_instructions(instructions_list[i]),
+                )
                 self.update_program_instructions(predictor=predictor, natural_language_rules=rules)
 
             score = await self.evaluate_program(program=candidate_program, dataset=valset)
@@ -67,9 +73,9 @@ class InferRules(BootstrapFewShot):
 
     async def induce_natural_language_rules(self, predictor, trainset):
         demos = self.get_predictor_demos(trainset=trainset, predictor=predictor)
-        signature = predictor.signature
+        task_spec = get_task_spec(predictor)
         while True:
-            examples_text = self.format_examples(demos=demos, signature=signature)
+            examples_text = self.format_examples(demos=demos, task_spec=task_spec)
             try:
                 return await self.rules_induction_program(examples_text)
             except Exception as e:
@@ -87,16 +93,20 @@ class InferRules(BootstrapFewShot):
                     ) from e
 
     def update_program_instructions(self, predictor, natural_language_rules) -> None:
-        predictor.signature.instructions = (
-            f"{predictor.signature.instructions}\n\n"
-            f"Please adhere to the following rules when making your prediction:\n{natural_language_rules}"
+        task_spec = get_task_spec(predictor)
+        set_task_spec(
+            predictor=predictor,
+            task_spec=task_spec.with_instructions(
+                f"{task_spec.instructions}\n\n"
+                f"Please adhere to the following rules when making your prediction:\n{natural_language_rules}"
+            ),
         )
 
-    def format_examples(self, demos, signature):
+    def format_examples(self, demos, task_spec):
         examples_text = ""
         for demo in demos:
-            input_fields = {k: v for k, v in demo.items() if k in signature.input_fields}
-            output_fields = {k: v for k, v in demo.items() if k in signature.output_fields}
+            input_fields = {k: v for k, v in demo.items() if k in task_spec.input_fields}
+            output_fields = {k: v for k, v in demo.items() if k in task_spec.output_fields}
             input_text = "\n".join(f"{k}: {v}" for k, v in input_fields.items())
             output_text = "\n".join(f"{k}: {v}" for k, v in output_fields.items())
             examples_text += f"Input Fields:\n{input_text}\n\n=========\nOutput Fields:\n{output_text}\n\n"
@@ -104,12 +114,12 @@ class InferRules(BootstrapFewShot):
 
     def get_predictor_demos(self, trainset, predictor):
         # TODO: Consider how this handled "incomplete" demos.
-        signature = predictor.signature
+        task_spec = get_task_spec(predictor)
         return [
             {
                 key: value
                 for key, value in example.items()
-                if key in signature.input_fields or key in signature.output_fields
+                if key in task_spec.input_fields or key in task_spec.output_fields
             }
             for example in trainset
         ]
@@ -127,20 +137,29 @@ class InferRules(BootstrapFewShot):
         return (await evaluate(program, metric=self.metric)).score
 
 
+def _rules_induction_task_spec(num_rules):
+    return make_task_spec(
+        {
+            "examples_text": FieldSpec.input("examples_text", str, desc="Text containing examples"),
+            "natural_language_rules": FieldSpec.output(
+                "natural_language_rules",
+                str,
+                desc="Induced natural language rules",
+            ),
+        },
+        instructions=(
+            f"Given a set of examples, extract a list of {num_rules} concise and non-redundant natural language "
+            "rules that provide clear guidance for performing the task. All rules should be actionable for a "
+            "well-specified scope of examples of this general kind of task."
+        ),
+        name="CustomRulesInduction",
+    )
+
+
 class RulesInductionProgram(Module):
     def __init__(self, num_rules, teacher_settings=None) -> None:
         super().__init__()
-
-        class CustomRulesInduction(Signature):
-            __doc__ = (
-                f"Given a set of examples, extract a list of {num_rules} concise and non-redundant natural language "
-                "rules that provide clear guidance for performing the task. All rules should be actionable for a "
-                "well-specified scope of examples of this general kind of task."
-            )
-            examples_text = InputField(desc="Text containing examples")
-            natural_language_rules = OutputField(desc="Induced natural language rules")
-
-        self.rules_induction = ChainOfThought(CustomRulesInduction)
+        self.rules_induction = ChainOfThought(_rules_induction_task_spec(num_rules))
         self.teacher_settings = teacher_settings or {}
         self.rng = random.Random(0)
 

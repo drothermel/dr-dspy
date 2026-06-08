@@ -16,6 +16,7 @@ from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, TraceData
+from dspy.teleprompt.utils import get_task_spec, set_task_spec
 
 if TYPE_CHECKING:
     from gepa.core.adapter import ProposalFn
@@ -155,7 +156,10 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
 
         for name, pred in new_prog.named_predictors():
             if name in candidate:
-                pred.signature = pred.signature.with_instructions(candidate[name])
+                set_task_spec(
+                    predictor=pred,
+                    task_spec=get_task_spec(pred).with_instructions(candidate[name]),
+                )
 
         return new_prog
 
@@ -242,7 +246,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 if isinstance(module_score, ScoreWithFeedback):
                     module_score = module_score.score
 
-                trace_instances = [t for t in trace if t[0].signature.equals(module.signature)]
+                trace_instances = [t for t in trace if get_task_spec(t[0]).equals(get_task_spec(module))]
                 if not self.add_format_failure_as_feedback:
                     trace_instances = [t for t in trace_instances if not isinstance(t[2], FailedPrediction)]
                 if len(trace_instances) == 0:
@@ -304,7 +308,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 if isinstance(outputs, FailedPrediction):
                     adapter = ChatAdapter()
                     structure_instruction = ""
-                    for message in adapter.format(module.signature, [], {}):
+                    for message in adapter.format(task_spec=get_task_spec(module), demos=[], inputs={}):
                         structure_instruction += message.role + ": " + (message.text or "") + "\n"
                     d["Feedback"] = "Your output failed to parse. Follow this structure:\n" + structure_instruction
                     # d['score'] = self.failure_score

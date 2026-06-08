@@ -4,7 +4,7 @@ import re
 
 from dspy.predict.parameter import Parameter
 from dspy.primitives.module import Module
-from dspy.teleprompt.utils import get_signature
+from dspy.teleprompt.utils import get_task_spec
 
 
 def strip_prefix(text):
@@ -63,7 +63,7 @@ def parse_list_of_instructions(instruction_string):
 def get_program_instruction_set_string(program) -> str:
     instruction_list = []
     for _, pred in enumerate(program.predictors()):
-        pred_instructions = get_signature(pred).instructions
+        pred_instructions = get_task_spec(pred).instructions
         instruction_list.append(f'"{pred_instructions}"')
     # Joining the list into a single string that looks like a list
     return f"[{', '.join(instruction_list)}]"
@@ -87,7 +87,7 @@ def create_predictor_level_history_string(*, base_program, predictor_i, trial_lo
 
     for history_item in instruction_history:
         predictor = history_item["program"].predictors()[predictor_i]
-        instruction = get_signature(predictor).instructions
+        instruction = get_task_spec(predictor).instructions
         score = history_item["score"]
 
         if instruction in instruction_aggregate:
@@ -122,7 +122,7 @@ def create_example_string(*, fields, example):
 
     output = []
     for field_name, field_values in fields.items():
-        name = field_values.json_schema_extra["prefix"]
+        name = field_values.prefix
 
         value = example.get(field_name)
 
@@ -155,15 +155,12 @@ def get_dspy_source_code(module):
                 continue
             if isinstance(item, Parameter):
                 if (
-                    hasattr(item, "signature")
-                    and item.signature is not None
-                    and item.signature.__pydantic_parent_namespace__["signature_name"] + "_sig" not in completed_set
+                    hasattr(item, "task_spec")
+                    and item.task_spec is not None
+                    and item.task_spec.name + "_sig" not in completed_set
                 ):
-                    try:
-                        header.append(inspect.getsource(item.signature))
-                    except (TypeError, OSError):
-                        header.append(str(item.signature))
-                    completed_set.add(item.signature.__pydantic_parent_namespace__["signature_name"] + "_sig")
+                    header.append(item.task_spec.to_declaration())
+                    completed_set.add(item.task_spec.name + "_sig")
             if isinstance(item, Module):
                 code = get_dspy_source_code(item).strip()
                 if code not in completed_set:
