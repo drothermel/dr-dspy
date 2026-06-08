@@ -296,9 +296,9 @@ class LM(BaseLM):
 
     def _response_from_provider(self, response: Any, request: LMRequest) -> LMResponse:
         if self.model_type == "responses":
-            lm_response = responses_to_lm_response(response, request)
+            lm_response = responses_to_lm_response(response=response, request=request)
         elif self.model_type in {"chat", "text"}:
-            lm_response = completion_to_lm_response(response, request)
+            lm_response = completion_to_lm_response(response=response, request=request)
         else:
             raise LMConfigurationError(
                 f"Unsupported model_type {self.model_type!r} for `dspy.clients.lm.LM`.",

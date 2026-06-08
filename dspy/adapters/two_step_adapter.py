@@ -134,7 +134,7 @@ class TwoStepAdapter(Adapter):
         request = LMRequest(
             model=lm.model,
             messages=messages,
-            config=merge_lm_request_config(lm, coerce_lm_config(config)),
+            config=merge_lm_request_config(lm=lm, config=coerce_lm_config(config)),
         )
         response = await lm.acall(request)
         extractor_signature = self._create_extractor_signature(signature)

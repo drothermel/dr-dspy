@@ -88,8 +88,8 @@ class Parallel:
         concurrency = concurrency or self.max_concurrency
 
         results, stats = await run_bounded(
-            exec_pairs,
-            self._run_pair,
+            items=exec_pairs,
+            fn=self._run_pair,
             max_concurrency=concurrency,
             max_errors=self.max_errors,
             provide_traceback=self.provide_traceback,

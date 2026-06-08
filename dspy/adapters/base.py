@@ -273,7 +273,7 @@ class Adapter:
             model=lm.model,
             messages=list(messages),
             tools=tools,
-            config=merge_lm_request_config(lm, config),
+            config=merge_lm_request_config(lm=lm, config=config),
         )
 
     async def _call_lm(self, lm: BaseLM, request: LMRequest) -> LMResponse:

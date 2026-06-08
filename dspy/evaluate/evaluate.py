@@ -165,8 +165,8 @@ class Evaluate:
             return prediction, score
 
         results, _stats = await run_bounded(
-            devset,
-            process_item,
+            items=devset,
+            fn=process_item,
             max_concurrency=concurrency or settings.num_threads,
             disable_progress_bar=not display_progress,
             max_errors=(self.max_errors if self.max_errors is not None else settings.max_errors),

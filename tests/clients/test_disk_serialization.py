@@ -112,7 +112,7 @@ def _assert_cached_tool_call_normalizes(directory):
     assert type(type(tool_call).__pydantic_serializer__).__name__ == "MockValSer"
     assert type(type(tool_call.function).__pydantic_serializer__).__name__ == "MockValSer"
 
-    lm_response = completion_to_lm_response(response, LMRequest(model="dummy", messages=[]))
+    lm_response = completion_to_lm_response(response=response, request=LMRequest(model="dummy", messages=[]))
     part = lm_response.outputs[0].tool_calls[0]
     assert part.name == "get_weather"
     assert part.args == {"city": "SF"}
@@ -163,7 +163,7 @@ def _assert_cached_responses_function_call_normalizes(directory):
     function_call = response.output[0]
     assert type(type(function_call).__pydantic_serializer__).__name__ == "MockValSer"
 
-    lm_response = responses_to_lm_response(response, LMRequest(model="dummy", messages=[]))
+    lm_response = responses_to_lm_response(response=response, request=LMRequest(model="dummy", messages=[]))
     part = lm_response.outputs[0].tool_calls[0]
     assert part.name == "get_weather"
     assert part.args == {"city": "SF"}

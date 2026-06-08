@@ -6,7 +6,7 @@ from dspy.utils.async_parallel import run_bounded
 
 
 async def _run_bounded(items, fn, **kwargs):
-    return await run_bounded(items, fn, **kwargs)
+    return await run_bounded(items=items, fn=fn, **kwargs)
 
 
 def test_worker_independence():
@@ -14,7 +14,7 @@ def test_worker_independence():
         return item * 2
 
     data = [1, 2, 3, 4, 5]
-    results, _stats = asyncio.run(_run_bounded(data, task, max_concurrency=3))
+    results, _stats = asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=3))
 
     assert results == [2, 4, 6, 8, 10]
 
@@ -28,7 +28,7 @@ def test_parallel_execution_speed():
 
     data = [1, 2, 3, 4, 5]
     start_time = time.time()
-    asyncio.run(_run_bounded(data, task, max_concurrency=5))
+    asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=5))
     end_time = time.time()
 
     assert end_time - start_time < len(data)
@@ -43,7 +43,7 @@ def test_max_errors_handling():
     data = [1, 2, 3, 4, 5]
 
     with pytest.raises(RuntimeError, match="Execution cancelled due to errors or interruption."):  # noqa: RUF043
-        asyncio.run(_run_bounded(data, task, max_concurrency=3, max_errors=1))
+        asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=3, max_errors=1))
 
 
 def test_max_errors_not_met():
@@ -53,7 +53,7 @@ def test_max_errors_not_met():
         return item
 
     data = [1, 2, 3, 4, 5]
-    results, _stats = asyncio.run(_run_bounded(data, task, max_concurrency=3, max_errors=2))
+    results, _stats = asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=3, max_errors=2))
 
     assert results == [1, 2, None, 4, 5]
 
@@ -67,7 +67,7 @@ def test_run_bounded_tracks_failed_indices_and_exceptions():
         return item
 
     data = [1, 2, 3, 4, 5]
-    results, stats = asyncio.run(_run_bounded(data, task, max_concurrency=3, max_errors=3))
+    results, stats = asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=3, max_errors=3))
 
     assert results == [1, 2, None, 4, None]
     assert sorted(stats.failed_indices) == [2, 4]
@@ -83,7 +83,7 @@ def test_sequential_execution():
         return item * 2
 
     data = [1, 2, 3, 4, 5]
-    results, _stats = asyncio.run(_run_bounded(data, task, max_concurrency=1))
+    results, _stats = asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=1))
 
     assert results == [2, 4, 6, 8, 10]
 
@@ -95,7 +95,7 @@ def test_sequential_max_errors_not_met():
         return item
 
     data = [1, 2, 3, 4, 5]
-    results, _stats = asyncio.run(_run_bounded(data, task, max_concurrency=1, max_errors=2))
+    results, _stats = asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=1, max_errors=2))
 
     assert results == [1, 2, None, 4, 5]
 
@@ -109,7 +109,7 @@ def test_sequential_max_errors_exceeded():
     data = [1, 2, 3, 4, 5]
 
     with pytest.raises(RuntimeError, match="Execution cancelled due to errors or interruption."):  # noqa: RUF043
-        asyncio.run(_run_bounded(data, task, max_concurrency=1, max_errors=1))
+        asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=1, max_errors=1))
 
 
 def test_compare_results():
@@ -118,7 +118,7 @@ def test_compare_results():
 
     data = [1, 2, 3, 4, 5]
     results, _stats = asyncio.run(
-        _run_bounded(data, task, max_concurrency=1, compare_results=True, disable_progress_bar=True)
+        _run_bounded(items=data, fn=task, max_concurrency=1, compare_results=True, disable_progress_bar=True)
     )
 
     assert results == [(1, False), (2, False), (3, True), (4, True), (5, True)]

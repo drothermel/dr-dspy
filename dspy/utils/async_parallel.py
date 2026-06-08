@@ -26,9 +26,9 @@ class BoundedRunStats:
 
 
 async def run_bounded(
+    *,
     items: Sequence[T],
     fn: Callable[[T], Awaitable[R]],
-    *,
     max_concurrency: int,
     max_errors: int | None = None,
     provide_traceback: bool | None = None,
