@@ -423,8 +423,8 @@ async def run_bounded(
 
 ### `dspy/evaluate/evaluate.py`
 
-- [ ] Replace `ParallelExecutor` with `run_bounded`
-- [ ] Make `Evaluate.__call__` async:
+- [x] Replace `ParallelExecutor` with `run_bounded`
+- [x] Make `Evaluate.__call__` async:
 
 ```python
 async def __call__(self, program, devset=None, ..., callback_metadata=None) -> EvaluationResult:
@@ -460,12 +460,12 @@ class Parallel:
         return await run_bounded(exec_pairs, run_pair, max_concurrency=self.num_threads)
 ```
 
-- [ ] Delete sync `forward()`
+- [x] Delete sync `forward()`
 
 ### `dspy/utils/parallelizer.py`
 
-- [ ] Either delete if unused after Evaluate migration, or add `AsyncParallelExecutor` and migrate callers
-- [ ] Grep for `ParallelExecutor` and update all call sites
+- [x] Deleted after Evaluate/Parallel migration
+- [x] Grep for `ParallelExecutor` and update all call sites
 
 ### `dspy/dsp/utils/settings.py`
 
@@ -483,7 +483,7 @@ class Parallel:
 uv run pytest tests/evaluate/ tests/predict/test_parallel.py tests/utils/test_parallelizer.py -q
 ```
 
-- [ ] **Commit Phase 5**
+- [x] **Commit Phase 5** (`pending`)
 
 ```bash
 git commit -m "$(cat <<'EOF'

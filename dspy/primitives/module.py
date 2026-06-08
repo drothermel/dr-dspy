@@ -252,17 +252,18 @@ class Module(BaseModule, metaclass=ProgramMeta):
         """
         pretty_print_history(self.history, n, file=file)
 
-    def batch(
+    async def batch(
         self,
         examples: list[Example],
         num_threads: int | None = None,
+        max_concurrency: int | None = None,
         max_errors: int | None = None,
         return_failed_examples: bool = False,
         provide_traceback: bool | None = None,
         disable_progress_bar: bool = False,
         timeout: int = 120,
         straggler_limit: int = 3,
-    ) -> list[Example] | tuple[list[Example], list[Example], list[Exception]]:
+    ) -> list[Any] | tuple[list[Any], list[Any], list[BaseException]]:
         """
         Processes a list of Example instances in parallel using the Parallel module.
 
@@ -284,6 +285,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
 
         parallel_executor = Parallel(
             num_threads=num_threads,
+            max_concurrency=max_concurrency,
             max_errors=max_errors,
             return_failed_examples=return_failed_examples,
             provide_traceback=provide_traceback,
@@ -293,9 +295,9 @@ class Module(BaseModule, metaclass=ProgramMeta):
         )
 
         if return_failed_examples:
-            results, failed_examples, exceptions = parallel_executor.forward(exec_pairs)
+            results, failed_examples, exceptions = await parallel_executor(exec_pairs)
             return results, failed_examples, exceptions
-        return parallel_executor.forward(exec_pairs)
+        return await parallel_executor(exec_pairs)
 
     def _set_lm_usage(self, tokens: dict[str, Any], output: Any) -> None:
         # Some optimizers (e.g., GEPA bootstrap tracing) temporarily patch

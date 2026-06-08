@@ -1,3 +1,5 @@
+import asyncio
+
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.auto_evaluation import CompleteAndGrounded, SemanticF1
 from dspy.primitives.example import Example
@@ -26,7 +28,7 @@ def test_semantic_f1_returns_prediction_without_trace():
 
     # Test SemanticF1
     metric = SemanticF1()
-    result = metric(example, pred)
+    result = asyncio.run(metric(example, pred))
 
     assert isinstance(result, Prediction)
     assert hasattr(result, "score")
@@ -53,7 +55,7 @@ def test_semantic_f1_returns_prediction_with_trace():
 
     # Test SemanticF1 with trace
     metric = SemanticF1(threshold=0.5)
-    result = metric(example, pred, trace=True)
+    result = asyncio.run(metric(example, pred, trace=True))
 
     assert isinstance(result, Prediction)
     assert hasattr(result, "score")
@@ -80,7 +82,7 @@ def test_semantic_f1_score_value():
 
     # Test SemanticF1
     metric = SemanticF1()
-    result = metric(example, pred)
+    result = asyncio.run(metric(example, pred))
 
     expected_f1 = 2 * (0.8 * 0.6) / (0.8 + 0.6)
     assert isinstance(result, Prediction)
@@ -115,7 +117,7 @@ def test_complete_and_grounded_returns_prediction_without_trace():
 
     # Test CompleteAndGrounded
     metric = CompleteAndGrounded()
-    result = metric(example, pred)
+    result = asyncio.run(metric(example, pred))
 
     assert isinstance(result, Prediction)
     assert hasattr(result, "score")
@@ -150,7 +152,7 @@ def test_complete_and_grounded_returns_prediction_with_trace():
 
     # Test CompleteAndGrounded with trace
     metric = CompleteAndGrounded(threshold=0.7)
-    result = metric(example, pred, trace=True)
+    result = asyncio.run(metric(example, pred, trace=True))
 
     assert isinstance(result, Prediction)
     assert hasattr(result, "score")
@@ -181,11 +183,11 @@ def test_semantic_f1_prediction_can_be_compared():
     # Create two predictions with different scores
     example1 = Example(question="test1", response="answer1")
     pred1 = Prediction(response="response1")
-    result1 = metric(example1, pred1)
+    result1 = asyncio.run(metric(example1, pred1))
 
     example2 = Example(question="test2", response="answer2")
     pred2 = Prediction(response="response2")
-    result2 = metric(example2, pred2)
+    result2 = asyncio.run(metric(example2, pred2))
 
     assert isinstance(result1, Prediction)
     assert isinstance(result2, Prediction)

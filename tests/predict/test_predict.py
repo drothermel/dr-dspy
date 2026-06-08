@@ -815,7 +815,7 @@ def test_lm_usage_with_parallel():
             (program_wrapper, {"question": "What is the capital of France?"}),
             (program_wrapper, {"question": "What is the capital of France?"}),
         ]
-        results = parallelizer(input_pairs)
+        results = asyncio.run(parallelizer(input_pairs))
         assert results[0].answer == "Paris"
         assert results[1].answer == "Paris"
         assert results[0].get_lm_usage()["openai/gpt-4o-mini"]["total_tokens"] == 10

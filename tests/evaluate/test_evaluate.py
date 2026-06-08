@@ -1,3 +1,4 @@
+import asyncio
 import json
 import signal
 import tempfile
@@ -48,13 +49,13 @@ def test_evaluate_call():
     )
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
     program = Predict("question -> answer")
-    assert program(question="What is 1+1?").answer == "2"
+    assert asyncio.run(program(question="What is 1+1?")).answer == "2"
     ev = Evaluate(
         devset=devset,
         metric=answer_exact_match,
         display_progress=False,
     )
-    score = ev(program)
+    score = asyncio.run(ev(program))
     assert score.score == 100.0
 
 
@@ -78,7 +79,7 @@ def test_evaluate_single_thread_runs_in_main_thread():
         display_progress=False,
         num_threads=1,
     )
-    result = ev(program)
+    result = asyncio.run(ev(program))
     assert result.score == 100.0
     assert all(t is threading.main_thread() for t in execution_threads)
 
@@ -119,14 +120,14 @@ def test_multithread_evaluate_call():
     settings.configure(lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
     program = Predict("question -> answer")
-    assert program(question="What is 1+1?").answer == "2"
+    assert asyncio.run(program(question="What is 1+1?")).answer == "2"
     ev = Evaluate(
         devset=devset,
         metric=answer_exact_match,
         display_progress=False,
         num_threads=2,
     )
-    result = ev(program)
+    result = asyncio.run(ev(program))
     assert result.score == 100.0
 
 
@@ -144,7 +145,7 @@ def test_multi_thread_evaluate_call_cancelled(monkeypatch):
 
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
     program = Predict("question -> answer")
-    assert program(question="What is 1+1?").answer == "2"
+    assert asyncio.run(program(question="What is 1+1?")).answer == "2"
 
     # spawn a thread that will sleep for .1 seconds then send a KeyboardInterrupt
     def sleep_then_interrupt():
@@ -165,7 +166,7 @@ def test_multi_thread_evaluate_call_cancelled(monkeypatch):
             display_progress=False,
             num_threads=2,
         )
-        ev(program)
+        asyncio.run(ev(program))
 
 
 def test_evaluate_call_wrong_answer():
@@ -177,7 +178,7 @@ def test_evaluate_call_wrong_answer():
         metric=answer_exact_match,
         display_progress=False,
     )
-    result = ev(program)
+    result = asyncio.run(ev(program))
     assert result.score == 0.0
 
 
@@ -189,15 +190,15 @@ def test_evaluate_call_wrong_answer():
         # Create programs that do not return dictionary-like objects because Evaluate()
         # has failed for such cases in the past
         (
-            lambda text: Predict("text: str -> entities: list[str]")(text=text).entities,
+            lambda text: asyncio.run(Predict("text: str -> entities: list[str]")(text=text)).entities,
             Example(text="United States", entities=["United States"]).with_inputs("text"),
         ),
         (
-            lambda text: Predict("text: str -> entities: list[dict[str, str]]")(text=text).entities,
+            lambda text: asyncio.run(Predict("text: str -> entities: list[dict[str, str]]")(text=text)).entities,
             Example(text="United States", entities=[{"name": "United States", "type": "location"}]).with_inputs("text"),
         ),
         (
-            lambda text: Predict("text: str -> first_word: Tuple[str, int]")(text=text).words,
+            lambda text: asyncio.run(Predict("text: str -> first_word: Tuple[str, int]")(text=text)).words,
             Example(text="United States", first_word=("United", 6)).with_inputs("text"),
         ),
     ],
@@ -223,7 +224,7 @@ def test_evaluate_display_table(program_with_example, display_table, capfd):
     )
     assert ev.display_table == display_table
 
-    ev(program)
+    asyncio.run(ev(program))
     out, _ = capfd.readouterr()
     if display_table:
         example_input = next(iter(example.inputs().values()))
@@ -270,13 +271,13 @@ def test_evaluate_callback():
     )
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
     program = Predict("question -> answer")
-    assert program(question="What is 1+1?").answer == "2"
+    assert asyncio.run(program(question="What is 1+1?")).answer == "2"
     ev = Evaluate(
         devset=devset,
         metric=answer_exact_match,
         display_progress=False,
     )
-    result = ev(program)
+    result = asyncio.run(ev(program))
     assert result.score == 100.0
     assert callback.start_call_inputs["program"] == program  # ty:ignore[not-subscriptable]
     assert callback.start_call_count == 1
@@ -334,7 +335,7 @@ def test_evaluate_save_as_json_with_history():
             save_as_json=temp_json,
         )
 
-        result = evaluator(program)
+        result = asyncio.run(evaluator(program))
         assert result.score == 100.0
 
         # Verify JSON file was created and is valid
@@ -402,7 +403,7 @@ def test_evaluate_save_as_csv_with_history():
             save_as_csv=temp_csv,
         )
 
-        result = evaluator(program)
+        result = asyncio.run(evaluator(program))
         assert result.score == 100.0
 
         # Verify CSV file was created

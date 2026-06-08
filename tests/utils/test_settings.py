@@ -90,7 +90,7 @@ def test_dspy_context_with_dspy_parallel():
             (module, {"question": "What is the capital of France?"}),
             (module, {"question": "What is the capital of Germany?"}),
         ]
-        parallelizer(input_pairs)
+        asyncio.run(parallelizer(input_pairs))
 
         # Verify mock was called correctly
         assert mock_completion.call_count == 2

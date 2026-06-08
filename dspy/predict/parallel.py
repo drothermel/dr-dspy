@@ -1,16 +1,17 @@
-import asyncio
-import threading
+from __future__ import annotations
+
 from typing import Any
 
 from dspy.dsp.utils.settings import settings
 from dspy.primitives.example import Example
-from dspy.utils.parallelizer import ParallelExecutor
+from dspy.utils.async_parallel import BoundedRunStats, run_bounded
 
 
 class Parallel:
     def __init__(
         self,
         num_threads: int | None = None,
+        max_concurrency: int | None = None,
         max_errors: int | None = None,
         access_examples: bool = True,
         return_failed_examples: bool = False,
@@ -20,50 +21,27 @@ class Parallel:
         straggler_limit: int = 3,
     ) -> None:
         """
-        A utility class for parallel, multi-threaded execution of (module, example) pairs.
+        A utility class for bounded async execution of (module, example) pairs.
         Supports various example formats (e.g., `Example`, dict, tuple, list), robust error handling,
         optional progress tracking, and can optionally return failed examples and exceptions.
 
         Args:
-            num_threads (int | None): The number of threads to use. Defaults to `settings.num_threads`.
-            max_errors (int | None): The maximum number of errors allowed before raising an exception. Defaults to `settings.max_errors`.
+            num_threads (int | None): Deprecated alias for ``max_concurrency``.
+            max_concurrency (int | None): Maximum concurrent module executions. Defaults to
+                ``settings.num_threads``.
+            max_errors (int | None): The maximum number of errors allowed before raising an exception.
+                Defaults to ``settings.max_errors``.
             access_examples (bool): Whether to unpack `Example` objects via `.inputs()`. Defaults to True.
             return_failed_examples (bool): Whether to return failed examples. Defaults to False.
             provide_traceback (bool | None): Whether to provide traceback. Defaults to None.
             disable_progress_bar (bool): Whether to disable progress bar. Defaults to False.
-
-        Example:
-            ```python
-            from dspy.clients.lm import LM
-            from dspy.dsp.utils.settings import settings
-            from dspy.predict.parallel import Parallel
-            from dspy.predict.predict import Predict
-
-            lm = LM("openai/gpt-4o-mini")
-            settings.configure(lm=lm)
-
-            examples = [
-                {"question": "What is the capital of Spain?"},
-                {"question": "What is 3 * 4?"},
-                {"question": "Who wrote Hamlet?"},
-            ]
-
-            module = Predict("question->answer")
-            exec_pairs = [(module, example) for example in examples]
-            parallel = Parallel(num_threads=3, disable_progress_bar=False)
-            results = parallel(exec_pairs)
-            for i, result in enumerate(results):
-                print(f"Result {i+1}: {result.answer}")
-
-            # Expected Output:
-            # Result 1: Madrid
-            # Result 2: 12
-            # Result 3: William Shakespeare
-            ```
+            timeout (int): Reserved for future straggler handling. Currently unused.
+            straggler_limit (int): Reserved for future straggler handling. Currently unused.
         """
 
-        super().__init__()
-        self.num_threads = num_threads or settings.num_threads
+        concurrency = max_concurrency if max_concurrency is not None else num_threads
+        self.max_concurrency = concurrency or settings.num_threads
+        self.num_threads = self.max_concurrency
         self.max_errors = settings.max_errors if max_errors is None else max_errors
         self.access_examples = access_examples
         self.return_failed_examples = return_failed_examples
@@ -72,58 +50,55 @@ class Parallel:
         self.timeout = timeout
         self.straggler_limit = straggler_limit
 
-        self.error_count = 0
-        self.error_lock = threading.Lock()
-        self.cancel_jobs = threading.Event()
-        self.failed_examples = []
-        self.exceptions = []
+        self.failed_examples: list[Any] = []
+        self.exceptions: list[BaseException] = []
+        self._last_stats = BoundedRunStats()
 
-    def forward(
-        self, exec_pairs: list[tuple[Any, Example]], num_threads: int | None = None
-    ) -> list[Any] | tuple[list[Any], list[Any], list[Exception]]:
-        num_threads = num_threads if num_threads is not None else self.num_threads
+    async def _run_pair(self, pair: tuple[Any, Any]) -> Any:
+        module, example = pair
 
-        executor = ParallelExecutor(
-            num_threads=num_threads,
+        if isinstance(example, Example):
+            if self.access_examples:
+                return await module(**example.inputs())
+            return await module(example)
+        if isinstance(example, dict):
+            return await module(**example)
+        if isinstance(example, list) and module.__class__.__name__ == "Parallel":
+            return await module(example)
+        if isinstance(example, tuple):
+            return await module(*example)
+        raise ValueError(
+            f"Invalid example type: {type(example)}, only supported types are Example, dict, list and tuple"
+        )
+
+    async def __call__(
+        self,
+        exec_pairs: list[tuple[Any, Any]],
+        num_threads: int | None = None,
+        max_concurrency: int | None = None,
+    ) -> list[Any] | tuple[list[Any], list[Any], list[BaseException]]:
+        concurrency = max_concurrency if max_concurrency is not None else num_threads
+        concurrency = concurrency or self.max_concurrency
+
+        results, stats = await run_bounded(
+            exec_pairs,
+            self._run_pair,
+            max_concurrency=concurrency,
             max_errors=self.max_errors,
             provide_traceback=self.provide_traceback,
             disable_progress_bar=self.disable_progress_bar,
-            timeout=self.timeout,
-            straggler_limit=self.straggler_limit,
         )
-
-        def process_pair(pair):
-            module, example = pair
-
-            if isinstance(example, Example):
-                result = module(**example.inputs()) if self.access_examples else module(example)
-            elif isinstance(example, dict):
-                result = module(**example)
-            elif isinstance(example, list) and module.__class__.__name__ == "Parallel":
-                result = module(example)
-            elif isinstance(example, tuple):
-                result = module(*example)
-            else:
-                raise ValueError(
-                    f"Invalid example type: {type(example)}, only supported types are Example, dict, list and tuple"
-                )
-
-            if asyncio.iscoroutine(result):
-                return asyncio.run(result)
-            return result
-
-        results = executor.execute(process_pair, exec_pairs)
+        self._last_stats = stats
 
         if self.return_failed_examples:
-            for failed_idx in executor.failed_indices:
+            self.failed_examples = []
+            self.exceptions = []
+            for failed_idx in stats.failed_indices:
                 if failed_idx < len(exec_pairs):
                     _, original_example = exec_pairs[failed_idx]
                     self.failed_examples.append(original_example)
-                    if exception := executor.exceptions_map.get(failed_idx):
+                    if exception := stats.exceptions_map.get(failed_idx):
                         self.exceptions.append(exception)
 
             return results, self.failed_examples, self.exceptions
         return results
-
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self.forward(*args, **kwargs)

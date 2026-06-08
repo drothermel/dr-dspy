@@ -21,8 +21,8 @@ if TYPE_CHECKING:
 import tqdm
 
 from dspy.primitives.prediction import Prediction
+from dspy.utils.async_parallel import run_bounded
 from dspy.utils.callback import with_callbacks
-from dspy.utils.parallelizer import ParallelExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,7 @@ class Evaluate:
         devset: list["Example"],
         metric: Callable | None = None,
         num_threads: int | None = None,
+        max_concurrency: int | None = None,
         display_progress: bool = False,
         display_table: bool | int = False,
         max_errors: int | None = None,
@@ -69,7 +70,8 @@ class Evaluate:
         Args:
             devset (list[dspy.primitives.example.Example]): the evaluation dataset.
             metric (Callable): The metric function to use for evaluation.
-            num_threads (int | None): The number of threads to use for parallel evaluation.
+            num_threads (int | None): Deprecated alias for ``max_concurrency``.
+            max_concurrency (int | None): Maximum concurrent evaluation tasks.
             display_progress (bool): Whether to display progress during evaluation.
             display_table (bool | int): Whether to display the evaluation results in a table.
                 If a number is passed, the evaluation results will be truncated to that number before displayed.
@@ -83,7 +85,8 @@ class Evaluate:
         """
         self.devset = devset
         self.metric = metric
-        self.num_threads = num_threads
+        self.max_concurrency = max_concurrency if max_concurrency is not None else num_threads
+        self.num_threads = self.max_concurrency
         self.display_progress = display_progress
         self.display_table = display_table
         self.max_errors = max_errors
@@ -93,12 +96,13 @@ class Evaluate:
         self.save_as_json = save_as_json
 
     @with_callbacks
-    def __call__(
+    async def __call__(
         self,
         program: "Module",
         metric: Callable | None = None,
         devset: list["Example"] | None = None,
         num_threads: int | None = None,
+        max_concurrency: int | None = None,
         display_progress: bool | None = None,
         display_table: bool | int | None = None,
         callback_metadata: dict[str, Any] | None = None,
@@ -110,8 +114,9 @@ class Evaluate:
             program (dspy.primitives.module.Module): The DSPy program to evaluate.
             metric (Callable): The metric function to use for evaluation. if not provided, use `self.metric`.
             devset (list[dspy.primitives.example.Example]): the evaluation dataset. if not provided, use `self.devset`.
-            num_threads (int | None): The number of threads to use for parallel evaluation. if not provided, use
-                `self.num_threads`.
+            num_threads (int | None): Deprecated alias for ``max_concurrency``.
+            max_concurrency (int | None): Maximum concurrent evaluation tasks. if not provided, use
+                ``self.max_concurrency``.
             display_progress (bool): Whether to display progress during evaluation. if not provided, use
                 `self.display_progress`.
             display_table (bool | int): Whether to display the evaluation results in a table. if not provided, use
@@ -127,7 +132,11 @@ class Evaluate:
         """
         metric = metric if metric is not None else self.metric
         devset = devset if devset is not None else self.devset
-        num_threads = num_threads if num_threads is not None else self.num_threads
+        concurrency = (
+            max_concurrency
+            if max_concurrency is not None
+            else (num_threads if num_threads is not None else self.max_concurrency)
+        )
         display_progress = display_progress if display_progress is not None else self.display_progress
         display_table = display_table if display_table is not None else self.display_table
         save_as_csv = save_as_csv if save_as_csv is not None else self.save_as_csv
@@ -141,22 +150,22 @@ class Evaluate:
 
         tqdm.tqdm._instances.clear()
 
-        executor = ParallelExecutor(
-            num_threads=num_threads,
+        async def process_item(example):
+            with settings.context(trace=[]):
+                prediction = await program(**example.inputs())
+                trace = list(settings.trace)
+            score = metric(example, prediction, trace)
+            return prediction, score
+
+        results, _stats = await run_bounded(
+            devset,
+            process_item,
+            max_concurrency=concurrency or settings.num_threads,
             disable_progress_bar=not display_progress,
             max_errors=(self.max_errors if self.max_errors is not None else settings.max_errors),
             provide_traceback=self.provide_traceback,
             compare_results=True,
         )
-
-        def process_item(example):
-            with settings.context(trace=[]):
-                prediction = program(**example.inputs())
-                trace = list(settings.trace)
-            score = metric(example, prediction, trace)
-            return prediction, score
-
-        results = executor.execute(process_item, devset)
         assert len(devset) == len(results)
 
         results = [((Prediction(), self.failure_score) if r is None else r) for r in results]
@@ -178,7 +187,7 @@ class Evaluate:
             metric_name = metric.__name__ if isinstance(metric, types.FunctionType) else metric.__class__.__name__
             data = self._prepare_results_output(results, metric_name)
 
-            with Path(save_as_csv).open("w", newline="") as csvfile:
+            with Path(save_as_csv).open("w", newline="") as csvfile:  # noqa: ASYNC230
                 fieldnames = data[0].keys()
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
@@ -188,7 +197,7 @@ class Evaluate:
         if save_as_json:
             metric_name = metric.__name__ if isinstance(metric, types.FunctionType) else metric.__class__.__name__
             data = self._prepare_results_output(results, metric_name)
-            with Path(save_as_json).open(
+            with Path(save_as_json).open(  # noqa: ASYNC230
                 "w",
             ) as f:
                 json.dump(data, f)
