@@ -11,16 +11,16 @@ class History(pydantic.BaseModel):
 
     ```
     from dspy.adapters.types.history import History
-    from dspy.task_spec import FieldSpec, make_task_spec
+    from dspy.task_spec import TaskSpec, input_field, output_field
 
-    task_spec = make_task_spec(
-        {
-            "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=History),
-            "answer": FieldSpec.output("answer"),
-        },
-        instructions="Answer using conversation history.",
-    )
+    class HistoryQATaskSpec(TaskSpec):
+        name: str = "HistoryQA"
+        instructions: str = "Answer using conversation history."
+        inputs: tuple = (
+            input_field("question"),
+            input_field("history", type_=History),
+        )
+        outputs: tuple = (output_field("answer"),)
     ```
 
     Then the history should be a list of dictionaries with keys "question" and "answer".
@@ -33,18 +33,18 @@ class History(pydantic.BaseModel):
         from dspy.clients.lm import LM
         from dspy.dsp.utils.settings import settings
         from dspy.predict.predict import Predict
-        from dspy.task_spec import FieldSpec, make_task_spec
+        from dspy.task_spec import TaskSpec, input_field, output_field
+
+        class HistoryQATaskSpec(TaskSpec):
+            name: str = "HistoryQA"
+            instructions: str = "Answer using conversation history."
+            inputs: tuple = (
+                input_field("question"),
+                input_field("history", type_=History),
+            )
+            outputs: tuple = (output_field("answer"),)
 
         settings.configure(lm=LM("openai/gpt-4o-mini"))
-
-        task_spec = make_task_spec(
-            {
-                "question": FieldSpec.input("question"),
-                "history": FieldSpec.input("history", type_=History),
-                "answer": FieldSpec.output("answer"),
-            },
-            instructions="Answer using conversation history.",
-        )
 
         history = History(
             messages=[
@@ -53,7 +53,7 @@ class History(pydantic.BaseModel):
             ]
         )
 
-        predict = Predict(task_spec)
+        predict = Predict(HistoryQATaskSpec())
         outputs = asyncio.run(predict(question="What is the capital of France?", history=history))
         ```
 
@@ -65,20 +65,20 @@ class History(pydantic.BaseModel):
         from dspy.clients.lm import LM
         from dspy.dsp.utils.settings import settings
         from dspy.predict.predict import Predict
-        from dspy.task_spec import FieldSpec, make_task_spec
+        from dspy.task_spec import TaskSpec, input_field, output_field
+
+        class HistoryQATaskSpec(TaskSpec):
+            name: str = "HistoryQA"
+            instructions: str = "Answer using conversation history."
+            inputs: tuple = (
+                input_field("question"),
+                input_field("history", type_=History),
+            )
+            outputs: tuple = (output_field("answer"),)
 
         settings.configure(lm=LM("openai/gpt-4o-mini"))
 
-        task_spec = make_task_spec(
-            {
-                "question": FieldSpec.input("question"),
-                "history": FieldSpec.input("history", type_=History),
-                "answer": FieldSpec.output("answer"),
-            },
-            instructions="Answer using conversation history.",
-        )
-
-        predict = Predict(task_spec)
+        predict = Predict(HistoryQATaskSpec())
         outputs = asyncio.run(predict(question="What is the capital of France?"))
         history = History(messages=[{"question": "What is the capital of France?", **outputs}])
         outputs_with_history = asyncio.run(predict(question="Are you sure?", history=history))

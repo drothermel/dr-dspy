@@ -159,7 +159,7 @@ class BAMLAdapter(JSONAdapter):
     from dspy.clients.lm import LM
     from dspy.dsp.utils.settings import settings
     from dspy.predict.predict import Predict
-    from dspy.task_spec import FieldSpec, make_task_spec
+    from dspy.task_spec import TaskSpec, input_field, output_field
 
     # 1. Define your Pydantic models
     class PatientAddress(BaseModel):
@@ -173,20 +173,18 @@ class BAMLAdapter(JSONAdapter):
         address: PatientAddress | None
 
     # 2. Define a task spec using the Pydantic model as an output field
-    ExtractPatientInfo = make_task_spec(
-        {
-            "clinical_note": FieldSpec.input("clinical_note"),
-            "patient_info": FieldSpec.output("patient_info", type_=PatientDetails),
-        },
-        instructions="Extract patient information from the clinical note.",
-    )
+    class ExtractPatientInfoTaskSpec(TaskSpec):
+        name: str = "ExtractPatientInfo"
+        instructions: str = "Extract patient information from the clinical note."
+        inputs: tuple = (input_field("clinical_note"),)
+        outputs: tuple = (output_field("patient_info", type_=PatientDetails),)
 
     # 3. Configure DSPy to use the new adapter
     lm = LM("openai/gpt-4.1-mini")
     settings.configure(lm=lm, adapter=BAMLAdapter())
 
     # 4. Run your program
-    extractor = Predict(ExtractPatientInfo)
+    extractor = Predict(ExtractPatientInfoTaskSpec())
     note = "John Doe, 45 years old, lives at 123 Main St, Anytown. Resident of the US."
     result = extractor(clinical_note=note)
     print(result.patient_info)

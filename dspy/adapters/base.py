@@ -26,7 +26,7 @@ from dspy.core.types import (
     coerce_lm_config,
     merge_lm_request_config,
 )
-from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
+from dspy.task_spec import FieldSpec, TaskSpec, input_field
 from dspy.utils.exceptions import AdapterParseError
 
 if TYPE_CHECKING:
@@ -38,10 +38,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _DEFAULT_NATIVE_RESPONSE_TYPES = [Citations, Reasoning]
-_TOOL_CALL_RESULTS_TASK_SPEC = make_task_spec(
-    {"tool_call_results": FieldSpec.input("tool_call_results", type_=ToolCallResults)},
-    instructions="Tool call results from conversation history.",
-)
+
+
+class ToolCallResultsTaskSpec(TaskSpec):
+    name: str = "ToolCallResults"
+    instructions: str = "Tool call results from conversation history."
+    inputs: tuple[FieldSpec, ...] = (input_field("tool_call_results", type_=ToolCallResults),)
+    outputs: tuple[FieldSpec, ...] = ()
 
 
 class Adapter:
@@ -664,7 +667,7 @@ class Adapter:
                 messages.append(build_lm_message(role="assistant", content=assistant_content))
             if tool_call_results is not None:
                 result_input = {"tool_call_results": tool_call_results}
-                content = self.format_user_message_content(task_spec=_TOOL_CALL_RESULTS_TASK_SPEC, inputs=result_input)
+                content = self.format_user_message_content(task_spec=ToolCallResultsTaskSpec(), inputs=result_input)
                 messages.append(build_lm_message(role="user", content=content))
 
         del inputs[history_field_name]

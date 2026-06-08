@@ -22,17 +22,15 @@ class File(Type):
 
         from dspy.adapters.types.file import File
         from dspy.predict.predict import Predict
-        from dspy.task_spec import FieldSpec, make_task_spec
+        from dspy.task_spec import TaskSpec, input_field, output_field
 
-        task_spec = make_task_spec(
-            {
-                "file": FieldSpec.input("file", type_=File),
-                "summary": FieldSpec.output("summary"),
-            },
-            instructions="Summarize the file.",
-        )
+        class FileSummaryTaskSpec(TaskSpec):
+            name: str = "FileSummary"
+            instructions: str = "Summarize the file."
+            inputs: tuple = (input_field("file", type_=File),)
+            outputs: tuple = (output_field("summary"),)
 
-        program = Predict(task_spec)
+        program = Predict(FileSummaryTaskSpec())
         result = asyncio.run(program(file=File.from_path("./research.pdf")))
         print(result.summary)
         ```

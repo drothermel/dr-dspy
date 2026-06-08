@@ -22,19 +22,17 @@ class Code(Type):
     from dspy.clients.lm import LM
     from dspy.dsp.utils.settings import settings
     from dspy.predict.predict import Predict
-    from dspy.task_spec import FieldSpec, make_task_spec
+    from dspy.task_spec import TaskSpec, input_field, output_field
+
+    class CodeGenerationTaskSpec(TaskSpec):
+        name: str = "CodeGeneration"
+        instructions: str = "Generate python code to answer the question."
+        inputs: tuple = (input_field("question", desc="The question to answer"),)
+        outputs: tuple = (output_field("code", type_=Code["java"], desc="The code to execute"),)
 
     settings.configure(lm=LM("openai/gpt-4o-mini"))
 
-    task_spec = make_task_spec(
-        {
-            "question": FieldSpec.input("question", desc="The question to answer"),
-            "code": FieldSpec.output("code", type_=Code["java"], desc="The code to execute"),
-        },
-        instructions="Generate python code to answer the question.",
-    )
-
-    predict = Predict(task_spec)
+    predict = Predict(CodeGenerationTaskSpec())
     result = asyncio.run(predict(question="Given an array, find if any of the two numbers sum up to 10"))
     print(result.code)
     ```
@@ -49,19 +47,17 @@ class Code(Type):
     from dspy.clients.lm import LM
     from dspy.dsp.utils.settings import settings
     from dspy.predict.predict import Predict
-    from dspy.task_spec import FieldSpec, make_task_spec
+    from dspy.task_spec import TaskSpec, input_field, output_field
+
+    class CodeAnalysisTaskSpec(TaskSpec):
+        name: str = "CodeAnalysis"
+        instructions: str = "Analyze the time complexity of the function."
+        inputs: tuple = (input_field("code", type_=Code["python"], desc="The function to analyze"),)
+        outputs: tuple = (output_field("result", desc="The time complexity of the function"),)
 
     settings.configure(lm=LM("openai/gpt-4o-mini"))
 
-    task_spec = make_task_spec(
-        {
-            "code": FieldSpec.input("code", type_=Code["python"], desc="The function to analyze"),
-            "result": FieldSpec.output("result", desc="The time complexity of the function"),
-        },
-        instructions="Analyze the time complexity of the function.",
-    )
-
-    predict = Predict(task_spec)
+    predict = Predict(CodeAnalysisTaskSpec())
 
     def sleepsort(x):
         import time

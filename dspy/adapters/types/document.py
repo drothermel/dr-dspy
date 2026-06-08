@@ -29,17 +29,19 @@ class Document(Type):
         from dspy.adapters.types.document import Document
         from dspy.clients.lm import LM
         from dspy.predict.predict import Predict
-        from dspy.task_spec import FieldSpec, make_task_spec
+        from dspy.task_spec import TaskSpec, input_field, output_field
 
-        task_spec = make_task_spec(
-            {
-                "documents": FieldSpec.input("documents", type_=list[Document]),
-                "question": FieldSpec.input("question"),
-                "answer": FieldSpec.output("answer"),
-                "citations": FieldSpec.output("citations", type_=Citations),
-            },
-            instructions="Answer questions using provided documents with citations.",
-        )
+        class DocumentQATaskSpec(TaskSpec):
+            name: str = "DocumentQA"
+            instructions: str = "Answer questions using provided documents with citations."
+            inputs: tuple = (
+                input_field("documents", type_=list[Document]),
+                input_field("question"),
+            )
+            outputs: tuple = (
+                output_field("answer"),
+                output_field("citations", type_=Citations),
+            )
 
         docs = [
             Document(
@@ -53,7 +55,7 @@ class Document(Type):
         ]
 
         lm = LM("anthropic/claude-opus-4-1-20250805")
-        predictor = Predict(task_spec)
+        predictor = Predict(DocumentQATaskSpec())
         result = asyncio.run(predictor(documents=docs, question="What temperature does water boil?", lm=lm))
         print(result.citations)
         ```
