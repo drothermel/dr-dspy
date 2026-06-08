@@ -1,0 +1,140 @@
+import asyncio
+import time
+from typing import TYPE_CHECKING
+from unittest import mock
+
+import pytest
+
+if TYPE_CHECKING:
+    from litellm.utils import ModelResponse
+
+try:
+    import litellm
+    from litellm.utils import Choices, Message, ModelResponse
+except ImportError:
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
+from openai import RateLimitError
+
+from dspy.clients.lm import LM
+from dspy.utils.exceptions import (
+    ContextWindowExceededError,
+    LMError,
+    LMRateLimitError,
+    LMUnexpectedError,
+)
+from tests.clients.lm.conftest import _request
+
+
+def test_lm_wraps_litellm_errors_with_metadata():
+    lm = LM("openai/gpt-4o-mini")
+    response = mock.Mock()
+    response.status_code = 429
+    response.headers = {"x-request-id": "req-123", "retry-after": "2.5"}
+
+    error = litellm.RateLimitError(
+        message="too many requests", llm_provider="openai", model="gpt-4o", response=response
+    )
+    wrapped = lm._wrap_litellm_exception(error)
+
+    assert isinstance(wrapped, LMRateLimitError)
+    assert wrapped.model == "gpt-4o"
+    assert wrapped.provider == "openai"
+    assert wrapped.status == 429
+    assert wrapped.request_id == "req-123"
+    assert wrapped.retry_after == 2.5
+
+
+def test_lm_wraps_litellm_context_window_error():
+    lm = LM("openai/gpt-4o-mini")
+    error = litellm.ContextWindowExceededError(message="too long", llm_provider="openai", model="gpt-4o")
+    wrapped = lm._wrap_litellm_exception(error)
+
+    assert isinstance(wrapped, ContextWindowExceededError)
+    assert isinstance(wrapped, LMError)
+    assert wrapped.model == "gpt-4o"
+    assert wrapped.provider == "openai"
+
+
+def test_lm_wraps_unknown_boundary_error_as_unexpected_error():
+    lm = LM("openai/gpt-4o-mini")
+    wrapped = lm._wrap_litellm_exception(RuntimeError("local boundary failure"))
+
+    assert isinstance(wrapped, LMUnexpectedError)
+    assert wrapped.code == "unexpected"
+    assert wrapped.model == "openai/gpt-4o-mini"
+
+
+def test_lm_preserves_existing_lm_error_without_self_cause():
+    error = LMRateLimitError("rate limited", model="openai/gpt-4o-mini")
+    lm = LM("openai/gpt-4o-mini")
+
+    with mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error):  # noqa: SIM117
+        with pytest.raises(LMRateLimitError) as exc_info:
+            asyncio.run(lm(_request(lm, prompt="question")))
+
+    assert exc_info.value is error
+    assert exc_info.value.__cause__ is None
+
+
+async def test_lm_preserves_existing_lm_error_without_self_cause_async():
+    error = LMRateLimitError("rate limited", model="openai/gpt-4o-mini")
+    lm = LM("openai/gpt-4o-mini")
+
+    with mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error):  # noqa: SIM117
+        with pytest.raises(LMRateLimitError) as exc_info:
+            await lm.acall(_request(lm, prompt="question"))
+
+    assert exc_info.value is error
+    assert exc_info.value.__cause__ is None
+
+
+def test_retry_number_set_correctly():
+    lm = LM("openai/gpt-4o-mini", num_retries=3)
+    mock_response = ModelResponse(
+        choices=[Choices(message=Message(content="answer"))],
+        model="openai/gpt-4o-mini",
+    )
+    with mock.patch("litellm.acompletion", mock.AsyncMock(return_value=mock_response)) as mock_completion:
+        asyncio.run(lm(_request(lm, prompt="query")))
+
+    assert mock_completion.call_args.kwargs["num_retries"] == 3
+
+
+def test_retry_made_on_system_errors():
+    retry_tracking = [0]  # Using a list to track retries
+
+    def mock_create(*args: object, **kwargs: object):
+        retry_tracking[0] += 1
+        # LiteLLM RateLimitError handling expects response.status_code and response.headers.
+        mock_response = mock.Mock()
+        mock_response.headers = {}
+        mock_response.status_code = 429
+        raise RateLimitError(response=mock_response, message="message", body="error")
+
+    lm = LM(model="openai/gpt-4o-mini", max_tokens=250, num_retries=3)
+    with mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create):  # noqa: SIM117
+        with pytest.raises(LMRateLimitError):
+            asyncio.run(lm(_request(lm, prompt="question")))
+
+    assert retry_tracking[0] == 2
+
+
+def test_exponential_backoff_retry():
+    time_counter = []
+
+    def mock_create(*args: object, **kwargs: object):
+        time_counter.append(time.time())
+        # LiteLLM RateLimitError handling expects response.status_code and response.headers.
+        mock_response = mock.Mock()
+        mock_response.headers = {}
+        mock_response.status_code = 429
+        raise RateLimitError(response=mock_response, message="message", body="error")
+
+    lm = LM(model="openai/gpt-3.5-turbo", max_tokens=250, num_retries=3)
+    with mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create):  # noqa: SIM117
+        with pytest.raises(LMRateLimitError):
+            asyncio.run(lm(_request(lm, prompt="question")))
+
+    # The first retry happens immediately regardless of the configuration
+    for i in range(1, len(time_counter) - 1):
+        assert time_counter[i + 1] - time_counter[i] >= 2 ** (i - 1)
