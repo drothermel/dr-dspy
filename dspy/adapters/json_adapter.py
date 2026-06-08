@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
@@ -9,7 +11,9 @@ import regex
 from pydantic.fields import FieldInfo
 from typing_extensions import override
 
-from dspy.adapters.chat_adapter import ChatAdapter, FieldInfoWithName
+from dspy.adapters.base import Adapter
+from dspy.adapters.format_shared import ChatFormatMixin, FieldInfoWithName
+
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import (
     format_field_value,
@@ -32,7 +36,7 @@ def _has_open_ended_mapping(task_spec: TaskSpec) -> bool:
     return any(get_origin(field.type_) is dict for field in task_spec.output_fields.values())
 
 
-class JSONAdapter(ChatAdapter):
+class JSONAdapter(ChatFormatMixin, Adapter):
     def __init__(
         self,
         callbacks: list[BaseCallback] | None = None,
@@ -48,7 +52,10 @@ class JSONAdapter(ChatAdapter):
     async def _call_chat_adapter(
         self, lm: BaseLM, config: LMConfig, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any]
     ) -> list[dict[str, Any]]:
-        return await super().acall(lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs)
+        # Preserve legacy `super().acall(...)` behavior: ChatAdapter formatting pipeline with JSONAdapter.parse.
+        return await Adapter.acall(
+            self, lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs
+        )
 
     async def _json_adapter_call_common(
         self,
@@ -99,13 +106,17 @@ class JSONAdapter(ChatAdapter):
                 task_spec=task_spec, use_native_function_calling=self.use_native_function_calling
             )
             resolved_config = resolved_config.model_copy(update={"response_format": structured_output_model})
-            return await super().acall(lm=lm, config=resolved_config, task_spec=task_spec, demos=demos, inputs=inputs)
+            return await Adapter.acall(
+                self, lm=lm, config=resolved_config, task_spec=task_spec, demos=demos, inputs=inputs
+            )
         except LMError:
             raise
         except Exception:
             logger.warning("Failed to use structured output format, falling back to JSON mode.")
             resolved_config = resolved_config.model_copy(update={"response_format": {"type": "json_object"}})
-            return await super().acall(lm=lm, config=resolved_config, task_spec=task_spec, demos=demos, inputs=inputs)
+            return await Adapter.acall(
+                self, lm=lm, config=resolved_config, task_spec=task_spec, demos=demos, inputs=inputs
+            )
 
     @override
     def format_field_structure(self, task_spec: TaskSpec) -> str:
@@ -133,7 +144,6 @@ class JSONAdapter(ChatAdapter):
 
     @override
     def user_message_output_requirements(self, task_spec: TaskSpec) -> str:
-
         def type_info(field_type: object) -> str:
             if field_type == ToolCalls:
                 return ' (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]})'
@@ -144,7 +154,7 @@ class JSONAdapter(ChatAdapter):
             )
 
         message = "Respond with a JSON object in the following order of fields: "
-        message += ", then ".join((f"`{f}`{type_info(field.type_)}" for f, field in task_spec.output_fields.items()))
+        message += ", then ".join(f"`{f}`{type_info(field.type_)}" for f, field in task_spec.output_fields.items())
         message += "."
         return message
 
@@ -163,7 +173,7 @@ class JSONAdapter(ChatAdapter):
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
         fields = json_repair.loads(completion)
         if not isinstance(fields, dict):
-            pattern = "\\{(?:[^{}]|(?R))*\\}"
+            pattern = r"\{(?:[^{}]|(?R))*\}"
             match = regex.search(pattern, completion, regex.DOTALL)
             if match:
                 completion = match.group(0)
@@ -193,8 +203,7 @@ class JSONAdapter(ChatAdapter):
                 formatted_field_value = format_field_value(field_info=field.info, value=field_value)
                 output.append(f"[[ ## {field.name} ## ]]\n{formatted_field_value}")
             return "\n\n".join(output).strip()
-        d = fields_with_values.items()
-        d = {k.name: v for k, v in d}
+        d = {k.name: v for k, v in fields_with_values.items()}
         return json.dumps(serialize_for_json(d), indent=2, ensure_ascii=False)
 
     @override

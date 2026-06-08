@@ -4,7 +4,8 @@ from typing import Any
 from pydantic.fields import FieldInfo
 from typing_extensions import override
 
-from dspy.adapters.chat_adapter import ChatAdapter, FieldInfoWithName
+from dspy.adapters.chat_adapter import ChatAdapter
+from dspy.adapters.format_shared import FieldInfoWithName
 from dspy.adapters.utils import (
     build_multimodal_user_message_content,
     format_field_value,

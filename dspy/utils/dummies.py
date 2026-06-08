@@ -7,7 +7,7 @@ from typing import Any, NoReturn, cast
 from pydantic.fields import FieldInfo
 from typing_extensions import override
 
-from dspy.adapters.chat_adapter import FieldInfoWithName, field_header_pattern
+from dspy.adapters.format_shared import FIELD_HEADER_PATTERN, FieldInfoWithName
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import provider_tool_call_to_part
 from dspy.core.types import LMOutput, LMPart, LMRequest, LMResponse, LMTextPart, LMThinkingPart
@@ -42,7 +42,7 @@ class DummyLM(BaseLM):
         fields = defaultdict(int)
         for message in messages:
             content = getattr(message, "text", None)
-            if content and (ma := field_header_pattern.match(content)):
+            if content and (ma := FIELD_HEADER_PATTERN.match(content)):
                 fields[content[ma.start() : ma.end()]] += 1
         max_count = max(fields.values())
         output_fields = [field for field, count in fields.items() if count != max_count]

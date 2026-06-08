@@ -11,7 +11,7 @@ try:
     from litellm import Choices, Message, ModelResponse
 except ImportError:
     pytest.skip("litellm is not installed", allow_module_level=True)
-from dspy.adapters.chat_adapter import FieldInfoWithName
+from dspy.adapters.format_shared import FieldInfoWithName
 from dspy.adapters.types.code import Code
 from dspy.adapters.types.history import History
 from dspy.adapters.types.image import Image
