@@ -2,7 +2,7 @@ from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
-from dspy.teleprompt.signature_opt import COPRO
+from dspy.teleprompt.copro_optimizer import COPRO
 from dspy.utils.dummies import DummyLM
 
 
