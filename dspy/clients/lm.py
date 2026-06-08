@@ -2,7 +2,6 @@ import logging
 import os
 import re
 import threading
-import warnings
 from typing import Any, Literal
 
 import pydantic
@@ -10,7 +9,6 @@ from typing_extensions import override
 
 from dspy.__metadata__ import __version__
 from dspy.clients._litellm import get_litellm, is_litellm_context_window_error
-from dspy.clients.cache import request_cache
 from dspy.clients.openai import OpenAIProvider
 from dspy.clients.openai_format import (
     completion_to_lm_response,
@@ -74,7 +72,6 @@ class LM(BaseLM):
         model_type: Literal["chat", "text", "responses"] = "chat",
         temperature: float | None = None,
         max_tokens: int | None = None,
-        cache: bool = True,
         callbacks: list[BaseCallback] | None = None,
         num_retries: int = 3,
         provider: Provider | None = None,
@@ -94,8 +91,6 @@ class LM(BaseLM):
                 `"responses"`.
             temperature: The sampling temperature to use when generating responses.
             max_tokens: The maximum number of tokens to generate per response.
-            cache: Whether to cache the model responses for reuse to improve performance
-                and reduce costs.
             callbacks: A list of callback functions to run before and after each request.
             num_retries: The number of times to retry a request if it fails transiently due to
                 network error, rate limiting, etc. Requests are retried with exponential
@@ -103,18 +98,12 @@ class LM(BaseLM):
             provider: The provider to use. If not specified, the provider will be inferred from the model.
             finetuning_model: The model to finetune. In some providers, the models available for finetuning is different
                 from the models available for inference.
-            rollout_id: Optional integer used to differentiate cache entries for otherwise
-                identical requests. Different values bypass DSPy's caches while still caching
-                future calls with the same inputs and rollout ID. Note that `rollout_id`
-                only affects generation when `temperature` is non-zero. This argument is
-                stripped before sending requests to the provider.
         """
         super().__init__(
             model=model,
             model_type=model_type,
             temperature=temperature,
             max_tokens=max_tokens,
-            cache=cache,
             num_retries=num_retries,
             callbacks=callbacks,
             **kwargs,
@@ -125,8 +114,6 @@ class LM(BaseLM):
         self.launch_kwargs = launch_kwargs or {}
         self.train_kwargs = train_kwargs or {}
         self.use_developer_role = use_developer_role
-
-        self._warn_zero_temp_rollout(self.kwargs.get("temperature"), self.kwargs.get("rollout_id"))
 
     @override
     def _get_initial_kwargs(self, *, temperature, max_tokens, **kwargs) -> dict[str, Any]:
@@ -144,8 +131,6 @@ class LM(BaseLM):
         else:
             initial_kwargs = super()._get_initial_kwargs(temperature=temperature, max_tokens=max_tokens, **kwargs)
 
-        if initial_kwargs.get("rollout_id") is None:
-            initial_kwargs.pop("rollout_id", None)
         return initial_kwargs
 
     @property
@@ -176,26 +161,6 @@ class LM(BaseLM):
         params = _get_litellm().get_supported_openai_params(model=self.model, custom_llm_provider=self._provider_name)
         return set(params) if params else set()
 
-    def _warn_zero_temp_rollout(self, temperature: float | None, rollout_id) -> None:
-        if not self._warned_zero_temp_rollout and rollout_id is not None and temperature == 0:
-            warnings.warn(
-                "rollout_id has no effect when temperature=0; set temperature>0 to bypass the cache.",
-                stacklevel=3,
-            )
-            self._warned_zero_temp_rollout = True
-
-    def _get_cached_completion_fn(self, completion_fn, cache):
-        ignored_args_for_cache_key = ["api_key", "api_base", "base_url"]
-        if cache:
-            completion_fn = request_cache(
-                cache_arg_name="request",
-                ignored_args_for_cache_key=ignored_args_for_cache_key,
-            )(completion_fn)
-
-        litellm_cache_args = {"no-cache": True, "no-store": True}
-
-        return completion_fn, litellm_cache_args
-
     def _wrap_litellm_exception(self, exc: Exception) -> LMError:
         """Convert exceptions raised at the LiteLLM boundary into DSPy LM exceptions."""
         if isinstance(exc, LMError):
@@ -222,13 +187,8 @@ class LM(BaseLM):
 
     async def aforward(self, request: LMRequest) -> LMResponse:
         """Call the configured LM asynchronously."""
-        rollout_id = request.config.cache.rollout_id if request.config.cache is not None else None
-        temperature = (
-            request.config.temperature if request.config.temperature is not None else self.kwargs.get("temperature")
-        )
-        self._warn_zero_temp_rollout(temperature, rollout_id)
         provider_request = self._provider_request(request)
-        cache = self._cache_enabled(request)
+        litellm_cache_args = {"no-cache": True, "no-store": True}
 
         if self.model_type == "chat":
             completion = alitellm_completion
@@ -242,8 +202,6 @@ class LM(BaseLM):
                 model=self.model,
                 provider=self._provider_name,
             )
-
-        completion, litellm_cache_args = self._get_cached_completion_fn(completion, cache)
 
         try:
             results = await completion(
@@ -283,16 +241,8 @@ class LM(BaseLM):
                 provider=self._provider_name,
             )
 
-        if request.config.cache is not None and request.config.cache.rollout_id is not None:
-            provider_request["rollout_id"] = request.config.cache.rollout_id
-
         lm_defaults = {key: value for key, value in self.kwargs.items() if value is not None}
         return {**lm_defaults, **provider_request}
-
-    def _cache_enabled(self, request: LMRequest) -> bool:
-        if request.config.cache is None or request.config.cache.enabled is None:
-            return self.cache
-        return request.config.cache.enabled
 
     def _response_from_provider(self, response: Any, request: LMRequest) -> LMResponse:
         if self.model_type == "responses":
@@ -310,7 +260,6 @@ class LM(BaseLM):
                 "model": getattr(response, "model", None) or lm_response.model,
                 "usage": usage_from_response(response),
                 "cost": cost_from_response(response),
-                "cache_hit": bool(getattr(response, "cache_hit", False)),
                 "provider_response": response,
             }
         )
@@ -443,7 +392,6 @@ class LM(BaseLM):
 async def alitellm_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
     cache = cache or {"no-cache": True, "no-store": True}
     request = dict(request)
-    request.pop("rollout_id", None)
     headers = _add_dspy_identifier_to_headers(request.pop("headers", None))
     return await _get_litellm().acompletion(
         cache=cache,
@@ -457,7 +405,6 @@ async def alitellm_completion(request: dict[str, Any], num_retries: int, cache: 
 async def alitellm_text_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
     cache = cache or {"no-cache": True, "no-store": True}
     request = dict(request)
-    request.pop("rollout_id", None)
     model = request.pop("model").split("/", 1)
     headers = request.pop("headers", None)
     provider, model = model[0] if len(model) > 1 else "openai", model[-1]
@@ -482,7 +429,6 @@ async def alitellm_text_completion(request: dict[str, Any], num_retries: int, ca
 async def alitellm_responses_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
     cache = cache or {"no-cache": True, "no-store": True}
     request = dict(request)
-    request.pop("rollout_id", None)
     headers = request.pop("headers", None)
     request = _convert_chat_request_to_responses_request(request)
 

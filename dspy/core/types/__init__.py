@@ -9,7 +9,6 @@ from dspy.core.types.builders import (
     User,
 )
 from dspy.core.types.config import (
-    LMCacheConfig,
     LMConfig,
     LMPromptCacheConfig,
     LMReasoningConfig,
@@ -67,7 +66,6 @@ __all__ = [
     "LMAudioDelta",
     "LMAudioPart",
     "LMBinaryPart",
-    "LMCacheConfig",
     "LMCitationDelta",
     "LMCitationPart",
     "LMConfig",

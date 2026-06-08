@@ -36,13 +36,9 @@ class Embeddings:
         embedder: Embedder,
         k: int = 5,
         callbacks: list[object] | None = None,
-        cache: bool = False,
         brute_force_threshold: int = 20_000,
         normalize: bool = True,
     ) -> None:
-        if cache is not False:
-            raise ValueError("Caching is not supported for embeddings-based retrievers")
-
         self.callbacks = callbacks or []
         self.embedder = embedder
         self.k = k

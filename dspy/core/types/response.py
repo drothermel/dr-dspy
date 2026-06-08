@@ -167,7 +167,6 @@ class LMResponse(BaseModel):
     outputs: list[LMOutput] = Field(min_length=1)
     usage: LMUsage | dict[str, Any] | None = None
     cost: float | None = None
-    cache_hit: bool = False
     response_id: str | None = None
     provider_response: Any | None = Field(default=None, exclude=True)
     provider_data: dict[str, Any] = Field(default_factory=dict)
@@ -191,7 +190,6 @@ class LMResponse(BaseModel):
         model: str | None = None,
         usage: LMUsage | dict[str, Any] | None = None,
         cost: float | None = None,
-        cache_hit: bool = False,
         **kwargs: Any,
     ) -> LMResponse:
         return cls(
@@ -199,7 +197,6 @@ class LMResponse(BaseModel):
             outputs=[LMOutput(parts=[LMTextPart(text=text)])],
             usage=usage,
             cost=cost,
-            cache_hit=cache_hit,
             **kwargs,
         )
 

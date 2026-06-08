@@ -57,19 +57,16 @@ class BaseLM:
         model_type: str = "chat",
         temperature: float | None = None,
         max_tokens: int | None = None,
-        cache: bool = True,
         callbacks: list[BaseCallback] | None = None,
         num_retries: int = 3,
         **kwargs: Any,
     ) -> None:
         self.model = model
         self.model_type = model_type
-        self.cache = cache
         self.callbacks = list(callbacks or [])
         self.num_retries = num_retries
         self.kwargs = self._get_initial_kwargs(temperature=temperature, max_tokens=max_tokens, **kwargs)
         self.history: list[LMHistoryEntry] = []
-        self._warned_zero_temp_rollout = False
 
     def _get_initial_kwargs(
         self, *, temperature: float | None, max_tokens: int | None, **kwargs: Any
@@ -112,7 +109,7 @@ class BaseLM:
         return set()
 
     def _finalize_lm_response(self, request: LMRequest, response: LMResponse) -> LMResponse:
-        if not getattr(response, "cache_hit", False) and settings.usage_tracker:
+        if settings.usage_tracker:
             usage = response.usage_as_dict()
             if usage:
                 settings.usage_tracker.add_usage(lm=self.model, usage_entry=usage)
@@ -139,7 +136,6 @@ class BaseLM:
             LM_CLASS_STATE_KEY: f"{type(self).__module__}.{type(self).__qualname__}",
             "model": self.model,
             "model_type": self.model_type,
-            "cache": self.cache,
             "num_retries": getattr(self, "num_retries", 3),
             **filtered_kwargs,
         }
@@ -147,6 +143,7 @@ class BaseLM:
     @classmethod
     def load_state(cls, state: dict[str, Any], *, allow_custom_lm_class: bool = False) -> "BaseLM":
         state = dict(state)
+        state.pop("cache", None)
         class_path = state.pop(LM_CLASS_STATE_KEY, None)
 
         if cls is BaseLM:

@@ -54,26 +54,6 @@ class LMToolChoice(BaseModel):
         return cls(**data)
 
 
-class LMCacheConfig(BaseModel):
-    """DSPy memoization cache controls for a normalized LM request.
-
-    This cache skips the provider call entirely when DSPy finds an exact
-    request match. Use `LMPromptCacheConfig` for provider-side prompt/token
-    caching that still sends the request to the provider.
-    """
-
-    enabled: bool | None = None
-    rollout_id: int | str | None = None
-
-    model_config = ConfigDict(extra="forbid")
-
-    @classmethod
-    def from_value(cls, value: Any = None, **overrides: Any) -> LMCacheConfig:
-        data = _config_data(value, bool_field="enabled")
-        data.update({key: value for key, value in overrides.items() if value is not _MISSING})
-        return cls(**data)
-
-
 class LMPromptCacheConfig(BaseModel):
     """Provider-side prompt/token cache controls.
 
@@ -123,7 +103,6 @@ class LMConfig(BaseModel):
     response_format: Any | None = None
     reasoning: LMReasoningConfig | None = None
     tool_choice: LMToolChoice | None = None
-    cache: LMCacheConfig | None = None
     prompt_cache: LMPromptCacheConfig | None = None
     extensions: dict[str, Any] = Field(default_factory=dict)
 
@@ -147,7 +126,7 @@ def _merge_lm_config(left: LMConfig | None, right: LMConfig | None) -> LMConfig 
         if key == "extensions":
             extensions = dict(value) if value is not None else {}
             continue
-        if key in ("reasoning", "tool_choice", "cache", "prompt_cache") and value is not None:
+        if key in ("reasoning", "tool_choice", "prompt_cache") and value is not None:
             left_value = data.get(key)
             right_value = value.model_dump(exclude_none=True)
             if isinstance(left_value, dict) and right_value:
@@ -190,12 +169,6 @@ def _merge_config_overrides(config: LMConfig, kwargs: dict[str, Any]) -> LMConfi
 
 def _coerce_from_call_config_kwargs(kwargs: Mapping[str, Any]) -> dict[str, Any]:
     data = dict(kwargs)
-    if "rollout_id" in data:
-        rollout_id = data.pop("rollout_id")
-        data["cache"] = LMCacheConfig.from_value(data.get("cache"), rollout_id=rollout_id)
-    cache = data.get("cache")
-    if isinstance(cache, bool):
-        data["cache"] = LMCacheConfig(enabled=cache)
     prompt_cache = data.get("prompt_cache")
     if isinstance(prompt_cache, bool):
         data["prompt_cache"] = LMPromptCacheConfig(enabled=prompt_cache)

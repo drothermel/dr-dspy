@@ -559,7 +559,6 @@ def completion_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
         model=model,
         outputs=outputs,
         usage=usage_from_response(response),
-        cache_hit=bool(get_value(response, "cache_hit", False)),
         response_id=response_id,
         provider_response=response,
     )
@@ -638,7 +637,6 @@ def responses_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
         model=model,
         outputs=[LMOutput(parts=parts, provider_output=response)],
         usage=usage_from_response(response),
-        cache_hit=bool(get_value(response, "cache_hit", False)),
         response_id=response_id,
         provider_response=response,
     )
