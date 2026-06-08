@@ -1,5 +1,6 @@
 import logging
-from typing import Any
+from collections.abc import Mapping, Sequence
+from typing import Any, cast
 
 from gepa.core.adapter import ProposalFn
 
@@ -266,8 +267,8 @@ class SingleComponentMultiModalProposer(Module):
         for example_images in image_map.values():
             all_images.extend(example_images)
 
-        multimodal_content = [formatted_text]
-        multimodal_content.extend(all_images)
+        multimodal_content: list[Any] = [formatted_text]
+        multimodal_content.extend(cast(list[Any], all_images))
         return multimodal_content
 
 
@@ -284,7 +285,7 @@ class MultiModalInstructionProposer(ProposalFn):
     def __call__(
         self,
         candidate: dict[str, str],
-        reflective_dataset: dict[str, list[ReflectiveExample]],
+        reflective_dataset: Mapping[str, Sequence[Mapping[str, Any]]],
         components_to_update: list[str],
     ) -> dict[str, str]:
         """GEPA-compatible proposal function.
@@ -302,7 +303,9 @@ class MultiModalInstructionProposer(ProposalFn):
         for component_name in components_to_update:
             if component_name in candidate and component_name in reflective_dataset:
                 current_instruction = candidate[component_name]
-                component_reflective_data = reflective_dataset[component_name]
+                component_reflective_data = cast(
+                    list[ReflectiveExample], reflective_dataset[component_name]
+                )
 
                 # Call the single-instruction proposer.
                 #

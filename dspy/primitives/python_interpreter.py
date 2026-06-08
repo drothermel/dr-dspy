@@ -18,7 +18,7 @@ import threading
 from collections.abc import Callable
 from os import PathLike
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
 from dspy.primitives.code_interpreter import SIMPLE_TYPES, CodeInterpreterError, FinalOutput
 
@@ -59,14 +59,14 @@ def _canonicalize_path(path: PathLike | str) -> str:
     return str(Path(os.fspath(path)).expanduser().resolve())
 
 
-def _jsonrpc_request(method: str, params: dict, id: int | str) -> str:
+def _jsonrpc_request(method: str, params: dict[str, Any], id: int | str) -> str:
     """Create a JSON-RPC 2.0 request (expects response)."""
     return json.dumps({"jsonrpc": "2.0", "method": method, "params": params, "id": id})
 
 
-def _jsonrpc_notification(method: str, params: dict | None = None) -> str:
+def _jsonrpc_notification(method: str, params: dict[str, Any] | None = None) -> str:
     """Create a JSON-RPC 2.0 notification (no response expected)."""
-    msg = {"jsonrpc": "2.0", "method": method}
+    msg: dict[str, Any] = {"jsonrpc": "2.0", "method": method}
     if params:
         msg["params"] = params
     return json.dumps(msg)
@@ -77,9 +77,9 @@ def _jsonrpc_result(result: Any, id: int | str) -> str:
     return json.dumps({"jsonrpc": "2.0", "result": result, "id": id})
 
 
-def _jsonrpc_error(code: int, message: str, id: int | str, data: dict | None = None) -> str:
+def _jsonrpc_error(code: int, message: str, id: int | str, data: dict[str, Any] | None = None) -> str:
     """Create a JSON-RPC 2.0 error response."""
-    err = {"code": code, "message": message}
+    err: dict[str, Any] = {"code": code, "message": message}
     if data:
         err["data"] = data
     return json.dumps({"jsonrpc": "2.0", "error": err, "id": id})
@@ -193,7 +193,7 @@ class PythonInterpreter:
                 args.append(self._env_arg)
             self.deno_command = args
 
-        self.deno_process = None
+        self.deno_process: subprocess.Popen[str] | None = None
         self._mounted_files = False
         self._request_id = 0
         self._owner_thread: int | None = None
@@ -268,8 +268,9 @@ class PythonInterpreter:
             virtual_path = f"/sandbox/{Path(path).name}"
             host_path = _canonicalize_path(path)
             sync_msg = _jsonrpc_notification("sync_file", {"virtual_path": virtual_path, "host_path": host_path})
-            self.deno_process.stdin.write(sync_msg + "\n")
-            self.deno_process.stdin.flush()
+            stdin = self._deno_stdin()
+            stdin.write(sync_msg + "\n")
+            stdin.flush()
 
     def _extract_parameters(self, fn: Callable) -> list[dict]:
         """Extract parameter info from a callable for sandbox registration."""
@@ -337,8 +338,9 @@ class PythonInterpreter:
             error_code = JSONRPC_APP_ERRORS.get(error_type, JSONRPC_APP_ERRORS["Unknown"])
             response = _jsonrpc_error(error_code, str(e), request_id, {"type": error_type})
 
-        self.deno_process.stdin.write(response + "\n")
-        self.deno_process.stdin.flush()
+        stdin = self._deno_stdin()
+        stdin.write(response + "\n")
+        stdin.flush()
 
     def _ensure_deno_process(self) -> None:
         if self.deno_process is None or self.deno_process.poll() is not None:
@@ -367,17 +369,37 @@ class PythonInterpreter:
                 raise CodeInterpreterError(install_instructions) from e
             self._health_check()
 
+    def _require_deno_process(self) -> subprocess.Popen[str]:
+        """Return the active Deno subprocess, creating it if needed."""
+        self._ensure_deno_process()
+        if self.deno_process is None:
+            raise CodeInterpreterError("Deno process unavailable")
+        return self.deno_process
+
+    def _deno_stdin(self) -> IO[str]:
+        stdin = self._require_deno_process().stdin
+        if stdin is None:
+            raise CodeInterpreterError("Deno process stdin unavailable")
+        return stdin
+
+    def _deno_stdout(self) -> IO[str]:
+        stdout = self._require_deno_process().stdout
+        if stdout is None:
+            raise CodeInterpreterError("Deno process stdout unavailable")
+        return stdout
+
     _MAX_SKIP_LINES = 100
 
     def _read_response_line(self, context: str) -> str:
         """Read one stdout line from Deno or raise a process-level error."""
-        response_line = self.deno_process.stdout.readline().strip()
+        process = self._require_deno_process()
+        response_line = self._deno_stdout().readline().strip()
         if response_line:
             return response_line
 
-        exit_code = self.deno_process.poll()
+        exit_code = process.poll()
         if exit_code is not None:
-            stderr = self.deno_process.stderr.read() if self.deno_process.stderr else ""
+            stderr = process.stderr.read() if process.stderr else ""
             raise CodeInterpreterError(f"Deno exited (code {exit_code}) {context}: {stderr}")
         raise CodeInterpreterError(f"No response {context}")
 
@@ -402,8 +424,9 @@ class PythonInterpreter:
         self._request_id += 1
         request_id = self._request_id
         msg = _jsonrpc_request(method, params, request_id)
-        self.deno_process.stdin.write(msg + "\n")
-        self.deno_process.stdin.flush()
+        stdin = self._deno_stdin()
+        stdin.write(msg + "\n")
+        stdin.flush()
 
         skipped = 0
         while skipped <= self._MAX_SKIP_LINES:
@@ -526,9 +549,10 @@ class PythonInterpreter:
         self._request_id += 1
         execute_request_id = self._request_id
         input_data = _jsonrpc_request("execute", {"code": code}, execute_request_id)
+        stdin = self._deno_stdin()
         try:
-            self.deno_process.stdin.write(input_data + "\n")
-            self.deno_process.stdin.flush()
+            stdin.write(input_data + "\n")
+            stdin.flush()
         except BrokenPipeError:
             # If the process died, restart and try again once
             self._ensure_deno_process()
@@ -536,8 +560,9 @@ class PythonInterpreter:
             self._register_tools()
             for name, value in self._pending_large_vars.items():
                 self._inject_large_var(name, value)
-            self.deno_process.stdin.write(input_data + "\n")
-            self.deno_process.stdin.flush()
+            stdin = self._deno_stdin()
+            stdin.write(input_data + "\n")
+            stdin.flush()
 
         # Read and handle messages until we get the final output.
         # Loop is needed because tool calls require back-and-forth communication.
@@ -612,9 +637,11 @@ class PythonInterpreter:
 
     def shutdown(self) -> None:
         if self.deno_process and self.deno_process.poll() is None:
-            self.deno_process.stdin.write(_jsonrpc_notification("shutdown") + "\n")
-            self.deno_process.stdin.flush()
-            self.deno_process.stdin.close()
+            stdin = self.deno_process.stdin
+            if stdin is not None:
+                stdin.write(_jsonrpc_notification("shutdown") + "\n")
+                stdin.flush()
+                stdin.close()
             self.deno_process.wait()
         self.deno_process = None
         self._owner_thread = None

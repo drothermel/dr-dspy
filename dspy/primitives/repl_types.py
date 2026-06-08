@@ -10,7 +10,7 @@ These types represent the state and history of REPL-based execution:
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pydantic
 from pydantic import Field
@@ -66,8 +66,8 @@ class REPLVariable(pydantic.BaseModel):
         desc = ""
         constraints = ""
         extra_dict: dict[str, Any] = {}
-        if field_info and isinstance(field_info.json_schema_extra, dict):
-            extra_dict.update(field_info.json_schema_extra)
+        if field_info:
+            extra_dict |= cast("dict[str, Any]", field_info.json_schema_extra or {})
         raw_desc = extra_dict.get("desc", "")
         if raw_desc and not raw_desc.startswith("${"):
             desc = raw_desc

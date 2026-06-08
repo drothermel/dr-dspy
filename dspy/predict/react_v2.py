@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, get_args
+from typing import TYPE_CHECKING, Any, cast, get_args
 
 import pydantic
 
@@ -70,8 +70,7 @@ class ReActV2(Module):
         fields = {}
         for name, field in self.signature.input_fields.items():
             extra_dict: dict[str, Any] = {}
-            if isinstance(field.json_schema_extra, dict):
-                extra_dict.update(field.json_schema_extra)
+            extra_dict |= cast("dict[str, Any]", field.json_schema_extra or {})
             fields[name] = (
                 _optional_annotation(field.annotation),
                 InputField(desc=extra_dict.get("desc")),

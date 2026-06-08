@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from dspy.adapters.base import Adapter
 from dspy.adapters.chat_adapter import ChatAdapter
@@ -64,7 +64,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
         trace_data = []
 
         teachers = teacher if isinstance(teacher, list) else [teacher]
-        teachers = [prepare_teacher(student, t) for t in teachers]
+        teachers = [prepare_teacher(student, cast(Module | None, t)) for t in teachers]
         num_threads = self.num_threads or settings.num_threads
         for t in teachers:
             trace_data += bootstrap_trace_data(program=t, dataset=trainset, metric=self.metric, num_threads=num_threads)
@@ -154,6 +154,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
             if isinstance(result, Exception):
                 raise result
             key_to_lm[key] = result
+            assert job.thread is not None
             job.thread.join()
             logger.info(f"Job {ind + 1}/{num_jobs} is done")
 
@@ -198,7 +199,9 @@ def build_call_data_from_trace(
     pred, inputs, outputs = trace[pred_ind]
 
     demos = [] if exclude_demos else pred.demos
-    return adapter.format_finetune_data(
+    if not hasattr(adapter, "format_finetune_data"):
+        raise TypeError(f"Adapter {type(adapter).__name__} does not support format_finetune_data")
+    return cast(Any, adapter).format_finetune_data(
         signature=pred.signature,
         demos=demos,
         inputs=inputs,

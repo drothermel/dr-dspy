@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from types import MethodType
-from typing import Any, Callable, TypedDict
+from typing import Any, Callable, TypedDict, cast
 
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
@@ -66,8 +66,8 @@ def bootstrap_trace_data(
                 return original_forward(**kwargs), settings.trace.copy()
             except AdapterParseError as e:
                 completion_str = e.lm_response
-                parsed_result = e.parsed_result
-                failed_signature = e.signature
+                parsed_result = cast(dict[str, Any] | None, e.parsed_result)
+                failed_signature = cast(Any, e.signature)
                 failed_inputs = kwargs
 
                 present = list(parsed_result.keys()) if parsed_result else None
@@ -87,7 +87,7 @@ def bootstrap_trace_data(
                     failed_pred = FailedPrediction(
                         completion_text=completion_str,
                         format_reward=format_failure_score
-                        + (failure_score - format_failure_score) * (present / expected),
+                        + (failure_score - format_failure_score) * (len(present) / len(expected)),
                     )
                 else:
                     failed_pred = FailedPrediction(completion_text=completion_str, format_reward=format_failure_score)
@@ -108,7 +108,7 @@ def bootstrap_trace_data(
 
                 return failed_pred, trace
 
-    program.forward = MethodType(patched_forward, program)
+    program.forward = MethodType(patched_forward, program)  # ty: ignore[unresolved-attribute]
 
     try:
         results = evaluator(
@@ -117,7 +117,7 @@ def bootstrap_trace_data(
             callback_metadata=callback_metadata,
         ).results
     finally:
-        program.forward = original_forward
+        program.forward = original_forward  # ty: ignore[unresolved-attribute]
 
     data = []
     for example_ind, (example, prediction, score) in enumerate(results):
@@ -135,9 +135,13 @@ def bootstrap_trace_data(
             if raise_on_error:
                 raise
             continue
-        data_dict = {"example": example, "prediction": prediction, "trace": trace, "example_ind": example_ind}
-        if metric:
-            data_dict["score"] = score
-        data.append(data_dict)
+        entry: TraceData = {
+            "example": example,
+            "prediction": prediction,
+            "trace": trace,
+            "example_ind": example_ind,
+            "score": score if metric else None,
+        }
+        data.append(entry)
 
     return data

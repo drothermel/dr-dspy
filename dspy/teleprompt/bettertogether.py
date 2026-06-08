@@ -1,7 +1,7 @@
 import inspect
 import logging
 import random
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
@@ -310,7 +310,7 @@ class BetterTogether(Teleprompter):
         if not teacher:
             return student, None
         teacher = [teacher] if not isinstance(teacher, list) else teacher
-        teacher = [prepare_teacher(student, t) for t in teacher]
+        teacher = [prepare_teacher(student, cast(Module | None, t)) for t in teacher]
 
         return student, teacher
 
@@ -575,7 +575,7 @@ class BetterTogether(Teleprompter):
         candidate_programs: list,
         student: Module,
         strategy: str,
-        score: float,
+        score: float | None,
     ) -> None:
         """Add a candidate program to the list."""
         candidate_programs.append({

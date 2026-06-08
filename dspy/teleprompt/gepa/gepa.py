@@ -3,7 +3,7 @@ import logging
 import math
 import random
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, Optional, Protocol, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Protocol, Union, cast
 
 from dspy.clients.lm import LM
 from dspy.primitives.example import Example
@@ -499,7 +499,7 @@ class GEPA(Teleprompter):
         """
         from gepa import GEPAResult, optimize
 
-        from dspy.teleprompt.gepa.gepa_utils import DspyAdapter, LoggerAdapter
+        from dspy.teleprompt.gepa.gepa_utils import DspyAdapter, DSPyTrace, LoggerAdapter, ScoreWithFeedback
 
         assert trainset is not None and len(trainset) > 0, "Trainset must be provided and non-empty"
         assert teacher is None, "Teacher is not supported in DspyGEPA yet."
@@ -543,8 +543,13 @@ class GEPA(Teleprompter):
                 module_inputs: Example,
                 module_outputs: Prediction,
                 captured_trace: "DSPyTrace",
-            ) -> "ScoreWithFeedback":
-                trace_for_pred = [(predictor, predictor_inputs, predictor_output)]
+            ) -> ScoreWithFeedback:
+                pred_output = (
+                    Prediction(**predictor_output)
+                    if isinstance(predictor_output, dict)
+                    else predictor_output
+                )
+                trace_for_pred: DSPyTrace = [(predictor, predictor_inputs, pred_output)]
                 o = self.metric_fn(
                     module_inputs,
                     module_outputs,
@@ -552,11 +557,16 @@ class GEPA(Teleprompter):
                     pred_name,
                     trace_for_pred,
                 )
-                if hasattr(o, "feedback"):
-                    if o["feedback"] is None:
-                        o["feedback"] = f"This trajectory got a score of {o['score']}."
+                if isinstance(o, ScoreWithFeedback):
+                    if o.feedback is None:
+                        o.feedback = f"This trajectory got a score of {o.score}."
                     return o
-                return {"score": o, "feedback": f"This trajectory got a score of {o}."}
+                if isinstance(o, (int, float)):
+                    return ScoreWithFeedback(
+                        score=float(o),
+                        feedback=f"This trajectory got a score of {o}.",
+                    )
+                raise TypeError(f"Unexpected metric return type: {type(o).__name__}")
 
             return feedback_fn
 
@@ -586,7 +596,10 @@ class GEPA(Teleprompter):
             valset=valset,
             adapter=adapter,
             # Reflection-based configuration
-            reflection_lm=(lambda x: adapter.stripped_lm_call(x)[0]) if self.reflection_lm is not None else None,
+            reflection_lm=cast(
+                Any,
+                (lambda x: adapter.stripped_lm_call(x)[0]) if self.reflection_lm is not None else None,
+            ),
             candidate_selection_strategy=self.candidate_selection_strategy,
             skip_perfect_score=self.skip_perfect_score,
             reflection_minibatch_size=self.reflection_minibatch_size,
@@ -594,11 +607,11 @@ class GEPA(Teleprompter):
             perfect_score=self.perfect_score,
             # Merge-based configuration
             use_merge=self.use_merge,
-            max_merge_invocations=self.max_merge_invocations,
+            max_merge_invocations=cast(Any, self.max_merge_invocations),
             # Budget
             max_metric_calls=self.max_metric_calls,
             # Logging
-            logger=LoggerAdapter(logger),
+            logger=cast(Any, LoggerAdapter(logger)),
             run_dir=self.log_dir,
             use_wandb=self.use_wandb,
             wandb_api_key=self.wandb_api_key,
@@ -608,11 +621,11 @@ class GEPA(Teleprompter):
             display_progress_bar=True,
             raise_on_exception=True,
             # Reproducibility
-            seed=self.seed,
+            seed=cast(Any, self.seed),
             **self.gepa_kwargs,
         )
 
-        new_prog = adapter.build_program(gepa_result.best_candidate)
+        new_prog = adapter.build_program(cast(dict[str, str], gepa_result.best_candidate))
 
         if self.track_stats:
             dspy_gepa_result = DspyGEPAResult.from_gepa_result(gepa_result, adapter)

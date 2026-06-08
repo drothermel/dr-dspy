@@ -1,6 +1,7 @@
 import inspect
 import textwrap
 from collections.abc import Callable
+from typing import Any, cast
 
 import orjson
 
@@ -123,7 +124,7 @@ class Refine(Module):
                         outputs = mod(**kwargs)
                     else:
 
-                        class WrapperAdapter(adapter.__class__):
+                        class WrapperAdapter(cast(Any, adapter.__class__)):
                             def __call__(self, lm, lm_kwargs, signature, demos, inputs):
                                 inputs["hint_"] = advice.get(signature2name[signature], "N/A")  # noqa: B023
                                 signature = signature.append(

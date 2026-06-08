@@ -5,7 +5,7 @@ import importlib
 import queue
 import random
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from dspy.primitives.example import Example
 
@@ -85,7 +85,7 @@ class EnvPool:
         self.available = queue.Queue()
 
         try:
-            mp = importlib.import_module("multiprocess")
+            mp = cast(Any, importlib.import_module("multiprocess"))
         except ImportError as err:
             raise ImportError("multiprocess is not installed. " "Please install it via `pip install multiprocess`.") from err
 

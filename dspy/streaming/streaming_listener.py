@@ -143,9 +143,9 @@ class StreamListener:
             and self._output_type.is_streamable()
         ) and (parsed_chunk := self._output_type.parse_stream_chunk(chunk)):
             return StreamResponse(
-                self.predict_name,
+                self.predict_name or "",
                 self.signature_field_name,
-                parsed_chunk,
+                cast(str, parsed_chunk),
                 is_last_chunk=self.stream_end,
             )
 
@@ -249,7 +249,7 @@ class StreamListener:
                     token + last_token[:right_curly_bracket_index] if token else last_token[:right_curly_bracket_index]
                 )
                 return StreamResponse(
-                    self.predict_name, self.signature_field_name, token, is_last_chunk=self.stream_end
+                    self.predict_name or "", self.signature_field_name, token or "", is_last_chunk=self.stream_end
                 )
             except ValueError:
                 pass
@@ -273,16 +273,16 @@ class StreamListener:
                         break
 
                 if next_field_name is not None:
-                    last_token_index = last_token.find(next_field_name)
+                    last_token_index = last_token.find(str(next_field_name))
                     token = token + last_token[:last_token_index] if token else last_token[:last_token_index]
         except ValueError:
             pass
 
         if token or self.stream_end:
             return StreamResponse(
-                self.predict_name,
+                self.predict_name or "",
                 self.signature_field_name,
-                token,
+                token or "",
                 is_last_chunk=self.stream_end,
             )
         return None
@@ -301,9 +301,9 @@ class StreamListener:
 
         if token or self.stream_end:
             return StreamResponse(
-                self.predict_name,
+                self.predict_name or "",
                 self.signature_field_name,
-                token,
+                token or "",
                 is_last_chunk=self.stream_end,
             )
         return None
@@ -353,7 +353,7 @@ class StreamListener:
             token = self.flush()
             if token:
                 return StreamResponse(
-                    self.predict_name,
+                    self.predict_name or "",
                     self.signature_field_name,
                     token,
                     is_last_chunk=True,

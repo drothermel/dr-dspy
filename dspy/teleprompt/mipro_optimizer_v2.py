@@ -292,6 +292,8 @@ class MIPROv2(Teleprompter):
         num_fewshot_candidates: int | None,
     ) -> tuple[int, list, bool, int, int]:
         if self.auto is None:
+            if num_trials is None:
+                raise ValueError("num_trials must be provided when auto is None.")
             if num_instruct_candidates is None or num_fewshot_candidates is None:
                 raise ValueError("num_candidates must be provided when auto is None.")
             return num_trials, valset, minibatch, num_instruct_candidates, num_fewshot_candidates
@@ -336,6 +338,7 @@ class MIPROv2(Teleprompter):
         num_fewshot_candidates: int,
         num_instruct_candidates: int,
     ) -> None:
+        assert self.auto is not None
         logger.info(
             f"\nRUNNING WITH THE FOLLOWING {self.auto.upper()} AUTO RUN SETTINGS:"
             f"\nnum_trials: {num_trials}"
@@ -736,7 +739,7 @@ class MIPROv2(Teleprompter):
         trial: "optuna.trial.Trial",
         trial_logs: dict,
         trial_num: int,
-    ) -> list[str]:
+    ) -> tuple[list[str], dict[str, int]]:
         chosen_params = []
         raw_chosen_params = {}
 
@@ -788,8 +791,8 @@ class MIPROv2(Teleprompter):
         best_score: float,
         best_program: Any,
         study: "optuna.Study",
-        instruction_candidates: list,
-        demo_candidates: list,
+        instruction_candidates: dict[int, list[str]],
+        demo_candidates: list | None,
     ):
         optuna = _import_optuna()
 

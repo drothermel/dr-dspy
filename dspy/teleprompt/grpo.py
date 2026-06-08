@@ -4,13 +4,13 @@ import operator
 import random
 import time
 from collections import Counter, deque
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, cast
 
 from dspy.adapters.base import Adapter
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
-from dspy.clients.utils_finetune import GRPOGroup, GRPOStatus, TrainDataFormat
+from dspy.clients.utils_finetune import GRPOChatData, GRPOGroup, GRPORolloutGroup, GRPOStatus, TrainDataFormat
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
@@ -293,7 +293,10 @@ class GRPO(FinetuneTeleprompter):
         logging.info("Preparing the teacher program(s)... We will ensure that the provided programs have the same program structure as the student program.")
         if (isinstance(teacher, list) and len(teacher) == 0) or teacher is None:
             teacher = student
-        teachers = teacher if isinstance(teacher, list) else [teacher]
+        if isinstance(teacher, list):
+            teachers = cast(list[Module], teacher)
+        else:
+            teachers = [cast(Module, teacher)]
         for t in teachers:
             assert_structural_equivalency(student, t)
             all_predictors_have_lms(t)
@@ -394,7 +397,7 @@ class GRPO(FinetuneTeleprompter):
             )
 
             logger.info("Preparing the training data batch from bootstrapped examples for GRPO...")
-            train_batch_per_predictor: list[list[GRPOGroup]] = [[] for _ in range(num_student_predictors)]
+            train_batch_per_predictor: list[list[GRPORolloutGroup]] = [[] for _ in range(num_student_predictors)]
             for pred_id in range(num_student_predictors):
                 for example_ind, example_data in enumerate(trace_data):
 
@@ -437,7 +440,7 @@ class GRPO(FinetuneTeleprompter):
                         assert self.variably_invoked_predictor_grouping_mode == "ragged", f"Unknown variably invoked predictor grouping mode {self.variably_invoked_predictor_grouping_mode}"
                     max_len = max([len(predictor_example_invocations[i]) for i in range(len(predictor_example_invocations))])
 
-                    example_training_data: list[GRPOGroup] = [[] for _ in range(max_len)]
+                    example_training_data: list[GRPORolloutGroup] = [[] for _ in range(max_len)]
 
                     for group_idx in range(max_len):
                         for rollout_idx in range(len(predictor_example_invocations)):
@@ -461,14 +464,14 @@ class GRPO(FinetuneTeleprompter):
 
                             if isinstance(trace_instance[2], FailedPrediction):
                                 score = trace_instance[2].format_reward or self.format_failure_score
-                                example_training_data[group_idx].append({
+                                example_training_data[group_idx].append(cast(GRPOChatData, {
                                     "messages": inp_messages,
                                     "completion": {
                                         "role": "assistant",
                                         "content": trace_instance[2].completion_text,
                                     },
                                     "reward": float(score),
-                                })
+                                }))
                                 logger.warning(f"Adding a format failure example to the training data for predictor {pred_id} and example {example_ind}.")
                             else:
                                 all_messages = adapter.format_finetune_data(
@@ -480,14 +483,14 @@ class GRPO(FinetuneTeleprompter):
 
                                 assert all_messages[:-1] == inp_messages, f"Input messages {inp_messages} do not match the expected messages {all_messages[:-1]}"
 
-                                example_training_data[group_idx].append({
+                                example_training_data[group_idx].append(cast(GRPOChatData, {
                                     "messages": inp_messages,
                                     "completion": {
                                         "role": all_messages[-1]["role"],
                                         "content": all_messages[-1]["content"],
                                     },
                                     "reward": float(score),
-                                })
+                                }))
 
                     train_batch_per_predictor[pred_id].extend(example_training_data)
 
@@ -519,7 +522,7 @@ class GRPO(FinetuneTeleprompter):
             #   LM.
             logger.info("Invoking GRPO training step...")
             for (lm_for_job, data_key), job in grpo_training_jobs.items():
-                train_data: list[GRPOGroup] = sum(train_batch_per_predictor, []) if data_key is None else train_batch_per_predictor[data_key] #noqa: RUF017
+                train_data: list[GRPORolloutGroup] = sum(train_batch_per_predictor, []) if data_key is None else train_batch_per_predictor[data_key] #noqa: RUF017
                 for group in train_data:
                     if len(group) != self.num_rollouts_per_grpo_step:
                         # TODO(GRPO Team): This is very undesirable. This occurs only because in some of the generations, the model does not follow the correct dspy format.

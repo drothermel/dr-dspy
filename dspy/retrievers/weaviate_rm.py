@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from dspy.dsp.utils.utils import dotdict
 
 try:
@@ -52,15 +54,18 @@ class WeaviateRM:
     ) -> None:
         self._weaviate_collection_name = weaviate_collection_name
         self._weaviate_client = weaviate_client
-        self._weaviate_collection = self._weaviate_client.collections.get(self._weaviate_collection_name)
         self._weaviate_collection_text_key = weaviate_collection_text_key
         self._tenant_id = tenant_id
 
         # Check the type of weaviate_client (this is added to support v3 and v4)
         if hasattr(weaviate_client, "collections"):
             self._client_type = "WeaviateClient"
+            self._weaviate_collection = cast(Any, weaviate_client).collections.get(
+                self._weaviate_collection_name
+            )
         elif hasattr(weaviate_client, "query"):
             self._client_type = "Client"
+            self._weaviate_collection = None
         else:
             raise ValueError("Unsupported Weaviate client type")
 
@@ -88,15 +93,16 @@ class WeaviateRM:
         tenant = kwargs.pop("tenant_id", self._tenant_id)
         for query in queries:
             if self._client_type == "WeaviateClient":
+                collection = cast(Any, self._weaviate_collection)
                 if tenant:
-                    results = self._weaviate_collection.query.with_tenant(tenant).hybrid(query=query, limit=k, **kwargs)
+                    results = collection.query.with_tenant(tenant).hybrid(query=query, limit=k, **kwargs)
                 else:
-                    results = self._weaviate_collection.query.hybrid(query=query, limit=k, **kwargs)
+                    results = collection.query.hybrid(query=query, limit=k, **kwargs)
 
                 parsed_results = [result.properties[self._weaviate_collection_text_key] for result in results.objects]
 
             elif self._client_type == "Client":
-                q = self._weaviate_client.query.get(
+                q = cast(Any, self._weaviate_client).query.get(
                         self._weaviate_collection_name, [self._weaviate_collection_text_key]
                     )
                 if tenant:
@@ -114,7 +120,8 @@ class WeaviateRM:
         """Get objects from Weaviate using the cursor API."""
         if self._client_type == "WeaviateClient":
             objects = []
-            for counter, item in enumerate(self._weaviate_collection.iterator()): # TODO: Apply tenant_id to object iteration; search is tenant-scoped but get_objects is not.
+            collection = cast(Any, self._weaviate_collection)
+            for counter, item in enumerate(collection.iterator()): # TODO: Apply tenant_id to object iteration; search is tenant-scoped but get_objects is not.
                 if counter >= num_samples:
                     break
                 new_object = {}
@@ -122,13 +129,13 @@ class WeaviateRM:
                     if key in fields:
                         new_object[key] = item.properties[key]
                 objects.append(new_object)
-            return objects
+            return cast(list[dict[str, object]], objects)
         raise ValueError("`get_objects` is not supported for the v3 Weaviate Python client, please upgrade to v4.")
 
     def insert(self, new_object_properties: dict[str, object]) -> None:
         if self._client_type == "WeaviateClient":
-            self._weaviate_collection.data.insert(
-                properties=new_object_properties,
+            cast(Any, self._weaviate_collection).data.insert(
+                properties=cast(Any, new_object_properties),
                 uuid=get_valid_uuid(uuid4())
             ) # TODO: Apply tenant_id to inserts; search is tenant-scoped but insert is not.
         else:

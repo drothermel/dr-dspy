@@ -15,7 +15,7 @@ import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pydantic
 
@@ -458,10 +458,10 @@ class RLM(Module):
         """
         interpreter.tools.update(execution_tools)
         if hasattr(interpreter, "output_fields"):
-            interpreter.output_fields = self._get_output_fields_info()
+            cast("Any", interpreter).output_fields = self._get_output_fields_info()
         # Reset registration flag to force re-registration with fresh tools
         if hasattr(interpreter, "_tools_registered"):
-            interpreter._tools_registered = False
+            cast("Any", interpreter)._tools_registered = False
 
     @contextmanager
     def _interpreter_context(self, execution_tools: dict[str, Callable]) -> Iterator[CodeInterpreter]:

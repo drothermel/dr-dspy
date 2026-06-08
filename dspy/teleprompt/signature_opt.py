@@ -43,7 +43,15 @@ class SignatureOptimizer(COPRO):
         verbose=False,
         track_stats=False,
     ) -> None:
-        super().__init__(prompt_model, metric, breadth, depth, init_temperature, verbose, track_stats)
+        super().__init__(
+            prompt_model=prompt_model,
+            metric=metric,
+            breadth=breadth,
+            depth=depth,
+            init_temperature=init_temperature,
+            track_stats=track_stats,
+            verbose=verbose,
+        )
 
-    def compile(self, student, *, devset, eval_kwargs):
+    def compile(self, student, *, devset, eval_kwargs):  # ty:ignore[invalid-method-override]
         return super().compile(student, trainset=devset, eval_kwargs=eval_kwargs)

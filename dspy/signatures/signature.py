@@ -213,7 +213,7 @@ class SignatureMeta(type(BaseModel)):
 
     @staticmethod
     def _validate_fields(cls: Any) -> None:
-        for name, field in cast("Any", cls).model_fields.items():
+        for name, field in cls.model_fields.items():
             extra = _field_info_extra(field)
             field_type = extra.get("__dspy_field_type")
             if field_type not in ["input", "output"]:
@@ -775,7 +775,8 @@ def _parse_type_node(node, names=None) -> Any:
     if isinstance(node, ast.Subscript):
         base_type = _parse_type_node(node.value, names)
         slice_node = node.slice
-        if isinstance(slice_node, ast.Index):  # For older Python versions
+        index_type = getattr(ast, "Index", None)
+        if index_type is not None and isinstance(slice_node, index_type):
             slice_node = slice_node.value
 
         if isinstance(slice_node, ast.Tuple):

@@ -1,6 +1,6 @@
 import logging
 import random
-from typing import TYPE_CHECKING, Any, Callable, Protocol, TypedDict
+from typing import TYPE_CHECKING, Any, Callable, Protocol, TypedDict, cast
 
 from gepa import EvaluationBatch, GEPAAdapter
 from gepa.strategies.instruction_proposal import InstructionProposalSignature
@@ -127,7 +127,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 base_instruction = candidate[name]
                 dataset_with_feedback = reflective_dataset[name]
                 results[name] = InstructionProposalSignature.run(
-                    lm=(lambda x: self.stripped_lm_call(x)[0]),
+                    lm=cast(Any, lambda x: self.stripped_lm_call(x)[0]),
                     input_dict={
                         "current_instruction_doc": base_instruction,
                         "dataset_with_feedback": dataset_with_feedback,
@@ -176,8 +176,10 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                     scores.append(self.failure_score)
                 else:
                     score = t["score"]
-                    if hasattr(score, "score"):
-                        score = score["score"]
+                    if isinstance(score, ScoreWithFeedback):
+                        score = score.score
+                    elif score is None:
+                        score = self.failure_score
                     scores.append(score)
 
             return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajs)
@@ -220,8 +222,8 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 example = data["example"]
                 prediction = data["prediction"]
                 module_score = data["score"]
-                if hasattr(module_score, "score"):
-                    module_score = module_score["score"]
+                if isinstance(module_score, ScoreWithFeedback):
+                    module_score = module_score.score
 
                 trace_instances = [t for t in trace if t[0].signature.equals(module.signature)]
                 if not self.add_format_failure_as_feedback:
@@ -307,7 +309,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                             self.warn_on_score_mismatch = False
                         fb["score"] = module_score
 
-                items.append(d)
+                items.append(cast(ReflectiveExample, d))
 
             if len(items) == 0:
                 logger.warning(f"  No valid reflective examples found for {pred_name}")
@@ -323,6 +325,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
     # Always return strings from the LM outputs
     # Even when it returns a dict with e.g., "text" and "reasoning" fields
     def stripped_lm_call(self, x: str) -> list[str]:
+        assert self.reflection_lm is not None
         raw_outputs = self.reflection_lm(x)
         outputs = []
         for raw_output in raw_outputs:

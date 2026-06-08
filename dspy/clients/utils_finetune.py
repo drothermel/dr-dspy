@@ -42,9 +42,12 @@ class GRPOChatData(TypedDict):
     reward: float
 
 
+GRPORolloutGroup = list[GRPOChatData]
+
+
 class GRPOGroup(TypedDict):
     batch_id: int | None
-    group: list[GRPOChatData]
+    group: GRPORolloutGroup
 
 class GRPOStatus(TypedDict):
     job_id: str
