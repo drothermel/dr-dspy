@@ -72,7 +72,7 @@ class MyCallback(BaseCallback):
 def test_callback_injection(args, kwargs):
 
     class Target(Module):
-        @with_callbacks
+        @with_callbacks(kind="module")
         def forward(self, x: int, y: str, z: float) -> int:
             time.sleep(0.1)
             return x + int(y) + int(z)
@@ -92,7 +92,7 @@ def test_callback_injection(args, kwargs):
 def test_callback_injection_local():
 
     class Target(Module):
-        @with_callbacks
+        @with_callbacks(kind="module")
         def forward(self, x: int, y: str, z: float) -> int:
             time.sleep(0.1)
             return x + int(y) + int(z)
@@ -115,7 +115,7 @@ def test_callback_injection_local():
 def test_callback_error_handling():
 
     class Target(Module):
-        @with_callbacks
+        @with_callbacks(kind="module")
         def forward(self, x: int, y: str, z: float) -> int:
             time.sleep(0.1)
             raise ValueError("Error")
@@ -134,7 +134,7 @@ def test_callback_error_handling():
 def test_multiple_callbacks():
 
     class Target(Module):
-        @with_callbacks
+        @with_callbacks(kind="module")
         def forward(self, x: int, y: str, z: float) -> int:
             time.sleep(0.1)
             return x + int(y) + int(z)

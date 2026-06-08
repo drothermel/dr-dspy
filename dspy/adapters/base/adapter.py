@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from dspy.adapters.base.call import AdapterCallMixin
 from dspy.adapters.base.conversation import AdapterConversationMixin
@@ -8,9 +8,7 @@ from dspy.adapters.base.format import AdapterFormatMixin
 from dspy.adapters.base.native import _DEFAULT_NATIVE_RESPONSE_TYPES
 from dspy.adapters.types.base_type import Type
 from dspy.task_spec import TaskSpec
-
-if TYPE_CHECKING:
-    from dspy.utils.callback import BaseCallback
+from dspy.utils.callback import BaseCallback, with_callbacks
 
 
 class Adapter(AdapterCallMixin, AdapterFormatMixin, AdapterConversationMixin):
@@ -28,10 +26,8 @@ class Adapter(AdapterCallMixin, AdapterFormatMixin, AdapterConversationMixin):
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
-        from dspy.utils.callback import with_callbacks
-
-        cls.format = with_callbacks(cls.format)
-        cls.parse = with_callbacks(cls.parse)
+        cls.format = with_callbacks(kind="adapter")(cls.format)
+        cls.parse = with_callbacks(kind="adapter")(cls.parse)
 
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
         raise NotImplementedError

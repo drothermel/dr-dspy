@@ -1,7 +1,6 @@
 import asyncio
 import inspect
 from collections.abc import Coroutine
-from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, get_origin, get_type_hints
 
 from pydantic import BaseModel, TypeAdapter, create_model
@@ -10,32 +9,13 @@ from typing_extensions import override
 from dspy.adapters.types.base_type import Type
 from dspy.core.types import LMToolSpec
 from dspy.dsp.utils.settings import settings
+from dspy.utils.callback import with_callbacks
 
 from .schema import _resolve_json_schema_reference, jsonschema
 
 if TYPE_CHECKING:
     import mcp
     from langchain.tools import BaseTool
-
-
-def _with_callbacks(fn: Callable[..., object]) -> Callable[..., object]:
-    if inspect.iscoroutinefunction(fn):
-
-        @wraps(fn)
-        async def async_wrapper(*args: object, **kwargs: object) -> object:
-            from dspy.utils.callback import with_callbacks
-
-            return await with_callbacks(fn)(*args, **kwargs)
-
-        return async_wrapper
-
-    @wraps(fn)
-    def sync_wrapper(*args: object, **kwargs: object) -> object:
-        from dspy.utils.callback import with_callbacks
-
-        return with_callbacks(fn)(*args, **kwargs)
-
-    return sync_wrapper
 
 
 def _validate_json_schema(instance: object, schema: dict[str, Any], arg_name: str) -> None:
@@ -144,7 +124,7 @@ class Tool(Type):
             return asyncio.run(coroutine)
         return loop.run_until_complete(coroutine)
 
-    @_with_callbacks
+    @with_callbacks(kind="tool")
     def __call__(self, **kwargs: object) -> object:
         parsed_kwargs = self._validate_and_parse_args(**kwargs)
         result = self.func(**parsed_kwargs)
@@ -156,7 +136,7 @@ class Tool(Type):
             )
         return result
 
-    @_with_callbacks
+    @with_callbacks(kind="tool")
     async def acall(self, **kwargs: object) -> object:
         parsed_kwargs = self._validate_and_parse_args(**kwargs)
         result = self.func(**parsed_kwargs)

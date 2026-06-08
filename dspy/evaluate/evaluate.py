@@ -63,7 +63,7 @@ class Evaluate:
         self.save_as_csv = save_as_csv
         self.save_as_json = save_as_json
 
-    @with_callbacks
+    @with_callbacks(kind="evaluate")
     async def __call__(
         self,
         program: "Module",

@@ -53,7 +53,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
         if not hasattr(self, "callbacks"):
             self.callbacks = []
 
-    @with_callbacks
+    @with_callbacks(kind="module")
     async def __call__(self, *args, **kwargs) -> Prediction:
         caller_modules = settings.caller_modules or []
         caller_modules = list(caller_modules)

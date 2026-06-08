@@ -63,7 +63,7 @@ class BaseLM:
     ) -> dict[str, Any]:
         return dict(temperature=temperature, max_tokens=max_tokens, **kwargs)
 
-    @with_callbacks
+    @with_callbacks(kind="lm")
     async def __call__(self, request: LMRequest) -> LMResponse:
         if not isinstance(request, LMRequest):
             raise TypeError(
