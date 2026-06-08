@@ -26,11 +26,9 @@ dependencies = [
     "requests>=2.31.0",
     "pydantic>=2.0",
     "litellm>=1.64.0",
-    "diskcache>=5.6.0",
     "json-repair>=0.54.2",
     "tenacity>=8.2.3", # undeclared runtime dep of litellm, needed for exponential_backoff_retry
     "anyio",
-    "cachetools>=5.5.0",
     "cloudpickle>=3.1.2",
     "srsly>=2.5.3",
 ]
