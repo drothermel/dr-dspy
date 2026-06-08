@@ -12,8 +12,8 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
+from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
-from dspy.teleprompt.utils import get_task_spec, set_task_spec
 
 DEFAULT_MAX_EXAMPLES = 10
 

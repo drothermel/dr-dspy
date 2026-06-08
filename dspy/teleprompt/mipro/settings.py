@@ -3,7 +3,7 @@ import math
 import random
 from typing import TYPE_CHECKING, Any
 
-from dspy.teleprompt.utils import create_minibatch
+from dspy.teleprompt.eval_batch import create_minibatch
 
 if TYPE_CHECKING:
     from dspy.teleprompt.mipro.optimizer import MIPROv2

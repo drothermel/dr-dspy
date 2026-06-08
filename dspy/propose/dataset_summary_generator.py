@@ -4,7 +4,7 @@ from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.propose.utils import strip_prefix
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
-from dspy.teleprompt.utils import optimizer_lm_context
+from dspy.teleprompt.optimizer_context import optimizer_lm_context
 
 
 class ObservationSummarizerTaskSpec(TaskSpec):

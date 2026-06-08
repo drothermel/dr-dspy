@@ -14,8 +14,8 @@ from dspy.teleprompt.mipro.settings import (
     set_num_trials_from_num_candidates,
     set_random_seeds,
 )
+from dspy.teleprompt.optimizer_context import optimizer_lm_context
 from dspy.teleprompt.teleprompt import Teleprompter
-from dspy.teleprompt.utils import optimizer_lm_context
 
 
 class MIPROv2(Teleprompter):

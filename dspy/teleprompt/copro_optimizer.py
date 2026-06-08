@@ -7,8 +7,9 @@ from typing_extensions import override
 from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.predict import Predict
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
+from dspy.teleprompt.optimizer_context import optimizer_lm_context
+from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
-from dspy.teleprompt.utils import get_task_spec, optimizer_lm_context, set_task_spec
 
 logger = logging.getLogger(__name__)
 

@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from dspy.dsp.utils.settings import settings
 from dspy.primitives.example import Example
+from dspy.teleprompt.task_spec_context import get_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
 
 from .vanilla import LabeledFewShot
@@ -63,8 +64,6 @@ class BootstrapFewShot(Teleprompter):
             student.named_predictors(), teacher.named_predictors(), strict=False
         ):
             assert name1 == name2, "Student and teacher must have the same program structure."
-            from dspy.teleprompt.utils import get_task_spec
-
             assert get_task_spec(predictor1).equals(get_task_spec(predictor2)), (
                 "Student and teacher must have the same task specs."
             )

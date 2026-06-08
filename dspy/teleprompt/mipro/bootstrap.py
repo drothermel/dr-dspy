@@ -2,8 +2,8 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from dspy.dsp.utils.settings import settings
+from dspy.teleprompt.demo_sets import create_n_fewshot_demo_sets
 from dspy.teleprompt.mipro.settings import BOOTSTRAPPED_FEWSHOT_EXAMPLES_IN_CONTEXT, LABELED_FEWSHOT_EXAMPLES_IN_CONTEXT
-from dspy.teleprompt.utils import create_n_fewshot_demo_sets
 
 if TYPE_CHECKING:
     from dspy.teleprompt.mipro.optimizer import MIPROv2

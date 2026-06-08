@@ -5,7 +5,8 @@ from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
-from dspy.teleprompt.utils import create_n_fewshot_demo_sets, eval_candidate_program
+from dspy.teleprompt.demo_sets import create_n_fewshot_demo_sets
+from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.utils.dummies import DummyLM
 from tests.task_spec.helpers import ts
 
@@ -73,7 +74,7 @@ def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled():
     trainset = [Example(input="test", output="test").with_inputs("input")]
     lm = DummyLM([{"output": "test"}])
     settings.configure(lm=lm)
-    with patch("dspy.teleprompt.utils.BootstrapFewShot") as MockBootstrap:
+    with patch("dspy.teleprompt.demo_sets.BootstrapFewShot") as MockBootstrap:
         mock_instance = Mock()
         mock_instance.compile = AsyncMock(return_value=student)
         MockBootstrap.return_value = mock_instance

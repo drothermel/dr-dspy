@@ -8,6 +8,7 @@ from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
+from dspy.teleprompt.task_spec_context import get_task_spec
 from dspy.utils.exceptions import AdapterParseError
 
 logger = logging.getLogger(__name__)
@@ -68,8 +69,6 @@ async def bootstrap_trace_data(
                 failed_inputs = kwargs
                 present = list(parsed_result.keys()) if parsed_result else None
                 expected = list(failed_task_spec.output_fields.keys())
-                from dspy.teleprompt.utils import get_task_spec
-
                 found_pred = None
                 for pred in program_to_use.predictors():
                     if get_task_spec(pred).equals(failed_task_spec):

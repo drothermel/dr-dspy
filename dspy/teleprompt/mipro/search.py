@@ -5,6 +5,8 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any
 
 from dspy.evaluate.evaluate import Evaluate
+from dspy.teleprompt.eval_batch import eval_candidate_program
+from dspy.teleprompt.log_utils import print_full_program, save_candidate_program
 from dspy.teleprompt.mipro.evaluate import (
     log_minibatch_eval,
     log_normal_eval,
@@ -12,7 +14,6 @@ from dspy.teleprompt.mipro.evaluate import (
     select_and_insert_instructions_and_demos,
 )
 from dspy.teleprompt.mipro.settings import ENDC, GREEN
-from dspy.teleprompt.utils import eval_candidate_program, print_full_program, save_candidate_program
 
 if TYPE_CHECKING:
     import optuna

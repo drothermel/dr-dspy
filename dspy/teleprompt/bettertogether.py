@@ -17,9 +17,9 @@ from dspy.teleprompt.bootstrap_finetune import (
     prepare_student,
     prepare_teacher,
 )
+from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.teleprompt.teleprompt import Teleprompter
-from dspy.teleprompt.utils import eval_candidate_program
 
 logger = logging.getLogger(__name__)
 YELLOW = "\x1b[93m"

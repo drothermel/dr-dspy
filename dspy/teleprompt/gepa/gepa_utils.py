@@ -18,7 +18,8 @@ from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, TraceData
 from dspy.teleprompt.gepa.task_specs import FrameworkGepaInstructionProposalTaskSpec
-from dspy.teleprompt.utils import get_task_spec, optimizer_lm_context, set_task_spec
+from dspy.teleprompt.optimizer_context import optimizer_lm_context
+from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 
 if TYPE_CHECKING:
     from gepa.core.adapter import ProposalFn

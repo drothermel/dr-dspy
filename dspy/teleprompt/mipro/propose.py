@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any
 
 from dspy.propose.grounded_proposer import GroundedProposer
 from dspy.teleprompt.mipro.settings import BOOTSTRAPPED_FEWSHOT_EXAMPLES_IN_CONTEXT
-from dspy.teleprompt.utils import get_task_spec
+from dspy.teleprompt.task_spec_context import get_task_spec
 
 if TYPE_CHECKING:
     from dspy.teleprompt.mipro.optimizer import MIPROv2

@@ -3,7 +3,7 @@ import re
 
 from dspy.predict.parameter import Parameter
 from dspy.primitives.module import Module
-from dspy.teleprompt.utils import get_task_spec
+from dspy.teleprompt.task_spec_context import get_task_spec
 from dspy.utils.source_format import get_formatted_source
 
 

@@ -22,7 +22,7 @@ from dspy.teleprompt.bootstrap_finetune import (
     assert_structural_equivalency,
 )
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, bootstrap_trace_data
-from dspy.teleprompt.utils import get_task_spec
+from dspy.teleprompt.task_spec_context import get_task_spec
 
 logger = logging.getLogger(__name__)
 
