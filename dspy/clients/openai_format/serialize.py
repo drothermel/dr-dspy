@@ -6,9 +6,8 @@ from typing import Any
 
 import pydantic
 
+from dspy.clients.openai_binary import binary_to_openai
 from dspy.clients.openai_format.media import (
-    data_uri,
-    data_uri_from_path,
     media_format,
     media_source,
     media_type_for_path,
@@ -114,23 +113,6 @@ def video_to_openai(video: LMVideoPart) -> dict[str, Any]:
             filename=filename,
         )
     )
-
-
-def binary_to_openai(binary: LMBinaryPart) -> dict[str, Any]:
-    file_data: dict[str, Any] = {}
-    if binary.data is not None:
-        file_data["file_data"] = data_uri(media_type=binary.media_type, data=binary.data)
-    elif binary.path is not None:
-        file_data["file_data"] = data_uri_from_path(binary.path, fallback_media_type=binary.media_type)
-        file_data["filename"] = binary.filename or os.path.basename(binary.path)
-    elif binary.url is not None:
-        file_data["file_data"] = binary.url
-    if binary.file_id is not None:
-        file_data["file_id"] = binary.file_id
-    if binary.filename is not None:
-        file_data["filename"] = binary.filename
-    return {"type": "file", "file": file_data}
-
 
 def tool_to_openai(tool: LMToolSpec) -> dict[str, Any]:
     data = {"type": "function", "function": {"name": tool.name, "parameters": tool.parameters}}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from dspy.clients.openai_binary import binary_to_openai
 from dspy.core.types.parts import (
     LMAudioPart,
     LMBinaryPart,
@@ -128,8 +129,6 @@ def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
             data["context"] = part.context
         return data
     if isinstance(part, LMBinaryPart):
-        from dspy.clients.openai_format import binary_to_openai
-
         return binary_to_openai(part)
     return part.model_dump(exclude_none=True)
 

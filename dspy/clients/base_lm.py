@@ -5,15 +5,18 @@ import inspect
 import uuid
 from typing import Any, TextIO
 
+from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
 from dspy.core.types import LMHistoryEntry, LMRequest, LMResponse
+from dspy.core.types.history import _history_request_messages_as_openai
 from dspy.dsp.utils.settings import settings
 from dspy.utils.callback import BaseCallback, with_callbacks
 from dspy.utils.inspect_history import pretty_print_history
+from dspy.utils.run_log import append_call_record, redact_config, redact_messages
+from dspy.utils.transparency import ACTIVE_CALL_METADATA, ACTIVE_COMPILED_CALL
 
 MAX_HISTORY_SIZE = 10000
 GLOBAL_HISTORY: list[LMHistoryEntry] = []
 LM_CLASS_STATE_KEY = "_dspy_lm_class"
-_BUILTIN_LM_CLASS_PATH = "dspy.clients.lm.LM"
 
 
 def _import_lm_class(class_path: str) -> type:
@@ -117,10 +120,6 @@ class BaseLM:
     def _append_run_log_entry(
         self, *, request: LMRequest, response: LMResponse, history_entry: LMHistoryEntry | None
     ) -> None:
-        from dspy.core.types.history import _history_request_messages_as_openai
-        from dspy.utils.run_log import append_call_record, redact_config, redact_messages
-        from dspy.utils.transparency import ACTIVE_CALL_METADATA, ACTIVE_COMPILED_CALL
-
         compiled = ACTIVE_COMPILED_CALL.get()
         metadata = ACTIVE_CALL_METADATA.get()
         call_id = (
@@ -188,10 +187,8 @@ class BaseLM:
         class_path = state.pop(LM_CLASS_STATE_KEY, None)
         if cls is BaseLM:
             if class_path is None:
-                from dspy.clients.lm import LM
-
-                return LM(**state)
-            if class_path != _BUILTIN_LM_CLASS_PATH and (not allow_custom_lm_class):
+                return get_lm_class(BUILTIN_LM_CLASS_PATH)(**state)
+            if class_path != BUILTIN_LM_CLASS_PATH and (not allow_custom_lm_class):
                 raise ValueError(
                     f"Refusing to import custom serialized LM class `{class_path}`. Pass allow_unsafe_lm_state=True when loading trusted files to enable custom LM classes."
                 )

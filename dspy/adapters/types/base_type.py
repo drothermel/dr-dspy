@@ -5,10 +5,13 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 
 import pydantic
 
+from dspy.core.types.parts import LMTextPart, _parts_from_openai_content
+
 if TYPE_CHECKING:
     from litellm import ModelResponseStream
 
-    from dspy.core.types import LMOutput, LMPart
+    from dspy.core.types import LMOutput
+    from dspy.core.types.parts import LMPart
 
 
 class Type(pydantic.BaseModel):
@@ -41,8 +44,6 @@ class Type(pydantic.BaseModel):
         return all(isinstance(block, dict) and "type" in block for block in formatted)
 
     def to_lm_parts(self) -> list[LMPart]:
-        from dspy.core.types import LMTextPart, _parts_from_openai_content
-
         formatted = self.format()
         if isinstance(formatted, str):
             return [LMTextPart(text=formatted)]
