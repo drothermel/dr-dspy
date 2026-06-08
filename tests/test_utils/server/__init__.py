@@ -1,11 +1,13 @@
 import importlib.util
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
 import tempfile
 import time
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -30,8 +32,12 @@ def litellm_test_server() -> tuple[str, str]:  # ty:ignore[invalid-return-type]
         port = _get_random_port()
         host = "127.0.0.1"
 
+        litellm_cmd = shutil.which("litellm") or str(Path(sys.executable).with_name("litellm"))
+        if not Path(litellm_cmd).exists():
+            pytest.skip("litellm CLI is not installed")
+
         process = subprocess.Popen(
-            ["litellm", "--host", host, "--port", str(port), "--config", _get_litellm_config_path()],
+            [litellm_cmd, "--host", host, "--port", str(port), "--config", _get_litellm_config_path()],
             env={LITELLM_TEST_SERVER_LOG_FILE_PATH_ENV_VAR: server_log_file_path, **os.environ.copy()},
             text=True,
         )

@@ -12,6 +12,7 @@ from dspy.clients.databricks import (
     _create_directory_in_databricks_unity_catalog,
 )
 from dspy.clients.lm import LM
+from dspy.core.types import LMRequest
 from dspy.dsp.utils.settings import settings
 
 try:
@@ -92,4 +93,4 @@ def test_deploy_finetuned_model():
     )
 
     lm = LM(model="databricks/main_chenmoney_finetuned_model")
-    lm("what is 2 + 2?")
+    lm(LMRequest.from_call(model=lm.model, prompt="what is 2 + 2?"))

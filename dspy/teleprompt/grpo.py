@@ -627,7 +627,7 @@ class GRPO(FinetuneTeleprompter):
             for (lm_for_job, data_key), job in grpo_training_jobs.items():
                 train_data: list[GRPORolloutGroup] = (
                     sum(train_batch_per_predictor, []) if data_key is None else train_batch_per_predictor[data_key]
-                )  # noqa: RUF017
+                )
                 for group in train_data:
                     if len(group) != self.num_rollouts_per_grpo_step:
                         # TODO(GRPO Team): This is very undesirable. This occurs only because in some of the generations, the model does not follow the correct dspy format.

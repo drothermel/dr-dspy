@@ -3,6 +3,7 @@ from io import StringIO
 import pytest
 
 from dspy.clients.base_lm import GLOBAL_HISTORY, inspect_history
+from dspy.core.types import LMHistoryEntry
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.utils.dummies import DummyLM
@@ -29,7 +30,7 @@ def test_inspect_history_basic(capsys):
     history = GLOBAL_HISTORY
     assert len(history) > 0
     assert isinstance(history, list)
-    assert all(isinstance(entry, dict) for entry in history)
+    assert all(isinstance(entry, LMHistoryEntry) for entry in history)
     assert all("messages" in entry for entry in history)
 
 

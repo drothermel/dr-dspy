@@ -543,12 +543,24 @@ def responses_tool_output_text(content: Any) -> str:
 def completion_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
     """Convert an OpenAI Chat or text completion response into `LMResponse`."""
     choices = get_value(response, "choices", []) or []
+    if not isinstance(choices, list):
+        choices = []
+
+    model = get_value(response, "model")
+    if not isinstance(model, str):
+        model = request.model
+
+    response_id = get_value(response, "id")
+    if not isinstance(response_id, str):
+        response_id = None
+
+    outputs = [choice_to_lm_output(choice) for choice in choices] if choices else [LMOutput(parts=[])]
     return LMResponse(
-        model=get_value(response, "model") or request.model,
-        outputs=[choice_to_lm_output(choice) for choice in choices],
+        model=model,
+        outputs=outputs,
         usage=usage_from_response(response),
         cache_hit=bool(get_value(response, "cache_hit", False)),
-        response_id=get_value(response, "id"),
+        response_id=response_id,
         provider_response=response,
     )
 
@@ -589,7 +601,10 @@ def responses_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
     DSPy stores those as typed parts on one `LMOutput`.
     """
     parts = []
-    for output_item in get_value(response, "output", []) or []:
+    output_items = get_value(response, "output", []) or []
+    if not isinstance(output_items, list):
+        output_items = []
+    for output_item in output_items:
         output_type = get_value(output_item, "type")
         if output_type == "message":
             for content_item in get_value(output_item, "content", []) or []:
@@ -610,12 +625,21 @@ def responses_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
                 text = get_value(item, "text")
                 if text:
                     parts.append(LMThinkingPart(text=text))
+
+    model = get_value(response, "model")
+    if not isinstance(model, str):
+        model = request.model
+
+    response_id = get_value(response, "id")
+    if not isinstance(response_id, str):
+        response_id = None
+
     return LMResponse(
-        model=get_value(response, "model") or request.model,
+        model=model,
         outputs=[LMOutput(parts=parts, provider_output=response)],
         usage=usage_from_response(response),
         cache_hit=bool(get_value(response, "cache_hit", False)),
-        response_id=get_value(response, "id"),
+        response_id=response_id,
         provider_response=response,
     )
 
@@ -910,67 +934,3 @@ def model_dump(value: Any) -> dict[str, Any]:
         if item is not None:
             data[key] = item
     return data
-
-
-# ---------------------------------------------------------------------------
-# Current BaseLM adapter compatibility helpers
-#
-# These helpers keep today's adapter->BaseLM boundary normalized internally while
-# BaseLM still returns legacy `list[str | dict | None]` outputs. Future native
-# LanguageModel implementations should use completion_to_lm_response() /
-# responses_to_lm_response() directly.
-# ---------------------------------------------------------------------------
-
-
-def lm_response_from_legacy_outputs(outputs: list[dict[str, Any] | str | None], request: LMRequest) -> LMResponse:
-    """Normalize current legacy `BaseLM` outputs into an `LMResponse`."""
-    if not outputs:
-        return LMResponse(model=request.model, outputs=[LMOutput(parts=[], metadata={"empty_legacy_outputs": True})])
-    return LMResponse(model=request.model, outputs=[lm_output_from_legacy_output(output) for output in outputs])
-
-
-def legacy_outputs_from_lm_response(response: LMResponse) -> list[dict[str, Any] | str | None]:
-    """Return legacy adapter postprocess values from a normalized response.
-
-    This is a temporary compatibility helper for current adapter postprocessing.
-    Prefer the exact original legacy output when it is available so compatibility
-    hooks that distinguish `str` from provider dictionaries keep working.
-    """
-    outputs = []
-    for output in response.outputs:
-        if output.metadata.get("empty_legacy_outputs"):
-            continue
-        if output.provider_output is not None:
-            outputs.append(output.provider_output)
-        elif (
-            output.text is not None
-            and not output.reasoning_content
-            and not output.tool_calls
-            and not output.citations
-            and output.logprobs is None
-        ):
-            outputs.append(output.text)
-        else:
-            outputs.append(output.to_output_dict())
-    return outputs
-
-
-def lm_output_from_legacy_output(output: dict[str, Any] | str | None) -> LMOutput:
-    """Normalize one current legacy `BaseLM` output item into an `LMOutput`."""
-    if isinstance(output, str):
-        return LMOutput(parts=[LMTextPart(text=output)], provider_output=output)
-    if output is None:
-        return LMOutput(parts=[])
-
-    parts = []
-    text = output.get("text")
-    if text:
-        parts.append(LMTextPart(text=text))
-    reasoning = output.get("reasoning_content")
-    if reasoning:
-        parts.append(LMThinkingPart(text=str(reasoning)))
-    for tool_call in output.get("tool_calls") or []:
-        parts.append(provider_tool_call_to_part(tool_call))  # noqa: PERF401 dynamic typing/lint migration for scoped ty adoption
-    for citation in output.get("citations") or []:
-        parts.append(citation_to_part(citation))  # noqa: PERF401 dynamic typing/lint migration for scoped ty adoption
-    return LMOutput(parts=parts, logprobs=output.get("logprobs"), provider_output=output)

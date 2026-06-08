@@ -130,6 +130,7 @@ def test_citations_from_dict_list():
 
 def test_citations_postprocessing():
     from dspy.adapters.chat_adapter import ChatAdapter
+    from dspy.core.types import LMCitationPart, LMOutput, LMResponse, LMTextPart
     from dspy.signatures.signature import Signature
 
     class CitationSignature(Signature):
@@ -141,26 +142,31 @@ def test_citations_postprocessing():
 
     adapter = ChatAdapter(native_response_types=[Citations])
 
-    outputs = [
-        {
-            "text": "[[ ## answer ## ]]\nThe answer is blue.\n\n[[ ## citations ## ]]\n[]",
-            "citations": [
-                {
-                    "cited_text": "The sky is blue",
-                    "document_index": 0,
-                    "document_title": "Weather Guide",
-                    "start_char_index": 10,
-                    "end_char_index": 25,
-                    "supported_text": "The sky is blue",
-                }
-            ],
-        }
-    ]
+    response = LMResponse(
+        model="anthropic/claude-3-5-sonnet-20241022",
+        outputs=[
+            LMOutput(
+                parts=[
+                    LMTextPart(text="[[ ## answer ## ]]\nThe answer is blue.\n\n[[ ## citations ## ]]\n[]"),
+                    LMCitationPart(
+                        text="The sky is blue",
+                        title="Weather Guide",
+                        metadata={
+                            "document_index": 0,
+                            "start_char_index": 10,
+                            "end_char_index": 25,
+                            "supported_text": "The sky is blue",
+                        },
+                    ),
+                ],
+            )
+        ],
+    )
 
     result = adapter._call_postprocess(
         CitationSignature.delete("citations"),
         CitationSignature,
-        outputs,  # ty:ignore[invalid-argument-type]
+        response,
         LM(model="anthropic/claude-3-5-sonnet-20241022"),
         lm_kwargs={},
     )
@@ -174,6 +180,8 @@ def test_citations_postprocessing():
 
 def test_citation_extraction_from_lm_response():
     from unittest.mock import MagicMock
+
+    from dspy.clients.openai_format import extract_citations_from_choice
 
     mock_choice = MagicMock(
         message=MagicMock(
@@ -195,14 +203,12 @@ def test_citation_extraction_from_lm_response():
         )
     )
 
-    lm = LM(model="test")
-    citations = lm._extract_citations_from_response(mock_choice)
+    citations = extract_citations_from_choice(mock_choice)
 
     assert citations is not None
     assert len(citations) == 1
-    assert citations[0]["cited_text"] == "The sky is blue"
-    assert citations[0]["document_index"] == 0
-    assert citations[0]["document_title"] == "Weather Guide"
-    assert citations[0]["start_char_index"] == 10
-    assert citations[0]["end_char_index"] == 25
-    assert citations[0]["supported_text"] == "The sky is blue"
+    assert citations[0].text == "The sky is blue"
+    assert citations[0].title == "Weather Guide"
+    assert citations[0].metadata["document_index"] == 0
+    assert citations[0].metadata["start_char_index"] == 10
+    assert citations[0].metadata["end_char_index"] == 25

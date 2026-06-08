@@ -1,10 +1,15 @@
+import json
+
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import ToolCalls
 from dspy.clients.base_lm import BaseLM
+from dspy.clients.openai_format import message_to_openai_chat
+from dspy.core.types import LMOutput, LMRequest, LMResponse, LMToolCallPart
 from dspy.dsp.utils.settings import settings
 from dspy.dsp.utils.utils import dotdict
 from dspy.predict.react_v2 import ReActV2
 from dspy.utils.dummies import DummyLM
+from tests.adapters.conftest import captured_lm_kwargs
 
 
 class ReasoningDummyLM(DummyLM):
@@ -176,9 +181,9 @@ def test_react_v2_forced_submit_on_empty_tool_calls():
 
     assert pred.answer == "forced"
     assert pred.termination_reason == "forced_submit"
-    assert lm.history[0]["kwargs"]["reasoning_effort"] == "low"
-    assert "tool_choice" not in lm.history[1]["kwargs"]
-    assert lm.history[1]["kwargs"].get("reasoning_effort") is None
+    assert lm.history[0].request.config.reasoning.effort == "low"
+    assert lm.history[1].request.config.reasoning is None
+    assert lm.history[1].request.config.tool_choice is None
 
 
 class NativeToolLM(BaseLM):
@@ -190,8 +195,8 @@ class NativeToolLM(BaseLM):
     def supports_function_calling(self):
         return True
 
-    def forward(self, prompt=None, messages=None, **kwargs: object):
-        self.calls.append({"messages": messages, "kwargs": kwargs})
+    def forward(self, request: LMRequest) -> LMResponse:
+        self.calls.append({"messages": request.messages, "kwargs": captured_lm_kwargs(request)})
         if len(self.calls) == 1:
             tool_call = dotdict(
                 id="call_provider_1",
@@ -205,15 +210,16 @@ class NativeToolLM(BaseLM):
                 function=dotdict(name="submit", arguments='{"answer":"found cats"}'),
             )
 
-        return dotdict(
-            choices=[
-                dotdict(
-                    message=dotdict(content=None, tool_calls=[tool_call]),
+        args = json.loads(tool_call.function.arguments)
+        return LMResponse(
+            model="native-tool-lm",
+            outputs=[
+                LMOutput(
+                    parts=[LMToolCallPart(id=tool_call.id, name=tool_call.function.name, args=args)],
                     finish_reason="tool_calls",
                 )
             ],
             usage=dotdict(prompt_tokens=0, completion_tokens=0, total_tokens=0),
-            model="native-tool-lm",
         )
 
 
@@ -226,8 +232,8 @@ class ParallelNativeToolLM(BaseLM):
     def supports_function_calling(self):
         return True
 
-    def forward(self, prompt=None, messages=None, **kwargs: object):
-        self.calls.append({"messages": messages, "kwargs": kwargs})
+    def forward(self, request: LMRequest) -> LMResponse:
+        self.calls.append({"messages": request.messages, "kwargs": captured_lm_kwargs(request)})
         if len(self.calls) == 1:
             tool_calls = [
                 dotdict(
@@ -250,15 +256,22 @@ class ParallelNativeToolLM(BaseLM):
                 )
             ]
 
-        return dotdict(
-            choices=[
-                dotdict(
-                    message=dotdict(content=None, tool_calls=tool_calls),
+        return LMResponse(
+            model="parallel-native-tool-lm",
+            outputs=[
+                LMOutput(
+                    parts=[
+                        LMToolCallPart(
+                            id=tool_call.id,
+                            name=tool_call.function.name,
+                            args=json.loads(tool_call.function.arguments),
+                        )
+                        for tool_call in tool_calls
+                    ],
                     finish_reason="tool_calls",
                 )
             ],
             usage=dotdict(prompt_tokens=0, completion_tokens=0, total_tokens=0),
-            model="parallel-native-tool-lm",
         )
 
 
@@ -277,7 +290,7 @@ def test_react_v2_native_tool_loop_replays_tool_result_with_provider_id():
     assert pred.history.messages[0]["tool_calls"].tool_call_results.tool_call_results[0].call_id == "call_provider_1"
     assert any(
         message["role"] == "tool" and message["tool_call_id"] == "call_provider_1"
-        for message in lm.calls[1]["messages"]
+        for message in (message_to_openai_chat(item) for item in lm.calls[1]["messages"])
     )
 
 
@@ -302,7 +315,11 @@ def test_react_v2_native_parallel_tool_calls_are_requested_and_replayed():
         "call_provider_1",
         "call_provider_2",
     ]
-    assert [message["tool_call_id"] for message in lm.calls[1]["messages"] if message["role"] == "tool"] == [
+    assert [
+        message["tool_call_id"]
+        for message in (message_to_openai_chat(item) for item in lm.calls[1]["messages"])
+        if message["role"] == "tool"
+    ] == [
         "call_provider_1",
         "call_provider_2",
     ]

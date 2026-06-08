@@ -82,6 +82,13 @@ class Reasoning(Type):
         return signature.delete(field_name)
 
     @classmethod
+    def parse_lm_output(cls, output: object) -> Reasoning | None:
+        """Parse the typed LM output into a Reasoning object."""
+        if getattr(output, "reasoning_content", None):
+            return Reasoning(content=output.reasoning_content)
+        return None
+
+    @classmethod
     def parse_lm_response(cls, response: str | dict[str, Any]) -> Reasoning | None:
         """Parse the LM response into a Reasoning object."""
         if isinstance(response, dict) and "reasoning_content" in response:

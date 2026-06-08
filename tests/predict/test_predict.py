@@ -23,6 +23,7 @@ from dspy.adapters.types.history import History
 from dspy.adapters.types.image import Image
 from dspy.clients.base_lm import LM_CLASS_STATE_KEY, BaseLM
 from dspy.clients.lm import LM
+from dspy.core.types import LMRequest
 from dspy.dsp.utils.settings import settings
 from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict, serialize_object
@@ -31,6 +32,7 @@ from dspy.primitives.module import Module
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
 from dspy.utils.dummies import DummyLM
+from tests.test_utils.spy_lm import SpyLM
 
 
 class CustomStateLM(BaseLM):
@@ -432,7 +434,9 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
             super().__init__({"choices": []})
 
     with patch("litellm.completion", return_value=FakeResp()) as completion_mock:
-        loaded_predict.lm.forward(prompt="hello", cache=False)  # ty:ignore[unresolved-attribute]
+        loaded_predict.lm.forward(  # ty:ignore[unresolved-attribute]
+            LMRequest.from_call(model=loaded_predict.lm.model, prompt="hello", cache=False)
+        )
 
     assert completion_mock.call_count == 1
     assert completion_mock.call_args.kwargs.get(endpoint_override_key) != override_url
@@ -470,7 +474,9 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
     safe_loaded_predict.load(file_path)
     with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:  # noqa: SIM117
         with patch("litellm.completion", return_value=FakeResp()) as completion_mock:
-            safe_loaded_predict.lm.forward(prompt="hello", cache=False)  # ty:ignore[unresolved-attribute]
+            safe_loaded_predict.lm.forward(  # ty:ignore[unresolved-attribute]
+                LMRequest.from_call(model=safe_loaded_predict.lm.model, prompt="hello", cache=False)
+            )
 
     assert completion_mock.called
     assert not batch_completion_mock.called
@@ -478,7 +484,9 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
     opt_in_loaded_predict = Predict("q->a")
     opt_in_loaded_predict.load(file_path, allow_unsafe_lm_state=True)
     with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:
-        opt_in_loaded_predict.lm.forward(prompt="hello", cache=False)  # ty:ignore[unresolved-attribute]
+        opt_in_loaded_predict.lm.forward(  # ty:ignore[unresolved-attribute]
+            LMRequest.from_call(model=opt_in_loaded_predict.lm.model, prompt="hello", cache=False)
+        )
 
     opt_in_deployments = batch_completion_mock.call_args.kwargs["deployments"]
     assert opt_in_deployments[0]["api_base"] == override_url
@@ -513,7 +521,9 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     opt_in_loaded_predict = Predict("q->a")
     opt_in_loaded_predict.load(file_path, allow_unsafe_lm_state=True)
     with patch("litellm.text_completion", return_value=FakeResp()) as text_completion_mock:
-        opt_in_loaded_predict.lm.forward(prompt="hello", cache=False)  # ty:ignore[unresolved-attribute]
+        opt_in_loaded_predict.lm.forward(  # ty:ignore[unresolved-attribute]
+            LMRequest.from_call(model=opt_in_loaded_predict.lm.model, prompt="hello", cache=False)
+        )
 
     assert text_completion_mock.call_args.kwargs["api_base"] == override_url
     assert text_completion_mock.call_args.kwargs["api_key"] == env_api_key
@@ -521,7 +531,9 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     safe_loaded_predict = Predict("q->a")
     safe_loaded_predict.load(file_path)
     with patch("litellm.text_completion", return_value=FakeResp()) as text_completion_mock:
-        safe_loaded_predict.lm.forward(prompt="hello", cache=False)  # ty:ignore[unresolved-attribute]
+        safe_loaded_predict.lm.forward(  # ty:ignore[unresolved-attribute]
+            LMRequest.from_call(model=safe_loaded_predict.lm.model, prompt="hello", cache=False)
+        )
 
     # In the safe path, the key still comes from the environment, but the serialized endpoint override does not.
     assert text_completion_mock.call_args.kwargs["api_key"] == env_api_key
@@ -724,18 +736,6 @@ def test_load_state_chaining():
 
 @pytest.mark.parametrize("adapter_type", ["chat", "json"])
 def test_call_predict_with_chat_history(adapter_type):
-    class SpyLM(LM):
-        def __init__(self, *args: object, return_json=False, **kwargs: object):
-            super().__init__(*args, **kwargs)  # ty:ignore[invalid-argument-type]
-            self.calls = []
-            self.return_json = return_json
-
-        def __call__(self, prompt=None, messages=None, **kwargs: object):
-            self.calls.append({"prompt": prompt, "messages": messages, "kwargs": kwargs})
-            if self.return_json:
-                return ["{'answer':'100%'}"]
-            return ["[[ ## answer ## ]]\n100%!"]
-
     class MySignature(Signature):
         question: str = InputField()
         history: History = InputField()
@@ -881,18 +881,6 @@ def test_error_message_on_invalid_lm_setup():
 
 @pytest.mark.parametrize("adapter_type", ["chat", "json"])
 def test_field_constraints(adapter_type):
-    class SpyLM(LM):
-        def __init__(self, *args: object, return_json=False, **kwargs: object):
-            super().__init__(*args, **kwargs)  # ty:ignore[invalid-argument-type]
-            self.calls = []
-            self.return_json = return_json
-
-        def __call__(self, prompt=None, messages=None, **kwargs: object):
-            self.calls.append({"prompt": prompt, "messages": messages, "kwargs": kwargs})
-            if self.return_json:
-                return ["{'score':'0.5', 'count':'2'}"]
-            return ["[[ ## score ## ]]\n0.5\n[[ ## count ## ]]\n2"]
-
     class ConstrainedSignature(Signature):
         """Test signature with constrained fields."""
 
@@ -905,12 +893,14 @@ def test_field_constraints(adapter_type):
         count: int = OutputField(multiple_of=2, desc="Even number count")
 
     program = Predict(ConstrainedSignature)
-    lm = SpyLM("dummy_model")
     if adapter_type == "chat":
-        lm = SpyLM("dummy_model")
+        lm = SpyLM(
+            "dummy_model",
+            response_text="[[ ## score ## ]]\n0.5\n[[ ## count ## ]]\n2",
+        )
         settings.configure(adapter=ChatAdapter(), lm=lm)
     else:
-        lm = SpyLM("dummy_model", return_json=True)
+        lm = SpyLM("dummy_model", return_json=True, response_text="{'score':'0.5', 'count':'2'}")
         settings.configure(adapter=JSONAdapter(), lm=lm)
 
     # Call the predictor to trigger instruction generation
@@ -939,9 +929,10 @@ async def test_async_predict():
 
 def test_predicted_outputs_piped_from_predict_to_lm_call():
     program = Predict("question -> answer")
-    settings.configure(lm=LM("openai/gpt-4o-mini"))
+    settings.configure(lm=LM("openai/gpt-4o-mini", cache=False))
+    mock_response = ModelResponse(choices=[{"message": {"content": "[[ ## answer ## ]]\nParis"}}])
 
-    with patch("litellm.completion") as mock_completion:
+    with patch("litellm.completion", return_value=mock_response) as mock_completion:
         program(
             question="Why did a chicken cross the kitchen?",
             prediction={"type": "content", "content": "A chicken crossing the kitchen"},
@@ -955,7 +946,8 @@ def test_predicted_outputs_piped_from_predict_to_lm_call():
     # If the signature has prediction as an input field, and the prediction is not set as the standard predicted output
     # format, it should not be passed to the LM.
     program = Predict("question, prediction -> judgement")
-    with patch("litellm.completion") as mock_completion:
+    judgement_response = ModelResponse(choices=[{"message": {"content": "[[ ## judgement ## ]]\nFair"}}])
+    with patch("litellm.completion", return_value=judgement_response) as mock_completion:
         program(question="Why did a chicken cross the kitchen?", prediction="To get to the other side!")
 
     assert "prediction" not in mock_completion.call_args[1]
@@ -1040,21 +1032,12 @@ def test_per_module_history_disabled():
 
 
 def test_input_field_default_value():
-    class SpyLM(LM):
-        def __init__(self):
-            super().__init__("dummy")
-            self.calls = []
-
-        def __call__(self, prompt=None, messages=None, **kwargs: object):
-            self.calls.append({"messages": messages})
-            return ["[[ ## answer ## ]]\ntest"]
-
     class SignatureWithDefault(Signature):
         context: str = InputField(default="DEFAULT_CONTEXT")
         question: str = InputField()
         answer: str = OutputField()
 
-    lm = SpyLM()
+    lm = SpyLM("dummy_model", response_text="[[ ## answer ## ]]\ntest")
     settings.configure(lm=lm)
     predictor = Predict(SignatureWithDefault)
     predictor(question="test")

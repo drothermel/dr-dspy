@@ -7,6 +7,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import get_field_description_string
 from dspy.clients.base_lm import BaseLM
+from dspy.core.types import LMRequest, LMToolCallPart
 from dspy.signatures.field import InputField
 from dspy.signatures.signature import Signature, make_signature
 from dspy.utils.exceptions import AdapterParseError, LMError
@@ -120,22 +121,17 @@ class TwoStepAdapter(Adapter):
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
         messages = self.format(signature, demos, inputs)
-
-        outputs = await lm.acall(messages=messages, **lm_kwargs)
+        request = LMRequest.from_call(model=lm.model, messages=messages, **{**lm.kwargs, **lm_kwargs})
+        response = await lm.acall(request)
         extractor_signature = self._create_extractor_signature(signature)
 
         values = []
 
         tool_call_output_field_name = self._get_tool_call_output_field_name(signature)
-        for output in outputs:
-            output_logprobs = None
-            tool_calls = None
-            text = output
-
-            if isinstance(output, dict):
-                text = output["text"]
-                output_logprobs = output.get("logprobs")
-                tool_calls = output.get("tool_calls")
+        for output in response.outputs:
+            output_logprobs = output.logprobs
+            tool_calls = output.tool_calls
+            text = output.text
 
             try:
                 value = await ChatAdapter().acall(
@@ -143,7 +139,7 @@ class TwoStepAdapter(Adapter):
                     lm_kwargs={},
                     signature=extractor_signature,
                     demos=[],
-                    inputs={"text": text},
+                    inputs={"text": text or ""},
                 )
                 value = value[0]
 
@@ -158,14 +154,20 @@ class TwoStepAdapter(Adapter):
                 ) from e
 
             if tool_calls and tool_call_output_field_name:
-                tool_calls = [
-                    {
-                        "name": v["function"]["name"],
-                        "args": json_repair.loads(v["function"]["arguments"]),
-                    }
-                    for v in tool_calls
-                ]
-                value[tool_call_output_field_name] = ToolCalls.from_dict_list(tool_calls)
+                normalized_tool_calls = []
+                for tool_call in tool_calls:
+                    if isinstance(tool_call, LMToolCallPart):
+                        normalized_tool_calls.append(
+                            {"name": tool_call.name, "args": dict(tool_call.args), "id": tool_call.id}
+                        )
+                    else:
+                        normalized_tool_calls.append(
+                            {
+                                "name": tool_call["function"]["name"],
+                                "args": json_repair.loads(tool_call["function"]["arguments"]),
+                            }
+                        )
+                value[tool_call_output_field_name] = ToolCalls.from_dict_list(normalized_tool_calls)
 
             if output_logprobs is not None:
                 value["logprobs"] = output_logprobs

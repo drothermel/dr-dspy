@@ -23,7 +23,7 @@ import sys
 import types
 import typing
 from copy import deepcopy
-from typing import Any, Iterator, cast, overload
+from typing import Any, Iterator, cast, get_origin, overload
 
 from pydantic import BaseModel, Field, create_model
 from pydantic.fields import FieldInfo
@@ -199,11 +199,11 @@ class SignatureMeta(type(BaseModel)):
                     if doc != "":
                         cls.__doc__ = doc
 
+        SignatureMeta._validate_fields(cast("Any", cls))
+
         # If no instructions were provided, derive default instructions from the input/output fields.
         if cls.__doc__ is None:
             cls.__doc__ = _default_instructions(cls)
-
-        SignatureMeta._validate_fields(cast("Any", cls))
 
         for name, field in cast("Any", cls).model_fields.items():
             if "prefix" not in field.json_schema_extra:
@@ -595,6 +595,8 @@ def make_signature(
     """
     # Prepare the names dictionary for type resolution
     names = None
+    if custom_types is None and isinstance(signature, str):
+        custom_types = SignatureMeta._detect_custom_types_from_caller(signature)
     if custom_types:
         names = dict(typing.__dict__)
         names.update(custom_types)
@@ -618,7 +620,10 @@ def make_signature(
         # program of thought and teleprompters, so we just silently default to string.
         if type_ is None:
             type_ = str
-        if not isinstance(type_, (type, types.GenericAlias, typing._SpecialForm, types.UnionType)):
+        if not (
+            isinstance(type_, (type, types.GenericAlias, typing._SpecialForm, types.UnionType))
+            or get_origin(type_) is not None
+        ):
             raise ValueError(f"Field types must be types, but received: {type_} of type {type(type_)}.")
         if not isinstance(field, FieldInfo):
             raise ValueError(f"Field values must be Field instances, but received: {field}.")
@@ -626,7 +631,11 @@ def make_signature(
 
     # Default prompt when no instructions are provided
     if instructions is None:
-        sig = make_signature(signature, "")  # Simple way to parse input/output fields
+        sig = create_model(
+            f"{signature_name}ForInstructions",
+            __base__=Signature,
+            **cast("Any", fixed_fields),
+        )
         instructions = _default_instructions(sig)
 
     return create_model(

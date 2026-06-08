@@ -13,8 +13,18 @@ from dspy.__metadata__ import __version__
 from dspy.clients._litellm import get_litellm, is_litellm_context_window_error
 from dspy.clients.cache import request_cache
 from dspy.clients.openai import OpenAIProvider
+from dspy.clients.openai_format import (
+    completion_to_lm_response,
+    cost_from_response,
+    responses_to_lm_response,
+    to_openai_chat_request,
+    to_openai_responses_request,
+    to_openai_text_request,
+    usage_from_response,
+)
 from dspy.clients.provider import Provider, ReinforceJob, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat
+from dspy.core.types import LMRequest, LMResponse
 from dspy.dsp.utils.settings import settings
 from dspy.utils.callback import BaseCallback
 from dspy.utils.exceptions import (
@@ -62,8 +72,6 @@ class LM(BaseLM):
     """
     A language model supporting chat or text completion requests for use with DSPy modules.
     """
-
-    forward_contract = "legacy"
 
     def __init__(
         self,
@@ -212,34 +220,15 @@ class LM(BaseLM):
         exc_cls = _lm_error_class_from_litellm_exception(exc) or _lm_error_class_from_status(status)
         return exc_cls(message, **metadata)  # ty:ignore[invalid-argument-type]
 
-    def forward(self, prompt: str | None = None, messages: list[dict[str, Any]] | None = None, **kwargs):
-        """Call the configured LM synchronously.
-
-        LiteLLM/provider exceptions are wrapped in DSPy's structured LM error
-        hierarchy before they are re-raised.
-
-        Args:
-            prompt: Optional prompt text. Ignored when `messages` is provided.
-            messages: Optional chat messages to send to the LM.
-            **kwargs: Per-call LM parameters that override defaults from `LM(...)`.
-
-        Raises:
-            dspy.utils.exceptions.LMError: Base class for wrapped LM configuration, transport,
-                provider, and unsupported-feature failures. Notable subclasses
-                include `dspy.utils.exceptions.ContextWindowExceededError` for context-window
-                failures, which adapters use to avoid inappropriate fallback
-                retries when the prompt is too long.
-        """
-        kwargs = dict(kwargs)
-        cache = kwargs.pop("cache", self.cache)
-
-        messages = messages or [{"role": "user", "content": prompt}]
-        if self.use_developer_role and self.model_type == "responses":
-            messages = [{**m, "role": "developer"} if m.get("role") == "system" else m for m in messages]
-        kwargs = {**self.kwargs, **kwargs}
-        self._warn_zero_temp_rollout(kwargs.get("temperature"), kwargs.get("rollout_id"))
-        if kwargs.get("rollout_id") is None:
-            kwargs.pop("rollout_id", None)
+    def forward(self, request: LMRequest) -> LMResponse:
+        """Call the configured LM synchronously."""
+        rollout_id = request.config.cache.rollout_id if request.config.cache is not None else None
+        temperature = (
+            request.config.temperature if request.config.temperature is not None else self.kwargs.get("temperature")
+        )
+        self._warn_zero_temp_rollout(temperature, rollout_id)
+        provider_request = self._provider_request(request)
+        cache = self._cache_enabled(request)
 
         if self.model_type == "chat":
             completion = litellm_completion
@@ -247,11 +236,18 @@ class LM(BaseLM):
             completion = litellm_text_completion
         elif self.model_type == "responses":
             completion = litellm_responses_completion
+        else:
+            raise LMConfigurationError(
+                f"Unsupported model_type {self.model_type!r} for `dspy.clients.lm.LM`.",
+                model=self.model,
+                provider=self._provider_name,
+            )
+
         completion, litellm_cache_args = self._get_cached_completion_fn(completion, cache)
 
         try:
             results = completion(
-                request=dict(model=self.model, messages=messages, **kwargs),
+                request=provider_request,
                 num_retries=self.num_retries,
                 cache=litellm_cache_args,
             )
@@ -261,42 +257,17 @@ class LM(BaseLM):
             raise self._wrap_litellm_exception(e) from e
 
         self._check_truncation(results)
+        return self._response_from_provider(results, request)
 
-        return results
-
-    async def aforward(
-        self,
-        prompt: str | None = None,
-        messages: list[dict[str, Any]] | None = None,
-        **kwargs,
-    ):
-        """Call the configured LM asynchronously.
-
-        LiteLLM/provider exceptions are wrapped in DSPy's structured LM error
-        hierarchy before they are re-raised.
-
-        Args:
-            prompt: Optional prompt text. Ignored when `messages` is provided.
-            messages: Optional chat messages to send to the LM.
-            **kwargs: Per-call LM parameters that override defaults from `LM(...)`.
-
-        Raises:
-            dspy.utils.exceptions.LMError: Base class for wrapped LM configuration, transport,
-                provider, and unsupported-feature failures. Notable subclasses
-                include `dspy.utils.exceptions.ContextWindowExceededError` for context-window
-                failures, which adapters use to avoid inappropriate fallback
-                retries when the prompt is too long.
-        """
-        kwargs = dict(kwargs)
-        cache = kwargs.pop("cache", self.cache)
-
-        messages = messages or [{"role": "user", "content": prompt}]
-        if self.use_developer_role and self.model_type == "responses":
-            messages = [{**m, "role": "developer"} if m.get("role") == "system" else m for m in messages]
-        kwargs = {**self.kwargs, **kwargs}
-        self._warn_zero_temp_rollout(kwargs.get("temperature"), kwargs.get("rollout_id"))
-        if kwargs.get("rollout_id") is None:
-            kwargs.pop("rollout_id", None)
+    async def aforward(self, request: LMRequest) -> LMResponse:
+        """Call the configured LM asynchronously."""
+        rollout_id = request.config.cache.rollout_id if request.config.cache is not None else None
+        temperature = (
+            request.config.temperature if request.config.temperature is not None else self.kwargs.get("temperature")
+        )
+        self._warn_zero_temp_rollout(temperature, rollout_id)
+        provider_request = self._provider_request(request)
+        cache = self._cache_enabled(request)
 
         if self.model_type == "chat":
             completion = alitellm_completion
@@ -304,11 +275,18 @@ class LM(BaseLM):
             completion = alitellm_text_completion
         elif self.model_type == "responses":
             completion = alitellm_responses_completion
+        else:
+            raise LMConfigurationError(
+                f"Unsupported model_type {self.model_type!r} for `dspy.clients.lm.LM`.",
+                model=self.model,
+                provider=self._provider_name,
+            )
+
         completion, litellm_cache_args = self._get_cached_completion_fn(completion, cache)
 
         try:
             results = await completion(
-                request=dict(model=self.model, messages=messages, **kwargs),
+                request=provider_request,
                 num_retries=self.num_retries,
                 cache=litellm_cache_args,
             )
@@ -318,8 +296,63 @@ class LM(BaseLM):
             raise self._wrap_litellm_exception(e) from e
 
         self._check_truncation(results)
+        return self._response_from_provider(results, request)
 
-        return results
+    def _provider_request(self, request: LMRequest) -> dict[str, Any]:
+        if self.use_developer_role and self.model_type == "responses":
+            request = request.model_copy(
+                update={
+                    "messages": [
+                        message.model_copy(update={"role": "developer"}) if message.role == "system" else message
+                        for message in request.messages
+                    ]
+                }
+            )
+
+        if self.model_type == "chat":
+            provider_request = to_openai_chat_request(request)
+        elif self.model_type == "text":
+            provider_request = to_openai_text_request(request)
+        elif self.model_type == "responses":
+            provider_request = to_openai_responses_request(request)
+        else:
+            raise LMConfigurationError(
+                f"Unsupported model_type {self.model_type!r} for `dspy.clients.lm.LM`.",
+                model=self.model,
+                provider=self._provider_name,
+            )
+
+        if request.config.cache is not None and request.config.cache.rollout_id is not None:
+            provider_request["rollout_id"] = request.config.cache.rollout_id
+
+        lm_defaults = {key: value for key, value in self.kwargs.items() if value is not None}
+        return {**lm_defaults, **provider_request}
+
+    def _cache_enabled(self, request: LMRequest) -> bool:
+        if request.config.cache is None or request.config.cache.enabled is None:
+            return self.cache
+        return request.config.cache.enabled
+
+    def _response_from_provider(self, response: Any, request: LMRequest) -> LMResponse:
+        if self.model_type == "responses":
+            lm_response = responses_to_lm_response(response, request)
+        elif self.model_type in {"chat", "text"}:
+            lm_response = completion_to_lm_response(response, request)
+        else:
+            raise LMConfigurationError(
+                f"Unsupported model_type {self.model_type!r} for `dspy.clients.lm.LM`.",
+                model=self.model,
+                provider=self._provider_name,
+            )
+        return lm_response.model_copy(
+            update={
+                "model": getattr(response, "model", None) or lm_response.model,
+                "usage": usage_from_response(response),
+                "cost": cost_from_response(response),
+                "cache_hit": bool(getattr(response, "cache_hit", False)),
+                "provider_response": response,
+            }
+        )
 
     def launch(self, launch_kwargs: dict[str, Any] | None = None) -> None:
         self.provider.launch(self, launch_kwargs)
@@ -519,8 +552,7 @@ def litellm_text_completion(request: dict[str, Any], num_retries: int, cache: di
 
     api_key = request.pop("api_key", None) or os.getenv(f"{provider}_API_KEY")
     api_base = request.pop("api_base", None) or os.getenv(f"{provider}_API_BASE")
-
-    prompt = "\n\n".join([x["content"] for x in request.pop("messages")] + ["BEGIN RESPONSE:"])
+    prompt = request.pop("prompt")
 
     return _get_litellm().text_completion(
         cache=cache,
@@ -563,8 +595,7 @@ async def alitellm_text_completion(request: dict[str, Any], num_retries: int, ca
 
     api_key = request.pop("api_key", None) or os.getenv(f"{provider}_API_KEY")
     api_base = request.pop("api_base", None) or os.getenv(f"{provider}_API_BASE")
-
-    prompt = "\n\n".join([x["content"] for x in request.pop("messages")] + ["BEGIN RESPONSE:"])
+    prompt = request.pop("prompt")
 
     return await _get_litellm().atext_completion(
         cache=cache,

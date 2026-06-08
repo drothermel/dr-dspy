@@ -225,18 +225,29 @@ class Citations(Type):
         return None
 
     @classmethod
+    def parse_lm_output(cls, output: object) -> Type | None:
+        """Parse a typed LM output into Citations."""
+        citations = getattr(output, "citations", None)
+        if citations:
+            return cls.from_dict_list([cls._citation_part_to_dict(citation) for citation in citations])
+        return None
+
+    @staticmethod
+    def _citation_part_to_dict(citation: Any) -> dict[str, Any]:
+        data = dict(getattr(citation, "metadata", {}) or {})
+        if getattr(citation, "text", None) is not None:
+            data["cited_text"] = citation.text
+        if getattr(citation, "title", None) is not None:
+            data["document_title"] = citation.title
+        if getattr(citation, "url", None) is not None:
+            data["url"] = citation.url
+        return data
+
+    @classmethod
     def parse_lm_response(cls, response: str | dict[str, Any]) -> Type | None:
-        """Parse a LM response into Citations.
-
-        Args:
-            response: A LM response that may contain citation data.
-
-        Returns:
-            A Citations object if citation data is found, None otherwise.
-        """
+        """Parse a LM response into Citations."""
         if isinstance(response, dict) and "citations" in response:
             citations_data = response["citations"]
             if isinstance(citations_data, list):
                 return cls.from_dict_list(citations_data)
-
         return None

@@ -34,7 +34,7 @@ from dspy.primitives.example import Example
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature, make_signature
 from dspy.utils.exceptions import AdapterParseError
-from tests.adapters.conftest import format_messages_and_lm_kwargs
+from tests.adapters.conftest import default_model_response, format_messages_and_lm_kwargs, legacy_outputs_to_lm_response
 
 
 @pytest.mark.parametrize(
@@ -95,16 +95,9 @@ def test_chat_adapter_quotes_literals_as_expected(
         input_text: input_literal = InputField()
         output_text: output_literal = OutputField()
 
-    program = Predict(TestSignature)
-
-    settings.configure(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter())
-
-    with mock.patch("litellm.completion") as mock_completion:
-        program(input_text=input_value)
-
-    mock_completion.assert_called_once()
-    _, call_kwargs = mock_completion.call_args
-    content = call_kwargs["messages"][0]["content"]
+    adapter = ChatAdapter()
+    messages = adapter.format(TestSignature, [], {"input_text": input_value})
+    content = messages[0]["content"]
 
     assert expected_input_str in content
     assert expected_output_str in content
@@ -2216,20 +2209,18 @@ def test_chat_adapter_with_pydantic_models():
         question: str = InputField()
         output: Answer = OutputField()
 
-    settings.configure(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter())
-    program = Predict(TestSignature)
+    adapter = ChatAdapter()
+    messages = adapter.format(
+        TestSignature,
+        [],
+        {
+            "owner": PetOwner(name="John", num_pets=5, dogs=DogClass(dog_breeds=["labrador", "chihuahua"], num_dogs=2)),
+            "question": "How many non-dog pets does John have?",
+        },
+    )
 
-    with mock.patch("litellm.completion") as mock_completion:
-        program(
-            owner=PetOwner(name="John", num_pets=5, dogs=DogClass(dog_breeds=["labrador", "chihuahua"], num_dogs=2)),
-            question="How many non-dog pets does John have?",
-        )
-
-    mock_completion.assert_called_once()
-    _, call_kwargs = mock_completion.call_args
-
-    system_content = call_kwargs["messages"][0]["content"]
-    user_content = call_kwargs["messages"][1]["content"]
+    system_content = messages[0]["content"]
+    user_content = messages[1]["content"]
     assert "1. `owner` (PetOwner)" in system_content
     assert "2. `question` (str)" in system_content
     assert "1. `output` (Answer)" in system_content
@@ -2252,21 +2243,22 @@ def test_chat_adapter_signature_information():
         input2: int = InputField(desc="Integer Input")
         output: str = OutputField(desc="String Output")
 
-    settings.configure(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter())
     program = Predict(TestSignature)
 
-    with mock.patch("litellm.completion") as mock_completion:
-        program(input1="Test", input2=11)
+    with settings.context(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter()):
+        with mock.patch("litellm.completion") as mock_completion:
+            mock_completion.return_value = default_model_response("[[ ## output ## ]]\nok\n\n[[ ## completed ## ]]")
+            program(input1="Test", input2=11)
 
-    mock_completion.assert_called_once()
-    _, call_kwargs = mock_completion.call_args
+            mock_completion.assert_called_once()
+            _, call_kwargs = mock_completion.call_args
 
-    assert len(call_kwargs["messages"]) == 2
-    assert call_kwargs["messages"][0]["role"] == "system"
-    assert call_kwargs["messages"][1]["role"] == "user"
+            assert len(call_kwargs["messages"]) == 2
+            assert call_kwargs["messages"][0]["role"] == "system"
+            assert call_kwargs["messages"][1]["role"] == "user"
 
-    system_content = call_kwargs["messages"][0]["content"]
-    user_content = call_kwargs["messages"][1]["content"]
+            system_content = call_kwargs["messages"][0]["content"]
+            user_content = call_kwargs["messages"][1]["content"]
 
     assert "1. `input1` (str)" in system_content
     assert "2. `input2` (int)" in system_content
@@ -2942,7 +2934,7 @@ def test_tool_call_with_null_content_does_not_raise():
         }
     ]
 
-    result = adapter._call_postprocess(sig_cls, sig_cls, outputs, None, {})  # ty:ignore[invalid-argument-type]
+    result = adapter._call_postprocess(sig_cls, sig_cls, legacy_outputs_to_lm_response(outputs), None, {})
     assert result is not None
     assert len(result) == 1
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
@@ -2965,7 +2957,7 @@ def test_tool_call_with_unstructured_content_does_not_raise():
         }
     ]
 
-    result = adapter._call_postprocess(processed_sig, original_sig, outputs, None, {})  # ty:ignore[invalid-argument-type]
+    result = adapter._call_postprocess(processed_sig, original_sig, legacy_outputs_to_lm_response(outputs), None, {})
 
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
     assert result[0]["next_thought"] == Reasoning(content="I need a search result.")
@@ -2984,7 +2976,7 @@ def test_tool_call_with_structured_content_preserves_other_outputs():
         }
     ]
 
-    result = adapter._call_postprocess(processed_sig, original_sig, outputs, None, {})  # ty:ignore[invalid-argument-type]
+    result = adapter._call_postprocess(processed_sig, original_sig, legacy_outputs_to_lm_response(outputs), None, {})
 
     assert result[0]["answer"] == "I should use a tool."
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
@@ -3007,7 +2999,7 @@ def test_provider_tool_calls_preserve_id_and_repair_arguments():
         }
     ]
 
-    result = adapter._call_postprocess(sig_cls, sig_cls, outputs, None, {})  # ty:ignore[invalid-argument-type]
+    result = adapter._call_postprocess(sig_cls, sig_cls, legacy_outputs_to_lm_response(outputs), None, {})
 
     assert result[0]["tool_calls"] == ToolCalls(
         tool_calls=[ToolCalls.ToolCall(id="call_from_responses", name="search", args={"query": "cats"})]

@@ -6,6 +6,8 @@ from typing import Any, NoReturn
 
 from dspy.adapters.chat_adapter import FieldInfoWithName, field_header_pattern
 from dspy.clients.base_lm import BaseLM
+from dspy.clients.openai_format import provider_tool_call_to_part
+from dspy.core.types import LMOutput, LMRequest, LMResponse, LMTextPart, LMThinkingPart
 from dspy.dsp.utils.utils import dotdict
 from dspy.signatures.field import OutputField
 from dspy.utils.lazy_import import require
@@ -76,8 +78,6 @@ class DummyLM(BaseLM):
 
     """
 
-    forward_contract = "legacy"
-
     def __init__(
         self,
         answers: list[dict[str, Any]] | dict[str, dict[str, Any]],
@@ -103,17 +103,20 @@ class DummyLM(BaseLM):
         # find all field names
         fields = defaultdict(int)
         for message in messages:
-            if "content" in message and (ma := field_header_pattern.match(message["content"])):
-                fields[message["content"][ma.start() : ma.end()]] += 1
+            content = getattr(message, "text", None)
+            if content and (ma := field_header_pattern.match(content)):
+                fields[content[ma.start() : ma.end()]] += 1
         # find the fields which are missing from the final turns
         max_count = max(fields.values())
         output_fields = [field for field, count in fields.items() if count != max_count]
 
         # get the output from the last turn that has the output fields as headers
-        final_input = messages[-1]["content"].split("\n\n")[0]
+        final_input = (messages[-1].text or "").split("\n\n")[0]
         for input, output in zip(reversed(messages[:-1]), reversed(messages), strict=False):
-            if any(field in output["content"] for field in output_fields) and final_input in input["content"]:
-                return output["content"]
+            input_content = getattr(input, "text", "") or ""
+            output_content = getattr(output, "text", "") or ""
+            if any(field in output_content for field in output_fields) and final_input in input_content:
+                return output_content
         return None
 
     def _format_answer_fields(self, field_names_and_values: dict[str, Any]):
@@ -132,35 +135,59 @@ class DummyLM(BaseLM):
             # Fallback for adapters that don't support role parameter (like ChatAdapter)
             return adapter.format_field_with_value(fields_with_values)
 
-    def forward(self, prompt=None, messages=None, **kwargs):
-        messages = messages or [{"role": "user", "content": prompt}]
-        kwargs = {**self.kwargs, **kwargs}
+    def forward(self, request: LMRequest) -> LMResponse:
+        messages = request.messages
+        kwargs = {**self.kwargs, **request.config.model_dump(exclude_none=True)}
 
-        choices = []
+        outputs = []
         for _ in range(kwargs.get("n", 1)):
             if self.follow_examples:
                 current_output = self._use_example(messages)
             elif isinstance(self.answers, dict):
+                last_message = messages[-1]
+                last_content = getattr(last_message, "text", None)
+                if last_content is None and isinstance(last_message, dict):
+                    last_content = last_message.get("content")
                 current_output = next(
-                    (self._format_answer_fields(v) for k, v in self.answers.items() if k in messages[-1]["content"]),  # ty:ignore[invalid-argument-type, unsupported-operator]
+                    (self._format_answer_fields(v) for k, v in self.answers.items() if k in (last_content or "")),
                     "No more responses",
                 )
             else:
                 current_output = self._format_answer_fields(next(self.answers, {"answer": "No more responses"}))  # ty:ignore[invalid-argument-type]
 
-            message = dotdict(content=current_output, tool_calls=None)
-            if self.reasoning:
-                message.reasoning_content = "Some reasoning"
-            choices.append(dotdict(message=message, finish_reason="stop"))
+            outputs.append(self._to_output(current_output))
 
-        return dotdict(
-            choices=choices,
-            usage=dotdict(prompt_tokens=0, completion_tokens=0, total_tokens=0),
+        return LMResponse(
             model="dummy",
+            outputs=outputs,
+            usage=dotdict(prompt_tokens=0, completion_tokens=0, total_tokens=0),
         )
 
-    async def aforward(self, prompt=None, messages=None, **kwargs):
-        return self.forward(prompt=prompt, messages=messages, **kwargs)
+    async def aforward(self, request: LMRequest) -> LMResponse:
+        return self.forward(request)
+
+    def _to_output(self, current_output: Any) -> LMOutput:
+        if isinstance(current_output, dict):
+            parts = []
+            text = current_output.get("text")
+            if isinstance(text, str):
+                parts.append(LMTextPart(text=text))
+            if self.reasoning and not any(isinstance(part, LMThinkingPart) for part in parts):
+                parts.append(LMThinkingPart(text="Some reasoning"))
+            reasoning_content = current_output.get("reasoning_content")
+            if isinstance(reasoning_content, str):
+                parts.append(LMThinkingPart(text=reasoning_content))
+            for tool_call in current_output.get("tool_calls") or []:
+                parts.append(provider_tool_call_to_part(tool_call))
+            return LMOutput(parts=parts, provider_output=current_output)
+
+        if current_output is None:
+            return LMOutput(parts=[])
+
+        parts = [LMTextPart(text=str(current_output))]
+        if self.reasoning:
+            parts.append(LMThinkingPart(text="Some reasoning"))
+        return LMOutput(parts=parts, provider_output=current_output)
 
     def get_convo(self, index):
         """Get the prompt + answer from the ith message."""

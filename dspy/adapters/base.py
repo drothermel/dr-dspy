@@ -16,12 +16,7 @@ from dspy.adapters.types.history import History
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.utils import serialize_for_json
-from dspy.clients.openai_format import (
-    legacy_outputs_from_lm_response,
-    lm_response_from_legacy_outputs,
-    to_openai_chat_request,
-)
-from dspy.core.types import LMMessage, LMRequest, LMResponse
+from dspy.core.types import LMMessage, LMRequest, LMResponse, LMToolCallPart
 from dspy.signatures.field import InputField
 from dspy.signatures.signature import Signature, make_signature
 from dspy.utils.exceptions import AdapterParseError
@@ -146,37 +141,28 @@ class Adapter:
         self,
         processed_signature: type[Signature],
         original_signature: type[Signature],
-        outputs: list[dict[str, Any] | str | None],
+        response: LMResponse,
         _lm: BaseLM,
         lm_kwargs: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        # TODO(adapters-plan): This still parses legacy adapter output objects.
-        # PR1 normalizes the LM boundary, then immediately converts back to this
-        # shape to avoid changing parser semantics. A later PR should parse
-        # `LMResponse` directly and merge text-parsed fields with explicit
-        # native fields from `_AdapterPlan`.
         values = []
 
         tool_call_output_field_name = self._get_tool_call_output_field_name(original_signature)
 
-        for output in outputs:
-            output_logprobs = None
-            tool_calls = None
-            text: str | None = output if isinstance(output, str) else None
+        for output in response.outputs:
+            output_logprobs = output.logprobs
+            tool_calls = output.tool_calls
+            text = output.text
 
-            if isinstance(output, dict):
-                raw_text = output.get("text")
-                text = raw_text if isinstance(raw_text, str) else None
-                output_logprobs = output.get("logprobs")
-                tool_calls = output.get("tool_calls")
-
-            if text and not (tool_calls and tool_call_output_field_name):
+            if text is not None and not (tool_calls and tool_call_output_field_name):
                 value = self.parse(processed_signature, text)
             elif tool_calls and tool_call_output_field_name:
                 try:
                     value = self.parse(processed_signature, text) if text and processed_signature.output_fields else {}
                 except AdapterParseError:
                     value = {}
+            elif text is None and not processed_signature.output_fields:
+                value = {}
             else:
                 raise AdapterParseError(
                     adapter_name=type(self).__name__,
@@ -202,7 +188,7 @@ class Adapter:
                     and field.annotation in self.native_response_types
                     and issubclass(field.annotation, Type)
                 ):
-                    parsed_value = field.annotation.parse_lm_response(output)
+                    parsed_value = field.annotation.parse_lm_output(output)
                     if parsed_value is not None:
                         value[name] = parsed_value
 
@@ -226,51 +212,14 @@ class Adapter:
         planned message/part insertions before creating `LMRequest`.
         """
         coerced_messages = cast("list[dict[str, Any] | LMMessage]", self._coerce_lm_messages(messages))
-        return LMRequest.from_call(
-            model=lm.model,
-            messages=coerced_messages,
-            **lm_kwargs,
-        )
+        request_kwargs = {**getattr(lm, "kwargs", {}), **lm_kwargs}
+        return LMRequest.from_call(model=lm.model, messages=coerced_messages, **request_kwargs)
 
     def _call_lm(self, lm: BaseLM, request: LMRequest) -> LMResponse:
-        """Call current `BaseLM` through the normalized request/response boundary.
-
-        TODO(language-models): When `BaseLM` is replaced by/updated to the
-        normalized `BaseLM.forward(request: LMRequest) -> LMResponse` contract,
-        remove this compatibility shim and let adapters call the normalized LM
-        entry point directly. The OpenAI-shaped compatibility kwargs should live
-        only inside concrete LM backends.
-        """
-        data = self._legacy_call_kwargs(request)
-        outputs = lm(messages=data.pop("messages"), **data)
-        return self._normalize_legacy_outputs(outputs, request)
+        return lm(request)
 
     async def _acall_lm(self, lm: BaseLM, request: LMRequest) -> LMResponse:
-        """Async variant of `_call_lm`.
-
-        TODO(language-models): Same transitional boundary as `_call_lm()`; this
-        should eventually call a normalized async LM method directly.
-        """
-        data = self._legacy_call_kwargs(request)
-        outputs = await lm.acall(messages=data.pop("messages"), **data)
-        return self._normalize_legacy_outputs(outputs, request)
-
-    def _legacy_call_kwargs(self, request: LMRequest) -> dict[str, Any]:
-        # TODO(language-models): Current `BaseLM` expects OpenAI/LiteLLM-shaped
-        # chat kwargs. We intentionally use `dspy.clients.openai_format` here so
-        # the conversion code lives in the future LM/client layer, not in
-        # adapters. Remove this adapter helper once `BaseLM` accepts `LMRequest`.
-        data = to_openai_chat_request(request)
-        data.pop("model", None)
-        # TODO(language-models): `cache` and `rollout_id` are DSPy BaseLM
-        # execution controls, not provider request fields. The future
-        # normalized LM base should own them before provider-format conversion.
-        if request.config.cache is not None:
-            if request.config.cache.enabled is not None:
-                data["cache"] = request.config.cache.enabled
-            if request.config.cache.rollout_id is not None:
-                data["rollout_id"] = request.config.cache.rollout_id
-        return data
+        return await lm.acall(request)
 
     def _coerce_lm_messages(self, messages: Sequence[LMMessage | dict[str, Any]]) -> list[LMMessage]:
         """Normalize subclass `format()` output before the LM boundary.
@@ -311,15 +260,6 @@ class Adapter:
                 message["content"] = sanitized
             return LMMessage(**message)
 
-    def _normalize_legacy_outputs(self, outputs: list[dict[str, Any] | str | None], request: LMRequest) -> LMResponse:
-        """Convert current `BaseLM` outputs into a normalized `LMResponse`.
-
-        TODO(language-models): Current `BaseLM` returns `list[str | dict | None]`.
-        Future LMs should return `LMResponse` directly, making this method a
-        compatibility-only path for old/custom LMs.
-        """
-        return lm_response_from_legacy_outputs(outputs, request)
-
     def __call__(
         self,
         lm: BaseLM,
@@ -353,8 +293,7 @@ class Adapter:
         # convert back to legacy postprocess dictionaries here to keep this PR
         # behavior-preserving. Replace with direct `LMResponse` parsing once the
         # explicit adapter plan exists.
-        outputs = legacy_outputs_from_lm_response(response)
-        return self._call_postprocess(processed_signature, signature, outputs, lm, lm_kwargs)
+        return self._call_postprocess(processed_signature, signature, response, lm, lm_kwargs)
 
     async def acall(
         self,
@@ -370,8 +309,7 @@ class Adapter:
         response = await self._acall_lm(lm, request)
         # TODO(adapters-response): Keep in sync with `__call__()` until both use
         # direct `LMResponse` parsing.
-        outputs = legacy_outputs_from_lm_response(response)
-        return self._call_postprocess(processed_signature, signature, outputs, lm, lm_kwargs)
+        return self._call_postprocess(processed_signature, signature, response, lm, lm_kwargs)
 
     def format(
         self,
@@ -735,6 +673,14 @@ def _provider_value(value: object, key: str, default: object = None) -> object:
 
 
 def _provider_tool_call_to_tool_call_dict(tool_call: object) -> dict[str, Any]:
+    if isinstance(tool_call, LMToolCallPart):
+        args = dict(tool_call.args)
+        if not args:
+            raw_arguments = tool_call.provider_data.get("raw_arguments") or tool_call.provider_data.get("arguments")
+            if isinstance(raw_arguments, str):
+                args = json_repair.loads(raw_arguments)
+        return {"id": tool_call.id, "name": tool_call.name, "args": args}
+
     function = _provider_value(tool_call, "function", {}) or {}
     arguments = _provider_value(function, "arguments", {})
     if isinstance(arguments, str):

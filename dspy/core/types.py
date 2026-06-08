@@ -917,9 +917,6 @@ class LMResponse(BaseModel):
                 outputs.append(output.to_value())
         return outputs
 
-    def to_legacy_outputs(self) -> list[Any]:
-        return self.to_outputs()
-
     def usage_as_dict(self) -> dict[str, Any]:
         if self.usage is None:
             return {}
@@ -1383,15 +1380,17 @@ def User(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None =
         ```python
         from dspy.clients.lm import LM
         from dspy.core.types import Assistant, User
-        from dspy.dsp.utils.settings import settings
 
         lm = LM("openai/gpt-4o-mini")
-        with settings.context(experimental=True):
-            response = lm(
+        request = LMRequest.from_call(
+            model=lm.model,
+            items=(
                 User("What is DSPy?"),
                 Assistant("DSPy is a framework for programming LM pipelines."),
                 User("Say that in five words."),
-            )
+            ),
+        )
+        response = lm(request)
         ```
 
         Multi-turn call with media:
@@ -1402,21 +1401,27 @@ def User(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None =
         from dspy.dsp.utils.settings import settings
 
         lm = LM("openai/gpt-4o-mini")
-        with settings.context(experimental=True):
-            response = lm(
+        request = LMRequest.from_call(
+            model=lm.model,
+            messages=[
                 System("Answer in one sentence."),
                 User(
                     "Describe this image.",
                     LMImagePart(url="https://example.com/dog.png"),
                 ),
-            )
+            ],
+        )
+        response = lm(request)
         ```
 
-        For a single user turn, pass the parts directly to `lm(...)` instead:
+        For a single user turn, build the request explicitly:
 
         ```python
-        with settings.context(experimental=True):
-            response = lm("Describe this image.", LMImagePart(url="https://example.com/dog.png"))
+        request = LMRequest.from_call(
+            model=lm.model,
+            items=("Describe this image.", LMImagePart(url="https://example.com/dog.png")),
+        )
+        response = lm(request)
         ```
 
         Explicit `LMRequest` for custom LM authors and advanced users:
@@ -1640,6 +1645,9 @@ def _history_message_parts_as_openai_content(parts: list[LMPart]) -> str | list[
 
 
 def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
+    legacy_block = getattr(part, "metadata", {}).get("legacy_content_block")
+    if legacy_block is not None:
+        return dict(legacy_block)
     if isinstance(part, LMTextPart):
         return {"type": "text", "text": part.text}
     if isinstance(part, LMImagePart):
@@ -1689,19 +1697,9 @@ def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
             data["context"] = part.context
         return data
     if isinstance(part, LMBinaryPart):
-        return {
-            "type": "binary",
-            "binary": {
-                key: value
-                for key, value in {
-                    "data": _history_part_source(part),
-                    "file_id": part.file_id,
-                    "filename": part.filename,
-                    "media_type": part.media_type,
-                }.items()
-                if value is not None
-            },
-        }
+        from dspy.clients.openai_format import binary_to_openai
+
+        return binary_to_openai(part)
     return part.model_dump(exclude_none=True)
 
 

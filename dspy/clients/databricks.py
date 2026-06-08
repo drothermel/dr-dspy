@@ -183,7 +183,7 @@ class DatabricksProvider(Provider):
         train_kwargs["train_data_path"] = DatabricksProvider.upload_data(  # ty:ignore[invalid-assignment]
             train_data,
             train_kwargs["train_data_path"],
-            train_data_format,  # ty:ignore[invalid-argument-type, not-subscriptable]
+            train_data_format,  # ty:ignore[invalid-argument-type]
         )
 
         try:
@@ -235,7 +235,7 @@ class DatabricksProvider(Provider):
             train_data_format,
             databricks_host,
             databricks_token,
-            deploy_timeout,  # ty:ignore[invalid-argument-type]
+            deploy_timeout,
         )
         job.launch_completed = True
         # The finetuned model name should be in the format: "databricks/<endpoint_name>".

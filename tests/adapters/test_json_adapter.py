@@ -32,6 +32,23 @@ from dspy.utils.exceptions import LMUnexpectedError
 from tests.adapters.conftest import format_messages_and_lm_kwargs
 
 
+def _structured_output_model_response() -> ModelResponse:
+    return ModelResponse(
+        choices=[
+            Choices(
+                message=Message(
+                    content=(
+                        '{"output1":"x","output2":true,'
+                        '"output3":{"subfield1":1,"subfield2":1.0},'
+                        '"output4_unannotated":"y"}'
+                    )
+                )
+            )
+        ],
+        model="openai/gpt-4o",
+    )
+
+
 def test_json_adapter_format_exact_messages_for_simple_signature():
     class StringSignature(Signature):
         question: str = InputField()
@@ -843,6 +860,7 @@ def test_json_adapter_passes_structured_output_when_supported_by_model():
     # Configure DSPy to use an OpenAI LM that supports structured outputs
     settings.configure(lm=LM(model="openai/gpt-4o"), adapter=JSONAdapter())
     with mock.patch("litellm.completion") as mock_completion:
+        mock_completion.return_value = _structured_output_model_response()
         program(input1="Test input")
 
     def clean_schema_extra(field_name, field_info):
@@ -900,7 +918,8 @@ def test_json_adapter_with_structured_outputs_does_not_mutate_original_signature
 
     settings.configure(lm=LM(model="openai/gpt-4o"), adapter=JSONAdapter())
     program = Predict(TestSignature)
-    with mock.patch("litellm.completion"):
+    with mock.patch("litellm.completion") as mock_completion:
+        mock_completion.return_value = _structured_output_model_response()
         program(input1="Test input")
 
     assert program.signature.output_fields == TestSignature.output_fields
@@ -1225,6 +1244,16 @@ def test_json_adapter_with_tool():
     assert "{'country': {'type': 'string'}, 'year': {'type': 'integer'}}" in messages[1]["content"]
 
     with mock.patch("litellm.completion") as mock_completion:
+        mock_completion.return_value = ModelResponse(
+            choices=[
+                Choices(
+                    message=Message(
+                        content='{"answer":"sunny","tool_calls":{"tool_calls":[]}}',
+                    )
+                )
+            ],
+            model="openai/gpt-4o-mini",
+        )
         lm = LM(model="openai/gpt-4o-mini")
         adapter(lm, {}, MySignature, [], {"question": "What is the weather in Tokyo?", "tools": tools})
 

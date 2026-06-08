@@ -13,8 +13,7 @@ import os
 import pytest
 
 from dspy.clients.lm import LM
-from dspy.core.types import Assistant, LMResponse, System, ToolCall, ToolResult, User
-from dspy.dsp.utils.settings import settings
+from dspy.core.types import Assistant, LMRequest, LMResponse, System, ToolCall, ToolResult, User
 
 
 def _require_env(*keys: str) -> None:
@@ -29,6 +28,10 @@ def _text(response: LMResponse) -> str:
     return response.text.strip()
 
 
+def _request(lm: LM, *items: object, prompt: str | None = None, **kwargs: object) -> LMRequest:
+    return LMRequest.from_call(model=lm.model, items=items, prompt=prompt, **{**lm.kwargs, **kwargs})
+
+
 @pytest.mark.llm_call
 def test_live_openai_chat_direct_system_user_assistant_multiturn():
     _require_env("OPENAI_API_KEY")
@@ -40,13 +43,15 @@ def test_live_openai_chat_direct_system_user_assistant_multiturn():
         max_completion_tokens=64,
     )
 
-    with settings.context(experimental=True):
-        response = lm(
+    response = lm(
+        _request(
+            lm,
             System("Follow the user's requested exact final token. No punctuation."),
             User("Reply with exactly: alpha"),
             Assistant("alpha"),
             User("Now reply with exactly: beta"),
         )
+    )
 
     assert "beta" in _text(response).lower()
     assert response.output.finish_reason is not None
@@ -63,14 +68,16 @@ def test_live_openai_chat_direct_tool_call_transcript():
         max_tokens=64,
     )
 
-    with settings.context(experimental=True):
-        response = lm(
+    response = lm(
+        _request(
+            lm,
             System("Use the supplied tool result. Keep the answer short."),
             User("What is the weather in Paris?"),
             Assistant(ToolCall(id="call_1", name="get_weather", args={"city": "Paris"})),
             ToolResult('{"temperature": "22 C"}', call_id="call_1", name="get_weather"),
             User("Answer with the temperature string from the tool result."),
         )
+    )
 
     text = _text(response).lower()
     assert "22" in text
@@ -88,13 +95,15 @@ def test_live_openai_chat_direct_reuse_lm_response_as_assistant_turn():
         max_tokens=64,
     )
 
-    with settings.context(experimental=True):
-        first = lm(User("Reply with exactly: DSPy"))
-        follow_up = lm(
+    first = lm(_request(lm, User("Reply with exactly: DSPy")))
+    follow_up = lm(
+        _request(
+            lm,
             User("Reply with exactly: DSPy"),
             first,
             User("Repeat the previous assistant answer exactly."),
         )
+    )
 
     assert "dspy" in _text(first).lower()
     assert "dspy" in _text(follow_up).lower()
@@ -112,13 +121,15 @@ def test_live_openai_responses_direct_system_user_assistant_multiturn():
         max_tokens=16000,
     )
 
-    with settings.context(experimental=True):
-        response = lm(
+    response = lm(
+        _request(
+            lm,
             System("Follow the user's requested exact final token. No punctuation."),
             User("Reply with exactly: alpha"),
             Assistant("alpha"),
             User("Now reply with exactly: beta"),
         )
+    )
 
     assert "beta" in _text(response).lower()
 
@@ -135,14 +146,16 @@ def test_live_openai_responses_direct_tool_call_transcript():
         max_tokens=16000,
     )
 
-    with settings.context(experimental=True):
-        response = lm(
+    response = lm(
+        _request(
+            lm,
             System("Use the supplied tool result. Keep the answer short."),
             User("What is the weather in Paris?"),
             Assistant(ToolCall(id="call_1", name="get_weather", args={"city": "Paris"})),
             ToolResult('{"temperature": "22 C"}', call_id="call_1", name="get_weather"),
             User("Answer with the temperature string from the tool result."),
         )
+    )
 
     text = _text(response).lower()
     assert "22" in text
@@ -161,13 +174,15 @@ def test_live_openai_responses_direct_reuse_lm_response_as_assistant_turn():
         max_tokens=16000,
     )
 
-    with settings.context(experimental=True):
-        first = lm(User("Reply with exactly: DSPy"))
-        follow_up = lm(
+    first = lm(_request(lm, User("Reply with exactly: DSPy")))
+    follow_up = lm(
+        _request(
+            lm,
             User("Reply with exactly: DSPy"),
             first,
             User("Repeat the previous assistant answer exactly."),
         )
+    )
 
     assert "dspy" in _text(first).lower()
     assert "dspy" in _text(follow_up).lower()
@@ -184,13 +199,15 @@ def test_live_anthropic_chat_direct_system_user_assistant_multiturn():
         max_tokens=64,
     )
 
-    with settings.context(experimental=True):
-        response = lm(
+    response = lm(
+        _request(
+            lm,
             System("Follow the user's requested exact final token. No punctuation."),
             User("Reply with exactly: alpha"),
             Assistant("alpha"),
             User("Now reply with exactly: beta"),
         )
+    )
 
     assert "beta" in _text(response).lower()
 
@@ -206,14 +223,16 @@ def test_live_anthropic_chat_direct_tool_call_transcript():
         max_tokens=64,
     )
 
-    with settings.context(experimental=True):
-        response = lm(
+    response = lm(
+        _request(
+            lm,
             System("Use the supplied tool result. Keep the answer short."),
             User("What is the weather in Paris?"),
             Assistant(ToolCall(id="call_1", name="get_weather", args={"city": "Paris"})),
             ToolResult('{"temperature": "22 C"}', call_id="call_1", name="get_weather"),
             User("Answer with the temperature string from the tool result."),
         )
+    )
 
     text = _text(response).lower()
     assert "22" in text
@@ -231,13 +250,15 @@ def test_live_anthropic_chat_direct_reuse_lm_response_as_assistant_turn():
         max_tokens=64,
     )
 
-    with settings.context(experimental=True):
-        first = lm(User("Reply with exactly: DSPy"))
-        follow_up = lm(
+    first = lm(_request(lm, User("Reply with exactly: DSPy")))
+    follow_up = lm(
+        _request(
+            lm,
             User("Reply with exactly: DSPy"),
             first,
             User("Repeat the previous assistant answer exactly."),
         )
+    )
 
     assert "dspy" in _text(first).lower()
     assert "dspy" in _text(follow_up).lower()
@@ -254,13 +275,15 @@ def test_live_gemini_chat_direct_system_user_assistant_multiturn():
         max_tokens=64,
     )
 
-    with settings.context(experimental=True):
-        response = lm(
+    response = lm(
+        _request(
+            lm,
             System("Follow the user's requested exact final token. No punctuation."),
             User("Reply with exactly: alpha"),
             Assistant("alpha"),
             User("Now reply with exactly: beta"),
         )
+    )
 
     assert "beta" in _text(response).lower()
 
@@ -276,14 +299,16 @@ def test_live_gemini_chat_direct_tool_call_transcript():
         max_tokens=64,
     )
 
-    with settings.context(experimental=True):
-        response = lm(
+    response = lm(
+        _request(
+            lm,
             System("Use the supplied tool result. Keep the answer short."),
             User("What is the weather in Paris?"),
             Assistant(ToolCall(id="call_1", name="get_weather", args={"city": "Paris"})),
             ToolResult('{"temperature": "22 C"}', call_id="call_1", name="get_weather"),
             User("Answer with the temperature string from the tool result."),
         )
+    )
 
     text = _text(response).lower()
     assert "22" in text
@@ -301,13 +326,15 @@ def test_live_gemini_chat_direct_reuse_lm_response_as_assistant_turn():
         max_tokens=64,
     )
 
-    with settings.context(experimental=True):
-        first = lm(User("Reply with exactly: DSPy"))
-        follow_up = lm(
+    first = lm(_request(lm, User("Reply with exactly: DSPy")))
+    follow_up = lm(
+        _request(
+            lm,
             User("Reply with exactly: DSPy"),
             first,
             User("Repeat the previous assistant answer exactly."),
         )
+    )
 
     assert "dspy" in _text(first).lower()
     assert "dspy" in _text(follow_up).lower()

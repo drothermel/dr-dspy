@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from litellm import ModelResponseStream
 
     from dspy.clients.base_lm import BaseLM
+    from dspy.core.types import LMOutput
     from dspy.signatures.signature import Signature
 
 CUSTOM_TYPE_START_IDENTIFIER = "<<CUSTOM-TYPE-START-IDENTIFIER>>"
@@ -123,15 +124,27 @@ class Type(pydantic.BaseModel):
         return None
 
     @classmethod
+    def parse_lm_output(cls, output: LMOutput) -> Type | None:
+        """Parse one typed LM output into the custom type."""
+        text = output.text
+        if text is not None:
+            parsed = cls.parse_lm_response(text)
+            if parsed is not None:
+                return parsed
+
+        output_dict = output.to_output_dict()
+        if output_dict:
+            parsed = cls.parse_lm_response(output_dict)
+            if parsed is not None:
+                return parsed
+
+        provider_output = output.provider_output
+        if isinstance(provider_output, (str, dict)):
+            return cls.parse_lm_response(provider_output)
+        return None
+
+    @classmethod
     def parse_lm_response(cls, response: str | dict[str, Any]) -> Type | None:
-        """Parse a LM response into the custom type.
-
-        Args:
-            response: A LM response.
-
-        Returns:
-            A custom type object.
-        """
         _ = response
         return None
 
