@@ -1,11 +1,12 @@
 import importlib
 import random
 import re
-from typing import Protocol, cast
-
-from datasets import DatasetDict
+from typing import TYPE_CHECKING, Protocol, cast
 
 from dspy.primitives.example import Example
+
+if TYPE_CHECKING:
+    from datasets import DatasetDict
 
 
 class HasAnswer(Protocol):

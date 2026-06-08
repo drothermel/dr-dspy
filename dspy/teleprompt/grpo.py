@@ -293,10 +293,11 @@ class GRPO(FinetuneTeleprompter):
         logging.info("Preparing the teacher program(s)... We will ensure that the provided programs have the same program structure as the student program.")
         if (isinstance(teacher, list) and len(teacher) == 0) or teacher is None:
             teacher = student
-        if isinstance(teacher, list):
-            teachers = cast("list[Module]", teacher)
-        else:
-            teachers = [cast("Module", teacher)]
+        teachers = (
+            cast("list[Module]", teacher)
+            if isinstance(teacher, list)
+            else [cast("Module", teacher)]
+        )
         for t in teachers:
             assert_structural_equivalency(student, t)
             all_predictors_have_lms(t)

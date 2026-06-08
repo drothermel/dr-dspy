@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic.fields import FieldInfo
 
@@ -6,7 +6,9 @@ from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.signatures.field import OutputField
 from dspy.signatures.signature import Signature, ensure_signature
-from dspy.utils.callback import BaseCallback
+
+if TYPE_CHECKING:
+    from dspy.utils.callback import BaseCallback
 
 # NOTE: This restores the legacy rationale_field behavior after PR #8822.
 
