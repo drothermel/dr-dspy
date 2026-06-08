@@ -8,7 +8,7 @@ from dspy.utils.dummies import DummyLM
 try:
     from litellm.utils import Choices, Message, ModelResponse
 except ImportError:
-    Choices = Message = ModelResponse = None
+    Choices = Message = ModelResponse = None  # ty:ignore[invalid-assignment]
 
 
 def default_model_response(content: str = "", *, model: str = "openai/gpt-4o-mini"):
@@ -48,19 +48,18 @@ def captured_lm_kwargs(request: LMRequest) -> dict:
 
 def legacy_outputs_to_lm_response(outputs: list[dict]) -> LMResponse:
     from dspy.clients.openai_format import provider_tool_call_to_part
-    from dspy.core.types import LMOutput, LMTextPart, LMThinkingPart
+    from dspy.core.types import LMOutput, LMPart, LMTextPart, LMThinkingPart
 
     lm_outputs = []
     for output in outputs:
-        parts = []
+        parts: list[LMPart] = []
         text = output.get("text")
         if isinstance(text, str):
             parts.append(LMTextPart(text=text))
         reasoning = output.get("reasoning_content")
         if isinstance(reasoning, str):
             parts.append(LMThinkingPart(text=reasoning))
-        for tool_call in output.get("tool_calls") or []:
-            parts.append(provider_tool_call_to_part(tool_call))
+        parts.extend(provider_tool_call_to_part(tool_call) for tool_call in output.get("tool_calls") or [])
         lm_outputs.append(LMOutput(parts=parts, provider_output=output))
     return LMResponse(model="test", outputs=lm_outputs)
 

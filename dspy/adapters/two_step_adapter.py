@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import json_repair
 
@@ -7,7 +7,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import get_field_description_string
 from dspy.clients.base_lm import BaseLM
-from dspy.core.types import LMRequest, LMToolCallPart
+from dspy.core.types import LMMessage, LMRequest, LMToolCallPart
 from dspy.signatures.field import InputField
 from dspy.signatures.signature import Signature, make_signature
 from dspy.utils.exceptions import AdapterParseError, LMError
@@ -121,7 +121,11 @@ class TwoStepAdapter(Adapter):
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
         messages = self.format(signature, demos, inputs)
-        request = LMRequest.from_call(model=lm.model, messages=messages, **{**lm.kwargs, **lm_kwargs})
+        request = LMRequest.from_call(
+            model=lm.model,
+            messages=cast("list[dict[str, Any] | LMMessage]", messages),
+            **{**lm.kwargs, **lm_kwargs},
+        )
         response = await lm.acall(request)
         extractor_signature = self._create_extractor_signature(signature)
 

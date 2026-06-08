@@ -132,7 +132,7 @@ def test_adapter_parse_error_with_parsed_result():
         adapter_name=adapter_name,
         signature=signature,
         lm_response=lm_response,
-        parsed_result=parsed_result,  # ty:ignore[invalid-argument-type]
+        parsed_result=parsed_result,
     )
 
     error_message = str(error)

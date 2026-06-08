@@ -34,7 +34,7 @@ def litellm_test_server() -> tuple[str, str]:  # ty:ignore[invalid-return-type]
 
         litellm_cmd = shutil.which("litellm") or str(Path(sys.executable).with_name("litellm"))
         if not Path(litellm_cmd).exists():
-            pytest.skip("litellm CLI is not installed")
+            pytest.skip("litellm CLI is not installed")  # ty:ignore[too-many-positional-arguments]
 
         process = subprocess.Popen(
             [litellm_cmd, "--host", host, "--port", str(port), "--config", _get_litellm_config_path()],

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from dspy.clients.lm import LM
 from dspy.clients.openai_format import message_to_openai_chat
@@ -35,8 +37,10 @@ class SpyLM(LM):
         kwargs = {**self.kwargs, **request.config.model_dump(exclude_none=True)}
         self.calls.append({"prompt": request_prompt(request), "messages": messages, "kwargs": kwargs})
 
-        if self.response_text is not None:
-            text = self.response_text(request) if callable(self.response_text) else self.response_text
+        if isinstance(self.response_text, str):
+            text = self.response_text
+        elif self.response_text is not None:
+            text = self.response_text(request)
         elif self.return_json:
             text = "{'answer':'100%'}"
         else:

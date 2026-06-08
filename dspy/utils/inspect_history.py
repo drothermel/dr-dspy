@@ -3,7 +3,10 @@ from __future__ import annotations
 import json
 import sys
 from contextlib import suppress
-from typing import Any, TextIO
+from typing import TYPE_CHECKING, Any, TextIO
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 
 def _green(text: str, end: str = "\n", *, use_colors: bool = True) -> str:
@@ -24,7 +27,7 @@ def _blue(text: str, end: str = "\n", *, use_colors: bool = True) -> str:
     return str(text) + end
 
 
-def pretty_print_history(history: list[dict[str, Any]], n: int = 1, file: TextIO | None = None) -> None:
+def pretty_print_history(history: Sequence[Mapping[str, Any]], n: int = 1, file: TextIO | None = None) -> None:
     """Print the last n prompts and their completions.
 
     Args:

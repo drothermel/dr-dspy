@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 from dspy.adapters.chat_adapter import FieldInfoWithName, field_header_pattern
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import provider_tool_call_to_part
-from dspy.core.types import LMOutput, LMRequest, LMResponse, LMTextPart, LMThinkingPart
+from dspy.core.types import LMOutput, LMPart, LMRequest, LMResponse, LMTextPart, LMThinkingPart
 from dspy.dsp.utils.utils import dotdict
 from dspy.signatures.field import OutputField
 from dspy.utils.lazy_import import require
@@ -144,12 +144,14 @@ class DummyLM(BaseLM):
             if self.follow_examples:
                 current_output = self._use_example(messages)
             elif isinstance(self.answers, dict):
+                answers = cast("dict[str, dict[str, Any]]", self.answers)
                 last_message = messages[-1]
                 last_content = getattr(last_message, "text", None)
                 if last_content is None and isinstance(last_message, dict):
                     last_content = last_message.get("content")
+                last_content_str = last_content if isinstance(last_content, str) else ""
                 current_output = next(
-                    (self._format_answer_fields(v) for k, v in self.answers.items() if k in (last_content or "")),
+                    (self._format_answer_fields(v) for k, v in answers.items() if k in last_content_str),
                     "No more responses",
                 )
             else:
@@ -168,7 +170,7 @@ class DummyLM(BaseLM):
 
     def _to_output(self, current_output: Any) -> LMOutput:
         if isinstance(current_output, dict):
-            parts = []
+            parts: list[LMPart] = []
             text = current_output.get("text")
             if isinstance(text, str):
                 parts.append(LMTextPart(text=text))
@@ -177,14 +179,13 @@ class DummyLM(BaseLM):
             reasoning_content = current_output.get("reasoning_content")
             if isinstance(reasoning_content, str):
                 parts.append(LMThinkingPart(text=reasoning_content))
-            for tool_call in current_output.get("tool_calls") or []:
-                parts.append(provider_tool_call_to_part(tool_call))
+            parts.extend(provider_tool_call_to_part(tool_call) for tool_call in current_output.get("tool_calls") or [])
             return LMOutput(parts=parts, provider_output=current_output)
 
         if current_output is None:
             return LMOutput(parts=[])
 
-        parts = [LMTextPart(text=str(current_output))]
+        parts: list[LMPart] = [LMTextPart(text=str(current_output))]
         if self.reasoning:
             parts.append(LMThinkingPart(text="Some reasoning"))
         return LMOutput(parts=parts, provider_output=current_output)

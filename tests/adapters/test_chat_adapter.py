@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Literal
+from typing import Literal, cast
 from unittest import mock
 
 import pydantic
@@ -2245,33 +2245,35 @@ def test_chat_adapter_signature_information():
 
     program = Predict(TestSignature)
 
-    with settings.context(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter()):
-        with mock.patch("litellm.completion") as mock_completion:
-            mock_completion.return_value = default_model_response("[[ ## output ## ]]\nok\n\n[[ ## completed ## ]]")
-            program(input1="Test", input2=11)
+    with (
+        settings.context(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter()),
+        mock.patch("litellm.completion") as mock_completion,
+    ):
+        mock_completion.return_value = default_model_response("[[ ## output ## ]]\nok\n\n[[ ## completed ## ]]")
+        program(input1="Test", input2=11)
 
-            mock_completion.assert_called_once()
-            _, call_kwargs = mock_completion.call_args
+        mock_completion.assert_called_once()
+        _, call_kwargs = mock_completion.call_args
 
-            assert len(call_kwargs["messages"]) == 2
-            assert call_kwargs["messages"][0]["role"] == "system"
-            assert call_kwargs["messages"][1]["role"] == "user"
+        assert len(call_kwargs["messages"]) == 2
+        assert call_kwargs["messages"][0]["role"] == "system"
+        assert call_kwargs["messages"][1]["role"] == "user"
 
-            system_content = call_kwargs["messages"][0]["content"]
-            user_content = call_kwargs["messages"][1]["content"]
+        system_content = call_kwargs["messages"][0]["content"]
+        user_content = call_kwargs["messages"][1]["content"]
 
-    assert "1. `input1` (str)" in system_content
-    assert "2. `input2` (int)" in system_content
-    assert "1. `output` (str)" in system_content
-    assert "[[ ## input1 ## ]]\n{input1}" in system_content
-    assert "[[ ## input2 ## ]]\n{input2}" in system_content
-    assert "[[ ## output ## ]]\n{output}" in system_content
-    assert "[[ ## completed ## ]]" in system_content
+        assert "1. `input1` (str)" in system_content
+        assert "2. `input2` (int)" in system_content
+        assert "1. `output` (str)" in system_content
+        assert "[[ ## input1 ## ]]\n{input1}" in system_content
+        assert "[[ ## input2 ## ]]\n{input2}" in system_content
+        assert "[[ ## output ## ]]\n{output}" in system_content
+        assert "[[ ## completed ## ]]" in system_content
 
-    assert "[[ ## input1 ## ]]" in user_content
-    assert "[[ ## input2 ## ]]" in user_content
-    assert "[[ ## output ## ]]" in user_content
-    assert "[[ ## completed ## ]]" in user_content
+        assert "[[ ## input1 ## ]]" in user_content
+        assert "[[ ## input2 ## ]]" in user_content
+        assert "[[ ## output ## ]]" in user_content
+        assert "[[ ## completed ## ]]" in user_content
 
 
 def test_chat_adapter_exception_raised_on_failure():
@@ -2934,7 +2936,13 @@ def test_tool_call_with_null_content_does_not_raise():
         }
     ]
 
-    result = adapter._call_postprocess(sig_cls, sig_cls, legacy_outputs_to_lm_response(outputs), None, {})
+    result = adapter._call_postprocess(
+        cast("type[Signature]", sig_cls),
+        cast("type[Signature]", sig_cls),
+        legacy_outputs_to_lm_response(outputs),
+        DummyLM([{}]),
+        {},
+    )
     assert result is not None
     assert len(result) == 1
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
@@ -2957,7 +2965,13 @@ def test_tool_call_with_unstructured_content_does_not_raise():
         }
     ]
 
-    result = adapter._call_postprocess(processed_sig, original_sig, legacy_outputs_to_lm_response(outputs), None, {})
+    result = adapter._call_postprocess(
+        cast("type[Signature]", processed_sig),
+        cast("type[Signature]", original_sig),
+        legacy_outputs_to_lm_response(outputs),
+        DummyLM([{}]),
+        {},
+    )
 
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
     assert result[0]["next_thought"] == Reasoning(content="I need a search result.")
@@ -2976,7 +2990,13 @@ def test_tool_call_with_structured_content_preserves_other_outputs():
         }
     ]
 
-    result = adapter._call_postprocess(processed_sig, original_sig, legacy_outputs_to_lm_response(outputs), None, {})
+    result = adapter._call_postprocess(
+        cast("type[Signature]", processed_sig),
+        cast("type[Signature]", original_sig),
+        legacy_outputs_to_lm_response(outputs),
+        DummyLM([{}]),
+        {},
+    )
 
     assert result[0]["answer"] == "I should use a tool."
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
@@ -2999,7 +3019,13 @@ def test_provider_tool_calls_preserve_id_and_repair_arguments():
         }
     ]
 
-    result = adapter._call_postprocess(sig_cls, sig_cls, legacy_outputs_to_lm_response(outputs), None, {})
+    result = adapter._call_postprocess(
+        cast("type[Signature]", sig_cls),
+        cast("type[Signature]", sig_cls),
+        legacy_outputs_to_lm_response(outputs),
+        DummyLM([{}]),
+        {},
+    )
 
     assert result[0]["tool_calls"] == ToolCalls(
         tool_calls=[ToolCalls.ToolCall(id="call_from_responses", name="search", args={"query": "cats"})]

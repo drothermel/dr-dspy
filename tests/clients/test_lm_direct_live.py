@@ -9,6 +9,7 @@ workflow. Each test skips unless the required provider credential is available.
 """
 
 import os
+from typing import Any
 
 import pytest
 
@@ -28,7 +29,7 @@ def _text(response: LMResponse) -> str:
     return response.text.strip()
 
 
-def _request(lm: LM, *items: object, prompt: str | None = None, **kwargs: object) -> LMRequest:
+def _request(lm: LM, *items: object, prompt: str | None = None, **kwargs: Any) -> LMRequest:
     return LMRequest.from_call(model=lm.model, items=items, prompt=prompt, **{**lm.kwargs, **kwargs})
 
 

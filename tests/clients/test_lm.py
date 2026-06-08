@@ -3,6 +3,7 @@ import tempfile
 import time
 import warnings
 from pathlib import Path
+from typing import Any, cast
 from unittest import mock
 from unittest.mock import patch
 
@@ -22,7 +23,7 @@ from openai.types.responses.response_reasoning_item import Summary
 import dspy.clients as dspy_clients
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm import LM
-from dspy.core.types import Assistant, LMRequest, LMResponse, System, ToolCall, ToolResult, User
+from dspy.core.types import Assistant, LMHistoryEntry, LMRequest, LMResponse, System, ToolCall, ToolResult, User
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.utils.exceptions import (
@@ -460,7 +461,13 @@ def test_base_lm_init_uses_lm_defaults_and_isolates_callback_list():
     assert lm.callbacks is not callbacks
 
 
-def _request(lm: BaseLM, *items: object, prompt: str | None = None, messages=None, **kwargs: object) -> LMRequest:
+def _request(
+    lm: BaseLM,
+    *items: object,
+    prompt: str | None = None,
+    messages=None,
+    **kwargs: Any,
+) -> LMRequest:
     return LMRequest.from_call(model=lm.model, items=items, prompt=prompt, messages=messages, **{**lm.kwargs, **kwargs})
 
 
@@ -701,7 +708,7 @@ def test_base_lm_copy_is_shallow_runtime_copy_with_isolated_dspy_state():
     lm = CustomLM(model="custom-model", callbacks=[callback], temperature=0.1)  # ty:ignore[invalid-argument-type]
     lm.client = client  # ty:ignore[unresolved-attribute]
     lm.extra_state = {"mutable": []}  # ty:ignore[unresolved-attribute]
-    lm.history = [{"prompt": "original"}]
+    lm.history = cast("list[LMHistoryEntry]", [{"prompt": "original"}])
 
     copied_lm = lm.copy(temperature=0.2, rollout_id=1)
 
@@ -1049,8 +1056,6 @@ def test_responses_api_tool_calls(litellm_test_server):
         "status": "completed",
         "id": "call_1",
     }
-    expected_response = [{"tool_calls": [expected_tool_call]}]
-
     api_response = make_response(
         output_blocks=[expected_tool_call],
     )

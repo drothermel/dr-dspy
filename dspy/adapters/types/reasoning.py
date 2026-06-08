@@ -84,8 +84,9 @@ class Reasoning(Type):
     @classmethod
     def parse_lm_output(cls, output: object) -> Reasoning | None:
         """Parse the typed LM output into a Reasoning object."""
-        if getattr(output, "reasoning_content", None):
-            return Reasoning(content=output.reasoning_content)
+        reasoning_content = getattr(output, "reasoning_content", None)
+        if reasoning_content:
+            return Reasoning(content=reasoning_content)
         return None
 
     @classmethod

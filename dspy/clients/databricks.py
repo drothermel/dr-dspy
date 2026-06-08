@@ -168,6 +168,7 @@ class DatabricksProvider(Provider):
         train_data_format: TrainDataFormat | str | None = "chat",
         train_kwargs: dict[str, Any] | None = None,
     ) -> str:  # ty:ignore[invalid-method-override]
+        train_kwargs = train_kwargs or {}
         if isinstance(train_data_format, str):
             if train_data_format == "chat":
                 train_data_format = TrainDataFormat.CHAT
@@ -228,7 +229,7 @@ class DatabricksProvider(Provider):
             return None  # ty:ignore[invalid-return-type]
 
         job.launch_started = True
-        model_to_deploy = train_kwargs.get("register_to")  # ty:ignore[unresolved-attribute]
+        model_to_deploy = train_kwargs["register_to"]
         job.endpoint_name = model_to_deploy.replace(".", "_")  # ty:ignore[unresolved-attribute]
         DatabricksProvider.deploy_finetuned_model(
             model_to_deploy,

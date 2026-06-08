@@ -181,7 +181,9 @@ def test_react_v2_forced_submit_on_empty_tool_calls():
 
     assert pred.answer == "forced"
     assert pred.termination_reason == "forced_submit"
-    assert lm.history[0].request.config.reasoning.effort == "low"
+    reasoning = lm.history[0].request.config.reasoning
+    assert reasoning is not None
+    assert reasoning.effort == "low"
     assert lm.history[1].request.config.reasoning is None
     assert lm.history[1].request.config.tool_choice is None
 

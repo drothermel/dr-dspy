@@ -7,11 +7,12 @@ def test_experimental_decorator_on_function():
         """A test function."""
         return "test"
 
+    assert test_function.__doc__ is not None
     assert (
         "Experimental: This function may change or be removed in a future release without warning."
         in test_function.__doc__
     )
-    assert "A test function." in test_function.__doc__  # ty:ignore[unsupported-operator]
+    assert "A test function." in test_function.__doc__
     assert test_function() == "test"
 
 
@@ -50,6 +51,7 @@ def test_experimental_decorator_on_class_with_version():
     class TestClass:
         """A test class with version."""
 
+    assert TestClass.__doc__ is not None
     assert "introduced in v2.5.0" in TestClass.__doc__  # ty:ignore[unsupported-operator]
     assert (
         "Experimental: This class may change or be removed in a future release without warning (introduced in v2.5.0)."

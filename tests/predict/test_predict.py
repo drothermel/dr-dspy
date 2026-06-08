@@ -434,9 +434,9 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
             super().__init__({"choices": []})
 
     with patch("litellm.completion", return_value=FakeResp()) as completion_mock:
-        loaded_predict.lm.forward(  # ty:ignore[unresolved-attribute]
-            LMRequest.from_call(model=loaded_predict.lm.model, prompt="hello", cache=False)
-        )
+        lm = loaded_predict.lm
+        assert lm is not None
+        lm.forward(LMRequest.from_call(model=lm.model, prompt="hello", cache=False))
 
     assert completion_mock.call_count == 1
     assert completion_mock.call_args.kwargs.get(endpoint_override_key) != override_url
@@ -474,9 +474,9 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
     safe_loaded_predict.load(file_path)
     with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:  # noqa: SIM117
         with patch("litellm.completion", return_value=FakeResp()) as completion_mock:
-            safe_loaded_predict.lm.forward(  # ty:ignore[unresolved-attribute]
-                LMRequest.from_call(model=safe_loaded_predict.lm.model, prompt="hello", cache=False)
-            )
+            lm = safe_loaded_predict.lm
+            assert lm is not None
+            lm.forward(LMRequest.from_call(model=lm.model, prompt="hello", cache=False))
 
     assert completion_mock.called
     assert not batch_completion_mock.called
@@ -484,9 +484,9 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
     opt_in_loaded_predict = Predict("q->a")
     opt_in_loaded_predict.load(file_path, allow_unsafe_lm_state=True)
     with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:
-        opt_in_loaded_predict.lm.forward(  # ty:ignore[unresolved-attribute]
-            LMRequest.from_call(model=opt_in_loaded_predict.lm.model, prompt="hello", cache=False)
-        )
+        lm = opt_in_loaded_predict.lm
+        assert lm is not None
+        lm.forward(LMRequest.from_call(model=lm.model, prompt="hello", cache=False))
 
     opt_in_deployments = batch_completion_mock.call_args.kwargs["deployments"]
     assert opt_in_deployments[0]["api_base"] == override_url
@@ -521,9 +521,9 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     opt_in_loaded_predict = Predict("q->a")
     opt_in_loaded_predict.load(file_path, allow_unsafe_lm_state=True)
     with patch("litellm.text_completion", return_value=FakeResp()) as text_completion_mock:
-        opt_in_loaded_predict.lm.forward(  # ty:ignore[unresolved-attribute]
-            LMRequest.from_call(model=opt_in_loaded_predict.lm.model, prompt="hello", cache=False)
-        )
+        lm = opt_in_loaded_predict.lm
+        assert lm is not None
+        lm.forward(LMRequest.from_call(model=lm.model, prompt="hello", cache=False))
 
     assert text_completion_mock.call_args.kwargs["api_base"] == override_url
     assert text_completion_mock.call_args.kwargs["api_key"] == env_api_key
@@ -531,9 +531,9 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     safe_loaded_predict = Predict("q->a")
     safe_loaded_predict.load(file_path)
     with patch("litellm.text_completion", return_value=FakeResp()) as text_completion_mock:
-        safe_loaded_predict.lm.forward(  # ty:ignore[unresolved-attribute]
-            LMRequest.from_call(model=safe_loaded_predict.lm.model, prompt="hello", cache=False)
-        )
+        lm = safe_loaded_predict.lm
+        assert lm is not None
+        lm.forward(LMRequest.from_call(model=lm.model, prompt="hello", cache=False))
 
     # In the safe path, the key still comes from the environment, but the serialized endpoint override does not.
     assert text_completion_mock.call_args.kwargs["api_key"] == env_api_key

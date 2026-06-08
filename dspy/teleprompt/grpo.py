@@ -626,7 +626,9 @@ class GRPO(FinetuneTeleprompter):
             logger.info("Invoking GRPO training step...")
             for (lm_for_job, data_key), job in grpo_training_jobs.items():
                 train_data: list[GRPORolloutGroup] = (
-                    sum(train_batch_per_predictor, []) if data_key is None else train_batch_per_predictor[data_key]
+                    functools.reduce(operator.iadd, train_batch_per_predictor, [])
+                    if data_key is None
+                    else train_batch_per_predictor[data_key]
                 )
                 for group in train_data:
                     if len(group) != self.num_rollouts_per_grpo_step:
