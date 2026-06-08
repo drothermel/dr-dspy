@@ -376,7 +376,7 @@ Each module: delete `forward()`, implement `async def aforward()`, replace inter
 uv run pytest tests/predict/ -q
 ```
 
-- [x] **Commit Phase 4** (pending hash below)
+- [x] **Commit Phase 4** (`eae4fdcb`)
 
 ```bash
 git commit -m "$(cat <<'EOF'
