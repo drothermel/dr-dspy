@@ -711,7 +711,7 @@ uv run ruff check --fix && uv run ty check --fix && uv run ruff format
 uv run pytest tests/ -q --ignore=tests/reliability
 ```
 
-- [x] **Commit Phase 8** (`pending`)
+- [x] **Commit Phase 8** (`ac872bb2`)
 
 ```bash
 git commit -m "$(cat <<'EOF'
