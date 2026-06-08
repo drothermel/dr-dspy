@@ -55,7 +55,7 @@ class Predict(Module, Parameter):
                 from dspy.predict.predict import Predict
 
                 predict = Predict("q -> a", rollout_id=1, temperature=1.0)
-                predict(q="What is 1 + 52?", config={"rollout_id": 2, "temperature": 1.0})
+                result = await predict(q="What is 1 + 52?", config={"rollout_id": 2, "temperature": 1.0})
     """
 
     def __init__(self, signature: str | type[Signature], callbacks: list[BaseCallback] | None = None, **config) -> None:

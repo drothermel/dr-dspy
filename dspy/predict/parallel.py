@@ -8,6 +8,13 @@ from dspy.utils.async_parallel import BoundedRunStats, run_bounded
 
 
 class Parallel:
+    """Bounded async execution of (module, example) pairs.
+
+    Examples:
+        >>> parallel = Parallel(max_concurrency=4)  # doctest: +SKIP
+        >>> results = await parallel([(predict, example), ...])  # doctest: +SKIP
+    """
+
     def __init__(
         self,
         num_threads: int | None = None,

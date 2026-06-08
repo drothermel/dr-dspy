@@ -1,5 +1,37 @@
 # Changelog
 
+## [Unreleased]
+
+### Breaking changes
+
+- DSPy modules are async-only. Use `await program(...)` instead of `program(...)`.
+- Subclasses must implement `async def aforward(...)`, not `forward`.
+- `Evaluate`, `Parallel`, `Module.batch`, and teleprompter `compile` are async:
+  `await evaluate(program, devset=...)`, `await parallel(pairs)`, `await module.batch(examples)`,
+  `await teleprompter.compile(...)`.
+- Removed streaming (`streamify`, `StreamListener`) and sync bridges (`asyncify`, `syncify`).
+- Removed `ParallelExecutor` thread pools; batch execution uses `asyncio`-bounded concurrency.
+- `BaseLM` and `Adapter` are async-only: `await lm(request)`, `await adapter.acall(lm=..., ...)`.
+- `Module.acall` and `BaseLM.acall` remain as aliases for `__call__` (may be removed in a future release).
+
+### Migration
+
+```python
+# Before
+result = program(question="What is DSPy?")
+
+# After
+result = await program(question="What is DSPy?")
+
+# Scripts without an event loop
+import asyncio
+
+async def main():
+    result = await program(question="What is DSPy?")
+
+asyncio.run(main())
+```
+
 ## 3.3.0b1
 
 ### Breaking changes

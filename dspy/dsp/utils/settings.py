@@ -52,7 +52,7 @@ class Settings:
     - 'configure' can be called by only one 'owner' thread (the first thread that calls it).
     - Other threads see the configured global values from 'main_thread_config'.
     - 'context' sets thread-local overrides. These overrides propagate to threads spawned
-      inside that context block, when (and only when!) using a ParallelExecutor that copies overrides.
+      inside that context block when using async batch utilities (e.g. ``Parallel``) that copy overrides.
 
       1. Only one unique thread (which can be any thread!) can call settings.configure.
       2. It affects a global state, visible to all. As a result, user threads work, but they shouldn't be

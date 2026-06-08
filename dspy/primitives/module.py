@@ -107,7 +107,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
 
             return await self.aforward(*args, **kwargs)
 
-    acall = __call__
+    acall = __call__  # Compatibility alias; prefer ``await module(...)``.
 
     def named_predictors(self):
         """Return all named Predict modules in this module.
@@ -269,17 +269,21 @@ class Module(BaseModule, metaclass=ProgramMeta):
 
         Args:
             examples: List of Example instances to process.
-            num_threads: Number of threads to use for parallel processing.
+            num_threads: Deprecated alias for ``max_concurrency``.
+            max_concurrency: Maximum concurrent module executions.
             max_errors: Maximum number of errors allowed before stopping execution.
                 If ``None``, inherits from ``dspy.settings.max_errors``.
             return_failed_examples: Whether to return failed examples and exceptions.
             provide_traceback: Whether to include traceback information in error logs.
             disable_progress_bar: Whether to display the progress bar.
-            timeout: Seconds before a straggler task is resubmitted. Set to 0 to disable.
-            straggler_limit: Only check for stragglers when this many or fewer tasks remain.
+            timeout: Reserved for future straggler handling. Currently unused.
+            straggler_limit: Reserved for future straggler handling. Currently unused.
 
         Returns:
             List of results, and optionally failed examples and exceptions.
+
+        Examples:
+            >>> results = await module.batch(examples)  # doctest: +SKIP
         """
         exec_pairs = [(self, example.inputs()) for example in examples]
 

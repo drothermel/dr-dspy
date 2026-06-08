@@ -345,7 +345,7 @@ def test_merge_usage_entries_with_pydantic_models():
 
 
 def test_parallel_executor_with_usage_tracker():
-    """Test that usage tracking works correctly with ParallelExecutor and mocked LM calls."""
+    """Test that usage tracking works correctly with async Parallel and mocked LM calls."""
 
     parent_tracker = UsageTracker()
 

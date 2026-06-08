@@ -45,10 +45,17 @@ class EvaluationResult(Prediction):
 
 
 class Evaluate:
-    """DSPy Evaluate class.
+    """Evaluate DSPy programs against a devset with a metric.
 
-    This class is used to evaluate the performance of a DSPy program. Users need to provide a evaluation dataset and
-    a metric function in order to use this class. This class supports parallel evaluation on the provided dataset.
+    Runs program invocations concurrently (bounded by ``max_concurrency``) and
+    aggregates scores. Metric callables remain synchronous; only program
+    execution is async.
+
+    Examples:
+        >>> evaluator = Evaluate(devset=devset, metric=answer_exact_match)  # doctest: +SKIP
+        >>> result = await evaluator(program)  # doctest: +SKIP
+        >>> result.score
+        100.0
     """
 
     def __init__(

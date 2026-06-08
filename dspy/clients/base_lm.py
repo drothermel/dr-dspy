@@ -92,6 +92,7 @@ class BaseLM:
         return self._finalize_lm_response(request, response)
 
     async def acall(self, request: LMRequest) -> LMResponse:
+        """Compatibility alias for ``__call__``; prefer ``await lm(request)``."""
         return await self.__call__(request)
 
     @property

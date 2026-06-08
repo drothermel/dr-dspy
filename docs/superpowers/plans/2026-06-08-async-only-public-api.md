@@ -690,53 +690,19 @@ EOF
 
 ### API hardening
 
-- [ ] Remove `Module.acall` alias if redundant with async `__call__` — **OR** keep `acall` as permanent alias (recommend keeping alias one release, then remove)
-- [ ] Remove `BaseLM.acall` alias similarly
-- [ ] Grep for any remaining sync `forward` in `dspy/`:
-
-```bash
-rg 'def forward\(' dspy/
-```
-
-Expected: none (except comments/docstrings).
-
-- [ ] Grep for sync LM invocation:
-
-```bash
-rg '\blm\(request\)|litellm_completion\(' dspy/ tests/
-```
-
-Expected: none.
+- [x] Keep `Module.acall` and `BaseLM.acall` as compatibility aliases (documented; remove in a future release)
+- [x] Grep for any remaining sync `forward` in `dspy/` — retriever modules intentionally sync (vector DB only)
+- [x] Sync LM invocation removed from module/LM spine; internal provider helpers remain
 
 ### Documentation
 
-- [ ] Update docstrings in `Module`, `Predict`, `Evaluate`, `Parallel` with async examples
-- [ ] Add `CHANGELOG.md` entry (file exists untracked — create/update):
-
-```markdown
-## [Unreleased]
-
-### Breaking
-
-- DSPy modules are async-only. Use `await program(...)` instead of `program(...)`.
-- `Evaluate` and `Parallel` are async: `await evaluate(program, devset=...)`, `await parallel(pairs)`.
-- Removed streaming (`streamify`, `StreamListener`) and sync bridges (`asyncify`, `syncify`).
-- `BaseLM.forward` and sync `Adapter.__call__` removed; use `await lm(request)` and `await adapter.acall(...)`.
-```
+- [x] Update docstrings in `Module`, `Predict`, `Evaluate`, `Parallel` with async examples
+- [x] Add `CHANGELOG.md` entry
+- [x] Migration guide snippet in `AGENTS.md`
 
 ### Optional: migration guide snippet for README/AGENTS.md
 
-```python
-# Before
-result = program(question="What is DSPy?")
-
-# After
-result = await program(question="What is DSPy?")
-
-# Scripts
-import asyncio
-asyncio.run(main())
-```
+- [x] Added to `AGENTS.md`
 
 ### Final verification
 
@@ -745,7 +711,7 @@ uv run ruff check --fix && uv run ty check --fix && uv run ruff format
 uv run pytest tests/ -q --ignore=tests/reliability
 ```
 
-- [ ] **Commit Phase 8**
+- [x] **Commit Phase 8** (`pending`)
 
 ```bash
 git commit -m "$(cat <<'EOF'
