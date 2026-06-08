@@ -597,7 +597,7 @@ class GEPA(Teleprompter):
             adapter=adapter,
             # Reflection-based configuration
             reflection_lm=cast(
-                Any,
+                "Any",
                 (lambda x: adapter.stripped_lm_call(x)[0]) if self.reflection_lm is not None else None,
             ),
             candidate_selection_strategy=self.candidate_selection_strategy,
@@ -607,11 +607,11 @@ class GEPA(Teleprompter):
             perfect_score=self.perfect_score,
             # Merge-based configuration
             use_merge=self.use_merge,
-            max_merge_invocations=cast(Any, self.max_merge_invocations),
+            max_merge_invocations=cast("Any", self.max_merge_invocations),
             # Budget
             max_metric_calls=self.max_metric_calls,
             # Logging
-            logger=cast(Any, LoggerAdapter(logger)),
+            logger=cast("Any", LoggerAdapter(logger)),
             run_dir=self.log_dir,
             use_wandb=self.use_wandb,
             wandb_api_key=self.wandb_api_key,
@@ -621,11 +621,11 @@ class GEPA(Teleprompter):
             display_progress_bar=True,
             raise_on_exception=True,
             # Reproducibility
-            seed=cast(Any, self.seed),
+            seed=cast("Any", self.seed),
             **self.gepa_kwargs,
         )
 
-        new_prog = adapter.build_program(cast(dict[str, str], gepa_result.best_candidate))
+        new_prog = adapter.build_program(cast("dict[str, str]", gepa_result.best_candidate))
 
         if self.track_stats:
             dspy_gepa_result = DspyGEPAResult.from_gepa_result(gepa_result, adapter)

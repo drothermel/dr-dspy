@@ -268,7 +268,7 @@ class SingleComponentMultiModalProposer(Module):
             all_images.extend(example_images)
 
         multimodal_content: list[Any] = [formatted_text]
-        multimodal_content.extend(cast(list[Any], all_images))
+        multimodal_content.extend(cast("list[Any]", all_images))
         return multimodal_content
 
 
@@ -304,7 +304,7 @@ class MultiModalInstructionProposer(ProposalFn):
             if component_name in candidate and component_name in reflective_dataset:
                 current_instruction = candidate[component_name]
                 component_reflective_data = cast(
-                    list[ReflectiveExample], reflective_dataset[component_name]
+                    "list[ReflectiveExample]", reflective_dataset[component_name]
                 )
 
                 # Call the single-instruction proposer.

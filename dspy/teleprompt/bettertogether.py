@@ -310,7 +310,7 @@ class BetterTogether(Teleprompter):
         if not teacher:
             return student, None
         teacher = [teacher] if not isinstance(teacher, list) else teacher
-        teacher = [prepare_teacher(student, cast(Module | None, t)) for t in teacher]
+        teacher = [prepare_teacher(student, cast("Module | None", t)) for t in teacher]
 
         return student, teacher
 

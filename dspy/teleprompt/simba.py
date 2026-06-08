@@ -154,13 +154,13 @@ class SIMBA(Teleprompter):
             nonlocal next_program_idx
             next_program_idx += 1
             new_idx = next_program_idx
-            cast(Any, prog).simba_idx = new_idx
+            cast("Any", prog).simba_idx = new_idx
             programs.append(prog)
             program_scores[new_idx] = score_list
 
         # Initialize the baseline program: index=0
         student = student.deepcopy()
-        cast(Any, student).simba_idx = 0
+        cast("Any", student).simba_idx = 0
         programs.append(student)
         program_scores[0] = []
 

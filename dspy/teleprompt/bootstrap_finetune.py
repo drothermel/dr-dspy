@@ -64,7 +64,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
         trace_data = []
 
         teachers = teacher if isinstance(teacher, list) else [teacher]
-        teachers = [prepare_teacher(student, cast(Module | None, t)) for t in teachers]
+        teachers = [prepare_teacher(student, cast("Module | None", t)) for t in teachers]
         num_threads = self.num_threads or settings.num_threads
         for t in teachers:
             trace_data += bootstrap_trace_data(program=t, dataset=trainset, metric=self.metric, num_threads=num_threads)
@@ -201,7 +201,7 @@ def build_call_data_from_trace(
     demos = [] if exclude_demos else pred.demos
     if not hasattr(adapter, "format_finetune_data"):
         raise TypeError(f"Adapter {type(adapter).__name__} does not support format_finetune_data")
-    return cast(Any, adapter).format_finetune_data(
+    return cast("Any", adapter).format_finetune_data(
         signature=pred.signature,
         demos=demos,
         inputs=inputs,

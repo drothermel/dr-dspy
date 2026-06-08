@@ -127,7 +127,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 base_instruction = candidate[name]
                 dataset_with_feedback = reflective_dataset[name]
                 results[name] = InstructionProposalSignature.run(
-                    lm=cast(Any, lambda x: self.stripped_lm_call(x)[0]),
+                    lm=cast("Any", lambda x: self.stripped_lm_call(x)[0]),
                     input_dict={
                         "current_instruction_doc": base_instruction,
                         "dataset_with_feedback": dataset_with_feedback,
@@ -309,7 +309,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                             self.warn_on_score_mismatch = False
                         fb["score"] = module_score
 
-                items.append(cast(ReflectiveExample, d))
+                items.append(cast("ReflectiveExample", d))
 
             if len(items) == 0:
                 logger.warning(f"  No valid reflective examples found for {pred_name}")

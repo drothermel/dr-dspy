@@ -145,7 +145,7 @@ class StreamListener:
             return StreamResponse(
                 self.predict_name or "",
                 self.signature_field_name,
-                cast(str, parsed_chunk),
+                cast("str", parsed_chunk),
                 is_last_chunk=self.stream_end,
             )
 

@@ -294,9 +294,9 @@ class GRPO(FinetuneTeleprompter):
         if (isinstance(teacher, list) and len(teacher) == 0) or teacher is None:
             teacher = student
         if isinstance(teacher, list):
-            teachers = cast(list[Module], teacher)
+            teachers = cast("list[Module]", teacher)
         else:
-            teachers = [cast(Module, teacher)]
+            teachers = [cast("Module", teacher)]
         for t in teachers:
             assert_structural_equivalency(student, t)
             all_predictors_have_lms(t)
@@ -464,7 +464,7 @@ class GRPO(FinetuneTeleprompter):
 
                             if isinstance(trace_instance[2], FailedPrediction):
                                 score = trace_instance[2].format_reward or self.format_failure_score
-                                example_training_data[group_idx].append(cast(GRPOChatData, {
+                                example_training_data[group_idx].append(cast("GRPOChatData", {
                                     "messages": inp_messages,
                                     "completion": {
                                         "role": "assistant",
@@ -483,7 +483,7 @@ class GRPO(FinetuneTeleprompter):
 
                                 assert all_messages[:-1] == inp_messages, f"Input messages {inp_messages} do not match the expected messages {all_messages[:-1]}"
 
-                                example_training_data[group_idx].append(cast(GRPOChatData, {
+                                example_training_data[group_idx].append(cast("GRPOChatData", {
                                     "messages": inp_messages,
                                     "completion": {
                                         "role": all_messages[-1]["role"],
