@@ -5,12 +5,16 @@ import logging
 import types
 from typing import TYPE_CHECKING, Any, Callable
 
+from dspy.dsp.utils.settings import settings
+
 if TYPE_CHECKING:
     import pandas as pd
 
+    from dspy.primitives.example import Example
+    from dspy.primitives.module import Module
+
 import tqdm
 
-import dspy
 from dspy.primitives.prediction import Prediction
 from dspy.utils.callback import with_callbacks
 from dspy.utils.parallelizer import ParallelExecutor
@@ -54,7 +58,7 @@ class EvaluationResult(Prediction):
     - results: a list of (example, prediction, score) tuples for each example in devset
     """
 
-    def __init__(self, score: float, results: list[tuple["dspy.Example", "dspy.Example", Any]]):
+    def __init__(self, score: float, results: list[tuple["Example", "Example", Any]]):
         super().__init__(score=score, results=results)
 
     def __repr__(self):
@@ -71,7 +75,7 @@ class Evaluate:
     def __init__(
         self,
         *,
-        devset: list["dspy.Example"],
+        devset: list["Example"],
         metric: Callable | None = None,
         num_threads: int | None = None,
         display_progress: bool = False,
@@ -116,9 +120,9 @@ class Evaluate:
     @with_callbacks
     def __call__(
         self,
-        program: "dspy.Module",
+        program: "Module",
         metric: Callable | None = None,
-        devset: list["dspy.Example"] | None = None,
+        devset: list["Example"] | None = None,
         num_threads: int | None = None,
         display_progress: bool | None = None,
         display_table: bool | int | None = None,
@@ -162,7 +166,7 @@ class Evaluate:
         executor = ParallelExecutor(
             num_threads=num_threads,
             disable_progress_bar=not display_progress,
-            max_errors=(self.max_errors if self.max_errors is not None else dspy.settings.max_errors),
+            max_errors=(self.max_errors if self.max_errors is not None else settings.max_errors),
             provide_traceback=self.provide_traceback,
             compare_results=True,
         )
@@ -175,7 +179,7 @@ class Evaluate:
         results = executor.execute(process_item, devset)
         assert len(devset) == len(results)
 
-        results = [((dspy.Prediction(), self.failure_score) if r is None else r) for r in results]
+        results = [((Prediction(), self.failure_score) if r is None else r) for r in results]
         results = [(example, prediction, score) for example, (prediction, score) in zip(devset, results, strict=False)]
         ncorrect, ntotal = sum(score for *_, score in results), len(devset)
 
@@ -227,7 +231,7 @@ class Evaluate:
 
     @staticmethod
     def _prepare_results_output(
-            results: list[tuple["dspy.Example", "dspy.Example", Any]], metric_name: str
+        results: list[tuple["Example", "Example", Any]], metric_name: str
     ):
         return [
             (
@@ -239,7 +243,7 @@ class Evaluate:
         ]
 
     def _construct_result_table(
-        self, results: list[tuple["dspy.Example", "dspy.Example", Any]], metric_name: str
+        self, results: list[tuple["Example", "Example", Any]], metric_name: str
     ) -> "pd.DataFrame":
         """
         Construct a pandas DataFrame from the specified result list.

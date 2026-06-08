@@ -2,11 +2,14 @@ import inspect
 import logging
 from typing import Callable
 
-import dspy
 from dspy.adapters.types.tool import Tool
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.predict.predict import Predict
 from dspy.predict.program_of_thought import ProgramOfThought
 from dspy.predict.react import ReAct
+from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
+from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature, ensure_signature
 
 logger = logging.getLogger(__name__)
@@ -51,20 +54,20 @@ class CodeAct(ReAct, ProgramOfThought):
         instructions = self._build_instructions(self.signature, tools)
 
         codeact_signature = (
-            dspy.Signature({**self.signature.input_fields}, "\n".join(instructions))
-            .append("trajectory", dspy.InputField(), type_=str)
-            .append("generated_code", dspy.OutputField(desc="Python code that when executed, produces output relevant to answering the question"), type_=str)
-            .append("finished", dspy.OutputField(desc="a boolean flag to determine if the process is done"), type_=bool)
+            Signature({**self.signature.input_fields}, "\n".join(instructions))
+            .append("trajectory", InputField(), type_=str)
+            .append("generated_code", OutputField(desc="Python code that when executed, produces output relevant to answering the question"), type_=str)
+            .append("finished", OutputField(desc="a boolean flag to determine if the process is done"), type_=bool)
         )
 
-        extract_signature = dspy.Signature(
+        extract_signature = Signature(
             {**self.signature.input_fields, **self.signature.output_fields},
             self.signature.instructions,
-        ).append("trajectory", dspy.InputField(), type_=str)
+        ).append("trajectory", InputField(), type_=str)
 
         self.tools: dict[str, Tool] = tools
-        self.codeact = dspy.Predict(codeact_signature)
-        self.extractor = dspy.ChainOfThought(extract_signature)
+        self.codeact = Predict(codeact_signature)
+        self.extractor = ChainOfThought(extract_signature)
         # It will raises exception when dspy cannot find available deno instance by now.
         self.interpreter = interpreter or PythonInterpreter()
 
@@ -116,4 +119,4 @@ class CodeAct(ReAct, ProgramOfThought):
 
         extract = self._call_with_potential_trajectory_truncation(self.extractor, trajectory, **kwargs)
         self.interpreter.shutdown()
-        return dspy.Prediction(trajectory=trajectory, **extract)
+        return Prediction(trajectory=trajectory, **extract)

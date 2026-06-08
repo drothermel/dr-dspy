@@ -10,12 +10,13 @@ import anyio.from_thread
 import pydantic
 from anyio.streams.memory import MemoryObjectSendStream
 
-import dspy
+from dspy.__metadata__ import __version__
 from dspy.clients._litellm import get_litellm, is_litellm_context_window_error
 from dspy.clients.cache import request_cache
 from dspy.clients.openai import OpenAIProvider
 from dspy.clients.provider import Provider, ReinforceJob, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat
+from dspy.dsp.utils.settings import settings
 from dspy.utils.callback import BaseCallback
 from dspy.utils.exceptions import (
     ContextWindowExceededError,
@@ -333,7 +334,6 @@ class LM(BaseLM):
         train_data_format: TrainDataFormat | None,
         train_kwargs: dict[str, Any] | None = None,
     ) -> TrainingJob:
-        from dspy import settings as settings
 
         if not self.provider.finetunable:
             raise LMUnsupportedFeatureError(
@@ -364,7 +364,6 @@ class LM(BaseLM):
 
     def reinforce(self, train_kwargs) -> ReinforceJob:
         # TODO(GRPO Team): Should we return an initialized job here?
-        from dspy import settings as settings
 
         if not self.provider.reinforceable:
             raise LMUnsupportedFeatureError(
@@ -450,8 +449,8 @@ def _get_stream_completion_fn(
     sync=True,
     headers: dict[str, Any] | None = None,
 ):
-    stream = dspy.settings.send_stream
-    caller_predict = dspy.settings.caller_predict
+    stream = settings.send_stream
+    caller_predict = settings.caller_predict
 
     if stream is None:
         return None
@@ -460,7 +459,7 @@ def _get_stream_completion_fn(
     stream = cast(MemoryObjectSendStream, stream)
     caller_predict_id = id(caller_predict) if caller_predict else None
 
-    if dspy.settings.track_usage:
+    if settings.track_usage:
         request["stream_options"] = {"include_usage": True}
 
     async def stream_completion(request: dict[str, Any], cache_kwargs: dict[str, Any]):
@@ -700,7 +699,7 @@ def _convert_content_item_to_responses_format(item: dict[str, Any]) -> dict[str,
 def _add_dspy_identifier_to_headers(headers: dict[str, Any] | None = None):
     headers = headers or {}
     return {
-        "User-Agent": f"DSPy/{dspy.__version__}",
+        "User-Agent": f"DSPy/{__version__}",
         **headers,
     }
 

@@ -5,19 +5,22 @@ Test organization:
 - Unit tests (no Deno required): MockInterpreter, RLM formatting, signatures
 - Integration tests (@pytest.mark.deno): PythonInterpreter with Deno
 """
-
 import base64
 from contextlib import contextmanager
 
 import pytest
 
 from dspy.adapters.types.tool import Tool
+from dspy.clients.lm import LM
+from dspy.dsp.utils.settings import settings
 from dspy.predict.rlm import RLM, _strip_code_fences
 from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
 from dspy.primitives.sandbox_serializable import SandboxSerializable
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
 from tests.mock_interpreter import MockInterpreter
 
 # ============================================================================
@@ -54,11 +57,10 @@ def make_mock_predictor(responses: list[dict], async_mode: bool = False):
 @contextmanager
 def dummy_lm_context(responses: list[dict]):
     """Context manager for DummyLM setup."""
-    import dspy
     from dspy.utils.dummies import DummyLM
 
     lm = DummyLM(responses)
-    with dspy.context(lm=lm):
+    with settings.context(lm=lm):
         yield lm
 
 
@@ -186,7 +188,6 @@ class TestRLMInitialization:
 
     def test_optional_parameters(self):
         """Test RLM optional parameters and their defaults."""
-        import dspy
 
         # Test defaults
         rlm = RLM("context -> answer")
@@ -196,7 +197,7 @@ class TestRLMInitialization:
 
         # Test custom values
         mock = MockInterpreter()
-        mock_lm = dspy.LM("openai/gpt-4o-mini")
+        mock_lm = LM("openai/gpt-4o-mini")
         rlm = RLM("context -> answer", max_llm_calls=100, sub_lm=mock_lm, interpreter=mock)
         assert rlm.max_llm_calls == 100
         assert rlm.sub_lm is mock_lm
@@ -460,10 +461,9 @@ class TestREPLTypes:
 
     def test_repl_variable_with_field_info(self):
         """Test REPLVariable includes desc and constraints from field_info."""
-        import dspy
 
         # Create a field with description and constraints
-        field = dspy.InputField(desc="The user's question", ge=0, le=100)
+        field = InputField(desc="The user's question", ge=0, le=100)
 
         var = REPLVariable.from_value("query", "What is 2+2?", field_info=field)
         assert var.desc == "The user's question"
@@ -487,13 +487,12 @@ class TestREPLTypes:
 
     def test_build_variables_includes_field_metadata(self):
         """Test _build_variables passes field_info to REPLVariable."""
-        import dspy
 
-        class QASig(dspy.Signature):
+        class QASig(Signature):
             """Answer questions."""
-            context: str = dspy.InputField(desc="Background information")
-            question: str = dspy.InputField(desc="The question to answer")
-            answer: str = dspy.OutputField()
+            context: str = InputField(desc="Background information")
+            question: str = InputField(desc="The question to answer")
+            answer: str = OutputField()
 
         rlm = RLM(QASig, max_iterations=3)
         variables = rlm._build_variables(context="Some text", question="What?")
@@ -1169,8 +1168,7 @@ class TestRLMIntegration:
 
     def test_simple_computation(self):
         """Test RLM on simple computation."""
-        import dspy
-        dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
+        settings.configure(lm=LM("openai/gpt-4o-mini"))
 
         rlm = RLM("context, query -> answer", max_iterations=5)
         result = rlm(
@@ -1181,8 +1179,7 @@ class TestRLMIntegration:
 
     def test_with_llm_query(self):
         """Test RLM using the llm_query tool."""
-        import dspy
-        dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
+        settings.configure(lm=LM("openai/gpt-4o-mini"))
 
         rlm = RLM("context, query -> answer", max_iterations=5)
         result = rlm(

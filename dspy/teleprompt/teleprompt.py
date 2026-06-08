@@ -1,6 +1,7 @@
 from typing import Any
 
-from dspy.primitives import Example, Module
+from dspy.primitives.example import Example
+from dspy.primitives.module import Module
 
 
 class Teleprompter:

@@ -7,7 +7,7 @@ import pytest
 from cachetools import LRUCache
 from diskcache import FanoutCache
 
-import dspy
+import dspy.clients as dspy_clients
 from dspy.clients.cache import Cache
 
 
@@ -239,8 +239,8 @@ def test_request_cache_decorator(cache):
     """Test the lm_cache decorator."""
     from dspy.clients.cache import request_cache
 
-    # Mock the dspy.cache attribute
-    with patch("dspy.cache", cache):
+    # Mock the package-owned cache singleton.
+    with patch("dspy.clients.DSPY_CACHE", cache):
         # Define a test function
         @request_cache()
         def test_function(prompt, model):
@@ -266,8 +266,8 @@ def test_request_cache_decorator_with_ignored_args_for_cache_key(cache):
     """Test the request_cache decorator with ignored_args_for_cache_key."""
     from dspy.clients.cache import request_cache
 
-    # Mock the dspy.cache attribute
-    with patch("dspy.cache", cache):
+    # Mock the package-owned cache singleton.
+    with patch("dspy.clients.DSPY_CACHE", cache):
         # Define a test function
         @request_cache(ignored_args_for_cache_key=["model"])
         def test_function1(prompt, model):
@@ -296,8 +296,8 @@ async def test_request_cache_decorator_async(cache):
     """Test the request_cache decorator with async functions."""
     from dspy.clients.cache import request_cache
 
-    # Mock the dspy.cache attribute
-    with patch("dspy.cache", cache):
+    # Mock the package-owned cache singleton.
+    with patch("dspy.clients.DSPY_CACHE", cache):
         # Define a test function
         @request_cache()
         async def test_function(prompt, model):
@@ -323,8 +323,8 @@ def test_cache_consistency_with_lm_call_modifies_the_request(cache):
     """Test that the cache is consistent with the LM call that modifies the request."""
     from dspy.clients.cache import request_cache
 
-    # Mock the dspy.cache attribute
-    with patch("dspy.cache", cache):
+    # Mock the package-owned cache singleton.
+    with patch("dspy.clients.DSPY_CACHE", cache):
         # Define a test function
         @request_cache()
         def test_function(**kwargs):
@@ -363,15 +363,14 @@ def test_cache_fallback_on_restricted_environment():
         # Set an invalid cache directory that can't be created
         os.environ["DSPY_CACHEDIR"] = "/dev/null/invalid_path"
 
-        import dspy
         from dspy.clients import _get_dspy_cache
 
-        dspy.cache = _get_dspy_cache()
+        dspy_clients.DSPY_CACHE = _get_dspy_cache()
 
         # Cache should work with memory-only fallback despite invalid disk path
         test_request = {"model": "test", "prompt": "hello"}
-        dspy.cache.put(test_request, "fallback_result")
-        result = dspy.cache.get(test_request)
+        dspy_clients.DSPY_CACHE.put(test_request, "fallback_result")
+        result = dspy_clients.DSPY_CACHE.get(test_request)
 
         assert result == "fallback_result", "Memory cache fallback should work"
 
@@ -436,9 +435,9 @@ def test_registered_dataclass_roundtrip_in_restricted_mode(tmp_path):
 
 
 def test_configure_cache_registers_safe_types(tmp_path):
-    original_cache = dspy.cache
+    original_cache = dspy_clients.DSPY_CACHE
     try:
-        dspy.configure_cache(
+        dspy_clients.configure_cache(
             enable_disk_cache=True,
             enable_memory_cache=False,
             disk_cache_dir=str(tmp_path / "configured"),
@@ -448,13 +447,13 @@ def test_configure_cache_registers_safe_types(tmp_path):
         request = {"model": "test", "prompt": "configured_safe_type"}
         response = CacheValidationDataclass(name="configured", value=7)
 
-        dspy.cache.put(request, response)
-        result = dspy.cache.get(request)
+        dspy_clients.DSPY_CACHE.put(request, response)
+        result = dspy_clients.DSPY_CACHE.get(request)
 
         assert isinstance(result, CacheValidationDataclass)
         assert result == response
     finally:
-        dspy.cache = original_cache
+        dspy_clients.DSPY_CACHE = original_cache
 
 
 def test_corrupt_disk_entries_return_none(tmp_path):

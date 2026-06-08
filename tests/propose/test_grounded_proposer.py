@@ -1,7 +1,7 @@
 import pytest
 
-import dspy
-from dspy.predict import Predict
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
 from dspy.propose.grounded_proposer import GroundedProposer
 from dspy.utils.dummies import DummyLM
 
@@ -10,7 +10,7 @@ from dspy.utils.dummies import DummyLM
     "demo_candidates",
     [
         None,
-        [[[dspy.Example(question="What is the capital of France?", answer="Paris")]]],
+        [[[Example(question="What is the capital of France?", answer="Paris")]]],
     ],
 )
 def test_propose_instructions_for_program(demo_candidates):
@@ -33,7 +33,7 @@ def test_propose_instructions_for_program(demo_candidates):
     "demo_candidates",
     [
         None,
-        [[[dspy.Example(question="What is the capital of France?", answer="Paris")]]],
+        [[[Example(question="What is the capital of France?", answer="Paris")]]],
     ],
 )
 def test_propose_instruction_for_predictor(demo_candidates):

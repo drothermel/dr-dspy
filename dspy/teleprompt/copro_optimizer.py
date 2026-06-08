@@ -2,9 +2,11 @@ import logging
 import statistics
 from collections import defaultdict
 
-import dspy
+from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
-from dspy.signatures import Signature
+from dspy.predict.predict import Predict
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
 from dspy.teleprompt.teleprompt import Teleprompter
 
 logger = logging.getLogger(__name__)
@@ -38,21 +40,21 @@ Note that this teleprompter takes in the following parameters:
 class BasicGenerateInstruction(Signature):
     """You are an instruction optimizer for large language models. I will give you a ``signature`` of fields (inputs and outputs) in English. Your task is to propose an instruction that will lead a good language model to perform the task well. Don't be afraid to be creative."""
 
-    basic_instruction = dspy.InputField(desc="The initial instructions before optimization")
-    proposed_instruction = dspy.OutputField(desc="The improved instructions for the language model")
-    proposed_prefix_for_output_field = dspy.OutputField(
+    basic_instruction = InputField(desc="The initial instructions before optimization")
+    proposed_instruction = OutputField(desc="The improved instructions for the language model")
+    proposed_prefix_for_output_field = OutputField(
         desc="The string at the end of the prompt, which will help the model start solving the task",
     )
 
 
-class GenerateInstructionGivenAttempts(dspy.Signature):
+class GenerateInstructionGivenAttempts(Signature):
     """You are an instruction optimizer for large language models. I will give some task instructions I've tried, along with their corresponding validation scores. The instructions are arranged in increasing order based on their scores, where higher scores indicate better quality.
 
     Your task is to propose a new instruction that will lead a good language model to perform the task even better. Don't be afraid to be creative."""
 
-    attempted_instructions = dspy.InputField()
-    proposed_instruction = dspy.OutputField(desc="The improved instructions for the language model")
-    proposed_prefix_for_output_field = dspy.OutputField(
+    attempted_instructions = InputField()
+    proposed_instruction = OutputField(desc="The improved instructions for the language model")
+    proposed_prefix_for_output_field = OutputField(
         desc="The string at the end of the prompt, which will help the model start solving the task",
     )
 
@@ -154,14 +156,14 @@ class COPRO(Teleprompter):
             basic_instruction = self._get_signature(predictor).instructions
             basic_prefix = self._get_signature(predictor).fields[last_key].json_schema_extra["prefix"]
             if self.prompt_model:
-                with dspy.context(lm=self.prompt_model):
-                    instruct = dspy.Predict(
+                with settings.context(lm=self.prompt_model):
+                    instruct = Predict(
                         BasicGenerateInstruction,
                         n=self.breadth - 1,
                         temperature=self.init_temperature,
                     )(basic_instruction=basic_instruction)
             else:
-                instruct = dspy.Predict(
+                instruct = Predict(
                     BasicGenerateInstruction,
                     n=self.breadth - 1,
                     temperature=self.init_temperature,
@@ -304,14 +306,14 @@ class COPRO(Teleprompter):
 
                 # Generate next batch of potential prompts to optimize, with previous attempts as input
                 if self.prompt_model:
-                    with dspy.context(lm=self.prompt_model):
-                        instr = dspy.Predict(
+                    with settings.context(lm=self.prompt_model):
+                        instr = Predict(
                             GenerateInstructionGivenAttempts,
                             n=self.breadth,
                             temperature=self.init_temperature,
                         )(attempted_instructions=attempts)
                 else:
-                    instr = dspy.Predict(
+                    instr = Predict(
                         GenerateInstructionGivenAttempts,
                         n=self.breadth,
                         temperature=self.init_temperature,

@@ -1,3 +1,8 @@
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.primitives.module import Module
+from dspy.signatures.field import InputField
+from dspy.signatures.field import OutputField
+from dspy.signatures.signature import Signature
 import importlib.util
 import json
 import os
@@ -15,7 +20,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import pydantic
 from datamodel_code_generator import InputFileType, generate
 
-import dspy
 from tests.reliability.utils import assert_program_output_correct, judge_dspy_configuration
 
 
@@ -46,7 +50,7 @@ def _retry(retries):
 
 
 @_retry(retries=5)
-def generate_test_program(dst_path: str, additional_instructions: Optional[str] = None) -> dspy.Module:
+def generate_test_program(dst_path: str, additional_instructions: Optional[str] = None) -> Module:
     """
     Generate a DSPy program for a reliability test case and save it to a destination path.
 
@@ -170,7 +174,7 @@ def generate_test_inputs(
     # upon retry if there's an error in the generation process (e.g. the input doesn't match the
     # program signature)
     with judge_dspy_configuration(cache=False, temperature=0.5), tempfile.TemporaryDirectory() as tmp_dir:
-        program: dspy.Module
+        program: Module
         program_input_schema: pydantic.BaseModel
         program, program_input_schema = load_generated_program(program_path)
         signature_json_schema = _get_json_schema(program.signature)
@@ -226,7 +230,7 @@ def generate_test_inputs(
         shutil.copytree(tmp_dir, dst_path, dirs_exist_ok=True)
 
 
-def load_generated_program(path) -> Tuple[dspy.Module, pydantic.BaseModel]:
+def load_generated_program(path) -> Tuple[Module, pydantic.BaseModel]:
     """
     Loads a generated program from the specified file.
 
@@ -369,7 +373,7 @@ for output_field_name, output_field in ProgramOutputs.model_fields.items():
 '''.format(program_description=program_description, program_var_definition=program_var_definition)
 
 
-def _get_test_program_generation_program() -> dspy.Module:
+def _get_test_program_generation_program() -> Module:
     """
     Create a DSPy program for generating other DSPy test programs.
 
@@ -377,7 +381,7 @@ def _get_test_program_generation_program() -> dspy.Module:
         A dspy.Module object representing the program generation program.
     """
 
-    class ProgramGeneration(dspy.Signature):
+    class ProgramGeneration(Signature):
         """
         Creates an AI program definition, including the AI program's description, input fields, and output fields.
         The AI program should be designed to solve a real problem for its users and produce correct outputs for a variety of inputs.
@@ -389,23 +393,23 @@ def _get_test_program_generation_program() -> dspy.Module:
         precisely in absolutely all cases.
         """
 
-        additional_instructions: str = dspy.InputField(
+        additional_instructions: str = InputField(
             description="Additional instructions for what kind of program to generate and how to generate it"
         )
-        program_description: str = dspy.OutputField(
+        program_description: str = OutputField(
             description="A description of the generated AI program, including its purpose and expected behavior"
         )
-        program_input_fields: str = dspy.OutputField(
+        program_input_fields: str = OutputField(
             description="The input fields of the generated program in JSON Schema format, including input field names, types, and descriptions."
         )
-        program_output_fields: str = dspy.OutputField(
+        program_output_fields: str = OutputField(
             description="The output fields of the generated program in JSON Schema format, including input field names, types, and descriptions."
         )
 
-    return dspy.ChainOfThought(ProgramGeneration)
+    return ChainOfThought(ProgramGeneration)
 
 
-def _get_test_inputs_generation_program() -> dspy.Module:
+def _get_test_inputs_generation_program() -> Module:
     """
     Create a DSPy program for generating test inputs for a given DSPy test program.
 
@@ -413,7 +417,7 @@ def _get_test_inputs_generation_program() -> dspy.Module:
         A dspy.Module object representing the test input generation program.
     """
 
-    class _TestInputsGeneration(dspy.Signature):
+    class _TestInputsGeneration(Signature):
         """
         Given the description and input / output signature (format) of an AI program that is designed to produce correct outputs for a variety
         of inputs while adhering to the input / output signature, generate test inputs used to verify that the program
@@ -427,21 +431,21 @@ def _get_test_inputs_generation_program() -> dspy.Module:
         precisely in absolutely all cases.
         """
 
-        program_description: str = dspy.InputField(
+        program_description: str = InputField(
             description="A description of the AI program being tested, including its purpose and expected behavior"
         )
-        program_input_signature: str = dspy.InputField(
+        program_input_signature: str = InputField(
             description="The input signature of the program in JSON Schema format, including input field names, types, and descriptions. The outermost fields in the JSON schema definition represent the top-level input fields of the program."
         )
-        program_output_signature: str = dspy.InputField(
+        program_output_signature: str = InputField(
             description="The output signature of the program in JSON Schema format, including output field names, types, and descriptions. The outermost fields in the JSON schema definition represent the top-level output fields of the program."
         )
-        additional_instructions: str = dspy.InputField(description="Additional instructions for generating test inputs")
-        test_inputs: list[_TestInput] = dspy.OutputField(
+        additional_instructions: str = InputField(description="Additional instructions for generating test inputs")
+        test_inputs: list[_TestInput] = OutputField(
             description="Generated test inputs for the program, used to verify the correctness of the program outputs for a variety of inputs"
         )
 
-    return dspy.ChainOfThought(_TestInputsGeneration)
+    return ChainOfThought(_TestInputsGeneration)
 
 
 class _TestInput(pydantic.BaseModel):
@@ -457,13 +461,13 @@ class _TestInput(pydantic.BaseModel):
     )
 
 
-def _get_assertions_generation_program() -> dspy.Module:
+def _get_assertions_generation_program() -> Module:
     """
     Create a DSPy program for generating assertions that verify the correctness of outputs
     from other DSPy programs.
     """
 
-    class _TestInputsGeneration(dspy.Signature):
+    class _TestInputsGeneration(Signature):
         """
         Given 1. the description and input / output signature (format) of an AI program that is designed to produce correct outputs for a variety
         of inputs while adhering to the input / output signature and 2. an example input to the AI program, generate assertions that can be used
@@ -479,20 +483,20 @@ def _get_assertions_generation_program() -> dspy.Module:
         If it's too difficult to generate accurate assertions, leave them blank.
         """
 
-        program_description: str = dspy.InputField(
+        program_description: str = InputField(
             description="A description of the AI program being tested, including its purpose and expected behavior"
         )
-        program_input: str = dspy.InputField(
+        program_input: str = InputField(
             description="An example input to the AI program, represented as a JSON string"
         )
-        program_output_signature: str = dspy.InputField(
+        program_output_signature: str = InputField(
             description="The output signature of the program in JSON Schema format, including output field names, types, and descriptions. The outermost fields in the JSON schema definition represent the top-level output fields of the program."
         )
-        output_assertions: list[str] = dspy.OutputField(
+        output_assertions: list[str] = OutputField(
             description="Assertions used to verify the correctness of the program output after running the program on the specified input"
         )
 
-    return dspy.ChainOfThought(_TestInputsGeneration)
+    return ChainOfThought(_TestInputsGeneration)
 
 
 def _clean_json_schema_property(prop: dict[str, Any]) -> dict[str, Any]:
@@ -516,7 +520,7 @@ def _clean_json_schema_property(prop: dict[str, Any]) -> dict[str, Any]:
     return cleaned_prop
 
 
-def _get_json_schema(signature: dspy.Signature) -> dict[str, Any]:
+def _get_json_schema(signature: Signature) -> dict[str, Any]:
     """
     Obtain the JSON schema representation of a DSPy signature.
 

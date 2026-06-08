@@ -5,8 +5,8 @@ import uuid
 from collections.abc import Iterable
 from typing import Any
 
-from dspy import Example
-from dspy.dsp.utils import dotdict
+from dspy.dsp.utils.utils import dotdict
+from dspy.primitives.example import Example
 
 
 class Dataset:

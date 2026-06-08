@@ -19,15 +19,18 @@ from typing import TYPE_CHECKING, Any, Callable, Iterator
 
 import pydantic
 
-import dspy
 from dspy.adapters.types.tool import Tool
 from dspy.adapters.utils import parse_value, translate_field_type
+from dspy.clients.lm import LM
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
 from dspy.primitives.code_interpreter import SIMPLE_TYPES, CodeInterpreter, CodeInterpreterError, FinalOutput
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
 from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
+from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import ensure_signature
 from dspy.utils.annotation import experimental
 
@@ -132,7 +135,7 @@ class RLM(Module):
         max_output_chars: int = 10_000,
         verbose: bool = False,
         tools: list[Callable] | None = None,
-        sub_lm: dspy.LM | None = None,
+        sub_lm: LM | None = None,
         interpreter: CodeInterpreter | None = None,
     ):
         """
@@ -162,8 +165,8 @@ class RLM(Module):
 
         # Build the action and extract signatures
         action_sig, extract_sig = self._build_signatures()
-        self.generate_action = dspy.Predict(action_sig)
-        self.extract = dspy.Predict(extract_sig)
+        self.generate_action = Predict(action_sig)
+        self.extract = Predict(extract_sig)
 
     # =========================================================================
     # Tool Creation and Validation
@@ -240,7 +243,7 @@ class RLM(Module):
                 state["call_count"] += n
 
         def _query_lm(prompt: str) -> str:
-            target_lm = lm if lm is not None else dspy.settings.lm
+            target_lm = lm if lm is not None else settings.lm
             if target_lm is None:
                 raise RuntimeError("No LM configured. Use dspy.configure(lm=...) or pass sub_lm to RLM.")
             response = target_lm(prompt)
@@ -305,15 +308,15 @@ class RLM(Module):
         tool_docs = self._format_tool_docs(self._user_tools)
 
         action_sig = (
-            dspy.Signature({}, task_instructions + ACTION_INSTRUCTIONS_TEMPLATE.format(
+            Signature({}, task_instructions + ACTION_INSTRUCTIONS_TEMPLATE.format(
                 inputs=inputs_str, final_output_names=final_output_names, output_fields=output_fields,
                 max_llm_calls=self.max_llm_calls,
             ) + tool_docs)
-            .append("variables_info", dspy.InputField(desc="Metadata about the variables available in the REPL"), type_=str)
-            .append("repl_history", dspy.InputField(desc="Previous REPL code executions and their outputs"), type_=REPLHistory)
-            .append("iteration", dspy.InputField(desc="Current iteration number (1-indexed) out of max_iterations"), type_=str)
-            .append("reasoning", dspy.OutputField(desc="Think step-by-step: what do you know? What remains? Plan your next action."), type_=str)
-            .append("code", dspy.OutputField(desc="Python code to execute. Use markdown code block format: ```python\\n<code>\\n```"), type_=str)
+            .append("variables_info", InputField(desc="Metadata about the variables available in the REPL"), type_=str)
+            .append("repl_history", InputField(desc="Previous REPL code executions and their outputs"), type_=REPLHistory)
+            .append("iteration", InputField(desc="Current iteration number (1-indexed) out of max_iterations"), type_=str)
+            .append("reasoning", OutputField(desc="Think step-by-step: what do you know? What remains? Plan your next action."), type_=str)
+            .append("code", OutputField(desc="Python code to execute. Use markdown code block format: ```python\\n<code>\\n```"), type_=str)
         )
 
         # Extract signature: includes the original signature's output fields and task instructions.
@@ -327,12 +330,12 @@ class RLM(Module):
             extended_task_instructions = "The trajectory was generated with the following objective: \n" + task_instructions + "\n"
         full_extract_instructions = extended_task_instructions + extract_instructions
 
-        extract_sig = dspy.Signature(
+        extract_sig = Signature(
             {**self.signature.output_fields},
             full_extract_instructions,
         )
-        extract_sig = extract_sig.prepend("repl_history", dspy.InputField(desc="Your REPL interactions so far"), type_=REPLHistory)
-        extract_sig = extract_sig.prepend("variables_info", dspy.InputField(desc="Metadata about the variables available in the REPL"), type_=str)
+        extract_sig = extract_sig.prepend("repl_history", InputField(desc="Your REPL interactions so far"), type_=REPLHistory)
+        extract_sig = extract_sig.prepend("variables_info", InputField(desc="Metadata about the variables available in the REPL"), type_=str)
 
         return action_sig, extract_sig
 

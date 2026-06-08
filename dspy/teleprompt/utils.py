@@ -6,13 +6,15 @@ import random
 import shutil
 import sys
 
+from dspy.dsp.utils.settings import settings
+from dspy.primitives.prediction import Prediction
+
 try:
     from IPython.core.magics.code import extract_symbols
 except ImportError:
     # Won't be able to read code from jupyter notebooks
     extract_symbols = None
 
-import dspy
 from dspy.teleprompt.bootstrap import BootstrapFewShot, LabeledFewShot
 
 """
@@ -59,7 +61,7 @@ def eval_candidate_program(batch_size, trainset, candidate_program, evaluate, rn
     except Exception:
         logger.error("An exception occurred during evaluation", exc_info=True)
         # TODO: Handle this better, as -ve scores are possible
-        return dspy.Prediction(score=0.0, results=[])
+        return Prediction(score=0.0, results=[])
 
 
 def eval_candidate_program_with_pruning(
@@ -309,7 +311,7 @@ def get_prompt_model(prompt_model):
     if prompt_model:
         return prompt_model
     else:
-        return dspy.settings.lm
+        return settings.lm
 
 
 def get_signature(predictor):
@@ -344,7 +346,7 @@ def create_n_fewshot_demo_sets(
     This function is copied from random_search.py, and creates fewshot examples in the same way that random search does.
     This allows us to take advantage of using the same fewshot examples when we use the same random seed in our optimizers.
     """
-    max_errors = dspy.settings.max_errors if max_errors is None else max_errors
+    max_errors = settings.max_errors if max_errors is None else max_errors
     demo_candidates = {}
 
     # Account for confusing way this is set up, where we add in 3 more candidate sets to the N specified

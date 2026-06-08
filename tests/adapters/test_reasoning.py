@@ -1,10 +1,12 @@
 import pytest
 
-import dspy
+from dspy.adapters.types.reasoning import Reasoning
+from dspy.dsp.utils.settings import settings
+from dspy.predict.chain_of_thought import ChainOfThought
 
 
 def test_reasoning_basic_operations():
-    reasoning = dspy.Reasoning(content="Hello World")
+    reasoning = Reasoning(content="Hello World")
 
     # Test str conversion
     assert str(reasoning) == "Hello World"
@@ -12,9 +14,9 @@ def test_reasoning_basic_operations():
 
     # Test equality
     assert reasoning == "Hello World"
-    assert reasoning == dspy.Reasoning(content="Hello World")
+    assert reasoning == Reasoning(content="Hello World")
     assert reasoning != "hello world"
-    assert reasoning != dspy.Reasoning(content="hello world")
+    assert reasoning != Reasoning(content="hello world")
 
     # Test len
     assert len(reasoning) == 11
@@ -35,7 +37,7 @@ def test_reasoning_basic_operations():
 
 
 def test_reasoning_concatenation():
-    reasoning = dspy.Reasoning(content="Hello")
+    reasoning = Reasoning(content="Hello")
 
     # Test + operator
     result1 = reasoning + " World"
@@ -48,14 +50,14 @@ def test_reasoning_concatenation():
     assert isinstance(result2, str)
 
     # Test Reasoning + Reasoning
-    reasoning2 = dspy.Reasoning(content=" World")
+    reasoning2 = Reasoning(content=" World")
     result3 = reasoning + reasoning2
-    assert isinstance(result3, dspy.Reasoning)
+    assert isinstance(result3, Reasoning)
     assert result3.content == "Hello World"
 
 
 def test_reasoning_string_methods():
-    reasoning = dspy.Reasoning(content="  Hello World  ")
+    reasoning = Reasoning(content="  Hello World  ")
 
     # Test strip
     assert reasoning.strip() == "Hello World"
@@ -88,12 +90,12 @@ def test_reasoning_string_methods():
 
 
 def test_reasoning_with_chain_of_thought():
-    from dspy.utils import DummyLM
+    from dspy.utils.dummies import DummyLM
 
     lm = DummyLM([{"reasoning": "Let me think step by step", "answer": "42"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
-    cot = dspy.ChainOfThought("question -> answer")
+    cot = ChainOfThought("question -> answer")
     result = cot(question="What is the answer?")
 
     # Test that we can use string methods on result.reasoning
@@ -105,7 +107,7 @@ def test_reasoning_with_chain_of_thought():
 
 
 def test_reasoning_error_message():
-    reasoning = dspy.Reasoning(content="Hello")
+    reasoning = Reasoning(content="Hello")
 
     with pytest.raises(AttributeError, match="`Reasoning` object has no attribute 'nonexistent_method'"):
         reasoning.nonexistent_method

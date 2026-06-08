@@ -2,7 +2,11 @@ from unittest import mock
 
 from pydantic import BaseModel
 
-import dspy
+from dspy.adapters.json_adapter import JSONAdapter
+from dspy.clients.lm import LM
+from dspy.dsp.utils.settings import settings
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.predict.parallel import Parallel
 from dspy.utils.usage_tracker import UsageTracker, track_usage
 
 
@@ -138,10 +142,10 @@ def test_track_usage_with_multiple_models():
 
 
 def test_track_usage_context_manager(lm_for_test):
-    lm = dspy.LM(lm_for_test, cache=False, temperature=0.0)
-    dspy.configure(lm=lm)
+    lm = LM(lm_for_test, cache=False, temperature=0.0)
+    settings.configure(lm=lm)
 
-    predict = dspy.ChainOfThought("question -> answer")
+    predict = ChainOfThought("question -> answer")
     with track_usage() as tracker:
         predict(question="What is the capital of France?")
         predict(question="What is the capital of Italy?")
@@ -345,16 +349,16 @@ def test_parallel_executor_with_usage_tracker():
     parent_tracker = UsageTracker()
 
     # Mock LM with different responses
-    mock_lm = mock.MagicMock(spec=dspy.LM)
+    mock_lm = mock.MagicMock(spec=LM)
     mock_lm.return_value = ['{"answer": "Mocked answer"}']
     mock_lm.kwargs = {}
     mock_lm.model = "openai/gpt-4o-mini"
 
-    dspy.configure(lm=mock_lm, adapter=dspy.JSONAdapter())
+    settings.configure(lm=mock_lm, adapter=JSONAdapter())
 
     def task1():
         # Simulate LM usage tracking for task 1
-        dspy.settings.usage_tracker.add_usage(
+        settings.usage_tracker.add_usage(
             "openai/gpt-4o-mini",
             {
                 "prompt_tokens": 50,
@@ -362,11 +366,11 @@ def test_parallel_executor_with_usage_tracker():
                 "total_tokens": 60,
             },
         )
-        return dspy.settings.usage_tracker.get_total_tokens()
+        return settings.usage_tracker.get_total_tokens()
 
     def task2():
         # Simulate LM usage tracking for task 2 with different values
-        dspy.settings.usage_tracker.add_usage(
+        settings.usage_tracker.add_usage(
             "openai/gpt-4o-mini",
             {
                 "prompt_tokens": 80,
@@ -374,11 +378,11 @@ def test_parallel_executor_with_usage_tracker():
                 "total_tokens": 95,
             },
         )
-        return dspy.settings.usage_tracker.get_total_tokens()
+        return settings.usage_tracker.get_total_tokens()
 
     # Execute tasks in parallel
-    with dspy.context(track_usage=True, usage_tracker=parent_tracker):
-        executor = dspy.Parallel()
+    with settings.context(track_usage=True, usage_tracker=parent_tracker):
+        executor = Parallel()
         results = executor([(task1, {}), (task2, {})])
     # Verify that the two workers had different usage
     usage1 = results[0]

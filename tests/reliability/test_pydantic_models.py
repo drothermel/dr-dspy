@@ -1,10 +1,14 @@
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.predict.predict import Predict
+from dspy.signatures.field import InputField
+from dspy.signatures.field import OutputField
+from dspy.signatures.signature import Signature
 from enum import Enum
 from typing import Any, List, Literal
 
 import pydantic
 import pytest
 
-import dspy
 from tests.reliability.utils import assert_program_output_correct, known_failing_models
 
 @pytest.mark.reliability
@@ -18,11 +22,11 @@ def test_qa_with_pydantic_answer_model():
             description="At least two comments providing additional details about the answer."
         )
 
-    class QA(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: Answer = dspy.OutputField()
+    class QA(Signature):
+        question: str = InputField()
+        answer: Answer = OutputField()
 
-    program = dspy.Predict(QA)
+    program = Predict(QA)
     question = "What is the capital of France?"
     answer = program(question=question).answer
 
@@ -43,14 +47,14 @@ def test_qa_with_pydantic_answer_model():
     assert len(answer.comments) >= 2
 
 
-@pytest.mark.parametrize("module", [dspy.Predict, dspy.ChainOfThought])
+@pytest.mark.parametrize("module", [Predict, ChainOfThought])
 @pytest.mark.reliability
 def test_color_classification_using_enum(module):
     Color = Enum("Color", ["RED", "GREEN", "BLUE"])
 
-    class Colorful(dspy.Signature):
-        text: str = dspy.InputField()
-        color: Color = dspy.OutputField()
+    class Colorful(Signature):
+        text: str = InputField()
+        color: Color = OutputField()
 
     program = module(Colorful)
     # Note: The precise text, including the trailing period, is important here for ensuring that
@@ -75,15 +79,15 @@ def test_entity_extraction_with_multiple_primitive_outputs():
             description="Boolean flag indicating low confidence or uncertainty in the extraction."
         )
 
-    class ExtractEntityFromDescription(dspy.Signature):
+    class ExtractEntityFromDescription(Signature):
         """Extract an entity from a Hungarian description, provide its English translation, categories, and an inverted flag."""
 
-        description: str = dspy.InputField(description="The input description in Hungarian.")
-        entity: ExtractEntityFromDescriptionOutput = dspy.OutputField(
+        description: str = InputField(description="The input description in Hungarian.")
+        entity: ExtractEntityFromDescriptionOutput = OutputField(
             description="The extracted entity and its properties."
         )
 
-    program = dspy.ChainOfThought(ExtractEntityFromDescription)
+    program = ChainOfThought(ExtractEntityFromDescription)
     description = "A kávé egy növényi eredetű ital, amelyet a kávébabból készítenek."
 
     extracted_entity = program(description=description).entity
@@ -107,7 +111,7 @@ def test_entity_extraction_with_multiple_primitive_outputs():
     )
 
 
-@pytest.mark.parametrize("module", [dspy.Predict, dspy.ChainOfThought])
+@pytest.mark.parametrize("module", [Predict, ChainOfThought])
 @pytest.mark.reliability
 def test_tool_calling_with_literals(module):
     next_tool_names = [
@@ -123,16 +127,16 @@ def test_tool_calling_with_literals(module):
         "check_carryover_policy",
     ]
 
-    class ToolCalling(dspy.Signature):
+    class ToolCalling(Signature):
         """
         Given the fields question, produce the fields response.
         You will be given question and your goal is to finish with response.
         To do this, you will interleave Thought, Tool Name, and Tool Args, and receive a resulting Observation.
         """
 
-        question: str = dspy.InputField()
-        trajectory: str = dspy.InputField()
-        next_thought: str = dspy.OutputField()
+        question: str = InputField()
+        trajectory: str = InputField()
+        next_thought: str = OutputField()
         next_tool_name: Literal[
             "get_docs",
             "finish",
@@ -144,12 +148,12 @@ def test_tool_calling_with_literals(module):
             "fetch_calendar",
             "verify_compensation",
             "check_carryover_policy",
-        ] = dspy.OutputField()
-        next_tool_args: dict[str, Any] = dspy.OutputField()
-        response_status: Literal["success", "error", "pending"] = dspy.OutputField()
-        user_intent: Literal["informational", "transactional", "exploratory"] = dspy.OutputField()
+        ] = OutputField()
+        next_tool_args: dict[str, Any] = OutputField()
+        response_status: Literal["success", "error", "pending"] = OutputField()
+        user_intent: Literal["informational", "transactional", "exploratory"] = OutputField()
 
-    program = dspy.Predict(ToolCalling)
+    program = Predict(ToolCalling)
     prediction = program(
         question=(
             "Tell me more about the company's internal policy for paid time off (PTO), "

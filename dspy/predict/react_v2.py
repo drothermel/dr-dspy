@@ -5,10 +5,13 @@ from typing import TYPE_CHECKING, Any, Callable, get_args
 
 import pydantic
 
-import dspy
+from dspy.adapters.types.history import History
+from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
+from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
+from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import ensure_signature
 from dspy.utils.annotation import experimental
 from dspy.utils.exceptions import AdapterParseError, ContextWindowExceededError
@@ -32,7 +35,7 @@ class ReActV2(Module):
             raise ValueError("`submit` is reserved by ReActV2 as the final-output tool.")
         self.tools["submit"] = self._make_submit_tool()
 
-        self.react = dspy.Predict(self._make_react_signature())
+        self.react = Predict(self._make_react_signature())
 
     def _make_submit_tool(self) -> Tool:
         output_fields = self.signature.output_fields
@@ -62,13 +65,13 @@ class ReActV2(Module):
         for name, field in self.signature.input_fields.items():
             fields[name] = (
                 _optional_annotation(field.annotation),
-                dspy.InputField(desc=field.json_schema_extra.get("desc")),
+                InputField(desc=field.json_schema_extra.get("desc")),
             )
 
-        fields["history"] = (dspy.History, dspy.InputField())
-        fields["tools"] = (list[dspy.Tool], dspy.InputField())
-        fields["next_thought"] = (dspy.Reasoning, dspy.OutputField())
-        fields["tool_calls"] = (dspy.ToolCalls, dspy.OutputField())
+        fields["history"] = (History, InputField())
+        fields["tools"] = (list[Tool], InputField())
+        fields["next_thought"] = (Reasoning, OutputField())
+        fields["tool_calls"] = (ToolCalls, OutputField())
 
         inputs = ", ".join(f"`{name}`" for name in self.signature.input_fields)
         outputs = ", ".join(f"`{name}`" for name in self.signature.output_fields)
@@ -83,7 +86,7 @@ class ReActV2(Module):
             ]
         ).strip()
 
-        return dspy.Signature(fields, instructions)
+        return Signature(fields, instructions)
 
     def forward(self, **input_args):
         max_iters = input_args.pop("max_iters", self.max_iters)
@@ -166,7 +169,7 @@ class ReActV2(Module):
 
     def _forced_submit(
         self,
-        history: dspy.History,
+        history: History,
         pending_inputs: dict[str, Any],
         break_reason: str,
         turn_index: int,
@@ -218,12 +221,12 @@ def _optional_annotation(annotation: Any) -> Any:
         return annotation
 
 
-def _coerce_history(history: Any) -> dspy.History:
+def _coerce_history(history: Any) -> History:
     if history is None:
-        return dspy.History(messages=[])
-    if isinstance(history, dspy.History):
+        return History(messages=[])
+    if isinstance(history, History):
         return history
-    return dspy.History.model_validate(history)
+    return History.model_validate(history)
 
 
 def _coerce_tool_calls(tool_calls: Any) -> ToolCalls:
@@ -241,7 +244,7 @@ def _ensure_tool_call_ids(tool_calls: ToolCalls, turn_index: int) -> ToolCalls:
     return ToolCalls(tool_calls=ensured)
 
 
-def _append_history_event(history: dspy.History, event: dict[str, Any]) -> None:
+def _append_history_event(history: History, event: dict[str, Any]) -> None:
     if event:
         history.messages.append(event)
 

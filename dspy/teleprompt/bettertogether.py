@@ -3,8 +3,8 @@ import logging
 import random
 from typing import Any, Callable
 
-import dspy
-from dspy.evaluate import Evaluate
+from dspy.dsp.utils.settings import settings
+from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.teleprompt.bootstrap_finetune import (
@@ -279,7 +279,7 @@ class BetterTogether(Teleprompter):
 
         student, teacher = self._prepare_student_and_teacher(student, teacher)
         trainset, valset = self._prepare_trainset_and_valset(trainset, valset, valset_ratio)
-        effective_max_errors = max_errors if max_errors is not None else dspy.settings.max_errors
+        effective_max_errors = max_errors if max_errors is not None else settings.max_errors
         parsed_strategy = self._prepare_strategy(strategy)
         optimizer_compile_args = self._prepare_optimizer_compile_args(optimizer_compile_args, teacher)
 

@@ -6,17 +6,19 @@ from unittest.mock import patch
 
 import pytest
 
-import dspy
+from dspy.adapters.types.history import History
+from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate, EvaluationResult
 from dspy.evaluate.metrics import answer_exact_match
-from dspy.predict import Predict
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
 from dspy.utils.callback import BaseCallback
 from dspy.utils.dummies import DummyLM
 
 
 def new_example(question, answer):
     """Helper function to create a new example."""
-    return dspy.Example(
+    return Example(
         question=question,
         answer=answer,
     ).with_inputs("question")
@@ -36,7 +38,7 @@ def test_evaluate_initialization():
 
 
 def test_evaluate_call():
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             {
                 "What is 1+1?": {"answer": "2"},
@@ -58,7 +60,7 @@ def test_evaluate_call():
 
 def test_evaluate_single_thread_runs_in_main_thread():
     """Evaluate with num_threads=1 should run in the main thread."""
-    dspy.configure(
+    settings.configure(
         lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}})
     )
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
@@ -115,7 +117,7 @@ def test_construct_result_df():
 
 
 def test_multithread_evaluate_call():
-    dspy.configure(lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
+    settings.configure(lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
     program = Predict("question -> answer")
     assert program(question="What is 1+1?").answer == "2"
@@ -138,7 +140,7 @@ def test_multi_thread_evaluate_call_cancelled(monkeypatch):
             time.sleep(1)
             return super().__call__(*args, **kwargs)
 
-    dspy.configure(lm=SlowLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
+    settings.configure(lm=SlowLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
 
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
     program = Predict("question -> answer")
@@ -167,7 +169,7 @@ def test_multi_thread_evaluate_call_cancelled(monkeypatch):
 
 
 def test_evaluate_call_wrong_answer():
-    dspy.configure(lm=DummyLM({"What is 1+1?": {"answer": "0"}, "What is 2+2?": {"answer": "0"}}))
+    settings.configure(lm=DummyLM({"What is 1+1?": {"answer": "0"}, "What is 2+2?": {"answer": "0"}}))
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
     program = Predict("question -> answer")
     ev = Evaluate(
@@ -188,17 +190,17 @@ def test_evaluate_call_wrong_answer():
         # has failed for such cases in the past
         (
             lambda text: Predict("text: str -> entities: list[str]")(text=text).entities,
-            dspy.Example(text="United States", entities=["United States"]).with_inputs("text"),
+            Example(text="United States", entities=["United States"]).with_inputs("text"),
         ),
         (
             lambda text: Predict("text: str -> entities: list[dict[str, str]]")(text=text).entities,
-            dspy.Example(text="United States", entities=[{"name": "United States", "type": "location"}]).with_inputs(
+            Example(text="United States", entities=[{"name": "United States", "type": "location"}]).with_inputs(
                 "text"
             ),
         ),
         (
             lambda text: Predict("text: str -> first_word: Tuple[str, int]")(text=text).words,
-            dspy.Example(text="United States", first_word=("United", 6)).with_inputs("text"),
+            Example(text="United States", first_word=("United", 6)).with_inputs("text"),
         ),
     ],
 )
@@ -209,7 +211,7 @@ def test_evaluate_display_table(program_with_example, display_table, is_in_ipyth
     example_input = next(iter(example.inputs().values()))
     example_output = {key: value for key, value in example.toDict().items() if key not in example.inputs()}
 
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             {
                 example_input: example_output,
@@ -263,7 +265,7 @@ def test_evaluate_callback():
             self.end_call_count += 1
 
     callback = TestCallback()
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             {
                 "What is 1+1?": {"answer": "2"},
@@ -293,9 +295,9 @@ def test_evaluation_result_repr():
 
 
 def test_evaluate_save_as_json_with_history():
-    """Test that save_as_json works with Examples containing dspy.History objects."""
+    """Test that save_as_json works with Examples containing History objects."""
     # Setup
-    dspy.settings.configure(
+    settings.configure(
         lm=DummyLM(
             {
                 "What is 1+1?": {"answer": "2"},
@@ -305,12 +307,12 @@ def test_evaluate_save_as_json_with_history():
     )
 
     # Create history objects
-    history1 = dspy.History(
+    history1 = History(
         messages=[
             {"question": "Previous Q1", "answer": "Previous A1"},
         ]
     )
-    history2 = dspy.History(
+    history2 = History(
         messages=[
             {"question": "Previous Q2", "answer": "Previous A2"},
             {"question": "Previous Q3", "answer": "Previous A3"},
@@ -319,8 +321,8 @@ def test_evaluate_save_as_json_with_history():
 
     # Create examples with history
     devset = [
-        dspy.Example(question="What is 1+1?", answer="2", history=history1).with_inputs("question"),
-        dspy.Example(question="What is 2+2?", answer="4", history=history2).with_inputs("question"),
+        Example(question="What is 1+1?", answer="2", history=history1).with_inputs("question"),
+        Example(question="What is 2+2?", answer="4", history=history2).with_inputs("question"),
     ]
 
     program = Predict("question -> answer")
@@ -368,9 +370,9 @@ def test_evaluate_save_as_json_with_history():
 
 
 def test_evaluate_save_as_csv_with_history():
-    """Test that save_as_csv works with Examples containing dspy.History objects."""
+    """Test that save_as_csv works with Examples containing History objects."""
     # Setup
-    dspy.settings.configure(
+    settings.configure(
         lm=DummyLM(
             {
                 "What is 1+1?": {"answer": "2"},
@@ -379,7 +381,7 @@ def test_evaluate_save_as_csv_with_history():
     )
 
     # Create history object
-    history = dspy.History(
+    history = History(
         messages=[
             {"question": "Previous Q", "answer": "Previous A"},
         ]
@@ -387,7 +389,7 @@ def test_evaluate_save_as_csv_with_history():
 
     # Create example with history
     devset = [
-        dspy.Example(question="What is 1+1?", answer="2", history=history).with_inputs("question"),
+        Example(question="What is 1+1?", answer="2", history=history).with_inputs("question"),
     ]
 
     program = Predict("question -> answer")

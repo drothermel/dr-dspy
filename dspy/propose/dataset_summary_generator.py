@@ -1,31 +1,34 @@
 import re
 
-import dspy
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
 from dspy.propose.utils import strip_prefix
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
 
 
-class ObservationSummarizer(dspy.Signature):
+class ObservationSummarizer(Signature):
     ("""Given a series of observations I have made about my dataset, please summarize them into a brief 2-3 sentence summary which highlights only the most important details.""")
-    observations = dspy.InputField(desc="Observations I have made about my dataset")
-    summary = dspy.OutputField(desc="Two to Three sentence summary of only the most significant highlights of my observations")
+    observations = InputField(desc="Observations I have made about my dataset")
+    summary = OutputField(desc="Two to Three sentence summary of only the most significant highlights of my observations")
 
-class DatasetDescriptor(dspy.Signature):
+class DatasetDescriptor(Signature):
     ("""Given several examples from a dataset please write observations about trends that hold for most or all of the samples. """
     """Some areas you may consider in your observations: topics, content, syntax, conciseness, etc. """
     """It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative""")
 
-    examples = dspy.InputField(desc="Sample data points from the dataset")
-    observations = dspy.OutputField(desc="Somethings that holds true for most or all of the data you observed")
+    examples = InputField(desc="Sample data points from the dataset")
+    observations = OutputField(desc="Somethings that holds true for most or all of the data you observed")
 
-class DatasetDescriptorWithPriorObservations(dspy.Signature):
+class DatasetDescriptorWithPriorObservations(Signature):
     ("""Given several examples from a dataset please write observations about trends that hold for most or all of the samples. """
     """I will also provide you with a few observations I have already made.  Please add your own observations or if you feel the observations are comprehensive say 'COMPLETE' """
     """Some areas you may consider in your observations: topics, content, syntax, conciceness, etc. """
     """It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative""")
 
-    examples = dspy.InputField(desc="Sample data points from the dataset")
-    prior_observations = dspy.InputField(desc="Some prior observations I made about the data")
-    observations = dspy.OutputField(desc="Somethings that holds true for most or all of the data you observed or COMPLETE if you have nothing to add")
+    examples = InputField(desc="Sample data points from the dataset")
+    prior_observations = InputField(desc="Some prior observations I made about the data")
+    observations = OutputField(desc="Somethings that holds true for most or all of the data you observed or COMPLETE if you have nothing to add")
 
 def order_input_keys_in_string(unordered_repr):
     # Regex pattern to match the input keys structure
@@ -49,9 +52,9 @@ def create_dataset_summary(trainset, view_data_batch_size, prompt_model, log_fil
     if verbose:
         print("\nBootstrapping dataset summary (this will be used to generate instructions)...")
     upper_lim = min(len(trainset), view_data_batch_size)
-    prompt_model = prompt_model if prompt_model else dspy.settings.lm
-    with dspy.context(lm=prompt_model):
-        observation = dspy.Predict(DatasetDescriptor, n=1, temperature=1.0)(examples=order_input_keys_in_string(trainset[0:upper_lim].__repr__()))
+    prompt_model = prompt_model if prompt_model else settings.lm
+    with settings.context(lm=prompt_model):
+        observation = Predict(DatasetDescriptor, n=1, temperature=1.0)(examples=order_input_keys_in_string(trainset[0:upper_lim].__repr__()))
     observations = observation["observations"]
 
     if log_file:
@@ -68,8 +71,8 @@ def create_dataset_summary(trainset, view_data_batch_size, prompt_model, log_fil
             if verbose:
                 print(f"b: {b}")
             upper_lim = min(len(trainset), b+view_data_batch_size)
-            with dspy.context(lm=prompt_model):
-                output = dspy.Predict(DatasetDescriptorWithPriorObservations, n=1, temperature=1.0)(prior_observations=observations, examples=order_input_keys_in_string(trainset[b:upper_lim].__repr__()))
+            with settings.context(lm=prompt_model):
+                output = Predict(DatasetDescriptorWithPriorObservations, n=1, temperature=1.0)(prior_observations=observations, examples=order_input_keys_in_string(trainset[b:upper_lim].__repr__()))
             if len(output["observations"]) >= 8 and output["observations"][:8].upper() == "COMPLETE":
                 skips += 1
                 if skips >= 5:
@@ -84,10 +87,10 @@ def create_dataset_summary(trainset, view_data_batch_size, prompt_model, log_fil
             print(f"e {e}. using observations from past round for a summary.")
 
     if prompt_model:
-        with dspy.context(lm=prompt_model):
-            summary = dspy.Predict(ObservationSummarizer, n=1, temperature=1.0)(observations=observations)
+        with settings.context(lm=prompt_model):
+            summary = Predict(ObservationSummarizer, n=1, temperature=1.0)(observations=observations)
     else:
-        summary = dspy.Predict(ObservationSummarizer, n=1, temperature=1.0)(observations=observations)
+        summary = Predict(ObservationSummarizer, n=1, temperature=1.0)(observations=observations)
     if verbose:
         print(f"summary: {summary}")
     if log_file:

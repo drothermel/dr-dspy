@@ -3,9 +3,14 @@ import re
 import pytest
 from pydantic import BaseModel
 
-import dspy
 import dspy.adapters.base as adapter_base
 import dspy.adapters.utils as adapter_utils
+from dspy.adapters.chat_adapter import ChatAdapter
+from dspy.dsp.utils.settings import settings
+from dspy.predict.react import ReAct
+from dspy.primitives.prediction import Prediction
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
 from dspy.utils.dummies import DummyLM
 from dspy.utils.exceptions import ContextWindowExceededError
 
@@ -17,13 +22,13 @@ def test_tool_observation_preserves_custom_type():
 
     captured_calls = []
 
-    class SpyChatAdapter(dspy.ChatAdapter):
+    class SpyChatAdapter(ChatAdapter):
         def format_user_message_content(self, signature, inputs, *args, **kwargs):
             captured_calls.append((signature, dict(inputs)))
             return super().format_user_message_content(signature, inputs, *args, **kwargs)
 
     def make_images():
-        return dspy.Image("https://example.com/test.png"), dspy.Image(Image.new("RGB", (100, 100), "red"))
+        return Image("https://example.com/test.png"), Image(Image.new("RGB", (100, 100), "red"))
 
 
     adapter = SpyChatAdapter()
@@ -43,9 +48,9 @@ def test_tool_observation_preserves_custom_type():
         ],
         adapter=adapter,
     )
-    dspy.configure(lm=lm, adapter=adapter)
+    settings.configure(lm=lm, adapter=adapter)
 
-    react = dspy.ReAct("question -> answer", tools=[make_images])
+    react = ReAct("question -> answer", tools=[make_images])
     react(question="Draw me something red")
 
     sigs_with_obs = [sig for sig, inputs in captured_calls if "observation_0" in inputs]
@@ -66,12 +71,12 @@ def test_tool_calling_with_pydantic_args():
             return None
         return f"It's my honor to invite {participant_name} to event {event_info.name} on {event_info.date}"
 
-    class InvitationSignature(dspy.Signature):
-        participant_name: str = dspy.InputField(desc="The name of the participant to invite")
-        event_info: CalendarEvent = dspy.InputField(desc="The information about the event")
-        invitation_letter: str = dspy.OutputField(desc="The invitation letter to be sent to the participant")
+    class InvitationSignature(Signature):
+        participant_name: str = InputField(desc="The name of the participant to invite")
+        event_info: CalendarEvent = InputField(desc="The information about the event")
+        invitation_letter: str = OutputField(desc="The invitation letter to be sent to the participant")
 
-    react = dspy.ReAct(InvitationSignature, tools=[write_invitation_letter])
+    react = ReAct(InvitationSignature, tools=[write_invitation_letter])
 
     lm = DummyLM(
         [
@@ -101,7 +106,7 @@ def test_tool_calling_with_pydantic_args():
             },
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     outputs = react(
         participant_name="Alice",
@@ -137,11 +142,11 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
     def get_user_info(name: str):
         return {"name": name}
 
-    class CustomerService(dspy.Signature):
-        user_request: str = dspy.InputField()
-        process_result: str = dspy.OutputField()
+    class CustomerService(Signature):
+        user_request: str = InputField()
+        process_result: str = OutputField()
 
-    react = dspy.ReAct(CustomerService, tools=[get_user_info])
+    react = ReAct(CustomerService, tools=[get_user_info])
     problem_annotation = react.react.signature.output_fields["next_tool_args"].annotation
 
     def guarded_issubclass(cls, class_or_tuple):
@@ -171,7 +176,7 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
         ]
     )
 
-    with dspy.context(lm=lm):
+    with settings.context(lm=lm):
         result = react(user_request="Help me, my name is Adam")
 
     assert result.process_result == "Resolved Adam's request."
@@ -184,7 +189,7 @@ def test_tool_calling_without_typehint():
         """Add two numbers."""
         return a + b
 
-    react = dspy.ReAct("a, b -> c:int", tools=[foo])
+    react = ReAct("a, b -> c:int", tools=[foo])
     lm = DummyLM(
         [
             {"next_thought": "I need to add two numbers.", "next_tool_name": "foo", "next_tool_args": {"a": 1, "b": 2}},
@@ -192,7 +197,7 @@ def test_tool_calling_without_typehint():
             {"reasoning": "I added the numbers successfully", "c": 3},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     outputs = react(a=1, b=2)
 
     expected_trajectory = {
@@ -217,7 +222,7 @@ def test_trajectory_truncation():
         return f"Echoed: {text}"
 
     # Create ReAct instance with our echo tool
-    react = dspy.ReAct("input_text -> output_text", tools=[echo])
+    react = ReAct("input_text -> output_text", tools=[echo])
 
     # Mock react.react to simulate multiple tool calls
     call_count = 0
@@ -228,7 +233,7 @@ def test_trajectory_truncation():
 
         if call_count < 3:
             # First 2 calls use the echo tool
-            return dspy.Prediction(
+            return Prediction(
                 next_thought=f"Thought {call_count}",
                 next_tool_name="echo",
                 next_tool_args={"text": f"Text {call_count}"},
@@ -238,10 +243,10 @@ def test_trajectory_truncation():
             raise ContextWindowExceededError()
         else:
             # The 4th call finishes
-            return dspy.Prediction(next_thought="Final thought", next_tool_name="finish", next_tool_args={})
+            return Prediction(next_thought="Final thought", next_tool_name="finish", next_tool_args={})
 
     react.react = mock_react
-    react.extract = lambda **kwargs: dspy.Prediction(output_text="Final output")
+    react.extract = lambda **kwargs: Prediction(output_text="Final output")
 
     # Call forward and get the result
     result = react(input_text="test input")
@@ -257,7 +262,7 @@ async def test_context_window_exceeded_after_retries():
     def echo(text: str) -> str:
         return f"Echoed: {text}"
 
-    react = dspy.ReAct("input_text -> output_text", tools=[echo])
+    react = ReAct("input_text -> output_text", tools=[echo])
 
     def mock_react(**kwargs):
         raise ContextWindowExceededError()
@@ -267,7 +272,7 @@ async def test_context_window_exceeded_after_retries():
 
     def mock_extract(**kwargs):
         extract_calls.append(kwargs)
-        return dspy.Prediction(output_text="Fallback output")
+        return Prediction(output_text="Fallback output")
 
     react.react = mock_react
     react.extract = mock_extract
@@ -287,7 +292,7 @@ async def test_context_window_exceeded_after_retries():
 
     async def mock_extract_async(**kwargs):
         async_extract_calls.append(kwargs)
-        return dspy.Prediction(output_text="Fallback output")
+        return Prediction(output_text="Fallback output")
 
     react.react.acall = mock_react_async
     react.extract.acall = mock_extract_async
@@ -306,7 +311,7 @@ def test_error_retry():
         raise Exception("tool error")
 
     # --- program under test -------------------------------------------------
-    react = dspy.ReAct("a, b -> c:int", tools=[foo])
+    react = ReAct("a, b -> c:int", tools=[foo])
     lm = DummyLM(
         [
             {
@@ -323,7 +328,7 @@ def test_error_retry():
             {"reasoning": "I added the numbers successfully", "c": 3},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     outputs = react(a=1, b=2, max_iters=2)
     traj = outputs.trajectory
@@ -360,12 +365,12 @@ async def test_async_tool_calling_with_pydantic_args():
             return None
         return f"It's my honor to invite {participant_name} to event {event_info.name} on {event_info.date}"
 
-    class InvitationSignature(dspy.Signature):
-        participant_name: str = dspy.InputField(desc="The name of the participant to invite")
-        event_info: CalendarEvent = dspy.InputField(desc="The information about the event")
-        invitation_letter: str = dspy.OutputField(desc="The invitation letter to be sent to the participant")
+    class InvitationSignature(Signature):
+        participant_name: str = InputField(desc="The name of the participant to invite")
+        event_info: CalendarEvent = InputField(desc="The information about the event")
+        invitation_letter: str = OutputField(desc="The invitation letter to be sent to the participant")
 
-    react = dspy.ReAct(InvitationSignature, tools=[write_invitation_letter])
+    react = ReAct(InvitationSignature, tools=[write_invitation_letter])
 
     lm = DummyLM(
         [
@@ -395,7 +400,7 @@ async def test_async_tool_calling_with_pydantic_args():
             },
         ]
     )
-    with dspy.context(lm=lm):
+    with settings.context(lm=lm):
         outputs = await react.acall(
             participant_name="Alice",
             event_info=CalendarEvent(
@@ -432,7 +437,7 @@ async def test_async_error_retry():
     async def foo(a, b):
         raise Exception("tool error")
 
-    react = dspy.ReAct("a, b -> c:int", tools=[foo])
+    react = ReAct("a, b -> c:int", tools=[foo])
     lm = DummyLM(
         [
             {
@@ -449,7 +454,7 @@ async def test_async_error_retry():
             {"reasoning": "I added the numbers successfully", "c": 3},
         ]
     )
-    with dspy.context(lm=lm):
+    with settings.context(lm=lm):
         outputs = await react.acall(a=1, b=2, max_iters=2)
     traj = outputs.trajectory
 

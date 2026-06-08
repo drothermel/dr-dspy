@@ -4,7 +4,8 @@ import threading
 
 import tqdm
 
-import dspy
+from dspy.dsp.utils.settings import settings
+from dspy.primitives.example import Example
 from dspy.teleprompt.teleprompt import Teleprompter
 
 from .vanilla import LabeledFewShot
@@ -185,19 +186,19 @@ class BootstrapFewShot(Teleprompter):
         predictor_cache = {}
 
         try:
-            with dspy.context(trace=[], **self.teacher_settings):
-                lm = dspy.settings.lm
+            with settings.context(trace=[], **self.teacher_settings):
+                lm = settings.lm
                 # Use a fresh rollout with temperature=1.0 to bypass caches.
                 lm = lm.copy(rollout_id=round_idx, temperature=1.0) if round_idx > 0 else lm
                 new_settings = {"lm": lm} if round_idx > 0 else {}
 
-                with dspy.context(**new_settings):
+                with settings.context(**new_settings):
                     for name, predictor in teacher.named_predictors():
                         predictor_cache[name] = predictor.demos
                         predictor.demos = [x for x in predictor.demos if x != example]
 
                     prediction = teacher(**example.inputs())
-                    trace = dspy.settings.trace
+                    trace = settings.trace
 
                     for name, predictor in teacher.named_predictors():
                         predictor.demos = predictor_cache[name]
@@ -215,7 +216,7 @@ class BootstrapFewShot(Teleprompter):
             with self.error_lock:
                 self.error_count += 1
                 current_error_count = self.error_count
-            effective_max_errors = self.max_errors if self.max_errors is not None else dspy.settings.max_errors
+            effective_max_errors = self.max_errors if self.max_errors is not None else settings.max_errors
             if current_error_count >= effective_max_errors:
                 raise e
             logger.error(f"Failed to run or to evaluate example {example} with {self.metric} due to {e}.")
@@ -223,7 +224,7 @@ class BootstrapFewShot(Teleprompter):
         if success:
             for step in trace:
                 predictor, inputs, outputs = step
-                demo = dspy.Example(augmented=True, **inputs, **outputs)
+                demo = Example(augmented=True, **inputs, **outputs)
 
                 try:
                     predictor_name = self.predictor2name[id(predictor)]

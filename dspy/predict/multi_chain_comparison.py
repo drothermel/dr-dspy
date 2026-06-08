@@ -1,6 +1,7 @@
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
-from dspy.signatures import InputField, OutputField
+from dspy.signatures.field import InputField
+from dspy.signatures.field import OutputField
 from dspy.signatures.signature import ensure_signature
 
 

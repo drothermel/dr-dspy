@@ -1,5 +1,6 @@
 import random
 
+from dspy.dsp.utils.settings import settings
 from dspy.predict.parameter import Parameter
 from dspy.primitives.prediction import Prediction
 from dspy.utils.callback import with_callbacks
@@ -48,12 +49,11 @@ class Retrieve(Parameter):
     ) -> list[str] | Prediction | list[Prediction]:
         k = k if k is not None else self.k
 
-        import dspy
 
-        if not dspy.settings.rm:
+        if not settings.rm:
             raise AssertionError("No RM is loaded.")
 
-        passages = dspy.settings.rm(query, k=k, **kwargs)
+        passages = settings.rm(query, k=k, **kwargs)
 
         from collections.abc import Iterable
         if not isinstance(passages, Iterable):

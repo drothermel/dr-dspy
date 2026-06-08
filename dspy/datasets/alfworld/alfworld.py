@@ -2,6 +2,8 @@ import os
 import queue
 import random
 
+from dspy.primitives.example import Example
+
 
 def env_worker(inq, outq):
     """
@@ -140,9 +142,8 @@ class AlfWorld:
     def __init__(self, max_threads=20):
         self.POOL = EnvPool(size=max_threads)
 
-        import dspy
 
-        dataset = [dspy.Example(idx=idx).with_inputs("idx") for idx in range(3500)]
+        dataset = [Example(idx=idx).with_inputs("idx") for idx in range(3500)]
         random.Random(0).shuffle(dataset)
 
         trainset, devset = dataset[:3000], dataset[-500:]

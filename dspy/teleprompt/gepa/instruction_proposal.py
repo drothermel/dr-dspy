@@ -3,14 +3,17 @@ from typing import Any
 
 from gepa.core.adapter import ProposalFn
 
-import dspy
 from dspy.adapters.types.base_type import Type
+from dspy.predict.predict import Predict
+from dspy.primitives.module import Module
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
 from dspy.teleprompt.gepa.gepa_utils import ReflectiveExample
 
 logger = logging.getLogger(__name__)
 
 
-class GenerateEnhancedMultimodalInstructionFromFeedback(dspy.Signature):
+class GenerateEnhancedMultimodalInstructionFromFeedback(Signature):
     """I provided an assistant with instructions to perform a task involving visual content, but the assistant's performance needs improvement based on the examples and feedback below.
 
     Your task is to write a better instruction for the assistant that addresses the specific issues identified in the feedback, with particular attention to how visual and textual information should be analyzed and integrated.
@@ -33,30 +36,30 @@ class GenerateEnhancedMultimodalInstructionFromFeedback(dspy.Signature):
 
     Focus on creating an instruction that helps the assistant properly analyze visual content, integrate it with textual information, and avoid the specific visual analysis mistakes shown in the examples."""
 
-    current_instruction = dspy.InputField(
+    current_instruction = InputField(
         desc="The current instruction that was provided to the assistant to perform the multimodal task"
     )
-    examples_with_feedback = dspy.InputField(
+    examples_with_feedback = InputField(
         desc="Task examples with visual content showing inputs, assistant outputs, and feedback. "
         "Pay special attention to feedback about visual analysis accuracy, visual-textual integration, "
         "and any domain-specific visual knowledge that the assistant missed."
     )
 
-    improved_instruction = dspy.OutputField(
+    improved_instruction = OutputField(
         desc="A better instruction for the assistant that addresses visual analysis issues, provides "
         "clear guidance on how to process and integrate visual and textual information, includes "
         "necessary visual domain knowledge, and prevents the visual analysis mistakes shown in the examples."
     )
 
 
-class SingleComponentMultiModalProposer(dspy.Module):
+class SingleComponentMultiModalProposer(Module):
     """
     dspy.Module for proposing improved instructions based on feedback.
     """
 
     def __init__(self):
         super().__init__()
-        self.propose_instruction = dspy.Predict(GenerateEnhancedMultimodalInstructionFromFeedback)
+        self.propose_instruction = Predict(GenerateEnhancedMultimodalInstructionFromFeedback)
 
     def forward(self, current_instruction: str, reflective_dataset: list[ReflectiveExample]) -> str:
         """

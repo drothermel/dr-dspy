@@ -1,7 +1,7 @@
 from typing import Any
 
 from dspy.clients.cache import request_cache
-from dspy.dsp.utils import dotdict
+from dspy.dsp.utils.utils import dotdict
 
 # TODO: Ideally, this takes the name of the index and looks up its port.
 

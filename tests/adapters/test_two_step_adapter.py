@@ -1,17 +1,24 @@
+from dspy.utils.dummies import DummyLM
 from unittest import mock
 
 import pytest
 
-import dspy
+from dspy.adapters.two_step_adapter import TwoStepAdapter
+from dspy.clients.lm import LM
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
+from dspy.utils.exceptions import AdapterParseError
 from tests.adapters.conftest import format_messages_and_lm_kwargs
 
 
 def test_two_step_adapter_format_exact_messages_for_simple_signature_with_demo():
-    class QA(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class QA(Signature):
+        question: str = InputField()
+        answer: str = OutputField()
 
-    adapter = dspy.TwoStepAdapter(dspy.utils.DummyLM([{"answer": "x"}]))
+    adapter = TwoStepAdapter(DummyLM([{"answer": "x"}]))
     messages, lm_kwargs = format_messages_and_lm_kwargs(adapter, QA, [{"question": "Q1", "answer": "A1"}], {"question": "Q2"})
 
     expected_messages = [{"role": "system",
@@ -32,12 +39,12 @@ def test_two_step_adapter_format_exact_messages_for_simple_signature_with_demo()
 
 
 def test_two_step_adapter_format_exact_messages_with_typed_outputs():
-    class TypedSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        count: int = dspy.OutputField()
-        answer: str = dspy.OutputField()
+    class TypedSignature(Signature):
+        question: str = InputField()
+        count: int = OutputField()
+        answer: str = OutputField()
 
-    adapter = dspy.TwoStepAdapter(dspy.utils.DummyLM([{"count": 1, "answer": "x"}]))
+    adapter = TwoStepAdapter(DummyLM([{"count": 1, "answer": "x"}]))
     messages, lm_kwargs = format_messages_and_lm_kwargs(adapter, TypedSignature, [], {"question": "Q"})
 
     expected_messages = [{"role": "system",
@@ -58,19 +65,19 @@ def test_two_step_adapter_format_exact_messages_with_typed_outputs():
 
 
 def test_two_step_adapter_call():
-    class TestSignature(dspy.Signature):
-        question: str = dspy.InputField(desc="The math question to solve")
-        solution: str = dspy.OutputField(desc="Step by step solution")
-        answer: float = dspy.OutputField(desc="The final numerical answer")
+    class TestSignature(Signature):
+        question: str = InputField(desc="The math question to solve")
+        solution: str = OutputField(desc="Step by step solution")
+        answer: float = OutputField(desc="The final numerical answer")
 
-    program = dspy.Predict(TestSignature)
+    program = Predict(TestSignature)
 
-    mock_main_lm = mock.MagicMock(spec=dspy.LM)
+    mock_main_lm = mock.MagicMock(spec=LM)
     mock_main_lm.return_value = ["text from main LM"]
     mock_main_lm.kwargs = {"temperature": 1.0}
     mock_main_lm.model = "openai/gpt-4o-mini"
 
-    mock_extraction_lm = mock.MagicMock(spec=dspy.LM)
+    mock_extraction_lm = mock.MagicMock(spec=LM)
     mock_extraction_lm.return_value = [
         """
 [[ ## solution ## ]] result
@@ -81,7 +88,7 @@ def test_two_step_adapter_call():
     mock_extraction_lm.kwargs = {"temperature": 1.0}
     mock_extraction_lm.model = "openai/gpt-4o"
 
-    dspy.configure(lm=mock_main_lm, adapter=dspy.TwoStepAdapter(extraction_model=mock_extraction_lm))
+    settings.configure(lm=mock_main_lm, adapter=TwoStepAdapter(extraction_model=mock_extraction_lm))
 
     result = program(question="What is 5 + 7?")
 
@@ -125,19 +132,19 @@ def test_two_step_adapter_call():
 
 @pytest.mark.asyncio
 async def test_two_step_adapter_async_call():
-    class TestSignature(dspy.Signature):
-        question: str = dspy.InputField(desc="The math question to solve")
-        solution: str = dspy.OutputField(desc="Step by step solution")
-        answer: float = dspy.OutputField(desc="The final numerical answer")
+    class TestSignature(Signature):
+        question: str = InputField(desc="The math question to solve")
+        solution: str = OutputField(desc="Step by step solution")
+        answer: float = OutputField(desc="The final numerical answer")
 
-    program = dspy.Predict(TestSignature)
+    program = Predict(TestSignature)
 
-    mock_main_lm = mock.MagicMock(spec=dspy.LM)
+    mock_main_lm = mock.MagicMock(spec=LM)
     mock_main_lm.acall.return_value = ["text from main LM"]
     mock_main_lm.kwargs = {"temperature": 1.0}
     mock_main_lm.model = "openai/gpt-4o-mini"
 
-    mock_extraction_lm = mock.MagicMock(spec=dspy.LM)
+    mock_extraction_lm = mock.MagicMock(spec=LM)
     mock_extraction_lm.acall.return_value = [
         """
 [[ ## solution ## ]] result
@@ -148,7 +155,7 @@ async def test_two_step_adapter_async_call():
     mock_extraction_lm.kwargs = {"temperature": 1.0}
     mock_extraction_lm.model = "openai/gpt-4o"
 
-    with dspy.context(lm=mock_main_lm, adapter=dspy.TwoStepAdapter(extraction_model=mock_extraction_lm)):
+    with settings.context(lm=mock_main_lm, adapter=TwoStepAdapter(extraction_model=mock_extraction_lm)):
         result = await program.acall(question="What is 5 + 7?")
 
     assert result.answer == 12
@@ -190,14 +197,14 @@ async def test_two_step_adapter_async_call():
 
 
 def test_two_step_adapter_parse():
-    class ComplexSignature(dspy.Signature):
-        input_text: str = dspy.InputField()
-        tags: list[str] = dspy.OutputField(desc="List of relevant tags")
-        confidence: float = dspy.OutputField(desc="Confidence score")
+    class ComplexSignature(Signature):
+        input_text: str = InputField()
+        tags: list[str] = OutputField(desc="List of relevant tags")
+        confidence: float = OutputField(desc="Confidence score")
 
     first_response = "main LM response"
 
-    mock_extraction_lm = mock.MagicMock(spec=dspy.LM)
+    mock_extraction_lm = mock.MagicMock(spec=LM)
     mock_extraction_lm.return_value = [
         """
         {
@@ -208,8 +215,8 @@ def test_two_step_adapter_parse():
     ]
     mock_extraction_lm.kwargs = {"temperature": 1.0}
     mock_extraction_lm.model = "openai/gpt-4o"
-    adapter = dspy.TwoStepAdapter(mock_extraction_lm)
-    dspy.configure(adapter=adapter, lm=mock_extraction_lm)
+    adapter = TwoStepAdapter(mock_extraction_lm)
+    settings.configure(adapter=adapter, lm=mock_extraction_lm)
 
     result = adapter.parse(ComplexSignature, first_response)
 
@@ -218,18 +225,18 @@ def test_two_step_adapter_parse():
 
 
 def test_two_step_adapter_parse_errors():
-    class TestSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class TestSignature(Signature):
+        question: str = InputField()
+        answer: str = OutputField()
 
     first_response = "main LM response"
 
-    mock_extraction_lm = mock.MagicMock(spec=dspy.LM)
+    mock_extraction_lm = mock.MagicMock(spec=LM)
     mock_extraction_lm.return_value = ["invalid response"]
     mock_extraction_lm.kwargs = {"temperature": 1.0}
     mock_extraction_lm.model = "openai/gpt-4o"
 
-    adapter = dspy.TwoStepAdapter(mock_extraction_lm)
+    adapter = TwoStepAdapter(mock_extraction_lm)
 
-    with pytest.raises(dspy.AdapterParseError, match="Failed to parse response"):
+    with pytest.raises(AdapterParseError, match="Failed to parse response"):
         adapter.parse(TestSignature, first_response)

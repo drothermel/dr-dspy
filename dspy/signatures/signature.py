@@ -685,6 +685,18 @@ def _parse_type_node(node, names=None) -> Any:
         names = dict(typing.__dict__)
         names["NoneType"] = type(None)
 
+    dspy_type_modules = {
+        "Audio": "dspy.adapters.types.audio",
+        "Code": "dspy.adapters.types.code",
+        "File": "dspy.adapters.types.file",
+        "History": "dspy.adapters.types.history",
+        "Image": "dspy.adapters.types.image",
+        "Reasoning": "dspy.adapters.types.reasoning",
+        "Tool": "dspy.adapters.types.tool",
+        "ToolCalls": "dspy.adapters.types.tool",
+        "ToolCallResults": "dspy.adapters.types.tool",
+    }
+
     def resolve_name(type_name: str):
         # Check if it's a built-in known type or in the provided names
         if type_name in names:
@@ -696,6 +708,12 @@ def _parse_type_node(node, names=None) -> Any:
         for t in builtin_types:
             if t.__name__ == type_name:
                 return t
+
+        if type_name in dspy_type_modules:
+            module = importlib.import_module(dspy_type_modules[type_name])
+            resolved_type = getattr(module, type_name)
+            names[type_name] = resolved_type
+            return resolved_type
 
         # Attempt to import a module with this name dynamically
         # This allows handling of module-based annotations like `dspy.Image`.

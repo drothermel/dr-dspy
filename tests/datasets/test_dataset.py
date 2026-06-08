@@ -3,8 +3,8 @@ import uuid
 
 import pytest
 
-from dspy import Example
 from dspy.datasets.dataset import Dataset
+from dspy.primitives.example import Example
 
 dummy_data = """content,question,answer
 "This is content 1","What is this?","This is answer 1"

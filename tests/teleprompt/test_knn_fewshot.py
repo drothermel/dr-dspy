@@ -1,13 +1,17 @@
 import pytest
 
-import dspy
+from dspy.clients.embedding import Embedder
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
+from dspy.primitives.module import Module
 from dspy.teleprompt.knn_fewshot import KNNFewShot
 from dspy.utils.dummies import DummyLM, DummyVectorizer
 
 
-def mock_example(question: str, answer: str) -> dspy.Example:
+def mock_example(question: str, answer: str) -> Example:
     """Creates a mock DSP example with specified question and answer."""
-    return dspy.Example(question=question, answer=answer).with_inputs("question")
+    return Example(question=question, answer=answer).with_inputs("question")
 
 
 @pytest.fixture
@@ -18,7 +22,7 @@ def setup_knn_few_shot() -> KNNFewShot:
         mock_example("What is the largest ocean?", "Pacific"),
         mock_example("What is 2+2?", "4"),
     ]
-    return KNNFewShot(k=2, trainset=trainset, vectorizer=dspy.Embedder(DummyVectorizer()))
+    return KNNFewShot(k=2, trainset=trainset, vectorizer=Embedder(DummyVectorizer()))
 
 
 def test_knn_few_shot_initialization(setup_knn_few_shot):
@@ -28,10 +32,10 @@ def test_knn_few_shot_initialization(setup_knn_few_shot):
     assert len(knn_few_shot.KNN.trainset) == 3, "Incorrect trainset size for KNN"
 
 
-class SimpleModule(dspy.Module):
+class SimpleModule(Module):
     def __init__(self, signature):
         super().__init__()
-        self.predictor = dspy.Predict(signature)
+        self.predictor = Predict(signature)
 
     def forward(self, *args, **kwargs):
         return self.predictor(**kwargs)
@@ -49,7 +53,7 @@ def _test_knn_few_shot_compile(setup_knn_few_shot):
 
     # Setup DummyLM with a response for a query similar to one of the training examples
     lm = DummyLM(["Madrid", "10"])
-    dspy.configure(lm=lm)  # Responses for the capital of Spain and the result of 5+5)
+    settings.configure(lm=lm)  # Responses for the capital of Spain and the result of 5+5)
 
     knn_few_shot = setup_knn_few_shot
     trainset = knn_few_shot.KNN.trainset

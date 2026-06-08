@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-import dspy
+import dspy.clients as dspy_clients
 from dspy.clients.embedding import Embedder
 
 
@@ -18,10 +18,10 @@ class MockEmbeddingResponse:
 
 @pytest.fixture
 def cache(tmp_path):
-    original_cache = dspy.cache
-    dspy.configure_cache(disk_cache_dir=tmp_path / ".dspy_cache")
+    original_cache = dspy_clients.DSPY_CACHE
+    dspy_clients.configure_cache(disk_cache_dir=tmp_path / ".dspy_cache")
     yield
-    dspy.cache = original_cache
+    dspy_clients.DSPY_CACHE = original_cache
 
 
 def test_litellm_embedding(cache):
@@ -93,7 +93,7 @@ def test_callable_embedding(cache):
 
 
 def test_callable_numpy_embedding_persists_to_disk(cache, tmp_path):
-    dspy.configure_cache(disk_cache_dir=tmp_path / ".dspy_cache_safe", restrict_pickle=True)
+    dspy_clients.configure_cache(disk_cache_dir=tmp_path / ".dspy_cache_safe", restrict_pickle=True)
 
     inputs = ["hello", "world"]
     expected_embeddings = np.array(
@@ -115,7 +115,7 @@ def test_callable_numpy_embedding_persists_to_disk(cache, tmp_path):
     assert embedding_fn.call_count == 1
     np.testing.assert_allclose(result, expected_embeddings)
 
-    dspy.cache.reset_memory_cache()
+    dspy_clients.DSPY_CACHE.reset_memory_cache()
 
     result = embedding(inputs)
     assert embedding_fn.call_count == 1

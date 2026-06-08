@@ -1,7 +1,9 @@
 from dspy.predict.chain_of_thought import ChainOfThought
-from dspy.primitives import Module
+from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.signatures import InputField, OutputField, Signature
+from dspy.signatures.field import InputField
+from dspy.signatures.field import OutputField
+from dspy.signatures.signature import Signature
 
 
 class SemanticRecallPrecision(Signature):

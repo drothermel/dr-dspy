@@ -1,9 +1,10 @@
 from unittest.mock import patch
 
-import dspy
-from dspy import Example
-from dspy.predict import Predict
-from dspy.teleprompt import BootstrapFinetune
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
+from dspy.primitives.module import Module
+from dspy.teleprompt.bootstrap_finetune import BootstrapFinetune
 from dspy.utils.dummies import DummyLM
 
 
@@ -26,7 +27,7 @@ def test_bootstrap_finetune_initialization():
     assert bootstrap.multitask == True, "Multitask should default to True"
 
 
-class SimpleModule(dspy.Module):
+class SimpleModule(Module):
     def __init__(self, signature):
         super().__init__()
         self.predictor = Predict(signature)
@@ -42,7 +43,7 @@ def test_compile_with_predict_instances():
     teacher = SimpleModule("input -> output")
 
     lm = DummyLM([{"output": "blue"}, {"output": "Ring-ding-ding-ding-dingeringeding!"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     # Set LM for both student and teacher
     student.set_lm(lm)
@@ -65,7 +66,7 @@ def test_error_handling_missing_lm():
     """Test error handling when predictor doesn't have an LM assigned."""
 
     lm = DummyLM([{"output": "test"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     student = SimpleModule("input -> output")
     # Intentionally NOT setting LM for the student module

@@ -1,15 +1,16 @@
 import pytest
 
-import dspy
-from dspy.predict import KNN
-from dspy.utils import DummyVectorizer
+from dspy.clients.embedding import Embedder
+from dspy.predict.knn import KNN
+from dspy.primitives.example import Example
+from dspy.utils.dummies import DummyVectorizer
 
 pytestmark = pytest.mark.extra
 
 
-def mock_example(question: str, answer: str) -> dspy.Example:
+def mock_example(question: str, answer: str) -> Example:
     """Creates a mock DSP example with specified question and answer."""
-    return dspy.Example(question=question, answer=answer).with_inputs("question")
+    return Example(question=question, answer=answer).with_inputs("question")
 
 
 @pytest.fixture
@@ -20,7 +21,7 @@ def setup_knn() -> KNN:
         mock_example("What is the largest ocean?", "Pacific"),
         mock_example("What is 2+2?", "4"),
     ]
-    return KNN(k=2, trainset=trainset, vectorizer=dspy.Embedder(DummyVectorizer()))
+    return KNN(k=2, trainset=trainset, vectorizer=Embedder(DummyVectorizer()))
 
 
 def test_knn_initialization(setup_knn):

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from types import MethodType
 from typing import Any, Callable, TypedDict
 
-import dspy
+from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
@@ -61,9 +61,9 @@ def bootstrap_trace_data(
     original_forward = object.__getattribute__(program, "forward")
 
     def patched_forward(program_to_use: Module, **kwargs):
-        with dspy.context(trace=[]):
+        with settings.context(trace=[]):
             try:
-                return original_forward(**kwargs), dspy.settings.trace.copy()
+                return original_forward(**kwargs), settings.trace.copy()
             except AdapterParseError as e:
                 completion_str = e.lm_response
                 parsed_result = e.parsed_result
@@ -81,7 +81,7 @@ def bootstrap_trace_data(
                 if found_pred is None:
                     raise ValueError(f"Failed to find the predictor for the failed signature: {failed_signature}")
 
-                trace = dspy.settings.trace.copy()
+                trace = settings.trace.copy()
                 # Trace is Tuple[signature, inputs, prediction outputs]
                 if present:
                     failed_pred = FailedPrediction(

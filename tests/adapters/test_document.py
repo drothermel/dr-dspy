@@ -1,7 +1,7 @@
 import pydantic
 import pytest
 
-from dspy.experimental import Document
+from dspy.adapters.types.document import Document
 
 
 def test_document_validate_input():

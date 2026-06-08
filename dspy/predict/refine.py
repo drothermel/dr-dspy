@@ -4,10 +4,13 @@ from typing import Callable
 
 import orjson
 
-import dspy
+from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.utils import get_field_description_string
-from dspy.predict.predict import Prediction
-from dspy.signatures import InputField, OutputField, Signature
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict, Prediction
+from dspy.signatures.field import InputField
+from dspy.signatures.field import OutputField
+from dspy.signatures.signature import Signature
 
 from .predict import Module
 
@@ -96,12 +99,12 @@ class Refine(Module):
             self.reward_fn_code = inspect.getsource(reward_fn.__class__)
 
     def forward(self, **kwargs):
-        lm = self.module.get_lm() or dspy.settings.lm
+        lm = self.module.get_lm() or settings.lm
         start = lm.kwargs.get("rollout_id", 0)
         rollout_ids = [start + i for i in range(self.N)]
         best_pred, best_trace, best_reward = None, None, -float("inf")
         advice = None
-        adapter = dspy.settings.adapter or dspy.ChatAdapter()
+        adapter = settings.adapter or ChatAdapter()
 
         for idx, rid in enumerate(rollout_ids):
             lm_ = lm.copy(rollout_id=rid, temperature=1.0)
@@ -113,7 +116,7 @@ class Refine(Module):
             module_names = [name for name, _ in mod.named_predictors()]
 
             try:
-                with dspy.context(trace=[]):
+                with settings.context(trace=[]):
                     if not advice:
                         outputs = mod(**kwargs)
                     else:
@@ -126,10 +129,10 @@ class Refine(Module):
                                 )
                                 return adapter(lm, lm_kwargs, signature, demos, inputs)
 
-                        with dspy.context(adapter=WrapperAdapter()):
+                        with settings.context(adapter=WrapperAdapter()):
                             outputs = mod(**kwargs)
 
-                    trace = dspy.settings.trace.copy()
+                    trace = settings.trace.copy()
 
                     # TODO: Remove the hint from the trace, if it's there.
 
@@ -164,7 +167,7 @@ class Refine(Module):
                     k: v if isinstance(v, str) else orjson.dumps(recursive_mask(v), option=orjson.OPT_INDENT_2).decode()
                     for k, v in advise_kwargs.items()
                 }
-                advice = dspy.Predict(OfferFeedback)(**advise_kwargs).advice
+                advice = Predict(OfferFeedback)(**advise_kwargs).advice
                 # print(f"Advice for each module: {advice}")
 
             except Exception as e:
@@ -173,7 +176,7 @@ class Refine(Module):
                     raise e
                 self.fail_count -= 1
         if best_trace:
-            dspy.settings.trace.extend(best_trace)
+            settings.trace.extend(best_trace)
         return best_pred
 
 

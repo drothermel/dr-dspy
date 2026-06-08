@@ -1,4 +1,5 @@
-import dspy
+from dspy.utils.dummies import DummyLM
+from dspy.clients.base_lm import BaseLM
 
 
 class StopAdapterCallCapture(BaseException):
@@ -10,9 +11,9 @@ class StopAdapterCallCapture(BaseException):
     """
 
 
-class CapturingLM(dspy.BaseLM):
+class CapturingLM(BaseLM):
     def __init__(self, source_lm=None):
-        source_lm = source_lm or dspy.utils.DummyLM([{}])
+        source_lm = source_lm or DummyLM([{}])
         super().__init__(
             model=source_lm.model,
             model_type=source_lm.model_type,

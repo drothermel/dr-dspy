@@ -4,10 +4,11 @@ from typing import Any
 import pytest
 from pydantic import BaseModel, TypeAdapter
 
-import dspy
+from dspy.adapters.types.history import History
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls, convert_input_schema_to_tool_args
 from dspy.clients.openai_format import to_openai_chat_request
 from dspy.core.types import LMMessage, LMRequest, LMToolResultPart
+from dspy.dsp.utils.settings import settings
 
 
 # Test fixtures
@@ -386,11 +387,11 @@ async def test_async_concurrent_calls():
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_async_tool_call_in_sync_mode():
     tool = Tool(async_dummy_function)
-    with dspy.context(allow_tool_async_sync_conversion=False):
+    with settings.context(allow_tool_async_sync_conversion=False):
         with pytest.raises(ValueError, match=r".*acall.*allow_tool_async_sync_conversion.*"):
             result = tool(x=1, y="hello")
 
-    with dspy.context(allow_tool_async_sync_conversion=True):
+    with settings.context(allow_tool_async_sync_conversion=True):
         result = tool(x=1, y="hello")
         assert result == "hello 1"
 
@@ -516,9 +517,9 @@ def test_tool_call_results_history_serialization_round_trip():
     )
     tool_calls = ToolCalls(tool_calls=[tool_call], tool_call_results=results)
 
-    history = dspy.History(messages=[{"tool_calls": tool_calls}])
+    history = History(messages=[{"tool_calls": tool_calls}])
     dumped = history.model_dump(mode="json")
-    restored = dspy.History.model_validate(dumped)
+    restored = History.model_validate(dumped)
 
     assert dumped == {
         "messages": [
@@ -697,16 +698,16 @@ def test_tool_call_execute():
         return a + b
 
     tools = [
-        dspy.Tool(get_weather),
-        dspy.Tool(add_numbers)
+        Tool(get_weather),
+        Tool(add_numbers)
     ]
 
-    tool_call = dspy.ToolCalls.ToolCall(name="get_weather", args={"city": "Berlin"})
+    tool_call = ToolCalls.ToolCall(name="get_weather", args={"city": "Berlin"})
     result = tool_call.execute(functions=tools)
     assert result == "The weather in Berlin is sunny"
 
     # Test individual tool call with function dict
-    tool_call2 = dspy.ToolCalls.ToolCall(name="add_numbers", args={"a": 7, "b": 13})
+    tool_call2 = ToolCalls.ToolCall(name="add_numbers", args={"a": 7, "b": 13})
     result2 = tool_call2.execute(functions={"add_numbers": add_numbers})
     assert result2 == 20
 
@@ -714,12 +715,12 @@ def test_tool_call_execute():
     def get_pi():
         return 3.14159
 
-    tool_call3 = dspy.ToolCalls.ToolCall(name="get_pi", args={})
+    tool_call3 = ToolCalls.ToolCall(name="get_pi", args={})
     result3 = tool_call3.execute(functions={"get_pi": get_pi})
     assert result3 == 3.14159
 
     # Test error case
-    tool_call4 = dspy.ToolCalls.ToolCall(name="nonexistent", args={})
+    tool_call4 = ToolCalls.ToolCall(name="nonexistent", args={})
     with pytest.raises(ValueError) as exc_info:
         tool_call4.execute(functions=tools)
     assert "not found" in str(exc_info.value)
@@ -734,18 +735,18 @@ def test_tool_call_execute_with_local_functions():
             return x * y
 
         # Test individual execution with local function
-        tool_call1 = dspy.ToolCalls.ToolCall(name="local_add", args={"a": 10, "b": 15})
+        tool_call1 = ToolCalls.ToolCall(name="local_add", args={"a": 10, "b": 15})
         result1 = tool_call1.execute()  # Should find local function automatically
         assert result1 == 25
 
-        tool_call2 = dspy.ToolCalls.ToolCall(name="local_multiply", args={"x": 4, "y": 7})
+        tool_call2 = ToolCalls.ToolCall(name="local_multiply", args={"x": 4, "y": 7})
         result2 = tool_call2.execute()  # Should find local function automatically
         assert result2 == 28
 
         # Test locals take precedence over globals
         try:
             globals()["local_add"] = lambda a, b: a + b + 1000
-            precedence_call = dspy.ToolCalls.ToolCall(name="local_add", args={"a": 1, "b": 2})
+            precedence_call = ToolCalls.ToolCall(name="local_add", args={"a": 1, "b": 2})
             result = precedence_call.execute()
             assert result == 3  # Should use local function (1+2=3), not global (1+2+1000=1003)
         finally:

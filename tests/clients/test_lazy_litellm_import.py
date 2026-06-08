@@ -5,6 +5,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
+from dspy.clients.embedding import Embedder
+from dspy.clients.lm import LM
+from dspy.streaming.streamify import streamify
+
 
 def _hide_litellm(monkeypatch):
     real_find_spec = importlib.util.find_spec
@@ -25,22 +29,20 @@ def _hide_litellm(monkeypatch):
 def test_import_dspy_does_not_import_litellm(monkeypatch):
     monkeypatch.delitem(sys.modules, "litellm", raising=False)
 
-    import dspy
 
-    _ = dspy.LM
-    _ = dspy.Embedder
-    _ = dspy.streamify
+    _ = LM
+    _ = Embedder
+    _ = streamify
 
     assert "litellm" not in sys.modules
 
 
 def test_lm_litellm_use_raises_helpful_error_without_litellm(monkeypatch):
-    import dspy
 
     _hide_litellm(monkeypatch)
 
     with pytest.raises(ImportError) as exc_info:
-        _ = dspy.LM("openai/gpt-4o-mini").supports_function_calling
+        _ = LM("openai/gpt-4o-mini").supports_function_calling
 
     msg = str(exc_info.value)
     assert "[litellm]" in msg
@@ -48,12 +50,11 @@ def test_lm_litellm_use_raises_helpful_error_without_litellm(monkeypatch):
 
 
 def test_embedder_litellm_use_raises_helpful_error_without_litellm(monkeypatch):
-    import dspy
 
     _hide_litellm(monkeypatch)
 
     with pytest.raises(ImportError) as exc_info:
-        dspy.Embedder("openai/text-embedding-3-small")(["hello"])
+        Embedder("openai/text-embedding-3-small")(["hello"])
 
     msg = str(exc_info.value)
     assert "[litellm]" in msg
@@ -61,7 +62,6 @@ def test_embedder_litellm_use_raises_helpful_error_without_litellm(monkeypatch):
 
 
 def test_concurrent_lm_first_use_materializes_litellm_once():
-    import dspy
     from dspy.clients._litellm import get_litellm
 
     original_litellm = sys.modules.pop("litellm", None)
@@ -72,7 +72,7 @@ def test_concurrent_lm_first_use_materializes_litellm_once():
 
         def supports_function_calling(_):
             barrier.wait()
-            lm = dspy.LM("openai/gpt-4o-mini", cache=False, num_retries=0)
+            lm = LM("openai/gpt-4o-mini", cache=False, num_retries=0)
             return lm.supports_function_calling
 
         with ThreadPoolExecutor(max_workers=threads) as executor:

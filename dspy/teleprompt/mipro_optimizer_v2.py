@@ -4,9 +4,9 @@ import random
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
-import dspy
+from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
-from dspy.propose import GroundedProposer
+from dspy.propose.grounded_proposer import GroundedProposer
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.utils import (
     create_minibatch,
@@ -87,8 +87,8 @@ class MIPROv2(Teleprompter):
         self.num_candidates = num_candidates
         self.metric = metric
         self.init_temperature = init_temperature
-        self.task_model = task_model if task_model else dspy.settings.lm
-        self.prompt_model = prompt_model if prompt_model else dspy.settings.lm
+        self.task_model = task_model if task_model else settings.lm
+        self.prompt_model = prompt_model if prompt_model else settings.lm
         self.max_bootstrapped_demos = max_bootstrapped_demos
         self.max_labeled_demos = max_labeled_demos
         self.verbose = verbose
@@ -138,7 +138,7 @@ class MIPROv2(Teleprompter):
         effective_max_errors = (
             self.max_errors
             if self.max_errors is not None
-            else dspy.settings.max_errors
+            else settings.max_errors
         )
 
         effective_max_bootstrapped_demos = (
@@ -226,7 +226,7 @@ class MIPROv2(Teleprompter):
             provide_traceback=provide_traceback,
         )
 
-        with dspy.context(lm=self.task_model):
+        with settings.context(lm=self.task_model):
             # Step 1: Bootstrap few-shot examples
             demo_candidates = self._bootstrap_fewshot_examples(
                 program,
@@ -257,7 +257,7 @@ class MIPROv2(Teleprompter):
         if zeroshot_opt:
             demo_candidates = None
 
-        with dspy.context(lm=self.task_model):
+        with settings.context(lm=self.task_model):
             # Step 3: Find optimal prompt parameters
             best_program = self._optimize_prompt_parameters(
                 program,
@@ -424,7 +424,7 @@ class MIPROv2(Teleprompter):
         zeroshot = max_bootstrapped_demos == 0 and max_labeled_demos == 0
 
         if max_errors is None:
-            max_errors = dspy.settings.max_errors
+            max_errors = settings.max_errors
 
         demo_candidates = create_n_fewshot_demo_sets(
             student=program,

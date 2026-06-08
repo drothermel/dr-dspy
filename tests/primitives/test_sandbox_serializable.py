@@ -1,10 +1,10 @@
 """Tests for the SandboxSerializable ABC and build_repl_variable helper."""
-
 import pytest
 
-import dspy
 from dspy.primitives.repl_types import REPLVariable
 from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
 
 # -- Stub implementations --
 
@@ -121,7 +121,7 @@ class TestBuildReplVariable:
         assert "import json" in var.desc
 
     def test_passes_field_info_through(self):
-        field = dspy.InputField(desc="A data column")
+        field = InputField(desc="A data column")
         var = build_repl_variable(ExampleSerializable(), "data", field_info=field)
         assert "A data column" in var.desc
         # Setup note still appended after user-provided desc
@@ -142,8 +142,8 @@ class TestSignatureAnnotation:
     """Subclasses should be usable as dspy.Signature field annotations."""
 
     def test_subclass_supports_signature_annotation(self):
-        class ExampleSignature(dspy.Signature):
-            data: ExampleSerializable = dspy.InputField()
-            answer: str = dspy.OutputField()
+        class ExampleSignature(Signature):
+            data: ExampleSerializable = InputField()
+            answer: str = OutputField()
 
         assert ExampleSignature.input_fields["data"].annotation is ExampleSerializable

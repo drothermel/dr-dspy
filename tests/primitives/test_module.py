@@ -4,17 +4,22 @@ from pathlib import Path
 
 import pytest
 
-import dspy
+from dspy.dsp.utils.settings import settings
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.predict.predict import Predict
+from dspy.predict.react import ReAct
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module, set_attribute_by_name
-from dspy.utils import DummyLM
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
+from dspy.utils.dummies import DummyLM
 
 
-class HopModule(dspy.Module):
+class HopModule(Module):
     def __init__(self):
         super().__init__()
-        self.predict1 = dspy.Predict("question -> query")
-        self.predict2 = dspy.Predict("query -> answer")
+        self.predict1 = Predict("question -> query")
+        self.predict2 = Predict("query -> answer")
 
     def forward(self, question):
         query = self.predict1(question=question).query
@@ -38,12 +43,12 @@ def test_predictors():
     module = HopModule()
     preds = module.predictors()
     assert len(preds) == 2, "Should return correct number of Predict instances"
-    assert all(isinstance(p, dspy.Predict) for p in preds), "All returned items should be instances of PredictMock"
+    assert all(isinstance(p, Predict) for p in preds), "All returned items should be instances of PredictMock"
 
 
 def test_forward():
     program = HopModule()
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             {
                 "What is 1+1?": {"query": "let me check"},
@@ -56,7 +61,7 @@ def test_forward():
 
 
 def test_nested_named_predictors():
-    class Hop2Module(dspy.Module):
+    class Hop2Module(Module):
         def __init__(self):
             super().__init__()
             self.hop = HopModule()
@@ -172,7 +177,7 @@ def test_complex_module_set_attribute_by_name():
 class DuplicateModule(Module):
     def __init__(self):
         super().__init__()
-        self.p0 = dspy.Predict("question -> answer")
+        self.p0 = Predict("question -> answer")
         self.p1 = self.p0
 
 
@@ -192,7 +197,7 @@ def test_load_dspy_program_cross_version():
     `dspy.ReAct` program.
     """
     path = Path(__file__).parent / "resources" / "saved_program.json"
-    loaded_react = dspy.ReAct("question->answer", tools=[])
+    loaded_react = ReAct("question->answer", tools=[])
     loaded_react.load(path)
     assert (
         "Imagine you are a detective racing against time to solve a high-profile"
@@ -211,15 +216,15 @@ def test_load_state_is_transactional():
     or malformed value), the module must be completely unchanged.
     """
 
-    class Sig(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class Sig(Signature):
+        question: str = InputField()
+        answer: str = OutputField()
 
-    class Prog(dspy.Module):
+    class Prog(Module):
         def __init__(self):
             super().__init__()
-            self.a = dspy.ChainOfThought(Sig)
-            self.b = dspy.ChainOfThought(Sig)
+            self.a = ChainOfThought(Sig)
+            self.b = ChainOfThought(Sig)
 
     source = Prog()
     sentinel = Example(question="q1", answer="a1").with_inputs("question")

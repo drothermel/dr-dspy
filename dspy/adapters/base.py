@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import json
 import logging
-from typing import Any, get_origin
+from typing import TYPE_CHECKING, Any, get_origin
 
 import json_repair
 
@@ -8,22 +10,25 @@ from dspy.adapters._legacy_type_markers import (
     _expand_legacy_custom_type_markers_in_chat_message,
     _expand_legacy_custom_type_markers_in_lm_message,
 )
-from dspy.adapters.types import History, Type
+from dspy.adapters.types.history import History
+from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.utils import serialize_for_json
-from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import (
     legacy_outputs_from_lm_response,
     lm_response_from_legacy_outputs,
     to_openai_chat_request,
 )
 from dspy.core.types import LMMessage, LMRequest, LMResponse
-from dspy.experimental import Citations
+from dspy.adapters.types.citation import Citations
 from dspy.signatures.field import InputField
 from dspy.signatures.signature import Signature
-from dspy.utils.callback import BaseCallback, with_callbacks
 from dspy.utils.exceptions import AdapterParseError
+
+if TYPE_CHECKING:
+    from dspy.clients.base_lm import BaseLM
+    from dspy.utils.callback import BaseCallback
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +80,7 @@ class Adapter:
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
+        from dspy.utils.callback import with_callbacks
 
         # Decorate format() and parse() method with with_callbacks
         cls.format = with_callbacks(cls.format)

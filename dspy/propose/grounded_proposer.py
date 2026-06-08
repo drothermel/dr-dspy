@@ -1,6 +1,9 @@
 import random
 
-import dspy
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
+from dspy.primitives.module import Module
+from dspy.primitives.prediction import Prediction
 from dspy.propose.dataset_summary_generator import create_dataset_summary
 from dspy.propose.propose_base import Proposer
 from dspy.propose.utils import (
@@ -9,6 +12,8 @@ from dspy.propose.utils import (
     get_dspy_source_code,
     strip_prefix,
 )
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
 from dspy.teleprompt.utils import get_prompt_model, get_signature
 
 # Hardcoded variables (TODO: update)
@@ -25,38 +30,38 @@ TIPS = {
 
 ### SIGNATURES USED TO HELP WITH INSTRUCTION GENERATION ###
 
-class DescribeProgram(dspy.Signature):
+class DescribeProgram(Signature):
     (
         """Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe what type of task this program appears to be designed to solve, and how it appears to work."""
     )
-    program_code = dspy.InputField(
+    program_code = InputField(
         desc="Pseudocode for a language model program designed to solve a particular task.",
     )
-    program_example = dspy.InputField(
+    program_example = InputField(
         desc="An example of the program in use.",
     )
-    program_description = dspy.OutputField(
+    program_description = OutputField(
         desc="Describe what task the program is designed to solve, and how it goes about solving this task.",
     )
 
 
-class DescribeModule(dspy.Signature):
+class DescribeModule(Signature):
     (
         """Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe the purpose of one of the specified module in this pipeline."""
     )
-    program_code = dspy.InputField(
+    program_code = InputField(
         desc="Pseudocode for a language model program designed to solve a particular task.",
     )
-    program_example = dspy.InputField(
+    program_example = InputField(
         desc="An example of the program in use.",
     )
-    program_description = dspy.InputField(
+    program_description = InputField(
         desc="Summary of the task the program is designed to solve, and how it goes about solving it.",
     )
-    module = dspy.InputField(
+    module = InputField(
         desc="The module in the program that we want to describe.",
     )
-    module_description = dspy.OutputField(
+    module_description = OutputField(
         desc="Description of the module's role in the broader program.",
     )
 
@@ -68,50 +73,50 @@ def generate_instruction_class(
     use_instruct_history=True,
     use_tip=True,
 ):
-    class GenerateSingleModuleInstruction(dspy.Signature):
+    class GenerateSingleModuleInstruction(Signature):
         (
             """Use the information below to learn about a task that we are trying to solve using calls to an LM, then generate a new instruction that will be used to prompt a Language Model to better solve the task."""
         )
         if use_dataset_summary:
-            dataset_description = dspy.InputField(
+            dataset_description = InputField(
                 desc="A description of the dataset that we are using.",
             )
         if program_aware:
-            program_code = dspy.InputField(
+            program_code = InputField(
                 desc="Language model program designed to solve a particular task.",
             )
-            program_description = dspy.InputField(
+            program_description = InputField(
                 desc="Summary of the task the program is designed to solve, and how it goes about solving it.",
             )
-            module = dspy.InputField(
+            module = InputField(
                 desc="The module to create an instruction for.",
             )
-            module_description = dspy.InputField(
+            module_description = InputField(
                 desc="Description of the module to create an instruction for.",
             )
-        task_demos = dspy.InputField(
+        task_demos = InputField(
             desc="Example inputs/outputs of our module.",
         )
         if use_instruct_history:
-            previous_instructions = dspy.InputField(
+            previous_instructions = InputField(
                 desc="Previous instructions we've attempted, along with their associated scores.",
             )
-        basic_instruction = dspy.InputField(
+        basic_instruction = InputField(
             desc="Basic instruction.",
         )
         if use_tip:
-            tip = dspy.InputField(
+            tip = InputField(
                 desc="A suggestion for how to go about generating the new instruction.",
             )
-        proposed_instruction = dspy.OutputField(
+        proposed_instruction = OutputField(
             desc="Propose an instruction that will be used to prompt a Language Model to perform this task.",
         )
 
-    return dspy.Predict(GenerateSingleModuleInstruction)
+    return Predict(GenerateSingleModuleInstruction)
 
 ### CLASS RESPONSIBLE FOR GENERATING A NEW INSTRUCTION, USING THE HELPER SIGNATURES ABOVE ###
 
-class GenerateModuleInstruction(dspy.Module):
+class GenerateModuleInstruction(Module):
     def __init__(
         self,
         program_code_string=None,
@@ -131,8 +136,8 @@ class GenerateModuleInstruction(dspy.Module):
         self.verbose = verbose
 
         self.program_code_string = program_code_string
-        self.describe_program = dspy.Predict(DescribeProgram)
-        self.describe_module = dspy.Predict(DescribeModule)
+        self.describe_program = Predict(DescribeProgram)
+        self.describe_module = Predict(DescribeModule)
         self.generate_module_instruction = generate_instruction_class(
             use_dataset_summary=use_dataset_summary,
             program_aware=program_aware,
@@ -242,7 +247,7 @@ class GenerateModuleInstruction(dspy.Module):
 
         proposed_instruction = strip_prefix(instruct.proposed_instruction)
 
-        return dspy.Prediction(proposed_instruction=proposed_instruction)
+        return Prediction(proposed_instruction=proposed_instruction)
 
 ### CLASS USED TO GENERATE THE FULL SET OF INSTRUCTIONS GIVEN THE SPECIFIED CRITERIA ###
 
@@ -397,7 +402,7 @@ class GroundedProposer(Proposer):
             temperature=self.init_temperature,
         )
 
-        with dspy.context(lm=rollout_lm):
+        with settings.context(lm=rollout_lm):
             proposed_instruction = instruction_generator(
                 demo_candidates=demo_candidates,
                 pred_i=pred_i,

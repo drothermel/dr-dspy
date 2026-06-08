@@ -1,3 +1,7 @@
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.signatures.field import InputField
+from dspy.signatures.field import OutputField
+from dspy.signatures.signature import Signature
 ### Input models ###
 
 
@@ -70,10 +74,9 @@ class ProgramOutputs(BaseModel):
 
 ### Program definition ###
 
-import dspy
 
 
-class BaseSignature(dspy.Signature):
+class BaseSignature(Signature):
     """
     This AI program is designed to process complex datasets with multiple nested input fields and produce structured output fields. It can handle cases where nested fields have the same name but different types, ensuring that the data is accurately processed and transformed. The program is particularly useful for applications that require detailed data analysis, integration of multiple data sources, and handling of heterogeneous data types.
     """
@@ -83,14 +86,14 @@ program_signature = BaseSignature
 for input_field_name, input_field in ProgramInputs.model_fields.items():
     program_signature = program_signature.append(
         name=input_field_name,
-        field=dspy.InputField(description=input_field.description),
+        field=InputField(description=input_field.description),
         type_=input_field.annotation,
     )
 for output_field_name, output_field in ProgramOutputs.model_fields.items():
     program_signature = program_signature.append(
         name=output_field_name,
-        field=dspy.OutputField(description=input_field.description),
+        field=OutputField(description=input_field.description),
         type_=output_field.annotation,
     )
 
-program = dspy.ChainOfThought(program_signature)
+program = ChainOfThought(program_signature)

@@ -1,3 +1,4 @@
+from dspy.utils.exceptions import AdapterParseError
 from typing import Literal
 from unittest import mock
 
@@ -6,8 +7,15 @@ import pytest
 from litellm import Choices, Message
 from litellm.files.main import ModelResponse
 
-import dspy
 from dspy.adapters.baml_adapter import COMMENT_SYMBOL, INDENTATION, BAMLAdapter
+from dspy.adapters.json_adapter import JSONAdapter
+from dspy.adapters.types.code import Code
+from dspy.adapters.types.history import History
+from dspy.adapters.types.image import Image
+from dspy.adapters.types.tool import Tool
+from dspy.clients.lm import LM
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
 from tests.adapters.conftest import format_messages_and_lm_kwargs
 
 
@@ -43,7 +51,7 @@ class ModelWithLists(pydantic.BaseModel):
 
 
 class ImageWrapper(pydantic.BaseModel):
-    images: list[dspy.Image]
+    images: list[Image]
     tag: list[str]
 
 
@@ -53,9 +61,9 @@ class CircularModel(pydantic.BaseModel):
 
 
 def test_baml_adapter_format_exact_messages_for_simple_signature_with_demo():
-    class QA(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class QA(Signature):
+        question: str = InputField()
+        answer: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(BAMLAdapter(), QA, [{"question": "Q1", "answer": "A1"}], {"question": "Q2"})
 
@@ -93,9 +101,9 @@ def test_baml_adapter_format_exact_messages_with_nested_output():
         value: int
         tags: list[str]
 
-    class TypedSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: BamlNested = dspy.OutputField()
+    class TypedSignature(Signature):
+        question: str = InputField()
+        answer: BamlNested = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(BAMLAdapter(), TypedSignature, [], {"question": "Q"})
 
@@ -133,9 +141,9 @@ def test_baml_adapter_format_exact_messages_with_nested_output():
 def test_baml_adapter_basic_schema_generation():
     """Test that BAMLAdapter generates simplified schemas for Pydantic models."""
 
-    class TestSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        patient: PatientDetails = dspy.OutputField()
+    class TestSignature(Signature):
+        question: str = InputField()
+        patient: PatientDetails = OutputField()
 
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
@@ -152,9 +160,9 @@ def test_baml_adapter_basic_schema_generation():
 def test_baml_adapter_handles_optional_fields():
     """Test optional field rendering with 'or null' syntax."""
 
-    class TestSignature(dspy.Signature):
-        input: str = dspy.InputField()
-        patient: PatientDetails = dspy.OutputField()
+    class TestSignature(Signature):
+        input: str = InputField()
+        patient: PatientDetails = OutputField()
 
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
@@ -173,9 +181,9 @@ def test_baml_adapter_handles_primitive_types():
         decimal: float
         flag: bool
 
-    class TestSignature(dspy.Signature):
-        input: str = dspy.InputField()
-        output: SimpleModel = dspy.OutputField()
+    class TestSignature(Signature):
+        input: str = InputField()
+        output: SimpleModel = OutputField()
 
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
@@ -189,9 +197,9 @@ def test_baml_adapter_handles_primitive_types():
 def test_baml_adapter_handles_lists_with_bracket_notation():
     """Test that lists of Pydantic models use proper bracket notation."""
 
-    class TestSignature(dspy.Signature):
-        input: str = dspy.InputField()
-        addresses: ModelWithLists = dspy.OutputField()
+    class TestSignature(Signature):
+        input: str = InputField()
+        addresses: ModelWithLists = OutputField()
 
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
@@ -208,9 +216,9 @@ def test_baml_adapter_handles_lists_with_bracket_notation():
 def test_baml_adapter_handles_complex_nested_models():
     """Test deeply nested Pydantic model schema generation."""
 
-    class TestSignature(dspy.Signature):
-        input: str = dspy.InputField()
-        complex: ComplexNestedModel = dspy.OutputField()
+    class TestSignature(Signature):
+        input: str = InputField()
+        complex: ComplexNestedModel = OutputField()
 
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
@@ -234,9 +242,9 @@ def test_baml_adapter_handles_complex_nested_models():
 def test_baml_adapter_raise_error_on_circular_references():
     """Test that circular references are handled gracefully."""
 
-    class TestSignature(dspy.Signature):
-        input: str = dspy.InputField()
-        circular: CircularModel = dspy.OutputField()
+    class TestSignature(Signature):
+        input: str = InputField()
+        circular: CircularModel = OutputField()
 
     adapter = BAMLAdapter()
     with pytest.raises(ValueError) as error:
@@ -248,10 +256,10 @@ def test_baml_adapter_raise_error_on_circular_references():
 def test_baml_adapter_formats_pydantic_inputs_as_clean_json():
     """Test that Pydantic input instances are formatted as clean JSON."""
 
-    class TestSignature(dspy.Signature):
-        patient: PatientDetails = dspy.InputField()
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class TestSignature(Signature):
+        patient: PatientDetails = InputField()
+        question: str = InputField()
+        answer: str = OutputField()
 
     adapter = BAMLAdapter()
     patient = PatientDetails(
@@ -271,11 +279,11 @@ def test_baml_adapter_formats_pydantic_inputs_as_clean_json():
 def test_baml_adapter_handles_mixed_input_types():
     """Test formatting of mixed Pydantic and primitive inputs."""
 
-    class TestSignature(dspy.Signature):
-        patient: PatientDetails = dspy.InputField()
-        priority: int = dspy.InputField()
-        notes: str = dspy.InputField()
-        result: str = dspy.OutputField()
+    class TestSignature(Signature):
+        patient: PatientDetails = InputField()
+        priority: int = InputField()
+        notes: str = InputField()
+        result: str = OutputField()
 
     adapter = BAMLAdapter()
     patient = PatientDetails(name="Jane Doe", age=30)
@@ -297,9 +305,9 @@ def test_baml_adapter_handles_schema_generation_errors_gracefully():
         # This might cause issues in schema generation
         field: object
 
-    class TestSignature(dspy.Signature):
-        input: str = dspy.InputField()
-        output: ProblematicModel = dspy.OutputField()
+    class TestSignature(Signature):
+        input: str = InputField()
+        output: ProblematicModel = OutputField()
 
     adapter = BAMLAdapter()
 
@@ -316,17 +324,17 @@ def test_baml_adapter_handles_schema_generation_errors_gracefully():
 def test_baml_adapter_raises_on_missing_fields():
     """Test that missing required fields raise appropriate errors."""
 
-    class TestSignature(dspy.Signature):
-        input: str = dspy.InputField()
-        patient: PatientDetails = dspy.OutputField()
-        summary: str = dspy.OutputField()
+    class TestSignature(Signature):
+        input: str = InputField()
+        patient: PatientDetails = OutputField()
+        summary: str = OutputField()
 
     adapter = BAMLAdapter()
 
     # Missing 'summary' field
     completion = '{"patient": {"name": "John", "age": 30}}'
 
-    with pytest.raises(dspy.utils.exceptions.AdapterParseError) as e:
+    with pytest.raises(AdapterParseError) as e:
         adapter.parse(TestSignature, completion)
 
     assert e.value.adapter_name == "JSONAdapter"  # BAMLAdapter inherits from JSONAdapter
@@ -336,9 +344,9 @@ def test_baml_adapter_raises_on_missing_fields():
 def test_baml_adapter_handles_type_casting_errors():
     """Test graceful handling of type casting errors."""
 
-    class TestSignature(dspy.Signature):
-        input: str = dspy.InputField()
-        patient: PatientDetails = dspy.OutputField()
+    class TestSignature(Signature):
+        input: str = InputField()
+        patient: PatientDetails = OutputField()
 
     adapter = BAMLAdapter()
 
@@ -346,21 +354,21 @@ def test_baml_adapter_handles_type_casting_errors():
     completion = '{"patient": {"name": "John", "age": "not_a_number"}}'
 
     # Should raise ValidationError from Pydantic (which is the expected behavior)
-    with pytest.raises((dspy.utils.exceptions.AdapterParseError, pydantic.ValidationError)):
+    with pytest.raises((AdapterParseError, pydantic.ValidationError)):
         adapter.parse(TestSignature, completion)
 
 
 def test_baml_adapter_with_images():
-    """Test BAMLAdapter integration with dspy.Image objects."""
+    """Test BAMLAdapter integration with Image objects."""
 
-    class TestSignature(dspy.Signature):
-        image_data: ImageWrapper = dspy.InputField()
-        description: str = dspy.OutputField()
+    class TestSignature(Signature):
+        image_data: ImageWrapper = InputField()
+        description: str = OutputField()
 
     adapter = BAMLAdapter()
 
     image_wrapper = ImageWrapper(
-        images=[dspy.Image(url="https://example.com/image1.jpg"), dspy.Image(url="https://example.com/image2.jpg")],
+        images=[Image(url="https://example.com/image1.jpg"), Image(url="https://example.com/image2.jpg")],
         tag=["test", "medical"],
     )
 
@@ -378,12 +386,12 @@ def test_baml_adapter_with_images():
 
 
 def test_baml_adapter_with_tools():
-    """Test BAMLAdapter integration with dspy.Tool objects."""
+    """Test BAMLAdapter integration with Tool objects."""
 
-    class TestSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class TestSignature(Signature):
+        question: str = InputField()
+        tools: list[Tool] = InputField()
+        answer: str = OutputField()
 
     def get_patient_info(patient_id: int) -> str:
         """Get patient information by ID"""
@@ -393,7 +401,7 @@ def test_baml_adapter_with_tools():
         """Schedule an appointment for a patient"""
         return f"Scheduled appointment for {patient_name} on {date}"
 
-    tools = [dspy.Tool(get_patient_info), dspy.Tool(schedule_appointment)]
+    tools = [Tool(get_patient_info), Tool(schedule_appointment)]
 
     adapter = BAMLAdapter()
     messages = adapter.format(TestSignature, [], {"question": "Schedule an appointment for John", "tools": tools})
@@ -406,12 +414,12 @@ def test_baml_adapter_with_tools():
 
 
 def test_baml_adapter_with_code():
-    """Test BAMLAdapter integration with dspy.Code objects."""
+    """Test BAMLAdapter integration with Code objects."""
 
     # Test with code as input field
-    class CodeAnalysisSignature(dspy.Signature):
-        code: dspy.Code = dspy.InputField()
-        analysis: str = dspy.OutputField()
+    class CodeAnalysisSignature(Signature):
+        code: Code = InputField()
+        analysis: str = OutputField()
 
     adapter = BAMLAdapter()
     messages = adapter.format(CodeAnalysisSignature, [], {"code": "def hello():\n    print('Hello, world!')"})
@@ -421,9 +429,9 @@ def test_baml_adapter_with_code():
     assert "print('Hello, world!')" in user_message
 
     # Test with code as output field
-    class CodeGenSignature(dspy.Signature):
-        task: str = dspy.InputField()
-        code: dspy.Code = dspy.OutputField()
+    class CodeGenSignature(Signature):
+        task: str = InputField()
+        code: Code = OutputField()
 
     with mock.patch("litellm.completion") as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -432,7 +440,7 @@ def test_baml_adapter_with_code():
         )
 
         result = adapter(
-            dspy.LM(model="openai/gpt-4o-mini", cache=False),
+            LM(model="openai/gpt-4o-mini", cache=False),
             {},
             CodeGenSignature,
             [],
@@ -443,14 +451,14 @@ def test_baml_adapter_with_code():
 
 
 def test_baml_adapter_with_conversation_history():
-    """Test BAMLAdapter integration with dspy.History objects."""
+    """Test BAMLAdapter integration with History objects."""
 
-    class TestSignature(dspy.Signature):
-        history: dspy.History = dspy.InputField()
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class TestSignature(Signature):
+        history: History = InputField()
+        question: str = InputField()
+        answer: str = OutputField()
 
-    history = dspy.History(
+    history = History(
         messages=[
             {"question": "What is the patient's age?", "answer": "45 years old"},
             {"question": "Any allergies?", "answer": "Penicillin allergy"},
@@ -472,12 +480,12 @@ def test_baml_adapter_with_conversation_history():
 def test_baml_vs_json_adapter_token_efficiency():
     """Test that BAMLAdapter generates more token-efficient schemas."""
 
-    class TestSignature(dspy.Signature):
-        input: str = dspy.InputField()
-        complex: ComplexNestedModel = dspy.OutputField()
+    class TestSignature(Signature):
+        input: str = InputField()
+        complex: ComplexNestedModel = OutputField()
 
     baml_adapter = BAMLAdapter()
-    json_adapter = dspy.JSONAdapter()
+    json_adapter = JSONAdapter()
 
     baml_schema = baml_adapter.format_field_structure(TestSignature)
     json_schema = json_adapter.format_field_structure(TestSignature)
@@ -490,12 +498,12 @@ def test_baml_vs_json_adapter_token_efficiency():
 def test_baml_vs_json_adapter_functional_compatibility():
     """Test that both adapters parse identical outputs to the same results."""
 
-    class TestSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        patient: PatientDetails = dspy.OutputField()
+    class TestSignature(Signature):
+        question: str = InputField()
+        patient: PatientDetails = OutputField()
 
     baml_adapter = BAMLAdapter()
-    json_adapter = dspy.JSONAdapter()
+    json_adapter = JSONAdapter()
 
     completion = """{"patient": {
         "name": "Alice Brown",
@@ -516,9 +524,9 @@ def test_baml_vs_json_adapter_functional_compatibility():
 async def test_baml_adapter_async_functionality():
     """Test BAMLAdapter async operations."""
 
-    class TestSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        patient: PatientDetails = dspy.OutputField()
+    class TestSignature(Signature):
+        question: str = InputField()
+        patient: PatientDetails = OutputField()
 
     with mock.patch("litellm.acompletion") as mock_acompletion:
         mock_acompletion.return_value = ModelResponse(
@@ -528,7 +536,7 @@ async def test_baml_adapter_async_functionality():
 
         adapter = BAMLAdapter()
         result = await adapter.acall(
-            dspy.LM(model="openai/gpt-4o", cache=False), {}, TestSignature, [], {"question": "Extract patient info"}
+            LM(model="openai/gpt-4o", cache=False), {}, TestSignature, [], {"question": "Extract patient info"}
         )
 
         assert result[0]["patient"].name == "John Doe"
@@ -542,9 +550,9 @@ def test_baml_adapter_with_field_aliases():
         full_name: str = pydantic.Field(alias="name")
         patient_age: int = pydantic.Field(alias="age")
 
-    class TestSignature(dspy.Signature):
-        input: str = dspy.InputField()
-        data: ModelWithAliases = dspy.OutputField()
+    class TestSignature(Signature):
+        input: str = InputField()
+        data: ModelWithAliases = OutputField()
 
     adapter = BAMLAdapter()
 
@@ -562,9 +570,9 @@ def test_baml_adapter_field_alias_without_description():
         regular_field: int
         field_with_description: str = pydantic.Field(description="This field has a description", alias="desc_field")
 
-    class TestSignature(dspy.Signature):
-        input: str = dspy.InputField()
-        data: ModelWithAliasNoDescription = dspy.OutputField()
+    class TestSignature(Signature):
+        input: str = InputField()
+        data: ModelWithAliasNoDescription = OutputField()
 
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
@@ -593,10 +601,10 @@ def test_baml_adapter_multiple_pydantic_input_fields():
         debug: bool
         endpoints: list[str]
 
-    class TestSignature(dspy.Signature):
-        input_1: UserProfile = dspy.InputField(desc="User profile information")
-        input_2: SystemConfig = dspy.InputField(desc="System configuration settings")
-        result: str = dspy.OutputField(desc="Resulting output after processing")
+    class TestSignature(Signature):
+        input_1: UserProfile = InputField(desc="User profile information")
+        input_2: SystemConfig = InputField(desc="System configuration settings")
+        result: str = OutputField(desc="Resulting output after processing")
 
     adapter = BAMLAdapter()
 

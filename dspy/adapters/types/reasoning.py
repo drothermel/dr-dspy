@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, Optional
 
 import pydantic
 
 from dspy.adapters.types.base_type import Type
-from dspy.clients.base_lm import BaseLM
 
 if TYPE_CHECKING:
+    from dspy.clients.base_lm import BaseLM
     from dspy.signatures.signature import Signature
 
 

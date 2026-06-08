@@ -1,8 +1,9 @@
+from dspy.clients.lm import LM
+from dspy.dsp.utils.settings import settings
 import os
 
 import pytest
 
-import dspy
 from ..conftest import clear_settings
 from ..reliability.utils import get_adapter, parse_reliability_conf_yaml
 
@@ -52,8 +53,8 @@ def configure_model(request):
     model_name, should_ignore_failure = request.param
     model_params = reliability_conf.models.get(model_name)
     if model_params:
-        lm = dspy.LM(**model_params)
-        dspy.configure(lm=lm, adapter=adapter)
+        lm = LM(**model_params)
+        settings.configure(lm=lm, adapter=adapter)
     else:
         pytest.skip(
             f"Skipping test because no reliability testing YAML configuration was found"

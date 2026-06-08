@@ -262,9 +262,9 @@ def request_cache(
 
         @wraps(fn)
         def sync_wrapper(*args, **kwargs):
-            import dspy
+            import dspy.clients as dspy_clients
 
-            cache = dspy.cache
+            cache = dspy_clients.DSPY_CACHE
             modified_request = process_request(args, kwargs)
 
             # Retrieve from cache if available
@@ -284,9 +284,9 @@ def request_cache(
 
         @wraps(fn)
         async def async_wrapper(*args, **kwargs):
-            import dspy
+            import dspy.clients as dspy_clients
 
-            cache = dspy.cache
+            cache = dspy_clients.DSPY_CACHE
             modified_request = process_request(args, kwargs)
 
             # Retrieve from cache if available

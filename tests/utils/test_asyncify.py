@@ -4,8 +4,8 @@ from time import sleep, time
 
 import pytest
 
-import dspy
-from dspy.utils.asyncify import get_limiter
+from dspy.dsp.utils.settings import settings
+from dspy.utils.asyncify import asyncify, get_limiter
 
 
 @pytest.mark.anyio
@@ -14,7 +14,7 @@ async def test_async_limiter():
     assert limiter.total_tokens == 8, "Default async capacity should be 8"
     assert get_limiter() == limiter, "AsyncLimiter should be a singleton"
 
-    with dspy.context(async_max_workers=16):
+    with settings.context(async_max_workers=16):
         assert get_limiter() == limiter, "AsyncLimiter should be a singleton"
         assert get_limiter().total_tokens == 16, "Async capacity should be 16"
         assert get_limiter() == get_limiter(), "AsyncLimiter should be a singleton"
@@ -26,13 +26,13 @@ async def test_asyncify():
         sleep(wait)
         return 42
 
-    ask_the_question = dspy.asyncify(the_answer_to_life_the_universe_and_everything)
+    ask_the_question = asyncify(the_answer_to_life_the_universe_and_everything)
 
     async def run_n_tasks(n: int, wait: float):
         await asyncio.gather(*[ask_the_question(wait) for _ in range(n)])
 
     async def verify_asyncify(capacity: int, number_of_tasks: int, wait: float = 0.5):
-        with dspy.context(async_max_workers=capacity):
+        with settings.context(async_max_workers=capacity):
             start = time()
             await run_n_tasks(number_of_tasks, wait)
             end = time()

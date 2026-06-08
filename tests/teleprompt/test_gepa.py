@@ -1,3 +1,4 @@
+from dspy.clients.lm import LM
 import json
 import threading
 from typing import Any
@@ -5,15 +6,19 @@ from unittest import mock
 
 import pytest
 
-import dspy
-import dspy.clients
-from dspy import Example
-from dspy.predict import Predict
+from dspy.adapters.types.image import Image
+from dspy.dsp.utils.settings import settings
+from dspy.predict.parallel import Parallel
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
+from dspy.primitives.module import Module
+from dspy.primitives.prediction import Prediction
 from dspy.teleprompt.gepa import instruction_proposal
+from dspy.teleprompt.gepa.gepa import GEPA
 from dspy.utils.dummies import DummyLM
 
 
-class SimpleModule(dspy.Module):
+class SimpleModule(Module):
     def __init__(self, signature):
         super().__init__()
         self.predictor = Predict(signature)
@@ -22,7 +27,7 @@ class SimpleModule(dspy.Module):
         return self.predictor(**kwargs)
 
 
-class DictDummyLM(dspy.clients.lm.LM):
+class DictDummyLM(LM):
     def __init__(self, history):
         super().__init__("dummy", "chat", 0.0, 1000, True)
         self.history = {}
@@ -36,7 +41,7 @@ class DictDummyLM(dspy.clients.lm.LM):
 
 
 def simple_metric(example, prediction, trace=None, pred_name=None, pred_trace=None):
-    return dspy.Prediction(score=example.output == prediction.output, feedback="Wrong answer.")
+    return Prediction(score=example.output == prediction.output, feedback="Wrong answer.")
 
 
 def bad_metric(example, prediction):
@@ -56,9 +61,9 @@ def test_gepa_adapter_disables_logging_on_minibatch_eval(monkeypatch, reflection
     from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
     from dspy.teleprompt.gepa import gepa_utils
 
-    class DummyModule(dspy.Module):
+    class DummyModule(Module):
         def forward(self, **kwargs):  # pragma: no cover - stub forward
-            return dspy.Prediction()
+            return Prediction()
 
     # Exercise the adapter evaluate path directly.
     adapter = gepa_utils.DspyAdapter(
@@ -106,10 +111,10 @@ def test_basic_workflow(use_mlflow, mock_mlflow):
     reflection_lm_history = data["reflection_lm"]
 
     lm_main = DictDummyLM(lm_history)
-    dspy.configure(lm=lm_main)
+    settings.configure(lm=lm_main)
     reflection_lm = DictDummyLM(reflection_lm_history)
 
-    optimizer = dspy.GEPA(
+    optimizer = GEPA(
         metric=simple_metric,
         reflection_lm=reflection_lm,
         max_metric_calls=5,
@@ -132,22 +137,22 @@ def test_basic_workflow(use_mlflow, mock_mlflow):
 def test_workflow_with_custom_instruction_proposer_and_component_selector():
     """Test to ensure the basic compile flow runs without errors when using a custom instruction proposer and component selector."""
 
-    class TimeReader(dspy.Module):
+    class TimeReader(Module):
         def __init__(self):
             super().__init__()
-            self.hour_predictor = dspy.Predict("clock_photo: dspy.Image -> reasoning: str, hour: int")
-            self.minute_predictor = dspy.Predict("clock_photo: dspy.Image -> reasoning: str, minute: int")
+            self.hour_predictor = Predict("clock_photo: Image -> reasoning: str, hour: int")
+            self.minute_predictor = Predict("clock_photo: Image -> reasoning: str, minute: int")
 
-            self.parallel = dspy.Parallel(num_threads=2)
+            self.parallel = Parallel(num_threads=2)
 
-        def forward(self, clock_photo: dspy.Image):
+        def forward(self, clock_photo: Image):
             hour_prediction, minute_prediction = self.parallel(
                 [
                     (self.hour_predictor, dict(clock_photo=clock_photo)),
                     (self.minute_predictor, dict(clock_photo=clock_photo)),
                 ]
             )
-            return dspy.Prediction(hour=hour_prediction.hour, minute=minute_prediction.minute)
+            return Prediction(hour=hour_prediction.hour, minute=minute_prediction.minute)
 
     def metric(example, prediction, trace=None, pred_name=None, pred_trace=None):
         target_hour, target_minute = example.hour, example.minute
@@ -155,7 +160,7 @@ def test_workflow_with_custom_instruction_proposer_and_component_selector():
 
         score = -abs(target_hour * 60 + target_minute - (predicted_hour * 60 + predicted_minute))
 
-        return dspy.Prediction(
+        return Prediction(
             score=score,
             feedback=f"Target: {target_hour}:{target_minute}, Predicted: {predicted_hour}:{predicted_minute}",
         )
@@ -175,8 +180,8 @@ def test_workflow_with_custom_instruction_proposer_and_component_selector():
     lm_main = DictDummyLM(lm_history)
     reflection_lm = DictDummyLM(reflection_lm_history)
 
-    dspy.configure(lm=lm_main)
-    optimizer = dspy.GEPA(
+    settings.configure(lm=lm_main)
+    optimizer = GEPA(
         metric=metric,
         reflection_lm=reflection_lm,
         max_metric_calls=5,
@@ -186,7 +191,7 @@ def test_workflow_with_custom_instruction_proposer_and_component_selector():
     )
     trainset = [
         Example(
-            clock_photo=dspy.Image(
+            clock_photo=Image(
                 "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Pendulum_clock_by_Jacob_Kock%2C_antique_furniture_photography%2C_IMG_0931_edit.jpg/500px-Pendulum_clock_by_Jacob_Kock%2C_antique_furniture_photography%2C_IMG_0931_edit.jpg",
                 download=False,
             ),
@@ -194,7 +199,7 @@ def test_workflow_with_custom_instruction_proposer_and_component_selector():
             minute=18,
         ).with_inputs("clock_photo"),
         Example(
-            clock_photo=dspy.Image(
+            clock_photo=Image(
                 "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Telechron_clock_2H07-Br_Administrator.JPG/960px-Telechron_clock_2H07-Br_Administrator.JPG",
                 download=False,
             ),
@@ -211,14 +216,14 @@ def test_workflow_with_custom_instruction_proposer_and_component_selector():
 def test_metric_requires_feedback_signature():
     reflection_lm = DictDummyLM([])
     with pytest.raises(TypeError):
-        dspy.GEPA(metric=bad_metric, reflection_lm=reflection_lm, max_metric_calls=1)
+        GEPA(metric=bad_metric, reflection_lm=reflection_lm, max_metric_calls=1)
 
 
 def test_reflection_prompt_template_in_gepa_kwargs_raises():
     """reflection_prompt_template via gepa_kwargs is unsupported: DspyAdapter owns propose_new_texts."""
     reflection_lm = DictDummyLM([])
     with pytest.raises(ValueError, match="reflection_prompt_template"):
-        dspy.GEPA(
+        GEPA(
             metric=simple_metric,
             reflection_lm=reflection_lm,
             max_metric_calls=1,
@@ -227,8 +232,8 @@ def test_reflection_prompt_template_in_gepa_kwargs_raises():
 
 
 def any_metric(
-    gold: dspy.Example,
-    pred: dspy.Prediction,
+    gold: Example,
+    pred: Prediction,
     trace: Any = None,
     pred_name: str | None = None,
     pred_trace: Any = None,
@@ -244,8 +249,8 @@ def test_gepa_compile_with_track_usage_no_tuple_error(caplog):
     GEPA.compile should not log tuple-usage error when track_usage=True and complete without hanging.
     Before, compile would hang and/or log "'tuple' object has no attribute 'set_lm_usage'" repeatedly.
     """
-    student = dspy.Predict("question -> answer")
-    trainset = [dspy.Example(question="What is 2+2?", answer="4").with_inputs("question")]
+    student = Predict("question -> answer")
+    trainset = [Example(question="What is 2+2?", answer="4").with_inputs("question")]
 
     task_lm = DummyLM([{"answer": "mock answer 1"}])
     reflection_lm = DummyLM([{"new_instruction": "Something new."}])
@@ -255,8 +260,8 @@ def test_gepa_compile_with_track_usage_no_tuple_error(caplog):
 
     def run_compile():
         try:
-            with dspy.context(lm=task_lm, track_usage=True):
-                optimizer = dspy.GEPA(metric=any_metric, reflection_lm=reflection_lm, max_metric_calls=3)
+            with settings.context(lm=task_lm, track_usage=True):
+                optimizer = GEPA(metric=any_metric, reflection_lm=reflection_lm, max_metric_calls=3)
                 compiled_container["prog"] = optimizer.compile(student, trainset=trainset, valset=trainset)
         except BaseException as e:
             exc_container["e"] = e
@@ -280,7 +285,7 @@ def test_gepa_compile_with_track_usage_no_tuple_error(caplog):
         pytest.fail("GEPA.compile did return a program (likely pre-fix behavior).")
 
 
-class MultiComponentModule(dspy.Module):
+class MultiComponentModule(Module):
     """Test module with multiple predictors."""
 
     def __init__(self):
@@ -291,12 +296,12 @@ class MultiComponentModule(dspy.Module):
     def forward(self, input):
         category = self.classifier(input=input).category
         output = self.generator(category=category, input=input).output
-        return dspy.Prediction(category=category, output=output)
+        return Prediction(category=category, output=output)
 
 
 def component_selection_metric(example, prediction, trace=None, pred_name=None, pred_trace=None):
     """Simple metric for component selection testing."""
-    return dspy.Prediction(score=0.3, feedback="Test feedback")
+    return Prediction(score=0.3, feedback="Test feedback")
 
 
 def test_component_selector_functionality():
@@ -321,10 +326,10 @@ def test_component_selector_functionality():
         ]
         * 10
     )
-    trainset = [dspy.Example(input="test", output="expected").with_inputs("input")]
+    trainset = [Example(input="test", output="expected").with_inputs("input")]
 
-    with dspy.context(lm=task_lm):
-        optimizer = dspy.GEPA(
+    with settings.context(lm=task_lm):
+        optimizer = GEPA(
             metric=component_selection_metric,
             reflection_lm=reflection_lm,
             max_metric_calls=6,  # Reduced to minimize output
@@ -346,11 +351,11 @@ def test_component_selector_default_behavior():
     # Provide enough responses for all possible LM calls
     task_lm = DummyLM([{"category": "test_category", "output": "test_output"}] * 15)
     reflection_lm = DummyLM([{"improved_instruction": "Better instruction"}] * 8)
-    trainset = [dspy.Example(input="test", output="expected").with_inputs("input")]
+    trainset = [Example(input="test", output="expected").with_inputs("input")]
 
-    with dspy.context(lm=task_lm):
+    with settings.context(lm=task_lm):
         # No component_selector - should use round-robin default
-        optimizer = dspy.GEPA(
+        optimizer = GEPA(
             metric=component_selection_metric,
             reflection_lm=reflection_lm,
             max_metric_calls=4,  # Minimal calls to reduce noise
@@ -367,10 +372,10 @@ def test_component_selector_string_round_robin():
     # Provide enough responses for all possible LM calls
     task_lm = DummyLM([{"category": "test_category", "output": "test_output"}] * 15)
     reflection_lm = DummyLM([{"improved_instruction": "Better instruction"}] * 8)
-    trainset = [dspy.Example(input="test", output="expected").with_inputs("input")]
+    trainset = [Example(input="test", output="expected").with_inputs("input")]
 
-    with dspy.context(lm=task_lm):
-        optimizer = dspy.GEPA(
+    with settings.context(lm=task_lm):
+        optimizer = GEPA(
             metric=component_selection_metric,
             reflection_lm=reflection_lm,
             max_metric_calls=4,
@@ -398,7 +403,7 @@ def test_component_selector_string_all():
             call_count += 1
             # Score improves with each call to encourage acceptance of new candidates
             score = min(0.3 + (call_count * 0.1), 1.0)
-            return dspy.Prediction(score=score, feedback="Improving feedback")
+            return Prediction(score=score, feedback="Improving feedback")
 
         # Provide enough responses for all possible LM calls
         task_lm = DummyLM([{"category": "test_category", "output": "test_output"}] * 20)
@@ -409,10 +414,10 @@ def test_component_selector_string_all():
             ]
             * 10
         )
-        trainset = [dspy.Example(input="test", output="expected").with_inputs("input")]
+        trainset = [Example(input="test", output="expected").with_inputs("input")]
 
-        with dspy.context(lm=task_lm):
-            optimizer = dspy.GEPA(
+        with settings.context(lm=task_lm):
+            optimizer = GEPA(
                 metric=improving_metric,
                 reflection_lm=reflection_lm,
                 max_metric_calls=8,
@@ -459,10 +464,10 @@ def test_component_selector_custom_random():
     # Provide enough responses for all possible LM calls
     task_lm = DummyLM([{"category": "test_category", "output": "test_output"}] * 15)
     reflection_lm = DummyLM([{"improved_instruction": "Better instruction"}] * 8)
-    trainset = [dspy.Example(input="test", output="expected").with_inputs("input")]
+    trainset = [Example(input="test", output="expected").with_inputs("input")]
 
-    with dspy.context(lm=task_lm):
-        optimizer = dspy.GEPA(
+    with settings.context(lm=task_lm):
+        optimizer = GEPA(
             metric=component_selection_metric,
             reflection_lm=reflection_lm,
             max_metric_calls=4,
@@ -510,10 +515,10 @@ def test_alternating_half_component_selector():
     # Provide enough responses for multiple iterations
     task_lm = DummyLM([{"category": "test_category", "output": "test_output"}] * 20)
     reflection_lm = DummyLM([{"improved_instruction": "Better instruction"}] * 10)
-    trainset = [dspy.Example(input="test", output="expected").with_inputs("input")]
+    trainset = [Example(input="test", output="expected").with_inputs("input")]
 
-    with dspy.context(lm=task_lm):
-        optimizer = dspy.GEPA(
+    with settings.context(lm=task_lm):
+        optimizer = GEPA(
             metric=component_selection_metric,
             reflection_lm=reflection_lm,
             max_metric_calls=8,  # Allow multiple iterations
@@ -551,8 +556,8 @@ def test_track_stats_result_structure():
     with open("tests/teleprompt/gepa_dummy_lm.json") as f:
         data = json.load(f)
 
-    dspy.configure(lm=DictDummyLM(data["lm"]))
-    optimizer = dspy.GEPA(
+    settings.configure(lm=DictDummyLM(data["lm"]))
+    optimizer = GEPA(
         metric=simple_metric,
         reflection_lm=DictDummyLM(data["reflection_lm"]),
         max_metric_calls=5,
@@ -582,7 +587,7 @@ def test_track_stats_result_structure():
         assert isinstance(best_set, set)
 
     # best_candidate returns a Module
-    assert isinstance(dr.best_candidate, dspy.Module), (
+    assert isinstance(dr.best_candidate, Module), (
         f"Expected Module, got {type(dr.best_candidate)}"
     )
 
@@ -613,8 +618,8 @@ def test_track_best_outputs_result_structure():
     with open("tests/teleprompt/gepa_dummy_lm.json") as f:
         data = json.load(f)
 
-    dspy.configure(lm=DictDummyLM(data["lm"]))
-    optimizer = dspy.GEPA(
+    settings.configure(lm=DictDummyLM(data["lm"]))
+    optimizer = GEPA(
         metric=simple_metric,
         reflection_lm=DictDummyLM(data["reflection_lm"]),
         max_metric_calls=5,

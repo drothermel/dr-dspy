@@ -3,12 +3,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from dspy.clients._litellm import get_litellm
-from dspy.clients.base_lm import BaseLM, inspect_history
 from dspy.clients.cache import Cache
-from dspy.clients.embedding import Embedder
-from dspy.clients.lm import LM
-from dspy.clients.provider import Provider, TrainingJob
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +34,8 @@ def configure_cache(
         safe_types: Additional types to allow when restrict_pickle is True.
     """
 
+    global DSPY_CACHE
+
     DSPY_CACHE = Cache(
         enable_disk_cache,
         enable_memory_cache,
@@ -48,11 +45,6 @@ def configure_cache(
         restrict_pickle=restrict_pickle,
         safe_types=safe_types,
     )
-
-    import dspy
-
-    # Update the reference to point to the new cache
-    dspy.cache = DSPY_CACHE
 
 
 
@@ -87,6 +79,8 @@ DSPY_CACHE = _get_dspy_cache()
 def configure_litellm_logging(level: str = "ERROR"):
     """Configure LiteLLM logging to the specified level."""
     # Litellm uses a global logger called `verbose_logger` to control all loggings.
+    from dspy.clients._litellm import get_litellm
+
     litellm = get_litellm(feature="LiteLLM logging")
     verbose_logger = litellm._logging.verbose_logger
 
@@ -98,6 +92,8 @@ def configure_litellm_logging(level: str = "ERROR"):
 
 
 def enable_litellm_logging():
+    from dspy.clients._litellm import get_litellm
+
     litellm = get_litellm(feature="LiteLLM logging")
     litellm.suppress_debug_info = False
     litellm._dspy_logging_configured = True
@@ -105,19 +101,9 @@ def enable_litellm_logging():
 
 
 def disable_litellm_logging():
+    from dspy.clients._litellm import get_litellm
+
     litellm = get_litellm(feature="LiteLLM logging")
     litellm.suppress_debug_info = True
     litellm._dspy_logging_configured = True
     configure_litellm_logging("ERROR")
-
-__all__ = [
-    "BaseLM",
-    "LM",
-    "Provider",
-    "TrainingJob",
-    "inspect_history",
-    "Embedder",
-    "enable_litellm_logging",
-    "disable_litellm_logging",
-    "configure_cache",
-]

@@ -15,7 +15,7 @@ from dspy.clients.openai_format import (
     usage_from_response,
 )
 from dspy.core.types import LMHistoryEntry, LMRequest, LMResponse
-from dspy.dsp.utils import settings
+from dspy.dsp.utils.settings import settings
 from dspy.utils.callback import BaseCallback, with_callbacks
 from dspy.utils.inspect_history import pretty_print_history
 

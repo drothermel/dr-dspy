@@ -4,8 +4,12 @@ from typing import Any
 
 import pytest
 
-import dspy
+from dspy.adapters.types.image import Image
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
 from dspy.teleprompt.gepa import instruction_proposal
+from dspy.teleprompt.gepa.gepa import GEPA
 from dspy.utils.dummies import DummyLM
 
 
@@ -76,9 +80,9 @@ def test_reflection_lm_gets_structured_images():
     """
     Verify reflection LM receives structured image messages, not serialized text.
     """
-    student = dspy.Predict("image: dspy.Image -> label: str")
-    image = dspy.Image("https://example.com/test.jpg")
-    example = dspy.Example(image=image, label="dog").with_inputs("image")
+    student = Predict("image: Image -> label: str")
+    image = Image("https://example.com/test.jpg")
+    example = Example(image=image, label="dog").with_inputs("image")
 
     reflection_lm = DummyLM(
         [
@@ -110,9 +114,9 @@ def test_reflection_lm_gets_structured_images():
             {"label": "vertebrate"},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
-    gepa = dspy.GEPA(
+    gepa = GEPA(
         metric=lambda gold, pred, trace=None, pred_name=None, pred_trace=None: 0.3,
         max_metric_calls=2,
         reflection_lm=reflection_lm,
@@ -147,13 +151,13 @@ def test_custom_proposer_without_reflection_lm():
     class ProposerWithExternalLM:
         def __call__(self, candidate, reflective_dataset, components_to_update):
             # This proposer manages its own external reflection LM
-            with dspy.context(lm=external_reflection_lm):
+            with settings.context(lm=external_reflection_lm):
                 # Use external LM for reflection (optional - could be any custom logic)
                 external_reflection_lm([{"role": "user", "content": "Improve this instruction"}])
                 return {name: f"Externally-improved: {candidate[name]}" for name in components_to_update}
 
-    student = dspy.Predict("text -> label")
-    example = dspy.Example(text="test input", label="test").with_inputs("text")
+    student = Predict("text -> label")
+    example = Example(text="test input", label="test").with_inputs("text")
 
     # Use a robust dummy LM with enough responses for optimization steps
     lm = DummyLM(
@@ -175,11 +179,11 @@ def test_custom_proposer_without_reflection_lm():
             {"label": "mode"},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     # Test the full flexibility: no reflection_lm provided to GEPA at all!
     # The updated GEPA core library now allows this when using custom proposers
-    gepa = dspy.GEPA(
+    gepa = GEPA(
         metric=lambda gold, pred, trace=None, pred_name=None, pred_trace=None: 0.7,  # Score to trigger optimization
         max_metric_calls=5,  # More calls to allow proper optimization
         reflection_lm=None,  # No reflection_lm provided - this now works!
@@ -228,7 +232,7 @@ def test_image_serialization_into_strings():
                     feedback_analysis += f"  Outputs: {outputs}\n"
                     feedback_analysis += f"  Feedback: {feedback}\n\n"
 
-                context_lm = dspy.settings.lm
+                context_lm = settings.lm
                 messages = [
                     {"role": "system", "content": "You are an instruction improvement assistant."},
                     {
@@ -244,13 +248,13 @@ def test_image_serialization_into_strings():
 
     direct_lm_call_proposer = InstructionProposerCallingLMDirectly()
 
-    student = dspy.Predict("image -> label")
+    student = Predict("image -> label")
 
-    image = dspy.Image("https://picsum.photos/id/237/200/300")
+    image = Image("https://picsum.photos/id/237/200/300")
 
     examples = [
-        dspy.Example(image=image, label="cat").with_inputs("image"),
-        dspy.Example(image=image, label="animal").with_inputs("image"),
+        Example(image=image, label="cat").with_inputs("image"),
+        Example(image=image, label="animal").with_inputs("image"),
     ]
 
     lm = DummyLM(
@@ -269,7 +273,7 @@ def test_image_serialization_into_strings():
             {"label": "herbivore"},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     reflection_lm = DummyLM(
         [
@@ -281,7 +285,7 @@ def test_image_serialization_into_strings():
         ]
     )
 
-    gepa = dspy.GEPA(
+    gepa = GEPA(
         metric=lambda gold, pred, trace=None, pred_name=None, pred_trace=None: 0.3,
         max_metric_calls=5,
         reflection_lm=reflection_lm,
@@ -302,13 +306,13 @@ def test_image_serialization_into_strings():
 
 @pytest.mark.parametrize("reasoning", [True, False])
 def test_default_proposer(reasoning: bool, caplog):
-    student = dspy.Predict("image -> label")
+    student = Predict("image -> label")
 
-    image = dspy.Image("https://picsum.photos/id/237/200/300")
+    image = Image("https://picsum.photos/id/237/200/300")
 
     examples = [
-        dspy.Example(image=image, label="cat").with_inputs("image"),
-        dspy.Example(image=image, label="animal").with_inputs("image"),
+        Example(image=image, label="cat").with_inputs("image"),
+        Example(image=image, label="animal").with_inputs("image"),
     ]
 
     lm = DummyLM(
@@ -327,7 +331,7 @@ def test_default_proposer(reasoning: bool, caplog):
             {"label": "herbivore"},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     reflection_lm = DummyLM(
         [
@@ -340,7 +344,7 @@ def test_default_proposer(reasoning: bool, caplog):
         reasoning=reasoning,
     )
 
-    gepa = dspy.GEPA(
+    gepa = GEPA(
         metric=lambda gold, pred, trace=None, pred_name=None, pred_trace=None: 0.3,
         max_metric_calls=5,
         reflection_lm=reflection_lm,

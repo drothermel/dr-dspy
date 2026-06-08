@@ -1,3 +1,12 @@
+from dspy.adapters.base import Adapter
+from dspy.adapters.chat_adapter import ChatAdapter
+from dspy.adapters.json_adapter import JSONAdapter
+from dspy.clients.lm import LM
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
+from dspy.signatures.field import InputField
+from dspy.signatures.field import OutputField
+from dspy.signatures.signature import Signature
 import os
 from contextlib import contextmanager
 from functools import lru_cache, wraps
@@ -7,7 +16,6 @@ import pydantic
 import pytest
 import yaml
 
-import dspy
 
 JUDGE_MODEL_NAME = "judge"
 
@@ -80,7 +88,7 @@ def judge_dspy_configuration(**extra_judge_config):
     if judge_params is None:
         raise ValueError(f"No LiteLLM configuration found for judge model: {JUDGE_MODEL_NAME}")
 
-    with dspy.context(lm=dspy.LM(**judge_params, **extra_judge_config), adapter=adapter):
+    with settings.context(lm=LM(**judge_params, **extra_judge_config), adapter=adapter):
         yield
 
 
@@ -89,7 +97,7 @@ def _get_judge_program():
         correct: bool = pydantic.Field("Whether or not the judge output is correct")
         justification: str = pydantic.Field("Justification for the correctness of the judge output")
 
-    class JudgeSignature(dspy.Signature):
+    class JudgeSignature(Signature):
         """
         Given the input and output of an AI program, determine whether the output is correct,
         according to the provided guidelines. Only consider the guidelines when determining correctness.
@@ -98,19 +106,19 @@ def _get_judge_program():
         you don't miss certain fields or values.
         """
 
-        program_input: str = dspy.InputField(description="The input to an AI program / model that is being judged")
-        program_output: str = dspy.InputField(
+        program_input: str = InputField(description="The input to an AI program / model that is being judged")
+        program_output: str = InputField(
             description="The resulting output from the AI program / model that is being judged"
         )
-        guidelines: str = dspy.InputField(
+        guidelines: str = InputField(
             description=(
                 "Grading guidelines for judging the correctness of the program output."
                 " If the output satisfies the guidelines, the judge will return correct=True."
             )
         )
-        judge_response: JudgeResponse = dspy.OutputField()
+        judge_response: JudgeResponse = OutputField()
 
-    return dspy.Predict(JudgeSignature)
+    return Predict(JudgeSignature)
 
 
 class ReliabilityTestConf(pydantic.BaseModel):
@@ -143,10 +151,10 @@ def parse_reliability_conf_yaml(conf_file_path: str) -> ReliabilityTestConf:
         raise ValueError(f"Error parsing LiteLLM configuration file: {conf_file_path}") from e
 
 
-def get_adapter(reliability_conf: ReliabilityTestConf) -> dspy.Adapter:
+def get_adapter(reliability_conf: ReliabilityTestConf) -> Adapter:
     if reliability_conf.adapter.lower() == "chat":
-        return dspy.ChatAdapter()
+        return ChatAdapter()
     elif reliability_conf.adapter.lower() == "json":
-        return dspy.JSONAdapter()
+        return JSONAdapter()
     else:
         raise ValueError(f"Unknown adapter specification '{reliability_conf.adapter}' in reliability_conf.yaml")

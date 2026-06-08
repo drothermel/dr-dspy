@@ -2,9 +2,13 @@ import logging
 import math
 import random
 
-import dspy
+from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
-from dspy.teleprompt import BootstrapFewShot
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.primitives.module import Module
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
+from dspy.teleprompt.bootstrap import BootstrapFewShot
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +113,7 @@ class InferRules(BootstrapFewShot):
 
     def evaluate_program(self, program, dataset):
         effective_max_errors = (
-            self.max_errors if self.max_errors is not None else dspy.settings.max_errors
+            self.max_errors if self.max_errors is not None else settings.max_errors
         )
         evaluate = Evaluate(
             devset=dataset,
@@ -123,30 +127,30 @@ class InferRules(BootstrapFewShot):
         return score
 
 
-class RulesInductionProgram(dspy.Module):
+class RulesInductionProgram(Module):
     def __init__(self, num_rules, teacher_settings=None):
         super().__init__()
 
-        class CustomRulesInduction(dspy.Signature):
+        class CustomRulesInduction(Signature):
             __doc__ = (
                 f"Given a set of examples, extract a list of {num_rules} concise and non-redundant natural language "
                 "rules that provide clear guidance for performing the task. All rules should be actionable for a "
                 "well-specified scope of examples of this general kind of task."
             )
-            examples_text = dspy.InputField(desc="Text containing examples")
-            natural_language_rules = dspy.OutputField(desc="Induced natural language rules")
+            examples_text = InputField(desc="Text containing examples")
+            natural_language_rules = OutputField(desc="Induced natural language rules")
 
-        self.rules_induction = dspy.ChainOfThought(CustomRulesInduction)
+        self.rules_induction = ChainOfThought(CustomRulesInduction)
         self.teacher_settings = teacher_settings or {}
         self.rng = random.Random(0)
 
     def forward(self, examples_text):
-        with dspy.context(**self.teacher_settings):
+        with settings.context(**self.teacher_settings):
             # Generate rules with a fresh rollout and non-zero temperature.
-            lm = dspy.settings.lm.copy(
+            lm = settings.lm.copy(
                 rollout_id=self.rng.randint(0, 10**9), temperature=1.0
             )
-            with dspy.context(lm=lm):
+            with settings.context(lm=lm):
                 rules = self.rules_induction(examples_text=examples_text).natural_language_rules
 
         return rules.strip()

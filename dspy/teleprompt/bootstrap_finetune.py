@@ -2,7 +2,6 @@ import logging
 from collections import defaultdict
 from typing import Any, Callable
 
-import dspy
 from dspy.adapters.base import Adapter
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.clients.lm import LM
@@ -71,7 +70,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
 
         teachers = teacher if isinstance(teacher, list) else [teacher]
         teachers = [prepare_teacher(student, t) for t in teachers]
-        num_threads = self.num_threads or dspy.settings.num_threads
+        num_threads = self.num_threads or settings.num_threads
         for t in teachers:
             trace_data += bootstrap_trace_data(program=t, dataset=trainset, metric=self.metric, num_threads=num_threads)
 

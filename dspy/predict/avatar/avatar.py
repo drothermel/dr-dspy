@@ -2,9 +2,12 @@ from copy import deepcopy
 
 from pydantic.fields import FieldInfo
 
-import dspy
 from dspy.predict.avatar.models import Action, ActionOutput, Tool
 from dspy.predict.avatar.signatures import Actor
+from dspy.predict.predict import Predict
+from dspy.primitives.module import Module
+from dspy.primitives.prediction import Prediction
+from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import ensure_signature
 
 
@@ -19,7 +22,7 @@ def get_number_with_suffix(number: int) -> str:
         return f"{number}th"
 
 
-class Avatar(dspy.Module):
+class Avatar(Module):
     def __init__(
         self,
         signature,
@@ -49,17 +52,17 @@ class Avatar(dspy.Module):
 
         self.verbose = verbose
         self.max_iters = max_iters
-        self.actor = dspy.TypedPredictor(self.actor_signature)
+        self.actor = Predict(self.actor_signature)
 
         self.actor_clone = deepcopy(self.actor)
 
     def _get_field(self, field_info: FieldInfo):
         if field_info.json_schema_extra["__dspy_field_type"] == "input":
-            return dspy.InputField(
+            return InputField(
                 desc=field_info.json_schema_extra["desc"],
             )
         elif field_info.json_schema_extra["__dspy_field_type"] == "output":
-            return dspy.OutputField(
+            return OutputField(
                 desc=field_info.json_schema_extra["desc"],
             )
         else:
@@ -72,7 +75,7 @@ class Avatar(dspy.Module):
 
         self.actor.signature = self.actor.signature.append(
             f"result_{idx}",
-            dspy.InputField(
+            InputField(
                 prefix=f"Result {idx}:",
                 desc=f"{get_number_with_suffix(idx)} result",
                 type_=str,
@@ -89,7 +92,7 @@ class Avatar(dspy.Module):
         else:
             self.actor.signature = self.actor.signature.append(
                 f"action_{idx+1}",
-                dspy.OutputField(
+                OutputField(
                     prefix=f"Action {idx+1}:",
                     desc=f"{get_number_with_suffix(idx+1)} action to taken",
                 ),
@@ -157,7 +160,7 @@ class Avatar(dspy.Module):
         final_answer = self.actor(**args)
         self.actor = deepcopy(self.actor_clone)
 
-        return dspy.Prediction(
+        return Prediction(
             **{key: getattr(final_answer, key) for key in self.output_fields.keys()},
             actions=action_results,
         )

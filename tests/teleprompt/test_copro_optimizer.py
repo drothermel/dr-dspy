@@ -1,5 +1,7 @@
-import dspy
-from dspy import Example
+from dspy.dsp.utils.settings import settings
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.primitives.example import Example
+from dspy.primitives.module import Module
 from dspy.teleprompt.signature_opt import COPRO
 from dspy.utils.dummies import DummyLM
 
@@ -27,11 +29,11 @@ def test_signature_optimizer_initialization():
     assert optimizer.init_temperature == 1.4, "Initial temperature not correctly initialized"
 
 
-class SimpleModule(dspy.Module):
+class SimpleModule(Module):
     def __init__(self, signature):
         super().__init__()
         # COPRO doesn't work with dspy.Predict
-        self.predictor = dspy.ChainOfThought(signature)
+        self.predictor = ChainOfThought(signature)
 
     def forward(self, **kwargs):
         return self.predictor(**kwargs)
@@ -39,7 +41,7 @@ class SimpleModule(dspy.Module):
 
 def test_signature_optimizer_optimization_process():
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             [
                 {
@@ -69,7 +71,7 @@ def test_signature_optimizer_statistics_tracking():
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
     optimizer.track_stats = True  # Enable statistics tracking
 
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             [
                 {
@@ -105,7 +107,7 @@ def test_optimization_and_output_verification():
             {"reasoning": "france", "output": "Paris"},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
 
     student = SimpleModule("input -> output")
@@ -125,7 +127,7 @@ def test_optimization_and_output_verification():
 
 
 def test_statistics_tracking_during_optimization():
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             [
                 {"proposed_instruction": "Optimized Prompt", "proposed_prefix_for_output_field": "Optimized Prefix"},

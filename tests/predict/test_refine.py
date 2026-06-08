@@ -1,13 +1,14 @@
 import pytest
 
-import dspy
+from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.predict.refine import Refine
+from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.utils.dummies import DummyLM
 
 
-class DummyModule(dspy.Module):
+class DummyModule(Module):
     def __init__(self, signature, forward_fn):
         super().__init__()
         self.predictor = Predict(signature)
@@ -19,7 +20,7 @@ class DummyModule(dspy.Module):
 
 def test_refine_forward_success_first_attempt():
     lm = DummyLM([{"answer": "Brussels"}, {"answer": "City of Brussels"}, {"answer": "Brussels"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     module_call_count = [0]
 
     def count_calls(self, **kwargs):
@@ -47,7 +48,7 @@ def test_refine_forward_success_first_attempt():
 
 def test_refine_module_default_fail_count():
     lm = DummyLM([{"answer": "Brussels"}, {"answer": "City of Brussels"}, {"answer": "Brussels"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     def always_raise(self, **kwargs):
         raise ValueError("Deliberately failing")
@@ -61,7 +62,7 @@ def test_refine_module_default_fail_count():
 
 def test_refine_module_custom_fail_count():
     lm = DummyLM([{"answer": "Brussels"}, {"answer": "City of Brussels"}, {"answer": "Brussels"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     module_call_count = [0]
 
     def raise_on_second_call(self, **kwargs):

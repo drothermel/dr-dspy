@@ -1,9 +1,9 @@
-
 import pydantic
 import pytest
 
-import dspy
-from dspy import Signature
+from dspy.predict.predict import Predict
+from dspy.primitives.module import Module
+from dspy.signatures.signature import Signature
 
 
 def test_basic_custom_type_resolution():
@@ -39,7 +39,7 @@ def test_type_alias_for_nested_types():
         class Score(pydantic.BaseModel):
             score: float
 
-    signature = dspy.Signature("query: Container2.Query -> score: Container2.Score")
+    signature = Signature("query: Container2.Query -> score: Container2.Score")
     assert signature.output_fields["score"].annotation == Container2.Score
 
 
@@ -96,10 +96,10 @@ def test_expected_failure():
         Signature("input: str -> output: InnerType")
 
 def test_module_type_resolution():
-    class TestModule(dspy.Module):
+    class TestModule(Module):
         def __init__(self):
             super().__init__()
-            self.predict = dspy.Predict("input: str -> output: OuterContainer.InnerType")
+            self.predict = Predict("input: str -> output: OuterContainer.InnerType")
 
         def predict(self, input: str) -> str:
             return input

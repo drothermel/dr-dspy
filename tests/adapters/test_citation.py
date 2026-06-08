@@ -1,8 +1,9 @@
 import pydantic
 import pytest
 
-import dspy
-from dspy.experimental import Citations
+from dspy.clients.lm import LM
+from dspy.adapters.types.citation import Citations
+from dspy.signatures.field import InputField, OutputField
 
 
 def test_citation_validate_input():
@@ -131,9 +132,9 @@ def test_citations_postprocessing():
 
     class CitationSignature(Signature):
         """Test signature with citations."""
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
-        citations: Citations = dspy.OutputField()
+        question: str = InputField()
+        answer: str = OutputField()
+        citations: Citations = OutputField()
 
     adapter = ChatAdapter(native_response_types=[Citations])
 
@@ -155,7 +156,7 @@ def test_citations_postprocessing():
         CitationSignature.delete("citations"),
         CitationSignature,
         outputs,
-        dspy.LM(model="anthropic/claude-3-5-sonnet-20241022"),
+        LM(model="anthropic/claude-3-5-sonnet-20241022"),
         lm_kwargs={},
     )
 
@@ -181,7 +182,7 @@ def test_citation_extraction_from_lm_response():
         }
     ]]}))
 
-    lm = dspy.LM(model="test")
+    lm = LM(model="test")
     citations = lm._extract_citations_from_response(mock_choice)
 
     assert citations is not None

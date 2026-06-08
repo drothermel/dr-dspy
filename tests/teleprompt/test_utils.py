@@ -1,11 +1,14 @@
 from unittest.mock import Mock, patch
 
-import dspy
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
+from dspy.primitives.module import Module
 from dspy.teleprompt.utils import create_n_fewshot_demo_sets, eval_candidate_program
 from dspy.utils.dummies import DummyLM
 
 
-class DummyModule(dspy.Module):
+class DummyModule(Module):
     def __init__(self):
         super().__init__()
 
@@ -59,11 +62,11 @@ def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled():
     Regression test for https://github.com/stanfordnlp/dspy/issues/9308
     """
     student = DummyModule()
-    student.predictor = dspy.Predict("input -> output")
-    trainset = [dspy.Example(input="test", output="test").with_inputs("input")]
+    student.predictor = Predict("input -> output")
+    trainset = [Example(input="test", output="test").with_inputs("input")]
 
     lm = DummyLM([{"output": "test"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     with patch("dspy.teleprompt.utils.BootstrapFewShot") as MockBootstrap:
         mock_instance = Mock()

@@ -1,5 +1,6 @@
 import random
 
+from dspy.primitives.module import Module
 from dspy.teleprompt.teleprompt import Teleprompter
 
 """
@@ -21,9 +22,8 @@ class Ensemble(Teleprompter):
         size = self.size
         reduce_fn = self.reduce_fn
 
-        import dspy
 
-        class EnsembledProgram(dspy.Module):
+        class EnsembledProgram(Module):
             def __init__(self):
                 super().__init__()
                 self.programs = programs

@@ -3,8 +3,15 @@ from unittest import mock
 
 from litellm import Choices, Message, ModelResponse
 
-import dspy
+from dspy.adapters.json_adapter import JSONAdapter
+from dspy.clients.lm import LM
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
+from dspy.primitives.module import Module
+from dspy.primitives.prediction import Prediction
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, bootstrap_trace_data
 
 
@@ -12,14 +19,14 @@ def test_bootstrap_trace_data():
     """Test bootstrap_trace_data function with single dspy.Predict program."""
 
     # Define signature for string -> int conversion
-    class StringToIntSignature(dspy.Signature):
+    class StringToIntSignature(Signature):
         """Convert a string number to integer"""
 
-        text: str = dspy.InputField()
-        number: int = dspy.OutputField()
+        text: str = InputField()
+        number: int = OutputField()
 
     # Create program with single dspy.Predict
-    program = dspy.Predict(StringToIntSignature)
+    program = Predict(StringToIntSignature)
 
     # Create dummy dataset of size 5
     dataset = [
@@ -35,7 +42,7 @@ def test_bootstrap_trace_data():
         return example.number == prediction.number
 
     # Configure dspy
-    dspy.configure(lm=dspy.LM(model="openai/gpt-4o-mini", cache=False), adapter=dspy.JSONAdapter())
+    settings.configure(lm=LM(model="openai/gpt-4o-mini", cache=False), adapter=JSONAdapter())
 
     # Mock litellm completion responses
     # 4 successful responses and 1 that will trigger AdapterParseError
@@ -124,9 +131,9 @@ def test_bootstrap_trace_data():
 def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch):
     from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
 
-    class DummyProgram(dspy.Module):
+    class DummyProgram(Module):
         def forward(self, **kwargs):  # pragma: no cover - stub forward
-            return dspy.Prediction()
+            return Prediction()
 
     captured_metadata: dict[str, Any] = {}
 

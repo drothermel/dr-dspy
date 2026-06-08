@@ -1,5 +1,6 @@
-import dspy
+from dspy.dsp.utils.settings import settings
 from dspy.evaluate.auto_evaluation import CompleteAndGrounded, SemanticF1
+from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
 from dspy.utils.dummies import DummyLM
 
@@ -7,7 +8,7 @@ from dspy.utils.dummies import DummyLM
 def test_semantic_f1_returns_prediction_without_trace():
     # Configure with a dummy LM that returns precision and recall values
     # ChainOfThought adds a "reasoning" field to the output
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             [
                 {
@@ -20,8 +21,8 @@ def test_semantic_f1_returns_prediction_without_trace():
     )
 
     # Create example and prediction
-    example = dspy.Example(question="What is 1+1?", response="2")
-    pred = dspy.Prediction(response="2")
+    example = Example(question="What is 1+1?", response="2")
+    pred = Prediction(response="2")
 
     # Test SemanticF1
     metric = SemanticF1()
@@ -34,7 +35,7 @@ def test_semantic_f1_returns_prediction_without_trace():
 
 def test_semantic_f1_returns_prediction_with_trace():
     # Configure with a dummy LM
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             [
                 {
@@ -47,8 +48,8 @@ def test_semantic_f1_returns_prediction_with_trace():
     )
 
     # Create example and prediction
-    example = dspy.Example(question="What is 1+1?", response="2")
-    pred = dspy.Prediction(response="2")
+    example = Example(question="What is 1+1?", response="2")
+    pred = Prediction(response="2")
 
     # Test SemanticF1 with trace
     metric = SemanticF1(threshold=0.5)
@@ -61,7 +62,7 @@ def test_semantic_f1_returns_prediction_with_trace():
 
 def test_semantic_f1_score_value():
     # Configure with a dummy LM that returns specific precision and recall
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             [
                 {
@@ -74,8 +75,8 @@ def test_semantic_f1_score_value():
     )
 
     # Create example and prediction
-    example = dspy.Example(question="test", response="answer")
-    pred = dspy.Prediction(response="response")
+    example = Example(question="test", response="answer")
+    pred = Prediction(response="response")
 
     # Test SemanticF1
     metric = SemanticF1()
@@ -88,7 +89,7 @@ def test_semantic_f1_score_value():
 
 def test_complete_and_grounded_returns_prediction_without_trace():
     # Configure with a dummy LM
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             [
                 {
@@ -109,8 +110,8 @@ def test_complete_and_grounded_returns_prediction_without_trace():
     )
 
     # Create example and prediction with context
-    example = dspy.Example(question="What is 1+1?", response="2")
-    pred = dspy.Prediction(response="2", context="context")
+    example = Example(question="What is 1+1?", response="2")
+    pred = Prediction(response="2", context="context")
 
     # Test CompleteAndGrounded
     metric = CompleteAndGrounded()
@@ -123,7 +124,7 @@ def test_complete_and_grounded_returns_prediction_without_trace():
 
 def test_complete_and_grounded_returns_prediction_with_trace():
     # Configure with a dummy LM
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             [
                 {
@@ -144,8 +145,8 @@ def test_complete_and_grounded_returns_prediction_with_trace():
     )
 
     # Create example and prediction with context
-    example = dspy.Example(question="What is 1+1?", response="2")
-    pred = dspy.Prediction(response="2", context="context")
+    example = Example(question="What is 1+1?", response="2")
+    pred = Prediction(response="2", context="context")
 
     # Test CompleteAndGrounded with trace
     metric = CompleteAndGrounded(threshold=0.7)
@@ -158,7 +159,7 @@ def test_complete_and_grounded_returns_prediction_with_trace():
 
 def test_semantic_f1_prediction_can_be_compared():
     # Configure with a dummy LM
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             [
                 {
@@ -178,12 +179,12 @@ def test_semantic_f1_prediction_can_be_compared():
     metric = SemanticF1()
 
     # Create two predictions with different scores
-    example1 = dspy.Example(question="test1", response="answer1")
-    pred1 = dspy.Prediction(response="response1")
+    example1 = Example(question="test1", response="answer1")
+    pred1 = Prediction(response="response1")
     result1 = metric(example1, pred1)
 
-    example2 = dspy.Example(question="test2", response="answer2")
-    pred2 = dspy.Prediction(response="response2")
+    example2 = Example(question="test2", response="answer2")
+    pred2 = Prediction(response="response2")
     result2 = metric(example2, pred2)
 
     assert isinstance(result1, Prediction)

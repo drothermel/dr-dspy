@@ -13,14 +13,23 @@ import pytest
 from litellm import ModelResponse
 from pydantic import BaseModel, HttpUrl
 
-import dspy
-from dspy import Predict, Signature
-from dspy.clients.base_lm import LM_CLASS_STATE_KEY
-from dspy.predict.predict import serialize_object
+from dspy.adapters.chat_adapter import ChatAdapter
+from dspy.adapters.json_adapter import JSONAdapter
+from dspy.adapters.types.history import History
+from dspy.adapters.types.image import Image
+from dspy.clients.base_lm import LM_CLASS_STATE_KEY, BaseLM
+from dspy.clients.lm import LM
+from dspy.dsp.utils.settings import settings
+from dspy.predict.parallel import Parallel
+from dspy.predict.predict import Predict, serialize_object
+from dspy.primitives.example import Example
+from dspy.primitives.module import Module
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
 from dspy.utils.dummies import DummyLM
 
 
-class CustomStateLM(dspy.BaseLM):
+class CustomStateLM(BaseLM):
     def __init__(self, model, *, deployment: str, **kwargs):
         super().__init__(model=model, **kwargs)
         self.deployment = deployment
@@ -38,7 +47,7 @@ class CustomStateLM(dspy.BaseLM):
 
 
 class OuterLMContainer:
-    class InnerLM(dspy.BaseLM):
+    class InnerLM(BaseLM):
         pass
 
 
@@ -65,7 +74,7 @@ def test_reset_method():
 
 def test_lm_after_dump_and_load_state():
     predict_instance = Predict("input -> output")
-    lm = dspy.LM(
+    lm = LM(
         model="openai/gpt-4o-mini",
         model_type="chat",
         temperature=1,
@@ -100,13 +109,13 @@ def test_base_lm_dump_state_ignores_internal_class_marker_kwarg():
 
 def test_legacy_lm_state_without_class_marker_loads_as_lm():
     predict_instance = Predict("input -> output")
-    predict_instance.lm = dspy.LM(model="openai/gpt-4o-mini", temperature=1, max_tokens=100)
+    predict_instance.lm = LM(model="openai/gpt-4o-mini", temperature=1, max_tokens=100)
     dumped_state = predict_instance.dump_state()
     dumped_state["lm"].pop(LM_CLASS_STATE_KEY)
 
     loaded_instance = Predict("input -> output").load_state(dumped_state)
 
-    assert isinstance(loaded_instance.lm, dspy.LM)
+    assert isinstance(loaded_instance.lm, LM)
     assert loaded_instance.lm.model == "openai/gpt-4o-mini"
     assert LM_CLASS_STATE_KEY in loaded_instance.lm.dump_state()
 
@@ -140,7 +149,7 @@ def test_nested_custom_lm_class_path_loads_for_trusted_state():
 def test_call_method():
     predict_instance = Predict("input -> output")
     lm = DummyLM([{"output": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     result = predict_instance(input="test input")
     assert result.output == "test output"
 
@@ -154,16 +163,16 @@ def test_instructions_after_dump_and_load_state():
 
 
 def test_demos_after_dump_and_load_state():
-    class TranslateToEnglish(dspy.Signature):
+    class TranslateToEnglish(Signature):
         """Translate content from a language to English."""
 
-        content: str = dspy.InputField()
-        language: str = dspy.InputField()
-        translation: str = dspy.OutputField()
+        content: str = InputField()
+        language: str = InputField()
+        translation: str = OutputField()
 
     original_instance = Predict(TranslateToEnglish)
     original_instance.demos = [
-        dspy.Example(
+        Example(
             content="¿Qué tal?",
             language="SPANISH",
             translation="Hello there",
@@ -189,17 +198,17 @@ def test_typed_demos_after_dump_and_load_state():
         name: str
         quantity: int
 
-    class InventorySignature(dspy.Signature):
+    class InventorySignature(Signature):
         """Handle inventory items and their translations."""
 
-        items: list[Item] = dspy.InputField()
-        language: str = dspy.InputField()
-        translated_items: list[Item] = dspy.OutputField()
-        total_quantity: int = dspy.OutputField()
+        items: list[Item] = InputField()
+        language: str = InputField()
+        translated_items: list[Item] = OutputField()
+        total_quantity: int = OutputField()
 
     original_instance = Predict(InventorySignature)
     original_instance.demos = [
-        dspy.Example(
+        Example(
             items=[Item(name="apple", quantity=5), Item(name="banana", quantity=3)],
             language="SPANISH",
             translated_items=[Item(name="manzana", quantity=5), Item(name="plátano", quantity=3)],
@@ -282,21 +291,21 @@ def test_typed_demos_after_dump_and_load_state():
 
 
 def test_signature_fields_after_dump_and_load_state(tmp_path):
-    class CustomSignature(dspy.Signature):
+    class CustomSignature(Signature):
         """I am just an instruction."""
 
-        sentence = dspy.InputField(desc="I am an innocent input!")
-        sentiment = dspy.OutputField()
+        sentence = InputField(desc="I am an innocent input!")
+        sentiment = OutputField()
 
     file_path = tmp_path / "tmp.json"
     original_instance = Predict(CustomSignature)
     original_instance.save(file_path)
 
-    class CustomSignature2(dspy.Signature):
+    class CustomSignature2(Signature):
         """I am not a pure instruction."""
 
-        sentence = dspy.InputField(desc="I am a malicious input!")
-        sentiment = dspy.OutputField(desc="I am a malicious output!", prefix="I am a prefix!")
+        sentence = InputField(desc="I am a malicious input!")
+        sentiment = OutputField(desc="I am a malicious output!", prefix="I am a prefix!")
 
     new_instance = Predict(CustomSignature2)
     assert new_instance.signature.dump_state() != original_instance.signature.dump_state()
@@ -308,21 +317,21 @@ def test_signature_fields_after_dump_and_load_state(tmp_path):
 @pytest.mark.parametrize("filename", ["model.json", "model.pkl"])
 def test_lm_field_after_dump_and_load_state(tmp_path, filename):
     file_path = tmp_path / filename
-    lm = dspy.LM(
+    lm = LM(
         model="openai/gpt-4o-mini",
         model_type="chat",
         temperature=1,
         max_tokens=100,
         num_retries=10,
     )
-    original_predict = dspy.Predict("q->a")
+    original_predict = Predict("q->a")
     original_predict.lm = lm
 
     original_predict.save(file_path)
 
     assert file_path.exists()
 
-    loaded_predict = dspy.Predict("q->a")
+    loaded_predict = Predict("q->a")
     loaded_predict.load(file_path, allow_pickle=True)
 
     assert original_predict.dump_state() == loaded_predict.dump_state()
@@ -332,8 +341,8 @@ def test_lm_field_after_dump_and_load_state(tmp_path, filename):
 def test_load_ignores_serialized_endpoint_override_by_default(tmp_path, endpoint_override_key):
     file_path = tmp_path / "model.json"
     override_url = "http://override.local/v1"
-    original_predict = dspy.Predict("q->a")
-    original_predict.lm = dspy.LM(model="openai/gpt-4o-mini")
+    original_predict = Predict("q->a")
+    original_predict.lm = LM(model="openai/gpt-4o-mini")
     original_predict.save(file_path)
 
     with open(file_path, "rb") as f:
@@ -343,7 +352,7 @@ def test_load_ignores_serialized_endpoint_override_by_default(tmp_path, endpoint
         f.write(orjson.dumps(saved_state))
 
     with patch("dspy.predict.predict.logger.warning") as warning_mock:
-        loaded_predict = dspy.Predict("q->a")
+        loaded_predict = Predict("q->a")
         loaded_predict.load(file_path)
 
     assert loaded_predict.lm is not None
@@ -356,8 +365,8 @@ def test_load_ignores_serialized_endpoint_override_by_default(tmp_path, endpoint
 def test_load_allows_serialized_endpoint_override_with_opt_in(tmp_path, endpoint_override_key):
     file_path = tmp_path / "model.json"
     override_url = "http://override.local/v1"
-    original_predict = dspy.Predict("q->a")
-    original_predict.lm = dspy.LM(model="openai/gpt-4o-mini")
+    original_predict = Predict("q->a")
+    original_predict.lm = LM(model="openai/gpt-4o-mini")
     original_predict.save(file_path)
 
     with open(file_path, "rb") as f:
@@ -367,7 +376,7 @@ def test_load_allows_serialized_endpoint_override_with_opt_in(tmp_path, endpoint
         f.write(orjson.dumps(saved_state))
 
     with patch("dspy.predict.predict.logger.warning") as warning_mock:
-        loaded_predict = dspy.Predict("q->a")
+        loaded_predict = Predict("q->a")
         loaded_predict.load(file_path, allow_unsafe_lm_state=True)
 
     assert loaded_predict.lm is not None
@@ -378,13 +387,13 @@ def test_load_allows_serialized_endpoint_override_with_opt_in(tmp_path, endpoint
 @pytest.mark.parametrize("endpoint_override_key", ["api_base", "base_url"])
 def test_load_state_ignores_serialized_endpoint_override_by_default(endpoint_override_key):
     override_url = "http://override.local/v1"
-    original_predict = dspy.Predict("q->a")
-    original_predict.lm = dspy.LM(model="openai/gpt-4o-mini")
+    original_predict = Predict("q->a")
+    original_predict.lm = LM(model="openai/gpt-4o-mini")
     saved_state = copy.deepcopy(original_predict.dump_state())
     saved_state["lm"][endpoint_override_key] = override_url
 
     with patch("dspy.predict.predict.logger.warning") as warning_mock:
-        loaded_predict = dspy.Predict("q->a")
+        loaded_predict = Predict("q->a")
         loaded_predict.load_state(saved_state)
 
     assert loaded_predict.lm is not None
@@ -396,13 +405,13 @@ def test_load_state_ignores_serialized_endpoint_override_by_default(endpoint_ove
 @pytest.mark.parametrize("endpoint_override_key", ["api_base", "base_url"])
 def test_load_state_allows_serialized_endpoint_override_with_opt_in(endpoint_override_key):
     override_url = "http://override.local/v1"
-    original_predict = dspy.Predict("q->a")
-    original_predict.lm = dspy.LM(model="openai/gpt-4o-mini")
+    original_predict = Predict("q->a")
+    original_predict.lm = LM(model="openai/gpt-4o-mini")
     saved_state = copy.deepcopy(original_predict.dump_state())
     saved_state["lm"][endpoint_override_key] = override_url
 
     with patch("dspy.predict.predict.logger.warning") as warning_mock:
-        loaded_predict = dspy.Predict("q->a")
+        loaded_predict = Predict("q->a")
         loaded_predict.load_state(saved_state, allow_unsafe_lm_state=True)
 
     assert loaded_predict.lm is not None
@@ -412,8 +421,8 @@ def test_load_state_allows_serialized_endpoint_override_with_opt_in(endpoint_ove
 
 def test_load_state_ignores_serialized_model_list_endpoint_override_by_default():
     override_url = "http://override.local/v1"
-    original_predict = dspy.Predict("q->a")
-    original_predict.lm = dspy.LM(model="openai/gpt-4o-mini")
+    original_predict = Predict("q->a")
+    original_predict.lm = LM(model="openai/gpt-4o-mini")
     saved_state = copy.deepcopy(original_predict.dump_state())
     saved_state["lm"]["model_list"] = [
         {
@@ -426,7 +435,7 @@ def test_load_state_ignores_serialized_model_list_endpoint_override_by_default()
     ]
 
     with patch("dspy.predict.predict.logger.warning") as warning_mock:
-        loaded_predict = dspy.Predict("q->a")
+        loaded_predict = Predict("q->a")
         loaded_predict.load_state(saved_state)
 
     assert loaded_predict.lm is not None
@@ -439,8 +448,8 @@ def test_load_state_ignores_serialized_model_list_endpoint_override_by_default()
 def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, endpoint_override_key):
     file_path = tmp_path / "model.json"
     override_url = "http://override.local/v1"
-    original_predict = dspy.Predict("q->a")
-    original_predict.lm = dspy.LM(model="openai/gpt-4o-mini")
+    original_predict = Predict("q->a")
+    original_predict.lm = LM(model="openai/gpt-4o-mini")
     original_predict.save(file_path)
 
     with open(file_path, "rb") as f:
@@ -449,7 +458,7 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
     with open(file_path, "wb") as f:
         f.write(orjson.dumps(saved_state))
 
-    loaded_predict = dspy.Predict("q->a")
+    loaded_predict = Predict("q->a")
     loaded_predict.load(file_path)
 
     class FakeResp(dict):
@@ -469,8 +478,8 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
 def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
     file_path = tmp_path / "model.json"
     override_url = "http://override.local/v1"
-    original_predict = dspy.Predict("q->a")
-    original_predict.lm = dspy.LM(model="openai/gpt-4o-mini")
+    original_predict = Predict("q->a")
+    original_predict.lm = LM(model="openai/gpt-4o-mini")
     original_predict.save(file_path)
 
     with open(file_path, "rb") as f:
@@ -494,7 +503,7 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
         def __init__(self):
             super().__init__({"choices": []})
 
-    safe_loaded_predict = dspy.Predict("q->a")
+    safe_loaded_predict = Predict("q->a")
     safe_loaded_predict.load(file_path)
     with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:
         with patch("litellm.completion", return_value=FakeResp()) as completion_mock:
@@ -503,7 +512,7 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
     assert completion_mock.called
     assert not batch_completion_mock.called
 
-    opt_in_loaded_predict = dspy.Predict("q->a")
+    opt_in_loaded_predict = Predict("q->a")
     opt_in_loaded_predict.load(file_path, allow_unsafe_lm_state=True)
     with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:
         opt_in_loaded_predict.lm.forward(prompt="hello", cache=False)
@@ -517,8 +526,8 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     override_url = "http://override.local/v1"
     env_api_key = "sk-live-test-secret"
 
-    original_predict = dspy.Predict("q->a")
-    original_predict.lm = dspy.LM(model="openai/gpt-4o-mini", model_type="text")
+    original_predict = Predict("q->a")
+    original_predict.lm = LM(model="openai/gpt-4o-mini", model_type="text")
     original_predict.save(file_path)
 
     with open(file_path, "rb") as f:
@@ -538,7 +547,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
             super().__init__({"choices": []})
 
     # Simulates legacy behavior by allowing serialized endpoint overrides.
-    opt_in_loaded_predict = dspy.Predict("q->a")
+    opt_in_loaded_predict = Predict("q->a")
     opt_in_loaded_predict.load(file_path, allow_unsafe_lm_state=True)
     with patch("litellm.text_completion", return_value=FakeResp()) as text_completion_mock:
         opt_in_loaded_predict.lm.forward(prompt="hello", cache=False)
@@ -546,7 +555,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     assert text_completion_mock.call_args.kwargs["api_base"] == override_url
     assert text_completion_mock.call_args.kwargs["api_key"] == env_api_key
 
-    safe_loaded_predict = dspy.Predict("q->a")
+    safe_loaded_predict = Predict("q->a")
     safe_loaded_predict.load(file_path)
     with patch("litellm.text_completion", return_value=FakeResp()) as text_completion_mock:
         safe_loaded_predict.lm.forward(prompt="hello", cache=False)
@@ -558,14 +567,14 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
 
 def test_forward_method():
     program = Predict("question -> answer")
-    dspy.configure(lm=DummyLM([{"answer": "No more responses"}]))
+    settings.configure(lm=DummyLM([{"answer": "No more responses"}]))
     result = program(question="What is 1+1?").answer
     assert result == "No more responses"
 
 
 def test_forward_method2():
     program = Predict("question -> answer1, answer2")
-    dspy.configure(lm=DummyLM([{"answer1": "my first answer", "answer2": "my second answer"}]))
+    settings.configure(lm=DummyLM([{"answer1": "my first answer", "answer2": "my second answer"}]))
     result = program(question="What is 1+1?")
     assert result.answer1 == "my first answer"
     assert result.answer2 == "my second answer"
@@ -580,7 +589,7 @@ def test_config_management():
 
 def test_multi_output():
     program = Predict("question -> answer", n=2)
-    dspy.configure(lm=DummyLM([{"answer": "my first answer"}, {"answer": "my second answer"}]))
+    settings.configure(lm=DummyLM([{"answer": "my first answer"}, {"answer": "my second answer"}]))
     results = program(question="What is 1+1?")
     assert results.completions.answer[0] == "my first answer"
     assert results.completions.answer[1] == "my second answer"
@@ -588,7 +597,7 @@ def test_multi_output():
 
 def test_multi_output2():
     program = Predict("question -> answer1, answer2", n=2)
-    dspy.configure(
+    settings.configure(
         lm=DummyLM(
             [
                 {"answer1": "my 0 answer", "answer2": "my 2 answer"},
@@ -609,10 +618,10 @@ def test_datetime_inputs_and_outputs():
         event_name: str
         event_time: datetime
 
-    class TimedSignature(dspy.Signature):
-        events: list[TimedEvent] = dspy.InputField()
-        summary: str = dspy.OutputField()
-        next_event_time: datetime = dspy.OutputField()
+    class TimedSignature(Signature):
+        events: list[TimedEvent] = InputField()
+        summary: str = OutputField()
+        next_event_time: datetime = OutputField()
 
     program = Predict(TimedSignature)
 
@@ -625,7 +634,7 @@ def test_datetime_inputs_and_outputs():
             }
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     output = program(
         events=[
@@ -643,9 +652,9 @@ def test_explicitly_valued_enum_inputs_and_outputs():
         IN_PROGRESS = "in_progress"
         COMPLETED = "completed"
 
-    class StatusSignature(dspy.Signature):
-        current_status: Status = dspy.InputField()
-        next_status: Status = dspy.OutputField()
+    class StatusSignature(Signature):
+        current_status: Status = InputField()
+        next_status: Status = OutputField()
 
     program = Predict(StatusSignature)
 
@@ -657,7 +666,7 @@ def test_explicitly_valued_enum_inputs_and_outputs():
             }
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     output = program(current_status=Status.PENDING)
     assert output.next_status == Status.IN_PROGRESS
@@ -669,9 +678,9 @@ def test_enum_inputs_and_outputs_with_shared_names_and_values():
         CLOSED = "RESOLVED"
         RESOLVED = "OPEN"
 
-    class TicketStatusSignature(dspy.Signature):
-        current_status: TicketStatus = dspy.InputField()
-        next_status: TicketStatus = dspy.OutputField()
+    class TicketStatusSignature(Signature):
+        current_status: TicketStatus = InputField()
+        next_status: TicketStatus = OutputField()
 
     program = Predict(TicketStatusSignature)
 
@@ -684,7 +693,7 @@ def test_enum_inputs_and_outputs_with_shared_names_and_values():
             }
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     output = program(current_status=TicketStatus.OPEN)
     assert output.next_status == TicketStatus.CLOSED  # By value
@@ -693,9 +702,9 @@ def test_enum_inputs_and_outputs_with_shared_names_and_values():
 def test_auto_valued_enum_inputs_and_outputs():
     Status = enum.Enum("Status", ["PENDING", "IN_PROGRESS", "COMPLETED"])  # noqa: N806
 
-    class StatusSignature(dspy.Signature):
-        current_status: Status = dspy.InputField()
-        next_status: Status = dspy.OutputField()
+    class StatusSignature(Signature):
+        current_status: Status = InputField()
+        next_status: Status = OutputField()
 
     program = Predict(StatusSignature)
 
@@ -707,14 +716,14 @@ def test_auto_valued_enum_inputs_and_outputs():
             }
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     output = program(current_status=Status.PENDING)
     assert output.next_status == Status.IN_PROGRESS
 
 
 def test_named_predictors():
-    class MyModule(dspy.Module):
+    class MyModule(Module):
         def __init__(self):
             super().__init__()
             self.inner = Predict("question -> answer")
@@ -728,13 +737,13 @@ def test_named_predictors():
 
 
 def test_output_only():
-    class OutputOnlySignature(dspy.Signature):
-        output = dspy.OutputField()
+    class OutputOnlySignature(Signature):
+        output = OutputField()
 
     predictor = Predict(OutputOnlySignature)
 
     lm = DummyLM([{"output": "short answer"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     assert predictor().output == "short answer"
 
 
@@ -751,7 +760,7 @@ def test_load_state_chaining():
 
 @pytest.mark.parametrize("adapter_type", ["chat", "json"])
 def test_call_predict_with_chat_history(adapter_type):
-    class SpyLM(dspy.LM):
+    class SpyLM(LM):
         def __init__(self, *args, return_json=False, **kwargs):
             super().__init__(*args, **kwargs)
             self.calls = []
@@ -763,23 +772,23 @@ def test_call_predict_with_chat_history(adapter_type):
                 return ["{'answer':'100%'}"]
             return ["[[ ## answer ## ]]\n100%!"]
 
-    class MySignature(dspy.Signature):
-        question: str = dspy.InputField()
-        history: dspy.History = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class MySignature(Signature):
+        question: str = InputField()
+        history: History = InputField()
+        answer: str = OutputField()
 
     program = Predict(MySignature)
 
     if adapter_type == "chat":
         lm = SpyLM("dummy_model")
-        dspy.configure(adapter=dspy.ChatAdapter(), lm=lm)
+        settings.configure(adapter=ChatAdapter(), lm=lm)
     else:
         lm = SpyLM("dummy_model", return_json=True)
-        dspy.configure(adapter=dspy.JSONAdapter(), lm=lm)
+        settings.configure(adapter=JSONAdapter(), lm=lm)
 
     program(
         question="are you sure that's correct?",
-        history=dspy.History(messages=[{"question": "what's the capital of france?", "answer": "paris"}]),
+        history=History(messages=[{"question": "what's the capital of france?", "answer": "paris"}]),
     )
 
     # Verify the LM was called with correct messages
@@ -795,7 +804,7 @@ def test_call_predict_with_chat_history(adapter_type):
 
 def test_lm_usage():
     program = Predict("question -> answer")
-    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False), track_usage=True)
+    settings.configure(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True)
     with patch(
         "dspy.clients.lm.litellm_completion",
         return_value=ModelResponse(
@@ -816,7 +825,7 @@ def test_lm_usage_with_parallel():
         time.sleep(0.5)
         return program(question=question)
 
-    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False), track_usage=True)
+    settings.configure(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True)
     with patch(
         "dspy.clients.lm.litellm_completion",
         return_value=ModelResponse(
@@ -824,7 +833,7 @@ def test_lm_usage_with_parallel():
             usage={"total_tokens": 10},
         ),
     ):
-        parallelizer = dspy.Parallel()
+        parallelizer = Parallel()
         input_pairs = [
             (program_wrapper, {"question": "What is the capital of France?"}),
             (program_wrapper, {"question": "What is the capital of France?"}),
@@ -848,7 +857,7 @@ async def test_lm_usage_with_async():
 
     program.aforward = types.MethodType(patched_aforward, program)
 
-    with dspy.context(lm=dspy.LM("openai/gpt-4o-mini", cache=False), track_usage=True):
+    with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True):
         with patch(
             "litellm.acompletion",
             return_value=ModelResponse(
@@ -886,7 +895,7 @@ def test_error_message_on_invalid_lm_setup():
         Predict("question -> answer")(question="Why did a chicken cross the kitchen?")
 
     # LM is a string.
-    dspy.configure(lm="openai/gpt-4o-mini")
+    settings.configure(lm="openai/gpt-4o-mini")
     with pytest.raises(ValueError) as e:
         Predict("question -> answer")(question="Why did a chicken cross the kitchen?")
 
@@ -896,7 +905,7 @@ def test_error_message_on_invalid_lm_setup():
         pass
 
     # LM is not an instance of dspy.BaseLM.
-    dspy.configure(lm=dummy_lm)
+    settings.configure(lm=dummy_lm)
     with pytest.raises(ValueError) as e:
         Predict("question -> answer")(question="Why did a chicken cross the kitchen?")
     assert "LM must be an instance of `dspy.BaseLM`, not <class 'function'>." in str(e.value)
@@ -904,7 +913,7 @@ def test_error_message_on_invalid_lm_setup():
 
 @pytest.mark.parametrize("adapter_type", ["chat", "json"])
 def test_field_constraints(adapter_type):
-    class SpyLM(dspy.LM):
+    class SpyLM(LM):
         def __init__(self, *args, return_json=False, **kwargs):
             super().__init__(*args, **kwargs)
             self.calls = []
@@ -916,25 +925,25 @@ def test_field_constraints(adapter_type):
                 return ["{'score':'0.5', 'count':'2'}"]
             return ["[[ ## score ## ]]\n0.5\n[[ ## count ## ]]\n2"]
 
-    class ConstrainedSignature(dspy.Signature):
+    class ConstrainedSignature(Signature):
         """Test signature with constrained fields."""
 
         # Input with length and value constraints
-        text: str = dspy.InputField(min_length=5, max_length=100, desc="Input text")
-        number: int = dspy.InputField(gt=0, lt=10, desc="A number between 0 and 10")
+        text: str = InputField(min_length=5, max_length=100, desc="Input text")
+        number: int = InputField(gt=0, lt=10, desc="A number between 0 and 10")
 
         # Output with multiple constraints
-        score: float = dspy.OutputField(ge=0.0, le=1.0, desc="Score between 0 and 1")
-        count: int = dspy.OutputField(multiple_of=2, desc="Even number count")
+        score: float = OutputField(ge=0.0, le=1.0, desc="Score between 0 and 1")
+        count: int = OutputField(multiple_of=2, desc="Even number count")
 
     program = Predict(ConstrainedSignature)
     lm = SpyLM("dummy_model")
     if adapter_type == "chat":
         lm = SpyLM("dummy_model")
-        dspy.configure(adapter=dspy.ChatAdapter(), lm=lm)
+        settings.configure(adapter=ChatAdapter(), lm=lm)
     else:
         lm = SpyLM("dummy_model", return_json=True)
-        dspy.configure(adapter=dspy.JSONAdapter(), lm=lm)
+        settings.configure(adapter=JSONAdapter(), lm=lm)
 
     # Call the predictor to trigger instruction generation
     program(text="hello world", number=5)
@@ -955,14 +964,14 @@ def test_field_constraints(adapter_type):
 @pytest.mark.asyncio
 async def test_async_predict():
     program = Predict("question -> answer")
-    with dspy.context(lm=DummyLM([{"answer": "Paris"}])):
+    with settings.context(lm=DummyLM([{"answer": "Paris"}])):
         result = await program.acall(question="What is the capital of France?")
         assert result.answer == "Paris"
 
 
 def test_predicted_outputs_piped_from_predict_to_lm_call():
     program = Predict("question -> answer")
-    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
+    settings.configure(lm=LM("openai/gpt-4o-mini"))
 
     with patch("litellm.completion") as mock_completion:
         program(
@@ -991,9 +1000,9 @@ def test_dump_state_pydantic_non_primitive_types():
         description: str | None = None
         created_at: datetime
 
-    class TestSignature(dspy.Signature):
-        website_info: WebsiteInfo = dspy.InputField()
-        summary: str = dspy.OutputField()
+    class TestSignature(Signature):
+        website_info: WebsiteInfo = InputField()
+        summary: str = OutputField()
 
     website_info = WebsiteInfo(
         name="Example",
@@ -1026,27 +1035,27 @@ def test_dump_state_pydantic_non_primitive_types():
 
 def test_trace_size_limit():
     program = Predict("question -> answer")
-    dspy.configure(lm=DummyLM([{"answer": "Paris"}]), max_trace_size=3)
+    settings.configure(lm=DummyLM([{"answer": "Paris"}]), max_trace_size=3)
 
     for _ in range(10):
         program(question="What is the capital of France?")
 
-    assert len(dspy.settings.trace) == 3
+    assert len(settings.trace) == 3
 
 
 def test_disable_trace():
     program = Predict("question -> answer")
-    dspy.configure(lm=DummyLM([{"answer": "Paris"}]), trace=None)
+    settings.configure(lm=DummyLM([{"answer": "Paris"}]), trace=None)
 
     for _ in range(10):
         program(question="What is the capital of France?")
 
-    assert dspy.settings.trace is None
+    assert settings.trace is None
 
 
 def test_per_module_history_size_limit():
     program = Predict("question -> answer")
-    dspy.configure(lm=DummyLM([{"answer": "Paris"}]), max_history_size=5)
+    settings.configure(lm=DummyLM([{"answer": "Paris"}]), max_history_size=5)
 
     for _ in range(10):
         program(question="What is the capital of France?")
@@ -1055,14 +1064,14 @@ def test_per_module_history_size_limit():
 
 def test_per_module_history_disabled():
     program = Predict("question -> answer")
-    dspy.configure(lm=DummyLM([{"answer": "Paris"}]), disable_history=True)
+    settings.configure(lm=DummyLM([{"answer": "Paris"}]), disable_history=True)
 
     for _ in range(10):
         program(question="What is the capital of France?")
     assert len(program.history) == 0
 
 def test_input_field_default_value():
-    class SpyLM(dspy.LM):
+    class SpyLM(LM):
         def __init__(self):
             super().__init__("dummy")
             self.calls = []
@@ -1071,13 +1080,13 @@ def test_input_field_default_value():
             self.calls.append({"messages": messages})
             return ["[[ ## answer ## ]]\ntest"]
 
-    class SignatureWithDefault(dspy.Signature):
-        context: str = dspy.InputField(default="DEFAULT_CONTEXT")
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class SignatureWithDefault(Signature):
+        context: str = InputField(default="DEFAULT_CONTEXT")
+        question: str = InputField()
+        answer: str = OutputField()
 
     lm = SpyLM()
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     predictor = Predict(SignatureWithDefault)
     predictor(question="test")
 
@@ -1086,7 +1095,7 @@ def test_input_field_default_value():
 
 def log_test_helper():
     lm = DummyLM([{"answer": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     dspy_logger = logging.getLogger("dspy")
     dspy_logger.propagate = True
 
@@ -1107,10 +1116,10 @@ def test_extra_fields_warning(caplog):
 def test_missing_optional_input_field_no_warning(caplog):
     log_test_helper()
 
-    class OptionalInputSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        context: str | None = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class OptionalInputSignature(Signature):
+        question: str = InputField()
+        context: str | None = InputField()
+        answer: str = OutputField()
 
     predict_instance = Predict(OptionalInputSignature)
 
@@ -1123,10 +1132,10 @@ def test_missing_optional_input_field_no_warning(caplog):
 def test_missing_required_input_field_still_warns(caplog):
     log_test_helper()
 
-    class OptionalInputSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        context: str | None = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class OptionalInputSignature(Signature):
+        question: str = InputField()
+        context: str | None = InputField()
+        answer: str = OutputField()
 
     predict_instance = Predict(OptionalInputSignature)
 
@@ -1141,10 +1150,10 @@ def test_warning_images(caplog):
     """Test whether type mismatch for images generates a warning."""
     log_test_helper()
 
-    predict_instance = Predict("question:dspy.Image -> answer")
+    predict_instance = Predict("question:Image -> answer")
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(question=dspy.Image("https://example.com/image1.jpg"))
+        predict_instance(question=Image("https://example.com/image1.jpg"))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1159,14 +1168,14 @@ def test_type_mismatch_warning(caplog):
     """Test that type mismatches in input fields generate a warning."""
     log_test_helper()
 
-    class TypedSignature(dspy.Signature):
-        count: int = dspy.InputField()
-        name: str = dspy.InputField()
-        result: str = dspy.OutputField()
+    class TypedSignature(Signature):
+        count: int = InputField()
+        name: str = InputField()
+        result: str = OutputField()
 
     predict_instance = Predict(TypedSignature)
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Pass a string where int is expected
@@ -1179,14 +1188,14 @@ def test_correct_types_no_warning(caplog):
     """Test that correct types don't generate warnings."""
     log_test_helper()
 
-    class TypedSignature(dspy.Signature):
-        count: int = dspy.InputField()
-        name: str = dspy.InputField()
-        result: str = dspy.OutputField()
+    class TypedSignature(Signature):
+        count: int = InputField()
+        name: str = InputField()
+        result: str = OutputField()
 
     predict_instance = Predict(TypedSignature)
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
@@ -1201,13 +1210,13 @@ def test_list_type_validation(caplog):
     """Test type validation with list[str] types."""
     log_test_helper()
 
-    class ComplexSignature(dspy.Signature):
-        items: list[str] = dspy.InputField()
-        result: str = dspy.OutputField()
+    class ComplexSignature(Signature):
+        items: list[str] = InputField()
+        result: str = OutputField()
 
     predict_instance = Predict(ComplexSignature)
     lm = DummyLM([{"result": "test output 1"}, {"result": "test output 2"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     # Test with wrong type
     caplog.clear()
@@ -1230,17 +1239,17 @@ def test_literal_type_validation(caplog):
 
     log_test_helper()
 
-    class LiteralSignature(dspy.Signature):
-        status: Literal["pending", "approved", "rejected"] = dspy.InputField()
-        priority: Literal[1, 2, 3] = dspy.InputField()
-        result: str = dspy.OutputField()
+    class LiteralSignature(Signature):
+        status: Literal["pending", "approved", "rejected"] = InputField()
+        priority: Literal[1, 2, 3] = InputField()
+        result: str = OutputField()
 
     predict_instance = Predict(LiteralSignature)
 
     # Test with correct literal values
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(status="approved", priority=2)
 
@@ -1249,7 +1258,7 @@ def test_literal_type_validation(caplog):
     # Test with incorrect literal value for string
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(status="invalid", priority=2)
 
@@ -1258,7 +1267,7 @@ def test_literal_type_validation(caplog):
     # Test with incorrect literal value for int
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(status="approved", priority=5)
 
@@ -1271,16 +1280,16 @@ def test_literal_union_type_validation(caplog):
 
     log_test_helper()
 
-    class UnionLiteralSignature(dspy.Signature):
-        mode: Literal["auto", "manual"] | None = dspy.InputField()
-        result: str = dspy.OutputField()
+    class UnionLiteralSignature(Signature):
+        mode: Literal["auto", "manual"] | None = InputField()
+        result: str = OutputField()
 
     predict_instance = Predict(UnionLiteralSignature)
 
     # Test with valid literal value
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(mode="auto")
 
@@ -1289,7 +1298,7 @@ def test_literal_union_type_validation(caplog):
     # Test with None
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(mode=None)
 
@@ -1298,7 +1307,7 @@ def test_literal_union_type_validation(caplog):
     # Test with invalid value
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(mode="invalid")
 
@@ -1309,13 +1318,13 @@ def test_list_string(caplog):
     """Test passing list of strings."""
     log_test_helper()
 
-    class TypedSignature(dspy.Signature):
-        nameList: list[str] = dspy.InputField()
-        result: str = dspy.OutputField()
+    class TypedSignature(Signature):
+        nameList: list[str] = InputField()
+        result: str = OutputField()
 
     predict_instance = Predict(TypedSignature)
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Pass list of strings
@@ -1326,7 +1335,7 @@ def test_list_string(caplog):
     caplog.clear()
 
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Pass list of non strings
         predict_instance(nameList=[1, 2, 3, None])
@@ -1338,17 +1347,17 @@ def test_nested_list_type_validation(caplog):
     """Test type validation with list element types."""
     log_test_helper()
 
-    class NestedListSignature(dspy.Signature):
-        numbers: list[int] = dspy.InputField()
-        names: list[str] = dspy.InputField()
-        result: str = dspy.OutputField()
+    class NestedListSignature(Signature):
+        numbers: list[int] = InputField()
+        names: list[str] = InputField()
+        result: str = OutputField()
 
     predict_instance = Predict(NestedListSignature)
 
     # Test with correct element types
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(numbers=[1, 2, 3], names=["alice", "bob"])
 
@@ -1358,7 +1367,7 @@ def test_nested_list_type_validation(caplog):
     # Test with incorrect element types in numbers
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(numbers=["1", "2", "3"], names=["alice", "bob"])
 
@@ -1367,7 +1376,7 @@ def test_nested_list_type_validation(caplog):
     # Test with incorrect element types in names
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(numbers=[1, 2, 3], names=[1, 2, 3])
 
@@ -1376,7 +1385,7 @@ def test_nested_list_type_validation(caplog):
     # Test with empty list (should be valid)
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(numbers=[], names=[])
 
@@ -1387,16 +1396,16 @@ def test_nested_dict_type_validation(caplog):
     """Test type validation with dict key and value types."""
     log_test_helper()
 
-    class DictSignature(dspy.Signature):
-        mapping: dict[str, int] = dspy.InputField()
-        result: str = dspy.OutputField()
+    class DictSignature(Signature):
+        mapping: dict[str, int] = InputField()
+        result: str = OutputField()
 
     predict_instance = Predict(DictSignature)
 
     # Test with correct key-value types
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(mapping={"a": 1, "b": 2, "c": 3})
 
@@ -1405,7 +1414,7 @@ def test_nested_dict_type_validation(caplog):
     # Test with incorrect value types
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(mapping={"a": "1", "b": "2", "c": "3"})
 
@@ -1414,7 +1423,7 @@ def test_nested_dict_type_validation(caplog):
     # Test with incorrect key types
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(mapping={1: 1, 2: 2, 3: 3})
 
@@ -1425,17 +1434,17 @@ def test_nested_tuple_type_validation(caplog):
     """Test type validation with tuple types."""
     log_test_helper()
 
-    class TupleSignature(dspy.Signature):
-        fixed_tuple: tuple[str, int, bool] = dspy.InputField()
-        var_tuple: tuple[int, ...] = dspy.InputField()
-        result: str = dspy.OutputField()
+    class TupleSignature(Signature):
+        fixed_tuple: tuple[str, int, bool] = InputField()
+        var_tuple: tuple[int, ...] = InputField()
+        result: str = OutputField()
 
     predict_instance = Predict(TupleSignature)
 
     # Test with correct tuple types
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(fixed_tuple=("hello", 42, True), var_tuple=(1, 2, 3, 4))
 
@@ -1444,7 +1453,7 @@ def test_nested_tuple_type_validation(caplog):
     # Test with incorrect element types in fixed tuple
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(fixed_tuple=(123, 42, True), var_tuple=(1, 2, 3))
 
@@ -1453,7 +1462,7 @@ def test_nested_tuple_type_validation(caplog):
     # Test with wrong length fixed tuple
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(fixed_tuple=("hello", 42), var_tuple=(1, 2, 3))
 
@@ -1462,7 +1471,7 @@ def test_nested_tuple_type_validation(caplog):
     # Test with incorrect element types in variable tuple
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(fixed_tuple=("hello", 42, True), var_tuple=("a", "b", "c"))
 
@@ -1479,7 +1488,7 @@ def test_literal_type_validation_string_signature(caplog):
     # Test with correct literal values
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(status="approved", priority=2)
 
@@ -1488,7 +1497,7 @@ def test_literal_type_validation_string_signature(caplog):
     # Test with incorrect literal value for string
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(status="invalid", priority=2)
 
@@ -1497,7 +1506,7 @@ def test_literal_type_validation_string_signature(caplog):
     # Test with incorrect literal value for int
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(status="approved", priority=5)
 
@@ -1514,7 +1523,7 @@ def test_list_type_validation_string_signature(caplog):
     # Test with correct element types
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(numbers=[1, 2, 3], names=["alice", "bob"])
 
@@ -1523,7 +1532,7 @@ def test_list_type_validation_string_signature(caplog):
     # Test with incorrect element types in numbers
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(numbers=["1", "2", "3"], names=["alice", "bob"])
 
@@ -1532,7 +1541,7 @@ def test_list_type_validation_string_signature(caplog):
     # Test with incorrect element types in names
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(numbers=[1, 2, 3], names=[1, 2, 3])
 
@@ -1541,7 +1550,7 @@ def test_list_type_validation_string_signature(caplog):
     # Test with empty list (should be valid)
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(numbers=[], names=[])
 
@@ -1558,7 +1567,7 @@ def test_dict_type_validation_string_signature(caplog):
     # Test with correct key-value types
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(mapping={"a": 1, "b": 2, "c": 3})
 
@@ -1567,7 +1576,7 @@ def test_dict_type_validation_string_signature(caplog):
     # Test with incorrect value types
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(mapping={"a": "1", "b": "2", "c": "3"})
 
@@ -1576,7 +1585,7 @@ def test_dict_type_validation_string_signature(caplog):
     # Test with incorrect key types
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(mapping={1: 1, 2: 2, 3: 3})
 
@@ -1593,7 +1602,7 @@ def test_tuple_type_validation_string_signature(caplog):
     # Test with correct tuple types
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(fixed_tuple=("hello", 42, True), var_tuple=(1, 2, 3, 4))
 
@@ -1602,7 +1611,7 @@ def test_tuple_type_validation_string_signature(caplog):
     # Test with incorrect element types in fixed tuple
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(fixed_tuple=(123, 42, True), var_tuple=(1, 2, 3))
 
@@ -1611,7 +1620,7 @@ def test_tuple_type_validation_string_signature(caplog):
     # Test with wrong length fixed tuple
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(fixed_tuple=("hello", 42), var_tuple=(1, 2, 3))
 
@@ -1620,7 +1629,7 @@ def test_tuple_type_validation_string_signature(caplog):
     # Test with incorrect element types in variable tuple
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(fixed_tuple=("hello", 42, True), var_tuple=("a", "b", "c"))
 
@@ -1637,7 +1646,7 @@ def test_union_type_validation_string_signature(caplog):
     # Test with valid literal value
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(mode="auto")
 
@@ -1646,7 +1655,7 @@ def test_union_type_validation_string_signature(caplog):
     # Test with None
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(mode=None)
 
@@ -1655,7 +1664,7 @@ def test_union_type_validation_string_signature(caplog):
     # Test with invalid value
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(mode="invalid")
 
@@ -1665,14 +1674,14 @@ def test_union_type_validation_string_signature(caplog):
 def test_basic_types_string_signature(caplog, enable_type_warnings):
     """Test type validation with basic types using string signatures."""
     log_test_helper()
-    dspy.configure(warn_on_type_mismatch=enable_type_warnings)
+    settings.configure(warn_on_type_mismatch=enable_type_warnings)
     # Use string signature with type annotations
     predict_instance = Predict("count:int, name:str -> result")
 
     # Test with correct types
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(count=42, name="test")
 
@@ -1681,7 +1690,7 @@ def test_basic_types_string_signature(caplog, enable_type_warnings):
     # Test with incorrect type for count
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         predict_instance(count="not an int", name="test")
 
@@ -1699,7 +1708,7 @@ def test_untyped_string_signature(caplog):
 
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Test with incorrect type for count and name
         predict_instance(count="abc", name=123)
@@ -1712,16 +1721,16 @@ def test_untyped_class_signature(caplog):
     log_test_helper()
 
     # Use class signature with type annotations
-    class TestSignature(dspy.Signature):
-        count = dspy.InputField()
-        name = dspy.InputField()
-        result = dspy.OutputField()
+    class TestSignature(Signature):
+        count = InputField()
+        name = InputField()
+        result = OutputField()
     predict_instance = Predict(TestSignature)
 
     # Test with correct types
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Test with "unexpected" type for count and name
         predict_instance(count="abc", name=123)
@@ -1733,15 +1742,15 @@ def test_string_to_list_signature(caplog):
     log_test_helper()
 
     # Use class signature with type annotations
-    class TestSignature(dspy.Signature):
-        name: str = dspy.InputField()
-        count = dspy.InputField()
-        result = dspy.OutputField()
+    class TestSignature(Signature):
+        name: str = InputField()
+        count = InputField()
+        result = OutputField()
     predict_instance = Predict(TestSignature)
 
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Test with a list of strings
         predict_instance(name=["abc", "def", "geh"], count=123)
@@ -1752,13 +1761,13 @@ def test_string_to_list_signature(caplog):
 def test_custom_signature_types(caplog, enable_type_warnings):
     """Test type validation with custom signature types."""
     log_test_helper()
-    dspy.configure(warn_on_type_mismatch=enable_type_warnings)
+    settings.configure(warn_on_type_mismatch=enable_type_warnings)
 
     class MyContainer:
         class Query(pydantic.BaseModel):
             text: str
 
-    signature = dspy.Signature("query: MyContainer.Query -> answer")
+    signature = Signature("query: MyContainer.Query -> answer")
     predict_instance = Predict(signature)
 
     # Create an instance of the Query model
@@ -1771,7 +1780,7 @@ def test_custom_signature_types(caplog, enable_type_warnings):
 
     caplog.clear()
     lm = DummyLM([{"answer": "test output"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Test with an incorrect type
         predict_instance(query="What is the capital of France?")

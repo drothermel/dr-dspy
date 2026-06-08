@@ -1,6 +1,6 @@
 import random
 
-import dspy
+from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.teleprompt.teleprompt import Teleprompter
 
@@ -58,7 +58,7 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         self.trainset = trainset
         self.valset = valset or trainset  # TODO: FIXME: Note this choice.
 
-        effective_max_errors = self.max_errors if self.max_errors is not None else dspy.settings.max_errors
+        effective_max_errors = self.max_errors if self.max_errors is not None else settings.max_errors
 
         scores = []
         all_subscores = []

@@ -1,9 +1,10 @@
 import pytest
 
-import dspy
-from dspy import Example
-from dspy.predict import Predict
-from dspy.teleprompt import BootstrapFewShot
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
+from dspy.primitives.module import Module
+from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.utils.dummies import DummyLM
 
 
@@ -27,7 +28,7 @@ def test_bootstrap_initialization():
     assert bootstrap.metric == simple_metric, "Metric not correctly initialized"
 
 
-class SimpleModule(dspy.Module):
+class SimpleModule(Module):
     def __init__(self, signature):
         super().__init__()
         self.predictor = Predict(signature)
@@ -43,7 +44,7 @@ def test_compile_with_predict_instances():
     teacher = SimpleModule("input -> output")
 
     lm = DummyLM(["Initial thoughts", "Finish[blue]"])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     # Initialize BootstrapFewShot and compile the student
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
@@ -58,7 +59,7 @@ def test_bootstrap_effectiveness():
     student = SimpleModule("input -> output")
     teacher = SimpleModule("input -> output")
     lm = DummyLM([{"output": "blue"}, {"output": "Ring-ding-ding-ding-dingeringeding!"}], follow_examples=True)
-    dspy.configure(lm=lm, trace=[])
+    settings.configure(lm=lm, trace=[])
 
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
     compiled_student = bootstrap.compile(student, teacher=teacher, trainset=trainset)
@@ -82,7 +83,7 @@ def test_error_handling_during_bootstrap():
     Test to verify error handling during the bootstrapping process
     """
 
-    class BuggyModule(dspy.Module):
+    class BuggyModule(Module):
         def __init__(self, signature):
             super().__init__()
             self.predictor = Predict(signature)
@@ -99,7 +100,7 @@ def test_error_handling_during_bootstrap():
             {"output": "Initial thoughts"},  # Simulate initial teacher's prediction
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     bootstrap = BootstrapFewShot(
         metric=simple_metric,
@@ -125,7 +126,7 @@ def test_validation_set_usage():
             {"output": "Finish[blue]"},  # Expected output for both training and validation
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
     compiled_student = bootstrap.compile(student, teacher=teacher, trainset=trainset)

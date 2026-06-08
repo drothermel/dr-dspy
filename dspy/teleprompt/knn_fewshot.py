@@ -1,10 +1,10 @@
 import types
 from typing import Any
 
-from dspy.clients import Embedder
+from dspy.clients.embedding import Embedder
 from dspy.predict.knn import KNN
-from dspy.primitives import Example
-from dspy.teleprompt import BootstrapFewShot
+from dspy.primitives.example import Example
+from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.teleprompt import Teleprompter
 
 

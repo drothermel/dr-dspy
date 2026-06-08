@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import re
 from typing import TYPE_CHECKING, Any, Optional, get_args, get_origin
@@ -5,9 +7,8 @@ from typing import TYPE_CHECKING, Any, Optional, get_args, get_origin
 import json_repair
 import pydantic
 
-from dspy.clients.base_lm import BaseLM
-
 if TYPE_CHECKING:
+    from dspy.clients.base_lm import BaseLM
     from litellm import ModelResponseStream
 
     from dspy.signatures.signature import Signature

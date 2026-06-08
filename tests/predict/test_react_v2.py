@@ -1,15 +1,20 @@
-import dspy
+from dspy.utils.dummies import DummyLM
+from dspy.adapters.chat_adapter import ChatAdapter
+from dspy.adapters.types.tool import ToolCalls
+from dspy.clients.base_lm import BaseLM
+from dspy.dsp.utils.settings import settings
 from dspy.dsp.utils.utils import dotdict
+from dspy.predict.react_v2 import ReActV2
 
 
-class ReasoningDummyLM(dspy.utils.DummyLM):
+class ReasoningDummyLM(DummyLM):
     @property
     def supports_reasoning(self):
         return True
 
 
 def test_react_v2_submit_tool_returns_original_output_fields():
-    react = dspy.ReActV2("question -> answer", tools=[])
+    react = ReActV2("question -> answer", tools=[])
 
     assert react.tools["submit"](answer="Paris") == {"answer": "Paris"}
     assert "tool_call_results" not in react.react.signature.input_fields
@@ -19,25 +24,25 @@ def test_react_v2_text_mock_lm_loop_records_inputs_once():
     def lookup(query: str) -> str:
         return f"found {query}"
 
-    lm = dspy.utils.DummyLM(
+    lm = DummyLM(
         [
             {
                 "next_thought": "I should look this up.",
-                "tool_calls": dspy.ToolCalls.from_dict_list(
+                "tool_calls": ToolCalls.from_dict_list(
                     [{"name": "lookup", "args": {"query": "cats"}}]
                 ),
             },
             {
                 "next_thought": "I can answer now.",
-                "tool_calls": dspy.ToolCalls.from_dict_list(
+                "tool_calls": ToolCalls.from_dict_list(
                     [{"name": "submit", "args": {"answer": "found cats"}}]
                 ),
             },
         ]
     )
 
-    with dspy.context(lm=lm, adapter=dspy.ChatAdapter()):
-        pred = dspy.ReActV2("question -> answer", tools=[lookup])(question="cats")
+    with settings.context(lm=lm, adapter=ChatAdapter()):
+        pred = ReActV2("question -> answer", tools=[lookup])(question="cats")
 
     assert pred.answer == "found cats"
     assert pred.termination_reason == "submit"
@@ -51,25 +56,25 @@ def test_react_v2_continuation_omits_missing_original_inputs():
     def lookup(query: str) -> str:
         return f"found {query}"
 
-    lm = dspy.utils.DummyLM(
+    lm = DummyLM(
         [
             {
                 "next_thought": "I should look this up.",
-                "tool_calls": dspy.ToolCalls.from_dict_list(
+                "tool_calls": ToolCalls.from_dict_list(
                     [{"name": "lookup", "args": {"query": "cats"}}]
                 ),
             },
             {
                 "next_thought": "I can answer now.",
-                "tool_calls": dspy.ToolCalls.from_dict_list(
+                "tool_calls": ToolCalls.from_dict_list(
                     [{"name": "submit", "args": {"answer": "found cats"}}]
                 ),
             },
         ]
     )
 
-    with dspy.context(lm=lm, adapter=dspy.ChatAdapter()):
-        pred = dspy.ReActV2("question -> answer", tools=[lookup])(question="cats")
+    with settings.context(lm=lm, adapter=ChatAdapter()):
+        pred = ReActV2("question -> answer", tools=[lookup])(question="cats")
 
     assert pred.answer == "found cats"
     second_call_messages = lm.history[1]["messages"]
@@ -83,7 +88,7 @@ def test_react_v2_text_mode_accepts_top_level_tool_arguments():
     def lookup(query: str) -> str:
         return f"found {query}"
 
-    lm = dspy.utils.DummyLM(
+    lm = DummyLM(
         [
             {
                 "next_thought": "I should look this up.",
@@ -91,15 +96,15 @@ def test_react_v2_text_mode_accepts_top_level_tool_arguments():
             },
             {
                 "next_thought": "I can answer now.",
-                "tool_calls": dspy.ToolCalls.from_dict_list(
+                "tool_calls": ToolCalls.from_dict_list(
                     [{"name": "submit", "args": {"answer": "found cats"}}]
                 ),
             },
         ]
     )
 
-    with dspy.context(lm=lm, adapter=dspy.ChatAdapter(use_native_function_calling=False)):
-        pred = dspy.ReActV2("question -> answer", tools=[lookup])(question="cats")
+    with settings.context(lm=lm, adapter=ChatAdapter(use_native_function_calling=False)):
+        pred = ReActV2("question -> answer", tools=[lookup])(question="cats")
 
     assert pred.answer == "found cats"
     assert pred.termination_reason == "submit"
@@ -107,7 +112,7 @@ def test_react_v2_text_mode_accepts_top_level_tool_arguments():
 
 
 def test_react_v2_text_mode_accepts_wrapped_submit_arguments():
-    lm = dspy.utils.DummyLM(
+    lm = DummyLM(
         [
             {
                 "next_thought": "I can answer now.",
@@ -116,33 +121,33 @@ def test_react_v2_text_mode_accepts_wrapped_submit_arguments():
         ]
     )
 
-    with dspy.context(lm=lm, adapter=dspy.ChatAdapter(use_native_function_calling=False)):
-        pred = dspy.ReActV2("question -> answer", tools=[])(question="cats")
+    with settings.context(lm=lm, adapter=ChatAdapter(use_native_function_calling=False)):
+        pred = ReActV2("question -> answer", tools=[])(question="cats")
 
     assert pred.answer == "done"
     assert pred.termination_reason == "submit"
 
 
 def test_react_v2_unknown_tool_observation_can_continue():
-    lm = dspy.utils.DummyLM(
+    lm = DummyLM(
         [
             {
                 "next_thought": "Try a missing tool.",
-                "tool_calls": dspy.ToolCalls.from_dict_list(
+                "tool_calls": ToolCalls.from_dict_list(
                     [{"name": "missing_tool", "args": {"query": "cats"}}]
                 ),
             },
             {
                 "next_thought": "Recover with a final answer.",
-                "tool_calls": dspy.ToolCalls.from_dict_list(
+                "tool_calls": ToolCalls.from_dict_list(
                     [{"name": "submit", "args": {"answer": "done"}}]
                 ),
             },
         ]
     )
 
-    with dspy.context(lm=lm, adapter=dspy.ChatAdapter()):
-        pred = dspy.ReActV2("question -> answer", tools=[])(question="cats")
+    with settings.context(lm=lm, adapter=ChatAdapter()):
+        pred = ReActV2("question -> answer", tools=[])(question="cats")
 
     first_result = pred.history.messages[0]["tool_calls"].tool_call_results.tool_call_results[0]
     assert first_result.is_error is True
@@ -152,19 +157,19 @@ def test_react_v2_unknown_tool_observation_can_continue():
 
 
 def test_react_v2_accepts_serialized_history_input():
-    lm = dspy.utils.DummyLM(
+    lm = DummyLM(
         [
             {
                 "next_thought": "I can answer.",
-                "tool_calls": dspy.ToolCalls.from_dict_list(
+                "tool_calls": ToolCalls.from_dict_list(
                     [{"name": "submit", "args": {"answer": "done"}}]
                 ),
             }
         ]
     )
 
-    with dspy.context(lm=lm, adapter=dspy.ChatAdapter()):
-        pred = dspy.ReActV2("question -> answer", tools=[])(history={"messages": [{"question": "old"}]})
+    with settings.context(lm=lm, adapter=ChatAdapter()):
+        pred = ReActV2("question -> answer", tools=[])(history={"messages": [{"question": "old"}]})
 
     assert pred.answer == "done"
     assert pred.history.messages[0] == {"question": "old"}
@@ -174,18 +179,18 @@ def test_react_v2_accepts_serialized_history_input():
 def test_react_v2_forced_submit_on_empty_tool_calls():
     lm = ReasoningDummyLM(
         [
-            {"next_thought": "No action.", "tool_calls": dspy.ToolCalls(tool_calls=[])},
+            {"next_thought": "No action.", "tool_calls": ToolCalls(tool_calls=[])},
             {
                 "next_thought": "Forced final.",
-                "tool_calls": dspy.ToolCalls.from_dict_list(
+                "tool_calls": ToolCalls.from_dict_list(
                     [{"name": "submit", "args": {"answer": "forced"}}]
                 ),
             },
         ]
     )
 
-    with dspy.context(lm=lm, adapter=dspy.ChatAdapter()):
-        pred = dspy.ReActV2("question -> answer", tools=[])(question="cats")
+    with settings.context(lm=lm, adapter=ChatAdapter()):
+        pred = ReActV2("question -> answer", tools=[])(question="cats")
 
     assert pred.answer == "forced"
     assert pred.termination_reason == "forced_submit"
@@ -194,7 +199,7 @@ def test_react_v2_forced_submit_on_empty_tool_calls():
     assert lm.history[1]["kwargs"].get("reasoning_effort") is None
 
 
-class NativeToolLM(dspy.BaseLM):
+class NativeToolLM(BaseLM):
     def __init__(self):
         super().__init__("native-tool-lm", "chat", 0.0, 1000, True)
         self.calls = []
@@ -230,7 +235,7 @@ class NativeToolLM(dspy.BaseLM):
         )
 
 
-class ParallelNativeToolLM(dspy.BaseLM):
+class ParallelNativeToolLM(BaseLM):
     def __init__(self):
         super().__init__("parallel-native-tool-lm", "chat", 0.0, 1000, True)
         self.calls = []
@@ -281,8 +286,8 @@ def test_react_v2_native_tool_loop_replays_tool_result_with_provider_id():
 
     lm = NativeToolLM()
 
-    with dspy.context(lm=lm, adapter=dspy.ChatAdapter(use_native_function_calling=True)):
-        pred = dspy.ReActV2("question -> answer", tools=[lookup])(question="cats")
+    with settings.context(lm=lm, adapter=ChatAdapter(use_native_function_calling=True)):
+        pred = ReActV2("question -> answer", tools=[lookup])(question="cats")
 
     assert pred.answer == "found cats"
     assert pred.history.messages[0]["tool_calls"].tool_calls[0].id == "call_provider_1"
@@ -300,8 +305,8 @@ def test_react_v2_native_parallel_tool_calls_are_requested_and_replayed():
 
     lm = ParallelNativeToolLM()
 
-    with dspy.context(lm=lm, adapter=dspy.ChatAdapter(use_native_function_calling=True, parallel_tool_calls=True)):
-        pred = dspy.ReActV2("question -> answer", tools=[lookup])(question="cats and dogs")
+    with settings.context(lm=lm, adapter=ChatAdapter(use_native_function_calling=True, parallel_tool_calls=True)):
+        pred = ReActV2("question -> answer", tools=[lookup])(question="cats and dogs")
 
     assert pred.answer == "found cats and found dogs"
     assert lm.calls[0]["kwargs"]["parallel_tool_calls"] is True

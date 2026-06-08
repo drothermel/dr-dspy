@@ -8,14 +8,25 @@ import pytest
 from litellm import Choices, Message, ModelResponse
 from litellm.types.utils import Usage
 
-import dspy
+from dspy.adapters.json_adapter import JSONAdapter
+from dspy.clients.lm import LM
+from dspy.dsp.utils.settings import settings
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.predict.parallel import Parallel
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
+from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
+from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.utils.dummies import DummyLM
+from dspy.utils.saving import load
 
 
 def test_deepcopy_basic():
-    signature = dspy.Signature("q -> a")
-    cot = dspy.ChainOfThought(signature)
+    signature = Signature("q -> a")
+    cot = ChainOfThought(signature)
     cot_copy = cot.deepcopy()
     assert len(cot.parameters()) == len(cot_copy.parameters())
     # Parameters should be different objects with the same values.
@@ -24,10 +35,10 @@ def test_deepcopy_basic():
 
 
 def test_deepcopy_with_uncopyable_modules():
-    class CustomClass(dspy.Module):
+    class CustomClass(Module):
         def __init__(self):
             self.lock = threading.Lock()  # Non-copyable object.
-            self.cot = dspy.ChainOfThought(dspy.Signature("q -> a"))
+            self.cot = ChainOfThought(Signature("q -> a"))
 
     model = CustomClass()
     model_copy = model.deepcopy()
@@ -40,12 +51,12 @@ def test_deepcopy_with_uncopyable_modules():
 
 
 def test_deepcopy_with_nested_modules():
-    class CustomClass1(dspy.Module):
+    class CustomClass1(Module):
         def __init__(self):
             self.lock = threading.Lock()  # Non-copyable object.
-            self.cot = dspy.ChainOfThought(dspy.Signature("q -> a"))
+            self.cot = ChainOfThought(Signature("q -> a"))
 
-    class CustomClass2(dspy.Module):
+    class CustomClass2(Module):
         def __init__(self):
             self.submodel = CustomClass1()
 
@@ -60,15 +71,15 @@ def test_deepcopy_with_nested_modules():
 
 
 def test_save_and_load_with_json(tmp_path):
-    model = dspy.ChainOfThought(dspy.Signature("q -> a"))
+    model = ChainOfThought(Signature("q -> a"))
     model.predict.signature = model.predict.signature.with_instructions("You are a helpful assistant.")
     model.predict.demos = [
-        dspy.Example(q="What is the capital of France?", a="Paris", reasoning="n/a").with_inputs("q"),
+        Example(q="What is the capital of France?", a="Paris", reasoning="n/a").with_inputs("q"),
         # Nested example
-        dspy.Example(
+        Example(
             q=[
-                dspy.Example(q="What is the capital of France?"),
-                dspy.Example(q="What is actually the capital of France?"),
+                Example(q="What is the capital of France?"),
+                Example(q="What is actually the capital of France?"),
             ],
             a="Paris",
             reasoning="n/a",
@@ -76,7 +87,7 @@ def test_save_and_load_with_json(tmp_path):
     ]
     save_path = tmp_path / "model.json"
     model.save(save_path)
-    new_model = dspy.ChainOfThought(dspy.Signature("q -> a"))
+    new_model = ChainOfThought(Signature("q -> a"))
     new_model.load(save_path)
 
     assert str(new_model.predict.signature) == str(model.predict.signature)
@@ -89,12 +100,12 @@ def test_save_and_load_with_pkl(tmp_path):
     import datetime
 
     # `datetime.date` is not json serializable, so we need to save with pickle.
-    class MySignature(dspy.Signature):
+    class MySignature(Signature):
         """Just a custom signature."""
 
-        current_date: datetime.date = dspy.InputField()
-        target_date: datetime.date = dspy.InputField()
-        date_diff: int = dspy.OutputField(desc="The difference in days between the current_date and the target_date")
+        current_date: datetime.date = InputField()
+        target_date: datetime.date = InputField()
+        date_diff: int = OutputField(desc="The difference in days between the current_date and the target_date")
 
     trainset = [
         {"current_date": datetime.date(2024, 1, 1), "target_date": datetime.date(2024, 1, 2), "date_diff": 1},
@@ -103,26 +114,26 @@ def test_save_and_load_with_pkl(tmp_path):
         {"current_date": datetime.date(2024, 1, 1), "target_date": datetime.date(2024, 1, 5), "date_diff": 4},
         {"current_date": datetime.date(2024, 1, 1), "target_date": datetime.date(2024, 1, 6), "date_diff": 5},
     ]
-    trainset = [dspy.Example(**example).with_inputs("current_date", "target_date") for example in trainset]
+    trainset = [Example(**example).with_inputs("current_date", "target_date") for example in trainset]
 
-    dspy.configure(
+    settings.configure(
         lm=DummyLM([{"date_diff": "1", "reasoning": "n/a"}, {"date_diff": "2", "reasoning": "n/a"}] * 10)
     )
 
-    cot = dspy.ChainOfThought(MySignature)
+    cot = ChainOfThought(MySignature)
     cot(current_date=datetime.date(2024, 1, 1), target_date=datetime.date(2024, 1, 2))
 
     def dummy_metric(example, pred, trace=None):
         return True
 
-    optimizer = dspy.BootstrapFewShot(max_bootstrapped_demos=4, max_labeled_demos=4, max_rounds=5, metric=dummy_metric)
+    optimizer = BootstrapFewShot(max_bootstrapped_demos=4, max_labeled_demos=4, max_rounds=5, metric=dummy_metric)
     compiled_cot = optimizer.compile(cot, trainset=trainset)
     compiled_cot.predict.signature = compiled_cot.predict.signature.with_instructions("You are a helpful assistant.")
 
     save_path = tmp_path / "program.pkl"
     compiled_cot.save(save_path)
 
-    new_cot = dspy.ChainOfThought(MySignature)
+    new_cot = ChainOfThought(MySignature)
     new_cot.load(save_path, allow_pickle=True)
 
     assert str(new_cot.predict.signature) == str(compiled_cot.predict.signature)
@@ -162,7 +173,7 @@ class MyModule(dspy.Module):
 
         # Test the loading fails without using `modules_to_serialize`
         with pytest.raises(ModuleNotFoundError):
-            dspy.load(tmp_path, allow_pickle=True)
+            load(tmp_path, allow_pickle=True)
 
         sys.path.insert(0, str(tmp_path))
         import custom_module
@@ -179,7 +190,7 @@ class MyModule(dspy.Module):
         sys.path.remove(str(tmp_path))
         del custom_module
 
-        loaded_module = dspy.load(tmp_path, allow_pickle=True)
+        loaded_module = load(tmp_path, allow_pickle=True)
         assert loaded_module.cot.predict.signature == cot.cot.predict.signature
 
     finally:
@@ -197,7 +208,7 @@ def test_load_with_version_mismatch(tmp_path):
     # Mock versions during load
     load_versions = {"python": "3.10", "dspy": "2.5.0", "cloudpickle": "2.1"}
 
-    predict = dspy.Predict("question->answer")
+    predict = Predict("question->answer")
 
     # Create a custom handler to capture log messages
     class ListHandler(logging.Handler):
@@ -222,7 +233,7 @@ def test_load_with_version_mismatch(tmp_path):
 
         # Mock version during load
         with patch("dspy.primitives.base_module.get_dependency_versions", return_value=load_versions):
-            loaded_predict = dspy.Predict("question->answer")
+            loaded_predict = Predict("question->answer")
             loaded_predict.load(save_path, allow_pickle=True)
 
         # Assert warnings were logged: 1 for pickle loading + 3 for version mismatches
@@ -236,7 +247,7 @@ def test_load_with_version_mismatch(tmp_path):
             assert "There is a mismatch of" in msg
 
         # Verify the model still loads correctly despite version mismatches
-        assert isinstance(loaded_predict, dspy.Predict)
+        assert isinstance(loaded_predict, Predict)
         assert str(predict.signature) == str(loaded_predict.signature)
 
     finally:
@@ -247,9 +258,9 @@ def test_load_with_version_mismatch(tmp_path):
 
 @pytest.mark.llm_call
 def test_single_module_call_with_usage_tracker(lm_for_test):
-    dspy.configure(lm=dspy.LM(lm_for_test, cache=False, temperature=0.0), track_usage=True)
+    settings.configure(lm=LM(lm_for_test, cache=False, temperature=0.0), track_usage=True)
 
-    predict = dspy.ChainOfThought("question -> answer")
+    predict = ChainOfThought("question -> answer")
     output = predict(question="What is the capital of France?")
 
     lm_usage = output.get_lm_usage()
@@ -259,7 +270,7 @@ def test_single_module_call_with_usage_tracker(lm_for_test):
     assert lm_usage[lm_for_test]["total_tokens"] > 0
 
     # Test no usage being tracked when cache is enabled
-    dspy.configure(lm=dspy.LM(lm_for_test, cache=True, temperature=0.0), track_usage=True)
+    settings.configure(lm=LM(lm_for_test, cache=True, temperature=0.0), track_usage=True)
     for _ in range(2):
         output = predict(question="What is the capital of France?")
 
@@ -268,12 +279,12 @@ def test_single_module_call_with_usage_tracker(lm_for_test):
 
 @pytest.mark.llm_call
 def test_multi_module_call_with_usage_tracker(lm_for_test):
-    dspy.configure(lm=dspy.LM(lm_for_test, cache=False, temperature=0.0), track_usage=True)
+    settings.configure(lm=LM(lm_for_test, cache=False, temperature=0.0), track_usage=True)
 
-    class MyProgram(dspy.Module):
+    class MyProgram(Module):
         def __init__(self):
-            self.predict1 = dspy.ChainOfThought("question -> answer")
-            self.predict2 = dspy.ChainOfThought("question, answer -> score")
+            self.predict1 = ChainOfThought("question -> answer")
+            self.predict2 = ChainOfThought("question, answer -> score")
 
         def __call__(self, question: str) -> Prediction:
             answer = self.predict1(question=question)
@@ -294,23 +305,23 @@ def test_multi_module_call_with_usage_tracker(lm_for_test):
 # TODO: prepare second model for testing this unit test in ci
 @pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="Skip the test if OPENAI_API_KEY is not set.")
 def test_usage_tracker_in_parallel():
-    class MyProgram(dspy.Module):
+    class MyProgram(Module):
         def __init__(self, lm):
             self.lm = lm
-            self.predict1 = dspy.ChainOfThought("question -> answer")
-            self.predict2 = dspy.ChainOfThought("question, answer -> score")
+            self.predict1 = ChainOfThought("question -> answer")
+            self.predict2 = ChainOfThought("question, answer -> score")
 
         def __call__(self, question: str) -> Prediction:
-            with dspy.context(lm=self.lm):
+            with settings.context(lm=self.lm):
                 answer = self.predict1(question=question)
                 score = self.predict2(question=question, answer=answer)
                 return score
 
-    dspy.configure(track_usage=True)
-    program1 = MyProgram(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
-    program2 = MyProgram(lm=dspy.LM("openai/gpt-3.5-turbo", cache=False))
+    settings.configure(track_usage=True)
+    program1 = MyProgram(lm=LM("openai/gpt-4o-mini", cache=False))
+    program2 = MyProgram(lm=LM("openai/gpt-3.5-turbo", cache=False))
 
-    parallelizer = dspy.Parallel()
+    parallelizer = Parallel()
 
     results = parallelizer(
         [
@@ -328,7 +339,7 @@ def test_usage_tracker_in_parallel():
 
 @pytest.mark.asyncio
 async def test_usage_tracker_async_parallel():
-    program = dspy.Predict("question -> answer")
+    program = Predict("question -> answer")
 
     with patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -356,8 +367,8 @@ async def test_usage_tracker_async_parallel():
             program.acall(question="What is the capital of France?"),
             program.acall(question="What is the capital of France?"),
         ]
-        with dspy.context(
-            lm=dspy.LM("openai/gpt-4o-mini", cache=False), track_usage=True, adapter=dspy.JSONAdapter()
+        with settings.context(
+            lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True, adapter=JSONAdapter()
         ):
             results = await asyncio.gather(*coroutines)
 
@@ -375,24 +386,24 @@ async def test_usage_tracker_async_parallel():
 
 
 def test_usage_tracker_no_side_effect():
-    class MyProgram(dspy.Module):
+    class MyProgram(Module):
         def __init__(self):
-            self.predict = dspy.Predict("question -> answer")
+            self.predict = Predict("question -> answer")
 
         def forward(self, question: str, **kwargs) -> str:
             return self.predict(question=question).answer
 
     program = MyProgram()
-    with dspy.context(lm=DummyLM([{"answer": "Paris"}]), track_usage=True):
+    with settings.context(lm=DummyLM([{"answer": "Paris"}]), track_usage=True):
         result = program(question="What is the capital of France?")
     assert result == "Paris"
 
 
 def test_module_history():
-    class MyProgram(dspy.Module):
+    class MyProgram(Module):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
-            self.cot = dspy.ChainOfThought("question -> answer")
+            self.cot = ChainOfThought("question -> answer")
 
         def forward(self, question: str, **kwargs) -> Prediction:
             return self.cot(question=question)
@@ -404,7 +415,7 @@ def test_module_history():
             ],
             model="openai/gpt-4o-mini",
         )
-        dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False), adapter=dspy.JSONAdapter())
+        settings.configure(lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter())
         program = MyProgram()
         program(question="What is the capital of France?")
 
@@ -421,7 +432,7 @@ def test_module_history():
 
         assert program.history[0]["outputs"] == ["{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"]
 
-        dspy.configure(disable_history=True)
+        settings.configure(disable_history=True)
 
         program(question="What is the capital of France?")
         # No history is recorded when history is disabled.
@@ -429,7 +440,7 @@ def test_module_history():
         assert len(program.cot.history) == 2
         assert len(program.cot.predict.history) == 2
 
-        dspy.configure(disable_history=False)
+        settings.configure(disable_history=False)
 
         program(question="What is the capital of France?")
         # History is recorded again when history is enabled.
@@ -439,10 +450,10 @@ def test_module_history():
 
 
 def test_module_history_with_concurrency():
-    class MyProgram(dspy.Module):
+    class MyProgram(Module):
         def __init__(self):
             super().__init__()
-            self.cot = dspy.ChainOfThought("question -> answer")
+            self.cot = ChainOfThought("question -> answer")
 
         def forward(self, question: str, **kwargs) -> Prediction:
             return self.cot(question=question)
@@ -452,10 +463,10 @@ def test_module_history_with_concurrency():
             choices=[Choices(message=Message(content="{'reasoning': 'N/A', 'answer': 'Holy crab!'}"))],
             model="openai/gpt-4o-mini",
         )
-        dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False), adapter=dspy.JSONAdapter())
+        settings.configure(lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter())
         program = MyProgram()
 
-        parallelizer = dspy.Parallel()
+        parallelizer = Parallel()
 
         parallelizer(
             [
@@ -470,10 +481,10 @@ def test_module_history_with_concurrency():
 
 @pytest.mark.asyncio
 async def test_module_history_async():
-    class MyProgram(dspy.Module):
+    class MyProgram(Module):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
-            self.cot = dspy.ChainOfThought("question -> answer")
+            self.cot = ChainOfThought("question -> answer")
 
         async def aforward(self, question: str, **kwargs) -> Prediction:
             return await self.cot.acall(question=question)
@@ -486,7 +497,7 @@ async def test_module_history_async():
             model="openai/gpt-4o-mini",
         )
         program = MyProgram()
-        with dspy.context(lm=dspy.LM("openai/gpt-4o-mini", cache=False), adapter=dspy.JSONAdapter()):
+        with settings.context(lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()):
             await program.acall(question="What is the capital of France?")
 
             # Second call only call the submodule.
@@ -502,8 +513,8 @@ async def test_module_history_async():
 
         assert program.history[0]["outputs"] == ["{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"]
 
-        with dspy.context(
-            disable_history=True, lm=dspy.LM("openai/gpt-4o-mini", cache=False), adapter=dspy.JSONAdapter()
+        with settings.context(
+            disable_history=True, lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()
         ):
             await program.acall(question="What is the capital of France?")
 
@@ -512,8 +523,8 @@ async def test_module_history_async():
         assert len(program.cot.history) == 2
         assert len(program.cot.predict.history) == 2
 
-        with dspy.context(
-            disable_history=False, lm=dspy.LM("openai/gpt-4o-mini", cache=False), adapter=dspy.JSONAdapter()
+        with settings.context(
+            disable_history=False, lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()
         ):
             await program.acall(question="What is the capital of France?")
         # History is recorded again when history is enabled.
@@ -523,7 +534,7 @@ async def test_module_history_async():
 
 
 def test_forward_direct_call_warning(capsys):
-    class TestModule(dspy.Module):
+    class TestModule(Module):
         def forward(self, x):
             return x
 
@@ -534,7 +545,7 @@ def test_forward_direct_call_warning(capsys):
 
 
 def test_forward_through_call_no_warning(capsys):
-    class TestModule(dspy.Module):
+    class TestModule(Module):
         def forward(self, x):
             return x
 

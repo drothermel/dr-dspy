@@ -1,16 +1,17 @@
 import pytest
 
-import dspy
-from dspy import Signature
-from dspy.predict import CodeAct
-from dspy.utils import DummyLM
+from dspy.dsp.utils.settings import settings
+from dspy.predict.code_act import CodeAct
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
+from dspy.utils.dummies import DummyLM
 
 pytestmark = pytest.mark.deno
 
 
 class BasicQA(Signature):
-    question = dspy.InputField()
-    answer = dspy.OutputField(desc="often between 1 and 5 words")
+    question = InputField()
+    answer = OutputField(desc="often between 1 and 5 words")
 
 def add(a: float, b: float) -> float:
     "add two numbers"
@@ -27,7 +28,7 @@ def test_codeact_code_generation():
             {"reasoning": "Reason_B", "answer": "2"},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     program = CodeAct(BasicQA, tools=[add])
     res = program(question="What is 1+1?")
     assert res.answer == "2"
@@ -39,9 +40,9 @@ def test_codeact_code_generation():
 
 
 class ExtremumFinder(Signature):
-    input_list = dspy.InputField()
-    maximum = dspy.OutputField(desc="The maximum of the given numbers")
-    minimum = dspy.OutputField(desc="The minimum of the given numbers")
+    input_list = InputField()
+    maximum = OutputField(desc="The maximum of the given numbers")
+    minimum = OutputField(desc="The minimum of the given numbers")
 
 def extract_maximum_minimum(input_list: str) -> dict[str, float]:
     numbers = list(map(float, input_list.split(",")))
@@ -58,7 +59,7 @@ def test_codeact_support_multiple_fields():
             {"reasoning": "Reason_B", "maximum": "6", "minimum": "2"},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     program = CodeAct(ExtremumFinder, tools=[extract_maximum_minimum])
     res = program(input_list="2, 3, 5, 6")
     assert res.maximum == "6"
@@ -86,7 +87,7 @@ def test_codeact_code_parse_failure():
             {"reasoning": "Reason_B", "answer": "2"},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     program = CodeAct(BasicQA, tools=[add])
     res = program(question="What is 1+1?")
     assert res.answer == "2"
@@ -115,7 +116,7 @@ def test_codeact_code_execution_failure():
             {"reasoning": "Reason_B", "answer": "2"},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     program = CodeAct(BasicQA, tools=[add])
     res = program(question="What is 1+1?")
     assert res.answer == "2"

@@ -1,7 +1,8 @@
 import pytest
 
-import dspy
-from dspy import Example
+from dspy.adapters.types.history import History
+from dspy.adapters.types.image import Image
+from dspy.primitives.example import Example
 
 
 def test_example_initialization():
@@ -53,7 +54,7 @@ def test_example_len():
 
 def test_example_repr_str_img():
     example = Example(
-        img=dspy.Image(url="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
+        img=Image(url="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
     )
     assert (
         repr(example)
@@ -126,8 +127,8 @@ def test_example_to_dict():
 
 
 def test_example_to_dict_with_history():
-    """Test that Example.toDict() properly serializes dspy.History objects."""
-    history = dspy.History(
+    """Test that Example.toDict() properly serializes History objects."""
+    history = History(
         messages=[
             {"question": "What is the capital of France?", "answer": "Paris"},
             {"question": "What is the capital of Germany?", "answer": "Berlin"},

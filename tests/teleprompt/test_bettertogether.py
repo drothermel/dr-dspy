@@ -7,10 +7,12 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-import dspy
-from dspy import Example
-from dspy.predict import Predict
-from dspy.teleprompt import BetterTogether, BootstrapFewShotWithRandomSearch, BootstrapFinetune
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
+from dspy.primitives.module import Module
+from dspy.teleprompt.bettertogether import BetterTogether
+from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
+from dspy.teleprompt.bootstrap_finetune import BootstrapFinetune
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.dummies import DummyLM
 
@@ -29,7 +31,7 @@ trainset = examples[:2]
 valset = [examples[2]]
 
 
-class SimpleModule(dspy.Module):
+class SimpleModule(Module):
     def __init__(self, signature):
         super().__init__()
         self.predictor = Predict(signature)
@@ -683,7 +685,7 @@ def test_candidate_programs_structure(student_with_lm):
         assert "program" in candidate, f"Candidate {i} missing 'program' key"
         assert "strategy" in candidate, f"Candidate {i} missing 'strategy' key"
         assert isinstance(candidate["score"], (int, float)), f"Candidate {i} score should be numeric"
-        assert isinstance(candidate["program"], dspy.Module), f"Candidate {i} program should be a Module"
+        assert isinstance(candidate["program"], Module), f"Candidate {i} program should be a Module"
         assert isinstance(candidate["strategy"], (str, type(None))), f"Candidate {i} strategy should be str or None"
 
     # Candidates should be sorted by score (best first)

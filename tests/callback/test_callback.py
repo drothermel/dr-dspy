@@ -2,7 +2,10 @@ import time
 
 import pytest
 
-import dspy
+from dspy.adapters.types.tool import Tool
+from dspy.dsp.utils.settings import settings
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.primitives.module import Module
 from dspy.utils.callback import ACTIVE_CALL_ID, BaseCallback, with_callbacks
 from dspy.utils.dummies import DummyLM
 
@@ -10,11 +13,11 @@ from dspy.utils.dummies import DummyLM
 @pytest.fixture(autouse=True)
 def reset_settings():
     # Make sure the settings are reset after each test
-    original_settings = dspy.settings.copy()
+    original_settings = settings.copy()
 
     yield
 
-    dspy.configure(**original_settings)
+    settings.configure(**original_settings)
 
 
 class MyCallback(BaseCallback):
@@ -64,14 +67,14 @@ class MyCallback(BaseCallback):
     ],
 )
 def test_callback_injection(args, kwargs):
-    class Target(dspy.Module):
+    class Target(Module):
         @with_callbacks
         def forward(self, x: int, y: str, z: float) -> int:
             time.sleep(0.1)
             return x + int(y) + int(z)
 
     callback = MyCallback()
-    dspy.configure(callbacks=[callback])
+    settings.configure(callbacks=[callback])
 
     target = Target()
     result = target.forward(*args, **kwargs)
@@ -86,7 +89,7 @@ def test_callback_injection(args, kwargs):
 
 
 def test_callback_injection_local():
-    class Target(dspy.Module):
+    class Target(Module):
         @with_callbacks
         def forward(self, x: int, y: str, z: float) -> int:
             time.sleep(0.1)
@@ -115,14 +118,14 @@ def test_callback_injection_local():
 
 
 def test_callback_error_handling():
-    class Target(dspy.Module):
+    class Target(Module):
         @with_callbacks
         def forward(self, x: int, y: str, z: float) -> int:
             time.sleep(0.1)
             raise ValueError("Error")
 
     callback = MyCallback()
-    dspy.configure(callbacks=[callback])
+    settings.configure(callbacks=[callback])
 
     target = Target()
 
@@ -136,7 +139,7 @@ def test_callback_error_handling():
 
 
 def test_multiple_callbacks():
-    class Target(dspy.Module):
+    class Target(Module):
         @with_callbacks
         def forward(self, x: int, y: str, z: float) -> int:
             time.sleep(0.1)
@@ -144,7 +147,7 @@ def test_multiple_callbacks():
 
     callback_1 = MyCallback()
     callback_2 = MyCallback()
-    dspy.configure(callbacks=[callback_1, callback_2])
+    settings.configure(callbacks=[callback_1, callback_2])
 
     target = Target()
     result = target.forward(1, "2", 3.0)
@@ -157,12 +160,12 @@ def test_multiple_callbacks():
 
 def test_callback_complex_module():
     callback = MyCallback()
-    dspy.configure(
+    settings.configure(
         lm=DummyLM({"How are you?": {"answer": "test output", "reasoning": "No more responses"}}),
         callbacks=[callback],
     )
 
-    cot = dspy.ChainOfThought("question -> answer", n=3)
+    cot = ChainOfThought("question -> answer", n=3)
     result = cot(question="How are you?")
     assert result["answer"] == "test output"
     assert result["reasoning"] == "No more responses"
@@ -189,11 +192,11 @@ def test_callback_complex_module():
 @pytest.mark.asyncio
 async def test_callback_async_module():
     callback = MyCallback()
-    with dspy.context(
+    with settings.context(
         lm=DummyLM({"How are you?": {"answer": "test output", "reasoning": "No more responses"}}),
         callbacks=[callback],
     ):
-        cot = dspy.ChainOfThought("question -> answer", n=3)
+        cot = ChainOfThought("question -> answer", n=3)
         result = await cot.acall(question="How are you?")
     assert result["answer"] == "test output"
     assert result["reasoning"] == "No more responses"
@@ -220,7 +223,7 @@ async def test_callback_async_module():
 
 def test_tool_calls():
     callback = MyCallback()
-    dspy.configure(callbacks=[callback])
+    settings.configure(callbacks=[callback])
 
     def tool_1(query: str) -> str:
         """A dummy tool function."""
@@ -230,9 +233,9 @@ def test_tool_calls():
         """Another dummy tool function."""
         return "result 2"
 
-    class MyModule(dspy.Module):
+    class MyModule(Module):
         def __init__(self):
-            self.tools = [dspy.Tool(tool_1), dspy.Tool(tool_2)]
+            self.tools = [Tool(tool_1), Tool(tool_2)]
 
         def forward(self, query: str) -> str:
             query = self.tools[0](query=query)
@@ -265,7 +268,7 @@ def test_active_id():
             self.parent_call_ids.append(parent_call_id)
             self.call_ids.append(call_id)
 
-    class Parent(dspy.Module):
+    class Parent(Module):
         def __init__(self):
             self.child_1 = Child()
             self.child_2 = Child()
@@ -274,12 +277,12 @@ def test_active_id():
             self.child_1()
             self.child_2()
 
-    class Child(dspy.Module):
+    class Child(Module):
         def forward(self):
             pass
 
     callback = CustomCallback()
-    dspy.configure(callbacks=[callback])
+    settings.configure(callbacks=[callback])
 
     parent = Parent()
     parent()

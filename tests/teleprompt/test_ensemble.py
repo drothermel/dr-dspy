@@ -1,10 +1,10 @@
 import pytest
 
-import dspy
-from dspy.teleprompt import Ensemble
+from dspy.primitives.module import Module
+from dspy.teleprompt.ensemble import Ensemble
 
 
-class MockProgram(dspy.Module):
+class MockProgram(Module):
     def __init__(self, output):
         super().__init__()
         self.output = output

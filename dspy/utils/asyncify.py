@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 import anyio
 from anyio import CapacityLimiter
 
+from dspy.dsp.utils.settings import settings
+
 if TYPE_CHECKING:
     from dspy.primitives.module import Module
 
@@ -11,9 +13,8 @@ _limiter = None
 
 
 def get_async_max_workers():
-    import dspy
 
-    return dspy.settings.async_max_workers
+    return settings.async_max_workers
 
 
 def get_limiter():

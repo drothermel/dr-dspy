@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 import cloudpickle
 import orjson
 
+from dspy.__metadata__ import __version__
+
 if TYPE_CHECKING:
     from dspy.primitives.module import Module
 
@@ -13,13 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 def get_dependency_versions():
-    import dspy
-
     cloudpickle_version = ".".join(cloudpickle.__version__.split(".")[:2])
 
     return {
         "python": f"{sys.version_info.major}.{sys.version_info.minor}",
-        "dspy": dspy.__version__,
+        "dspy": __version__,
         "cloudpickle": cloudpickle_version,
     }
 

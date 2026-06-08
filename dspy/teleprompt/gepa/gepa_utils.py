@@ -6,12 +6,13 @@ from gepa import EvaluationBatch, GEPAAdapter
 from gepa.core.adapter import ProposalFn
 from gepa.strategies.instruction_proposal import InstructionProposalSignature
 
-import dspy
 from dspy.adapters.chat_adapter import ChatAdapter
-from dspy.adapters.types import History
+from dspy.adapters.types.history import History
 from dspy.adapters.types.base_type import Type
-from dspy.evaluate import Evaluate
-from dspy.primitives import Example, Prediction
+from dspy.dsp.utils.settings import settings
+from dspy.evaluate.evaluate import Evaluate
+from dspy.primitives.example import Example
+from dspy.primitives.prediction import Prediction
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, TraceData
 
 logger = logging.getLogger(__name__)
@@ -107,10 +108,10 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         reflective_dataset: dict[str, list[dict[str, Any]]],
         components_to_update: list[str],
     ) -> dict[str, str]:
-        reflection_lm = self.reflection_lm or dspy.settings.lm
+        reflection_lm = self.reflection_lm or settings.lm
         # If custom proposer provided, override everything with custom proposer
         if self.custom_instruction_proposer:
-            with dspy.context(lm=reflection_lm):
+            with settings.context(lm=reflection_lm):
                 return self.custom_instruction_proposer(
                     candidate=candidate,
                     reflective_dataset=reflective_dataset,
@@ -119,7 +120,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
 
         results: dict[str, str] = {}
 
-        with dspy.context(lm=reflection_lm):
+        with settings.context(lm=reflection_lm):
             for name in components_to_update:
                 base_instruction = candidate[name]
                 dataset_with_feedback = reflective_dataset[name]

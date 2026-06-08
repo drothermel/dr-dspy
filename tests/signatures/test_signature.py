@@ -6,8 +6,10 @@ import cloudpickle
 import pydantic
 import pytest
 
-import dspy
-from dspy import InputField, OutputField, Signature, infer_prefix
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature, infer_prefix
 from dspy.utils.dummies import DummyLM
 
 
@@ -153,10 +155,10 @@ def test_insert_field_at_various_positions():
 
 
 def test_order_preserved_with_mixed_annotations():
-    class ExampleSignature(dspy.Signature):
-        text: str = dspy.InputField()
-        output = dspy.OutputField()
-        pass_evaluation: bool = dspy.OutputField()
+    class ExampleSignature(Signature):
+        text: str = InputField()
+        output = OutputField()
+        pass_evaluation: bool = OutputField()
 
     expected_order = ["text", "output", "pass_evaluation"]
     actual_order = list(ExampleSignature.fields.keys())
@@ -196,7 +198,7 @@ def test_insantiating2():
 
 def test_multiline_instructions():
     lm = DummyLM([{"output": "short answer"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     class MySignature(Signature):
         """First line
@@ -205,16 +207,16 @@ def test_multiline_instructions():
 
         output = OutputField()
 
-    predictor = dspy.Predict(MySignature)
+    predictor = Predict(MySignature)
     assert predictor().output == "short answer"
 
 
 def test_dump_and_load_state():
-    class CustomSignature(dspy.Signature):
+    class CustomSignature(Signature):
         """I am just an instruction."""
 
-        sentence = dspy.InputField(desc="I am an innocent input!")
-        sentiment = dspy.OutputField()
+        sentence = InputField(desc="I am an innocent input!")
+        sentiment = OutputField()
 
     state = CustomSignature.dump_state()
     expected = {
@@ -232,11 +234,11 @@ def test_dump_and_load_state():
     }
     assert state == expected
 
-    class CustomSignature2(dspy.Signature):
+    class CustomSignature2(Signature):
         """I am a malicious instruction."""
 
-        sentence = dspy.InputField(desc="I am an malicious input!")
-        sentiment = dspy.OutputField()
+        sentence = InputField(desc="I am an malicious input!")
+        sentiment = OutputField()
 
     assert CustomSignature2.dump_state() != expected
     # Overwrite the state with the state of CustomSignature.
@@ -417,7 +419,7 @@ def test_basic_custom_type():
     class CustomType(pydantic.BaseModel):
         value: str
 
-    test_signature = dspy.Signature(
+    test_signature = Signature(
         "input: CustomType -> output: str",
         custom_types={"CustomType": CustomType}
     )
@@ -425,24 +427,24 @@ def test_basic_custom_type():
     assert test_signature.input_fields["input"].annotation == CustomType
 
     lm = DummyLM([{"output": "processed"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     custom_obj = CustomType(value="test")
-    pred = dspy.Predict(test_signature)(input=custom_obj)
+    pred = Predict(test_signature)(input=custom_obj)
     assert pred.output == "processed"
 
 
 def test_custom_type_from_different_module():
     from pathlib import Path
 
-    test_signature = dspy.Signature("input: Path -> output: str")
+    test_signature = Signature("input: Path -> output: str")
     assert test_signature.input_fields["input"].annotation == Path
 
     lm = DummyLM([{"output": "/test/path"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     path_obj = Path("/test/path")
-    pred = dspy.Predict(test_signature)(input=path_obj)
+    pred = Predict(test_signature)(input=path_obj)
     assert pred.output == "/test/path"
 
 def test_pep604_union_type_inline():
@@ -575,10 +577,10 @@ def test_pep604_union_type_with_custom_types():
     assert sig.output_fields["output"].annotation == Union[int, str]
 
     lm = DummyLM([{"output": "processed"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     custom_obj = CustomType(value="test")
-    pred = dspy.Predict(sig)(input=custom_obj)
+    pred = Predict(sig)(input=custom_obj)
     assert pred.output == "processed"
 
 
@@ -604,7 +606,7 @@ def test_predict_cloudpickle_roundtrip():
         question: str = InputField()
         answer: str = OutputField()
 
-    predict = dspy.Predict(QA)
+    predict = Predict(QA)
     data = cloudpickle.dumps(predict)
     loaded = pickle.loads(data)
 

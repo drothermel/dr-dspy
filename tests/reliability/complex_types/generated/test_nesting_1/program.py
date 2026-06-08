@@ -1,3 +1,7 @@
+from dspy.predict.predict import Predict
+from dspy.signatures.field import InputField
+from dspy.signatures.field import OutputField
+from dspy.signatures.signature import Signature
 ### Input models ###
 
 
@@ -64,10 +68,9 @@ class ProgramOutputs(BaseModel):
 
 ### Program definition ###
 
-import dspy
 
 
-class BaseSignature(dspy.Signature):
+class BaseSignature(Signature):
     """
     The AI program is designed to process hierarchical data structures with multiple levels of nesting. The program will take a deeply nested input structure representing a complex dataset, perform specific transformations, validations, and computations, and then produce an equally complex nested output structure. The program is suitable for applications that require detailed data processing, such as multi-level data aggregation, hierarchical data validation, and nested data transformation.
     """
@@ -77,14 +80,14 @@ program_signature = BaseSignature
 for input_field_name, input_field in ProgramInputs.model_fields.items():
     program_signature = program_signature.append(
         name=input_field_name,
-        field=dspy.InputField(description=input_field.description),
+        field=InputField(description=input_field.description),
         type_=input_field.annotation,
     )
 for output_field_name, output_field in ProgramOutputs.model_fields.items():
     program_signature = program_signature.append(
         name=output_field_name,
-        field=dspy.OutputField(description=input_field.description),
+        field=OutputField(description=input_field.description),
         type_=output_field.annotation,
     )
 
-program = dspy.Predict(program_signature)
+program = Predict(program_signature)

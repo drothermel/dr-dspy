@@ -1,3 +1,4 @@
+from dspy.teleprompt.vanilla import LabeledFewShot
 import os
 import tempfile
 from io import BytesIO
@@ -7,8 +8,12 @@ import pytest
 import requests
 from PIL import Image as PILImage
 
-import dspy
-from dspy.adapters.types.image import encode_image
+from dspy.adapters.types.image import Image, encode_image
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
 from dspy.utils.dummies import DummyLM
 
 
@@ -24,7 +29,7 @@ def sample_pil_image():
 @pytest.fixture
 def sample_dspy_image_download():
     url = "https://images.dog.ceo/breeds/dane-great/n02109047_8912.jpg"
-    return dspy.Image(url, download=True)
+    return Image(url, download=True)
 
 
 @pytest.fixture
@@ -34,7 +39,7 @@ def sample_url():
 
 @pytest.fixture
 def sample_dspy_image_no_download():
-    return dspy.Image("https://images.dog.ceo/breeds/dane-great/n02109047_8912.jpg")
+    return Image("https://images.dog.ceo/breeds/dane-great/n02109047_8912.jpg")
 
 
 def count_messages_with_image_url_pattern(messages):
@@ -69,8 +74,8 @@ def count_messages_with_image_url_pattern(messages):
 def setup_predictor(signature, expected_output):
     """Helper to set up a predictor with DummyLM"""
     lm = DummyLM([expected_output])
-    dspy.configure(lm=lm)
-    return dspy.Predict(signature), lm
+    settings.configure(lm=lm)
+    return Predict(signature), lm
 
 
 @pytest.mark.parametrize(
@@ -78,28 +83,28 @@ def setup_predictor(signature, expected_output):
     [
         {
             "name": "probabilistic_classification",
-            "signature": "image: dspy.Image, class_labels: list[str] -> probabilities: dict[str, float]",
+            "signature": "image: Image, class_labels: list[str] -> probabilities: dict[str, float]",
             "inputs": {"image": "https://example.com/dog.jpg", "class_labels": ["dog", "cat", "bird"]},
             "key_output": "probabilities",
             "expected": {"probabilities": {"dog": 0.8, "cat": 0.1, "bird": 0.1}},
         },
         {
             "name": "image_to_code",
-            "signature": "ui_image: dspy.Image, target_language: str -> generated_code: str",
+            "signature": "ui_image: Image, target_language: str -> generated_code: str",
             "inputs": {"ui_image": "https://example.com/button.png", "target_language": "HTML"},
             "key_output": "generated_code",
             "expected": {"generated_code": "<button>Click me</button>"},
         },
         {
             "name": "bbox_detection",
-            "signature": "image: dspy.Image -> bboxes: list[Tuple[int, int, int, int]]",
+            "signature": "image: Image -> bboxes: list[Tuple[int, int, int, int]]",
             "inputs": {"image": "https://example.com/image.jpg"},
             "key_output": "bboxes",
             "expected": {"bboxes": [(10, 20, 30, 40), (50, 60, 70, 80)]},
         },
         {
             "name": "multilingual_caption",
-            "signature": "image: dspy.Image, languages: list[str] -> captions: dict[str, str]",
+            "signature": "image: Image, languages: list[str] -> captions: dict[str, str]",
             "inputs": {"image": "https://example.com/dog.jpg", "languages": ["en", "es", "fr"]},
             "key_output": "captions",
             "expected": {
@@ -112,9 +117,9 @@ def test_basic_image_operations(test_case):
     """Consolidated test for basic image operations"""
     predictor, lm = setup_predictor(test_case["signature"], test_case["expected"])
 
-    # Convert string URLs to dspy.Image objects
+    # Convert string URLs to Image objects
     inputs = {
-        k: dspy.Image(v) if isinstance(v, str) and k in ["image", "ui_image"] else v
+        k: Image(v) if isinstance(v, str) and k in ["image", "ui_image"] else v
         for k, v in test_case["inputs"].items()
     }
 
@@ -131,15 +136,15 @@ def test_basic_image_operations(test_case):
     [
         ("pil_image", "PIL Image"),
         ("encoded_pil_image", "encoded PIL image string"),
-        ("dspy_image_download", "dspy.Image with download=True"),
-        ("dspy_image_no_download", "dspy.Image without download"),
+        ("dspy_image_download", "Image with download=True"),
+        ("dspy_image_no_download", "Image without download"),
     ],
 )
 def test_image_input_formats(
     request, sample_pil_image, sample_dspy_image_download, sample_dspy_image_no_download, image_input, description
 ):
     """Test different input formats for image fields"""
-    signature = "image: dspy.Image, class_labels: list[str] -> probabilities: dict[str, float]"
+    signature = "image: Image, class_labels: list[str] -> probabilities: dict[str, float]"
     expected = {"probabilities": {"dog": 0.8, "cat": 0.1, "bird": 0.1}}
     predictor, lm = setup_predictor(signature, expected)
 
@@ -151,9 +156,9 @@ def test_image_input_formats(
     }
 
     actual_input = input_map[image_input]
-    # TODO(isaacbmiller): Support the cases without direct dspy.Image coercion
+    # TODO(isaacbmiller): Support the cases without direct Image coercion
     if image_input in ["pil_image", "encoded_pil_image"]:
-        pytest.xfail(f"{description} not fully supported without dspy.Image coercion")
+        pytest.xfail(f"{description} not fully supported without Image coercion")
 
     result = predictor(image=actual_input, class_labels=["dog", "cat", "bird"])
     assert result.probabilities == expected["probabilities"]
@@ -162,22 +167,22 @@ def test_image_input_formats(
 
 def test_predictor_save_load(sample_url, sample_pil_image):
     """Test saving and loading predictors with image fields"""
-    signature = "image: dspy.Image -> caption: str"
+    signature = "image: Image -> caption: str"
     examples = [
-        dspy.Example(image=dspy.Image(sample_url), caption="Example 1"),
-        dspy.Example(image=sample_pil_image, caption="Example 2"),
+        Example(image=Image(sample_url), caption="Example 1"),
+        Example(image=sample_pil_image, caption="Example 2"),
     ]
 
     predictor, lm = setup_predictor(signature, {"caption": "A golden retriever"})
-    optimizer = dspy.teleprompt.LabeledFewShot(k=1)
+    optimizer = LabeledFewShot(k=1)
     compiled_predictor = optimizer.compile(student=predictor, trainset=examples, sample=False)
 
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
-        loaded_predictor = dspy.Predict(signature)
+        loaded_predictor = Predict(signature)
         loaded_predictor.load(temp_file.name)
 
-    loaded_predictor(image=dspy.Image("https://example.com/dog.jpg"))
+    loaded_predictor(image=Image("https://example.com/dog.jpg"))
     assert count_messages_with_image_url_pattern(lm.history[-1]["messages"]) == 2
     assert "<DSPY_IMAGE_START>" not in str(lm.history[-1]["messages"])
 
@@ -185,26 +190,26 @@ def test_predictor_save_load(sample_url, sample_pil_image):
 def test_save_load_complex_default_types():
     """Test saving and loading predictors with complex default types (lists of images)"""
     examples = [
-        dspy.Example(
+        Example(
             image_list=[
-                dspy.Image("https://example.com/dog.jpg"),
-                dspy.Image("https://example.com/cat.jpg"),
+                Image("https://example.com/dog.jpg"),
+                Image("https://example.com/cat.jpg"),
             ],
             caption="Example 1",
         ).with_inputs("image_list"),
     ]
 
-    class ComplexTypeSignature(dspy.Signature):
-        image_list: list[dspy.Image] = dspy.InputField(desc="A list of images")
-        caption: str = dspy.OutputField(desc="A caption for the image list")
+    class ComplexTypeSignature(Signature):
+        image_list: list[Image] = InputField(desc="A list of images")
+        caption: str = OutputField(desc="A caption for the image list")
 
     predictor, lm = setup_predictor(ComplexTypeSignature, {"caption": "A list of images"})
-    optimizer = dspy.teleprompt.LabeledFewShot(k=1)
+    optimizer = LabeledFewShot(k=1)
     compiled_predictor = optimizer.compile(student=predictor, trainset=examples, sample=False)
 
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
-        loaded_predictor = dspy.Predict(ComplexTypeSignature)
+        loaded_predictor = Predict(ComplexTypeSignature)
         loaded_predictor.load(temp_file.name)
 
     result = loaded_predictor(**examples[0].inputs())
@@ -213,18 +218,18 @@ def test_save_load_complex_default_types():
     assert "<DSPY_IMAGE_START>" not in str(lm.history[-1]["messages"])
 
 
-class BasicImageSignature(dspy.Signature):
+class BasicImageSignature(Signature):
     """Basic signature with a single image input"""
 
-    image: dspy.Image = dspy.InputField()
-    output: str = dspy.OutputField()
+    image: Image = InputField()
+    output: str = OutputField()
 
 
-class ImageListSignature(dspy.Signature):
+class ImageListSignature(Signature):
     """Signature with a list of images input"""
 
-    image_list: list[dspy.Image] = dspy.InputField()
-    output: str = dspy.OutputField()
+    image_list: list[Image] = InputField()
+    output: str = OutputField()
 
 
 @pytest.mark.parametrize(
@@ -250,27 +255,27 @@ def test_save_load_complex_types(test_case):
     """Test saving and loading predictors with complex types"""
     signature_cls = test_case["signature_class"]
 
-    # Convert string URLs to dspy.Image objects in input
+    # Convert string URLs to Image objects in input
     processed_input = {}
     for key, value in test_case["inputs"].items():
         if isinstance(value, str) and "http" in value:
-            processed_input[key] = dspy.Image(value)
+            processed_input[key] = Image(value)
         elif isinstance(value, list) and value and isinstance(value[0], str):
-            processed_input[key] = [dspy.Image(url) for url in value]
+            processed_input[key] = [Image(url) for url in value]
         else:
             processed_input[key] = value
 
     # Create example and predictor
-    examples = [dspy.Example(**processed_input, **test_case["expected"]).with_inputs(*processed_input.keys())]
+    examples = [Example(**processed_input, **test_case["expected"]).with_inputs(*processed_input.keys())]
 
     predictor, lm = setup_predictor(signature_cls, test_case["expected"])
-    optimizer = dspy.teleprompt.LabeledFewShot(k=1)
+    optimizer = LabeledFewShot(k=1)
     compiled_predictor = optimizer.compile(student=predictor, trainset=examples, sample=False)
 
     # Test save and load
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
-        loaded_predictor = dspy.Predict(signature_cls)
+        loaded_predictor = Predict(signature_cls)
         loaded_predictor.load(temp_file.name)
 
     # Run prediction
@@ -289,32 +294,32 @@ def test_save_load_pydantic_model():
     """Test saving and loading predictors with pydantic models"""
 
     class ImageModel(pydantic.BaseModel):
-        image: dspy.Image
-        image_list: list[dspy.Image] | None = None
+        image: Image
+        image_list: list[Image] | None = None
         output: str
 
-    class PydanticSignature(dspy.Signature):
-        model_input: ImageModel = dspy.InputField()
-        output: str = dspy.OutputField()
+    class PydanticSignature(Signature):
+        model_input: ImageModel = InputField()
+        output: str = OutputField()
 
     # Create model instance
     model_input = ImageModel(
-        image=dspy.Image("https://example.com/dog.jpg"),
-        image_list=[dspy.Image("https://example.com/cat.jpg")],
+        image=Image("https://example.com/dog.jpg"),
+        image_list=[Image("https://example.com/cat.jpg")],
         output="Multiple photos",
     )
 
     # Create example and predictor
-    examples = [dspy.Example(model_input=model_input, output="Multiple photos").with_inputs("model_input")]
+    examples = [Example(model_input=model_input, output="Multiple photos").with_inputs("model_input")]
 
     predictor, lm = setup_predictor(PydanticSignature, {"output": "Multiple photos"})
-    optimizer = dspy.teleprompt.LabeledFewShot(k=1)
+    optimizer = LabeledFewShot(k=1)
     compiled_predictor = optimizer.compile(student=predictor, trainset=examples, sample=False)
 
     # Test save and load
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
-        loaded_predictor = dspy.Predict(PydanticSignature)
+        loaded_predictor = Predict(PydanticSignature)
         loaded_predictor.load(temp_file.name)
 
     # Run prediction
@@ -329,9 +334,9 @@ def test_save_load_pydantic_model():
 def test_optional_image_field():
     """Test that optional image fields are not required"""
 
-    class OptionalImageSignature(dspy.Signature):
-        image: dspy.Image | None = dspy.InputField()
-        output: str = dspy.OutputField()
+    class OptionalImageSignature(Signature):
+        image: Image | None = InputField()
+        output: str = OutputField()
 
     predictor, lm = setup_predictor(OptionalImageSignature, {"output": "Hello"})
     result = predictor(image=None)
@@ -343,17 +348,17 @@ def test_pdf_url_support():
     """Test support for PDF files from URLs"""
     pdf_url = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
 
-    # Create a dspy.Image object from the PDF URL with download=True
-    pdf_image = dspy.Image(pdf_url, download=True)
+    # Create a Image object from the PDF URL with download=True
+    pdf_image = Image(pdf_url, download=True)
 
     # The data URI should contain application/pdf in the MIME type
     assert "data:application/pdf" in pdf_image.url
     assert ";base64," in pdf_image.url
 
     # Test using it in a predictor
-    class PDFSignature(dspy.Signature):
-        document: dspy.Image = dspy.InputField(desc="A PDF document")
-        summary: str = dspy.OutputField(desc="A summary of the PDF")
+    class PDFSignature(Signature):
+        document: Image = InputField(desc="A PDF document")
+        summary: str = OutputField(desc="A summary of the PDF")
 
     predictor, lm = setup_predictor(PDFSignature, {"summary": "This is a dummy PDF"})
     result = predictor(document=pdf_image)
@@ -421,17 +426,17 @@ def test_pdf_from_file():
         tmp_file_path = tmp_file.name
 
     try:
-        # Create a dspy.Image from the file
-        pdf_image = dspy.Image(tmp_file_path)
+        # Create a Image from the file
+        pdf_image = Image(tmp_file_path)
 
         # The constructor encodes the file into a data URI we can inspect directly
         assert "data:application/pdf" in pdf_image.url
         assert ";base64," in pdf_image.url
 
         # Test the image in a predictor
-        class FilePDFSignature(dspy.Signature):
-            document: dspy.Image = dspy.InputField(desc="A PDF document from file")
-            summary: str = dspy.OutputField(desc="A summary of the PDF")
+        class FilePDFSignature(Signature):
+            document: Image = InputField(desc="A PDF document from file")
+            summary: str = OutputField(desc="A summary of the PDF")
 
         predictor, lm = setup_predictor(FilePDFSignature, {"summary": "This is a PDF from file"})
         result = predictor(document=pdf_image)
@@ -448,7 +453,7 @@ def test_pdf_from_file():
 
 def test_image_repr():
     """Test string representation of Image objects"""
-    url_image = dspy.Image("https://example.com/dog.jpg")
+    url_image = Image("https://example.com/dog.jpg")
     assert str(url_image) == (
         "<<CUSTOM-TYPE-START-IDENTIFIER>>"
         '[{"type": "image_url", "image_url": {"url": "https://example.com/dog.jpg"}}]'
@@ -457,7 +462,7 @@ def test_image_repr():
     assert repr(url_image) == "Image(url='https://example.com/dog.jpg')"
 
     sample_pil = PILImage.new("RGB", (60, 30), color="red")
-    pil_image = dspy.Image(sample_pil)
+    pil_image = Image(sample_pil)
     assert str(pil_image).startswith('<<CUSTOM-TYPE-START-IDENTIFIER>>[{"type": "image_url",')
     assert str(pil_image).endswith("<<CUSTOM-TYPE-END-IDENTIFIER>>")
     assert "base64" in str(pil_image)
@@ -469,12 +474,12 @@ def test_from_methods_warn(tmp_path):
     tmp_file.write_bytes(b"pngdata")
 
     with pytest.warns(DeprecationWarning):
-        dspy.Image.from_url("https://example.com/dog.jpg")
+        Image.from_url("https://example.com/dog.jpg")
     with pytest.warns(DeprecationWarning):
-        dspy.Image.from_file(str(tmp_file))
+        Image.from_file(str(tmp_file))
     sample_pil = PILImage.new("RGB", (10, 10), color="blue")
     with pytest.warns(DeprecationWarning):
-        dspy.Image.from_PIL(sample_pil)
+        Image.from_PIL(sample_pil)
 
 
 def test_invalid_string_format():
@@ -483,15 +488,15 @@ def test_invalid_string_format():
 
     # Should raise a ValueError and not pass the string through
     with pytest.raises(ValueError, match="Unrecognized") as warning_info:
-        image = dspy.Image(invalid_string)
+        image = Image(invalid_string)
 
 def test_pil_image_with_download_parameter():
     """Test behavior when PIL image is passed with download=True"""
     sample_pil = PILImage.new("RGB", (60, 30), color="red")
 
     # PIL image should be encoded regardless of download parameter
-    image_no_download = dspy.Image(sample_pil)
-    image_with_download = dspy.Image(sample_pil, download=True)
+    image_no_download = Image(sample_pil)
+    image_with_download = Image(sample_pil, download=True)
 
     # Both should result in base64 encoded data URIs
     assert image_no_download.url.startswith("data:")

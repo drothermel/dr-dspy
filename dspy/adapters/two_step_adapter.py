@@ -4,7 +4,7 @@ import json_repair
 
 from dspy.adapters.base import Adapter
 from dspy.adapters.chat_adapter import ChatAdapter
-from dspy.adapters.types import ToolCalls
+from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import get_field_description_string
 from dspy.clients.base_lm import BaseLM
 from dspy.signatures.field import InputField

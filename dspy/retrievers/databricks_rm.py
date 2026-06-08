@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from importlib.util import find_spec
 from typing import Any
 
-import dspy
 from dspy.primitives.prediction import Prediction
+from dspy.retrievers.retrieve import Retrieve
 
 _databricks_sdk_installed = find_spec("databricks.sdk") is not None
 
@@ -24,7 +24,7 @@ class Document:
         }
 
 
-class DatabricksRM(dspy.Retrieve):
+class DatabricksRM(Retrieve):
     """
     A retriever module that uses a Databricks Mosaic AI Vector Search Index to return the top-k
     embeddings for a given query.
@@ -208,7 +208,7 @@ class DatabricksRM(dspy.Retrieve):
         query: str | list[float],
         query_type: str = "ANN",
         filters_json: str | None = None,
-    ) -> dspy.Prediction | list[dict[str, Any]]:
+    ) -> Prediction | list[dict[str, Any]]:
         """
         Retrieve documents from a Databricks Mosaic AI Vector Search Index that are relevant to the
         specified query.

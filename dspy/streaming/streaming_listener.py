@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
-from dspy.adapters.types import Type
+from dspy.adapters.types.base_type import Type
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.dsp.utils.settings import settings
 from dspy.streaming.messages import StreamResponse

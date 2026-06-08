@@ -1,12 +1,12 @@
 import re
 
-import dspy
+import dspy.__metadata__ as metadata
 
 
 def test_metadata():
-    assert dspy.__name__ == "dspy"
-    assert re.match(r"\d+\.\d+\.\d+", dspy.__version__)
-    assert dspy.__author__ == "Omar Khattab"
-    assert dspy.__author_email__ == "okhattab@stanford.edu"
-    assert dspy.__url__ == "https://github.com/stanfordnlp/dspy"
-    assert dspy.__description__ == "DSPy"
+    assert metadata.__name__ == "dspy"
+    assert re.match(r"\d+\.\d+\.\d+", metadata.__version__)
+    assert metadata.__author__ == "Omar Khattab"
+    assert metadata.__author_email__ == "okhattab@stanford.edu"
+    assert metadata.__url__ == "https://github.com/stanfordnlp/dspy"
+    assert metadata.__description__ == "DSPy"

@@ -1,5 +1,5 @@
-from dspy.clients import Embedder
-from dspy.primitives import Example
+from dspy.clients.embedding import Embedder
+from dspy.primitives.example import Example
 from dspy.utils.lazy_import import require
 
 np = require("numpy")

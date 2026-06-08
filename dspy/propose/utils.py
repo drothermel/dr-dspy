@@ -2,7 +2,7 @@ import inspect
 import json
 import re
 
-import dspy
+from dspy.primitives.module import Module
 
 try:
     from IPython.core.magics.code import extract_symbols
@@ -179,7 +179,7 @@ def get_dspy_source_code(module):
                     except (TypeError, OSError):
                         header.append(str(item.signature))
                     completed_set.add(item.signature.__pydantic_parent_namespace__["signature_name"] + "_sig")
-            if isinstance(item, dspy.Module):
+            if isinstance(item, Module):
                 code = get_dspy_source_code(item).strip()
                 if code not in completed_set:
                     header.append(code)

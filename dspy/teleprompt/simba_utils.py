@@ -5,14 +5,20 @@ from typing import Callable
 
 import orjson
 
-import dspy
 from dspy.adapters.utils import get_field_description_string
-from dspy.signatures import InputField, OutputField
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
+from dspy.primitives.module import Module
+from dspy.primitives.prediction import Prediction
+from dspy.signatures.field import InputField
+from dspy.signatures.field import OutputField
+from dspy.signatures.signature import Signature
 
 logger = logging.getLogger(__name__)
 
-def prepare_models_for_resampling(program: dspy.Module, n: int, teacher_settings: dict | None = None):
-    lm = program.get_lm() or dspy.settings.lm
+def prepare_models_for_resampling(program: Module, n: int, teacher_settings: dict | None = None):
+    lm = program.get_lm() or settings.lm
 
     start_rollout_id = lm.kwargs.get("rollout_id", 0)
     rollout_ids = [start_rollout_id + i for i in range(n)]
@@ -31,15 +37,15 @@ def prepare_models_for_resampling(program: dspy.Module, n: int, teacher_settings
 
     return models
 
-def wrap_program(program: dspy.Module, metric: Callable):
+def wrap_program(program: Module, metric: Callable):
     def wrapped_program(example):
-        with dspy.context(trace=[]):
+        with settings.context(trace=[]):
             prediction, trace, score = None, None, 0.0
             try:
                 prediction = program(**example.inputs())
             except Exception as e:
                 logger.warning(e)
-            trace = dspy.settings.trace.copy()
+            trace = settings.trace.copy()
 
         output = None
         score = 0.0
@@ -49,7 +55,7 @@ def wrap_program(program: dspy.Module, metric: Callable):
             output = metric(example, prediction)
             if isinstance(output, (int, float)):
                 score = output
-            elif isinstance(output, dspy.Prediction):
+            elif isinstance(output, Prediction):
                 if not hasattr(output, "score"):
                     raise ValueError("When `metric` returns a `dspy.Prediction`, it must contain a `score` field.")
                 score = output.score
@@ -90,7 +96,7 @@ def append_a_demo(demo_input_field_maxlen):
                 if demo_input_field_maxlen and len(str(v)) > demo_input_field_maxlen:
                     _inputs[k] = f"{str(v)[:demo_input_field_maxlen]}\n\t\t... <TRUNCATED FOR BREVITY>"
 
-            demo = dspy.Example(augmented=True, **_inputs, **_outputs)
+            demo = Example(augmented=True, **_inputs, **_outputs)
             name = predictor2name[id(predictor)]
             name2demo[name] = demo  # keep the last demo for each predictor
         for name, demo in name2demo.items():
@@ -106,7 +112,7 @@ def append_a_demo(demo_input_field_maxlen):
 def append_a_rule(bucket, system, **kwargs):
     predictor2name = kwargs["predictor2name"]
     batch_10p_score, batch_90p_score = kwargs["batch_10p_score"], kwargs["batch_90p_score"]
-    prompt_model = kwargs["prompt_model"] or dspy.settings.lm
+    prompt_model = kwargs["prompt_model"] or settings.lm
 
     module_names = [name for name, _ in system.named_predictors()]
     good, bad = bucket[0], bucket[-1]
@@ -155,8 +161,8 @@ def append_a_rule(bucket, system, **kwargs):
     kwargs = {k: v if isinstance(v, str) else orjson.dumps(recursive_mask(v), option=orjson.OPT_INDENT_2).decode()
               for k, v in kwargs.items()}
 
-    with dspy.context(trace=[], lm=prompt_model):
-        advice_program = dspy.Predict(OfferFeedback)
+    with settings.context(trace=[], lm=prompt_model):
+        advice_program = Predict(OfferFeedback)
         advice = advice_program(**kwargs).module_advice
 
     for name, predictor in system.named_predictors():
@@ -167,7 +173,7 @@ def append_a_rule(bucket, system, **kwargs):
 
     return True
 
-class OfferFeedback(dspy.Signature):
+class OfferFeedback(Signature):
     """
     You will be given two trajectories of an LLM-driven program's execution. Your goal is to help the program's modules
     build up experience on how to maximize the reward value assigned to the program's outputs if it were to receive

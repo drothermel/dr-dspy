@@ -1,3 +1,4 @@
+from dspy.utils.dummies import DummyLM
 import json
 import re
 from typing import Literal
@@ -7,8 +8,27 @@ import pydantic
 import pytest
 from litellm.utils import ChatCompletionMessageToolCall, Choices, Function, Message, ModelResponse
 
-import dspy
-from dspy.experimental import Citations, Document
+from dspy.adapters.chat_adapter import ChatAdapter
+from dspy.adapters.json_adapter import JSONAdapter
+from dspy.adapters.types.audio import Audio
+from dspy.adapters.types.base_type import Type as DSPyType
+from dspy.adapters.types.code import Code
+from dspy.adapters.types.file import File
+from dspy.adapters.types.history import History
+from dspy.adapters.types.image import Image
+from dspy.adapters.types.reasoning import Reasoning
+from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
+from dspy.adapters.xml_adapter import XMLAdapter
+from dspy.clients.lm import LM
+from dspy.dsp.utils.settings import settings
+from dspy.adapters.types.citation import Citations
+from dspy.adapters.types.document import Document
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature, make_signature
+from dspy.utils.exceptions import AdapterParseError
 from tests.adapters.conftest import format_messages_and_lm_kwargs
 
 
@@ -66,13 +86,13 @@ def test_chat_adapter_quotes_literals_as_expected(
     Literals exactly as we want them to appear (like IPython does).
     """
 
-    class TestSignature(dspy.Signature):
-        input_text: input_literal = dspy.InputField()
-        output_text: output_literal = dspy.OutputField()
+    class TestSignature(Signature):
+        input_text: input_literal = InputField()
+        output_text: output_literal = OutputField()
 
-    program = dspy.Predict(TestSignature)
+    program = Predict(TestSignature)
 
-    dspy.configure(lm=dspy.LM(model="openai/gpt-4o"), adapter=dspy.ChatAdapter())
+    settings.configure(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter())
 
     with mock.patch("litellm.completion") as mock_completion:
         program(input_text=input_value)
@@ -86,30 +106,30 @@ def test_chat_adapter_quotes_literals_as_expected(
 
 
 def test_chat_adapter_sync_call():
-    signature = dspy.make_signature("question->answer")
-    adapter = dspy.ChatAdapter()
-    lm = dspy.utils.DummyLM([{"answer": "Paris"}])
+    signature = make_signature("question->answer")
+    adapter = ChatAdapter()
+    lm = DummyLM([{"answer": "Paris"}])
     result = adapter(lm, {}, signature, [], {"question": "What is the capital of France?"})
     assert result == [{"answer": "Paris"}]
 
 
 @pytest.mark.asyncio
 async def test_chat_adapter_async_call():
-    signature = dspy.make_signature("question->answer")
-    adapter = dspy.ChatAdapter()
-    lm = dspy.utils.DummyLM([{"answer": "Paris"}])
+    signature = make_signature("question->answer")
+    adapter = ChatAdapter()
+    lm = DummyLM([{"answer": "Paris"}])
     result = await adapter.acall(lm, {}, signature, [], {"question": "What is the capital of France?"})
     assert result == [{"answer": "Paris"}]
 
 
 def test_chat_adapter_format_exact_messages_for_simple_signature():
-    class QA(dspy.Signature):
+    class QA(Signature):
         """Answer the question."""
 
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
+        question: str = InputField()
+        answer: str = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(), QA, [], {"question": "What is the capital of France?"})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(), QA, [], {"question": "What is the capital of France?"})
 
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
@@ -144,14 +164,14 @@ Respond with the corresponding output fields, starting with the field `[[ ## ans
 
 
 def test_chat_adapter_format_exact_messages_with_demo_and_typed_outputs():
-    class MultiAnswer(dspy.Signature):
+    class MultiAnswer(Signature):
         """Answer the question with multiple answers and scores"""
 
-        question: str = dspy.InputField()
-        answers: list[str] = dspy.OutputField()
-        scores: list[float] = dspy.OutputField()
+        question: str = InputField()
+        answers: list[str] = OutputField()
+        scores: list[float] = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(),
         MultiAnswer,
         demos=[{"question": "Q1", "answers": ["A1", "A2"], "scores": [0.1, 0.9]}],
         inputs={"question": "Q2"},
@@ -220,11 +240,11 @@ def test_chat_adapter_format_exact_messages_with_nested_pydantic_models():
         headline: str
         score: float
 
-    class PydanticSignature(dspy.Signature):
-        person: Person = dspy.InputField()
-        summary: Summary = dspy.OutputField()
+    class PydanticSignature(Signature):
+        person: Person = InputField()
+        summary: Summary = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(),
         PydanticSignature,
         [],
         {"person": Person(name="Ada", address=Address(city="London", country="UK"), tags=["math", "code"])},
@@ -264,13 +284,13 @@ def test_chat_adapter_format_exact_messages_with_nested_pydantic_models():
 
 
 def test_chat_adapter_format_exact_messages_with_incomplete_demo():
-    class IncompleteDemoSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        context: str = dspy.InputField()
-        answer: str = dspy.OutputField()
-        confidence: float = dspy.OutputField()
+    class IncompleteDemoSignature(Signature):
+        question: str = InputField()
+        context: str = InputField()
+        answer: str = OutputField()
+        confidence: float = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(),
         IncompleteDemoSignature,
         [{"question": "Q1", "answer": "A1"}],
         {"question": "Q2", "context": "C2"},
@@ -332,18 +352,18 @@ def test_chat_adapter_format_exact_messages_with_incomplete_demo():
 
 
 def test_chat_adapter_format_exact_messages_with_history():
-    class HistorySignature(dspy.Signature):
-        history: dspy.History = dspy.InputField()
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class HistorySignature(Signature):
+        history: History = InputField()
+        question: str = InputField()
+        answer: str = OutputField()
 
-    history = dspy.History(
+    history = History(
         messages=[
             {"question": "What is 1+1?", "answer": "2"},
             {"question": "What is 2+2?", "answer": "4"},
         ]
     )
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(),
         HistorySignature,
         [],
         {"history": history, "question": "What is 3+3?"},
@@ -386,11 +406,11 @@ def test_chat_adapter_format_exact_messages_with_history():
 
 
 def test_chat_adapter_format_exact_messages_with_list_value_for_string_input():
-    class ListAsStringSignature(dspy.Signature):
-        context: str = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class ListAsStringSignature(Signature):
+        context: str = InputField()
+        answer: str = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(), ListAsStringSignature, [], {"context": ["alpha", "beta"]})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(), ListAsStringSignature, [], {"context": ["alpha", "beta"]})
 
     expected_messages = [{"role": "system",
       "content": "Your input fields are:\n"
@@ -422,11 +442,11 @@ def test_chat_adapter_format_exact_messages_with_list_value_for_string_input():
 
 
 def test_chat_adapter_format_exact_messages_with_literal_output():
-    class LiteralSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        verdict: Literal["yes", "no"] = dspy.OutputField()
+    class LiteralSignature(Signature):
+        question: str = InputField()
+        verdict: Literal["yes", "no"] = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(), LiteralSignature, [], {"question": "Is the sky blue?"})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(), LiteralSignature, [], {"question": "Is the sky blue?"})
 
     expected_messages = [{"role": "system",
       "content": "Your input fields are:\n"
@@ -459,20 +479,20 @@ def test_chat_adapter_format_exact_messages_with_literal_output():
 
 
 def test_chat_adapter_format_exact_messages_with_multimodal_custom_type_inputs():
-    class CustomTypeSignature(dspy.Signature):
-        image: dspy.Image = dspy.InputField()
-        audio: dspy.Audio = dspy.InputField()
-        file: dspy.File = dspy.InputField()
-        document: Document = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class CustomTypeSignature(Signature):
+        image: Image = InputField()
+        audio: Audio = InputField()
+        file: File = InputField()
+        document: Document = InputField()
+        answer: str = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(),
         CustomTypeSignature,
         [],
         {
-            "image": dspy.Image("https://example.com/cat.png"),
-            "audio": dspy.Audio(data="QUJD", audio_format="wav"),
-            "file": dspy.File.from_file_id("file-123", filename="notes.txt"),
+            "image": Image("https://example.com/cat.png"),
+            "audio": Audio(data="QUJD", audio_format="wav"),
+            "file": File.from_file_id("file-123", filename="notes.txt"),
             "document": Document(data="Alpha beta", title="Doc"),
         },
     )
@@ -551,17 +571,17 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
         answer: str
         sources: list[str]
 
-    class RichRenderingSignature(dspy.Signature):
+    class RichRenderingSignature(Signature):
         """Answer using all supplied context."""
 
-        history: dspy.History = dspy.InputField()
-        image: dspy.Image = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        profile: Profile = dspy.InputField()
-        question: str = dspy.InputField()
-        answer: AnswerCard = dspy.OutputField()
+        history: History = InputField()
+        image: Image = InputField()
+        tools: list[Tool] = InputField()
+        profile: Profile = InputField()
+        question: str = InputField()
+        answer: AnswerCard = OutputField()
 
-    tool = dspy.Tool(search)
+    tool = Tool(search)
     demo_profile = Profile(
         name="Ada",
         location=Location(city="London", country="UK"),
@@ -572,7 +592,7 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
         location=Location(city="Arlington", country="USA"),
         interests=["compilers", "navy"],
     )
-    history = dspy.History(
+    history = History(
         messages=[
             {
                 "profile": demo_profile,
@@ -581,11 +601,11 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
             }
         ]
     )
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(),
         RichRenderingSignature,
         demos=[
             {
-                "image": dspy.Image("https://example.com/demo.png"),
+                "image": Image("https://example.com/demo.png"),
                 "tools": [tool],
                 "profile": demo_profile,
                 "question": "What should we mention?",
@@ -594,7 +614,7 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
         ],
         inputs={
             "history": history,
-            "image": dspy.Image("https://example.com/current.png"),
+            "image": Image("https://example.com/current.png"),
             "tools": [tool],
             "profile": current_profile,
             "question": "What should the answer include?",
@@ -701,7 +721,7 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
     assert lm_kwargs == expected_lm_kwargs
 
 def test_chat_adapter_format_exact_messages_with_base_custom_type_input():
-    class Event(dspy.Type):
+    class Event(DSPyType):
         label: str
 
         def format(self):
@@ -711,11 +731,11 @@ def test_chat_adapter_format_exact_messages_with_base_custom_type_input():
         def description(cls):
             return "An event block."
 
-    class EventSignature(dspy.Signature):
-        event: Event = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class EventSignature(Signature):
+        event: Event = InputField()
+        answer: str = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(), EventSignature, [], {"event": Event(label="launch")})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(), EventSignature, [], {"event": Event(label="launch")})
 
     expected_messages = [{"role": "system",
       "content": "Your input fields are:\n"
@@ -749,11 +769,11 @@ def test_chat_adapter_format_exact_messages_with_base_custom_type_input():
     assert lm_kwargs == expected_lm_kwargs
 
 def test_chat_adapter_format_exact_messages_with_citations_output_demo():
-    class CitationSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        citations: Citations = dspy.OutputField()
+    class CitationSignature(Signature):
+        question: str = InputField()
+        citations: Citations = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(),
         CitationSignature,
         [
             {
@@ -860,18 +880,18 @@ def test_chat_adapter_format_exact_messages_with_citations_output_demo():
     assert lm_kwargs == expected_lm_kwargs
 
 def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_citations():
-    class AnthropicLM(dspy.utils.DummyLM):
+    class AnthropicLM(DummyLM):
         def __init__(self):
             super().__init__([{}])
             self.model = "anthropic/claude-3-5-sonnet"
 
-    class CitationSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
-        citations: Citations = dspy.OutputField()
+    class CitationSignature(Signature):
+        question: str = InputField()
+        answer: str = OutputField()
+        citations: Citations = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        dspy.ChatAdapter(),
+        ChatAdapter(),
         CitationSignature,
         [],
         {"question": "Q?"},
@@ -906,12 +926,12 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_citations(
     assert lm_kwargs == expected_lm_kwargs
 
 def test_chat_adapter_format_exact_messages_preserves_passthrough_lm_kwargs():
-    class PassthroughSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class PassthroughSignature(Signature):
+        question: str = InputField()
+        answer: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        dspy.ChatAdapter(),
+        ChatAdapter(),
         PassthroughSignature,
         [],
         {"question": "Q?"},
@@ -946,18 +966,18 @@ def test_chat_adapter_format_exact_messages_preserves_passthrough_lm_kwargs():
     assert lm_kwargs == expected_lm_kwargs
 
 def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_reasoning():
-    class ReasoningLM(dspy.utils.DummyLM):
+    class ReasoningLM(DummyLM):
         @property
         def supports_reasoning(self):
             return True
 
-    class NativeReasoningSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        reasoning: dspy.Reasoning = dspy.OutputField()
-        answer: str = dspy.OutputField()
+    class NativeReasoningSignature(Signature):
+        question: str = InputField()
+        reasoning: Reasoning = OutputField()
+        answer: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        dspy.ChatAdapter(),
+        ChatAdapter(),
         NativeReasoningSignature,
         [],
         {"question": "Q?"},
@@ -993,7 +1013,7 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_reasoning(
 
 
 def test_chat_adapter_native_tool_calling_still_enables_native_reasoning():
-    class NativeToolReasoningLM(dspy.utils.DummyLM):
+    class NativeToolReasoningLM(DummyLM):
         @property
         def supports_function_calling(self):
             return True
@@ -1005,17 +1025,17 @@ def test_chat_adapter_native_tool_calling_still_enables_native_reasoning():
     def search(query: str) -> str:
         return query
 
-    class NativeToolReasoningSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        next_thought: dspy.Reasoning = dspy.OutputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class NativeToolReasoningSignature(Signature):
+        question: str = InputField()
+        tools: list[Tool] = InputField()
+        next_thought: Reasoning = OutputField()
+        tool_calls: ToolCalls = OutputField()
 
     _, lm_kwargs = format_messages_and_lm_kwargs(
-        dspy.ChatAdapter(use_native_function_calling=True),
+        ChatAdapter(use_native_function_calling=True),
         NativeToolReasoningSignature,
         [],
-        {"question": "Q?", "tools": [dspy.Tool(search)]},
+        {"question": "Q?", "tools": [Tool(search)]},
         lm=NativeToolReasoningLM([{}]),
     )
 
@@ -1027,16 +1047,16 @@ def test_chat_adapter_nonnative_strips_native_tool_kwargs():
     def search(query: str) -> str:
         return query
 
-    class NonNativeToolSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class NonNativeToolSignature(Signature):
+        question: str = InputField()
+        tools: list[Tool] = InputField()
+        tool_calls: ToolCalls = OutputField()
 
     _, lm_kwargs = format_messages_and_lm_kwargs(
-        dspy.ChatAdapter(use_native_function_calling=False),
+        ChatAdapter(use_native_function_calling=False),
         NonNativeToolSignature,
         [],
-        {"question": "Q?", "tools": [dspy.Tool(search)]},
+        {"question": "Q?", "tools": [Tool(search)]},
         lm_kwargs={
             "tools": [{"type": "function", "function": {"name": "submit"}}],
             "tool_choice": {"type": "function", "function": {"name": "submit"}},
@@ -1050,16 +1070,16 @@ def test_chat_adapter_nonnative_strips_native_tool_kwargs():
 
 
 def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
-    python_code = dspy.Code["python"]
+    python_code = Code["python"]
 
-    class CodeSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        reasoning: dspy.Reasoning = dspy.OutputField()
-        code: python_code = dspy.OutputField()
+    class CodeSignature(Signature):
+        question: str = InputField()
+        reasoning: Reasoning = OutputField()
+        code: python_code = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(),
         CodeSignature,
-        [{"question": "Q1", "reasoning": dspy.Reasoning(content="Think"), "code": python_code(code="print('hi')")}],
+        [{"question": "Q1", "reasoning": Reasoning(content="Think"), "code": python_code(code="print('hi')")}],
         {"question": "Q2"},
     )
 
@@ -1114,7 +1134,7 @@ def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
 
 
 def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calling():
-    class FunctionCallingLM(dspy.utils.DummyLM):
+    class FunctionCallingLM(DummyLM):
         @property
         def supports_function_calling(self):
             return True
@@ -1123,16 +1143,16 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
         """Search for documents."""
         return query
 
-    class NativeToolSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class NativeToolSignature(Signature):
+        question: str = InputField()
+        tools: list[Tool] = InputField()
+        tool_calls: ToolCalls = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        dspy.ChatAdapter(use_native_function_calling=True),
+        ChatAdapter(use_native_function_calling=True),
         NativeToolSignature,
         [],
-        {"question": "Q?", "tools": [dspy.Tool(search)]},
+        {"question": "Q?", "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1172,13 +1192,13 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
 @pytest.mark.parametrize(
     "adapter",
     [
-        dspy.ChatAdapter(use_native_function_calling=True, parallel_tool_calls=True),
-        dspy.JSONAdapter(use_native_function_calling=True, parallel_tool_calls=True),
-        dspy.XMLAdapter(use_native_function_calling=True, parallel_tool_calls=True),
+        ChatAdapter(use_native_function_calling=True, parallel_tool_calls=True),
+        JSONAdapter(use_native_function_calling=True, parallel_tool_calls=True),
+        XMLAdapter(use_native_function_calling=True, parallel_tool_calls=True),
     ],
 )
 def test_adapter_native_tool_calling_can_request_parallel_tool_calls(adapter):
-    class FunctionCallingLM(dspy.utils.DummyLM):
+    class FunctionCallingLM(DummyLM):
         @property
         def supports_function_calling(self):
             return True
@@ -1186,16 +1206,16 @@ def test_adapter_native_tool_calling_can_request_parallel_tool_calls(adapter):
     def search(query: str) -> str:
         return query
 
-    class NativeToolSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class NativeToolSignature(Signature):
+        question: str = InputField()
+        tools: list[Tool] = InputField()
+        tool_calls: ToolCalls = OutputField()
 
     _messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter,
         NativeToolSignature,
         [],
-        {"question": "Q?", "tools": [dspy.Tool(search)]},
+        {"question": "Q?", "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1204,7 +1224,7 @@ def test_adapter_native_tool_calling_can_request_parallel_tool_calls(adapter):
 
 
 def test_adapter_native_tool_calling_respects_lm_kwargs_parallel_tool_call_override():
-    class FunctionCallingLM(dspy.utils.DummyLM):
+    class FunctionCallingLM(DummyLM):
         @property
         def supports_function_calling(self):
             return True
@@ -1212,16 +1232,16 @@ def test_adapter_native_tool_calling_respects_lm_kwargs_parallel_tool_call_overr
     def search(query: str) -> str:
         return query
 
-    class NativeToolSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class NativeToolSignature(Signature):
+        question: str = InputField()
+        tools: list[Tool] = InputField()
+        tool_calls: ToolCalls = OutputField()
 
     _messages, lm_kwargs = format_messages_and_lm_kwargs(
-        dspy.ChatAdapter(use_native_function_calling=True, parallel_tool_calls=True),
+        ChatAdapter(use_native_function_calling=True, parallel_tool_calls=True),
         NativeToolSignature,
         [],
-        {"question": "Q?", "tools": [dspy.Tool(search)]},
+        {"question": "Q?", "tools": [Tool(search)]},
         lm_kwargs={"parallel_tool_calls": False},
         lm=FunctionCallingLM([{}]),
     )
@@ -1231,7 +1251,7 @@ def test_adapter_native_tool_calling_respects_lm_kwargs_parallel_tool_call_overr
 
 
 def test_chat_adapter_native_tool_history_replay():
-    class FunctionCallingLM(dspy.utils.DummyLM):
+    class FunctionCallingLM(DummyLM):
         @property
         def supports_function_calling(self):
             return True
@@ -1240,30 +1260,30 @@ def test_chat_adapter_native_tool_history_replay():
         """Search for documents."""
         return query
 
-    class NativeToolHistorySignature(dspy.Signature):
-        question: str = dspy.InputField()
-        history: dspy.History = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        next_thought: dspy.Reasoning = dspy.OutputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class NativeToolHistorySignature(Signature):
+        question: str = InputField()
+        history: History = InputField()
+        tools: list[Tool] = InputField()
+        next_thought: Reasoning = OutputField()
+        tool_calls: ToolCalls = OutputField()
 
-    tool_call = dspy.ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
-    tool_call_results = dspy.ToolCallResults.from_tool_calls_and_values([tool_call], [{"items": ["cat"]}])
-    history = dspy.History(
+    tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
+    tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], [{"items": ["cat"]}])
+    history = History(
         messages=[
             {
                 "question": "Q1",
-                "next_thought": dspy.Reasoning(content="I should search."),
-                "tool_calls": dspy.ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
+                "next_thought": Reasoning(content="I should search."),
+                "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
             }
         ]
     )
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        dspy.ChatAdapter(use_native_function_calling=True),
+        ChatAdapter(use_native_function_calling=True),
         NativeToolHistorySignature,
         [],
-        {"question": "Q2", "history": history, "tools": [dspy.Tool(search)]},
+        {"question": "Q2", "history": history, "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1297,7 +1317,7 @@ def test_chat_adapter_native_tool_history_replay():
 
 
 def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
-    class FunctionCallingLM(dspy.utils.DummyLM):
+    class FunctionCallingLM(DummyLM):
         @property
         def supports_function_calling(self):
             return True
@@ -1305,38 +1325,38 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
     def search(query: str) -> str:
         return query
 
-    class NativeToolHistorySignature(dspy.Signature):
-        question: str = dspy.InputField()
-        history: dspy.History = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        next_thought: dspy.Reasoning = dspy.OutputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class NativeToolHistorySignature(Signature):
+        question: str = InputField()
+        history: History = InputField()
+        tools: list[Tool] = InputField()
+        next_thought: Reasoning = OutputField()
+        tool_calls: ToolCalls = OutputField()
 
-    tool_calls = dspy.ToolCalls(
+    tool_calls = ToolCalls(
         tool_calls=[
-            dspy.ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"}),
-            dspy.ToolCalls.ToolCall(id="call_2", name="search", args={"query": "dogs"}),
+            ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"}),
+            ToolCalls.ToolCall(id="call_2", name="search", args={"query": "dogs"}),
         ]
     )
-    tool_call_results = dspy.ToolCallResults.from_tool_calls_and_values(
+    tool_call_results = ToolCallResults.from_tool_calls_and_values(
         tool_calls,
         [{"items": ["cat"]}, {"items": ["dog"]}],
     )
-    history = dspy.History(
+    history = History(
         messages=[
             {
                 "question": "Q1",
-                "next_thought": dspy.Reasoning(content="I should search twice."),
+                "next_thought": Reasoning(content="I should search twice."),
                 "tool_calls": tool_calls.model_copy(update={"tool_call_results": tool_call_results}),
             }
         ]
     )
 
     messages, _lm_kwargs = format_messages_and_lm_kwargs(
-        dspy.ChatAdapter(use_native_function_calling=True),
+        ChatAdapter(use_native_function_calling=True),
         NativeToolHistorySignature,
         [],
-        {"question": "Q2", "history": history, "tools": [dspy.Tool(search)]},
+        {"question": "Q2", "history": history, "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1351,7 +1371,7 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
 
 
 def test_chat_adapter_native_tool_history_skips_empty_user_message():
-    class FunctionCallingLM(dspy.utils.DummyLM):
+    class FunctionCallingLM(DummyLM):
         @property
         def supports_function_calling(self):
             return True
@@ -1359,27 +1379,27 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
     def search(query: str) -> str:
         return query
 
-    class NativeToolHistorySignature(dspy.Signature):
-        history: dspy.History = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        next_thought: dspy.Reasoning = dspy.OutputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class NativeToolHistorySignature(Signature):
+        history: History = InputField()
+        tools: list[Tool] = InputField()
+        next_thought: Reasoning = OutputField()
+        tool_calls: ToolCalls = OutputField()
 
-    tool_call = dspy.ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
-    tool_call_results = dspy.ToolCallResults.from_tool_calls_and_values([tool_call], ["cat result"])
-    history = dspy.History(
+    tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
+    tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat result"])
+    history = History(
         messages=[
             {
-                "tool_calls": dspy.ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
+                "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
             }
         ]
     )
 
     messages, _ = format_messages_and_lm_kwargs(
-        dspy.ChatAdapter(use_native_function_calling=True),
+        ChatAdapter(use_native_function_calling=True),
         NativeToolHistorySignature,
         [],
-        {"history": history, "tools": [dspy.Tool(search)]},
+        {"history": history, "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1394,24 +1414,24 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
         ("call_1", None),
         (
             "call_1",
-            dspy.ToolCallResults(
+            ToolCallResults(
                 tool_call_results=[
-                    dspy.ToolCallResults.ToolCallResult(call_id="other_call", name="search", value="cat result")
+                    ToolCallResults.ToolCallResult(call_id="other_call", name="search", value="cat result")
                 ]
             ),
         ),
         (
             None,
-            dspy.ToolCallResults(
+            ToolCallResults(
                 tool_call_results=[
-                    dspy.ToolCallResults.ToolCallResult(call_id=None, name="search", value="cat result")
+                    ToolCallResults.ToolCallResult(call_id=None, name="search", value="cat result")
                 ]
             ),
         ),
     ],
 )
 def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_id, tool_call_results):
-    class FunctionCallingLM(dspy.utils.DummyLM):
+    class FunctionCallingLM(DummyLM):
         @property
         def supports_function_calling(self):
             return True
@@ -1419,30 +1439,30 @@ def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_i
     def search(query: str) -> str:
         return query
 
-    class NativeToolHistorySignature(dspy.Signature):
-        question: str = dspy.InputField()
-        history: dspy.History = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        next_thought: dspy.Reasoning = dspy.OutputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class NativeToolHistorySignature(Signature):
+        question: str = InputField()
+        history: History = InputField()
+        tools: list[Tool] = InputField()
+        next_thought: Reasoning = OutputField()
+        tool_calls: ToolCalls = OutputField()
 
-    tool_call = dspy.ToolCalls.ToolCall(id=tool_call_id, name="search", args={"query": "cats"})
-    tool_calls = dspy.ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results)
-    history = dspy.History(
+    tool_call = ToolCalls.ToolCall(id=tool_call_id, name="search", args={"query": "cats"})
+    tool_calls = ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results)
+    history = History(
         messages=[
             {
                 "question": "Q1",
-                "next_thought": dspy.Reasoning(content="I should search."),
+                "next_thought": Reasoning(content="I should search."),
                 "tool_calls": tool_calls,
             }
         ]
     )
 
     messages, _ = format_messages_and_lm_kwargs(
-        dspy.ChatAdapter(use_native_function_calling=True),
+        ChatAdapter(use_native_function_calling=True),
         NativeToolHistorySignature,
         [],
-        {"question": "Q2", "history": history, "tools": [dspy.Tool(search)]},
+        {"question": "Q2", "history": history, "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1456,30 +1476,30 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
     def search(query: str) -> str:
         return query
 
-    class ToolHistorySignature(dspy.Signature):
-        question: str = dspy.InputField()
-        history: dspy.History = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        next_thought: str = dspy.OutputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class ToolHistorySignature(Signature):
+        question: str = InputField()
+        history: History = InputField()
+        tools: list[Tool] = InputField()
+        next_thought: str = OutputField()
+        tool_calls: ToolCalls = OutputField()
 
-    tool_call = dspy.ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
-    tool_call_results = dspy.ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
-    history = dspy.History(
+    tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
+    tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
+    history = History(
         messages=[
             {
                 "question": "Q1",
                 "next_thought": "I should search.",
-                "tool_calls": dspy.ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
+                "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
             }
         ]
     )
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        dspy.ChatAdapter(use_native_function_calling=False),
+        ChatAdapter(use_native_function_calling=False),
         ToolHistorySignature,
         [],
-        {"question": "Q2", "history": history, "tools": [dspy.Tool(search)]},
+        {"question": "Q2", "history": history, "tools": [Tool(search)]},
     )
 
     expected_messages = [
@@ -1557,36 +1577,36 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
 
 @pytest.mark.parametrize(
     "adapter",
-    [dspy.ChatAdapter(use_native_function_calling=False), dspy.JSONAdapter(use_native_function_calling=False)],
+    [ChatAdapter(use_native_function_calling=False), JSONAdapter(use_native_function_calling=False)],
 )
 def test_non_native_tool_history_remains_text_based(adapter):
     def search(query: str) -> str:
         return query
 
-    class ToolHistorySignature(dspy.Signature):
-        question: str = dspy.InputField()
-        history: dspy.History = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        next_thought: str = dspy.OutputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class ToolHistorySignature(Signature):
+        question: str = InputField()
+        history: History = InputField()
+        tools: list[Tool] = InputField()
+        next_thought: str = OutputField()
+        tool_calls: ToolCalls = OutputField()
 
-    tool_call = dspy.ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
-    tool_call_results = dspy.ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
+    tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
+    tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
     messages = adapter.format(
         ToolHistorySignature,
         [],
         {
             "question": "Q2",
-            "history": dspy.History(
+            "history": History(
                 messages=[
                     {
                         "question": "Q1",
                         "next_thought": "I should search.",
-                        "tool_calls": dspy.ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
+                        "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
                     }
                 ]
             ),
-            "tools": [dspy.Tool(search)],
+            "tools": [Tool(search)],
         },
     )
 
@@ -1603,22 +1623,22 @@ def test_non_native_tool_history_remains_text_based(adapter):
 
 
 def test_chat_adapter_format_accepts_custom_history_formatter_returning_messages_only():
-    class CustomHistoryAdapter(dspy.ChatAdapter):
+    class CustomHistoryAdapter(ChatAdapter):
         def format_conversation_history(self, signature, history_field_name, inputs):
             del inputs[history_field_name]
             return [{"role": "user", "content": "custom history"}]
 
-    class HistorySignature(dspy.Signature):
-        question: str = dspy.InputField()
-        history: dspy.History = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class HistorySignature(Signature):
+        question: str = InputField()
+        history: History = InputField()
+        answer: str = OutputField()
 
     messages = CustomHistoryAdapter().format(
         HistorySignature,
         [],
         {
             "question": "Q2",
-            "history": dspy.History(messages=[{"question": "Q1"}]),
+            "history": History(messages=[{"question": "Q1"}]),
         },
     )
 
@@ -1632,15 +1652,15 @@ def test_chat_adapter_format_exact_messages_with_tool_input():
         """Search for documents."""
         return query
 
-    class ToolSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class ToolSignature(Signature):
+        question: str = InputField()
+        tools: list[Tool] = InputField()
+        answer: str = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(),
         ToolSignature,
         [],
-        {"question": "Q?", "tools": [dspy.Tool(search)]},
+        {"question": "Q?", "tools": [Tool(search)]},
     )
 
     expected_messages = [{"role": "system",
@@ -1685,7 +1705,7 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
         """Search for documents."""
         return query
 
-    class Event(dspy.Type):
+    class Event(DSPyType):
         label: str
 
         def format(self):
@@ -1708,24 +1728,24 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
         answer: str
         sources: list[str]
 
-    class KitchenSinkSignature(dspy.Signature):
+    class KitchenSinkSignature(Signature):
         """Answer carefully using every available signal."""
 
-        history: dspy.History = dspy.InputField()
-        image: dspy.Image = dspy.InputField()
-        audio: dspy.Audio = dspy.InputField()
-        file: dspy.File = dspy.InputField()
-        document: Document = dspy.InputField()
-        event: Event = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        profile: Profile = dspy.InputField()
-        context: str = dspy.InputField()
-        question: str = dspy.InputField()
-        answer: AnswerCard = dspy.OutputField()
-        verdict: Literal["yes", "no"] = dspy.OutputField()
-        confidence: float = dspy.OutputField()
+        history: History = InputField()
+        image: Image = InputField()
+        audio: Audio = InputField()
+        file: File = InputField()
+        document: Document = InputField()
+        event: Event = InputField()
+        tools: list[Tool] = InputField()
+        profile: Profile = InputField()
+        context: str = InputField()
+        question: str = InputField()
+        answer: AnswerCard = OutputField()
+        verdict: Literal["yes", "no"] = OutputField()
+        confidence: float = OutputField()
 
-    tool = dspy.Tool(search)
+    tool = Tool(search)
     demo_profile = Profile(
         name="Ada",
         location=Location(city="London", country="UK"),
@@ -1736,7 +1756,7 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
         location=Location(city="Arlington", country="USA"),
         interests=["compilers", "navy"],
     )
-    history = dspy.History(
+    history = History(
         messages=[
             {
                 "profile": demo_profile,
@@ -1748,13 +1768,13 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
             }
         ]
     )
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.ChatAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(ChatAdapter(),
         KitchenSinkSignature,
         demos=[
             {
-                "image": dspy.Image("https://example.com/demo.png"),
-                "audio": dspy.Audio(data="REVNTw==", audio_format="wav"),
-                "file": dspy.File.from_file_id("file-demo", filename="demo.txt"),
+                "image": Image("https://example.com/demo.png"),
+                "audio": Audio(data="REVNTw==", audio_format="wav"),
+                "file": File.from_file_id("file-demo", filename="demo.txt"),
                 "document": Document(data="Demo document", title="Demo Doc"),
                 "event": Event(label="demo-event"),
                 "tools": [tool],
@@ -1772,9 +1792,9 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
         ],
         inputs={
             "history": history,
-            "image": dspy.Image("https://example.com/current.png"),
-            "audio": dspy.Audio(data="Q1VSUkVOVA==", audio_format="wav"),
-            "file": dspy.File.from_file_id("file-current", filename="current.txt"),
+            "image": Image("https://example.com/current.png"),
+            "audio": Audio(data="Q1VSUkVOVA==", audio_format="wav"),
+            "file": File.from_file_id("file-current", filename="current.txt"),
             "document": Document(data="Current document", title="Current Doc"),
             "event": Event(label="current-event"),
             "tools": [tool],
@@ -1999,13 +2019,13 @@ def test_chat_adapter_with_pydantic_models():
         result: str
         analysis: str
 
-    class TestSignature(dspy.Signature):
-        owner: PetOwner = dspy.InputField()
-        question: str = dspy.InputField()
-        output: Answer = dspy.OutputField()
+    class TestSignature(Signature):
+        owner: PetOwner = InputField()
+        question: str = InputField()
+        output: Answer = OutputField()
 
-    dspy.configure(lm=dspy.LM(model="openai/gpt-4o"), adapter=dspy.ChatAdapter())
-    program = dspy.Predict(TestSignature)
+    settings.configure(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter())
+    program = Predict(TestSignature)
 
     with mock.patch("litellm.completion") as mock_completion:
         program(
@@ -2035,13 +2055,13 @@ def test_chat_adapter_signature_information():
     This test ensures that the signature information sent to the LM follows an expected format.
     """
 
-    class TestSignature(dspy.Signature):
-        input1: str = dspy.InputField(desc="String Input")
-        input2: int = dspy.InputField(desc="Integer Input")
-        output: str = dspy.OutputField(desc="String Output")
+    class TestSignature(Signature):
+        input1: str = InputField(desc="String Input")
+        input2: int = InputField(desc="Integer Input")
+        output: str = OutputField(desc="String Output")
 
-    dspy.configure(lm=dspy.LM(model="openai/gpt-4o"), adapter=dspy.ChatAdapter())
-    program = dspy.Predict(TestSignature)
+    settings.configure(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter())
+    program = Predict(TestSignature)
 
     with mock.patch("litellm.completion") as mock_completion:
         program(input1="Test", input2=11)
@@ -2074,22 +2094,22 @@ def test_chat_adapter_exception_raised_on_failure():
     """
     This test ensures that on an error, ChatAdapter raises an explicit exception.
     """
-    signature = dspy.make_signature("question->answer")
-    adapter = dspy.ChatAdapter()
+    signature = make_signature("question->answer")
+    adapter = ChatAdapter()
     invalid_completion = "{'output':'mismatched value'}"
-    with pytest.raises(dspy.utils.exceptions.AdapterParseError, match=r"Adapter ChatAdapter failed to parse.*"):
+    with pytest.raises(AdapterParseError, match=r"Adapter ChatAdapter failed to parse.*"):
         adapter.parse(signature, invalid_completion)
 
 
 def test_chat_adapter_formats_image():
     # Test basic image formatting
-    image = dspy.Image(url="https://example.com/image.jpg")
+    image = Image(url="https://example.com/image.jpg")
 
-    class MySignature(dspy.Signature):
-        image: dspy.Image = dspy.InputField()
-        text: str = dspy.OutputField()
+    class MySignature(Signature):
+        image: Image = InputField()
+        text: str = OutputField()
 
-    adapter = dspy.ChatAdapter()
+    adapter = ChatAdapter()
     messages = adapter.format(MySignature, [], {"image": image})
 
     assert len(messages) == 2
@@ -2107,23 +2127,23 @@ def test_chat_adapter_formats_image():
 
 
 def test_chat_adapter_formats_image_with_few_shot_examples():
-    class MySignature(dspy.Signature):
-        image: dspy.Image = dspy.InputField()
-        text: str = dspy.OutputField()
+    class MySignature(Signature):
+        image: Image = InputField()
+        text: str = OutputField()
 
-    adapter = dspy.ChatAdapter()
+    adapter = ChatAdapter()
 
     demos = [
-        dspy.Example(
-            image=dspy.Image(url="https://example.com/image1.jpg"),
+        Example(
+            image=Image(url="https://example.com/image1.jpg"),
             text="This is a test image",
         ),
-        dspy.Example(
-            image=dspy.Image(url="https://example.com/image2.jpg"),
+        Example(
+            image=Image(url="https://example.com/image2.jpg"),
             text="This is another test image",
         ),
     ]
-    messages = adapter.format(MySignature, demos, {"image": dspy.Image(url="https://example.com/image3.jpg")})
+    messages = adapter.format(MySignature, demos, {"image": Image(url="https://example.com/image3.jpg")})
 
     # 1 system message, 2 few shot examples (1 user and assistant message for each example), 1 user message
     assert len(messages) == 6
@@ -2138,20 +2158,20 @@ def test_chat_adapter_formats_image_with_few_shot_examples():
 
 def test_chat_adapter_formats_image_with_nested_images():
     class ImageWrapper(pydantic.BaseModel):
-        images: list[dspy.Image]
+        images: list[Image]
         tag: list[str]
 
-    class MySignature(dspy.Signature):
-        image: ImageWrapper = dspy.InputField()
-        text: str = dspy.OutputField()
+    class MySignature(Signature):
+        image: ImageWrapper = InputField()
+        text: str = OutputField()
 
-    image1 = dspy.Image(url="https://example.com/image1.jpg")
-    image2 = dspy.Image(url="https://example.com/image2.jpg")
-    image3 = dspy.Image(url="https://example.com/image3.jpg")
+    image1 = Image(url="https://example.com/image1.jpg")
+    image2 = Image(url="https://example.com/image2.jpg")
+    image3 = Image(url="https://example.com/image3.jpg")
 
     image_wrapper = ImageWrapper(images=[image1, image2, image3], tag=["test", "example"])
 
-    adapter = dspy.ChatAdapter()
+    adapter = ChatAdapter()
     messages = adapter.format(MySignature, [], {"image": image_wrapper})
 
     expected_image1_content = {"type": "image_url", "image_url": {"url": "https://example.com/image1.jpg"}}
@@ -2165,27 +2185,27 @@ def test_chat_adapter_formats_image_with_nested_images():
 
 def test_chat_adapter_formats_image_with_few_shot_examples_with_nested_images():
     class ImageWrapper(pydantic.BaseModel):
-        images: list[dspy.Image]
+        images: list[Image]
         tag: list[str]
 
-    class MySignature(dspy.Signature):
-        image: ImageWrapper = dspy.InputField()
-        text: str = dspy.OutputField()
+    class MySignature(Signature):
+        image: ImageWrapper = InputField()
+        text: str = OutputField()
 
-    image1 = dspy.Image(url="https://example.com/image1.jpg")
-    image2 = dspy.Image(url="https://example.com/image2.jpg")
-    image3 = dspy.Image(url="https://example.com/image3.jpg")
+    image1 = Image(url="https://example.com/image1.jpg")
+    image2 = Image(url="https://example.com/image2.jpg")
+    image3 = Image(url="https://example.com/image3.jpg")
 
     image_wrapper = ImageWrapper(images=[image1, image2, image3], tag=["test", "example"])
     demos = [
-        dspy.Example(
+        Example(
             image=image_wrapper,
             text="This is a test image",
         ),
     ]
 
-    image_wrapper_2 = ImageWrapper(images=[dspy.Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
-    adapter = dspy.ChatAdapter()
+    image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
+    adapter = ChatAdapter()
     messages = adapter.format(MySignature, demos, {"image": image_wrapper_2})
 
     assert len(messages) == 4
@@ -2203,13 +2223,13 @@ def test_chat_adapter_formats_image_with_few_shot_examples_with_nested_images():
 
 
 def test_chat_adapter_with_tool():
-    class MySignature(dspy.Signature):
+    class MySignature(Signature):
         """Answer question with the help of the tools"""
 
-        question: str = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        answer: str = dspy.OutputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+        question: str = InputField()
+        tools: list[Tool] = InputField()
+        answer: str = OutputField()
+        tool_calls: ToolCalls = OutputField()
 
     def get_weather(city: str) -> str:
         """Get the weather for a city"""
@@ -2219,15 +2239,15 @@ def test_chat_adapter_with_tool():
         """Get the population for a country"""
         return f"The population of {country} in {year} is 1000000"
 
-    tools = [dspy.Tool(get_weather), dspy.Tool(get_population)]
+    tools = [Tool(get_weather), Tool(get_population)]
 
-    adapter = dspy.ChatAdapter()
+    adapter = ChatAdapter()
     messages = adapter.format(MySignature, [], {"question": "What is the weather in Tokyo?", "tools": tools})
 
     assert len(messages) == 2
 
     # The output field type description should be included in the system message even if the output field is nested
-    assert dspy.ToolCalls.description() in messages[0]["content"]
+    assert ToolCalls.description() in messages[0]["content"]
 
     # The user message should include the question and the tools
     assert "What is the weather in Tokyo?" in messages[1]["content"]
@@ -2241,38 +2261,38 @@ def test_chat_adapter_with_tool():
 
 def test_chat_adapter_with_code():
     # Test with code as input field
-    class CodeAnalysis(dspy.Signature):
+    class CodeAnalysis(Signature):
         """Analyze the time complexity of the code"""
 
-        code: dspy.Code = dspy.InputField()
-        result: str = dspy.OutputField()
+        code: Code = InputField()
+        result: str = OutputField()
 
-    adapter = dspy.ChatAdapter()
+    adapter = ChatAdapter()
     messages = adapter.format(CodeAnalysis, [], {"code": "print('Hello, world!')"})
 
     assert len(messages) == 2
 
     # The output field type description should be included in the system message even if the output field is nested
-    assert dspy.Code.description() in messages[0]["content"]
+    assert Code.description() in messages[0]["content"]
 
     # The user message should include the question and the tools
     assert "print('Hello, world!')" in messages[1]["content"]
 
     # Test with code as output field
-    class CodeGeneration(dspy.Signature):
+    class CodeGeneration(Signature):
         """Generate code to answer the question"""
 
-        question: str = dspy.InputField()
-        code: dspy.Code = dspy.OutputField()
+        question: str = InputField()
+        code: Code = OutputField()
 
-    adapter = dspy.ChatAdapter()
+    adapter = ChatAdapter()
     with mock.patch("litellm.completion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content='[[ ## code ## ]]\nprint("Hello, world!")'))],
             model="openai/gpt-4o-mini",
         )
         result = adapter(
-            dspy.LM(model="openai/gpt-4o-mini", cache=False),
+            LM(model="openai/gpt-4o-mini", cache=False),
             {},
             CodeGeneration,
             [],
@@ -2282,17 +2302,17 @@ def test_chat_adapter_with_code():
 
 
 def test_code_output_field_omits_json_schema_in_prompt():
-    """Regression test for #9251: dspy.Code should avoid duplicating large JSON schema text."""
-    class CodeGeneration(dspy.Signature):
+    """Regression test for #9251: Code should avoid duplicating large JSON schema text."""
+    class CodeGeneration(Signature):
         """Generate code to answer the question"""
-        question: str = dspy.InputField()
-        code: dspy.Code = dspy.OutputField()
+        question: str = InputField()
+        code: Code = OutputField()
 
-    adapter = dspy.ChatAdapter()
+    adapter = ChatAdapter()
     messages = adapter.format(CodeGeneration, [], {"question": "Hello"})
     system_content = messages[0]["content"]
 
-    assert dspy.Code.description() in system_content
+    assert Code.description() in system_content
     assert "JSON schema" not in system_content
     assert '"properties"' not in system_content
     assert "Code type in DSPy" not in system_content
@@ -2301,11 +2321,11 @@ def test_code_output_field_omits_json_schema_in_prompt():
 def test_citations_output_field_keeps_json_schema_in_prompt():
     """Non-Code custom types should keep schema guidance for structured output reliability."""
 
-    class CitationGeneration(dspy.Signature):
-        question: str = dspy.InputField()
-        citations: Citations = dspy.OutputField()
+    class CitationGeneration(Signature):
+        question: str = InputField()
+        citations: Citations = OutputField()
 
-    adapter = dspy.ChatAdapter()
+    adapter = ChatAdapter()
     messages = adapter.format(CitationGeneration, [], {"question": "Hello"})
     system_content = messages[0]["content"]
 
@@ -2314,19 +2334,19 @@ def test_citations_output_field_keeps_json_schema_in_prompt():
 
 
 def test_chat_adapter_formats_conversation_history():
-    class MySignature(dspy.Signature):
-        question: str = dspy.InputField()
-        history: dspy.History = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class MySignature(Signature):
+        question: str = InputField()
+        history: History = InputField()
+        answer: str = OutputField()
 
-    history = dspy.History(
+    history = History(
         messages=[
             {"question": "What is the capital of France?", "answer": "Paris"},
             {"question": "What is the capital of Germany?", "answer": "Berlin"},
         ]
     )
 
-    adapter = dspy.ChatAdapter()
+    adapter = ChatAdapter()
     messages = adapter.format(MySignature, [], {"question": "What is the capital of France?", "history": history})
 
     assert len(messages) == 6
@@ -2337,8 +2357,8 @@ def test_chat_adapter_formats_conversation_history():
 
 
 def test_chat_adapter_fallback_to_json_adapter_on_exception():
-    signature = dspy.make_signature("question->answer")
-    adapter = dspy.ChatAdapter()
+    signature = make_signature("question->answer")
+    adapter = ChatAdapter()
 
     with mock.patch("litellm.completion") as mock_completion:
         # Mock returning a response compatible with JSONAdapter but not ChatAdapter
@@ -2347,7 +2367,7 @@ def test_chat_adapter_fallback_to_json_adapter_on_exception():
             model="openai/gpt-4o-mini",
         )
 
-        lm = dspy.LM("openai/gpt-4o-mini", cache=False)
+        lm = LM("openai/gpt-4o-mini", cache=False)
 
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.__call__") as mock_json_adapter_call:
             adapter(lm, {}, signature, [], {"question": "What is the capital of France?"})
@@ -2359,8 +2379,8 @@ def test_chat_adapter_fallback_to_json_adapter_on_exception():
 
 
 def test_chat_adapter_fallback_preserves_native_function_calling_flag():
-    signature = dspy.make_signature("question->answer")
-    adapter = dspy.ChatAdapter(use_native_function_calling=False)
+    signature = make_signature("question->answer")
+    adapter = ChatAdapter(use_native_function_calling=False)
     seen = {}
 
     def fake_json_adapter_call(self, lm, lm_kwargs, signature, demos, inputs):
@@ -2372,7 +2392,7 @@ def test_chat_adapter_fallback_preserves_native_function_calling_flag():
             choices=[Choices(message=Message(content="nonsense"))],
             model="openai/gpt-4o-mini",
         )
-        lm = dspy.LM("openai/gpt-4o-mini", cache=False)
+        lm = LM("openai/gpt-4o-mini", cache=False)
 
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.__call__", new=fake_json_adapter_call):
             result = adapter(lm, {}, signature, [], {"question": "What is the capital of France?"})
@@ -2382,8 +2402,8 @@ def test_chat_adapter_fallback_preserves_native_function_calling_flag():
 
 
 def test_chat_adapter_respects_use_json_adapter_fallback_flag():
-    signature = dspy.make_signature("question->answer")
-    adapter = dspy.ChatAdapter(use_json_adapter_fallback=False)
+    signature = make_signature("question->answer")
+    adapter = ChatAdapter(use_json_adapter_fallback=False)
 
     with mock.patch("litellm.completion") as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -2391,18 +2411,18 @@ def test_chat_adapter_respects_use_json_adapter_fallback_flag():
             model="openai/gpt-4o-mini",
         )
 
-        lm = dspy.LM("openai/gpt-4o-mini", cache=False)
+        lm = LM("openai/gpt-4o-mini", cache=False)
 
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.__call__") as mock_json_adapter_call:
-            with pytest.raises(dspy.utils.exceptions.AdapterParseError):
+            with pytest.raises(AdapterParseError):
                 adapter(lm, {}, signature, [], {"question": "What is the capital of France?"})
         mock_json_adapter_call.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_chat_adapter_fallback_to_json_adapter_on_exception_async():
-    signature = dspy.make_signature("question->answer")
-    adapter = dspy.ChatAdapter()
+    signature = make_signature("question->answer")
+    adapter = ChatAdapter()
 
     with mock.patch("litellm.acompletion") as mock_completion:
         # Mock returning a response compatible with JSONAdapter but not ChatAdapter
@@ -2411,7 +2431,7 @@ async def test_chat_adapter_fallback_to_json_adapter_on_exception_async():
             model="openai/gpt-4o-mini",
         )
 
-        lm = dspy.LM("openai/gpt-4o-mini", cache=False)
+        lm = LM("openai/gpt-4o-mini", cache=False)
 
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall") as mock_json_adapter_acall:
             await adapter.acall(lm, {}, signature, [], {"question": "What is the capital of France?"})
@@ -2424,8 +2444,8 @@ async def test_chat_adapter_fallback_to_json_adapter_on_exception_async():
 
 @pytest.mark.asyncio
 async def test_chat_adapter_async_fallback_preserves_native_function_calling_flag():
-    signature = dspy.make_signature("question->answer")
-    adapter = dspy.ChatAdapter(use_native_function_calling=False)
+    signature = make_signature("question->answer")
+    adapter = ChatAdapter(use_native_function_calling=False)
     seen = {}
 
     async def fake_json_adapter_acall(self, lm, lm_kwargs, signature, demos, inputs):
@@ -2437,7 +2457,7 @@ async def test_chat_adapter_async_fallback_preserves_native_function_calling_fla
             choices=[Choices(message=Message(content="nonsense"))],
             model="openai/gpt-4o-mini",
         )
-        lm = dspy.LM("openai/gpt-4o-mini", cache=False)
+        lm = LM("openai/gpt-4o-mini", cache=False)
 
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall", new=fake_json_adapter_acall):
             result = await adapter.acall(lm, {}, signature, [], {"question": "What is the capital of France?"})
@@ -2447,18 +2467,18 @@ async def test_chat_adapter_async_fallback_preserves_native_function_calling_fla
 
 
 def test_chat_adapter_toolcalls_native_function_calling():
-    class MySignature(dspy.Signature):
-        question: str = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        answer: str = dspy.OutputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class MySignature(Signature):
+        question: str = InputField()
+        tools: list[Tool] = InputField()
+        answer: str = OutputField()
+        tool_calls: ToolCalls = OutputField()
 
     def get_weather(city: str) -> str:
         return f"The weather in {city} is sunny"
 
-    tools = [dspy.Tool(get_weather)]
+    tools = [Tool(get_weather)]
 
-    adapter = dspy.JSONAdapter(use_native_function_calling=True)
+    adapter = JSONAdapter(use_native_function_calling=True)
 
     # Case 1: Tool calls are present in the response, while content is None.
     with mock.patch("litellm.completion") as mock_completion:
@@ -2483,16 +2503,16 @@ def test_chat_adapter_toolcalls_native_function_calling():
             model="openai/gpt-4o-mini",
         )
         result = adapter(
-            dspy.LM(model="openai/gpt-4o-mini", cache=False),
+            LM(model="openai/gpt-4o-mini", cache=False),
             {},
             MySignature,
             [],
             {"question": "What is the weather in Paris?", "tools": tools},
         )
 
-        assert result[0]["tool_calls"] == dspy.ToolCalls(
+        assert result[0]["tool_calls"] == ToolCalls(
             tool_calls=[
-                dspy.ToolCalls.ToolCall(
+                ToolCalls.ToolCall(
                     id="call_pQm8ajtSMxgA0nrzK2ivFmxG",
                     name="get_weather",
                     args={"city": "Paris"},
@@ -2509,7 +2529,7 @@ def test_chat_adapter_toolcalls_native_function_calling():
             model="openai/gpt-4o-mini",
         )
         result = adapter(
-            dspy.LM(model="openai/gpt-4o-mini", cache=False),
+            LM(model="openai/gpt-4o-mini", cache=False),
             {},
             MySignature,
             [],
@@ -2520,17 +2540,17 @@ def test_chat_adapter_toolcalls_native_function_calling():
 
 
 def test_chat_adapter_toolcalls_vague_match():
-    class MySignature(dspy.Signature):
-        question: str = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class MySignature(Signature):
+        question: str = InputField()
+        tools: list[Tool] = InputField()
+        tool_calls: ToolCalls = OutputField()
 
     def get_weather(city: str) -> str:
         return f"The weather in {city} is sunny"
 
-    tools = [dspy.Tool(get_weather)]
+    tools = [Tool(get_weather)]
 
-    adapter = dspy.ChatAdapter()
+    adapter = ChatAdapter()
 
     with mock.patch("litellm.completion") as mock_completion:
         # Case 1: tool_calls field is a list of dicts
@@ -2545,14 +2565,14 @@ def test_chat_adapter_toolcalls_vague_match():
             model="openai/gpt-4o-mini",
         )
         result = adapter(
-            dspy.LM(model="openai/gpt-4o-mini", cache=False),
+            LM(model="openai/gpt-4o-mini", cache=False),
             {},
             MySignature,
             [],
             {"question": "What is the weather in Paris?", "tools": tools},
         )
-        assert result[0]["tool_calls"] == dspy.ToolCalls(
-            tool_calls=[dspy.ToolCalls.ToolCall(name="get_weather", args={"city": "Paris"})]
+        assert result[0]["tool_calls"] == ToolCalls(
+            tool_calls=[ToolCalls.ToolCall(name="get_weather", args={"city": "Paris"})]
         )
 
     with mock.patch("litellm.completion") as mock_completion:
@@ -2568,24 +2588,24 @@ def test_chat_adapter_toolcalls_vague_match():
             model="openai/gpt-4o-mini",
         )
         result = adapter(
-            dspy.LM(model="openai/gpt-4o-mini", cache=False),
+            LM(model="openai/gpt-4o-mini", cache=False),
             {},
             MySignature,
             [],
             {"question": "What is the weather in Paris?", "tools": tools},
         )
-        assert result[0]["tool_calls"] == dspy.ToolCalls(
-            tool_calls=[dspy.ToolCalls.ToolCall(name="get_weather", args={"city": "Paris"})]
+        assert result[0]["tool_calls"] == ToolCalls(
+            tool_calls=[ToolCalls.ToolCall(name="get_weather", args={"city": "Paris"})]
         )
 
 
 def test_chat_adapter_native_reasoning():
-    class MySignature(dspy.Signature):
-        question: str = dspy.InputField()
-        reasoning: dspy.Reasoning = dspy.OutputField()
-        answer: str = dspy.OutputField()
+    class MySignature(Signature):
+        question: str = InputField()
+        reasoning: Reasoning = OutputField()
+        answer: str = OutputField()
 
-    adapter = dspy.ChatAdapter()
+    adapter = ChatAdapter()
 
     with mock.patch("litellm.completion") as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -2600,7 +2620,7 @@ def test_chat_adapter_native_reasoning():
             model="anthropic/claude-3-7-sonnet-20250219",
         )
         modified_signature = adapter._call_preprocess(
-            dspy.LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low", cache=False),
+            LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low", cache=False),
             {},
             MySignature,
             {"question": "What is the capital of France?"},
@@ -2608,13 +2628,13 @@ def test_chat_adapter_native_reasoning():
         assert "reasoning" not in modified_signature.output_fields
 
         result = adapter(
-            dspy.LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low", cache=False),
+            LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low", cache=False),
             {},
             MySignature,
             [],
             {"question": "What is the capital of France?"},
         )
-        assert result[0]["reasoning"] == dspy.Reasoning(content="Step-by-step thinking about the capital of France")
+        assert result[0]["reasoning"] == Reasoning(content="Step-by-step thinking about the capital of France")
 
 
 def test_chat_adapter_parses_float_with_underscores():
@@ -2626,11 +2646,11 @@ def test_chat_adapter_parses_float_with_underscores():
     class Score(pydantic.BaseModel):
         score: float
 
-    class MySignature(dspy.Signature):
-        question: str = dspy.InputField()
-        score: Score = dspy.OutputField()
+    class MySignature(Signature):
+        question: str = InputField()
+        score: Score = OutputField()
 
-    adapter = dspy.ChatAdapter()
+    adapter = ChatAdapter()
 
     # Simulate a response with a float number containing underscores
     with mock.patch("litellm.completion") as mock_completion:
@@ -2641,7 +2661,7 @@ def test_chat_adapter_parses_float_with_underscores():
             model="openai/gpt-4o-mini",
         )
 
-        lm = dspy.LM("openai/gpt-4o-mini", cache=False)
+        lm = LM("openai/gpt-4o-mini", cache=False)
         result = adapter(lm, {}, MySignature, [], {"question": "What is the score?"})
 
         # The underscore-separated float should be parsed as a normal float
@@ -2649,14 +2669,14 @@ def test_chat_adapter_parses_float_with_underscores():
 
 
 def test_format_system_message():
-    class MySignature(dspy.Signature):
+    class MySignature(Signature):
         """Answer the question with multiple answers and scores"""
 
-        question: str = dspy.InputField()
-        answers: list[str] = dspy.OutputField()
-        scores: list[float] = dspy.OutputField()
+        question: str = InputField()
+        answers: list[str] = OutputField()
+        scores: list[float] = OutputField()
 
-    adapter = dspy.ChatAdapter()
+    adapter = ChatAdapter()
     system_message = adapter.format_system_message(MySignature)
     expected_system_message = """Your input fields are:
 1. `question` (str):
@@ -2685,15 +2705,15 @@ def test_null_content_raises_adapter_parse_error():
     the adapter should raise AdapterParseError instead of silently returning None fields."""
     from dspy.utils.exceptions import AdapterParseError
 
-    lm = dspy.LM("openai/gpt-4o-mini", cache=False)
+    lm = LM("openai/gpt-4o-mini", cache=False)
     response = ModelResponse(
         choices=[Choices(message=Message(content=None))],
         model="openai/gpt-4o-mini",
     )
 
-    with dspy.context(lm=lm):
+    with settings.context(lm=lm):
         with mock.patch("litellm.completion", return_value=response):
-            cot = dspy.ChainOfThought("question -> answer")
+            cot = ChainOfThought("question -> answer")
             with pytest.raises(AdapterParseError):
                 cot(question="test")
 
@@ -2702,15 +2722,15 @@ def test_empty_string_content_raises_adapter_parse_error():
     """Same as above but with empty string content."""
     from dspy.utils.exceptions import AdapterParseError
 
-    lm = dspy.LM("openai/gpt-4o-mini", cache=False)
+    lm = LM("openai/gpt-4o-mini", cache=False)
     response = ModelResponse(
         choices=[Choices(message=Message(content=""))],
         model="openai/gpt-4o-mini",
     )
 
-    with dspy.context(lm=lm):
+    with settings.context(lm=lm):
         with mock.patch("litellm.completion", return_value=response):
-            cot = dspy.ChainOfThought("question -> answer")
+            cot = ChainOfThought("question -> answer")
             with pytest.raises(AdapterParseError):
                 cot(question="test")
 
@@ -2718,8 +2738,8 @@ def test_empty_string_content_raises_adapter_parse_error():
 def test_tool_call_with_null_content_does_not_raise():
     """Tool-call-only responses legitimately have content=None.
     _call_postprocess must NOT raise when tool_calls are present."""
-    adapter = dspy.ChatAdapter(use_native_function_calling=True)
-    sig_cls = dspy.Signature("question, tools: list[dspy.Tool] -> answer, tool_calls: dspy.ToolCalls")
+    adapter = ChatAdapter(use_native_function_calling=True)
+    sig_cls = Signature("question, tools: list[Tool] -> answer, tool_calls: ToolCalls")
 
     outputs = [{"text": None, "tool_calls": [
         {"function": {"name": "search", "arguments": '{"query": "test"}'}, "id": "call_1", "type": "function"}
@@ -2733,9 +2753,9 @@ def test_tool_call_with_null_content_does_not_raise():
 
 def test_tool_call_with_unstructured_content_does_not_raise():
     """Provider tool calls are authoritative even when content is not adapter-formatted."""
-    adapter = dspy.ChatAdapter(use_native_function_calling=True)
-    original_sig = dspy.Signature(
-        "question, tools: list[dspy.Tool] -> next_thought: dspy.Reasoning, tool_calls: dspy.ToolCalls"
+    adapter = ChatAdapter(use_native_function_calling=True)
+    original_sig = Signature(
+        "question, tools: list[Tool] -> next_thought: Reasoning, tool_calls: ToolCalls"
     )
     processed_sig = original_sig.delete("tools").delete("tool_calls").delete("next_thought")
     outputs = [
@@ -2751,12 +2771,12 @@ def test_tool_call_with_unstructured_content_does_not_raise():
     result = adapter._call_postprocess(processed_sig, original_sig, outputs, None, {})
 
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
-    assert result[0]["next_thought"] == dspy.Reasoning(content="I need a search result.")
+    assert result[0]["next_thought"] == Reasoning(content="I need a search result.")
 
 
 def test_tool_call_with_structured_content_preserves_other_outputs():
-    adapter = dspy.ChatAdapter(use_native_function_calling=True)
-    original_sig = dspy.Signature("question, tools: list[dspy.Tool] -> answer, tool_calls: dspy.ToolCalls")
+    adapter = ChatAdapter(use_native_function_calling=True)
+    original_sig = Signature("question, tools: list[Tool] -> answer, tool_calls: ToolCalls")
     processed_sig = original_sig.delete("tools").delete("tool_calls")
     outputs = [
         {
@@ -2774,8 +2794,8 @@ def test_tool_call_with_structured_content_preserves_other_outputs():
 
 
 def test_provider_tool_calls_preserve_id_and_repair_arguments():
-    adapter = dspy.ChatAdapter(use_native_function_calling=True)
-    sig_cls = dspy.Signature("question, tools: list[dspy.Tool] -> tool_calls: dspy.ToolCalls")
+    adapter = ChatAdapter(use_native_function_calling=True)
+    sig_cls = Signature("question, tools: list[Tool] -> tool_calls: ToolCalls")
 
     outputs = [
         {
@@ -2792,8 +2812,8 @@ def test_provider_tool_calls_preserve_id_and_repair_arguments():
 
     result = adapter._call_postprocess(sig_cls, sig_cls, outputs, None, {})
 
-    assert result[0]["tool_calls"] == dspy.ToolCalls(
+    assert result[0]["tool_calls"] == ToolCalls(
         tool_calls=[
-            dspy.ToolCalls.ToolCall(id="call_from_responses", name="search", args={"query": "cats"})
+            ToolCalls.ToolCall(id="call_from_responses", name="search", args={"query": "cats"})
         ]
     )

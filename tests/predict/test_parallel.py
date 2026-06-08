@@ -1,4 +1,8 @@
-import dspy
+from dspy.dsp.utils.settings import settings
+from dspy.predict.parallel import Parallel
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
+from dspy.primitives.module import Module
 from dspy.utils.dummies import DummyLM
 
 
@@ -12,15 +16,15 @@ def test_parallel_module():
             {"output": "test output 5"},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
-    class MyModule(dspy.Module):
+    class MyModule(Module):
         def __init__(self):
             super().__init__()
-            self.predictor = dspy.Predict("input -> output")
-            self.predictor2 = dspy.Predict("input -> output")
+            self.predictor = Predict("input -> output")
+            self.predictor2 = Predict("input -> output")
 
-            self.parallel = dspy.Parallel(num_threads=2)
+            self.parallel = Parallel(num_threads=2)
 
         def forward(self, input):
             return self.parallel(
@@ -33,7 +37,7 @@ def test_parallel_module():
                 ]
             )
 
-    output = MyModule()(dspy.Example(input="test input").with_inputs("input"))
+    output = MyModule()(Example(input="test input").with_inputs("input"))
 
     expected_outputs = {f"test output {i}" for i in range(1, 6)}
     assert {r.output for r in output} == expected_outputs
@@ -59,24 +63,24 @@ def test_batch_module():
         ]
     )
 
-    class MyModule(dspy.Module):
+    class MyModule(Module):
         def __init__(self):
             super().__init__()
-            self.predictor = dspy.Predict("input -> output")
-            self.predictor2 = dspy.Predict("input -> output, reasoning")
+            self.predictor = Predict("input -> output")
+            self.predictor2 = Predict("input -> output, reasoning")
 
-            self.parallel = dspy.Parallel(num_threads=2)
+            self.parallel = Parallel(num_threads=2)
 
         def forward(self, input):
-            with dspy.context(lm=lm):
+            with settings.context(lm=lm):
                 res1 = self.predictor.batch([input] * 5)
 
-            with dspy.context(lm=res_lm):
+            with settings.context(lm=res_lm):
                 res2 = self.predictor2.batch([input] * 5)
 
             return (res1, res2)
 
-    result, reason_result = MyModule()(dspy.Example(input="test input").with_inputs("input"))
+    result, reason_result = MyModule()(Example(input="test input").with_inputs("input"))
 
     # Check that we got all expected outputs without caring about order
     expected_outputs = {f"test output {i}" for i in range(1, 6)}
@@ -99,15 +103,15 @@ def test_nested_parallel_module():
             {"output": "test output 5"},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
-    class MyModule(dspy.Module):
+    class MyModule(Module):
         def __init__(self):
             super().__init__()
-            self.predictor = dspy.Predict("input -> output")
-            self.predictor2 = dspy.Predict("input -> output")
+            self.predictor = Predict("input -> output")
+            self.predictor2 = Predict("input -> output")
 
-            self.parallel = dspy.Parallel(num_threads=2)
+            self.parallel = Parallel(num_threads=2)
 
         def forward(self, input):
             return self.parallel(
@@ -124,7 +128,7 @@ def test_nested_parallel_module():
                 ]
             )
 
-    output = MyModule()(dspy.Example(input="test input").with_inputs("input"))
+    output = MyModule()(Example(input="test input").with_inputs("input"))
 
     # For nested structure, check first two outputs and nested outputs separately
     assert {output[0].output, output[1].output} <= {f"test output {i}" for i in range(1, 5)}
@@ -143,19 +147,19 @@ def test_nested_batch_method():
             {"output": "test output 5"},
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
-    class MyModule(dspy.Module):
+    class MyModule(Module):
         def __init__(self):
             super().__init__()
-            self.predictor = dspy.Predict("input -> output")
+            self.predictor = Predict("input -> output")
 
         def forward(self, input):
-            res = self.predictor.batch([dspy.Example(input=input).with_inputs("input")] * 2)
+            res = self.predictor.batch([Example(input=input).with_inputs("input")] * 2)
 
             return res
 
-    result = MyModule().batch([dspy.Example(input="test input").with_inputs("input")] * 2)
+    result = MyModule().batch([Example(input="test input").with_inputs("input")] * 2)
 
     assert {result[0][0].output, result[0][1].output, result[1][0].output, result[1][1].output} == {
         "test output 1",
@@ -166,7 +170,7 @@ def test_nested_batch_method():
 
 
 def test_batch_with_failed_examples():
-    class FailingModule(dspy.Module):
+    class FailingModule(Module):
         def forward(self, value: int) -> str:
             if value == 42:
                 raise ValueError("test error")
@@ -175,9 +179,9 @@ def test_batch_with_failed_examples():
     module = FailingModule()
 
     examples = [
-        dspy.Example(value=1).with_inputs("value"),
-        dspy.Example(value=42).with_inputs("value"),  # This will fail
-        dspy.Example(value=3).with_inputs("value"),
+        Example(value=1).with_inputs("value"),
+        Example(value=42).with_inputs("value"),  # This will fail
+        Example(value=3).with_inputs("value"),
     ]
 
     results, failed_examples, exceptions = module.batch(
@@ -197,25 +201,25 @@ def test_batch_with_failed_examples():
 
 
 def test_parallel_timeout_and_straggler_limit_params():
-    parallel_default = dspy.Parallel()
+    parallel_default = Parallel()
     assert parallel_default.timeout == 120
     assert parallel_default.straggler_limit == 3
 
-    parallel_custom = dspy.Parallel(timeout=0, straggler_limit=5)
+    parallel_custom = Parallel(timeout=0, straggler_limit=5)
     assert parallel_custom.timeout == 0
     assert parallel_custom.straggler_limit == 5
 
 
 def test_batch_timeout_and_straggler_limit_params():
-    class SimpleModule(dspy.Module):
+    class SimpleModule(Module):
         def forward(self, value: int) -> int:
             return value * 2
 
     module = SimpleModule()
     examples = [
-        dspy.Example(value=1).with_inputs("value"),
-        dspy.Example(value=2).with_inputs("value"),
-        dspy.Example(value=3).with_inputs("value"),
+        Example(value=1).with_inputs("value"),
+        Example(value=2).with_inputs("value"),
+        Example(value=3).with_inputs("value"),
     ]
 
     results = module.batch(examples, timeout=0, straggler_limit=5)

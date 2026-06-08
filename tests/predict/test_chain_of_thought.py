@@ -3,14 +3,15 @@ from unittest import mock
 import pytest
 from litellm.utils import Choices, Message, ModelResponse
 
-import dspy
-from dspy import ChainOfThought
-from dspy.utils import DummyLM
+from dspy.clients.lm import LM
+from dspy.dsp.utils.settings import settings
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.utils.dummies import DummyLM
 
 
 def test_initialization_with_string_signature():
     lm = DummyLM([{"reasoning": "find the number after 1", "answer": "2"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     predict = ChainOfThought("question -> answer")
     assert list(predict.predict.signature.output_fields.keys()) == [
         "reasoning",
@@ -22,7 +23,7 @@ def test_initialization_with_string_signature():
 @pytest.mark.asyncio
 async def test_async_chain_of_thought():
     lm = DummyLM([{"reasoning": "find the number after 1", "answer": "2"}])
-    with dspy.context(lm=lm):
+    with settings.context(lm=lm):
         program = ChainOfThought("question -> answer")
         result = await program.acall(question="What is 1+1?")
         assert result.answer == "2"
@@ -31,8 +32,8 @@ async def test_async_chain_of_thought():
 def test_chain_of_thought_with_native_reasoning():
     """Test ChainOfThought with a model that supports native reasoning, but using manual fields."""
 
-    lm = dspy.LM(model="anthropic/claude-3-7-sonnet-20250219", cache=False)
-    dspy.settings.configure(lm=lm)
+    lm = LM(model="anthropic/claude-3-7-sonnet-20250219", cache=False)
+    settings.configure(lm=lm)
 
     with mock.patch("litellm.completion") as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -60,8 +61,8 @@ def test_chain_of_thought_with_native_reasoning():
 
 def test_chain_of_thought_with_manual_reasoning():
     """Test ChainOfThought with manual reasoning where LM doesn't support native reasoning."""
-    lm = dspy.LM(model="openai/gpt-4o-mini")
-    dspy.settings.configure(lm=lm)
+    lm = LM(model="openai/gpt-4o-mini")
+    settings.configure(lm=lm)
 
     with mock.patch("litellm.completion") as mock_completion:
         mock_completion.return_value = ModelResponse(

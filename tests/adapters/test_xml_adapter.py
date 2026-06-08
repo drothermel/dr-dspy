@@ -1,3 +1,4 @@
+from dspy.utils.exceptions import AdapterParseError
 import sys
 from unittest import mock
 
@@ -5,16 +6,23 @@ import pydantic
 import pytest
 from litellm import Choices, Message, ModelResponse
 
-import dspy
 from dspy.adapters.chat_adapter import FieldInfoWithName
+from dspy.adapters.types.code import Code
+from dspy.adapters.types.history import History
+from dspy.adapters.types.image import Image
+from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.xml_adapter import XMLAdapter
+from dspy.clients.lm import LM
+from dspy.primitives.example import Example
+from dspy.signatures.field import InputField, OutputField
+from dspy.signatures.signature import Signature
 from tests.adapters.conftest import format_messages_and_lm_kwargs
 
 
 def test_xml_adapter_format_and_parse_basic():
-    class TestSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class TestSignature(Signature):
+        question: str = InputField()
+        answer: str = OutputField()
 
     adapter = XMLAdapter()
     # Format output fields as XML
@@ -29,10 +37,10 @@ def test_xml_adapter_format_and_parse_basic():
 
 
 def test_xml_adapter_parse_multiple_fields():
-    class TestSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
-        explanation: str = dspy.OutputField()
+    class TestSignature(Signature):
+        question: str = InputField()
+        answer: str = OutputField()
+        explanation: str = OutputField()
 
     adapter = XMLAdapter()
     completion = """
@@ -44,14 +52,14 @@ def test_xml_adapter_parse_multiple_fields():
 
 
 def test_xml_adapter_parse_raises_on_missing_field():
-    class TestSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
-        explanation: str = dspy.OutputField()
+    class TestSignature(Signature):
+        question: str = InputField()
+        answer: str = OutputField()
+        explanation: str = OutputField()
 
     adapter = XMLAdapter()
     completion = "<answer>Paris</answer>"
-    with pytest.raises(dspy.utils.exceptions.AdapterParseError) as e:
+    with pytest.raises(AdapterParseError) as e:
         adapter.parse(TestSignature, completion)
     assert e.value.adapter_name == "XMLAdapter"
     assert e.value.signature == TestSignature
@@ -60,9 +68,9 @@ def test_xml_adapter_parse_raises_on_missing_field():
 
 
 def test_xml_adapter_parse_casts_types():
-    class TestSignature(dspy.Signature):
-        number: int = dspy.OutputField()
-        flag: bool = dspy.OutputField()
+    class TestSignature(Signature):
+        number: int = OutputField()
+        flag: bool = OutputField()
 
     adapter = XMLAdapter()
     completion = """
@@ -74,12 +82,12 @@ def test_xml_adapter_parse_casts_types():
 
 
 def test_xml_adapter_parse_raises_on_type_error():
-    class TestSignature(dspy.Signature):
-        number: int = dspy.OutputField()
+    class TestSignature(Signature):
+        number: int = OutputField()
 
     adapter = XMLAdapter()
     completion = "<number>not_a_number</number>"
-    with pytest.raises(dspy.utils.exceptions.AdapterParseError) as e:
+    with pytest.raises(AdapterParseError) as e:
         adapter.parse(TestSignature, completion)
     assert "Failed to parse field" in str(e.value)
 
@@ -89,9 +97,9 @@ def test_xml_adapter_format_and_parse_nested_model():
         value: int
         label: str
 
-    class TestSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        result: InnerModel = dspy.OutputField()
+    class TestSignature(Signature):
+        question: str = InputField()
+        result: InnerModel = OutputField()
 
     adapter = XMLAdapter()
     # Format output fields as XML
@@ -119,8 +127,8 @@ def test_xml_adapter_format_and_parse_list_of_models():
         name: str
         score: float
 
-    class TestSignature(dspy.Signature):
-        items: list[Item] = dspy.OutputField()
+    class TestSignature(Signature):
+        items: list[Item] = OutputField()
 
     adapter = XMLAdapter()
     items = [Item(name="a", score=1.1), Item(name="b", score=2.2)]
@@ -149,10 +157,10 @@ def test_xml_adapter_with_tool_like_output():
         args: dict
         result: str
 
-    class TestSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        tool_calls: list[ToolCall] = dspy.OutputField()
-        answer: str = dspy.OutputField()
+    class TestSignature(Signature):
+        question: str = InputField()
+        tool_calls: list[ToolCall] = OutputField()
+        answer: str = OutputField()
 
     adapter = XMLAdapter()
     tool_calls = [
@@ -186,27 +194,27 @@ def test_xml_adapter_with_tool_like_output():
 
 def test_xml_adapter_formats_nested_images():
     class ImageWrapper(pydantic.BaseModel):
-        images: list[dspy.Image]
+        images: list[Image]
         tag: list[str]
 
-    class MySignature(dspy.Signature):
-        image: ImageWrapper = dspy.InputField()
-        text: str = dspy.OutputField()
+    class MySignature(Signature):
+        image: ImageWrapper = InputField()
+        text: str = OutputField()
 
-    image1 = dspy.Image(url="https://example.com/image1.jpg")
-    image2 = dspy.Image(url="https://example.com/image2.jpg")
-    image3 = dspy.Image(url="https://example.com/image3.jpg")
+    image1 = Image(url="https://example.com/image1.jpg")
+    image2 = Image(url="https://example.com/image2.jpg")
+    image3 = Image(url="https://example.com/image3.jpg")
 
     image_wrapper = ImageWrapper(images=[image1, image2, image3], tag=["test", "example"])
     demos = [
-        dspy.Example(
+        Example(
             image=image_wrapper,
             text="This is a test image",
         ),
     ]
 
-    image_wrapper_2 = ImageWrapper(images=[dspy.Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
-    adapter = dspy.XMLAdapter()
+    image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
+    adapter = XMLAdapter()
     messages = adapter.format(MySignature, demos, {"image": image_wrapper_2})
 
     assert len(messages) == 4
@@ -225,38 +233,38 @@ def test_xml_adapter_formats_nested_images():
 
 def test_xml_adapter_with_code():
     # Test with code as input field
-    class CodeAnalysis(dspy.Signature):
+    class CodeAnalysis(Signature):
         """Analyze the time complexity of the code"""
 
-        code: dspy.Code = dspy.InputField()
-        result: str = dspy.OutputField()
+        code: Code = InputField()
+        result: str = OutputField()
 
-    adapter = dspy.XMLAdapter()
+    adapter = XMLAdapter()
     messages = adapter.format(CodeAnalysis, [], {"code": "print('Hello, world!')"})
 
     assert len(messages) == 2
 
     # The output field type description should be included in the system message even if the output field is nested
-    assert dspy.Code.description() in messages[0]["content"]
+    assert Code.description() in messages[0]["content"]
 
     # The user message should include the question and the tools
     assert "print('Hello, world!')" in messages[1]["content"]
 
     # Test with code as output field
-    class CodeGeneration(dspy.Signature):
+    class CodeGeneration(Signature):
         """Generate code to answer the question"""
 
-        question: str = dspy.InputField()
-        code: dspy.Code = dspy.OutputField()
+        question: str = InputField()
+        code: Code = OutputField()
 
-    adapter = dspy.XMLAdapter()
+    adapter = XMLAdapter()
     with mock.patch("litellm.completion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content='<code>print("Hello, world!")</code>'))],
             model="openai/gpt-4o-mini",
         )
         result = adapter(
-            dspy.LM(model="openai/gpt-4o-mini", cache=False),
+            LM(model="openai/gpt-4o-mini", cache=False),
             {},
             CodeGeneration,
             [],
@@ -266,12 +274,12 @@ def test_xml_adapter_with_code():
 
 
 def test_xml_adapter_full_prompt():
-    class QA(dspy.Signature):
-        query: str = dspy.InputField()
-        context: str | None = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class QA(Signature):
+        query: str = InputField()
+        context: str | None = InputField()
+        answer: str = OutputField()
 
-    adapter = dspy.XMLAdapter()
+    adapter = XMLAdapter()
     messages = adapter.format(QA, [], {"query": "when was Marie Curie born"})
 
     assert len(messages) == 2
@@ -304,11 +312,11 @@ def test_xml_adapter_full_prompt():
 
 
 def test_xml_adapter_format_exact_messages_for_simple_signature():
-    class StringSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
+    class StringSignature(Signature):
+        question: str = InputField()
+        answer: str = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.XMLAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(XMLAdapter(),
         StringSignature,
         demos=[],
         inputs={"question": "why did a chicken cross the kitchen?"},
@@ -351,32 +359,32 @@ def test_xml_adapter_format_exact_non_native_tool_result_history_field():
     def search(query: str) -> str:
         return query
 
-    class ToolHistorySignature(dspy.Signature):
-        question: str = dspy.InputField()
-        history: dspy.History = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        next_thought: str = dspy.OutputField()
-        tool_calls: dspy.ToolCalls = dspy.OutputField()
+    class ToolHistorySignature(Signature):
+        question: str = InputField()
+        history: History = InputField()
+        tools: list[Tool] = InputField()
+        next_thought: str = OutputField()
+        tool_calls: ToolCalls = OutputField()
 
-    tool_call = dspy.ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
-    tool_call_results = dspy.ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
+    tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
+    tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
 
     messages, _lm_kwargs = format_messages_and_lm_kwargs(
-        dspy.XMLAdapter(use_native_function_calling=False),
+        XMLAdapter(use_native_function_calling=False),
         ToolHistorySignature,
         [],
         {
             "question": "Q2",
-            "history": dspy.History(
+            "history": History(
                 messages=[
                     {
                         "question": "Q1",
                         "next_thought": "I should search.",
-                        "tool_calls": dspy.ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
+                        "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
                     }
                 ]
             ),
-            "tools": [dspy.Tool(search)],
+            "tools": [Tool(search)],
         },
     )
 
@@ -399,12 +407,12 @@ def test_xml_adapter_format_exact_non_native_tool_result_history_field():
 
 
 def test_xml_adapter_format_exact_messages_for_two_input_signature():
-    class StringSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: str = dspy.InputField()
-        judgement: str = dspy.OutputField()
+    class StringSignature(Signature):
+        question: str = InputField()
+        answer: str = InputField()
+        judgement: str = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.XMLAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(XMLAdapter(),
         StringSignature,
         demos=[],
         inputs={"question": "why did a chicken cross the kitchen?", "answer": "To get to the other side!"},
@@ -453,12 +461,12 @@ Respond with the corresponding output fields wrapped in XML tags `<judgement>`."
 
 
 def test_xml_adapter_format_exact_messages_with_demo_and_typed_output():
-    class MultiAnswer(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
-        score: float = dspy.OutputField()
+    class MultiAnswer(Signature):
+        question: str = InputField()
+        answer: str = OutputField()
+        score: float = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.XMLAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(XMLAdapter(),
         MultiAnswer,
         demos=[{"question": "Q1", "answer": "A1", "score": 0.9}],
         inputs={"question": "Q2"},
@@ -533,17 +541,17 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
         answer: str
         sources: list[str]
 
-    class RichRenderingSignature(dspy.Signature):
+    class RichRenderingSignature(Signature):
         """Answer using all supplied context."""
 
-        history: dspy.History = dspy.InputField()
-        image: dspy.Image = dspy.InputField()
-        tools: list[dspy.Tool] = dspy.InputField()
-        profile: Profile = dspy.InputField()
-        question: str = dspy.InputField()
-        answer: AnswerCard = dspy.OutputField()
+        history: History = InputField()
+        image: Image = InputField()
+        tools: list[Tool] = InputField()
+        profile: Profile = InputField()
+        question: str = InputField()
+        answer: AnswerCard = OutputField()
 
-    tool = dspy.Tool(search)
+    tool = Tool(search)
     demo_profile = Profile(
         name="Ada",
         location=Location(city="London", country="UK"),
@@ -554,7 +562,7 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
         location=Location(city="Arlington", country="USA"),
         interests=["compilers", "navy"],
     )
-    history = dspy.History(
+    history = History(
         messages=[
             {
                 "profile": demo_profile,
@@ -563,11 +571,11 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
             }
         ]
     )
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.XMLAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(XMLAdapter(),
         RichRenderingSignature,
         demos=[
             {
-                "image": dspy.Image("https://example.com/demo.png"),
+                "image": Image("https://example.com/demo.png"),
                 "tools": [tool],
                 "profile": demo_profile,
                 "question": "What should we mention?",
@@ -576,7 +584,7 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
         ],
         inputs={
             "history": history,
-            "image": dspy.Image("https://example.com/current.png"),
+            "image": Image("https://example.com/current.png"),
             "tools": [tool],
             "profile": current_profile,
             "question": "What should the answer include?",
@@ -698,11 +706,11 @@ def test_xml_adapter_format_exact_messages_with_nested_pydantic_output():
         title: str
         address: XmlAddress
 
-    class PydanticSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        summary: XmlSummary = dspy.OutputField()
+    class PydanticSignature(Signature):
+        question: str = InputField()
+        summary: XmlSummary = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.XMLAdapter(), PydanticSignature, [], {"question": "Summarize"})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(XMLAdapter(), PydanticSignature, [], {"question": "Summarize"})
 
     expected_messages = [{"role": "system",
       "content": 'Your input fields are:\n'
@@ -738,13 +746,13 @@ def test_xml_adapter_format_exact_messages_with_nested_pydantic_output():
 
 
 def test_xml_adapter_format_exact_messages_with_incomplete_demo():
-    class IncompleteDemoSignature(dspy.Signature):
-        question: str = dspy.InputField()
-        context: str = dspy.InputField()
-        answer: str = dspy.OutputField()
-        score: float = dspy.OutputField()
+    class IncompleteDemoSignature(Signature):
+        question: str = InputField()
+        context: str = InputField()
+        answer: str = OutputField()
+        score: float = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(dspy.XMLAdapter(),
+    messages, lm_kwargs = format_messages_and_lm_kwargs(XMLAdapter(),
         IncompleteDemoSignature,
         [{"question": "Q1", "answer": "A1"}],
         {"question": "Q2", "context": "C2"},
@@ -810,14 +818,14 @@ def test_xml_adapter_format_exact_messages_with_incomplete_demo():
 
 
 def test_format_system_message():
-    class MySignature(dspy.Signature):
+    class MySignature(Signature):
         """Answer the question with multiple answers and scores"""
 
-        question: str = dspy.InputField()
-        answers: list[str] = dspy.OutputField()
-        scores: list[float] = dspy.OutputField()
+        question: str = InputField()
+        answers: list[str] = OutputField()
+        scores: list[float] = OutputField()
 
-    adapter = dspy.XMLAdapter()
+    adapter = XMLAdapter()
     system_message = adapter.format_system_message(MySignature)
 
     expected_system_message = """Your input fields are:

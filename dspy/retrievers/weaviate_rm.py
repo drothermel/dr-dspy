@@ -1,7 +1,6 @@
-
-import dspy
-from dspy.dsp.utils import dotdict
+from dspy.dsp.utils.utils import dotdict
 from dspy.primitives.prediction import Prediction
+from dspy.retrievers.retrieve import Retrieve
 
 try:
     from uuid import uuid4
@@ -14,7 +13,7 @@ except ImportError as err:
     ) from err
 
 
-class WeaviateRM(dspy.Retrieve):
+class WeaviateRM(Retrieve):
     """A retrieval module that uses Weaviate to return the top passages for a given query.
 
     Assumes that a Weaviate collection has been created and populated with the following payload:

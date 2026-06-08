@@ -3,15 +3,15 @@
 This test requires valid Databricks credentials, so it is skipped on github actions. Right now it is only used for
 manual testing.
 """
-
 import pytest
 
-import dspy
 from dspy.clients.databricks import (
     DatabricksProvider,
     TrainingJobDatabricks,
     _create_directory_in_databricks_unity_catalog,
 )
+from dspy.clients.lm import LM
+from dspy.dsp.utils.settings import settings
 
 try:
     from databricks.sdk import WorkspaceClient
@@ -62,7 +62,7 @@ def test_create_finetuning_job():
             ]
         },
     ]
-    dspy.settings.experimental = True
+    settings.experimental = True
 
     job = TrainingJobDatabricks()
 
@@ -82,7 +82,7 @@ def test_create_finetuning_job():
 
 
 def test_deploy_finetuned_model():
-    dspy.settings.experimental = True
+    settings.experimental = True
     model_to_deploy = "main.chenmoney.finetuned_model"
 
     DatabricksProvider.deploy_finetuned_model(
@@ -90,5 +90,5 @@ def test_deploy_finetuned_model():
         data_format="chat",
     )
 
-    lm = dspy.LM(model="databricks/main_chenmoney_finetuned_model")
+    lm = LM(model="databricks/main_chenmoney_finetuned_model")
     lm("what is 2 + 2?")

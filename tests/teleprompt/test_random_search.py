@@ -1,11 +1,12 @@
-import dspy
-from dspy import Example
-from dspy.predict import Predict
-from dspy.teleprompt import BootstrapFewShotWithRandomSearch
+from dspy.dsp.utils.settings import settings
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
+from dspy.primitives.module import Module
+from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.utils.dummies import DummyLM
 
 
-class SimpleModule(dspy.Module):
+class SimpleModule(Module):
     def __init__(self, signature):
         super().__init__()
         self.predictor = Predict(signature)
@@ -29,7 +30,7 @@ def test_basic_workflow():
             "Finish[blue]",  # Expected output for both training and validation
         ]
     )
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
 
     optimizer = BootstrapFewShotWithRandomSearch(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
     trainset = [

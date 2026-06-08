@@ -1,12 +1,11 @@
 # FILEPATH: /Users/ahle/repos/dspy/tests/evaluate/test_metrics.py
-
-import dspy
 from dspy.evaluate.metrics import answer_exact_match
-from dspy.predict import Predict
+from dspy.predict.predict import Predict
+from dspy.primitives.example import Example
 
 
 def test_answer_exact_match_string():
-    example = dspy.Example(
+    example = Example(
         question="What is 1+1?",
         answer="2",
     ).with_inputs("question")
@@ -16,7 +15,7 @@ def test_answer_exact_match_string():
 
 
 def test_answer_exact_match_list():
-    example = dspy.Example(
+    example = Example(
         question="What is 1+1?",
         answer=["2", "two"],
     ).with_inputs("question")
@@ -26,7 +25,7 @@ def test_answer_exact_match_list():
 
 
 def test_answer_exact_match_no_match():
-    example = dspy.Example(
+    example = Example(
         question="What is 1+1?",
         answer="2",
     ).with_inputs("question")

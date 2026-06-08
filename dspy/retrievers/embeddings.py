@@ -4,6 +4,7 @@ import json
 import os
 from typing import Any
 
+from dspy.primitives.prediction import Prediction
 from dspy.utils.lazy_import import require
 from dspy.utils.unbatchify import Unbatchify
 
@@ -53,10 +54,9 @@ class Embeddings:
         Returns:
             dspy.Prediction: A prediction containing passages and their corpus indices.
         """
-        import dspy
 
         passages, indices, _scores = self.search_fn(query)
-        return dspy.Prediction(passages=passages, indices=indices)
+        return Prediction(passages=passages, indices=indices)
 
     def _batch_forward(self, queries: list[str]):
         q_embeds = self.embedder(queries)
@@ -255,7 +255,6 @@ class EmbeddingsWithScores(Embeddings):
         Returns:
             dspy.Prediction: A prediction containing passages, indices, and similarity scores.
         """
-        import dspy
 
         passages, indices, scores = self.search_fn(query)
-        return dspy.Prediction(passages=passages, indices=indices, scores=scores)
+        return Prediction(passages=passages, indices=indices, scores=scores)
