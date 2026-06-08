@@ -288,7 +288,7 @@ def answer_exact_match(example, pred, trace=None, frac=1.0):
     Args:
         example: `dspy.primitives.example.Example` object with field `answer` (str or list[str]).
         pred: `dspy.primitives.prediction.Prediction` object with field `answer` (str).
-        trace: Unused; reserved for compatibility.
+        trace: Optional program trace from evaluation.
         frac (float, optional): Threshold in [0.0, 1.0]. `1.0` means EM.
 
     Returns:
@@ -322,7 +322,7 @@ def answer_passage_match(example, pred, trace=None):
     Args:
         example: `dspy.primitives.example.Example` object with field `answer` (str or list[str]).
         pred: `dspy.primitives.prediction.Prediction` object with field `context` (list[str]) containing passages.
-        trace: Unused; reserved for compatibility.
+        trace: Optional program trace from evaluation.
 
     Returns:
         bool: True if any passage contains any reference answer; otherwise False.

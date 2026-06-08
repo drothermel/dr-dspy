@@ -288,11 +288,11 @@ async def test_stream_listener_chat_adapter(lm_for_test):
             if isinstance(value, StreamResponse):
                 all_chunks.append(value)  # noqa: PERF401
 
-    assert all_chunks[0].predict_name == "predict1"
+    assert all_chunks[0].predict_name == "self.predict1"
     assert all_chunks[0].signature_field_name == "answer"
     # The last chunk can be from either predictor because sometimes small LMs miss the `[[ ## completed ## ]]` marker,
     # which results in an extra chunk that flushes out the buffer.
-    assert all_chunks[-2].predict_name == "predict2"
+    assert all_chunks[-2].predict_name == "self.predict2"
     assert all_chunks[-2].signature_field_name == "judgement"
 
 
@@ -353,11 +353,11 @@ async def test_stream_listener_json_adapter(lm_for_test):
             if isinstance(value, StreamResponse):
                 all_chunks.append(value)  # noqa: PERF401
 
-    assert all_chunks[0].predict_name == "predict1"
+    assert all_chunks[0].predict_name == "self.predict1"
     assert all_chunks[0].signature_field_name == "answer"
     assert all_chunks[0].is_last_chunk is False
 
-    assert all_chunks[-1].predict_name == "predict2"
+    assert all_chunks[-1].predict_name == "self.predict2"
     assert all_chunks[-1].signature_field_name == "judgement"
 
 
@@ -419,12 +419,12 @@ def test_sync_streaming(lm_for_test):
             if isinstance(value, StreamResponse):
                 all_chunks.append(value)  # noqa: PERF401
 
-    assert all_chunks[0].predict_name == "predict1"
+    assert all_chunks[0].predict_name == "self.predict1"
     assert all_chunks[0].signature_field_name == "answer"
     assert all_chunks[0].is_last_chunk is False
     # The last chunk can be from either predictor because sometimes small LMs miss the `[[ ## completed ## ]]` marker,
     # which results in an extra chunk that flushes out the buffer.
-    assert all_chunks[-2].predict_name == "predict2"
+    assert all_chunks[-2].predict_name == "self.predict2"
     assert all_chunks[-2].signature_field_name == "judgement"
 
 
@@ -529,7 +529,7 @@ async def test_stream_listener_returns_correct_chunk_chat_adapter():
                 if isinstance(value, StreamResponse):
                     all_chunks.append(value)  # noqa: PERF401
 
-        assert all_chunks[0].predict_name == "predict1"
+        assert all_chunks[0].predict_name == "self.predict1"
         assert all_chunks[0].signature_field_name == "answer"
         assert all_chunks[0].chunk == "To"
         assert all_chunks[1].chunk == " get"
@@ -544,7 +544,7 @@ async def test_stream_listener_returns_correct_chunk_chat_adapter():
         assert all_chunks[10].chunk == "!"
         assert all_chunks[10].is_last_chunk is True
 
-        assert all_chunks[11].predict_name == "predict2"
+        assert all_chunks[11].predict_name == "self.predict2"
         assert all_chunks[11].signature_field_name == "judgement"
         assert all_chunks[11].chunk == "The"
         assert all_chunks[12].chunk == " answer"
@@ -635,7 +635,7 @@ async def test_stream_listener_returns_correct_chunk_json_adapter():
                 if isinstance(value, StreamResponse):
                     all_chunks.append(value)  # noqa: PERF401
 
-        assert all_chunks[0].predict_name == "predict1"
+        assert all_chunks[0].predict_name == "self.predict1"
         assert all_chunks[0].signature_field_name == "answer"
         assert all_chunks[0].chunk == '"To'
         assert all_chunks[1].chunk == " get"
@@ -650,7 +650,7 @@ async def test_stream_listener_returns_correct_chunk_json_adapter():
         assert all_chunks[10].chunk == '!"'
         assert all_chunks[10].is_last_chunk is True
 
-        assert all_chunks[11].predict_name == "predict2"
+        assert all_chunks[11].predict_name == "self.predict2"
         assert all_chunks[11].signature_field_name == "judgement"
         assert all_chunks[11].chunk == '"The'
         assert all_chunks[12].chunk == " answer"
@@ -730,12 +730,12 @@ async def test_stream_listener_returns_correct_chunk_chat_adapter_untokenized_st
                 if isinstance(value, StreamResponse):
                     all_chunks.append(value)  # noqa: PERF401
 
-        assert all_chunks[0].predict_name == "predict1"
+        assert all_chunks[0].predict_name == "self.predict1"
         assert all_chunks[0].signature_field_name == "answer"
         assert all_chunks[0].chunk == "To get to the other side."
         assert all_chunks[1].is_last_chunk is True
 
-        assert all_chunks[2].predict_name == "predict2"
+        assert all_chunks[2].predict_name == "self.predict2"
         assert all_chunks[2].signature_field_name == "judgement"
         assert all_chunks[2].chunk == (
             "The answer provides the standard punchline for this classic joke format, adapted to the specific location "
@@ -863,12 +863,12 @@ async def test_stream_listener_returns_correct_chunk_json_adapter_untokenized_st
                 if isinstance(value, StreamResponse):
                     all_chunks.append(value)  # noqa: PERF401
 
-        assert all_chunks[0].predict_name == "predict1"
+        assert all_chunks[0].predict_name == "self.predict1"
         assert all_chunks[0].signature_field_name == "answer"
 
         assert all_chunks[0].chunk == '"To get to the other side... of the cutting board!"'
 
-        assert all_chunks[1].predict_name == "predict2"
+        assert all_chunks[1].predict_name == "self.predict2"
         assert all_chunks[1].signature_field_name == "judgement"
         assert (
             all_chunks[1].chunk == '"The answer provides a humorous and relevant punchline to the classic joke setup."'
@@ -1048,13 +1048,13 @@ async def test_stream_listener_returns_correct_chunk_xml_adapter():
     # Verify answer chunks
     answer_chunks = [chunk for chunk in all_chunks if chunk.signature_field_name == "answer"]
     assert len(answer_chunks) > 0
-    assert answer_chunks[0].predict_name == "predict1"
+    assert answer_chunks[0].predict_name == "self.predict1"
     assert "".join([chunk.chunk for chunk in answer_chunks]) == "To get to the other side!"
 
     # Verify judgement chunks
     judgement_chunks = [chunk for chunk in all_chunks if chunk.signature_field_name == "judgement"]
     assert len(judgement_chunks) > 0
-    assert judgement_chunks[0].predict_name == "predict2"
+    assert judgement_chunks[0].predict_name == "self.predict2"
     assert "".join([chunk.chunk for chunk in judgement_chunks]) == "The answer is humorous."
 
 

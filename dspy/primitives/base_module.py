@@ -9,9 +9,6 @@ import orjson
 
 from dspy.utils.saving import get_dependency_versions
 
-# named_parameters intentionally remains less recursive than named_sub_modules for compatibility; revisit only with caller/test migration.
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -20,47 +17,43 @@ class BaseModule:
         pass
 
     def named_parameters(self):
-        """
-        Unlike PyTorch, handles (non-recursive) lists of parameters too.
-        """
+        """Return all parameters in the module tree, including nested containers."""
 
         from dspy.predict.parameter import Parameter
-        from dspy.primitives.module import Module
 
-        visited = set()
         named_parameters = []
+        visited_parameters = set()
+        queue: deque[tuple[str, object]] = deque([("self", self)])
+        seen = {id(self)}
 
-        def add_parameter(param_name, param_value) -> None:
-            if isinstance(param_value, Parameter):
-                if id(param_value) not in visited:
-                    visited.add(id(param_value))
-                    named_parameters.append((param_name, param_value))
+        def enqueue(name: str, item: object) -> None:
+            if id(item) not in seen:
+                seen.add(id(item))
+                queue.append((name, item))
 
-            elif isinstance(param_value, Module) and not getattr(param_value, "_compiled", False):
-                # When a sub-module is pre-compiled, keep it frozen.
-                for sub_name, param in param_value.named_parameters():
-                    add_parameter(f"{param_name}.{sub_name}", param)
+        while queue:
+            name, item = queue.popleft()
 
-        if isinstance(self, Parameter):
-            add_parameter("self", self)
+            if isinstance(item, Parameter):
+                if id(item) not in visited_parameters:
+                    visited_parameters.add(id(item))
+                    named_parameters.append((name, item))
+                continue
 
-        for name, value in self.__dict__.items():
-            if isinstance(value, Parameter):
-                add_parameter(name, value)
+            if isinstance(item, BaseModule):
+                if name == "self" or not getattr(item, "_compiled", False):
+                    for sub_name, sub_item in item.__dict__.items():
+                        enqueue(f"{name}.{sub_name}", sub_item)
+                continue
 
-            elif isinstance(value, Module):
-                # When a sub-module is pre-compiled, keep it frozen.
-                if not getattr(value, "_compiled", False):
-                    for sub_name, param in value.named_parameters():
-                        add_parameter(f"{name}.{sub_name}", param)
+            if isinstance(item, (list, tuple)):
+                for idx, sub_item in enumerate(item):
+                    enqueue(f"{name}[{idx}]", sub_item)
+                continue
 
-            elif isinstance(value, (list, tuple)):
-                for idx, item in enumerate(value):
-                    add_parameter(f"{name}[{idx}]", item)
-
-            elif isinstance(value, dict):
-                for key, item in value.items():
-                    add_parameter(f"{name}['{key}']", item)
+            if isinstance(item, dict):
+                for key, sub_item in item.items():
+                    enqueue(f"{name}[{key}]", sub_item)
 
         return named_parameters
 

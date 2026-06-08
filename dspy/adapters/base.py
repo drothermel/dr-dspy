@@ -98,12 +98,6 @@ class Adapter:
         signature: type[Signature],
         inputs: dict[str, Any],
     ) -> tuple[type[Signature], list[LMToolSpec], LMConfig]:
-        # TODO(adapters-plan): This remains the pre-normalized planning hook. It
-        # mutates `config` and returns only the render signature, which loses
-        # information we will need for plan-driven rendering/parsing. The next
-        # stacked PR should replace this with an explicit `_AdapterPlan` that
-        # records deleted fields, native tools, native output fields, inserted
-        # messages/parts, and LM config patches.
         if not isinstance(config, LMConfig):
             config = coerce_lm_config(config)
         tools: list[LMToolSpec] = []
@@ -317,10 +311,6 @@ class Adapter:
         messages = self.format(processed_signature, demos, inputs)
         request = self._render_request(lm, resolved_config, tools, messages)
         response = self._call_lm(lm, request)
-        # TODO(adapters-response): We normalize at the LM boundary, but still
-        # convert back to legacy postprocess dictionaries here to keep this PR
-        # behavior-preserving. Replace with direct `LMResponse` parsing once the
-        # explicit adapter plan exists.
         return self._call_postprocess(processed_signature, signature, response, lm, resolved_config)
 
     async def acall(
@@ -336,8 +326,6 @@ class Adapter:
         messages = self.format(processed_signature, demos, inputs)
         request = self._render_request(lm, resolved_config, tools, messages)
         response = await self._acall_lm(lm, request)
-        # TODO(adapters-response): Keep in sync with `__call__()` until both use
-        # direct `LMResponse` parsing.
         return self._call_postprocess(processed_signature, signature, response, lm, resolved_config)
 
     def format(

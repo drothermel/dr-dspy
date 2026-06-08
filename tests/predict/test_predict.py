@@ -708,11 +708,11 @@ def test_named_predictors():
             self.inner = Predict("question -> answer")
 
     program = MyModule()
-    assert program.named_predictors() == [("inner", program.inner)]
+    assert program.named_predictors() == [("self.inner", program.inner)]
 
     # Check that it also works the second time.
     program2 = copy.deepcopy(program)
-    assert program2.named_predictors() == [("inner", program2.inner)]
+    assert program2.named_predictors() == [("self.inner", program2.inner)]
 
 
 def test_output_only():

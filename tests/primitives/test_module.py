@@ -35,7 +35,9 @@ def test_named_predictors():
     named_preds = module.named_predictors()
     assert len(named_preds) == 2, "Should identify correct number of Predict instances"
     names, _preds = zip(*named_preds, strict=False)
-    assert "predict1" in names and "predict2" in names, "Named predictors should include 'predict1' and 'predict2'"
+    assert "self.predict1" in names and "self.predict2" in names, (
+        "Named predictors should include 'self.predict1' and 'self.predict2'"
+    )
 
 
 def test_predictors():
@@ -69,8 +71,8 @@ def test_nested_named_predictors():
     named_preds = module.named_predictors()
     assert len(named_preds) == 2
     names, _preds = zip(*named_preds, strict=False)
-    assert "hop.predict1" in names
-    assert "hop.predict2" in names
+    assert "self.hop.predict1" in names
+    assert "self.hop.predict2" in names
 
 
 def test_empty_module():
@@ -142,13 +144,27 @@ def test_complex_module_traversal_with_same_module():
         "self.sub_module.nested_list[0]",
         "self.sub_module.nested_list[1][key]",  # NOTE: named_sub_modules allows recursive structures
         "self.sub_module.nested_tuple[0]",
-        "self.sub_module.nested_tuple[1][0]",  # NEW: named_sub_modules allows recursive structures, but named_parameters does not
+        "self.sub_module.nested_tuple[1][0]",
     }
     found_names = {name for name, _ in root.named_sub_modules()}
 
     assert found_names == expected_names, (
         f"Missing or extra modules found. Missing: {expected_names - found_names}, Extra: {found_names - expected_names}"
     )
+
+
+def test_named_parameters_traverses_nested_containers():
+    root = Module()
+    root.sub_module = Module()  # ty:ignore[unresolved-attribute]
+    root.sub_module.nested_predict = Predict("question -> answer")  # ty:ignore[unresolved-attribute]
+    root.sub_module.nested_list = [Predict("question -> answer")]  # ty:ignore[unresolved-attribute]
+    root.sub_module.nested_dict = {"key": Predict("question -> answer")}  # ty:ignore[unresolved-attribute]
+
+    found_names = {name for name, _ in root.named_parameters()}
+
+    assert "self.sub_module.nested_predict" in found_names
+    assert "self.sub_module.nested_list[0]" in found_names
+    assert "self.sub_module.nested_dict[key]" in found_names
 
 
 def test_complex_module_set_attribute_by_name():
