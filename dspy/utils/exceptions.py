@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from dspy.signatures.signature import Signature
+    from dspy.task_spec import TaskSpec
 
 
 class DSPyError(Exception):
@@ -223,11 +223,11 @@ def is_retryable_lm_error(error: Exception) -> bool:
 
 
 class AdapterParseError(DSPyError):
-    """Raised when an adapter cannot parse an LM response into signature outputs.
+    """Raised when an adapter cannot parse an LM response into task spec outputs.
 
     Args:
         adapter_name: Name of the adapter that failed to parse the response.
-        signature: DSPy signature whose output fields were expected.
+        task_spec: DSPy task spec whose output fields were expected.
         lm_response: Raw LM response text or representation being parsed.
         message: Optional additional context about the parse failure.
         parsed_result: Partial parsed result, if any.
@@ -238,13 +238,13 @@ class AdapterParseError(DSPyError):
     def __init__(
         self,
         adapter_name: str,
-        signature: type[Signature],
+        task_spec: TaskSpec,
         lm_response: str,
         message: str | None = None,
         parsed_result: dict[str, Any] | None = None,
     ) -> None:
         self.adapter_name = adapter_name
-        self.signature = signature
+        self.task_spec = task_spec
         self.lm_response = lm_response
         self.parsed_result = parsed_result
 
@@ -253,7 +253,7 @@ class AdapterParseError(DSPyError):
             f"{message}"
             f"Adapter {adapter_name} failed to parse the LM response. \n\n"
             f"LM Response: {lm_response} \n\n"
-            f"Expected to find output fields in the LM response: [{', '.join(signature.output_fields.keys())}] \n\n"
+            f"Expected to find output fields in the LM response: [{', '.join(task_spec.output_fields.keys())}] \n\n"
         )
 
         if parsed_result is not None:

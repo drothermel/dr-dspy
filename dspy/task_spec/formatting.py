@@ -16,12 +16,9 @@ def get_field_spec_description_string(fields: dict[str, FieldSpec]) -> str:
         custom_types = DspyType.extract_custom_type_from_annotation(field.type_)
         for custom_type in custom_types:
             if len(custom_type.description()) > 0:
-                field_message += (
-                    f"\n    Type description of {get_annotation_name(custom_type)}: {custom_type.description()}"
-                )
+                desc += f"\n    Type description of {get_annotation_name(custom_type)}: {custom_type.description()}"
 
-        if desc:
-            field_message += f": {desc}"
+        field_message += f": {desc}"
         if field.constraints:
             field_message += f"\nConstraints: {field.constraints}"
         field_descriptions.append(field_message)

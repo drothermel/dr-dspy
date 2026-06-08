@@ -9,11 +9,11 @@ from dspy.clients.openai_format import message_to_openai_chat
 from dspy.core.types import LMRequest, LMResponse
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
+from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.utils.dummies import DummyLM
 from dspy.utils.exceptions import AdapterParseError
 from tests.adapters.conftest import format_messages_and_lm_kwargs
+from tests.task_spec.helpers import ts
 
 
 class RecordingTextLM(BaseLM):
@@ -30,14 +30,11 @@ class RecordingTextLM(BaseLM):
 
 
 def test_two_step_adapter_format_exact_messages_for_simple_signature_with_demo():
-    class QA(Signature):
-        question: str = InputField()
-        answer: str = OutputField()
-
+    QA = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
     adapter = TwoStepAdapter(DummyLM([{"answer": "x"}]))
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=adapter,
-        signature=QA,
+        task_spec=QA,
         demos=[{"question": "Q1", "answer": "A1"}],
         inputs={"question": "Q2"},
     )
@@ -64,14 +61,17 @@ def test_two_step_adapter_format_exact_messages_for_simple_signature_with_demo()
 
 
 def test_two_step_adapter_format_exact_messages_with_typed_outputs():
-    class TypedSignature(Signature):
-        question: str = InputField()
-        count: int = OutputField()
-        answer: str = OutputField()
-
+    TypedSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "count": FieldSpec.output("count", type_=int),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Given the fields `question`, produce the fields `count`, `answer`.",
+    )
     adapter = TwoStepAdapter(DummyLM([{"count": 1, "answer": "x"}]))
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=adapter, signature=TypedSignature, demos=[], inputs={"question": "Q"}
+        adapter=adapter, task_spec=TypedSignature, demos=[], inputs={"question": "Q"}
     )
 
     expected_messages = [
@@ -96,11 +96,14 @@ def test_two_step_adapter_format_exact_messages_with_typed_outputs():
 
 
 def test_two_step_adapter_call():
-    class TestSignature(Signature):
-        question: str = InputField(desc="The math question to solve")
-        solution: str = OutputField(desc="Step by step solution")
-        answer: float = OutputField(desc="The final numerical answer")
-
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question", desc="The math question to solve"),
+            "solution": FieldSpec.output("solution", desc="Step by step solution"),
+            "answer": FieldSpec.output("answer", type_=float, desc="The final numerical answer"),
+        },
+        instructions="Given the fields `question`, produce the fields `solution`, `answer`.",
+    )
     program = Predict(TestSignature)
 
     main_lm = RecordingTextLM(["text from main LM"])
@@ -138,11 +141,14 @@ def test_two_step_adapter_call():
 
 @pytest.mark.asyncio
 async def test_two_step_adapter_async_call():
-    class TestSignature(Signature):
-        question: str = InputField(desc="The math question to solve")
-        solution: str = OutputField(desc="Step by step solution")
-        answer: float = OutputField(desc="The final numerical answer")
-
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question", desc="The math question to solve"),
+            "solution": FieldSpec.output("solution", desc="Step by step solution"),
+            "answer": FieldSpec.output("answer", type_=float, desc="The final numerical answer"),
+        },
+        instructions="Given the fields `question`, produce the fields `solution`, `answer`.",
+    )
     program = Predict(TestSignature)
 
     main_lm = RecordingTextLM(["text from main LM"])
@@ -178,32 +184,32 @@ async def test_two_step_adapter_async_call():
 
 
 def test_two_step_adapter_parse():
-    class ComplexSignature(Signature):
-        input_text: str = InputField()
-        tags: list[str] = OutputField(desc="List of relevant tags")
-        confidence: float = OutputField(desc="Confidence score")
-
+    ComplexSignature = make_task_spec(
+        {
+            "input_text": FieldSpec.input("input_text"),
+            "tags": FieldSpec.output("tags", type_=list[str], desc="List of relevant tags"),
+            "confidence": FieldSpec.output("confidence", type_=float, desc="Confidence score"),
+        },
+        instructions="Given the fields `input_text`, produce the fields `tags`, `confidence`.",
+    )
     first_response = "main LM response"
 
     extraction_lm = DummyLM([{"tags": ["AI", "deep learning", "neural networks"], "confidence": 0.87}])
     adapter = TwoStepAdapter(extraction_lm)
     settings.configure(adapter=adapter, lm=extraction_lm)
 
-    result = adapter.parse(ComplexSignature, first_response)
+    result = adapter.parse(task_spec=ComplexSignature, completion=first_response)
 
     assert result["tags"] == ["AI", "deep learning", "neural networks"]
     assert result["confidence"] == 0.87
 
 
 def test_two_step_adapter_parse_errors():
-    class TestSignature(Signature):
-        question: str = InputField()
-        answer: str = OutputField()
-
+    TestSignature = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
     first_response = "main LM response"
 
     extraction_lm = RecordingTextLM(["not parseable extraction output"])
     adapter = TwoStepAdapter(extraction_lm)
 
     with pytest.raises(AdapterParseError, match="Failed to parse response"):
-        adapter.parse(TestSignature, first_response)
+        adapter.parse(task_spec=TestSignature, completion=first_response)

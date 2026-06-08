@@ -262,7 +262,15 @@ class Predict(Module, Parameter):
         lm, config, signature, demos, kwargs = self._forward_preprocess(**kwargs)
 
         adapter = settings.adapter or ChatAdapter()
-        completions = await adapter.acall(lm=lm, config=config, signature=signature, demos=demos, inputs=kwargs)
+        from dspy.task_spec.bridge import task_spec_from_signature
+
+        completions = await adapter.acall(
+            lm=lm,
+            config=config,
+            task_spec=task_spec_from_signature(signature),
+            demos=demos,
+            inputs=kwargs,
+        )
         return self._forward_postprocess(completions, signature, **kwargs)
 
     def update_config(self, **kwargs) -> None:

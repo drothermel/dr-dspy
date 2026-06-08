@@ -3,9 +3,22 @@
 from typing import Any
 
 from pydantic import BaseModel, Field, create_model
+from pydantic.fields import FieldInfo
 
 from dspy.task_spec.task_spec import TaskSpec
 from dspy.utils.constants import IS_TYPE_UNDEFINED
+
+
+def task_spec_input_field_infos(spec: TaskSpec) -> dict[str, FieldInfo]:
+    """Return Pydantic FieldInfo objects for a TaskSpec's input fields."""
+    model = task_spec_to_pydantic_model(spec)
+    return {name: model.model_fields[name] for name in spec.input_fields}
+
+
+def task_spec_output_field_infos(spec: TaskSpec) -> dict[str, FieldInfo]:
+    """Return Pydantic FieldInfo objects for a TaskSpec's output fields."""
+    model = task_spec_to_pydantic_model(spec)
+    return {name: model.model_fields[name] for name in spec.output_fields}
 
 
 def task_spec_to_pydantic_model(spec: TaskSpec) -> type[BaseModel]:

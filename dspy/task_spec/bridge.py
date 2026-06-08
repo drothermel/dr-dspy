@@ -1,4 +1,4 @@
-"""Temporary bridge from legacy Signature classes to TaskSpec instances."""
+"""Temporary bridge between legacy Signature classes and TaskSpec instances."""
 
 from typing import TYPE_CHECKING, cast
 
@@ -8,6 +8,26 @@ from dspy.utils.constants import IS_TYPE_UNDEFINED
 
 if TYPE_CHECKING:
     from dspy.signatures.signature import Signature
+
+
+def _field_spec_to_signature_field(field: FieldSpec):
+    from dspy.signatures.field import InputField, OutputField
+
+    kwargs: dict = {}
+    if field.desc != f"${{{field.name}}}":
+        kwargs["desc"] = field.desc
+    if field.constraints:
+        kwargs["constraints"] = field.constraints
+    field_cls = InputField if field.role == "input" else OutputField
+    return field.type_, field_cls(**kwargs)
+
+
+def signature_from_task_spec(spec: TaskSpec) -> type["Signature"]:
+    """Convert a TaskSpec instance into a legacy ``type[Signature]`` for unmigrated callers."""
+    from dspy.signatures.signature import make_signature
+
+    fields = {name: _field_spec_to_signature_field(field) for name, field in spec.fields.items()}
+    return make_signature(fields, instructions=spec.instructions, signature_name=spec.name)
 
 
 def task_spec_from_signature(signature: type["Signature"]) -> TaskSpec:

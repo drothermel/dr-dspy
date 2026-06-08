@@ -11,7 +11,8 @@ from dspy.adapters.utils import (
     inputs_include_multimodal_custom_type_values,
     translate_field_type,
 )
-from dspy.signatures.signature import Signature
+from dspy.task_spec import TaskSpec
+from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
 
 
 class XMLAdapter(ChatAdapter):
@@ -26,7 +27,7 @@ class XMLAdapter(ChatAdapter):
         return "\n\n".join(output).strip()
 
     @override
-    def format_field_structure(self, signature: type[Signature]) -> str:
+    def format_field_structure(self, task_spec: TaskSpec) -> str:
         """
         XMLAdapter requires input and output fields to be wrapped in XML tags like `<field_name>`.
         """
@@ -34,33 +35,36 @@ class XMLAdapter(ChatAdapter):
         parts = []
         parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
 
-        def format_signature_fields_for_instructions(fields: dict[str, FieldInfo]) -> str:
+        input_field_infos = task_spec_input_field_infos(task_spec)
+        output_field_infos = task_spec_output_field_infos(task_spec)
+
+        def format_task_spec_fields_for_instructions(field_infos: dict[str, FieldInfo]) -> str:
             return self.format_field_with_value(
                 fields_with_values={
                     FieldInfoWithName(name=field_name, info=field_info): translate_field_type(
                         field_name=field_name, field_info=field_info
                     )
-                    for field_name, field_info in fields.items()
+                    for field_name, field_info in field_infos.items()
                 },
             )
 
-        parts.append(format_signature_fields_for_instructions(signature.input_fields))
-        parts.append(format_signature_fields_for_instructions(signature.output_fields))
+        parts.append(format_task_spec_fields_for_instructions(input_field_infos))
+        parts.append(format_task_spec_fields_for_instructions(output_field_infos))
         return "\n\n".join(parts).strip()
 
     @override
     def format_user_message_content(
         self,
-        signature: type[Signature],
+        task_spec: TaskSpec,
         inputs: dict[str, Any],
         prefix: str = "",
         suffix: str = "",
         main_request: bool = False,
     ) -> str | list[dict[str, Any]]:
-        if inputs_include_multimodal_custom_type_values(signature=signature, inputs=inputs):
-            output_requirements = self.user_message_output_requirements(signature) if main_request else None
+        if inputs_include_multimodal_custom_type_values(task_spec=task_spec, inputs=inputs):
+            output_requirements = self.user_message_output_requirements(task_spec) if main_request else None
             return build_multimodal_user_message_content(
-                signature=signature,
+                task_spec=task_spec,
                 inputs=inputs,
                 prefix=prefix,
                 suffix=suffix,
@@ -69,20 +73,21 @@ class XMLAdapter(ChatAdapter):
                 field_wrapper="xml",
             )
 
+        input_field_infos = task_spec_input_field_infos(task_spec)
         messages = [prefix]
 
         messages.append(
             self.format_field_with_value(
                 {
-                    FieldInfoWithName(name=k, info=v): inputs.get(k)
-                    for k, v in signature.input_fields.items()
+                    FieldInfoWithName(name=k, info=input_field_infos[k]): inputs.get(k)
+                    for k in task_spec.input_fields
                     if k in inputs
                 },
             )
         )
 
         if main_request:
-            output_requirements = self.user_message_output_requirements(signature)
+            output_requirements = self.user_message_output_requirements(task_spec)
             if output_requirements is not None:
                 messages.append(output_requirements)
 
@@ -92,47 +97,48 @@ class XMLAdapter(ChatAdapter):
     @override
     def format_assistant_message_content(
         self,
-        signature: type[Signature],
+        task_spec: TaskSpec,
         outputs: dict[str, Any],
         missing_field_message: str | None = None,
     ) -> str:
+        output_field_infos = task_spec_output_field_infos(task_spec)
         return self.format_field_with_value(
             {
-                FieldInfoWithName(name=k, info=v): outputs.get(k, missing_field_message)
-                for k, v in signature.output_fields.items()
+                FieldInfoWithName(name=k, info=output_field_infos[k]): outputs.get(k, missing_field_message)
+                for k in task_spec.output_fields
             },
         )
 
     @override
-    def user_message_output_requirements(self, signature: type[Signature]) -> str:
+    def user_message_output_requirements(self, task_spec: TaskSpec) -> str:
         message = "Respond with the corresponding output fields wrapped in XML tags "
-        message += ", then ".join(f"`<{f}>`" for f in signature.output_fields)
+        message += ", then ".join(f"`<{f}>`" for f in task_spec.output_fields)
         message += "."
         return message
 
     @override
-    def parse(self, signature: type[Signature], completion: str) -> dict[str, Any]:
+    def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
         raw_fields: dict[str, str] = {}
         for match in self.field_pattern.finditer(completion):
             name = match.group("name")
             content = match.group("content").strip()
-            if name in signature.output_fields and name not in raw_fields:
+            if name in task_spec.output_fields and name not in raw_fields:
                 raw_fields[name] = content
         fields = {
             k: self._parse_field_value(
-                field_info=signature.output_fields[k],
+                field_type=task_spec.output_fields[k].type_,
                 raw=v,
                 completion=completion,
-                signature=signature,
+                task_spec=task_spec,
             )
             for k, v in raw_fields.items()
         }
-        if fields.keys() != signature.output_fields.keys():
+        if fields.keys() != task_spec.output_fields.keys():
             from dspy.utils.exceptions import AdapterParseError
 
             raise AdapterParseError(
                 adapter_name="XMLAdapter",
-                signature=signature,
+                task_spec=task_spec,
                 lm_response=completion,
                 parsed_result=fields,
             )
@@ -140,21 +146,21 @@ class XMLAdapter(ChatAdapter):
 
     def _parse_field_value(
         self,
-        field_info: FieldInfo,
+        field_type: object,
         raw: str,
         completion: str,
-        signature: type[Signature],
+        task_spec: TaskSpec,
     ) -> object:
         from dspy.adapters.utils import parse_value
 
         try:
-            return parse_value(value=raw, annotation=field_info.annotation)
+            return parse_value(value=raw, annotation=field_type)
         except Exception as e:
             from dspy.utils.exceptions import AdapterParseError
 
             raise AdapterParseError(
                 adapter_name="XMLAdapter",
-                signature=signature,
+                task_spec=task_spec,
                 lm_response=completion,
-                message=f"Failed to parse field {field_info} with value {raw}: {e}",
+                message=f"Failed to parse field {field_type} with value {raw}: {e}",
             )

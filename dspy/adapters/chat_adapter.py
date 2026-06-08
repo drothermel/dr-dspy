@@ -12,11 +12,12 @@ from dspy.adapters.utils import (
     build_multimodal_user_message_content,
     format_field_value,
     get_annotation_name,
-    get_field_description_string,
     inputs_include_multimodal_custom_type_values,
     parse_value,
     translate_field_type,
 )
+from dspy.task_spec.formatting import get_field_spec_description_string
+from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
 from dspy.utils.exceptions import AdapterParseError, LMError
 
 if TYPE_CHECKING:
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
     from dspy.adapters.json_adapter import JSONAdapter
     from dspy.adapters.types.base_type import Type
     from dspy.clients.base_lm import BaseLM
-    from dspy.signatures.signature import Signature
+    from dspy.task_spec import TaskSpec
     from dspy.utils.callback import BaseCallback
 
 field_header_pattern = re.compile(r"\[\[ ## (\w+) ## \]\]")
@@ -39,7 +40,7 @@ class FieldInfoWithName(NamedTuple):
 class ChatAdapter(Adapter):
     """Default Adapter for most language models.
 
-    The ChatAdapter formats DSPy signatures into a format compatible with most language models.
+    The ChatAdapter formats DSPy task specs into a format compatible with most language models.
     It uses delimiter patterns like `[[ ## field_name ## ]]` to clearly separate input and output fields in
     the message content.
 
@@ -89,12 +90,12 @@ class ChatAdapter(Adapter):
         *,
         lm: BaseLM,
         config: Any,
-        signature: type[Signature],
+        task_spec: TaskSpec,
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
         try:
-            return await super().acall(lm=lm, config=config, signature=signature, demos=demos, inputs=inputs)
+            return await super().acall(lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs)
         except TypeError:
             raise
         except Exception as e:
@@ -105,18 +106,18 @@ class ChatAdapter(Adapter):
                 # retry with a different adapter. Raise the original error instead of the fallback error.
                 raise
             return await self._make_json_adapter_fallback().acall(
-                lm=lm, config=config, signature=signature, demos=demos, inputs=inputs
+                lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=inputs
             )
 
     @override
-    def format_field_description(self, signature: type[Signature]) -> str:
+    def format_field_description(self, task_spec: TaskSpec) -> str:
         return (
-            f"Your input fields are:\n{get_field_description_string(signature.input_fields)}\n"
-            f"Your output fields are:\n{get_field_description_string(signature.output_fields)}"
+            f"Your input fields are:\n{get_field_spec_description_string(task_spec.input_fields)}\n"
+            f"Your output fields are:\n{get_field_spec_description_string(task_spec.output_fields)}"
         )
 
     @override
-    def format_field_structure(self, signature: type[Signature]) -> str:
+    def format_field_structure(self, task_spec: TaskSpec) -> str:
         """
         `ChatAdapter` requires input and output fields to be in their own sections, with section header using markers
         `[[ ## field_name ## ]]`. An arbitrary field `completed` ([[ ## completed ## ]]) is added to the end of the
@@ -125,40 +126,43 @@ class ChatAdapter(Adapter):
         parts = []
         parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
 
-        def format_signature_fields_for_instructions(fields: dict[str, FieldInfo]) -> str:
+        input_field_infos = task_spec_input_field_infos(task_spec)
+        output_field_infos = task_spec_output_field_infos(task_spec)
+
+        def format_task_spec_fields_for_instructions(field_infos: dict[str, FieldInfo]) -> str:
             return self.format_field_with_value(
                 fields_with_values={
                     FieldInfoWithName(name=field_name, info=field_info): translate_field_type(
                         field_name=field_name, field_info=field_info
                     )
-                    for field_name, field_info in fields.items()
+                    for field_name, field_info in field_infos.items()
                 },
             )
 
-        parts.append(format_signature_fields_for_instructions(signature.input_fields))
-        parts.append(format_signature_fields_for_instructions(signature.output_fields))
+        parts.append(format_task_spec_fields_for_instructions(input_field_infos))
+        parts.append(format_task_spec_fields_for_instructions(output_field_infos))
         parts.append("[[ ## completed ## ]]\n")
         return "\n\n".join(parts).strip()
 
     @override
-    def format_task_description(self, signature: type[Signature]) -> str:
-        instructions = textwrap.dedent(signature.instructions)
+    def format_task_description(self, task_spec: TaskSpec) -> str:
+        instructions = textwrap.dedent(task_spec.instructions)
         objective = ("\n" + " " * 8).join([""] + instructions.splitlines())
         return f"In adhering to this structure, your objective is: {objective}"
 
     @override
     def format_user_message_content(
         self,
-        signature: type[Signature],
+        task_spec: TaskSpec,
         inputs: dict[str, Any],
         prefix: str = "",
         suffix: str = "",
         main_request: bool = False,
     ) -> str | list[dict[str, Any]]:
-        if inputs_include_multimodal_custom_type_values(signature=signature, inputs=inputs):
-            output_requirements = self.user_message_output_requirements(signature) if main_request else None
+        if inputs_include_multimodal_custom_type_values(task_spec=task_spec, inputs=inputs):
+            output_requirements = self.user_message_output_requirements(task_spec) if main_request else None
             return build_multimodal_user_message_content(
-                signature=signature,
+                task_spec=task_spec,
                 inputs=inputs,
                 prefix=prefix,
                 suffix=suffix,
@@ -166,22 +170,23 @@ class ChatAdapter(Adapter):
                 output_requirements=output_requirements,
             )
 
+        input_field_infos = task_spec_input_field_infos(task_spec)
         messages = [prefix]
-        for k, v in signature.input_fields.items():
+        for k in task_spec.input_fields:
             if k in inputs:
                 value = inputs.get(k)
-                formatted_field_value = format_field_value(field_info=v, value=value)
+                formatted_field_value = format_field_value(field_info=input_field_infos[k], value=value)
                 messages.append(f"[[ ## {k} ## ]]\n{formatted_field_value}")
 
         if main_request:
-            output_requirements = self.user_message_output_requirements(signature)
+            output_requirements = self.user_message_output_requirements(task_spec)
             if output_requirements is not None:
                 messages.append(output_requirements)
 
         messages.append(suffix)
         return "\n\n".join(messages).strip()
 
-    def user_message_output_requirements(self, signature: type[Signature]) -> str:
+    def user_message_output_requirements(self, task_spec: TaskSpec) -> str:
         """Returns a simplified format reminder for the language model.
 
         In chat-based interactions, language models may lose track of the required output format
@@ -189,46 +194,49 @@ class ChatAdapter(Adapter):
         the expected output structure that can be included in user messages.
 
         Args:
-            signature (Type[Signature]): The DSPy signature defining the expected input/output fields.
+            task_spec: The DSPy task spec defining the expected input/output fields.
 
         Returns:
-            str: A simplified description of the required output format.
+            A simplified description of the required output format.
 
         Note:
             This is a more lightweight version of `format_field_structure` specifically designed
             for inline reminders within chat messages.
         """
 
-        def type_info(v: FieldInfo) -> str:
-            if v.annotation == ToolCalls:
+        def type_info(field_type: object) -> str:
+            if field_type == ToolCalls:
                 return ' (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]})'
-            if v.annotation is not str:
-                return f" (must be formatted as a valid Python {get_annotation_name(v.annotation)})"
+            if field_type is not str:
+                return f" (must be formatted as a valid Python {get_annotation_name(field_type)})"
             return ""
 
         message = "Respond with the corresponding output fields, starting with the field "
-        message += ", then ".join(f"`[[ ## {f} ## ]]`{type_info(v)}" for f, v in signature.output_fields.items())
+        message += ", then ".join(
+            f"`[[ ## {f} ## ]]`{type_info(field.type_)}" for f, field in task_spec.output_fields.items()
+        )
         message += ", and then ending with the marker for `[[ ## completed ## ]]`."
         return message
 
     @override
     def format_assistant_message_content(
         self,
-        signature: type[Signature],
+        task_spec: TaskSpec,
         outputs: dict[str, Any],
         missing_field_message: str | None = None,
     ) -> str:
+        output_field_infos = task_spec_output_field_infos(task_spec)
         assistant_message_content = self.format_field_with_value(
             {
-                FieldInfoWithName(name=k, info=v): outputs.get(k, missing_field_message)
-                for k, v in signature.output_fields.items()
+                FieldInfoWithName(name=k, info=output_field_infos[k]): outputs.get(k, missing_field_message)
+                for k in task_spec.output_fields
             },
         )
         assistant_message_content += "\n\n[[ ## completed ## ]]\n"
         return assistant_message_content
 
     @override
-    def parse(self, signature: type[Signature], completion: str) -> dict[str, Any]:
+    def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
         sections = [(None, [])]
 
         for line in completion.splitlines():
@@ -245,20 +253,20 @@ class ChatAdapter(Adapter):
 
         fields = {}
         for k, v in sections:
-            if (k not in fields) and (k in signature.output_fields):
+            if (k not in fields) and (k in task_spec.output_fields):
                 try:
-                    fields[k] = parse_value(value=v, annotation=signature.output_fields[k].annotation)
+                    fields[k] = parse_value(value=v, annotation=task_spec.output_fields[k].type_)
                 except Exception as e:
                     raise AdapterParseError(
                         adapter_name="ChatAdapter",
-                        signature=signature,
+                        task_spec=task_spec,
                         lm_response=completion,
                         message=f"Failed to parse field {k} with value {v} from the LM response. Error message: {e}",
                     )
-        if fields.keys() != signature.output_fields.keys():
+        if fields.keys() != task_spec.output_fields.keys():
             raise AdapterParseError(
                 adapter_name="ChatAdapter",
-                signature=signature,
+                task_spec=task_spec,
                 lm_response=completion,
                 parsed_result=fields,
             )
@@ -287,7 +295,7 @@ class ChatAdapter(Adapter):
 
     def format_finetune_data(
         self,
-        signature: type[Signature],
+        task_spec: TaskSpec,
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
         outputs: dict[str, Any],
@@ -302,9 +310,9 @@ class ChatAdapter(Adapter):
         from dspy.clients.openai_format import message_to_openai_chat
 
         system_user_messages = [
-            message_to_openai_chat(message) for message in self.format(signature=signature, demos=demos, inputs=inputs)
+            message_to_openai_chat(message) for message in self.format(task_spec=task_spec, demos=demos, inputs=inputs)
         ]
-        assistant_message_content = self.format_assistant_message_content(signature=signature, outputs=outputs)
+        assistant_message_content = self.format_assistant_message_content(task_spec=task_spec, outputs=outputs)
         assistant_message = {"role": "assistant", "content": assistant_message_content}
         messages = system_user_messages + [assistant_message]
         return {"messages": messages}

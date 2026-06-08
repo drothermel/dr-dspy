@@ -31,10 +31,10 @@ from dspy.clients.lm import LM
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature, make_signature
+from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.utils.exceptions import LMUnexpectedError
 from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs
+from tests.task_spec.helpers import ts
 
 
 def _structured_output_model_response() -> ModelResponse:
@@ -55,13 +55,10 @@ def _structured_output_model_response() -> ModelResponse:
 
 
 def test_json_adapter_format_exact_messages_for_simple_signature():
-    class StringSignature(Signature):
-        question: str = InputField()
-        answer: str = OutputField()
-
+    StringSignature = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=JSONAdapter(),
-        signature=StringSignature,
+        task_spec=StringSignature,
         demos=[],
         inputs={"question": "What is the capital of France?"},
     )
@@ -102,14 +99,17 @@ Respond with a JSON object in the following order of fields: `answer`.""",
 
 
 def test_json_adapter_format_exact_messages_with_demo_and_typed_output():
-    class MultiAnswer(Signature):
-        question: str = InputField()
-        answer: str = OutputField()
-        confidence: float = OutputField()
-
+    MultiAnswer = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer"),
+            "confidence": FieldSpec.output("confidence", type_=float),
+        },
+        instructions="Given the fields `question`, produce the fields `answer`, `confidence`.",
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=JSONAdapter(),
-        signature=MultiAnswer,
+        task_spec=MultiAnswer,
         demos=[{"question": "Q1", "answer": "A1", "confidence": 0.9}],
         inputs={"question": "Q2"},
     )
@@ -164,13 +164,16 @@ Respond with a JSON object in the following order of fields: `answer`, then `con
 
 
 def test_json_adapter_format_exact_messages_with_described_and_bool_outputs():
-    class TestSignature(Signature):
-        input1: str = InputField()
-        output1: str = OutputField(desc="String output field")
-        output2: bool = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "input1": FieldSpec.input("input1"),
+            "output1": FieldSpec.output("output1", desc="String output field"),
+            "output2": FieldSpec.output("output2", type_=bool),
+        },
+        instructions="Given the fields `input1`, produce the fields `output1`, `output2`.",
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=JSONAdapter(), signature=TestSignature, demos=[], inputs={"input1": "Test input"}
+        adapter=JSONAdapter(), task_spec=TestSignature, demos=[], inputs={"input1": "Test input"}
     )
 
     expected_lm_kwargs = {}
@@ -228,16 +231,17 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
         answer: str
         sources: list[str]
 
-    class RichRenderingSignature(Signature):
-        """Answer using all supplied context."""
-
-        history: History = InputField()
-        image: Image = InputField()
-        tools: list[Tool] = InputField()
-        profile: Profile = InputField()
-        question: str = InputField()
-        answer: AnswerCard = OutputField()
-
+    RichRenderingSignature = make_task_spec(
+        {
+            "history": FieldSpec.input("history", type_=History),
+            "image": FieldSpec.input("image", type_=Image),
+            "tools": FieldSpec.input("tools", type_=list[Tool]),
+            "profile": FieldSpec.input("profile", type_=Profile),
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer", type_=AnswerCard),
+        },
+        instructions="Answer using all supplied context.",
+    )
     tool = Tool(search)
     demo_profile = Profile(
         name="Ada",
@@ -260,7 +264,7 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=JSONAdapter(),
-        signature=RichRenderingSignature,
+        task_spec=RichRenderingSignature,
         demos=[
             {
                 "image": Image("https://example.com/demo.png"),
@@ -414,14 +418,17 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
 
 
 def test_json_adapter_format_exact_messages_with_int_and_mapping_outputs():
-    class IntDictSignature(Signature):
-        question: str = InputField()
-        count: int = OutputField()
-        metadata: dict[str, int] = OutputField()
-
+    IntDictSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "count": FieldSpec.output("count", type_=int),
+            "metadata": FieldSpec.output("metadata", type_=dict[str, int]),
+        },
+        instructions="Given the fields `question`, produce the fields `count`, `metadata`.",
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=JSONAdapter(),
-        signature=IntDictSignature,
+        task_spec=IntDictSignature,
         demos=[],
         inputs={"question": "Count things"},
     )
@@ -474,13 +481,16 @@ def test_json_adapter_format_exact_messages_with_literal_and_enum_outputs():
         POSITIVE = "positive"
         NEGATIVE = "negative"
 
-    class LiteralEnumSignature(Signature):
-        text: str = InputField()
-        decision: Literal["accept", "reject"] = OutputField()
-        label: Label = OutputField()
-
+    LiteralEnumSignature = make_task_spec(
+        {
+            "text": FieldSpec.input("text"),
+            "decision": FieldSpec.output("decision", type_=Literal["accept", "reject"]),
+            "label": FieldSpec.output("label", type_=Label),
+        },
+        instructions="Given the fields `text`, produce the fields `decision`, `label`.",
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=JSONAdapter(), signature=LiteralEnumSignature, demos=[], inputs={"text": "Looks good"}
+        adapter=JSONAdapter(), task_spec=LiteralEnumSignature, demos=[], inputs={"text": "Looks good"}
     )
 
     expected_messages = [
@@ -535,12 +545,15 @@ def test_json_adapter_format_exact_messages_with_nested_pydantic_output():
         address: JsonNestedAddress
         scores: list[float]
 
-    class PydanticSignature(Signature):
-        question: str = InputField()
-        summary: JsonNestedSummary = OutputField()
-
+    PydanticSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "summary": FieldSpec.output("summary", type_=JsonNestedSummary),
+        },
+        instructions="Given the fields `question`, produce the fields `summary`.",
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=JSONAdapter(), signature=PydanticSignature, demos=[], inputs={"question": "Summarize"}
+        adapter=JSONAdapter(), task_spec=PydanticSignature, demos=[], inputs={"question": "Summarize"}
     )
 
     expected_messages = [
@@ -590,15 +603,18 @@ def test_json_adapter_format_exact_messages_with_nested_pydantic_output():
 
 
 def test_json_adapter_format_exact_messages_with_incomplete_demo():
-    class IncompleteDemoSignature(Signature):
-        question: str = InputField()
-        context: str = InputField()
-        answer: str = OutputField()
-        score: float = OutputField()
-
+    IncompleteDemoSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "context": FieldSpec.input("context"),
+            "answer": FieldSpec.output("answer"),
+            "score": FieldSpec.output("score", type_=float),
+        },
+        instructions="Given the fields `question`, `context`, produce the fields `answer`, `score`.",
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=JSONAdapter(),
-        signature=IncompleteDemoSignature,
+        task_spec=IncompleteDemoSignature,
         demos=[{"question": "Q1", "answer": "A1"}],
         inputs={"question": "Q2", "context": "C2"},
     )
@@ -674,14 +690,17 @@ def test_json_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
         """Search for documents."""
         return query
 
-    class NativeToolSignature(Signature):
-        question: str = InputField()
-        tools: list[Tool] = InputField()
-        tool_calls: ToolCalls = OutputField()
-
+    NativeToolSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "tools": FieldSpec.input("tools", type_=list[Tool]),
+            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+        },
+        instructions="Given the fields `question`, `tools`, produce the fields `tool_calls`.",
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=JSONAdapter(use_native_function_calling=True),
-        signature=NativeToolSignature,
+        task_spec=NativeToolSignature,
         demos=[],
         inputs={"question": "Q?", "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
@@ -734,13 +753,16 @@ def test_json_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
 
 
 def test_json_adapter_format_exact_messages_with_tool_calls_output_demo():
-    class ToolCallsSignature(Signature):
-        question: str = InputField()
-        tool_calls: ToolCalls = OutputField()
-
+    ToolCallsSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+        },
+        instructions="Given the fields `question`, produce the fields `tool_calls`.",
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=JSONAdapter(use_native_function_calling=False),
-        signature=ToolCallsSignature,
+        task_spec=ToolCallsSignature,
         demos=[
             {"question": "Q1", "tool_calls": ToolCalls.from_dict_list([{"name": "search", "args": {"query": "cats"}}])}
         ],
@@ -814,19 +836,22 @@ def test_json_adapter_format_exact_non_native_tool_result_history_field():
     def search(query: str) -> str:
         return query
 
-    class ToolHistorySignature(Signature):
-        question: str = InputField()
-        history: History = InputField()
-        tools: list[Tool] = InputField()
-        next_thought: str = OutputField()
-        tool_calls: ToolCalls = OutputField()
-
+    ToolHistorySignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "history": FieldSpec.input("history", type_=History),
+            "tools": FieldSpec.input("tools", type_=list[Tool]),
+            "next_thought": FieldSpec.output("next_thought"),
+            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+        },
+        instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
+    )
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
 
     messages, _lm_kwargs = format_messages_and_lm_kwargs(
         adapter=JSONAdapter(use_native_function_calling=False),
-        signature=ToolHistorySignature,
+        task_spec=ToolHistorySignature,
         demos=[],
         inputs={
             "question": "Q2",
@@ -864,13 +889,16 @@ def test_json_adapter_passes_structured_output_when_supported_by_model():
         subfield1: int = pydantic.Field(description="Int subfield 1", ge=0, le=10)
         subfield2: float = pydantic.Field(description="Float subfield 2")
 
-    class TestSignature(Signature):
-        input1: str = InputField()
-        output1: str = OutputField()  # Description intentionally left blank
-        output2: bool = OutputField(desc="Boolean output field")
-        output3: OutputField3 = OutputField(desc="Nested output field")
-        output4_unannotated = OutputField(desc="Unannotated output field")
-
+    TestSignature = make_task_spec(
+        {
+            "input1": FieldSpec.input("input1"),
+            "output1": FieldSpec.output("output1"),
+            "output2": FieldSpec.output("output2", type_=bool, desc="Boolean output field"),
+            "output3": FieldSpec.output("output3", type_=OutputField3, desc="Nested output field"),
+            "output4_unannotated": FieldSpec.output("output4_unannotated", desc="Unannotated output field"),
+        },
+        instructions="Given the fields `input1`, produce the fields `output1`, `output2`, `output3`, `output4_unannotated`.",
+    )
     program = Predict(TestSignature)
 
     # Configure DSPy to use an OpenAI LM that supports structured outputs
@@ -898,11 +926,14 @@ def test_json_adapter_passes_structured_output_when_supported_by_model():
 
 
 def test_json_adapter_not_using_structured_outputs_when_not_supported_by_model():
-    class TestSignature(Signature):
-        input1: str = InputField()
-        output1: str = OutputField()
-        output2: bool = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "input1": FieldSpec.input("input1"),
+            "output1": FieldSpec.output("output1"),
+            "output2": FieldSpec.output("output2", type_=bool),
+        },
+        instructions="Given the fields `input1`, produce the fields `output1`, `output2`.",
+    )
     program = Predict(TestSignature)
 
     # Configure DSPy to use a model from a fake provider that doesn't support structured outputs
@@ -925,30 +956,35 @@ def test_json_adapter_with_structured_outputs_does_not_mutate_original_signature
         subfield1: int = pydantic.Field(description="Int subfield 1")
         subfield2: float = pydantic.Field(description="Float subfield 2")
 
-    class TestSignature(Signature):
-        input1: str = InputField()
-        output1: str = OutputField()  # Description intentionally left blank
-        output2: bool = OutputField(desc="Boolean output field")
-        output3: OutputField3 = OutputField(desc="Nested output field")
-        output4_unannotated = OutputField(desc="Unannotated output field")
-
+    TestSignature = make_task_spec(
+        {
+            "input1": FieldSpec.input("input1"),
+            "output1": FieldSpec.output("output1"),
+            "output2": FieldSpec.output("output2", type_=bool, desc="Boolean output field"),
+            "output3": FieldSpec.output("output3", type_=OutputField3, desc="Nested output field"),
+            "output4_unannotated": FieldSpec.output("output4_unannotated", desc="Unannotated output field"),
+        },
+        instructions="Given the fields `input1`, produce the fields `output1`, `output2`, `output3`, `output4_unannotated`.",
+    )
     settings.configure(lm=LM(model="openai/gpt-4o"), adapter=JSONAdapter())
     program = Predict(TestSignature)
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = _structured_output_model_response()
         asyncio.run(program.acall(input1="Test input"))
 
-    assert program.signature.output_fields == TestSignature.output_fields
+    from dspy.task_spec.bridge import task_spec_from_signature
+
+    assert task_spec_from_signature(program.signature).equals(TestSignature)
 
 
 def test_json_adapter_sync_call():
-    signature = make_signature("question->answer")
+    signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
     adapter = JSONAdapter()
     lm = DummyLM([{"answer": "Paris"}], adapter=adapter)
     with settings.context(adapter=adapter):
         result = asyncio.run(
             adapter.acall(
-                lm=lm, config={}, signature=signature, demos=[], inputs={"question": "What is the capital of France?"}
+                lm=lm, config={}, task_spec=signature, demos=[], inputs={"question": "What is the capital of France?"}
             )
         )
     assert result == [{"answer": "Paris"}]
@@ -956,12 +992,12 @@ def test_json_adapter_sync_call():
 
 @pytest.mark.asyncio
 async def test_json_adapter_async_call():
-    signature = make_signature("question->answer")
+    signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
     adapter = JSONAdapter()
     lm = DummyLM([{"answer": "Paris"}], adapter=adapter)
     with settings.context(adapter=adapter):
         result = await adapter.acall(
-            lm=lm, config={}, signature=signature, demos=[], inputs={"question": "What is the capital of France?"}
+            lm=lm, config={}, task_spec=signature, demos=[], inputs={"question": "What is the capital of France?"}
         )
     assert result == [{"answer": "Paris"}]
 
@@ -978,11 +1014,14 @@ def test_json_adapter_on_pydantic_model():
         analysis: str
         result: str
 
-    class TestSignature(Signature):
-        user: User = InputField(desc="The user who asks the question")
-        question: str = InputField(desc="Question the user asks")
-        answer: Answer = OutputField(desc="Answer to this question")
-
+    TestSignature = make_task_spec(
+        {
+            "user": FieldSpec.input("user", type_=User, desc="The user who asks the question"),
+            "question": FieldSpec.input("question", desc="Question the user asks"),
+            "answer": FieldSpec.output("answer", type_=Answer, desc="Answer to this question"),
+        },
+        instructions="Given the fields `user`, `question`, produce the fields `answer`.",
+    )
     program = Predict(TestSignature)
 
     settings.configure(lm=LM(model="openai/gpt-4o", cache=False), adapter=JSONAdapter())
@@ -1057,7 +1096,7 @@ def test_json_adapter_on_pydantic_model():
 
 
 def test_json_adapter_parse_raise_error_on_mismatch_fields():
-    signature = make_signature("question->answer")
+    signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
     adapter = JSONAdapter()
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -1072,14 +1111,14 @@ def test_json_adapter_parse_raise_error_on_mismatch_fields():
                 adapter.acall(
                     lm=lm,
                     config={},
-                    signature=signature,
+                    task_spec=signature,
                     demos=[],
                     inputs={"question": "What is the capital of France?"},
                 )
             )
 
     assert e.value.adapter_name == "JSONAdapter"
-    assert e.value.signature == signature
+    assert e.value.task_spec == signature
     assert e.value.lm_response == "{'answer1': 'Paris'}"
     assert e.value.parsed_result == {}
 
@@ -1095,12 +1134,15 @@ def test_json_adapter_formats_image():
     # Test basic image formatting
     image = Image(url="https://example.com/image.jpg")
 
-    class MySignature(Signature):
-        image: Image = InputField()
-        text: str = OutputField()
-
+    MySignature = make_task_spec(
+        {
+            "image": FieldSpec.input("image", type_=Image),
+            "text": FieldSpec.output("text"),
+        },
+        instructions="Given the fields `image`, produce the fields `text`.",
+    )
     adapter = JSONAdapter()
-    messages = adapter_format_as_openai(adapter=adapter, signature=MySignature, demos=[], inputs={"image": image})
+    messages = adapter_format_as_openai(adapter=adapter, task_spec=MySignature, demos=[], inputs={"image": image})
 
     assert len(messages) == 2
     user_message_content = messages[1]["content"]
@@ -1117,10 +1159,13 @@ def test_json_adapter_formats_image():
 
 
 def test_json_adapter_formats_image_with_few_shot_examples():
-    class MySignature(Signature):
-        image: Image = InputField()
-        text: str = OutputField()
-
+    MySignature = make_task_spec(
+        {
+            "image": FieldSpec.input("image", type_=Image),
+            "text": FieldSpec.output("text"),
+        },
+        instructions="Given the fields `image`, produce the fields `text`.",
+    )
     adapter = JSONAdapter()
 
     demos = [
@@ -1135,7 +1180,7 @@ def test_json_adapter_formats_image_with_few_shot_examples():
     ]
     messages = adapter_format_as_openai(
         adapter=adapter,
-        signature=MySignature,
+        task_spec=MySignature,
         demos=demos,
         inputs={"image": Image(url="https://example.com/image3.jpg")},
     )
@@ -1153,10 +1198,13 @@ def test_json_adapter_formats_image_with_nested_images():
         images: list[Image]
         tag: list[str]
 
-    class MySignature(Signature):
-        image: ImageWrapper = InputField()
-        text: str = OutputField()
-
+    MySignature = make_task_spec(
+        {
+            "image": FieldSpec.input("image", type_=ImageWrapper),
+            "text": FieldSpec.output("text"),
+        },
+        instructions="Given the fields `image`, produce the fields `text`.",
+    )
     image1 = Image(url="https://example.com/image1.jpg")
     image2 = Image(url="https://example.com/image2.jpg")
     image3 = Image(url="https://example.com/image3.jpg")
@@ -1165,7 +1213,7 @@ def test_json_adapter_formats_image_with_nested_images():
 
     adapter = JSONAdapter()
     messages = adapter_format_as_openai(
-        adapter=adapter, signature=MySignature, demos=[], inputs={"image": image_wrapper}
+        adapter=adapter, task_spec=MySignature, demos=[], inputs={"image": image_wrapper}
     )
 
     expected_image1_content = {"type": "image_url", "image_url": {"url": "https://example.com/image1.jpg"}}
@@ -1181,10 +1229,13 @@ def test_json_adapter_formats_with_nested_documents():
     class DocumentWrapper(pydantic.BaseModel):
         documents: list[Document]
 
-    class MySignature(Signature):
-        document: DocumentWrapper = InputField()
-        text: str = OutputField()
-
+    MySignature = make_task_spec(
+        {
+            "document": FieldSpec.input("document", type_=DocumentWrapper),
+            "text": FieldSpec.output("text"),
+        },
+        instructions="Given the fields `document`, produce the fields `text`.",
+    )
     doc1 = Document(data="Hello, world!")
     doc2 = Document(data="Hello, world 2!")
 
@@ -1192,7 +1243,7 @@ def test_json_adapter_formats_with_nested_documents():
 
     adapter = JSONAdapter()
     messages = adapter_format_as_openai(
-        adapter=adapter, signature=MySignature, demos=[], inputs={"document": document_wrapper}
+        adapter=adapter, task_spec=MySignature, demos=[], inputs={"document": document_wrapper}
     )
 
     expected_doc1_content = {
@@ -1215,10 +1266,13 @@ def test_json_adapter_formats_image_with_few_shot_examples_with_nested_images():
         images: list[Image]
         tag: list[str]
 
-    class MySignature(Signature):
-        image: ImageWrapper = InputField()
-        text: str = OutputField()
-
+    MySignature = make_task_spec(
+        {
+            "image": FieldSpec.input("image", type_=ImageWrapper),
+            "text": FieldSpec.output("text"),
+        },
+        instructions="Given the fields `image`, produce the fields `text`.",
+    )
     image1 = Image(url="https://example.com/image1.jpg")
     image2 = Image(url="https://example.com/image2.jpg")
     image3 = Image(url="https://example.com/image3.jpg")
@@ -1234,7 +1288,7 @@ def test_json_adapter_formats_image_with_few_shot_examples_with_nested_images():
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = JSONAdapter()
     messages = adapter_format_as_openai(
-        adapter=adapter, signature=MySignature, demos=demos, inputs={"image": image_wrapper_2}
+        adapter=adapter, task_spec=MySignature, demos=demos, inputs={"image": image_wrapper_2}
     )
 
     assert len(messages) == 4
@@ -1252,13 +1306,15 @@ def test_json_adapter_formats_image_with_few_shot_examples_with_nested_images():
 
 
 def test_json_adapter_with_tool():
-    class MySignature(Signature):
-        """Answer question with the help of the tools"""
-
-        question: str = InputField()
-        tools: list[Tool] = InputField()
-        answer: str = OutputField()
-        tool_calls: ToolCalls = OutputField()
+    MySignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "tools": FieldSpec.input("tools", type_=list[Tool]),
+            "answer": FieldSpec.output("answer"),
+            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+        },
+        instructions="Answer question with the help of the tools",
+    )
 
     def get_weather(city: str) -> str:
         """Get the weather for a city"""
@@ -1273,7 +1329,7 @@ def test_json_adapter_with_tool():
     adapter = JSONAdapter()
     messages = adapter_format_as_openai(
         adapter=adapter,
-        signature=MySignature,
+        task_spec=MySignature,
         demos=[],
         inputs={"question": "What is the weather in Tokyo?", "tools": tools},
     )
@@ -1308,7 +1364,7 @@ def test_json_adapter_with_tool():
             adapter.acall(
                 lm=lm,
                 config={},
-                signature=MySignature,
+                task_spec=MySignature,
                 demos=[],
                 inputs={"question": "What is the weather in Tokyo?", "tools": tools},
             )
@@ -1358,15 +1414,16 @@ def test_json_adapter_with_tool():
 
 def test_json_adapter_with_code():
     # Test with code as input field
-    class CodeAnalysis(Signature):
-        """Analyze the time complexity of the code"""
-
-        code: Code = InputField()
-        result: str = OutputField()
-
+    CodeAnalysis = make_task_spec(
+        {
+            "code": FieldSpec.input("code", type_=Code),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="Analyze the time complexity of the code",
+    )
     adapter = JSONAdapter()
     messages = adapter_format_as_openai(
-        adapter=adapter, signature=CodeAnalysis, demos=[], inputs={"code": "print('Hello, world!')"}
+        adapter=adapter, task_spec=CodeAnalysis, demos=[], inputs={"code": "print('Hello, world!')"}
     )
 
     assert len(messages) == 2
@@ -1378,12 +1435,13 @@ def test_json_adapter_with_code():
     assert "print('Hello, world!')" in messages[1]["content"]
 
     # Test with code as output field
-    class CodeGeneration(Signature):
-        """Generate code to answer the question"""
-
-        question: str = InputField()
-        code: Code = OutputField()
-
+    CodeGeneration = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "code": FieldSpec.output("code", type_=Code),
+        },
+        instructions="Generate code to answer the question",
+    )
     adapter = JSONAdapter()
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -1394,7 +1452,7 @@ def test_json_adapter_with_code():
             adapter.acall(
                 lm=LM(model="openai/gpt-4o-mini", cache=False),
                 config={},
-                signature=CodeGeneration,
+                task_spec=CodeGeneration,
                 demos=[],
                 inputs={"question": "Write a python program to print 'Hello, world!'"},
             )
@@ -1403,11 +1461,14 @@ def test_json_adapter_with_code():
 
 
 def test_json_adapter_formats_conversation_history():
-    class MySignature(Signature):
-        question: str = InputField()
-        history: History = InputField()
-        answer: str = OutputField()
-
+    MySignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "history": FieldSpec.input("history", type_=History),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Given the fields `question`, `history`, produce the fields `answer`.",
+    )
     history = History(
         messages=[
             {"question": "What is the capital of France?", "answer": "Paris"},
@@ -1418,7 +1479,7 @@ def test_json_adapter_formats_conversation_history():
     adapter = JSONAdapter()
     messages = adapter_format_as_openai(
         adapter=adapter,
-        signature=MySignature,
+        task_spec=MySignature,
         demos=[],
         inputs={"question": "What is the capital of France?", "history": history},
     )
@@ -1443,11 +1504,14 @@ async def test_json_adapter_on_pydantic_model_async():
         analysis: str
         result: str
 
-    class TestSignature(Signature):
-        user: User = InputField(desc="The user who asks the question")
-        question: str = InputField(desc="Question the user asks")
-        answer: Answer = OutputField(desc="Answer to this question")
-
+    TestSignature = make_task_spec(
+        {
+            "user": FieldSpec.input("user", type_=User, desc="The user who asks the question"),
+            "question": FieldSpec.input("question", desc="Question the user asks"),
+            "answer": FieldSpec.output("answer", type_=Answer, desc="Answer to this question"),
+        },
+        instructions="Given the fields `user`, `question`, produce the fields `answer`.",
+    )
     program = Predict(TestSignature)
 
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
@@ -1519,10 +1583,13 @@ async def test_json_adapter_on_pydantic_model_async():
 
 
 def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_lm_error():
-    class TestSignature(Signature):
-        question: str = InputField()
-        answer: str = OutputField(desc="String output field")
-
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer", desc="String output field"),
+        },
+        instructions="Given the fields `question`, produce the fields `answer`.",
+    )
     settings.configure(lm=LM(model="openai/gpt-4o-mini", cache=False), adapter=JSONAdapter())
     program = Predict(TestSignature)
 
@@ -1538,10 +1605,13 @@ def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_lm_err
 
 
 def test_json_adapter_json_mode_no_structured_outputs():
-    class TestSignature(Signature):
-        question: str = InputField()
-        answer: str = OutputField(desc="String output field")
-
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer", desc="String output field"),
+        },
+        instructions="Given the fields `question`, produce the fields `answer`.",
+    )
     settings.configure(lm=LM(model="openai/gpt-4o", cache=False), adapter=JSONAdapter())
     program = Predict(TestSignature)
 
@@ -1568,10 +1638,13 @@ def test_json_adapter_json_mode_no_structured_outputs():
 
 @pytest.mark.asyncio
 async def test_json_adapter_json_mode_no_structured_outputs_async():
-    class TestSignature(Signature):
-        question: str = InputField()
-        answer: str = OutputField(desc="String output field")
-
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer", desc="String output field"),
+        },
+        instructions="Given the fields `question`, produce the fields `answer`.",
+    )
     program = Predict(TestSignature)
 
     with (
@@ -1598,10 +1671,13 @@ async def test_json_adapter_json_mode_no_structured_outputs_async():
 
 @pytest.mark.asyncio
 async def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_lm_error_async():
-    class TestSignature(Signature):
-        question: str = InputField()
-        answer: str = OutputField(desc="String output field")
-
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer", desc="String output field"),
+        },
+        instructions="Given the fields `question`, produce the fields `answer`.",
+    )
     program = Predict(TestSignature)
 
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_acompletion:
@@ -1617,10 +1693,13 @@ async def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_
 
 
 def test_error_message_on_json_adapter_failure():
-    class TestSignature(Signature):
-        question: str = InputField()
-        answer: str = OutputField(desc="String output field")
-
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer", desc="String output field"),
+        },
+        instructions="Given the fields `question`, produce the fields `answer`.",
+    )
     program = Predict(TestSignature)
 
     settings.configure(lm=LM(model="openai/gpt-4o-mini", cache=False), adapter=JSONAdapter())
@@ -1642,10 +1721,13 @@ def test_error_message_on_json_adapter_failure():
 
 @pytest.mark.asyncio
 async def test_error_message_on_json_adapter_failure_async():
-    class TestSignature(Signature):
-        question: str = InputField()
-        answer: str = OutputField(desc="String output field")
-
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer", desc="String output field"),
+        },
+        instructions="Given the fields `question`, produce the fields `answer`.",
+    )
     program = Predict(TestSignature)
 
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_acompletion:  # noqa: SIM117
@@ -1664,11 +1746,15 @@ async def test_error_message_on_json_adapter_failure_async():
 
 
 def test_json_adapter_toolcalls_native_function_calling():
-    class MySignature(Signature):
-        question: str = InputField()
-        tools: list[Tool] = InputField()
-        answer: str = OutputField()
-        tool_calls: ToolCalls = OutputField()
+    MySignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "tools": FieldSpec.input("tools", type_=list[Tool]),
+            "answer": FieldSpec.output("answer"),
+            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+        },
+        instructions="Given the fields `question`, `tools`, produce the fields `answer`, `tool_calls`.",
+    )
 
     def get_weather(city: str) -> str:
         return f"The weather in {city} is sunny"
@@ -1703,7 +1789,7 @@ def test_json_adapter_toolcalls_native_function_calling():
             adapter.acall(
                 lm=LM(model="openai/gpt-4o-mini", cache=False),
                 config={},
-                signature=MySignature,
+                task_spec=MySignature,
                 demos=[],
                 inputs={"question": "What is the weather in Paris?", "tools": tools},
             )
@@ -1731,7 +1817,7 @@ def test_json_adapter_toolcalls_native_function_calling():
             adapter.acall(
                 lm=LM(model="openai/gpt-4o-mini", cache=False),
                 config={},
-                signature=MySignature,
+                task_spec=MySignature,
                 demos=[],
                 inputs={"question": "What is the weather in Paris?", "tools": tools},
             )
@@ -1741,11 +1827,15 @@ def test_json_adapter_toolcalls_native_function_calling():
 
 
 def test_json_adapter_toolcalls_no_native_function_calling():
-    class MySignature(Signature):
-        question: str = InputField()
-        tools: list[Tool] = InputField()
-        answer: str = OutputField()
-        tool_calls: ToolCalls = OutputField()
+    MySignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "tools": FieldSpec.input("tools", type_=list[Tool]),
+            "answer": FieldSpec.output("answer"),
+            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+        },
+        instructions="Given the fields `question`, `tools`, produce the fields `answer`, `tool_calls`.",
+    )
 
     def get_weather(city: str) -> str:
         return f"The weather in {city} is sunny"
@@ -1766,7 +1856,7 @@ def test_json_adapter_toolcalls_no_native_function_calling():
                 adapter.acall(
                     lm=lm,
                     config={},
-                    signature=MySignature,
+                    task_spec=MySignature,
                     demos=[],
                     inputs={"question": "What is the weather in Tokyo?", "tools": tools},
                 )
@@ -1781,11 +1871,14 @@ def test_json_adapter_toolcalls_no_native_function_calling():
 
 
 def test_json_adapter_native_reasoning():
-    class MySignature(Signature):
-        question: str = InputField()
-        reasoning: Reasoning = OutputField()
-        answer: str = OutputField()
-
+    MySignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "reasoning": FieldSpec.output("reasoning", type_=Reasoning),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Given the fields `question`, produce the fields `reasoning`, `answer`.",
+    )
     adapter = JSONAdapter()
 
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
@@ -1812,7 +1905,7 @@ def test_json_adapter_native_reasoning():
             adapter.acall(
                 lm=LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low", cache=False),
                 config={},
-                signature=MySignature,
+                task_spec=MySignature,
                 demos=[],
                 inputs={"question": "What is the capital of France?"},
             )
@@ -1821,10 +1914,7 @@ def test_json_adapter_native_reasoning():
 
 
 def test_json_adapter_with_responses_api():
-    class TestSignature(Signature):
-        question: str = InputField()
-        answer: str = OutputField()
-
+    TestSignature = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
     api_response = ResponsesAPIResponse(
         id="resp_1",
         created_at=0.0,
@@ -1879,13 +1969,14 @@ def test_json_adapter_with_responses_api():
 
 
 def test_format_system_message():
-    class MySignature(Signature):
-        """Answer the question with multiple answers and scores"""
-
-        question: str = InputField()
-        answers: list[str] = OutputField()
-        scores: list[float] = OutputField()
-
+    MySignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "answers": FieldSpec.output("answers", type_=list[str]),
+            "scores": FieldSpec.output("scores", type_=list[float]),
+        },
+        instructions="Answer the question with multiple answers and scores",
+    )
     adapter = JSONAdapter()
     system_message = adapter.format_system_message(MySignature)
     expected_system_message = """Your input fields are:

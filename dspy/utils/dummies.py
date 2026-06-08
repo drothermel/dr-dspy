@@ -4,6 +4,7 @@ import random
 from collections import defaultdict
 from typing import Any, NoReturn, cast
 
+from pydantic.fields import FieldInfo
 from typing_extensions import override
 
 from dspy.adapters.chat_adapter import FieldInfoWithName, field_header_pattern
@@ -11,7 +12,6 @@ from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import provider_tool_call_to_part
 from dspy.core.types import LMOutput, LMPart, LMRequest, LMResponse, LMTextPart, LMThinkingPart
 from dspy.dsp.utils.utils import dotdict
-from dspy.signatures.field import OutputField
 from dspy.utils.lazy_import import require
 
 np = require("numpy")
@@ -121,9 +121,25 @@ class DummyLM(BaseLM):
                 return output_content
         return None
 
+    @staticmethod
+    def _field_info_for_dummy_value(value: object) -> FieldInfo:
+        if isinstance(value, bool):
+            return FieldInfo(annotation=bool)
+        if isinstance(value, int):
+            return FieldInfo(annotation=int)
+        if isinstance(value, float):
+            return FieldInfo(annotation=float)
+        if isinstance(value, list):
+            if value and all(isinstance(item, str) for item in value):
+                return FieldInfo(annotation=list[str])
+            return FieldInfo(annotation=list[Any])
+        if isinstance(value, dict):
+            return FieldInfo(annotation=dict[str, Any])
+        return FieldInfo(annotation=str)
+
     def _format_answer_fields(self, field_names_and_values: dict[str, Any]):
         fields_with_values = {
-            FieldInfoWithName(name=field_name, info=OutputField()): value
+            FieldInfoWithName(name=field_name, info=self._field_info_for_dummy_value(value)): value
             for field_name, value in field_names_and_values.items()
         }
         # The reason why DummyLM needs an adapter is because it needs to know which output format to mimic.

@@ -1,8 +1,7 @@
 import pydantic
 
 from dspy.adapters.types.base_type import Type as DSPyType
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
+from dspy.task_spec import FieldSpec, make_task_spec
 
 
 def test_basic_extract_custom_type_from_annotation():
@@ -12,21 +11,19 @@ def test_basic_extract_custom_type_from_annotation():
         end_date_time: str | None
         location: str | None
 
-    class ExtractEvent(Signature):
-        """Extract all events from the email content."""
+    extract_event = make_task_spec(
+        {"email": FieldSpec.input("email"), "event": FieldSpec.output("event", type_=Event)},
+        instructions="Extract all events from the email content.",
+    )
 
-        email: str = InputField()
-        event: Event = OutputField()
+    assert DSPyType.extract_custom_type_from_annotation(extract_event.output_fields["event"].type_) == [Event]
 
-    assert DSPyType.extract_custom_type_from_annotation(ExtractEvent.output_fields["event"].annotation) == [Event]
+    extract_events = make_task_spec(
+        {"email": FieldSpec.input("email"), "events": FieldSpec.output("events", type_=list[Event])},
+        instructions="Extract all events from the email content.",
+    )
 
-    class ExtractEvents(Signature):
-        """Extract all events from the email content."""
-
-        email: str = InputField()
-        events: list[Event] = OutputField()
-
-    assert DSPyType.extract_custom_type_from_annotation(ExtractEvents.output_fields["events"].annotation) == [Event]
+    assert DSPyType.extract_custom_type_from_annotation(extract_events.output_fields["events"].type_) == [Event]
 
 
 def test_extract_custom_type_from_annotation_with_nested_type():
@@ -41,13 +38,15 @@ def test_extract_custom_type_from_annotation_with_nested_type():
         event_id: str
         event_name: str
 
-    class ExtractEvents(Signature):
-        """Extract all events from the email content."""
+    extract_events = make_task_spec(
+        {
+            "email": FieldSpec.input("email"),
+            "events": FieldSpec.output("events", type_=list[dict[EventIdentifier, Event]]),
+        },
+        instructions="Extract all events from the email content.",
+    )
 
-        email: str = InputField()
-        events: list[dict[EventIdentifier, Event]] = OutputField()
-
-    assert DSPyType.extract_custom_type_from_annotation(ExtractEvents.output_fields["events"].annotation) == [
+    assert DSPyType.extract_custom_type_from_annotation(extract_events.output_fields["events"].type_) == [
         EventIdentifier,
         Event,
     ]

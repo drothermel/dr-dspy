@@ -15,8 +15,8 @@ from dspy.adapters.types.base_type import Type as DspyType
 from dspy.adapters.types.code import Code
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.core.types import LMMessage
-from dspy.signatures.signature import Signature
 from dspy.signatures.utils import get_dspy_field_type
+from dspy.task_spec import TaskSpec
 
 
 def build_lm_message(
@@ -87,8 +87,8 @@ def value_contains_multimodal_custom_type(value: object) -> bool:
     return False
 
 
-def inputs_include_multimodal_custom_type_values(signature: type[Signature], inputs: Mapping[str, Any]) -> bool:
-    for field_name in signature.input_fields:
+def inputs_include_multimodal_custom_type_values(task_spec: TaskSpec, inputs: Mapping[str, Any]) -> bool:
+    for field_name in task_spec.input_fields:
         if field_name in inputs and value_contains_multimodal_custom_type(inputs[field_name]):
             return True
     return False
@@ -147,7 +147,7 @@ def field_value_to_content_blocks(
 
 
 def build_multimodal_user_message_content(
-    signature: type[Signature],
+    task_spec: TaskSpec,
     inputs: Mapping[str, Any],
     *,
     prefix: str = "",
@@ -156,19 +156,22 @@ def build_multimodal_user_message_content(
     output_requirements: str | None = None,
     field_wrapper: str | None = None,
 ) -> list[dict[str, Any]]:
+    from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
+
     blocks: list[dict[str, Any]] = []
     if prefix:
         blocks.append({"type": "text", "text": prefix})
 
     field_blocks_added = False
-    for field_name, field_info in signature.input_fields.items():
+    input_field_infos = task_spec_input_field_infos(task_spec)
+    for field_name in task_spec.input_fields:
         if field_name not in inputs:
             continue
         field_prefix = "\n\n" if field_blocks_added else ""
         field_blocks_added = True
         blocks.extend(
             field_value_to_content_blocks(
-                field_info=field_info,
+                field_info=input_field_infos[field_name],
                 field_name=field_name,
                 value=inputs[field_name],
                 prefix=field_prefix,

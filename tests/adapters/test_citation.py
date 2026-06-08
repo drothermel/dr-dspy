@@ -4,7 +4,6 @@ import pytest
 from dspy.adapters.types.citation import Citations
 from dspy.clients.lm import LM
 from dspy.core.types import LMConfig
-from dspy.signatures.field import InputField, OutputField
 
 
 def test_citation_validate_input():
@@ -132,15 +131,16 @@ def test_citations_from_dict_list():
 def test_citations_postprocessing():
     from dspy.adapters.chat_adapter import ChatAdapter
     from dspy.core.types import LMCitationPart, LMOutput, LMResponse, LMTextPart
-    from dspy.signatures.signature import Signature
+    from dspy.task_spec import FieldSpec, make_task_spec
 
-    class CitationSignature(Signature):
-        """Test signature with citations."""
-
-        question: str = InputField()
-        answer: str = OutputField()
-        citations: Citations = OutputField()
-
+    CitationSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer"),
+            "citations": FieldSpec.output("citations", type_=Citations),
+        },
+        instructions="Test signature with citations.",
+    )
     adapter = ChatAdapter(native_response_types=[Citations])
 
     response = LMResponse(

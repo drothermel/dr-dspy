@@ -20,81 +20,85 @@ from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
 from dspy.primitives.example import Example
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
+from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec.pydantic_bridge import task_spec_output_field_infos
 from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs
+from tests.task_spec.helpers import ts
 
 
 def test_xml_adapter_format_and_parse_basic():
-    class TestSignature(Signature):
-        question: str = InputField()
-        answer: str = OutputField()
-
+    TestSignature = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
     adapter = XMLAdapter()
     # Format output fields as XML
-    fields_with_values = {FieldInfoWithName(name="answer", info=TestSignature.output_fields["answer"]): "Paris"}
+    fields_with_values = {
+        FieldInfoWithName(name="answer", info=task_spec_output_field_infos(TestSignature)["answer"]): "Paris"
+    }
     xml = adapter.format_field_with_value(fields_with_values)
     assert xml.strip() == "<answer>\nParis\n</answer>"
 
     # Parse XML output
     completion = "<answer>Paris</answer>"
-    parsed = adapter.parse(TestSignature, completion)
+    parsed = adapter.parse(task_spec=TestSignature, completion=completion)
     assert parsed == {"answer": "Paris"}
 
 
 def test_xml_adapter_parse_multiple_fields():
-    class TestSignature(Signature):
-        question: str = InputField()
-        answer: str = OutputField()
-        explanation: str = OutputField()
-
+    TestSignature = ts(
+        "question -> answer, explanation",
+        instructions="Given the fields `question`, produce the fields `answer`, `explanation`.",
+    )
     adapter = XMLAdapter()
     completion = """
 <answer>Paris</answer>
 <explanation>The capital of France is Paris.</explanation>
 """
-    parsed = adapter.parse(TestSignature, completion)
+    parsed = adapter.parse(task_spec=TestSignature, completion=completion)
     assert parsed == {"answer": "Paris", "explanation": "The capital of France is Paris."}
 
 
 def test_xml_adapter_parse_raises_on_missing_field():
-    class TestSignature(Signature):
-        question: str = InputField()
-        answer: str = OutputField()
-        explanation: str = OutputField()
-
+    TestSignature = ts(
+        "question -> answer, explanation",
+        instructions="Given the fields `question`, produce the fields `answer`, `explanation`.",
+    )
     adapter = XMLAdapter()
     completion = "<answer>Paris</answer>"
     with pytest.raises(AdapterParseError) as e:
-        adapter.parse(TestSignature, completion)
+        adapter.parse(task_spec=TestSignature, completion=completion)
     assert e.value.adapter_name == "XMLAdapter"
-    assert e.value.signature == TestSignature
+    assert e.value.task_spec == TestSignature
     assert e.value.lm_response == "<answer>Paris</answer>"
     assert "explanation" in str(e.value)
 
 
 def test_xml_adapter_parse_casts_types():
-    class TestSignature(Signature):
-        number: int = OutputField()
-        flag: bool = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "number": FieldSpec.output("number", type_=int),
+            "flag": FieldSpec.output("flag", type_=bool),
+        },
+        instructions="Given the fields , produce the fields `number`, `flag`.",
+    )
     adapter = XMLAdapter()
     completion = """
 <number>42</number>
 <flag>true</flag>
 """
-    parsed = adapter.parse(TestSignature, completion)
+    parsed = adapter.parse(task_spec=TestSignature, completion=completion)
     assert parsed == {"number": 42, "flag": True}
 
 
 def test_xml_adapter_parse_raises_on_type_error():
-    class TestSignature(Signature):
-        number: int = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "number": FieldSpec.output("number", type_=int),
+        },
+        instructions="Given the fields , produce the fields `number`.",
+    )
     adapter = XMLAdapter()
     completion = "<number>not_a_number</number>"
     with pytest.raises(AdapterParseError) as e:
-        adapter.parse(TestSignature, completion)
+        adapter.parse(task_spec=TestSignature, completion=completion)
     assert "Failed to parse field" in str(e.value)
 
 
@@ -103,14 +107,19 @@ def test_xml_adapter_format_and_parse_nested_model():
         value: int
         label: str
 
-    class TestSignature(Signature):
-        question: str = InputField()
-        result: InnerModel = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "result": FieldSpec.output("result", type_=InnerModel),
+        },
+        instructions="Given the fields `question`, produce the fields `result`.",
+    )
     adapter = XMLAdapter()
     # Format output fields as XML
     fields_with_values = {
-        FieldInfoWithName(name="result", info=TestSignature.output_fields["result"]): InnerModel(value=5, label="foo")
+        FieldInfoWithName(name="result", info=task_spec_output_field_infos(TestSignature)["result"]): InnerModel(
+            value=5, label="foo"
+        )
     }
     xml = adapter.format_field_with_value(fields_with_values)
     # The output will be a JSON string inside the XML tag
@@ -121,7 +130,7 @@ def test_xml_adapter_format_and_parse_nested_model():
 
     # Parse XML output (should parse as string, not as model)
     completion = '<result>{"value": 5, "label": "foo"}</result>'
-    parsed = adapter.parse(TestSignature, completion)
+    parsed = adapter.parse(task_spec=TestSignature, completion=completion)
     # The parse_value helper will try to cast to InnerModel
     assert isinstance(parsed["result"], InnerModel)
     assert parsed["result"].value == 5
@@ -133,12 +142,17 @@ def test_xml_adapter_format_and_parse_list_of_models():
         name: str
         score: float
 
-    class TestSignature(Signature):
-        items: list[Item] = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "items": FieldSpec.output("items", type_=list[Item]),
+        },
+        instructions="Given the fields , produce the fields `items`.",
+    )
     adapter = XMLAdapter()
     items = [Item(name="a", score=1.1), Item(name="b", score=2.2)]
-    fields_with_values = {FieldInfoWithName(name="items", info=TestSignature.output_fields["items"]): items}
+    fields_with_values = {
+        FieldInfoWithName(name="items", info=task_spec_output_field_infos(TestSignature)["items"]): items
+    }
     xml = adapter.format_field_with_value(fields_with_values)
     assert xml.strip().startswith("<items>")
     assert '"name": "a"' in xml
@@ -149,7 +163,7 @@ def test_xml_adapter_format_and_parse_list_of_models():
     import json
 
     completion = f"<items>{json.dumps([i.model_dump() for i in items])}</items>"
-    parsed = adapter.parse(TestSignature, completion)
+    parsed = adapter.parse(task_spec=TestSignature, completion=completion)
     assert isinstance(parsed["items"], list)
     assert all(isinstance(i, Item) for i in parsed["items"])
     assert parsed["items"][0].name == "a"
@@ -163,18 +177,23 @@ def test_xml_adapter_with_tool_like_output():
         args: dict
         result: str
 
-    class TestSignature(Signature):
-        question: str = InputField()
-        tool_calls: list[ToolCall] = OutputField()
-        answer: str = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "tool_calls": FieldSpec.output("tool_calls", type_=list[ToolCall]),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Given the fields `question`, produce the fields `tool_calls`, `answer`.",
+    )
     adapter = XMLAdapter()
     tool_calls = [
         ToolCall(name="get_weather", args={"city": "Tokyo"}, result="Sunny"),
         ToolCall(name="get_population", args={"country": "Japan", "year": 2023}, result="125M"),
     ]
     fields_with_values = {
-        FieldInfoWithName(name="tool_calls", info=TestSignature.output_fields["tool_calls"]): tool_calls,
+        FieldInfoWithName(
+            name="tool_calls", info=task_spec_output_field_infos(TestSignature)["tool_calls"]
+        ): tool_calls,
         FieldInfoWithName(
             name="answer", info=TestSignature.output_fields["answer"]
         ): "The weather is Sunny. Population is 125M.",
@@ -191,7 +210,7 @@ def test_xml_adapter_with_tool_like_output():
         f"<tool_calls>{json.dumps([tc.model_dump() for tc in tool_calls])}</tool_calls>"
         f"\n<answer>The weather is Sunny. Population is 125M.</answer>"
     )
-    parsed = adapter.parse(TestSignature, completion)
+    parsed = adapter.parse(task_spec=TestSignature, completion=completion)
     assert isinstance(parsed["tool_calls"], list)
     assert parsed["tool_calls"][0].name == "get_weather"
     assert parsed["tool_calls"][1].result == "125M"
@@ -203,10 +222,13 @@ def test_xml_adapter_formats_nested_images():
         images: list[Image]
         tag: list[str]
 
-    class MySignature(Signature):
-        image: ImageWrapper = InputField()
-        text: str = OutputField()
-
+    MySignature = make_task_spec(
+        {
+            "image": FieldSpec.input("image", type_=ImageWrapper),
+            "text": FieldSpec.output("text"),
+        },
+        instructions="Given the fields `image`, produce the fields `text`.",
+    )
     image1 = Image(url="https://example.com/image1.jpg")
     image2 = Image(url="https://example.com/image2.jpg")
     image3 = Image(url="https://example.com/image3.jpg")
@@ -222,7 +244,7 @@ def test_xml_adapter_formats_nested_images():
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = XMLAdapter()
     messages = adapter_format_as_openai(
-        adapter=adapter, signature=MySignature, demos=demos, inputs={"image": image_wrapper_2}
+        adapter=adapter, task_spec=MySignature, demos=demos, inputs={"image": image_wrapper_2}
     )
 
     assert len(messages) == 4
@@ -241,15 +263,16 @@ def test_xml_adapter_formats_nested_images():
 
 def test_xml_adapter_with_code():
     # Test with code as input field
-    class CodeAnalysis(Signature):
-        """Analyze the time complexity of the code"""
-
-        code: Code = InputField()
-        result: str = OutputField()
-
+    CodeAnalysis = make_task_spec(
+        {
+            "code": FieldSpec.input("code", type_=Code),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="Analyze the time complexity of the code",
+    )
     adapter = XMLAdapter()
     messages = adapter_format_as_openai(
-        adapter=adapter, signature=CodeAnalysis, demos=[], inputs={"code": "print('Hello, world!')"}
+        adapter=adapter, task_spec=CodeAnalysis, demos=[], inputs={"code": "print('Hello, world!')"}
     )
 
     assert len(messages) == 2
@@ -261,12 +284,13 @@ def test_xml_adapter_with_code():
     assert "print('Hello, world!')" in messages[1]["content"]
 
     # Test with code as output field
-    class CodeGeneration(Signature):
-        """Generate code to answer the question"""
-
-        question: str = InputField()
-        code: Code = OutputField()
-
+    CodeGeneration = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "code": FieldSpec.output("code", type_=Code),
+        },
+        instructions="Generate code to answer the question",
+    )
     adapter = XMLAdapter()
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -277,7 +301,7 @@ def test_xml_adapter_with_code():
             adapter.acall(
                 lm=LM(model="openai/gpt-4o-mini", cache=False),
                 config={},
-                signature=CodeGeneration,
+                task_spec=CodeGeneration,
                 demos=[],
                 inputs={"question": "Write a python program to print 'Hello, world!'"},
             )
@@ -286,14 +310,17 @@ def test_xml_adapter_with_code():
 
 
 def test_xml_adapter_full_prompt():
-    class QA(Signature):
-        query: str = InputField()
-        context: str | None = InputField()
-        answer: str = OutputField()
-
+    QA = make_task_spec(
+        {
+            "query": FieldSpec.input("query"),
+            "context": FieldSpec.input("context", type_=str | None),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Given the fields `query`, `context`, produce the fields `answer`.",
+    )
     adapter = XMLAdapter()
     messages = adapter_format_as_openai(
-        adapter=adapter, signature=QA, demos=[], inputs={"query": "when was Marie Curie born"}
+        adapter=adapter, task_spec=QA, demos=[], inputs={"query": "when was Marie Curie born"}
     )
 
     assert len(messages) == 2
@@ -326,13 +353,10 @@ def test_xml_adapter_full_prompt():
 
 
 def test_xml_adapter_format_exact_messages_for_simple_signature():
-    class StringSignature(Signature):
-        question: str = InputField()
-        answer: str = OutputField()
-
+    StringSignature = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=XMLAdapter(),
-        signature=StringSignature,
+        task_spec=StringSignature,
         demos=[],
         inputs={"question": "why did a chicken cross the kitchen?"},
     )
@@ -374,19 +398,22 @@ def test_xml_adapter_format_exact_non_native_tool_result_history_field():
     def search(query: str) -> str:
         return query
 
-    class ToolHistorySignature(Signature):
-        question: str = InputField()
-        history: History = InputField()
-        tools: list[Tool] = InputField()
-        next_thought: str = OutputField()
-        tool_calls: ToolCalls = OutputField()
-
+    ToolHistorySignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "history": FieldSpec.input("history", type_=History),
+            "tools": FieldSpec.input("tools", type_=list[Tool]),
+            "next_thought": FieldSpec.output("next_thought"),
+            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+        },
+        instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
+    )
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
 
     messages, _lm_kwargs = format_messages_and_lm_kwargs(
         adapter=XMLAdapter(use_native_function_calling=False),
-        signature=ToolHistorySignature,
+        task_spec=ToolHistorySignature,
         demos=[],
         inputs={
             "question": "Q2",
@@ -422,14 +449,13 @@ def test_xml_adapter_format_exact_non_native_tool_result_history_field():
 
 
 def test_xml_adapter_format_exact_messages_for_two_input_signature():
-    class StringSignature(Signature):
-        question: str = InputField()
-        answer: str = InputField()
-        judgement: str = OutputField()
-
+    StringSignature = ts(
+        "question, answer -> judgement",
+        instructions="Given the fields `question`, `answer`, produce the fields `judgement`.",
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=XMLAdapter(),
-        signature=StringSignature,
+        task_spec=StringSignature,
         demos=[],
         inputs={"question": "why did a chicken cross the kitchen?", "answer": "To get to the other side!"},
     )
@@ -477,14 +503,17 @@ Respond with the corresponding output fields wrapped in XML tags `<judgement>`."
 
 
 def test_xml_adapter_format_exact_messages_with_demo_and_typed_output():
-    class MultiAnswer(Signature):
-        question: str = InputField()
-        answer: str = OutputField()
-        score: float = OutputField()
-
+    MultiAnswer = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer"),
+            "score": FieldSpec.output("score", type_=float),
+        },
+        instructions="Given the fields `question`, produce the fields `answer`, `score`.",
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=XMLAdapter(),
-        signature=MultiAnswer,
+        task_spec=MultiAnswer,
         demos=[{"question": "Q1", "answer": "A1", "score": 0.9}],
         inputs={"question": "Q2"},
     )
@@ -561,16 +590,17 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
         answer: str
         sources: list[str]
 
-    class RichRenderingSignature(Signature):
-        """Answer using all supplied context."""
-
-        history: History = InputField()
-        image: Image = InputField()
-        tools: list[Tool] = InputField()
-        profile: Profile = InputField()
-        question: str = InputField()
-        answer: AnswerCard = OutputField()
-
+    RichRenderingSignature = make_task_spec(
+        {
+            "history": FieldSpec.input("history", type_=History),
+            "image": FieldSpec.input("image", type_=Image),
+            "tools": FieldSpec.input("tools", type_=list[Tool]),
+            "profile": FieldSpec.input("profile", type_=Profile),
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer", type_=AnswerCard),
+        },
+        instructions="Answer using all supplied context.",
+    )
     tool = Tool(search)
     demo_profile = Profile(
         name="Ada",
@@ -593,7 +623,7 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=XMLAdapter(),
-        signature=RichRenderingSignature,
+        task_spec=RichRenderingSignature,
         demos=[
             {
                 "image": Image("https://example.com/demo.png"),
@@ -748,12 +778,15 @@ def test_xml_adapter_format_exact_messages_with_nested_pydantic_output():
         title: str
         address: XmlAddress
 
-    class PydanticSignature(Signature):
-        question: str = InputField()
-        summary: XmlSummary = OutputField()
-
+    PydanticSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "summary": FieldSpec.output("summary", type_=XmlSummary),
+        },
+        instructions="Given the fields `question`, produce the fields `summary`.",
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=XMLAdapter(), signature=PydanticSignature, demos=[], inputs={"question": "Summarize"}
+        adapter=XMLAdapter(), task_spec=PydanticSignature, demos=[], inputs={"question": "Summarize"}
     )
 
     expected_messages = [
@@ -796,15 +829,18 @@ def test_xml_adapter_format_exact_messages_with_nested_pydantic_output():
 
 
 def test_xml_adapter_format_exact_messages_with_incomplete_demo():
-    class IncompleteDemoSignature(Signature):
-        question: str = InputField()
-        context: str = InputField()
-        answer: str = OutputField()
-        score: float = OutputField()
-
+    IncompleteDemoSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "context": FieldSpec.input("context"),
+            "answer": FieldSpec.output("answer"),
+            "score": FieldSpec.output("score", type_=float),
+        },
+        instructions="Given the fields `question`, `context`, produce the fields `answer`, `score`.",
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=XMLAdapter(),
-        signature=IncompleteDemoSignature,
+        task_spec=IncompleteDemoSignature,
         demos=[{"question": "Q1", "answer": "A1"}],
         inputs={"question": "Q2", "context": "C2"},
     )
@@ -873,13 +909,14 @@ def test_xml_adapter_format_exact_messages_with_incomplete_demo():
 
 
 def test_format_system_message():
-    class MySignature(Signature):
-        """Answer the question with multiple answers and scores"""
-
-        question: str = InputField()
-        answers: list[str] = OutputField()
-        scores: list[float] = OutputField()
-
+    MySignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "answers": FieldSpec.output("answers", type_=list[str]),
+            "scores": FieldSpec.output("scores", type_=list[float]),
+        },
+        instructions="Answer the question with multiple answers and scores",
+    )
     adapter = XMLAdapter()
     system_message = adapter.format_system_message(MySignature)
 

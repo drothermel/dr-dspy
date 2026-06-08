@@ -13,7 +13,8 @@ from typing_extensions import override
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.utils import build_multimodal_user_message_content, inputs_include_multimodal_custom_type_values
 from dspy.adapters.utils import format_field_value as original_format_field_value
-from dspy.signatures.signature import Signature
+from dspy.task_spec import TaskSpec
+from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
 
 # BAML schema comments are prompt text; this adapter uses Python-style # comments because they have produced better model adherence than //.
 COMMENT_SYMBOL = "#"
@@ -107,14 +108,6 @@ def _build_simplified_schema(
     current_indent = INDENTATION * indent
     next_indent = INDENTATION * (indent + 1)
 
-    if indent == 0 and pydantic_model.__doc__:
-        docstring = pydantic_model.__doc__.strip()
-        # Handle multiline docstrings by prefixing each line with the comment symbol
-        for line in docstring.split("\n"):
-            line = line.strip()
-            if line:
-                lines.append(f"{current_indent}{COMMENT_SYMBOL} {line}")
-
     lines.append(f"{current_indent}{{")
 
     fields = pydantic_model.model_fields
@@ -136,13 +129,6 @@ def _build_simplified_schema(
             non_none_args = [arg for arg in args if arg is not type(None)]
             if len(non_none_args) == 1:
                 field_annotation = non_none_args[0]
-
-        if inspect.isclass(field_annotation) and issubclass(field_annotation, BaseModel) and field_annotation.__doc__:
-            docstring = field_annotation.__doc__.strip()
-            for line in docstring.split("\n"):
-                line = line.strip()
-                if line:
-                    lines.append(f"{next_indent}{COMMENT_SYMBOL} {line}")
 
         rendered_type = _render_type_str(annotation=field.annotation, indent=indent + 1, seen_models=seen_models)
         line = f"{next_indent}{name}: {rendered_type},"
@@ -173,8 +159,7 @@ class BAMLAdapter(JSONAdapter):
     from dspy.clients.lm import LM
     from dspy.dsp.utils.settings import settings
     from dspy.predict.predict import Predict
-    from dspy.signatures.field import InputField, OutputField
-    from dspy.signatures.signature import Signature
+    from dspy.task_spec import FieldSpec, make_task_spec
 
     # 1. Define your Pydantic models
     class PatientAddress(BaseModel):
@@ -187,11 +172,14 @@ class BAMLAdapter(JSONAdapter):
         age: int
         address: PatientAddress | None
 
-    # 2. Define a signature using the Pydantic model as an output field
-    class ExtractPatientInfo(Signature):
-        '''Extract patient information from the clinical note.'''
-        clinical_note: str = InputField()
-        patient_info: PatientDetails = OutputField()
+    # 2. Define a task spec using the Pydantic model as an output field
+    ExtractPatientInfo = make_task_spec(
+        {
+            "clinical_note": FieldSpec.input("clinical_note"),
+            "patient_info": FieldSpec.output("patient_info", type_=PatientDetails),
+        },
+        instructions="Extract patient information from the clinical note.",
+    )
 
     # 3. Configure DSPy to use the new adapter
     lm = LM("openai/gpt-4.1-mini")
@@ -209,7 +197,7 @@ class BAMLAdapter(JSONAdapter):
     """
 
     @override
-    def format_field_structure(self, signature: type[Signature]) -> str:
+    def format_field_structure(self, task_spec: TaskSpec) -> str:
         """Overrides the base method to generate a simplified schema for Pydantic models."""
 
         sections = []
@@ -218,16 +206,18 @@ class BAMLAdapter(JSONAdapter):
             "All interactions will be structured in the following way, with the appropriate values filled in.\n"
         )
 
-        if signature.input_fields:
-            for name in signature.input_fields:
+        if task_spec.input_fields:
+            for name in task_spec.input_fields:
                 sections.append(f"[[ ## {name} ## ]]")
                 sections.append(f"{{{name}}}")
                 sections.append("")  # Empty line after each input
 
-        if signature.output_fields:
-            for name, field in signature.output_fields.items():
-                field_type = field.annotation
+        if task_spec.output_fields:
+            for name, field in task_spec.output_fields.items():
+                field_type = field.type_
                 sections.append(f"[[ ## {name} ## ]]")
+                if field.desc and field.desc != f"${{{name}}}":
+                    sections.append(f"{COMMENT_SYMBOL} {field.desc}")
                 sections.append(
                     f"Output field `{name}` should be of type: {_render_type_str(annotation=field_type, indent=0)}\n"
                 )
@@ -239,17 +229,17 @@ class BAMLAdapter(JSONAdapter):
     @override
     def format_user_message_content(
         self,
-        signature: type[Signature],
+        task_spec: TaskSpec,
         inputs: dict[str, Any],
         prefix: str = "",
         suffix: str = "",
         main_request: bool = False,
     ) -> str | list[dict[str, Any]]:
         """Overrides the base method to render Pydantic input instances as clean JSON."""
-        if inputs_include_multimodal_custom_type_values(signature=signature, inputs=inputs):
-            output_requirements = self.user_message_output_requirements(signature) if main_request else None
+        if inputs_include_multimodal_custom_type_values(task_spec=task_spec, inputs=inputs):
+            output_requirements = self.user_message_output_requirements(task_spec) if main_request else None
             return build_multimodal_user_message_content(
-                signature=signature,
+                task_spec=task_spec,
                 inputs=inputs,
                 prefix=prefix,
                 suffix=suffix,
@@ -257,20 +247,21 @@ class BAMLAdapter(JSONAdapter):
                 output_requirements=output_requirements,
             )
 
+        input_field_infos = task_spec_input_field_infos(task_spec)
         messages = [prefix]
-        for key, field_info in signature.input_fields.items():
+        for key in task_spec.input_fields:
             if key in inputs:
                 value = inputs.get(key)
                 formatted_value = ""
                 if isinstance(value, BaseModel):
                     formatted_value = value.model_dump_json(indent=2, by_alias=True)
                 else:
-                    formatted_value = original_format_field_value(field_info=field_info, value=value)
+                    formatted_value = original_format_field_value(field_info=input_field_infos[key], value=value)
 
                 messages.append(f"[[ ## {key} ## ]]\n{formatted_value}")
 
         if main_request:
-            output_requirements = self.user_message_output_requirements(signature)
+            output_requirements = self.user_message_output_requirements(task_spec)
             if output_requirements is not None:
                 messages.append(output_requirements)
 

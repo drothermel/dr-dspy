@@ -558,6 +558,14 @@ def ensure_signature(signature: str | type[Signature] | None, instructions=None)
         return None
     if isinstance(signature, str):
         return make_signature(signature, instructions)
+    from dspy.task_spec import TaskSpec
+
+    if isinstance(signature, TaskSpec):
+        from dspy.task_spec.bridge import signature_from_task_spec
+
+        if instructions is not None:
+            raise ValueError("Don't specify instructions when initializing with a TaskSpec")
+        return signature_from_task_spec(signature)
     if instructions is not None:
         raise ValueError("Don't specify instructions when initializing with a Signature")
     return signature

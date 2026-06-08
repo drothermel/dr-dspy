@@ -20,9 +20,9 @@ from dspy.adapters.types.history import History
 from dspy.adapters.types.image import Image
 from dspy.adapters.types.tool import Tool
 from dspy.clients.lm import LM
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
+from dspy.task_spec import FieldSpec, make_task_spec
 from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs
+from tests.task_spec.helpers import ts
 
 
 # Test fixtures - Pydantic models for testing
@@ -70,13 +70,10 @@ class CircularModel(pydantic.BaseModel):
 
 
 def test_baml_adapter_format_exact_messages_for_simple_signature_with_demo():
-    class QA(Signature):
-        question: str = InputField()
-        answer: str = OutputField()
-
+    QA = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=BAMLAdapter(),
-        signature=QA,
+        task_spec=QA,
         demos=[{"question": "Q1", "answer": "A1"}],
         inputs={"question": "Q2"},
     )
@@ -121,12 +118,15 @@ def test_baml_adapter_format_exact_messages_with_nested_output():
         value: int
         tags: list[str]
 
-    class TypedSignature(Signature):
-        question: str = InputField()
-        answer: BamlNested = OutputField()
-
+    TypedSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer", type_=BamlNested),
+        },
+        instructions="Given the fields `question`, produce the fields `answer`.",
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=BAMLAdapter(), signature=TypedSignature, demos=[], inputs={"question": "Q"}
+        adapter=BAMLAdapter(), task_spec=TypedSignature, demos=[], inputs={"question": "Q"}
     )
 
     expected_messages = [
@@ -169,10 +169,13 @@ def test_baml_adapter_format_exact_messages_with_nested_output():
 def test_baml_adapter_basic_schema_generation():
     """Test that BAMLAdapter generates simplified schemas for Pydantic models."""
 
-    class TestSignature(Signature):
-        question: str = InputField()
-        patient: PatientDetails = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "patient": FieldSpec.output("patient", type_=PatientDetails),
+        },
+        instructions="Given the fields `question`, produce the fields `patient`.",
+    )
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
 
@@ -187,10 +190,13 @@ def test_baml_adapter_basic_schema_generation():
 def test_baml_adapter_handles_optional_fields():
     """Test optional field rendering with 'or null' syntax."""
 
-    class TestSignature(Signature):
-        input: str = InputField()
-        patient: PatientDetails = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "input": FieldSpec.input("input"),
+            "patient": FieldSpec.output("patient", type_=PatientDetails),
+        },
+        instructions="Given the fields `input`, produce the fields `patient`.",
+    )
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
 
@@ -207,10 +213,13 @@ def test_baml_adapter_handles_primitive_types():
         decimal: float
         flag: bool
 
-    class TestSignature(Signature):
-        input: str = InputField()
-        output: SimpleModel = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "input": FieldSpec.input("input"),
+            "output": FieldSpec.output("output", type_=SimpleModel),
+        },
+        instructions="Given the fields `input`, produce the fields `output`.",
+    )
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
 
@@ -223,10 +232,13 @@ def test_baml_adapter_handles_primitive_types():
 def test_baml_adapter_handles_lists_with_bracket_notation():
     """Test that lists of Pydantic models use proper bracket notation."""
 
-    class TestSignature(Signature):
-        input: str = InputField()
-        addresses: ModelWithLists = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "input": FieldSpec.input("input"),
+            "addresses": FieldSpec.output("addresses", type_=ModelWithLists),
+        },
+        instructions="Given the fields `input`, produce the fields `addresses`.",
+    )
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
 
@@ -241,37 +253,33 @@ def test_baml_adapter_handles_lists_with_bracket_notation():
 def test_baml_adapter_handles_complex_nested_models():
     """Test deeply nested Pydantic model schema generation."""
 
-    class TestSignature(Signature):
-        input: str = InputField()
-        complex: ComplexNestedModel = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "input": FieldSpec.input("input"),
+            "complex": FieldSpec.output("complex", type_=ComplexNestedModel),
+        },
+        instructions="Given the fields `input`, produce the fields `complex`.",
+    )
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
 
-    expected_patient_details = "\n".join(
-        [
-            f"{INDENTATION}{COMMENT_SYMBOL} Patient Details model docstring",
-            f"{INDENTATION}{COMMENT_SYMBOL} Multiline docstring support test",
-            f"{INDENTATION}details:",
-        ]
-    )
-
     assert f"{COMMENT_SYMBOL} Unique identifier" in schema
-    assert expected_patient_details in schema
+    assert f"{INDENTATION}details:" in schema
     assert f"{COMMENT_SYMBOL} Full name of the patient" in schema
     assert "tags: string[]," in schema
     assert "metadata: dict[string, string]," in schema
-    assert f"{COMMENT_SYMBOL} Complex model docstring" in schema
-    assert f"{COMMENT_SYMBOL} Patient Address model docstring" in schema
 
 
 def test_baml_adapter_raise_error_on_circular_references():
     """Test that circular references are handled gracefully."""
 
-    class TestSignature(Signature):
-        input: str = InputField()
-        circular: CircularModel = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "input": FieldSpec.input("input"),
+            "circular": FieldSpec.output("circular", type_=CircularModel),
+        },
+        instructions="Given the fields `input`, produce the fields `circular`.",
+    )
     adapter = BAMLAdapter()
     with pytest.raises(ValueError) as error:  # noqa: PT011
         adapter.format_field_structure(TestSignature)
@@ -282,11 +290,14 @@ def test_baml_adapter_raise_error_on_circular_references():
 def test_baml_adapter_formats_pydantic_inputs_as_clean_json():
     """Test that Pydantic input instances are formatted as clean JSON."""
 
-    class TestSignature(Signature):
-        patient: PatientDetails = InputField()
-        question: str = InputField()
-        answer: str = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "patient": FieldSpec.input("patient", type_=PatientDetails),
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Given the fields `patient`, `question`, produce the fields `answer`.",
+    )
     adapter = BAMLAdapter()
     patient = PatientDetails(
         name="John Doe", age=45, address=PatientAddress(street="123 Main St", city="Anytown", country="US")
@@ -294,7 +305,7 @@ def test_baml_adapter_formats_pydantic_inputs_as_clean_json():
 
     messages = adapter_format_as_openai(
         adapter=adapter,
-        signature=TestSignature,
+        task_spec=TestSignature,
         demos=[],
         inputs={"patient": patient, "question": "What is the diagnosis?"},
     )
@@ -309,18 +320,21 @@ def test_baml_adapter_formats_pydantic_inputs_as_clean_json():
 def test_baml_adapter_handles_mixed_input_types():
     """Test formatting of mixed Pydantic and primitive inputs."""
 
-    class TestSignature(Signature):
-        patient: PatientDetails = InputField()
-        priority: int = InputField()
-        notes: str = InputField()
-        result: str = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "patient": FieldSpec.input("patient", type_=PatientDetails),
+            "priority": FieldSpec.input("priority", type_=int),
+            "notes": FieldSpec.input("notes"),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="Given the fields `patient`, `priority`, `notes`, produce the fields `result`.",
+    )
     adapter = BAMLAdapter()
     patient = PatientDetails(name="Jane Doe", age=30)
 
     messages = adapter_format_as_openai(
         adapter=adapter,
-        signature=TestSignature,
+        task_spec=TestSignature,
         demos=[],
         inputs={"patient": patient, "priority": 1, "notes": "Urgent case"},
     )
@@ -338,10 +352,13 @@ def test_baml_adapter_handles_schema_generation_errors_gracefully():
         # This might cause issues in schema generation
         field: object
 
-    class TestSignature(Signature):
-        input: str = InputField()
-        output: ProblematicModel = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "input": FieldSpec.input("input"),
+            "output": FieldSpec.output("output", type_=ProblematicModel),
+        },
+        instructions="Given the fields `input`, produce the fields `output`.",
+    )
     adapter = BAMLAdapter()
 
     try:
@@ -354,18 +371,21 @@ def test_baml_adapter_handles_schema_generation_errors_gracefully():
 def test_baml_adapter_raises_on_missing_fields():
     """Test that missing required fields raise appropriate errors."""
 
-    class TestSignature(Signature):
-        input: str = InputField()
-        patient: PatientDetails = OutputField()
-        summary: str = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "input": FieldSpec.input("input"),
+            "patient": FieldSpec.output("patient", type_=PatientDetails),
+            "summary": FieldSpec.output("summary"),
+        },
+        instructions="Given the fields `input`, produce the fields `patient`, `summary`.",
+    )
     adapter = BAMLAdapter()
 
     # Missing 'summary' field
     completion = '{"patient": {"name": "John", "age": 30}}'
 
     with pytest.raises(AdapterParseError) as e:
-        adapter.parse(TestSignature, completion)
+        adapter.parse(task_spec=TestSignature, completion=completion)
 
     assert e.value.adapter_name == "JSONAdapter"  # BAMLAdapter inherits from JSONAdapter
     assert "summary" in str(e.value)
@@ -374,26 +394,32 @@ def test_baml_adapter_raises_on_missing_fields():
 def test_baml_adapter_handles_type_casting_errors():
     """Test graceful handling of type casting errors."""
 
-    class TestSignature(Signature):
-        input: str = InputField()
-        patient: PatientDetails = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "input": FieldSpec.input("input"),
+            "patient": FieldSpec.output("patient", type_=PatientDetails),
+        },
+        instructions="Given the fields `input`, produce the fields `patient`.",
+    )
     adapter = BAMLAdapter()
 
     # Invalid age type
     completion = '{"patient": {"name": "John", "age": "not_a_number"}}'
 
     with pytest.raises((AdapterParseError, pydantic.ValidationError)):
-        adapter.parse(TestSignature, completion)
+        adapter.parse(task_spec=TestSignature, completion=completion)
 
 
 def test_baml_adapter_with_images():
     """Test BAMLAdapter integration with Image objects."""
 
-    class TestSignature(Signature):
-        image_data: ImageWrapper = InputField()
-        description: str = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "image_data": FieldSpec.input("image_data", type_=ImageWrapper),
+            "description": FieldSpec.output("description"),
+        },
+        instructions="Given the fields `image_data`, produce the fields `description`.",
+    )
     adapter = BAMLAdapter()
 
     image_wrapper = ImageWrapper(
@@ -402,7 +428,7 @@ def test_baml_adapter_with_images():
     )
 
     messages = adapter_format_as_openai(
-        adapter=adapter, signature=TestSignature, demos=[], inputs={"image_data": image_wrapper}
+        adapter=adapter, task_spec=TestSignature, demos=[], inputs={"image_data": image_wrapper}
     )
 
     user_message = messages[-1]["content"]
@@ -418,10 +444,14 @@ def test_baml_adapter_with_images():
 def test_baml_adapter_with_tools():
     """Test BAMLAdapter integration with Tool objects."""
 
-    class TestSignature(Signature):
-        question: str = InputField()
-        tools: list[Tool] = InputField()
-        answer: str = OutputField()
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "tools": FieldSpec.input("tools", type_=list[Tool]),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Given the fields `question`, `tools`, produce the fields `answer`.",
+    )
 
     def get_patient_info(patient_id: int) -> str:
         """Get patient information by ID"""
@@ -436,7 +466,7 @@ def test_baml_adapter_with_tools():
     adapter = BAMLAdapter()
     messages = adapter_format_as_openai(
         adapter=adapter,
-        signature=TestSignature,
+        task_spec=TestSignature,
         demos=[],
         inputs={"question": "Schedule an appointment for John", "tools": tools},
     )
@@ -452,14 +482,17 @@ def test_baml_adapter_with_code():
     """Test BAMLAdapter integration with Code objects."""
 
     # Test with code as input field
-    class CodeAnalysisSignature(Signature):
-        code: Code = InputField()
-        analysis: str = OutputField()
-
+    CodeAnalysisSignature = make_task_spec(
+        {
+            "code": FieldSpec.input("code", type_=Code),
+            "analysis": FieldSpec.output("analysis"),
+        },
+        instructions="Given the fields `code`, produce the fields `analysis`.",
+    )
     adapter = BAMLAdapter()
     messages = adapter_format_as_openai(
         adapter=adapter,
-        signature=CodeAnalysisSignature,
+        task_spec=CodeAnalysisSignature,
         demos=[],
         inputs={"code": "def hello():\n    print('Hello, world!')"},
     )
@@ -469,10 +502,13 @@ def test_baml_adapter_with_code():
     assert "print('Hello, world!')" in user_message
 
     # Test with code as output field
-    class CodeGenSignature(Signature):
-        task: str = InputField()
-        code: Code = OutputField()
-
+    CodeGenSignature = make_task_spec(
+        {
+            "task": FieldSpec.input("task"),
+            "code": FieldSpec.output("code", type_=Code),
+        },
+        instructions="Given the fields `task`, produce the fields `code`.",
+    )
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content='{"code": "print(\\"Generated code\\")"}'))],
@@ -483,7 +519,7 @@ def test_baml_adapter_with_code():
             adapter.acall(
                 lm=LM(model="openai/gpt-4o-mini", cache=False),
                 config={},
-                signature=CodeGenSignature,
+                task_spec=CodeGenSignature,
                 demos=[],
                 inputs={"task": "Write a hello world program"},
             )
@@ -495,11 +531,14 @@ def test_baml_adapter_with_code():
 def test_baml_adapter_with_conversation_history():
     """Test BAMLAdapter integration with History objects."""
 
-    class TestSignature(Signature):
-        history: History = InputField()
-        question: str = InputField()
-        answer: str = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "history": FieldSpec.input("history", type_=History),
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Given the fields `history`, `question`, produce the fields `answer`.",
+    )
     history = History(
         messages=[
             {"question": "What is the patient's age?", "answer": "45 years old"},
@@ -510,7 +549,7 @@ def test_baml_adapter_with_conversation_history():
     adapter = BAMLAdapter()
     messages = adapter_format_as_openai(
         adapter=adapter,
-        signature=TestSignature,
+        task_spec=TestSignature,
         demos=[],
         inputs={"history": history, "question": "What medications should we avoid?"},
     )
@@ -526,10 +565,13 @@ def test_baml_adapter_with_conversation_history():
 def test_baml_vs_json_adapter_token_efficiency():
     """Test that BAMLAdapter generates more token-efficient schemas."""
 
-    class TestSignature(Signature):
-        input: str = InputField()
-        complex: ComplexNestedModel = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "input": FieldSpec.input("input"),
+            "complex": FieldSpec.output("complex", type_=ComplexNestedModel),
+        },
+        instructions="Given the fields `input`, produce the fields `complex`.",
+    )
     baml_adapter = BAMLAdapter()
     json_adapter = JSONAdapter()
 
@@ -544,10 +586,13 @@ def test_baml_vs_json_adapter_token_efficiency():
 def test_baml_vs_json_adapter_functional_compatibility():
     """Test that both adapters parse identical outputs to the same results."""
 
-    class TestSignature(Signature):
-        question: str = InputField()
-        patient: PatientDetails = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "patient": FieldSpec.output("patient", type_=PatientDetails),
+        },
+        instructions="Given the fields `question`, produce the fields `patient`.",
+    )
     baml_adapter = BAMLAdapter()
     json_adapter = JSONAdapter()
 
@@ -557,8 +602,8 @@ def test_baml_vs_json_adapter_functional_compatibility():
         "address": {"street": "789 Pine St", "city": "Boston", "country": "US"}
     }}"""
 
-    baml_result = baml_adapter.parse(TestSignature, completion)
-    json_result = json_adapter.parse(TestSignature, completion)
+    baml_result = baml_adapter.parse(task_spec=TestSignature, completion=completion)
+    json_result = json_adapter.parse(task_spec=TestSignature, completion=completion)
 
     assert baml_result["patient"].name == json_result["patient"].name
     assert baml_result["patient"].age == json_result["patient"].age
@@ -569,10 +614,13 @@ def test_baml_vs_json_adapter_functional_compatibility():
 async def test_baml_adapter_async_functionality():
     """Test BAMLAdapter async operations."""
 
-    class TestSignature(Signature):
-        question: str = InputField()
-        patient: PatientDetails = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "patient": FieldSpec.output("patient", type_=PatientDetails),
+        },
+        instructions="Given the fields `question`, produce the fields `patient`.",
+    )
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_acompletion:
         mock_acompletion.return_value = ModelResponse(
             choices=[Choices(message=Message(content='{"patient": {"name": "John Doe", "age": 28}}'))],
@@ -583,7 +631,7 @@ async def test_baml_adapter_async_functionality():
         result = await adapter.acall(
             lm=LM(model="openai/gpt-4o", cache=False),
             config={},
-            signature=TestSignature,
+            task_spec=TestSignature,
             demos=[],
             inputs={"question": "Extract patient info"},
         )
@@ -599,10 +647,13 @@ def test_baml_adapter_with_field_aliases():
         full_name: str = pydantic.Field(alias="name")
         patient_age: int = pydantic.Field(alias="age")
 
-    class TestSignature(Signature):
-        input: str = InputField()
-        data: ModelWithAliases = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "input": FieldSpec.input("input"),
+            "data": FieldSpec.output("data", type_=ModelWithAliases),
+        },
+        instructions="Given the fields `input`, produce the fields `data`.",
+    )
     adapter = BAMLAdapter()
 
     schema = adapter.format_field_structure(TestSignature)
@@ -618,10 +669,13 @@ def test_baml_adapter_field_alias_without_description():
         regular_field: int
         field_with_description: str = pydantic.Field(description="This field has a description", alias="desc_field")
 
-    class TestSignature(Signature):
-        input: str = InputField()
-        data: ModelWithAliasNoDescription = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "input": FieldSpec.input("input"),
+            "data": FieldSpec.output("data", type_=ModelWithAliasNoDescription),
+        },
+        instructions="Given the fields `input`, produce the fields `data`.",
+    )
     adapter = BAMLAdapter()
     schema = adapter.format_field_structure(TestSignature)
 
@@ -645,11 +699,14 @@ def test_baml_adapter_multiple_pydantic_input_fields():
         debug: bool
         endpoints: list[str]
 
-    class TestSignature(Signature):
-        input_1: UserProfile = InputField(desc="User profile information")
-        input_2: SystemConfig = InputField(desc="System configuration settings")
-        result: str = OutputField(desc="Resulting output after processing")
-
+    TestSignature = make_task_spec(
+        {
+            "input_1": FieldSpec.input("input_1", type_=UserProfile, desc="User profile information"),
+            "input_2": FieldSpec.input("input_2", type_=SystemConfig, desc="System configuration settings"),
+            "result": FieldSpec.output("result", desc="Resulting output after processing"),
+        },
+        instructions="Given the fields `input_1`, `input_2`, produce the fields `result`.",
+    )
     adapter = BAMLAdapter()
 
     schema = adapter.format_field_structure(TestSignature)
@@ -673,7 +730,7 @@ def test_baml_adapter_multiple_pydantic_input_fields():
     system_config = SystemConfig(timeout=300, debug=True, endpoints=["api1", "api2"])
 
     messages = adapter_format_as_openai(
-        adapter=adapter, signature=TestSignature, demos=[], inputs={"input_1": user_profile, "input_2": system_config}
+        adapter=adapter, task_spec=TestSignature, demos=[], inputs={"input_1": user_profile, "input_2": system_config}
     )
 
     user_message = messages[-1]["content"]
