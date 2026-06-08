@@ -2,13 +2,13 @@
 
 from typing import Any, get_args, get_origin
 
-from dspy.task_spec.field_spec import FieldSpec
+from dspy.task_spec.field_spec import _UNSET, FieldSpec
 
 TASK_SPEC_VERSION = 2
 
 
 def field_spec_to_dict(field: FieldSpec) -> dict[str, Any]:
-    return {
+    data = {
         "name": field.name,
         "type": _type_to_str(field.type_),
         "desc": field.desc,
@@ -17,6 +17,10 @@ def field_spec_to_dict(field: FieldSpec) -> dict[str, Any]:
         "is_type_undefined": field.is_type_undefined,
         "constraints": field.constraints,
     }
+    if field.has_default:
+        data["has_default"] = True
+        data["default"] = field.default
+    return data
 
 
 def field_spec_from_dict(data: dict[str, Any], *, custom_types: dict[str, type] | None = None) -> FieldSpec:
@@ -31,6 +35,7 @@ def field_spec_from_dict(data: dict[str, Any], *, custom_types: dict[str, type] 
             data["name"],
             type_,
             is_type_undefined=data.get("is_type_undefined", False),
+            default=data["default"] if data.get("has_default") else _UNSET,
             **common,
         )
     return FieldSpec.output(data["name"], type_, **common)

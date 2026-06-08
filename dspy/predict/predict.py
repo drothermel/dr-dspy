@@ -1,7 +1,7 @@
 import logging
 import random
 import types
-from typing import Annotated, Any, Literal, Union, get_args, get_origin
+from typing import Annotated, Any, Literal, Union, cast, get_args, get_origin
 
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
@@ -14,7 +14,9 @@ from dspy.dsp.utils.settings import settings
 from dspy.predict.parameter import Parameter
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.signatures.signature import Signature, ensure_signature
+from dspy.signatures.signature import Signature
+from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
+from dspy.task_spec.task_spec import TaskSpec
 from dspy.utils.callback import BaseCallback
 from dspy.utils.constants import IS_TYPE_UNDEFINED
 
@@ -45,7 +47,7 @@ class Predict(Module, Parameter):
     """Basic DSPy module that maps inputs to outputs using a language model.
 
     Args:
-        signature: The input/output signature describing the task.
+        task_spec: The input/output task spec describing the task.
         callbacks: Optional list of callbacks for instrumentation.
         **config: Default keyword arguments forwarded to the underlying
             language model. These values can be overridden for a single
@@ -53,18 +55,29 @@ class Predict(Module, Parameter):
             module. For example::
 
                 from dspy.predict.predict import Predict
+                from dspy.task_spec import make_task_spec
 
-                predict = Predict("q -> a", rollout_id=1, temperature=1.0)
+                qa = make_task_spec("q -> a", instructions="Answer the question.")
+                predict = Predict(qa, rollout_id=1, temperature=1.0)
                 result = await predict(q="What is 1 + 52?", config={"rollout_id": 2, "temperature": 1.0})
     """
 
-    def __init__(self, signature: str | type[Signature], callbacks: list[BaseCallback] | None = None, **config) -> None:
+    def __init__(self, task_spec: TaskSpec, callbacks: list[BaseCallback] | None = None, **config) -> None:
+        if isinstance(task_spec, str):
+            raise TypeError(
+                "Predict requires a TaskSpec instance, not a string. "
+                "Use make_task_spec(...) to create one from a spec string."
+            )
+        if isinstance(task_spec, type) and issubclass(task_spec, Signature):
+            raise TypeError(
+                "Predict requires a TaskSpec instance, not a Signature class. Use make_task_spec(...) to create one."
+            )
+        if not isinstance(task_spec, TaskSpec):
+            raise TypeError(f"Predict requires a TaskSpec instance, got {type(task_spec).__name__}.")
+
         super().__init__(callbacks=callbacks)
         self.stage = random.randbytes(8).hex()
-        resolved_signature = ensure_signature(signature)
-        if resolved_signature is None:
-            raise ValueError(f"Invalid signature: {signature!r}")
-        self.signature: type[Signature] = resolved_signature
+        self.task_spec: TaskSpec = task_spec
         self.config = config
         self.reset()
 
@@ -92,28 +105,42 @@ class Predict(Module, Parameter):
             else:
                 state["demos"].append(demo)
 
-        state["signature"] = self.signature.dump_state()
+        state["task_spec"] = self.task_spec.to_dict()
         state["lm"] = self.lm.dump_state() if self.lm else None
         return state
 
     @override
-    def load_state(self, state: dict, *, allow_unsafe_lm_state: bool = False) -> "Predict":
+    def load_state(
+        self,
+        state: dict,
+        *,
+        allow_unsafe_lm_state: bool = False,
+        custom_types: dict[str, type] | None = None,
+    ) -> "Predict":
         """Load the saved state of a `Predict` object.
 
         Args:
             state: The saved state of a `Predict` object.
             allow_unsafe_lm_state: If True, preserves `api_base`, `base_url`, and `model_list` from
                 serialized LM state and allows importing custom LM classes. Enable only when loading trusted files.
+            custom_types: Optional mapping of serialized type names to types when restoring a saved task spec.
 
         Returns:
             Self to allow method chaining.
         """
-        excluded_keys = ["signature", "extended_signature", "lm"]
+        excluded_keys = ["task_spec", "extended_signature", "lm"]
         for name, value in state.items():
             if name not in excluded_keys:
                 setattr(self, name, value)
 
-        self.signature = self.signature.load_state(state["signature"])
+        if "task_spec" not in state:
+            if "signature" in state:
+                raise ValueError(
+                    "Saved state uses legacy 'signature' format. Re-save the program with the current DSPy version."
+                )
+            raise ValueError("Missing required 'task_spec' key in saved Predict state.")
+
+        self.task_spec = TaskSpec.from_dict(state["task_spec"], custom_types=custom_types)
         sanitized_lm_state = _sanitize_lm_state(state["lm"], allow_unsafe_lm_state) if state["lm"] else None
         self.lm = (
             BaseLM.load_state(sanitized_lm_state, allow_custom_lm_class=allow_unsafe_lm_state)
@@ -124,11 +151,11 @@ class Predict(Module, Parameter):
         return self
 
     def _get_positional_args_error_message(self) -> str:
-        input_fields = list(self.signature.input_fields.keys())
+        input_fields = list(self.task_spec.input_fields.keys())
         return (
             "Positional arguments are not allowed when calling `dspy.predict.predict.Predict`, must use keyword "
             "arguments "
-            f"that match your signature input fields: '{', '.join(input_fields)}'. For example: "
+            f"that match your task spec input fields: '{', '.join(input_fields)}'. For example: "
             f"`predict({input_fields[0]}=input_value, ...)`."
         )
 
@@ -148,9 +175,12 @@ class Predict(Module, Parameter):
 
     def _forward_preprocess(self, **kwargs):
         assert "new_signature" not in kwargs, "new_signature is no longer a valid keyword argument."
-        signature = ensure_signature(kwargs.pop("signature", self.signature))
-        if signature is None:
-            raise ValueError("Invalid signature provided to Predict.")
+        if "signature" in kwargs:
+            raise TypeError("The 'signature' keyword argument is no longer supported. Pass 'task_spec' instead.")
+        task_spec = kwargs.pop("task_spec", self.task_spec)
+        if not isinstance(task_spec, TaskSpec):
+            raise TypeError(f"Predict expected a TaskSpec, got {type(task_spec).__name__}.")
+        input_fields = task_spec_input_field_infos(task_spec)
         demos = kwargs.pop("demos", self.demos)
         base_config = coerce_lm_config(self.config)
         override = kwargs.pop("config", {})
@@ -205,30 +235,31 @@ class Predict(Module, Parameter):
             extensions["prediction"] = kwargs.pop("prediction")
             config = config.model_copy(update={"extensions": extensions})
 
-        for k, v in signature.input_fields.items():
-            if k not in kwargs and v.default is not PydanticUndefined:
-                kwargs[k] = v.default
+        for k, field_info in input_fields.items():
+            if k not in kwargs and field_info.default is not PydanticUndefined:
+                kwargs[k] = field_info.default
 
-        extra_fields = [k for k in kwargs if k not in signature.input_fields]
+        extra_fields = [k for k in kwargs if k not in input_fields]
         if extra_fields:
             logger.warning(
-                "Input contains fields not in signature. These fields will be ignored: %s. Expected fields: %s.",
+                "Input contains fields not in task spec. These fields will be ignored: %s. Expected fields: %s.",
                 extra_fields,
-                list(signature.input_fields.keys()),
+                list(input_fields.keys()),
             )
 
         if settings.warn_on_type_mismatch:
-            for field_name, field_info in signature.input_fields.items():
+            for field_name, field_info in input_fields.items():
                 if field_name in kwargs:
                     value = kwargs[field_name]
-                    expected_type: type = field_info.annotation
+                    expected_type = field_info.annotation
+                    json_schema_extra = cast("dict[str, Any]", field_info.json_schema_extra or {})
 
-                    if value is None or field_info.json_schema_extra.get(IS_TYPE_UNDEFINED, False):
+                    if value is None or json_schema_extra.get(IS_TYPE_UNDEFINED, False):
                         continue
 
-                    if not _is_value_compatible_with_type(value, expected_type):
+                    if not _is_value_compatible_with_type(value, cast("type", expected_type)):
                         logger.warning(
-                            "Type mismatch for field '%s': expected %s based on given Signature, "
+                            "Type mismatch for field '%s': expected %s based on given task spec, "
                             "but the provided value is incompatible: %s.",
                             field_name,
                             _get_type_name(expected_type),
@@ -237,20 +268,20 @@ class Predict(Module, Parameter):
 
         missing = [
             k
-            for k, field_info in signature.input_fields.items()
+            for k, field_info in input_fields.items()
             if k not in kwargs and not _annotation_allows_none(field_info.annotation)
         ]
         if missing:
-            present = [k for k in signature.input_fields if k in kwargs]
+            present = [k for k in input_fields if k in kwargs]
             logger.warning(
                 "Not all input fields were provided to module. Present: %s. Missing: %s.",
                 present,
                 missing,
             )
-        return lm, config, signature, demos, kwargs
+        return lm, config, task_spec, demos, kwargs
 
-    def _forward_postprocess(self, completions, signature, **kwargs):
-        pred = Prediction.from_completions(completions, signature=signature)
+    def _forward_postprocess(self, completions, task_spec, **kwargs):
+        pred = Prediction.from_completions(completions, task_spec=task_spec)
         if kwargs.pop("_trace", True) and settings.trace is not None and settings.max_trace_size > 0:
             trace = settings.trace
             if len(trace) >= settings.max_trace_size:
@@ -259,19 +290,17 @@ class Predict(Module, Parameter):
         return pred
 
     async def aforward(self, **kwargs):
-        lm, config, signature, demos, kwargs = self._forward_preprocess(**kwargs)
+        lm, config, task_spec, demos, kwargs = self._forward_preprocess(**kwargs)
 
         adapter = settings.adapter or ChatAdapter()
-        from dspy.task_spec.bridge import task_spec_from_signature
-
         completions = await adapter.acall(
             lm=lm,
             config=config,
-            task_spec=task_spec_from_signature(signature),
+            task_spec=task_spec,
             demos=demos,
             inputs=kwargs,
         )
-        return self._forward_postprocess(completions, signature, **kwargs)
+        return self._forward_postprocess(completions, task_spec, **kwargs)
 
     def update_config(self, **kwargs) -> None:
         self.config = {**self.config, **kwargs}
@@ -281,7 +310,7 @@ class Predict(Module, Parameter):
 
     @override
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.signature})"
+        return f"{self.__class__.__name__}({self.task_spec})"
 
 
 def _get_type_name(type_annotation) -> str:

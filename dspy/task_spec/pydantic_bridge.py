@@ -34,9 +34,12 @@ def task_spec_to_pydantic_model(spec: TaskSpec) -> type[BaseModel]:
             json_schema_extra[IS_TYPE_UNDEFINED] = True
         if field.constraints:
             json_schema_extra["constraints"] = field.constraints
-        field_defs[field.name] = (
-            field.type_,
-            Field(json_schema_extra=json_schema_extra, description=field.desc),
-        )
+        field_kwargs: dict[str, Any] = {
+            "json_schema_extra": json_schema_extra,
+            "description": field.desc,
+        }
+        if field.role == "input" and field.has_default:
+            field_kwargs["default"] = field.default
+        field_defs[field.name] = (field.type_, Field(**field_kwargs))
     model_name = spec.name.replace(" ", "_")
     return create_model(model_name, **field_defs)

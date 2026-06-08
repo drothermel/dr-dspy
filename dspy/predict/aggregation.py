@@ -22,12 +22,12 @@ def majority(prediction_or_completions, normalize=default_normalize, field=None)
         completions = prediction_or_completions
 
     try:
-        signature = completions.signature
+        task_spec = completions.task_spec
     except Exception:
-        signature = None
+        task_spec = None
 
     if not field:
-        field = list(signature.output_fields.keys())[-1] if signature else list(completions[0].keys())[-1]
+        field = list(task_spec.output_fields.keys())[-1] if task_spec else list(completions[0].keys())[-1]
 
     normalize = normalize if normalize else lambda x: x
     normalized_values = [normalize(completion[field]) for completion in completions]
@@ -45,4 +45,4 @@ def majority(prediction_or_completions, normalize=default_normalize, field=None)
             completion = candidate
             break
 
-    return Prediction.from_completions([completion], signature=signature)
+    return Prediction.from_completions([completion], task_spec=task_spec)

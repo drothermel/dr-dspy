@@ -295,12 +295,31 @@ def get_prompt_model(prompt_model):
     return settings.lm
 
 
+def get_task_spec(predictor):
+    assert hasattr(predictor, "task_spec")
+    return predictor.task_spec
+
+
+def set_task_spec(*, predictor, task_spec) -> None:
+    assert hasattr(predictor, "task_spec")
+    predictor.task_spec = task_spec
+
+
 def get_signature(predictor):
+    if hasattr(predictor, "task_spec"):
+        from dspy.task_spec.bridge import signature_from_task_spec
+
+        return signature_from_task_spec(predictor.task_spec)
     assert hasattr(predictor, "signature")
     return predictor.signature
 
 
 def set_signature(*, predictor, updated_signature) -> None:
+    if hasattr(predictor, "task_spec"):
+        from dspy.task_spec.bridge import task_spec_from_signature
+
+        predictor.task_spec = task_spec_from_signature(updated_signature)
+        return
     assert hasattr(predictor, "signature")
     predictor.signature = updated_signature
 

@@ -29,10 +29,34 @@ from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict, serialize_object
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
+from dspy.task_spec import FieldSpec, TaskSpec, default_task_instructions, make_task_spec
 from dspy.utils.dummies import DummyLM
 from tests.test_utils.spy_lm import SpyLM
+
+
+def _field_names(spec_part: str) -> tuple[str, ...]:
+    names: list[str] = []
+    for chunk in spec_part.split(","):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        names.append(chunk.split(":")[0].strip())
+    return tuple(names)
+
+
+def pspec(spec: str, *, instructions: str | None = None, **kwargs) -> TaskSpec:
+    if instructions is None:
+        inputs_str, outputs_str = spec.split("->", 1)
+        instructions = default_task_instructions(
+            inputs=_field_names(inputs_str),
+            outputs=_field_names(outputs_str),
+        )
+    return make_task_spec(spec, instructions=instructions, **kwargs)
+
+
+class InventoryItem(pydantic.BaseModel):
+    name: str
+    quantity: int
 
 
 class CustomStateLM(BaseLM):
@@ -61,14 +85,15 @@ class OuterLMContainer:
 
 def test_initialization_with_string_signature():
     signature_string = "input1, input2 -> output"
-    predict = Predict(signature_string)
+    with pytest.raises(TypeError, match="TaskSpec instance, not a string"):
+        Predict(signature_string)
     expected_instruction = "Given the fields `input1`, `input2`, produce the fields `output`."
-    assert predict.signature.instructions == expected_instruction
-    assert predict.signature.instructions == Signature(signature_string).instructions  # ty:ignore[too-many-positional-arguments, unresolved-attribute]
+    predict = Predict(pspec(signature_string))
+    assert predict.task_spec.instructions == expected_instruction
 
 
 def test_reset_method():
-    predict_instance = Predict("input -> output")
+    predict_instance = Predict(pspec("input -> output"))
     predict_instance.lm = "modified"  # ty:ignore[invalid-assignment]
     predict_instance.traces = ["trace"]
     predict_instance.train = ["train"]
@@ -81,7 +106,7 @@ def test_reset_method():
 
 
 def test_lm_after_dump_and_load_state():
-    predict_instance = Predict("input -> output")
+    predict_instance = Predict(pspec("input -> output"))
     lm = LM(
         model="openai/gpt-4o-mini",
         model_type="chat",
@@ -104,7 +129,7 @@ def test_lm_after_dump_and_load_state():
     }
     assert lm.dump_state() == expected_lm_state
     dumped_state = predict_instance.dump_state()
-    new_instance = Predict("input -> output")
+    new_instance = Predict(pspec("input -> output"))
     new_instance.load_state(dumped_state)
     assert new_instance.lm.dump_state() == expected_lm_state  # ty:ignore[unresolved-attribute]
 
@@ -116,12 +141,12 @@ def test_base_lm_dump_state_ignores_internal_class_marker_kwarg():
 
 
 def test_legacy_lm_state_without_class_marker_loads_as_lm():
-    predict_instance = Predict("input -> output")
+    predict_instance = Predict(pspec("input -> output"))
     predict_instance.lm = LM(model="openai/gpt-4o-mini", temperature=1, max_tokens=100)
     dumped_state = predict_instance.dump_state()
     dumped_state["lm"].pop(LM_CLASS_STATE_KEY)
 
-    loaded_instance = Predict("input -> output").load_state(dumped_state)
+    loaded_instance = Predict(pspec("input -> output")).load_state(dumped_state)
 
     assert isinstance(loaded_instance.lm, LM)
     assert loaded_instance.lm.model == "openai/gpt-4o-mini"
@@ -129,14 +154,14 @@ def test_legacy_lm_state_without_class_marker_loads_as_lm():
 
 
 def test_custom_lm_load_state_requires_trusted_opt_in():
-    predict_instance = Predict("input -> output")
+    predict_instance = Predict(pspec("input -> output"))
     predict_instance.lm = CustomStateLM(model="custom-model", deployment="prod")
     dumped_state = predict_instance.dump_state()
 
     with pytest.raises(ValueError, match="Refusing to import custom serialized LM class"):
-        Predict("input -> output").load_state(dumped_state)
+        Predict(pspec("input -> output")).load_state(dumped_state)
 
-    loaded_instance = Predict("input -> output").load_state(dumped_state, allow_unsafe_lm_state=True)
+    loaded_instance = Predict(pspec("input -> output")).load_state(dumped_state, allow_unsafe_lm_state=True)
 
     assert isinstance(loaded_instance.lm, CustomStateLM)
     assert loaded_instance.lm.model == "custom-model"
@@ -144,18 +169,18 @@ def test_custom_lm_load_state_requires_trusted_opt_in():
 
 
 def test_nested_custom_lm_class_path_loads_for_trusted_state():
-    predict_instance = Predict("input -> output")
+    predict_instance = Predict(pspec("input -> output"))
     predict_instance.lm = OuterLMContainer.InnerLM(model="nested-model")
     dumped_state = predict_instance.dump_state()
 
-    loaded_instance = Predict("input -> output").load_state(dumped_state, allow_unsafe_lm_state=True)
+    loaded_instance = Predict(pspec("input -> output")).load_state(dumped_state, allow_unsafe_lm_state=True)
 
     assert isinstance(loaded_instance.lm, OuterLMContainer.InnerLM)
     assert loaded_instance.lm.model == "nested-model"
 
 
 def test_call_method():
-    predict_instance = Predict("input -> output")
+    predict_instance = Predict(pspec("input -> output"))
     lm = DummyLM([{"output": "test output"}])
     settings.configure(lm=lm)
     result = asyncio.run(predict_instance(input="test input"))
@@ -163,21 +188,23 @@ def test_call_method():
 
 
 def test_instructions_after_dump_and_load_state():
-    predict_instance = Predict(Signature("input -> output", "original instructions"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
+    predict_instance = Predict(pspec("input -> output", instructions="original instructions"))
     dumped_state = predict_instance.dump_state()
-    new_instance = Predict(Signature("input -> output", "new instructions"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
+    new_instance = Predict(pspec("input -> output", instructions="new instructions"))
     new_instance.load_state(dumped_state)
-    assert new_instance.signature.instructions == "original instructions"
+    assert new_instance.task_spec.instructions == "original instructions"
 
 
 def test_demos_after_dump_and_load_state():
-    class TranslateToEnglish(Signature):
-        """Translate content from a language to English."""
-
-        content: str = InputField()
-        language: str = InputField()
-        translation: str = OutputField()
-
+    TranslateToEnglish = make_task_spec(
+        {
+            "content": FieldSpec.input("content"),
+            "language": FieldSpec.input("language"),
+            "translation": FieldSpec.output("translation"),
+        },
+        instructions="Translate content from a language to English.",
+        name="TranslateToEnglish",
+    )
     original_instance = Predict(TranslateToEnglish)
     original_instance.demos = [
         Example(
@@ -202,24 +229,22 @@ def test_demos_after_dump_and_load_state():
 
 
 def test_typed_demos_after_dump_and_load_state():
-    class Item(pydantic.BaseModel):
-        name: str
-        quantity: int
-
-    class InventorySignature(Signature):
-        """Handle inventory items and their translations."""
-
-        items: list[Item] = InputField()
-        language: str = InputField()
-        translated_items: list[Item] = OutputField()
-        total_quantity: int = OutputField()
-
+    InventorySignature = make_task_spec(
+        {
+            "items": FieldSpec.input("items", type_=list[InventoryItem]),
+            "language": FieldSpec.input("language"),
+            "translated_items": FieldSpec.output("translated_items", type_=list[InventoryItem]),
+            "total_quantity": FieldSpec.output("total_quantity", type_=int),
+        },
+        instructions="Handle inventory items and their translations.",
+        name="InventorySignature",
+    )
     original_instance = Predict(InventorySignature)
     original_instance.demos = [
         Example(
-            items=[Item(name="apple", quantity=5), Item(name="banana", quantity=3)],
+            items=[InventoryItem(name="apple", quantity=5), InventoryItem(name="banana", quantity=3)],
             language="SPANISH",
-            translated_items=[Item(name="manzana", quantity=5), Item(name="plátano", quantity=3)],
+            translated_items=[InventoryItem(name="manzana", quantity=5), InventoryItem(name="plátano", quantity=3)],
             total_quantity=8,
         ).with_inputs("items", "language"),
     ]
@@ -238,7 +263,8 @@ def test_typed_demos_after_dump_and_load_state():
 
     # Test load_state
     new_instance = Predict(InventorySignature)
-    new_instance.load_state(loaded_state)
+    item_type_key = f"{InventoryItem.__module__}.{InventoryItem.__qualname__}"
+    new_instance.load_state(loaded_state, custom_types={item_type_key: InventoryItem})
     assert len(new_instance.demos) == len(original_instance.demos)
 
     # Verify the structure is maintained after loading
@@ -258,27 +284,31 @@ def test_typed_demos_after_dump_and_load_state():
 
 
 def test_signature_fields_after_dump_and_load_state(tmp_path):
-    class CustomSignature(Signature):
-        """I am just an instruction."""
-
-        sentence = InputField(desc="I am an innocent input!")
-        sentiment = OutputField()
-
+    CustomSignature = make_task_spec(
+        {
+            "sentence": FieldSpec.input("sentence", desc="I am an innocent input!"),
+            "sentiment": FieldSpec.output("sentiment"),
+        },
+        instructions="I am just an instruction.",
+        name="CustomSignature",
+    )
     file_path = tmp_path / "tmp.json"
     original_instance = Predict(CustomSignature)
     original_instance.save(file_path)
 
-    class CustomSignature2(Signature):
-        """I am not a pure instruction."""
-
-        sentence = InputField(desc="I am a malicious input!")
-        sentiment = OutputField(desc="I am a malicious output!")
-
+    CustomSignature2 = make_task_spec(
+        {
+            "sentence": FieldSpec.input("sentence", desc="I am a malicious input!"),
+            "sentiment": FieldSpec.output("sentiment", desc="I am a malicious output!"),
+        },
+        instructions="I am not a pure instruction.",
+        name="CustomSignature2",
+    )
     new_instance = Predict(CustomSignature2)
-    assert new_instance.signature.dump_state() != original_instance.signature.dump_state()
+    assert new_instance.task_spec.to_dict() != original_instance.task_spec.to_dict()
     # After loading, the fields should be the same.
     new_instance.load(file_path)
-    assert new_instance.signature.dump_state() == original_instance.signature.dump_state()
+    assert new_instance.task_spec.to_dict() == original_instance.task_spec.to_dict()
 
 
 @pytest.mark.parametrize("filename", ["model.json", "model.pkl"])
@@ -291,14 +321,14 @@ def test_lm_field_after_dump_and_load_state(tmp_path, filename):
         max_tokens=100,
         num_retries=10,
     )
-    original_predict = Predict("q->a")
+    original_predict = Predict(pspec("q->a"))
     original_predict.lm = lm
 
     original_predict.save(file_path)
 
     assert file_path.exists()
 
-    loaded_predict = Predict("q->a")
+    loaded_predict = Predict(pspec("q->a"))
     loaded_predict.load(file_path, allow_pickle=True)
 
     assert original_predict.dump_state() == loaded_predict.dump_state()
@@ -308,7 +338,7 @@ def test_lm_field_after_dump_and_load_state(tmp_path, filename):
 def test_load_ignores_serialized_endpoint_override_by_default(tmp_path, endpoint_override_key):
     file_path = tmp_path / "model.json"
     override_url = "http://override.local/v1"
-    original_predict = Predict("q->a")
+    original_predict = Predict(pspec("q->a"))
     original_predict.lm = LM(model="openai/gpt-4o-mini")
     original_predict.save(file_path)
 
@@ -319,7 +349,7 @@ def test_load_ignores_serialized_endpoint_override_by_default(tmp_path, endpoint
         f.write(orjson.dumps(saved_state))
 
     with patch("dspy.predict.predict.logger.warning") as warning_mock:
-        loaded_predict = Predict("q->a")
+        loaded_predict = Predict(pspec("q->a"))
         loaded_predict.load(file_path)
 
     assert loaded_predict.lm is not None
@@ -332,7 +362,7 @@ def test_load_ignores_serialized_endpoint_override_by_default(tmp_path, endpoint
 def test_load_allows_serialized_endpoint_override_with_opt_in(tmp_path, endpoint_override_key):
     file_path = tmp_path / "model.json"
     override_url = "http://override.local/v1"
-    original_predict = Predict("q->a")
+    original_predict = Predict(pspec("q->a"))
     original_predict.lm = LM(model="openai/gpt-4o-mini")
     original_predict.save(file_path)
 
@@ -343,7 +373,7 @@ def test_load_allows_serialized_endpoint_override_with_opt_in(tmp_path, endpoint
         f.write(orjson.dumps(saved_state))
 
     with patch("dspy.predict.predict.logger.warning") as warning_mock:
-        loaded_predict = Predict("q->a")
+        loaded_predict = Predict(pspec("q->a"))
         loaded_predict.load(file_path, allow_unsafe_lm_state=True)
 
     assert loaded_predict.lm is not None
@@ -354,13 +384,13 @@ def test_load_allows_serialized_endpoint_override_with_opt_in(tmp_path, endpoint
 @pytest.mark.parametrize("endpoint_override_key", ["api_base", "base_url"])
 def test_load_state_ignores_serialized_endpoint_override_by_default(endpoint_override_key):
     override_url = "http://override.local/v1"
-    original_predict = Predict("q->a")
+    original_predict = Predict(pspec("q->a"))
     original_predict.lm = LM(model="openai/gpt-4o-mini")
     saved_state = copy.deepcopy(original_predict.dump_state())
     saved_state["lm"][endpoint_override_key] = override_url
 
     with patch("dspy.predict.predict.logger.warning") as warning_mock:
-        loaded_predict = Predict("q->a")
+        loaded_predict = Predict(pspec("q->a"))
         loaded_predict.load_state(saved_state)
 
     assert loaded_predict.lm is not None
@@ -372,13 +402,13 @@ def test_load_state_ignores_serialized_endpoint_override_by_default(endpoint_ove
 @pytest.mark.parametrize("endpoint_override_key", ["api_base", "base_url"])
 def test_load_state_allows_serialized_endpoint_override_with_opt_in(endpoint_override_key):
     override_url = "http://override.local/v1"
-    original_predict = Predict("q->a")
+    original_predict = Predict(pspec("q->a"))
     original_predict.lm = LM(model="openai/gpt-4o-mini")
     saved_state = copy.deepcopy(original_predict.dump_state())
     saved_state["lm"][endpoint_override_key] = override_url
 
     with patch("dspy.predict.predict.logger.warning") as warning_mock:
-        loaded_predict = Predict("q->a")
+        loaded_predict = Predict(pspec("q->a"))
         loaded_predict.load_state(saved_state, allow_unsafe_lm_state=True)
 
     assert loaded_predict.lm is not None
@@ -388,7 +418,7 @@ def test_load_state_allows_serialized_endpoint_override_with_opt_in(endpoint_ove
 
 def test_load_state_ignores_serialized_model_list_endpoint_override_by_default():
     override_url = "http://override.local/v1"
-    original_predict = Predict("q->a")
+    original_predict = Predict(pspec("q->a"))
     original_predict.lm = LM(model="openai/gpt-4o-mini")
     saved_state = copy.deepcopy(original_predict.dump_state())
     saved_state["lm"]["model_list"] = [
@@ -402,7 +432,7 @@ def test_load_state_ignores_serialized_model_list_endpoint_override_by_default()
     ]
 
     with patch("dspy.predict.predict.logger.warning") as warning_mock:
-        loaded_predict = Predict("q->a")
+        loaded_predict = Predict(pspec("q->a"))
         loaded_predict.load_state(saved_state)
 
     assert loaded_predict.lm is not None
@@ -415,7 +445,7 @@ def test_load_state_ignores_serialized_model_list_endpoint_override_by_default()
 def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, endpoint_override_key):
     file_path = tmp_path / "model.json"
     override_url = "http://override.local/v1"
-    original_predict = Predict("q->a")
+    original_predict = Predict(pspec("q->a"))
     original_predict.lm = LM(model="openai/gpt-4o-mini")
     original_predict.save(file_path)
 
@@ -425,7 +455,7 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
     with open(file_path, "wb") as f:
         f.write(orjson.dumps(saved_state))
 
-    loaded_predict = Predict("q->a")
+    loaded_predict = Predict(pspec("q->a"))
     loaded_predict.load(file_path)
 
     class FakeResp(dict):
@@ -449,7 +479,7 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
 def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
     file_path = tmp_path / "model.json"
     override_url = "http://override.local/v1"
-    original_predict = Predict("q->a")
+    original_predict = Predict(pspec("q->a"))
     original_predict.lm = LM(model="openai/gpt-4o-mini")
     original_predict.save(file_path)
 
@@ -474,7 +504,7 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
         def __init__(self):
             super().__init__({"choices": []})
 
-    safe_loaded_predict = Predict("q->a")
+    safe_loaded_predict = Predict(pspec("q->a"))
     safe_loaded_predict.load(file_path)
     with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:  # noqa: SIM117
         with patch(
@@ -487,7 +517,7 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
     assert completion_mock.called
     assert not batch_completion_mock.called
 
-    opt_in_loaded_predict = Predict("q->a")
+    opt_in_loaded_predict = Predict(pspec("q->a"))
     opt_in_loaded_predict.load(file_path, allow_unsafe_lm_state=True)
     with patch(
         "litellm.batch_completion_models", new_callable=AsyncMock, return_value=FakeResp()
@@ -505,7 +535,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     override_url = "http://override.local/v1"
     env_api_key = "sk-live-test-secret"
 
-    original_predict = Predict("q->a")
+    original_predict = Predict(pspec("q->a"))
     original_predict.lm = LM(model="openai/gpt-4o-mini", model_type="text")
     original_predict.save(file_path)
 
@@ -526,7 +556,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
             super().__init__({"choices": []})
 
     # Simulates legacy behavior by allowing serialized endpoint overrides.
-    opt_in_loaded_predict = Predict("q->a")
+    opt_in_loaded_predict = Predict(pspec("q->a"))
     opt_in_loaded_predict.load(file_path, allow_unsafe_lm_state=True)
     with patch("litellm.atext_completion", new_callable=AsyncMock, return_value=FakeResp()) as text_completion_mock:
         lm = opt_in_loaded_predict.lm
@@ -536,7 +566,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     assert text_completion_mock.call_args.kwargs["api_base"] == override_url
     assert text_completion_mock.call_args.kwargs["api_key"] == env_api_key
 
-    safe_loaded_predict = Predict("q->a")
+    safe_loaded_predict = Predict(pspec("q->a"))
     safe_loaded_predict.load(file_path)
     with patch("litellm.atext_completion", new_callable=AsyncMock, return_value=FakeResp()) as text_completion_mock:
         lm = safe_loaded_predict.lm
@@ -549,14 +579,14 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
 
 
 def test_forward_method():
-    program = Predict("question -> answer")
+    program = Predict(pspec("question -> answer"))
     settings.configure(lm=DummyLM([{"answer": "No more responses"}]))
     result = asyncio.run(program(question="What is 1+1?")).answer
     assert result == "No more responses"
 
 
 def test_forward_method2():
-    program = Predict("question -> answer1, answer2")
+    program = Predict(pspec("question -> answer1, answer2"))
     settings.configure(lm=DummyLM([{"answer1": "my first answer", "answer2": "my second answer"}]))
     result = asyncio.run(program(question="What is 1+1?"))
     assert result.answer1 == "my first answer"
@@ -564,7 +594,7 @@ def test_forward_method2():
 
 
 def test_config_management():
-    predict_instance = Predict("input -> output")
+    predict_instance = Predict(pspec("input -> output"))
     predict_instance.update_config(new_key="value")
     config = predict_instance.get_config()
     assert "new_key" in config
@@ -572,7 +602,7 @@ def test_config_management():
 
 
 def test_multi_output():
-    program = Predict("question -> answer", n=2)
+    program = Predict(pspec("question -> answer"), n=2)
     settings.configure(lm=DummyLM([{"answer": "my first answer"}, {"answer": "my second answer"}]))
     results = asyncio.run(program(question="What is 1+1?"))
     assert results.completions.answer[0] == "my first answer"
@@ -580,7 +610,7 @@ def test_multi_output():
 
 
 def test_multi_output2():
-    program = Predict("question -> answer1, answer2", n=2)
+    program = Predict(pspec("question -> answer1, answer2"), n=2)
     settings.configure(
         lm=DummyLM(
             [
@@ -602,11 +632,15 @@ def test_datetime_inputs_and_outputs():
         event_name: str
         event_time: datetime
 
-    class TimedSignature(Signature):
-        events: list[TimedEvent] = InputField()
-        summary: str = OutputField()
-        next_event_time: datetime = OutputField()
-
+    TimedSignature = make_task_spec(
+        {
+            "events": FieldSpec.input("events", type_=list[TimedEvent]),
+            "summary": FieldSpec.output("summary"),
+            "next_event_time": FieldSpec.output("next_event_time", type_=datetime),
+        },
+        instructions="Process timed events.",
+        name="TimedSignature",
+    )
     program = Predict(TimedSignature)
 
     lm = DummyLM(
@@ -638,10 +672,14 @@ def test_explicitly_valued_enum_inputs_and_outputs():
         IN_PROGRESS = "in_progress"
         COMPLETED = "completed"
 
-    class StatusSignature(Signature):
-        current_status: Status = InputField()
-        next_status: Status = OutputField()
-
+    StatusSignature = make_task_spec(
+        {
+            "current_status": FieldSpec.input("current_status", type_=Status),
+            "next_status": FieldSpec.output("next_status", type_=Status),
+        },
+        instructions="Advance status.",
+        name="StatusSignature",
+    )
     program = Predict(StatusSignature)
 
     lm = DummyLM(
@@ -664,10 +702,14 @@ def test_enum_inputs_and_outputs_with_shared_names_and_values():
         CLOSED = "RESOLVED"
         RESOLVED = "OPEN"
 
-    class TicketStatusSignature(Signature):
-        current_status: TicketStatus = InputField()
-        next_status: TicketStatus = OutputField()
-
+    TicketStatusSignature = make_task_spec(
+        {
+            "current_status": FieldSpec.input("current_status", type_=TicketStatus),
+            "next_status": FieldSpec.output("next_status", type_=TicketStatus),
+        },
+        instructions="Advance ticket status.",
+        name="TicketStatusSignature",
+    )
     program = Predict(TicketStatusSignature)
 
     # Mock reasoning and output
@@ -688,10 +730,14 @@ def test_enum_inputs_and_outputs_with_shared_names_and_values():
 def test_auto_valued_enum_inputs_and_outputs():
     Status = enum.Enum("Status", ["PENDING", "IN_PROGRESS", "COMPLETED"])
 
-    class StatusSignature(Signature):
-        current_status: Status = InputField()
-        next_status: Status = OutputField()
-
+    StatusSignature = make_task_spec(
+        {
+            "current_status": FieldSpec.input("current_status", type_=Status),
+            "next_status": FieldSpec.output("next_status", type_=Status),
+        },
+        instructions="Advance auto-valued status.",
+        name="StatusSignature",
+    )
     program = Predict(StatusSignature)
 
     lm = DummyLM(
@@ -712,7 +758,7 @@ def test_named_predictors():
     class MyModule(Module):
         def __init__(self):
             super().__init__()
-            self.inner = Predict("question -> answer")
+            self.inner = Predict(pspec("question -> answer"))
 
     program = MyModule()
     assert program.named_predictors() == [("self.inner", program.inner)]
@@ -723,9 +769,11 @@ def test_named_predictors():
 
 
 def test_output_only():
-    class OutputOnlySignature(Signature):
-        output = OutputField()
-
+    OutputOnlySignature = make_task_spec(
+        {"output": FieldSpec.output("output")},
+        instructions="Produce output.",
+        name="OutputOnlySignature",
+    )
     predictor = Predict(OutputOnlySignature)
 
     lm = DummyLM([{"output": "short answer"}])
@@ -735,22 +783,26 @@ def test_output_only():
 
 def test_load_state_chaining():
     """Test that load_state returns self for chaining."""
-    original = Predict("question -> answer")
+    original = Predict(pspec("question -> answer"))
     original.demos = [{"question": "test", "answer": "response"}]
     state = original.dump_state()
 
-    new_instance = Predict("question -> answer").load_state(state)
+    new_instance = Predict(pspec("question -> answer")).load_state(state)
     assert new_instance is not None
     assert new_instance.demos == original.demos
 
 
 @pytest.mark.parametrize("adapter_type", ["chat", "json"])
 def test_call_predict_with_chat_history(adapter_type):
-    class MySignature(Signature):
-        question: str = InputField()
-        history: History = InputField()
-        answer: str = OutputField()
-
+    MySignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "history": FieldSpec.input("history", type_=History),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Answer with chat history.",
+        name="MySignature",
+    )
     program = Predict(MySignature)
 
     if adapter_type == "chat":
@@ -779,7 +831,7 @@ def test_call_predict_with_chat_history(adapter_type):
 
 
 def test_lm_usage():
-    program = Predict("question -> answer")
+    program = Predict(pspec("question -> answer"))
     settings.configure(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True)
     with patch(
         "dspy.clients.lm.alitellm_completion",
@@ -794,7 +846,7 @@ def test_lm_usage():
 
 
 def test_lm_usage_with_parallel():
-    program = Predict("question -> answer")
+    program = Predict(pspec("question -> answer"))
 
     async def program_wrapper(question):
         # Sleep to make it possible to cause a race condition
@@ -823,7 +875,7 @@ def test_lm_usage_with_parallel():
 
 @pytest.mark.asyncio
 async def test_lm_usage_with_async():
-    program = Predict("question -> answer")
+    program = Predict(pspec("question -> answer"))
 
     original_aforward = program.aforward
 
@@ -859,25 +911,25 @@ async def test_lm_usage_with_async():
 
 
 def test_positional_arguments():
-    program = Predict("question -> answer")
+    program = Predict(pspec("question -> answer"))
     with pytest.raises(ValueError) as e:  # noqa: PT011
         asyncio.run(program("What is the capital of France?"))
     assert str(e.value) == (
         "Positional arguments are not allowed when calling `dspy.predict.predict.Predict`, must use keyword arguments "
         "that match "
-        "your signature input fields: 'question'. For example: `predict(question=input_value, ...)`."
+        "your task spec input fields: 'question'. For example: `predict(question=input_value, ...)`."
     )
 
 
 def test_error_message_on_invalid_lm_setup():
     # No LM is loaded.
     with pytest.raises(ValueError, match="No LM is loaded"):
-        asyncio.run(Predict("question -> answer")(question="Why did a chicken cross the kitchen?"))
+        asyncio.run(Predict(pspec("question -> answer"))(question="Why did a chicken cross the kitchen?"))
 
     # LM is a string.
     settings.configure(lm="openai/gpt-4o-mini")
     with pytest.raises(ValueError) as e:  # noqa: PT011
-        asyncio.run(Predict("question -> answer")(question="Why did a chicken cross the kitchen?"))
+        asyncio.run(Predict(pspec("question -> answer"))(question="Why did a chicken cross the kitchen?"))
 
     assert "LM must be an instance of `dspy.clients.base_lm.BaseLM`, not a string." in str(e.value)
 
@@ -887,23 +939,41 @@ def test_error_message_on_invalid_lm_setup():
     # LM is not an instance of BaseLM.
     settings.configure(lm=dummy_lm)
     with pytest.raises(ValueError) as e:  # noqa: PT011
-        asyncio.run(Predict("question -> answer")(question="Why did a chicken cross the kitchen?"))
+        asyncio.run(Predict(pspec("question -> answer"))(question="Why did a chicken cross the kitchen?"))
     assert "LM must be an instance of `dspy.clients.base_lm.BaseLM`, not <class 'function'>." in str(e.value)
 
 
 @pytest.mark.parametrize("adapter_type", ["chat", "json"])
 def test_field_constraints(adapter_type):
-    class ConstrainedSignature(Signature):
-        """Test signature with constrained fields."""
-
-        # Input with length and value constraints
-        text: str = InputField(min_length=5, max_length=100, desc="Input text")
-        number: int = InputField(gt=0, lt=10, desc="A number between 0 and 10")
-
-        # Output with multiple constraints
-        score: float = OutputField(ge=0.0, le=1.0, desc="Score between 0 and 1")
-        count: int = OutputField(multiple_of=2, desc="Even number count")
-
+    ConstrainedSignature = make_task_spec(
+        {
+            "text": FieldSpec.input(
+                "text",
+                desc="Input text",
+                constraints="minimum length: 5, maximum length: 100",
+            ),
+            "number": FieldSpec.input(
+                "number",
+                type_=int,
+                desc="A number between 0 and 10",
+                constraints="greater than: 0, less than: 10",
+            ),
+            "score": FieldSpec.output(
+                "score",
+                type_=float,
+                desc="Score between 0 and 1",
+                constraints="greater than or equal to: 0.0, less than or equal to: 1.0",
+            ),
+            "count": FieldSpec.output(
+                "count",
+                type_=int,
+                desc="Even number count",
+                constraints="a multiple of the given number: 2",
+            ),
+        },
+        instructions="Test signature with constrained fields.",
+        name="ConstrainedSignature",
+    )
     program = Predict(ConstrainedSignature)
     if adapter_type == "chat":
         lm = SpyLM(
@@ -933,14 +1003,14 @@ def test_field_constraints(adapter_type):
 
 @pytest.mark.asyncio
 async def test_async_predict():
-    program = Predict("question -> answer")
+    program = Predict(pspec("question -> answer"))
     with settings.context(lm=DummyLM([{"answer": "Paris"}])):
         result = await program.acall(question="What is the capital of France?")
         assert result.answer == "Paris"
 
 
 def test_predicted_outputs_piped_from_predict_to_lm_call():
-    program = Predict("question -> answer")
+    program = Predict(pspec("question -> answer"))
     settings.configure(lm=LM("openai/gpt-4o-mini", cache=False))
     mock_response = ModelResponse(choices=[{"message": {"content": "[[ ## answer ## ]]\nParis"}}])
 
@@ -959,7 +1029,7 @@ def test_predicted_outputs_piped_from_predict_to_lm_call():
 
     # If the signature has prediction as an input field, and the prediction is not set as the standard predicted output
     # format, it should not be passed to the LM.
-    program = Predict("question, prediction -> judgement")
+    program = Predict(pspec("question, prediction -> judgement"))
     judgement_response = ModelResponse(choices=[{"message": {"content": "[[ ## judgement ## ]]\nFair"}}])
     with patch("litellm.acompletion", return_value=judgement_response) as mock_completion:
         asyncio.run(program(question="Why did a chicken cross the kitchen?", prediction="To get to the other side!"))
@@ -974,9 +1044,14 @@ def test_dump_state_pydantic_non_primitive_types():
         description: str | None = None
         created_at: datetime
 
-    class TestSignature(Signature):
-        website_info: WebsiteInfo = InputField()
-        summary: str = OutputField()
+    TestSignature = make_task_spec(
+        {
+            "website_info": FieldSpec.input("website_info", type_=WebsiteInfo),
+            "summary": FieldSpec.output("summary"),
+        },
+        instructions="Summarize website info.",
+        name="TestSignature",
+    )
 
     website_info = WebsiteInfo(
         name="Example",
@@ -1008,7 +1083,7 @@ def test_dump_state_pydantic_non_primitive_types():
 
 
 def test_trace_size_limit():
-    program = Predict("question -> answer")
+    program = Predict(pspec("question -> answer"))
     settings.configure(lm=DummyLM([{"answer": "Paris"}]), max_trace_size=3)
 
     for _ in range(10):
@@ -1018,7 +1093,7 @@ def test_trace_size_limit():
 
 
 def test_disable_trace():
-    program = Predict("question -> answer")
+    program = Predict(pspec("question -> answer"))
     settings.configure(lm=DummyLM([{"answer": "Paris"}]), trace=None)
 
     for _ in range(10):
@@ -1028,7 +1103,7 @@ def test_disable_trace():
 
 
 def test_per_module_history_size_limit():
-    program = Predict("question -> answer")
+    program = Predict(pspec("question -> answer"))
     settings.configure(lm=DummyLM([{"answer": "Paris"}]), max_history_size=5)
 
     for _ in range(10):
@@ -1037,7 +1112,7 @@ def test_per_module_history_size_limit():
 
 
 def test_per_module_history_disabled():
-    program = Predict("question -> answer")
+    program = Predict(pspec("question -> answer"))
     settings.configure(lm=DummyLM([{"answer": "Paris"}]), disable_history=True)
 
     for _ in range(10):
@@ -1046,10 +1121,15 @@ def test_per_module_history_disabled():
 
 
 def test_input_field_default_value():
-    class SignatureWithDefault(Signature):
-        context: str = InputField(default="DEFAULT_CONTEXT")
-        question: str = InputField()
-        answer: str = OutputField()
+    SignatureWithDefault = make_task_spec(
+        {
+            "context": FieldSpec.input("context", default="DEFAULT_CONTEXT"),
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Answer using context.",
+        name="SignatureWithDefault",
+    )
 
     lm = SpyLM("dummy_model", response_text="[[ ## answer ## ]]\ntest")
     settings.configure(lm=lm)
@@ -1071,24 +1151,28 @@ def test_extra_fields_warning(caplog):
     """Test that extra fields not in signature generate a warning."""
     log_test_helper()
 
-    predict_instance = Predict("question -> answer")
+    predict_instance = Predict(pspec("question -> answer"))
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         asyncio.run(predict_instance(question="test", extra_field="should warn", another="also warn"))
 
     # Check that warning was logged about extra fields
-    assert "not in signature" in caplog.text
+    assert "not in task spec" in caplog.text
     assert "extra_field" in caplog.text
 
 
 def test_missing_optional_input_field_no_warning(caplog):
     log_test_helper()
 
-    class OptionalInputSignature(Signature):
-        question: str = InputField()
-        context: str | None = InputField()
-        answer: str = OutputField()
-
+    OptionalInputSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "context": FieldSpec.input("context", type_=str | None),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Answer with optional context.",
+        name="OptionalInputSignature",
+    )
     predict_instance = Predict(OptionalInputSignature)
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
@@ -1100,11 +1184,15 @@ def test_missing_optional_input_field_no_warning(caplog):
 def test_missing_required_input_field_still_warns(caplog):
     log_test_helper()
 
-    class OptionalInputSignature(Signature):
-        question: str = InputField()
-        context: str | None = InputField()
-        answer: str = OutputField()
-
+    OptionalInputSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "context": FieldSpec.input("context", type_=str | None),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Answer with optional context.",
+        name="OptionalInputSignature",
+    )
     predict_instance = Predict(OptionalInputSignature)
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
@@ -1118,7 +1206,7 @@ def test_warning_images(caplog):
     """Test whether type mismatch for images generates a warning."""
     log_test_helper()
 
-    predict_instance = Predict("question:Image -> answer")
+    predict_instance = Predict(pspec("question:Image -> answer"))
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         asyncio.run(predict_instance(question=Image("https://example.com/image1.jpg")))
@@ -1137,11 +1225,15 @@ def test_type_mismatch_warning(caplog):
     """Test that type mismatches in input fields generate a warning."""
     log_test_helper()
 
-    class TypedSignature(Signature):
-        count: int = InputField()
-        name: str = InputField()
-        result: str = OutputField()
-
+    TypedSignature = make_task_spec(
+        {
+            "count": FieldSpec.input("count", type_=int),
+            "name": FieldSpec.input("name"),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="Typed inputs.",
+        name="TypedSignature",
+    )
     predict_instance = Predict(TypedSignature)
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
@@ -1157,11 +1249,15 @@ def test_correct_types_no_warning(caplog):
     """Test that correct types don't generate warnings."""
     log_test_helper()
 
-    class TypedSignature(Signature):
-        count: int = InputField()
-        name: str = InputField()
-        result: str = OutputField()
-
+    TypedSignature = make_task_spec(
+        {
+            "count": FieldSpec.input("count", type_=int),
+            "name": FieldSpec.input("name"),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="Typed inputs.",
+        name="TypedSignature",
+    )
     predict_instance = Predict(TypedSignature)
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
@@ -1171,7 +1267,7 @@ def test_correct_types_no_warning(caplog):
         # Pass correct types
         asyncio.run(predict_instance(count=42, name="test"))
 
-    assert "not in signature" not in caplog.text
+    assert "not in task spec" not in caplog.text
     assert "Type mismatch" not in caplog.text
 
 
@@ -1179,10 +1275,14 @@ def test_list_type_validation(caplog):
     """Test type validation with list[str] types."""
     log_test_helper()
 
-    class ComplexSignature(Signature):
-        items: list[str] = InputField()
-        result: str = OutputField()
-
+    ComplexSignature = make_task_spec(
+        {
+            "items": FieldSpec.input("items", type_=list[str]),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="Process items.",
+        name="ComplexSignature",
+    )
     predict_instance = Predict(ComplexSignature)
     lm = DummyLM([{"result": "test output 1"}, {"result": "test output 2"}])
     settings.configure(lm=lm)
@@ -1208,11 +1308,15 @@ def test_literal_type_validation(caplog):
 
     log_test_helper()
 
-    class LiteralSignature(Signature):
-        status: Literal["pending", "approved", "rejected"] = InputField()
-        priority: Literal[1, 2, 3] = InputField()
-        result: str = OutputField()
-
+    LiteralSignature = make_task_spec(
+        {
+            "status": FieldSpec.input("status", type_=Literal["pending", "approved", "rejected"]),
+            "priority": FieldSpec.input("priority", type_=Literal[1, 2, 3]),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="Validate literals.",
+        name="LiteralSignature",
+    )
     predict_instance = Predict(LiteralSignature)
 
     # Test with correct literal values
@@ -1249,10 +1353,14 @@ def test_literal_union_type_validation(caplog):
 
     log_test_helper()
 
-    class UnionLiteralSignature(Signature):
-        mode: Literal["auto", "manual"] | None = InputField()
-        result: str = OutputField()
-
+    UnionLiteralSignature = make_task_spec(
+        {
+            "mode": FieldSpec.input("mode", type_=Literal["auto", "manual"] | None),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="Validate union literals.",
+        name="UnionLiteralSignature",
+    )
     predict_instance = Predict(UnionLiteralSignature)
 
     # Test with valid literal value
@@ -1287,10 +1395,14 @@ def test_list_string(caplog):
     """Test passing list of strings."""
     log_test_helper()
 
-    class TypedSignature(Signature):
-        nameList: list[str] = InputField()  # noqa: N815
-        result: str = OutputField()
-
+    TypedSignature = make_task_spec(
+        {
+            "nameList": FieldSpec.input("nameList", type_=list[str]),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="Process name list.",
+        name="TypedSignature",
+    )
     predict_instance = Predict(TypedSignature)
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
@@ -1316,11 +1428,15 @@ def test_nested_list_type_validation(caplog):
     """Test type validation with list element types."""
     log_test_helper()
 
-    class NestedListSignature(Signature):
-        numbers: list[int] = InputField()
-        names: list[str] = InputField()
-        result: str = OutputField()
-
+    NestedListSignature = make_task_spec(
+        {
+            "numbers": FieldSpec.input("numbers", type_=list[int]),
+            "names": FieldSpec.input("names", type_=list[str]),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="Validate nested lists.",
+        name="NestedListSignature",
+    )
     predict_instance = Predict(NestedListSignature)
 
     # Test with correct element types
@@ -1365,10 +1481,14 @@ def test_nested_dict_type_validation(caplog):
     """Test type validation with dict key and value types."""
     log_test_helper()
 
-    class DictSignature(Signature):
-        mapping: dict[str, int] = InputField()
-        result: str = OutputField()
-
+    DictSignature = make_task_spec(
+        {
+            "mapping": FieldSpec.input("mapping", type_=dict[str, int]),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="Validate dict input.",
+        name="DictSignature",
+    )
     predict_instance = Predict(DictSignature)
 
     # Test with correct key-value types
@@ -1403,11 +1523,15 @@ def test_nested_tuple_type_validation(caplog):
     """Test type validation with tuple types."""
     log_test_helper()
 
-    class TupleSignature(Signature):
-        fixed_tuple: tuple[str, int, bool] = InputField()
-        var_tuple: tuple[int, ...] = InputField()
-        result: str = OutputField()
-
+    TupleSignature = make_task_spec(
+        {
+            "fixed_tuple": FieldSpec.input("fixed_tuple", type_=tuple[str, int, bool]),
+            "var_tuple": FieldSpec.input("var_tuple", type_=tuple[int, ...]),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="Validate tuple input.",
+        name="TupleSignature",
+    )
     predict_instance = Predict(TupleSignature)
 
     # Test with correct tuple types
@@ -1452,7 +1576,9 @@ def test_literal_type_validation_string_signature(caplog):
     log_test_helper()
 
     # Use string signature with type annotations
-    predict_instance = Predict("status:Literal['pending','approved','rejected'], priority:Literal[1,2,3] -> result")
+    predict_instance = Predict(
+        pspec("status:Literal['pending','approved','rejected'], priority:Literal[1,2,3] -> result")
+    )
 
     # Test with correct literal values
     caplog.clear()
@@ -1487,7 +1613,7 @@ def test_list_type_validation_string_signature(caplog):
     log_test_helper()
 
     # Use string signature with type annotations
-    predict_instance = Predict("numbers:list[int], names:list[str] -> result")
+    predict_instance = Predict(pspec("numbers:list[int], names:list[str] -> result"))
 
     # Test with correct element types
     caplog.clear()
@@ -1531,7 +1657,7 @@ def test_dict_type_validation_string_signature(caplog):
     log_test_helper()
 
     # Use string signature with type annotations
-    predict_instance = Predict("mapping:dict[str,int] -> result")
+    predict_instance = Predict(pspec("mapping:dict[str,int] -> result"))
 
     # Test with correct key-value types
     caplog.clear()
@@ -1566,7 +1692,7 @@ def test_tuple_type_validation_string_signature(caplog):
     log_test_helper()
 
     # Use string signature with type annotations
-    predict_instance = Predict("fixed_tuple:tuple[str,int,bool], var_tuple:tuple[int,...] -> result")
+    predict_instance = Predict(pspec("fixed_tuple:tuple[str,int,bool], var_tuple:tuple[int,...] -> result"))
 
     # Test with correct tuple types
     caplog.clear()
@@ -1610,7 +1736,7 @@ def test_union_type_validation_string_signature(caplog):
     log_test_helper()
 
     # Use string signature with type annotations
-    predict_instance = Predict("mode:Literal['auto','manual']|None -> result")
+    predict_instance = Predict(pspec("mode:Literal['auto','manual']|None -> result"))
 
     # Test with valid literal value
     caplog.clear()
@@ -1646,7 +1772,7 @@ def test_basic_types_string_signature(caplog, enable_type_warnings):
     log_test_helper()
     settings.configure(warn_on_type_mismatch=enable_type_warnings)
     # Use string signature with type annotations
-    predict_instance = Predict("count:int, name:str -> result")
+    predict_instance = Predict(pspec("count:int, name:str -> result"))
 
     # Test with correct types
     caplog.clear()
@@ -1675,7 +1801,7 @@ def test_untyped_string_signature(caplog):
     log_test_helper()
 
     # Use string signature without annotations
-    predict_instance = Predict("count, name -> result")
+    predict_instance = Predict(pspec("count, name -> result"))
 
     caplog.clear()
     lm = DummyLM([{"result": "test output"}])
@@ -1692,11 +1818,15 @@ def test_untyped_class_signature(caplog):
     log_test_helper()
 
     # Use class signature with type annotations
-    class TestSignature(Signature):
-        count = InputField()
-        name = InputField()
-        result = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "count": FieldSpec.input("count", is_type_undefined=True),
+            "name": FieldSpec.input("name", is_type_undefined=True),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="Untyped class fields.",
+        name="TestSignature",
+    )
     predict_instance = Predict(TestSignature)
 
     # Test with correct types
@@ -1715,11 +1845,15 @@ def test_string_to_list_signature(caplog):
     log_test_helper()
 
     # Use class signature with type annotations
-    class TestSignature(Signature):
-        name: str = InputField()
-        count = InputField()
-        result = OutputField()
-
+    TestSignature = make_task_spec(
+        {
+            "name": FieldSpec.input("name"),
+            "count": FieldSpec.input("count", is_type_undefined=True),
+            "result": FieldSpec.output("result"),
+        },
+        instructions="String to list validation.",
+        name="TestSignature",
+    )
     predict_instance = Predict(TestSignature)
 
     caplog.clear()
@@ -1742,8 +1876,14 @@ def test_custom_signature_types(caplog, enable_type_warnings):
         class Query(pydantic.BaseModel):
             text: str
 
-    signature = Signature("query: MyContainer.Query -> answer")  # ty:ignore[too-many-positional-arguments]
-    predict_instance = Predict(signature)  # ty:ignore[invalid-argument-type]
+    task_spec = make_task_spec(
+        {
+            "query": FieldSpec.input("query", type_=MyContainer.Query),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Answer the query.",
+    )
+    predict_instance = Predict(task_spec)
 
     # Create an instance of the Query model
     query_instance = MyContainer.Query(text="What is the capital of France?")

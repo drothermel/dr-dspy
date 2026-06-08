@@ -33,9 +33,9 @@ class Prediction(Example):
         self._lm_usage = value
 
     @classmethod
-    def from_completions(cls, list_or_dict, signature=None):
+    def from_completions(cls, list_or_dict, task_spec=None):
         obj = cls()
-        obj._completions = Completions(list_or_dict, signature=signature)
+        obj._completions = Completions(list_or_dict, task_spec=task_spec)
         obj._store = {k: v[0] for k, v in obj._completions.items()}
 
         return obj
@@ -121,8 +121,8 @@ class Prediction(Example):
 
 
 class Completions:
-    def __init__(self, list_or_dict, signature=None) -> None:
-        self.signature = signature
+    def __init__(self, list_or_dict, task_spec=None) -> None:
+        self.task_spec = task_spec
 
         if isinstance(list_or_dict, list):
             kwargs = {}

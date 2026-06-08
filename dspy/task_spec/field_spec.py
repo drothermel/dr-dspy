@@ -3,6 +3,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+_UNSET = object()
+
 
 def infer_prefix(attribute_name: str) -> str:
     """Infer a human-readable prefix from a field name."""
@@ -31,6 +33,8 @@ class FieldSpec(BaseModel):
     prefix: str
     is_type_undefined: bool = False
     constraints: str | None = None
+    has_default: bool = False
+    default: Any = None
 
     @classmethod
     def input(
@@ -42,7 +46,9 @@ class FieldSpec(BaseModel):
         prefix: str | None = None,
         is_type_undefined: bool = False,
         constraints: str | None = None,
+        default: Any = _UNSET,
     ) -> "FieldSpec":
+        has_default = default is not _UNSET
         return cls(
             name=name,
             type=type_,
@@ -51,6 +57,8 @@ class FieldSpec(BaseModel):
             prefix=prefix if prefix is not None else infer_prefix(name) + ":",
             is_type_undefined=is_type_undefined,
             constraints=constraints,
+            has_default=has_default,
+            default=None if default is _UNSET else default,
         )
 
     @classmethod
