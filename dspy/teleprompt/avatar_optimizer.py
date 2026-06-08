@@ -5,12 +5,12 @@ from typing import Any, Callable, cast
 from pydantic import BaseModel
 from typing_extensions import override
 
-from dspy.dsp.utils.settings import settings
 from dspy.predict.avatar.models import ActionOutput
 from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
+from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
@@ -67,8 +67,9 @@ class _AvatarEvalModule(Module):
 
     async def aforward(self, **kwargs):
         example = Example(**kwargs)
+        run = resolve_run(run=kwargs.pop("run", None), bound_run=self.run)
         return await self._optimizer.process_example(
-            actor=self._actor, example=example, return_outputs=self._return_outputs
+            actor=self._actor, example=example, return_outputs=self._return_outputs, run=run
         )
 
 
@@ -94,12 +95,12 @@ class AvatarOptimizer(Teleprompter):
         self.comparator = Predict(ComparatorTaskSpec())
         self.feedback_instruction = Predict(FeedbackBasedInstructionTaskSpec())
 
-    async def process_example(self, actor, example, return_outputs):
+    async def process_example(self, actor, example, return_outputs, *, run: RunContext):
         actor = deepcopy(actor)
         try:
-            with settings.context(trace=[]):
-                prediction = await actor(**example.inputs())
-                trace = list(settings.trace)
+            item_run = run.fork(trace=[])
+            prediction = await actor(**example.inputs(), run=item_run)
+            trace = list(item_run.trace)
             score = self.metric(example, prediction, trace)
             if return_outputs:
                 return (example, prediction, score)
@@ -109,12 +110,12 @@ class AvatarOptimizer(Teleprompter):
                 return (example, None, 0)
             return 0
 
-    async def thread_safe_evaluator(self, devset, actor, return_outputs=False, num_threads=None):
+    async def thread_safe_evaluator(self, devset, actor, return_outputs=False, num_threads=None, *, run: RunContext):
         total_score = 0
         total_examples = len(devset)
-        num_threads = num_threads or settings.num_threads
+        num_threads = num_threads or run.execution.num_threads
         eval_module = _AvatarEvalModule(self, actor, return_outputs)
-        run_parallel = Parallel(num_threads=num_threads, disable_progress_bar=False)
+        run_parallel = Parallel(run=run, num_threads=num_threads, disable_progress_bar=False)
         exec_pairs = [(eval_module, example) for example in devset]
         parallel_results = await run_parallel(exec_pairs)
         if return_outputs:
@@ -129,11 +130,13 @@ class AvatarOptimizer(Teleprompter):
         return total_score / total_examples
 
     async def _get_pos_neg_results(
-        self, actor: Module, trainset: list[Example]
+        self, actor: Module, trainset: list[Example], *, run: RunContext
     ) -> tuple[float, list[EvalResult], list[EvalResult]]:
         pos_inputs = []
         neg_inputs = []
-        avg_score, results = await self.thread_safe_evaluator(devset=trainset, actor=actor, return_outputs=True)
+        avg_score, results = await self.thread_safe_evaluator(
+            devset=trainset, actor=actor, return_outputs=True, run=run
+        )
         for example, prediction, score in results:
             if score >= self.upper_bound:
                 pos_inputs.append(
@@ -158,11 +161,11 @@ class AvatarOptimizer(Teleprompter):
         return (avg_score, pos_inputs, neg_inputs)
 
     @override
-    async def compile(self, student, *, trainset):
+    async def compile(self, student, *, trainset, run: RunContext):
         best_actor = deepcopy(student)
         best_score = -999 if self.optimize_for == "max" else 999
         for _i in range(self.max_iters):
-            score, pos_inputs, neg_inputs = await self._get_pos_neg_results(best_actor, trainset)
+            score, pos_inputs, neg_inputs = await self._get_pos_neg_results(best_actor, trainset, run=run)
             if self.max_positive_inputs and len(pos_inputs) > self.max_positive_inputs:
                 pos_inputs = sample(pos_inputs, self.max_positive_inputs)
             if self.max_negative_inputs and len(neg_inputs) > self.max_negative_inputs:
@@ -174,10 +177,13 @@ class AvatarOptimizer(Teleprompter):
                     actions=[str(tool) for tool in best_actor.tools],
                     pos_input_with_metrics=pos_inputs,
                     neg_input_with_metrics=neg_inputs,
+                    run=run,
                 )
             ).feedback
             new_instruction = (
-                await self.feedback_instruction(previous_instruction=actor_task_spec.instructions, feedback=feedback)
+                await self.feedback_instruction(
+                    previous_instruction=actor_task_spec.instructions, feedback=feedback, run=run
+                )
             ).new_instruction
             if (self.optimize_for == "max" and best_score < score) or (
                 self.optimize_for == "min" and best_score > score

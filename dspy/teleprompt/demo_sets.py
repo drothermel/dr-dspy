@@ -1,6 +1,6 @@
 import random
 
-from dspy.dsp.utils.settings import settings
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap import BootstrapFewShot, LabeledFewShot
 
 
@@ -11,7 +11,8 @@ async def create_n_fewshot_demo_sets(
     max_labeled_demos,
     max_bootstrapped_demos,
     metric,
-    teacher_settings,
+    run: RunContext,
+    teacher_run: RunContext | None = None,
     max_errors=None,
     max_rounds=1,
     labeled_sample=True,
@@ -22,7 +23,7 @@ async def create_n_fewshot_demo_sets(
     seed=0,
     rng=None,
 ):
-    max_errors = settings.max_errors if max_errors is None else max_errors
+    max_errors = run.execution.max_errors if max_errors is None else max_errors
     demo_candidates = {}
     num_candidate_sets -= 3
     for i, _ in enumerate(student.predictors()):
@@ -34,7 +35,7 @@ async def create_n_fewshot_demo_sets(
             program2 = student.reset_copy()
         elif seed == -2 and max_labeled_demos > 0 and include_non_bootstrapped:
             teleprompter = LabeledFewShot(k=max_labeled_demos)
-            program2 = await teleprompter.compile(student, trainset=trainset_copy, sample=labeled_sample)
+            program2 = await teleprompter.compile(student, trainset=trainset_copy, sample=labeled_sample, run=run)
         elif seed == -1:
             program = BootstrapFewShot(
                 metric=metric,
@@ -42,10 +43,10 @@ async def create_n_fewshot_demo_sets(
                 metric_threshold=metric_threshold,
                 max_bootstrapped_demos=max_bootstrapped_demos,
                 max_labeled_demos=max_labeled_demos,
-                teacher_settings=teacher_settings,
+                teacher_run=teacher_run,
                 max_rounds=max_rounds,
             )
-            program2 = await program.compile(student, teacher=teacher, trainset=trainset_copy)
+            program2 = await program.compile(student, teacher=teacher, trainset=trainset_copy, run=run)
         else:
             rng.shuffle(trainset_copy)
             size = rng.randint(min_num_samples, max_bootstrapped_demos)
@@ -55,10 +56,10 @@ async def create_n_fewshot_demo_sets(
                 metric_threshold=metric_threshold,
                 max_bootstrapped_demos=size,
                 max_labeled_demos=max_labeled_demos,
-                teacher_settings=teacher_settings,
+                teacher_run=teacher_run,
                 max_rounds=max_rounds,
             )
-            program2 = await teleprompter.compile(student, teacher=teacher, trainset=trainset_copy)
+            program2 = await teleprompter.compile(student, teacher=teacher, trainset=trainset_copy, run=run)
         for i, _ in enumerate(student.predictors()):
             demo_candidates[i].append(program2.predictors()[i].demos)
     return demo_candidates

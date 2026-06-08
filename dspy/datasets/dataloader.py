@@ -3,8 +3,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from dspy.datasets.dataset import Dataset
-from dspy.dsp.utils.settings import settings
 from dspy.primitives.example import Example
+from dspy.runtime.run_context import RunContext
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -96,22 +96,21 @@ class DataLoader(Dataset):
             rows=cast("Iterable[Mapping[str, object]]", dataset), fields=fields, input_keys=input_keys
         )
 
-    def from_rm(self, num_samples: int, fields: list[str], input_keys: list[str]) -> list[Example]:
+    def from_rm(self, run: RunContext, num_samples: int, fields: list[str], input_keys: list[str]) -> list[Example]:
+        rm = run.retrieval
+        if rm is None:
+            raise ValueError(
+                "Retrieval module not found. Pass retrieval=... when creating RunContext."
+            )
         try:
-            rm = settings.rm
-            try:
-                return _rows_to_examples(
-                    rows=cast("Iterable[Mapping[str, object]]", rm.get_objects(num_samples=num_samples, fields=fields)),
-                    fields=fields,
-                    input_keys=tuple(input_keys),
-                )
-            except AttributeError:
-                raise ValueError(
-                    "Retrieval module does not support `get_objects`. Please use a different retrieval module."
-                )
+            return _rows_to_examples(
+                rows=cast("Iterable[Mapping[str, object]]", rm.get_objects(num_samples=num_samples, fields=fields)),
+                fields=fields,
+                input_keys=tuple(input_keys),
+            )
         except AttributeError:
             raise ValueError(
-                "Retrieval module not found. Please set a retrieval module using `from dspy.dsp.utils.settings import settings; settings.configure(rm=...)`."
+                "Retrieval module does not support `get_objects`. Please use a different retrieval module."
             )
 
     def sample(self, dataset: list[Example], n: int) -> list[Example]:

@@ -5,10 +5,10 @@ from typing import Any, Callable, cast
 
 from typing_extensions import override
 
-from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_finetune import (
     BootstrapFinetune,
     all_predictors_have_lms,
@@ -60,6 +60,7 @@ class BetterTogether(Teleprompter):
         shuffle_trainset_between_steps: bool = True,
         strategy: str = "p -> w -> p",
         optimizer_compile_args: dict[str, dict[str, Any]] | None = None,
+        run: RunContext,
     ) -> Module:
         logger.info(f"\n{BOLD}==> BETTERTOGETHER COMPILATION STARTED <=={ENDC}")
         logger.info(f"{BLUE}Strategy:{ENDC} {strategy}")
@@ -69,7 +70,7 @@ class BetterTogether(Teleprompter):
         trainset, valset = self._prepare_trainset_and_valset(
             trainset=trainset, valset=valset, valset_ratio=valset_ratio
         )
-        effective_max_errors = max_errors if max_errors is not None else settings.max_errors
+        effective_max_errors = max_errors if max_errors is not None else run.execution.max_errors
         parsed_strategy = self._prepare_strategy(strategy)
         optimizer_compile_args = self._prepare_optimizer_compile_args(optimizer_compile_args, teacher)
         student = await self._run_strategies(
@@ -84,6 +85,7 @@ class BetterTogether(Teleprompter):
             parsed_strategy,
             shuffle_trainset_between_steps,
             optimizer_compile_args,
+            run,
         )
         logger.info(f"\n{BOLD}{GREEN}==> BETTERTOGETHER COMPILATION COMPLETE <=={ENDC}")
         logger.info(f"{GREEN}Best score achieved:{ENDC} {student.candidate_programs[0]['score']}")
@@ -181,6 +183,7 @@ class BetterTogether(Teleprompter):
         parsed_strategy: list[str],
         shuffle_trainset_between_steps: bool,
         optimizer_args: dict[str, dict[str, Any]],
+        run: RunContext,
     ) -> Module:
         rng = random.Random(seed)
         candidate_programs = []
@@ -191,7 +194,7 @@ class BetterTogether(Teleprompter):
         launch_lms(student)
         flag_lms_launched = True
         score = await self._evaluate_on_valset(
-            student, valset, rng, num_threads, effective_max_errors, provide_traceback
+            student, valset, rng, num_threads, effective_max_errors, provide_traceback, run
         )
         self._add_candidate(candidate_programs=candidate_programs, student=student, strategy="", score=score)
         logger.info(f"{YELLOW}Baseline score:{ENDC} {score}")
@@ -221,6 +224,7 @@ class BetterTogether(Teleprompter):
                     num_threads,
                     effective_max_errors,
                     provide_traceback,
+                    run,
                 )
                 if lms_relaunched:
                     flag_lms_launched = True
@@ -273,11 +277,12 @@ class BetterTogether(Teleprompter):
         num_threads: int | None,
         effective_max_errors: int | None,
         provide_traceback: bool | None,
+        run: RunContext,
     ) -> tuple[Module, float | None, bool, bool]:
         pred_lms_before = [pred.lm for pred in student.predictors()]
         student._compiled = False
         logger.info(f"{BLUE}Running {optimizer.__class__.__name__} with {len(trainset)} training examples...{ENDC}")
-        potential_args = {"trainset": trainset, "teacher": teacher, "valset": valset, **compile_args}
+        potential_args = {"trainset": trainset, "teacher": teacher, "valset": valset, "run": run, **compile_args}
         sig = inspect.signature(optimizer.compile)
         accepted_params = set(sig.parameters.keys())
         filtered_compile_args = {k: v for k, v in potential_args.items() if k in accepted_params}
@@ -293,7 +298,7 @@ class BetterTogether(Teleprompter):
             launch_lms(student)
             lms_relaunched = True
         score = await self._evaluate_on_valset(
-            student, valset, rng, num_threads, effective_max_errors, provide_traceback
+            student, valset, rng, num_threads, effective_max_errors, provide_traceback, run
         )
         self._add_candidate(
             candidate_programs=candidate_programs, student=student, strategy=current_strategy, score=score
@@ -320,6 +325,7 @@ class BetterTogether(Teleprompter):
         num_threads: int | None,
         effective_max_errors: int | None,
         provide_traceback: bool | None,
+        run: RunContext,
     ) -> float | None:
         if valset is None or len(valset) == 0:
             logger.info(f"{YELLOW}No validation set provided. Skipping evaluation.{ENDC}")
@@ -335,6 +341,6 @@ class BetterTogether(Teleprompter):
             provide_traceback=provide_traceback,
         )
         eval_result = await eval_candidate_program(
-            batch_size=len(valset), trainset=valset, candidate_program=program, evaluate=evaluate, rng=rng
+            batch_size=len(valset), trainset=valset, candidate_program=program, evaluate=evaluate, run=run, rng=rng
         )
         return eval_result.score

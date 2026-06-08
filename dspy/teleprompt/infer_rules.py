@@ -4,34 +4,34 @@ import random
 
 from typing_extensions import override
 
-from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.module import Module
+from dspy.runtime.run_context import RunContext
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
-from dspy.teleprompt.optimizer_context import optimizer_lm_context
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
+from dspy.teleprompt.utils import optimizer_lm_context
 
 logger = logging.getLogger(__name__)
 
 
 class InferRules(BootstrapFewShot):
-    def __init__(self, num_candidates=10, num_rules=10, num_threads=None, teacher_settings=None, **kwargs) -> None:
-        super().__init__(teacher_settings=teacher_settings, **kwargs)
+    def __init__(self, num_candidates=10, num_rules=10, num_threads=None, teacher_run=None, **kwargs) -> None:
+        super().__init__(teacher_run=teacher_run, **kwargs)
         self.num_candidates = num_candidates
         self.num_rules = num_rules
         self.num_threads = num_threads
-        self.rules_induction_program = RulesInductionProgram(num_rules, teacher_settings=teacher_settings)
+        self.rules_induction_program = RulesInductionProgram(num_rules, teacher_run=teacher_run)
         self.metric = kwargs.get("metric")
         self.max_errors = kwargs.get("max_errors")
 
     @override
-    async def compile(self, student, *, teacher=None, trainset, valset=None):
+    async def compile(self, student, *, teacher=None, trainset, run: RunContext, valset=None):
         if valset is None:
             train_size = int(0.5 * len(trainset))
             trainset, valset = (trainset[:train_size], trainset[train_size:])
-        await super().compile(student, teacher=teacher, trainset=trainset)
+        await super().compile(student, teacher=teacher, trainset=trainset, run=run)
         original_program = self.student.deepcopy()
         all_predictors = [p for p in original_program.predictors() if hasattr(p, "task_spec")]
         instructions_list = [get_task_spec(p).instructions for p in all_predictors]
@@ -45,12 +45,12 @@ class InferRules(BootstrapFewShot):
                     predictor=predictor, task_spec=get_task_spec(predictor).with_instructions(instructions_list[i])
                 )
             for i, predictor in enumerate(candidate_predictors):
-                rules = await self.induce_natural_language_rules(predictor=predictor, trainset=trainset)
+                rules = await self.induce_natural_language_rules(predictor=predictor, trainset=trainset, run=run)
                 set_task_spec(
                     predictor=predictor, task_spec=get_task_spec(predictor).with_instructions(instructions_list[i])
                 )
                 self.update_program_instructions(predictor=predictor, natural_language_rules=rules)
-            score = await self.evaluate_program(program=candidate_program, dataset=valset)
+            score = await self.evaluate_program(program=candidate_program, dataset=valset, run=run)
             if score > best_score:
                 best_score = score
                 best_program = candidate_program
@@ -58,13 +58,13 @@ class InferRules(BootstrapFewShot):
         logger.info(f"Final best score: {best_score}")
         return best_program
 
-    async def induce_natural_language_rules(self, predictor, trainset):
+    async def induce_natural_language_rules(self, predictor, trainset, *, run: RunContext):
         demos = self.get_predictor_demos(trainset=trainset, predictor=predictor)
         task_spec = get_task_spec(predictor)
         while True:
             examples_text = self.format_examples(demos=demos, task_spec=task_spec)
             try:
-                return await self.rules_induction_program(examples_text)
+                return await self.rules_induction_program(examples_text, run=run)
             except Exception as e:
                 assert (
                     isinstance(e, ValueError)
@@ -108,8 +108,8 @@ class InferRules(BootstrapFewShot):
             for example in trainset
         ]
 
-    async def evaluate_program(self, program, dataset):
-        effective_max_errors = self.max_errors if self.max_errors is not None else settings.max_errors
+    async def evaluate_program(self, program, dataset, *, run: RunContext):
+        effective_max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors
         evaluate = Evaluate(
             devset=dataset,
             metric=self.metric,
@@ -118,7 +118,7 @@ class InferRules(BootstrapFewShot):
             display_table=False,
             display_progress=True,
         )
-        return (await evaluate(program, metric=self.metric)).score
+        return (await evaluate(program, run=run, metric=self.metric)).score
 
 
 def _rules_induction_task_spec(num_rules):
@@ -135,15 +135,15 @@ def _rules_induction_task_spec(num_rules):
 
 
 class RulesInductionProgram(Module):
-    def __init__(self, num_rules, teacher_settings=None) -> None:
+    def __init__(self, num_rules, teacher_run: RunContext | None = None) -> None:
         super().__init__()
         self.rules_induction = ChainOfThought(_rules_induction_task_spec(num_rules))
-        self.teacher_settings = teacher_settings or {}
+        self.teacher_run = teacher_run
         self.rng = random.Random(0)
 
-    async def aforward(self, examples_text):
-        with settings.context(**self.teacher_settings):
-            lm = settings.lm.copy(temperature=1.0)
-            with optimizer_lm_context(lm=lm, phase="infer_rules.induction", lm_role="teacher"):
-                rules = (await self.rules_induction(examples_text=examples_text)).natural_language_rules
+    async def aforward(self, examples_text, *, run: RunContext):
+        teacher_run = (self.teacher_run or run).fork(trace=[])
+        lm = teacher_run.lm.copy(temperature=1.0)
+        with optimizer_lm_context(run, lm=lm, phase="infer_rules.induction", lm_role="teacher") as opt_run:
+            rules = (await self.rules_induction(examples_text=examples_text, run=opt_run)).natural_language_rules
         return rules.strip()

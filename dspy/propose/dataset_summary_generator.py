@@ -1,10 +1,11 @@
 import re
 
-from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.propose.utils import strip_prefix
+from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
-from dspy.teleprompt.optimizer_context import optimizer_lm_context
+from dspy.teleprompt.task_spec_context import get_prompt_model
+from dspy.teleprompt.utils import optimizer_lm_context
 
 
 class ObservationSummarizerTaskSpec(TaskSpec):
@@ -58,14 +59,14 @@ def order_input_keys_in_string(unordered_repr):
     return re.sub(pattern, reorder_keys, unordered_repr)
 
 
-async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model, log_file=None, verbose=False):
+async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model, run: RunContext, log_file=None, verbose=False):
     if verbose:
         pass
     upper_lim = min(len(trainset), view_data_batch_size)
-    prompt_model = prompt_model if prompt_model else settings.lm
-    with optimizer_lm_context(lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model"):
+    prompt_model = get_prompt_model(prompt_model, run)
+    with optimizer_lm_context(run, lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model") as opt_run:
         observation = await Predict(DatasetDescriptorTaskSpec(), n=1, temperature=1.0)(
-            examples=order_input_keys_in_string(trainset[0:upper_lim].__repr__())
+            examples=order_input_keys_in_string(trainset[0:upper_lim].__repr__()), run=opt_run
         )
     observations = observation["observations"]
     if log_file:
@@ -81,10 +82,13 @@ async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model
             if verbose:
                 pass
             upper_lim = min(len(trainset), b + view_data_batch_size)
-            with optimizer_lm_context(lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model"):
+            with optimizer_lm_context(
+                run, lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model"
+            ) as opt_run:
                 output = await Predict(DatasetDescriptorWithPriorObservationsTaskSpec(), n=1, temperature=1.0)(
                     prior_observations=observations,
                     examples=order_input_keys_in_string(trainset[b:upper_lim].__repr__()),
+                    run=opt_run,
                 )
             if len(output["observations"]) >= 8 and output["observations"][:8].upper() == "COMPLETE":
                 skips += 1
@@ -98,8 +102,12 @@ async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model
         if verbose:
             pass
     if prompt_model:
-        with optimizer_lm_context(lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model"):
-            summary = await Predict(ObservationSummarizerTaskSpec(), n=1, temperature=1.0)(observations=observations)
+        with optimizer_lm_context(
+            run, lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model"
+        ) as opt_run:
+            summary = await Predict(ObservationSummarizerTaskSpec(), n=1, temperature=1.0)(
+                observations=observations, run=opt_run
+            )
     else:
         summary = await Predict(ObservationSummarizerTaskSpec(), n=1, temperature=1.0)(observations=observations)
     if verbose:

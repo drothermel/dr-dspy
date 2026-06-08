@@ -6,10 +6,11 @@ from typing_extensions import override
 
 from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.predict import Predict
+from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
-from dspy.teleprompt.optimizer_context import optimizer_lm_context
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
+from dspy.teleprompt.utils import optimizer_lm_context
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +98,7 @@ class COPRO(Teleprompter):
         logger.debug(f"p: {list(task_spec.fields.values())[-1].prefix}")
 
     @override
-    async def compile(self, student, *, trainset, eval_kwargs):
+    async def compile(self, student, *, trainset, eval_kwargs, run: RunContext):
         module = student.deepcopy()
         evaluate = Evaluate(devset=trainset, metric=self.metric, **eval_kwargs)
         total_calls = 0
@@ -117,15 +118,15 @@ class COPRO(Teleprompter):
             basic_prefix = get_task_spec(predictor).fields[last_key].prefix
             if self.prompt_model:
                 with optimizer_lm_context(
-                    lm=self.prompt_model, phase="copro.generate_instruction", lm_role="prompt_model"
-                ):
+                    run, lm=self.prompt_model, phase="copro.generate_instruction", lm_role="prompt_model"
+                ) as opt_run:
                     instruct = await Predict(
                         BasicGenerateInstructionTaskSpec(), n=self.breadth - 1, temperature=self.init_temperature
-                    )(basic_instruction=basic_instruction)
+                    )(basic_instruction=basic_instruction, run=opt_run)
             else:
                 instruct = await Predict(
                     BasicGenerateInstructionTaskSpec(), n=self.breadth - 1, temperature=self.init_temperature
-                )(basic_instruction=basic_instruction)
+                )(basic_instruction=basic_instruction, run=run)
             instruct.completions.proposed_instruction.append(basic_instruction)
             instruct.completions.proposed_prefix_for_output_field.append(basic_prefix)
             candidates[id(predictor)] = instruct.completions
@@ -158,7 +159,7 @@ class COPRO(Teleprompter):
                     logger.info(
                         f"At Depth {d + 1}/{self.depth}, Evaluating Prompt Candidate #{c_i + 1}/{len(candidates_)} for Predictor {p_i + 1} of {len(module.predictors())}."
                     )
-                    score = (await evaluate(module_clone, devset=trainset, **eval_kwargs)).score
+                    score = (await evaluate(module_clone, run=run, devset=trainset, **eval_kwargs)).score
                     if self.prompt_model:
                         logger.debug(f"prompt_model.inspect_history(n=1) {self.prompt_model.inspect_history(n=1)}")
                     total_calls += 1
@@ -220,17 +221,17 @@ class COPRO(Teleprompter):
                     attempts.append(f"Resulting Score #{shortest_len - i}: {best_predictors[i]['score']}")
                 if self.prompt_model:
                     with optimizer_lm_context(
-                        lm=self.prompt_model, phase="copro.refine_instruction", lm_role="prompt_model"
-                    ):
+                        run, lm=self.prompt_model, phase="copro.refine_instruction", lm_role="prompt_model"
+                    ) as opt_run:
                         instr = await Predict(
                             GenerateInstructionGivenAttemptsTaskSpec(),
                             n=self.breadth,
                             temperature=self.init_temperature,
-                        )(attempted_instructions=attempts)
+                        )(attempted_instructions=attempts, run=opt_run)
                 else:
                     instr = await Predict(
                         GenerateInstructionGivenAttemptsTaskSpec(), n=self.breadth, temperature=self.init_temperature
-                    )(attempted_instructions=attempts)
+                    )(attempted_instructions=attempts, run=run)
                 new_candidates[id(p_base)] = instr.completions
                 all_candidates[id(p_base)].proposed_instruction.extend(instr.completions.proposed_instruction)
                 all_candidates[id(p_base)].proposed_prefix_for_output_field.extend(

@@ -5,8 +5,8 @@ import threading
 import tqdm
 from typing_extensions import override
 
-from dspy.dsp.utils.settings import settings
 from dspy.primitives.example import Example
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.task_spec_context import get_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.hasher import Hasher
@@ -21,7 +21,7 @@ class BootstrapFewShot(Teleprompter):
         self,
         metric=None,
         metric_threshold=None,
-        teacher_settings: dict | None = None,
+        teacher_run: RunContext | None = None,
         max_bootstrapped_demos=4,
         max_labeled_demos=16,
         max_rounds=1,
@@ -29,7 +29,7 @@ class BootstrapFewShot(Teleprompter):
     ) -> None:
         self.metric = metric
         self.metric_threshold = metric_threshold
-        self.teacher_settings = {} if teacher_settings is None else teacher_settings
+        self.teacher_run = teacher_run
         self.max_bootstrapped_demos = max_bootstrapped_demos
         self.max_labeled_demos = max_labeled_demos
         self.max_rounds = max_rounds
@@ -38,22 +38,22 @@ class BootstrapFewShot(Teleprompter):
         self.error_lock = threading.Lock()
 
     @override
-    async def compile(self, student, *, teacher=None, trainset):
+    async def compile(self, student, *, teacher=None, trainset, run: RunContext):
         self.trainset = trainset
-        await self._prepare_student_and_teacher(student=student, teacher=teacher)
+        await self._prepare_student_and_teacher(student=student, teacher=teacher, run=run)
         self._prepare_predictor_mappings()
-        await self._bootstrap()
+        await self._bootstrap(run=run)
         self.student = self._train()
         self.student._compiled = True
         return self.student
 
-    async def _prepare_student_and_teacher(self, student, teacher) -> None:
+    async def _prepare_student_and_teacher(self, student, teacher, *, run: RunContext) -> None:
         self.student = student.reset_copy()
         self.teacher = teacher.deepcopy() if teacher is not None else student.deepcopy()
         assert getattr(self.student, "_compiled", False) is False, "Student must be uncompiled."
         if self.max_labeled_demos and getattr(self.teacher, "_compiled", False) is False:
             teleprompter = LabeledFewShot(k=self.max_labeled_demos)
-            self.teacher = await teleprompter.compile(self.teacher.reset_copy(), trainset=self.trainset)
+            self.teacher = await teleprompter.compile(self.teacher.reset_copy(), trainset=self.trainset, run=run)
 
     def _prepare_predictor_mappings(self) -> None:
         name2predictor, predictor2name = ({}, {})
@@ -75,7 +75,7 @@ class BootstrapFewShot(Teleprompter):
         self.name2predictor = name2predictor
         self.predictor2name = predictor2name
 
-    async def _bootstrap(self, *, max_bootstraps=None) -> None:
+    async def _bootstrap(self, *, run: RunContext, max_bootstraps=None) -> None:
         max_bootstraps = max_bootstraps or self.max_bootstrapped_demos
         bootstrap_attempts = 0
         bootstrapped = {}
@@ -85,42 +85,43 @@ class BootstrapFewShot(Teleprompter):
                 break
             for round_idx in range(self.max_rounds):
                 bootstrap_attempts += 1
-                if await self._bootstrap_one_example(example=example, round_idx=round_idx):
+                if await self._bootstrap_one_example(example=example, round_idx=round_idx, run=run):
                     bootstrapped[example_idx] = True
                     break
         self.validation = [x for idx, x in enumerate(self.trainset) if idx not in bootstrapped]
         random.Random(0).shuffle(self.validation)
         self.validation = self.validation
 
-    async def _bootstrap_one_example(self, example, round_idx=0):
+    async def _bootstrap_one_example(self, example, round_idx=0, *, run: RunContext):
         name2traces = {}
         teacher = self.teacher
         predictor_cache = {}
         trace: list = []
         try:
-            with settings.context(trace=[], **self.teacher_settings):
-                lm = settings.lm
-                lm = lm.copy(temperature=1.0) if round_idx > 0 else lm
-                new_settings = {"lm": lm} if round_idx > 0 else {}
-                with settings.context(**new_settings):
-                    for name, predictor in teacher.named_predictors():
-                        predictor_cache[name] = predictor.demos
-                        predictor.demos = [x for x in predictor.demos if x != example]
-                    prediction = await teacher(**example.inputs())
-                    trace = settings.trace
-                    for name, predictor in teacher.named_predictors():
-                        predictor.demos = predictor_cache[name]
-                if self.metric:
-                    metric_val = self.metric(example, prediction, trace)
-                    success = metric_val >= self.metric_threshold if self.metric_threshold else metric_val
-                else:
-                    success = True
+            teacher_run = (self.teacher_run or run).fork(trace=[])
+            lm = teacher_run.lm
+            lm = lm.copy(temperature=1.0) if round_idx > 0 else lm
+            if round_idx > 0:
+                teacher_run = teacher_run.fork(lm=lm)
+            item_run = teacher_run.fork(trace=[])
+            for name, predictor in teacher.named_predictors():
+                predictor_cache[name] = predictor.demos
+                predictor.demos = [x for x in predictor.demos if x != example]
+            prediction = await teacher(**example.inputs(), run=item_run)
+            trace = list(item_run.trace)
+            for name, predictor in teacher.named_predictors():
+                predictor.demos = predictor_cache[name]
+            if self.metric:
+                metric_val = self.metric(example, prediction, trace)
+                success = metric_val >= self.metric_threshold if self.metric_threshold else metric_val
+            else:
+                success = True
         except Exception as e:
             success = False
             with self.error_lock:
                 self.error_count += 1
                 current_error_count = self.error_count
-            effective_max_errors = self.max_errors if self.max_errors is not None else settings.max_errors
+            effective_max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors
             if current_error_count >= effective_max_errors:
                 raise
             logger.exception(f"Failed to run or to evaluate example {example} with {self.metric} due to {e}.")

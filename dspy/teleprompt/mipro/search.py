@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any
 
 from dspy.evaluate.evaluate import Evaluate
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.teleprompt.log_utils import print_full_program, save_candidate_program
 from dspy.teleprompt.mipro.evaluate import (
@@ -48,6 +49,7 @@ def objective(
     adjusted_num_trials: int,
     study: "optuna.Study",
     state: dict[str, Any],
+    run: RunContext,
 ) -> float:
     best_program = state["best_program"]
     best_score = state["best_score"]
@@ -76,6 +78,7 @@ def objective(
             trainset=valset,
             candidate_program=candidate_program,
             evaluate=evaluate,
+            run=run,
             rng=optimizer.rng,
         )
     ).score
@@ -136,6 +139,7 @@ def objective(
                 study,
                 instruction_candidates,
                 demo_candidates,
+                run=run,
             )
         )
     state["best_program"] = best_program
@@ -156,6 +160,7 @@ async def optimize_prompt_parameters(
     minibatch_size: int,
     minibatch_full_eval_steps: int,
     seed: int,
+    run: RunContext,
 ) -> Any | None:
     optuna = import_optuna()
     optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -172,7 +177,7 @@ async def optimize_prompt_parameters(
     logger.info(f"== Trial {1} / {adjusted_num_trials} - Full Evaluation of Default Program ==")
     default_score = (
         await eval_candidate_program(
-            batch_size=len(valset), trainset=valset, candidate_program=program, evaluate=evaluate, rng=optimizer.rng
+            batch_size=len(valset), trainset=valset, candidate_program=program, evaluate=evaluate, run=run, rng=optimizer.rng
         )
     ).score
     logger.info(f"Default program score: {default_score}\n")
@@ -228,6 +233,7 @@ async def optimize_prompt_parameters(
             adjusted_num_trials=adjusted_num_trials,
             study=study,
             state=state,
+            run=run,
         ),
         n_trials=num_trials,
     )

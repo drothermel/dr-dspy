@@ -1,7 +1,7 @@
 import logging
 from typing import TYPE_CHECKING, Any
 
-from dspy.dsp.utils.settings import settings
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.demo_sets import create_n_fewshot_demo_sets
 from dspy.teleprompt.mipro.settings import BOOTSTRAPPED_FEWSHOT_EXAMPLES_IN_CONTEXT, LABELED_FEWSHOT_EXAMPLES_IN_CONTEXT
 
@@ -22,6 +22,7 @@ async def bootstrap_fewshot_examples(
     max_labeled_demos: int,
     max_errors: int | None,
     metric_threshold: float | None,
+    run: RunContext,
 ) -> list | None:
     logger.info("\n==> STEP 1: BOOTSTRAP FEWSHOT EXAMPLES <==")
     if max_bootstrapped_demos > 0:
@@ -33,7 +34,7 @@ async def bootstrap_fewshot_examples(
     logger.info(f"Bootstrapping N={num_fewshot_candidates} sets of demonstrations...")
     zeroshot = max_bootstrapped_demos == 0 and max_labeled_demos == 0
     if max_errors is None:
-        max_errors = settings.max_errors
+        max_errors = run.execution.max_errors
     return await create_n_fewshot_demo_sets(
         student=program,
         num_candidate_sets=num_fewshot_candidates,
@@ -43,7 +44,8 @@ async def bootstrap_fewshot_examples(
         metric=optimizer.metric,
         max_errors=max_errors,
         teacher=teacher,
-        teacher_settings=optimizer.teacher_settings,
+        teacher_run=optimizer.teacher_run,
+        run=run,
         seed=seed,
         metric_threshold=metric_threshold,
         rng=optimizer.rng,

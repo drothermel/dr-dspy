@@ -1,10 +1,10 @@
-from dspy.dsp.utils.settings import settings
+from dspy.runtime.run_context import RunContext
 
 
-def get_prompt_model(prompt_model):
+def get_prompt_model(prompt_model, run: RunContext):
     if prompt_model:
         return prompt_model
-    return settings.lm
+    return run.lm
 
 
 def get_task_spec(predictor):

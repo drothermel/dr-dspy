@@ -3,11 +3,11 @@ from typing import Any, cast
 
 from dspy.adapters.types.tool import Tool
 from dspy.compile.resolve import resolve_adapter
-from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
+from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import TaskSpec, default_task_instructions, input_field, make_task_spec, output_field
 from dspy.utils.exceptions import ContextWindowExceededError
 
@@ -66,8 +66,8 @@ class ReAct(Module):
         self.react = Predict(react_task_spec)
         self.extract = ChainOfThought(fallback_task_spec)
 
-    def _format_trajectory(self, trajectory: dict[str, Any]):
-        adapter, _ = resolve_adapter(settings.adapter, transparency=settings.get("transparency", "strict"))
+    def _format_trajectory(self, trajectory: dict[str, Any], run: RunContext):
+        adapter, _ = resolve_adapter(run.adapter, transparency=run.telemetry.transparency)
         trajectory_keys = ", ".join(trajectory.keys())
         trajectory_task_spec = make_task_spec(
             f"{trajectory_keys} -> x",
@@ -76,11 +76,13 @@ class ReAct(Module):
         return adapter.format_user_message_content(task_spec=trajectory_task_spec, inputs=trajectory)
 
     async def aforward(self, **input_args):
+        run = resolve_run(run=input_args.pop("run", None), bound_run=self.run)
+        input_args["run"] = run
         trajectory = {}
         max_iters = input_args.pop("max_iters", self.max_iters)
         for idx in range(max_iters):
             try:
-                pred = await self._call_with_potential_trajectory_truncation(self.react, trajectory, **input_args)
+                pred = await self._call_with_potential_trajectory_truncation(self.react, trajectory, run, **input_args)
             except ValueError as err:
                 logger.warning(f"Ending the trajectory: Agent failed to select a valid tool: {_fmt_exc(err)}")
                 break
@@ -94,13 +96,13 @@ class ReAct(Module):
                 trajectory[f"observation_{idx}"] = f"Execution error in {pred.next_tool_name}: {_fmt_exc(err)}"
             if pred.next_tool_name == "finish":
                 break
-        extract = await self._call_with_potential_trajectory_truncation(self.extract, trajectory, **input_args)
+        extract = await self._call_with_potential_trajectory_truncation(self.extract, trajectory, run, **input_args)
         return Prediction(trajectory=trajectory, **extract)
 
-    async def _call_with_potential_trajectory_truncation(self, module, trajectory, **input_args):
+    async def _call_with_potential_trajectory_truncation(self, module, trajectory, run, **input_args):
         for _ in range(3):
             try:
-                return await module(**input_args, trajectory=self._format_trajectory(trajectory))
+                return await module(**input_args, trajectory=self._format_trajectory(trajectory, run), run=run)
             except ContextWindowExceededError:
                 logger.warning("Trajectory exceeded the context window, truncating the oldest tool call information.")
                 trajectory = self.truncate_trajectory(trajectory)

@@ -85,7 +85,7 @@ def validate_compiled_call(call: CompiledCall, mode: TransparencyMode) -> list[s
     violations = list(call.violations)
     if not call.adapter_class or call.adapter_class == "ChatAdapter(default)":
         violations.append(
-            "adapter not configured (would default to ChatAdapter). Fix: settings.configure(adapter=JSONAdapter()) or pass adapter in settings.context(...)."
+            "adapter not configured (would default to ChatAdapter). Fix: RunContext.create(lm=LM(...), adapter=JSONAdapter())."
         )
     for task_spec in (call.original_task_spec, call.processed_task_spec):
         violations.extend(collect_task_spec_violations(task_spec))

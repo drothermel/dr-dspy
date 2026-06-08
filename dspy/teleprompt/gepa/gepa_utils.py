@@ -11,15 +11,15 @@ from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.history import History
-from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, TraceData
 from dspy.teleprompt.gepa.task_specs import FrameworkGepaInstructionProposalTaskSpec
-from dspy.teleprompt.optimizer_context import optimizer_lm_context
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
+from dspy.teleprompt.utils import optimizer_lm_context
 
 if TYPE_CHECKING:
     from gepa.core.adapter import ProposalFn
@@ -84,6 +84,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         custom_instruction_proposer: "ProposalFn | None" = None,
         warn_on_score_mismatch: bool = True,
         reflection_minibatch_size: int | None = None,
+        run: RunContext | None = None,
     ) -> None:
         self.student = student_module
         self.metric_fn = metric_fn
@@ -96,6 +97,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         self.custom_instruction_proposer = custom_instruction_proposer
         self.warn_on_score_mismatch = warn_on_score_mismatch
         self.reflection_minibatch_size = reflection_minibatch_size
+        self.run = run
 
     @override
     def propose_new_texts(
@@ -104,9 +106,11 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         reflective_dataset: dict[str, list[dict[str, Any]]],
         components_to_update: list[str],
     ) -> dict[str, str]:
-        reflection_lm = self.reflection_lm or settings.lm
+        reflection_lm = self.reflection_lm or self.run.lm
         if self.custom_instruction_proposer:
-            with optimizer_lm_context(lm=reflection_lm, phase="gepa.reflection", lm_role="reflection_lm"):
+            with optimizer_lm_context(
+                self.run, lm=reflection_lm, phase="gepa.reflection", lm_role="reflection_lm"
+            ) as opt_run:
                 return self.custom_instruction_proposer(
                     candidate=candidate,
                     reflective_dataset=reflective_dataset,
@@ -114,7 +118,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 )
         results: dict[str, str] = {}
         proposer = Predict(FrameworkGepaInstructionProposalTaskSpec())
-        with optimizer_lm_context(lm=reflection_lm, phase="gepa.reflection", lm_role="reflection_lm"):
+        with optimizer_lm_context(self.run, lm=reflection_lm, phase="gepa.reflection", lm_role="reflection_lm") as opt_run:
             for name in components_to_update:
                 base_instruction = candidate[name]
                 dataset_with_feedback = reflective_dataset[name]
@@ -122,6 +126,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                     proposer(
                         current_instruction_doc=base_instruction,
                         dataset_with_feedback=json.dumps(dataset_with_feedback, indent=2, default=str),
+                        run=opt_run,
                     )
                 )
                 results[name] = prediction.new_instruction
@@ -151,6 +156,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             trajs = await bootstrap_trace_module.bootstrap_trace_data(
                 program=program,
                 dataset=batch,
+                run=self.run,
                 metric=self.metric_fn,
                 num_threads=self.num_threads,
                 raise_on_error=False,
@@ -181,7 +187,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             provide_traceback=True,
             max_errors=len(batch) * 100,
         )
-        res = await evaluator(program, callback_metadata=callback_metadata)
+        res = await evaluator(program, run=self.run, callback_metadata=callback_metadata)
         outputs = [r[1] for r in res.results]
         scores = [r[2] for r in res.results]
         scores = [s["score"] if hasattr(s, "score") else s for s in scores]

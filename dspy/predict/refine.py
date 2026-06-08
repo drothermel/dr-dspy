@@ -6,8 +6,8 @@ import orjson
 from dspy.adapters.call.wrappers import HintInjectingAdapter
 from dspy.adapters.utils import get_field_description_string
 from dspy.compile.resolve import resolve_adapter
-from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict, Prediction
+from dspy.runtime.run_context import resolve_run
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
 from dspy.utils.source_format import get_formatted_source
@@ -64,10 +64,11 @@ class Refine(Module):
             self.reward_fn_code = get_formatted_source(reward_fn.__class__)
 
     async def aforward(self, **kwargs):
-        lm = self.module.get_lm() or settings.lm
+        run = resolve_run(run=kwargs.pop("run", None), bound_run=self.run)
+        lm = self.module.get_lm() or run.lm
         best_pred, best_trace, best_reward = (None, None, -float("inf"))
         advice = None
-        adapter, _ = resolve_adapter(settings.adapter, transparency=settings.get("transparency", "strict"))
+        adapter, _ = resolve_adapter(run.adapter, transparency=run.telemetry.transparency)
         for idx in range(self.N):
             lm_ = lm.copy(temperature=1.0)
             mod = self.module.deepcopy()
@@ -76,19 +77,19 @@ class Refine(Module):
             task_spec2name = {predictor.task_spec: name for name, predictor in mod.named_predictors()}
             module_names = [name for name, _ in mod.named_predictors()]
             try:
-                with settings.context(trace=[]):
-                    if not advice:
-                        outputs = await mod(**kwargs)
-                    else:
-                        hint_adapter = HintInjectingAdapter(
-                            inner=adapter,
-                            hint_map=advice,
-                            task_spec_to_name=task_spec2name,
-                        )
-                        with settings.context(adapter=hint_adapter):
-                            outputs = await mod(**kwargs)
-                    trace = settings.trace.copy()
-                    reward = self.reward_fn(kwargs, outputs)
+                item_run = run.fork(trace=[])
+                if not advice:
+                    outputs = await mod(**kwargs, run=item_run)
+                else:
+                    hint_adapter = HintInjectingAdapter(
+                        inner=adapter,
+                        hint_map=advice,
+                        task_spec_to_name=task_spec2name,
+                    )
+                    hint_run = item_run.fork(adapter=hint_adapter)
+                    outputs = await mod(**kwargs, run=hint_run)
+                trace = list(item_run.trace)
+                reward = self.reward_fn(kwargs, outputs)
                 if reward > best_reward:
                     best_reward, best_pred, best_trace = (reward, outputs, trace)
                 if self.threshold is not None and reward >= self.threshold:
@@ -118,7 +119,7 @@ class Refine(Module):
                     raise
                 self.fail_count -= 1
         if best_trace:
-            settings.trace.extend(best_trace)
+            run.trace.extend(best_trace)
         return best_pred
 
 

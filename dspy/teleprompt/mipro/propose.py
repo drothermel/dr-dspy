@@ -2,6 +2,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from dspy.propose.grounded_proposer import GroundedProposer
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.mipro.settings import BOOTSTRAPPED_FEWSHOT_EXAMPLES_IN_CONTEXT
 from dspy.teleprompt.task_spec_context import get_task_spec
 
@@ -21,6 +22,7 @@ async def propose_instructions(
     tip_aware_proposer: bool,
     fewshot_aware_proposer: bool,
     num_instruct_candidates: int,
+    run: RunContext,
 ) -> dict[int, list[str]]:
     logger.info("\n==> STEP 2: PROPOSE INSTRUCTION CANDIDATES <==")
     logger.info(
@@ -45,7 +47,7 @@ async def propose_instructions(
     )
     logger.info(f"\nProposing N={num_instruct_candidates} instructions...\n")
     instruction_candidates = await proposer.propose_instructions_for_program(
-        trainset=trainset, program=program, demo_candidates=demo_candidates, N=num_instruct_candidates, trial_logs={}
+        trainset=trainset, program=program, demo_candidates=demo_candidates, N=num_instruct_candidates, trial_logs={}, run=run
     )
     for i, pred in enumerate(program.predictors()):
         logger.info(f"Proposed Instructions for Predictor {i}:\n")

@@ -2,6 +2,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from dspy.evaluate.evaluate import Evaluate
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.eval_batch import eval_candidate_program, get_program_with_highest_avg_score
 from dspy.teleprompt.log_utils import save_candidate_program
 from dspy.teleprompt.mipro.optuna_helpers import get_param_distributions, import_optuna
@@ -116,6 +117,7 @@ async def perform_full_evaluation(
     study: "optuna.Study",
     instruction_candidates: dict[int, list[str]],
     demo_candidates: list | None,
+    run: RunContext,
 ):
     optuna = import_optuna()
     logger.info(f"===== Trial {trial_num + 1} / {adjusted_num_trials} - Full Evaluation =====")
@@ -129,6 +131,7 @@ async def perform_full_evaluation(
             trainset=valset,
             candidate_program=highest_mean_program,
             evaluate=evaluate,
+            run=run,
             rng=optimizer.rng,
         )
     ).score

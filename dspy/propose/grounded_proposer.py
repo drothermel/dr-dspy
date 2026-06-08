@@ -15,8 +15,8 @@ from dspy.propose.utils import (
     strip_prefix,
 )
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
-from dspy.teleprompt.optimizer_context import optimizer_lm_context
 from dspy.teleprompt.task_spec_context import get_prompt_model, get_task_spec
+from dspy.teleprompt.utils import optimizer_lm_context
 
 logger = logging.getLogger(__name__)
 MAX_INSTRUCT_IN_HISTORY = 5
@@ -272,7 +272,7 @@ class GroundedProposer(Proposer):
         self.set_history_randomly = set_history_randomly
         self.verbose = verbose
         self.rng = rng or random
-        self.prompt_model = get_prompt_model(prompt_model)
+        self.prompt_model = prompt_model
         self.init_temperature = init_temperature
         self.program_code_string = None
         if self.program_aware:
@@ -288,19 +288,20 @@ class GroundedProposer(Proposer):
         self._summary_trainset = trainset
         self._view_data_batch_size = view_data_batch_size
 
-    async def _ensure_data_summary(self) -> None:
+    async def _ensure_data_summary(self, *, run) -> None:
         if self.data_summary is None and self.use_dataset_summary:
             self.data_summary = await create_dataset_summary(
                 trainset=self._summary_trainset,
                 view_data_batch_size=self._view_data_batch_size,
-                prompt_model=self.prompt_model,
+                prompt_model=get_prompt_model(self.prompt_model, run),
+                run=run,
             )
 
     @override
     async def propose_instructions_for_program(
-        self, trainset, program, demo_candidates, trial_logs, N
+        self, trainset, program, demo_candidates, trial_logs, N, *, run
     ) -> dict[int, list[str]]:
-        await self._ensure_data_summary()
+        await self._ensure_data_summary(run=run)
         proposed_instructions = {}
         if self.set_history_randomly:
             use_history = self.rng.random() < 0.5
@@ -336,13 +337,14 @@ class GroundedProposer(Proposer):
                         demo_set_i=demo_set_i,
                         trial_logs=trial_logs,
                         tip=selected_tip,
+                        run=run,
                     )
                 )
         return proposed_instructions
 
     @override
     async def propose_instruction_for_predictor(
-        self, program, predictor, pred_i, demo_candidates, demo_set_i, trial_logs, tip=None
+        self, program, predictor, pred_i, demo_candidates, demo_set_i, trial_logs, tip=None, *, run
     ) -> str:
         instruction_history = create_predictor_level_history_string(
             base_program=program, predictor_i=pred_i, trial_logs=trial_logs, top_n=MAX_INSTRUCT_IN_HISTORY
@@ -356,8 +358,8 @@ class GroundedProposer(Proposer):
             use_tip=self.use_tip,
             verbose=self.verbose,
         )
-        rollout_lm = self.prompt_model.copy(temperature=self.init_temperature)
-        with optimizer_lm_context(lm=rollout_lm, phase="propose.grounded", lm_role="prompt_model"):
+        rollout_lm = get_prompt_model(self.prompt_model, run).copy(temperature=self.init_temperature)
+        with optimizer_lm_context(run, lm=rollout_lm, phase="propose.grounded", lm_role="prompt_model") as opt_run:
             proposed_instruction = (
                 await instruction_generator(
                     demo_candidates=demo_candidates,
@@ -368,6 +370,7 @@ class GroundedProposer(Proposer):
                     previous_instructions=instruction_history,
                     num_demos_in_context=self.num_demos_in_context,
                     tip=tip,
+                    run=opt_run,
                 )
             ).proposed_instruction
         if self.verbose:

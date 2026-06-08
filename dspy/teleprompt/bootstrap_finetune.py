@@ -7,10 +7,10 @@ from typing_extensions import override
 from dspy.adapters.base import Adapter
 from dspy.clients.lm import LM
 from dspy.clients.utils_finetune import infer_data_format
-from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_trace import bootstrap_trace_data
 from dspy.teleprompt.teleprompt import Teleprompter
 
@@ -48,7 +48,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
 
     @override
     async def compile(
-        self, student: Module, trainset: list[Example], teacher: Module | list[Module] | None = None
+        self, student: Module, trainset: list[Example], teacher: Module | list[Module] | None = None, *, run: RunContext
     ) -> Module:
         logger.info("Preparing the student and teacher programs...")
         all_predictors_have_lms(student)
@@ -56,10 +56,10 @@ class BootstrapFinetune(FinetuneTeleprompter):
         trace_data = []
         teachers = teacher if isinstance(teacher, list) else [teacher]
         teachers = [prepare_teacher(student=student, teacher=cast("Module | None", t)) for t in teachers]
-        num_threads = self.num_threads or settings.num_threads
+        num_threads = self.num_threads or run.execution.num_threads
         for t in teachers:
             trace_data += await bootstrap_trace_data(
-                program=t, dataset=trainset, metric=self.metric, num_threads=num_threads
+                program=t, dataset=trainset, metric=self.metric, num_threads=num_threads, run=run
             )
         logger.info("Preparing the train data...")
         key_to_data = {}
@@ -72,7 +72,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
             training_key = (pred.lm, data_pred_ind)
             if training_key not in key_to_data:
                 train_data, data_format = self._prepare_finetune_data(
-                    trace_data=trace_data, lm=pred.lm, pred_ind=data_pred_ind
+                    trace_data=trace_data, lm=pred.lm, pred_ind=data_pred_ind, run=run
                 )
                 logger.info(f"Using {len(train_data)} data points for fine-tuning the model: {pred.lm.model}")
                 finetune_kwargs = {
@@ -125,7 +125,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
             logger.info(f"Job {ind + 1}/{num_jobs} is done")
         return key_to_lm
 
-    def _prepare_finetune_data(self, trace_data: list[dict[str, Any]], lm: LM, pred_ind: int | None = None):
+    def _prepare_finetune_data(self, trace_data: list[dict[str, Any]], lm: LM, pred_ind: int | None, *, run: RunContext):
         if self.metric:
             logger.info(f"Collected data for {len(trace_data)} examples")
             trace_data = [d for d in trace_data if d["score"]]
@@ -135,7 +135,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
 
         configured_adapter = self.adapter[lm] if isinstance(self.adapter, dict) else self.adapter
         adapter, _ = resolve_adapter(
-            configured_adapter or settings.adapter, transparency=settings.get("transparency", "strict")
+            configured_adapter or run.adapter, transparency=run.telemetry.transparency
         )
         data_format = infer_data_format(adapter)
         for item in trace_data:

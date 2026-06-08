@@ -89,8 +89,8 @@ def prepare_serializable_vars(input_args: dict[str, Any], repl: CodeInterpreter)
     return regular_args
 
 
-def prepare_execution_tools(rlm: RLM) -> dict[str, Callable]:
-    execution_tools = make_llm_tools(rlm)
+def prepare_execution_tools(rlm: RLM, run: RunContext | None = None) -> dict[str, Callable]:
+    execution_tools = make_llm_tools(rlm, run=run)
     execution_tools.update({name: tool.func for name, tool in rlm._user_tools.items()})
     return execution_tools
 

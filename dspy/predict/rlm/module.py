@@ -10,6 +10,7 @@ from dspy.predict.rlm.task_specs import FrameworkRlmSubQueryTaskSpec
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.repl_types import REPLHistory, REPLVariable
+from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import TaskSpec
 from dspy.utils.annotation import experimental
 
@@ -60,8 +61,8 @@ class RLM(Module):
     def _format_tool_docs(self, user_tools: dict[str, Tool]) -> str:
         return rlm_tools.format_tool_docs(user_tools)
 
-    def _make_llm_tools(self, max_workers: int = 8) -> dict[str, Callable]:
-        return rlm_tools.make_llm_tools(self, max_workers=max_workers)
+    def _make_llm_tools(self, run: RunContext | None = None, max_workers: int = 8) -> dict[str, Callable]:
+        return rlm_tools.make_llm_tools(self, run=run, max_workers=max_workers)
 
     @property
     def tools(self) -> dict[str, Tool]:
@@ -85,8 +86,8 @@ class RLM(Module):
     def _prepare_serializable_vars(self, input_args: dict[str, Any], repl: CodeInterpreter) -> dict[str, Any]:
         return rlm_execution.prepare_serializable_vars(input_args, repl)
 
-    def _prepare_execution_tools(self) -> dict[str, Callable]:
-        return rlm_execution.prepare_execution_tools(self)
+    def _prepare_execution_tools(self, run=None) -> dict[str, Callable]:
+        return rlm_execution.prepare_execution_tools(self, run=run)
 
     def _inject_execution_context(self, interpreter: CodeInterpreter, execution_tools: dict[str, Callable]) -> None:
         rlm_execution.inject_execution_context(self, interpreter, execution_tools)
@@ -144,9 +145,11 @@ class RLM(Module):
         )
 
     async def aforward(self, **input_args) -> Prediction:
+        run = resolve_run(run=input_args.pop("run", None), bound_run=self.run)
+        input_args["run"] = run
         self._validate_inputs(input_args)
         output_field_names = list(self.task_spec.output_fields.keys())
-        execution_tools = self._prepare_execution_tools()
+        execution_tools = self._prepare_execution_tools(run=run)
         variables = self._build_variables(**input_args)
         with self._interpreter_context(execution_tools) as repl:
             regular_args = self._prepare_serializable_vars(input_args, repl)

@@ -3,11 +3,11 @@ from dataclasses import dataclass
 from types import MethodType
 from typing import Any, Callable, TypedDict
 
-from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.task_spec_context import get_task_spec
 from dspy.utils.exceptions import AdapterParseError
 
@@ -31,6 +31,7 @@ class TraceData(TypedDict):
 async def bootstrap_trace_data(
     program: Module,
     dataset: list[Example],
+    run: RunContext,
     metric: Callable | None = None,
     num_threads: int | None = None,
     raise_on_error=True,
@@ -59,42 +60,44 @@ async def bootstrap_trace_data(
     original_aforward = object.__getattribute__(program, "aforward")
 
     async def patched_aforward(program_to_use: Module, **kwargs):
-        with settings.context(trace=[]):
-            try:
-                return (await original_aforward(**kwargs), settings.trace.copy())
-            except AdapterParseError as e:
-                completion_str = e.lm_response
-                parsed_result = e.parsed_result
-                failed_task_spec = e.task_spec
-                failed_inputs = kwargs
-                present = list(parsed_result.keys()) if parsed_result else None
-                expected = list(failed_task_spec.output_fields.keys())
-                found_pred = None
-                for pred in program_to_use.predictors():
-                    if get_task_spec(pred).equals(failed_task_spec):
-                        found_pred = pred
-                        break
-                if found_pred is None:
-                    raise ValueError(f"Failed to find the predictor for the failed task spec: {failed_task_spec}")
-                trace = settings.trace.copy()
-                if present:
-                    failed_pred = FailedPrediction(
-                        completion_text=completion_str,
-                        format_reward=format_failure_score
-                        + (failure_score - format_failure_score) * (len(present) / len(expected)),
-                    )
-                else:
-                    failed_pred = FailedPrediction(completion_text=completion_str, format_reward=format_failure_score)
-                trace.append((found_pred, failed_inputs, failed_pred))
-                if log_format_failures:
-                    logging.warning(
-                        "Failed to parse output for example. This is likely due to the LLM response not following the adapter's formatting."
-                    )
-                return (failed_pred, trace)
+        item_run = run.fork(trace=[])
+        try:
+            return (await original_aforward(**kwargs, run=item_run), list(item_run.trace))
+        except AdapterParseError as e:
+            completion_str = e.lm_response
+            parsed_result = e.parsed_result
+            failed_task_spec = e.task_spec
+            failed_inputs = kwargs
+            present = list(parsed_result.keys()) if parsed_result else None
+            expected = list(failed_task_spec.output_fields.keys())
+            found_pred = None
+            for pred in program_to_use.predictors():
+                if get_task_spec(pred).equals(failed_task_spec):
+                    found_pred = pred
+                    break
+            if found_pred is None:
+                raise ValueError(f"Failed to find the predictor for the failed task spec: {failed_task_spec}")
+            trace = list(item_run.trace)
+            if present:
+                failed_pred = FailedPrediction(
+                    completion_text=completion_str,
+                    format_reward=format_failure_score
+                    + (failure_score - format_failure_score) * (len(present) / len(expected)),
+                )
+            else:
+                failed_pred = FailedPrediction(completion_text=completion_str, format_reward=format_failure_score)
+            trace.append((found_pred, failed_inputs, failed_pred))
+            if log_format_failures:
+                logging.warning(
+                    "Failed to parse output for example. This is likely due to the LLM response not following the adapter's formatting."
+                )
+            return (failed_pred, trace)
 
     program.aforward = MethodType(patched_aforward, program)
     try:
-        results = (await evaluator(program, metric=wrapped_metric, callback_metadata=callback_metadata)).results
+        results = (
+            await evaluator(program, run=run, metric=wrapped_metric, callback_metadata=callback_metadata)
+        ).results
     finally:
         program.aforward = original_aforward
     data = []

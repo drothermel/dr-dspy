@@ -2,8 +2,8 @@ import random
 
 from typing_extensions import override
 
-from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.teleprompt import Teleprompter
 
 from .bootstrap import BootstrapFewShot
@@ -14,7 +14,7 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
     def __init__(
         self,
         metric,
-        teacher_settings=None,
+        teacher_run: RunContext | None = None,
         max_bootstrapped_demos=4,
         max_labeled_demos=16,
         max_rounds=1,
@@ -25,7 +25,7 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         metric_threshold=None,
     ) -> None:
         self.metric = metric
-        self.teacher_settings = teacher_settings or {}
+        self.teacher_run = teacher_run
         self.max_rounds = max_rounds
         self.num_threads = num_threads
         self.stop_at_score = stop_at_score
@@ -37,10 +37,10 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         self.max_labeled_demos = max_labeled_demos
 
     @override
-    async def compile(self, student, *, teacher=None, trainset, valset=None, restrict=None, labeled_sample=True):
+    async def compile(self, student, *, teacher=None, trainset, run: RunContext, valset=None, restrict=None, labeled_sample=True):
         self.trainset = trainset
         self.valset = valset or trainset
-        effective_max_errors = self.max_errors if self.max_errors is not None else settings.max_errors
+        effective_max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors
         scores = []
         all_subscores = []
         score_data = []
@@ -53,18 +53,18 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
                 program = student.reset_copy()
             elif seed == -2:
                 teleprompter = LabeledFewShot(k=self.max_labeled_demos)
-                program = await teleprompter.compile(student, trainset=trainset_copy, sample=labeled_sample)
+                program = await teleprompter.compile(student, trainset=trainset_copy, sample=labeled_sample, run=run)
             elif seed == -1:
                 optimizer = BootstrapFewShot(
                     metric=self.metric,
                     metric_threshold=self.metric_threshold,
                     max_bootstrapped_demos=self.max_num_samples,
                     max_labeled_demos=self.max_labeled_demos,
-                    teacher_settings=self.teacher_settings,
+                    teacher_run=self.teacher_run,
                     max_rounds=self.max_rounds,
                     max_errors=effective_max_errors,
                 )
-                program = await optimizer.compile(student, teacher=teacher, trainset=trainset_copy)
+                program = await optimizer.compile(student, teacher=teacher, trainset=trainset_copy, run=run)
             else:
                 assert seed >= 0, seed
                 random.Random(seed).shuffle(trainset_copy)
@@ -74,11 +74,11 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
                     metric_threshold=self.metric_threshold,
                     max_bootstrapped_demos=size,
                     max_labeled_demos=self.max_labeled_demos,
-                    teacher_settings=self.teacher_settings,
+                    teacher_run=self.teacher_run,
                     max_rounds=self.max_rounds,
                     max_errors=effective_max_errors,
                 )
-                program = await optimizer.compile(student, teacher=teacher, trainset=trainset_copy)
+                program = await optimizer.compile(student, teacher=teacher, trainset=trainset_copy, run=run)
             evaluate = Evaluate(
                 devset=self.valset,
                 metric=self.metric,
@@ -87,7 +87,7 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
                 display_table=False,
                 display_progress=True,
             )
-            result = await evaluate(program)
+            result = await evaluate(program, run=run)
             score, subscores = (result.score, [output[2] for output in result.results])
             all_subscores.append(subscores)
             if len(scores) == 0 or score > max(scores):

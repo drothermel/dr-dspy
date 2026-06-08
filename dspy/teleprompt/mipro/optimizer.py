@@ -2,8 +2,8 @@ from typing import Any, Callable, Literal
 
 from typing_extensions import override
 
-from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.mipro.bootstrap import bootstrap_fewshot_examples
 from dspy.teleprompt.mipro.propose import propose_instructions
 from dspy.teleprompt.mipro.search import optimize_prompt_parameters
@@ -14,8 +14,9 @@ from dspy.teleprompt.mipro.settings import (
     set_num_trials_from_num_candidates,
     set_random_seeds,
 )
-from dspy.teleprompt.optimizer_context import optimizer_lm_context
+from dspy.teleprompt.task_spec_context import get_prompt_model
 from dspy.teleprompt.teleprompt import Teleprompter
+from dspy.teleprompt.utils import optimizer_lm_context
 
 
 class MIPROv2(Teleprompter):
@@ -24,7 +25,7 @@ class MIPROv2(Teleprompter):
         metric: Callable,
         prompt_model: Any | None = None,
         task_model: Any | None = None,
-        teacher_settings: dict | None = None,
+        teacher_run: RunContext | None = None,
         max_bootstrapped_demos: int = 4,
         max_labeled_demos: int = 4,
         auto: Literal["light", "medium", "heavy"] | None = "light",
@@ -47,14 +48,14 @@ class MIPROv2(Teleprompter):
         self.num_candidates = num_candidates
         self.metric = metric
         self.init_temperature = init_temperature
-        self.task_model = task_model if task_model else settings.lm
-        self.prompt_model = prompt_model if prompt_model else settings.lm
+        self.task_model = task_model
+        self.prompt_model = prompt_model
         self.max_bootstrapped_demos = max_bootstrapped_demos
         self.max_labeled_demos = max_labeled_demos
         self.verbose = verbose
         self.track_stats = track_stats
         self.log_dir = log_dir
-        self.teacher_settings = teacher_settings or {}
+        self.teacher_run = teacher_run
         self.prompt_model_total_calls = 0
         self.total_calls = 0
         self.num_threads = num_threads
@@ -62,10 +63,6 @@ class MIPROv2(Teleprompter):
         self.metric_threshold = metric_threshold
         self.seed = seed
         self.rng = None
-        if not self.prompt_model or not self.task_model:
-            raise ValueError(
-                "Either provide both prompt_model and task_model or set a default LM through settings.configure(lm=...) from dspy.dsp.utils.settings."
-            )
 
     @override
     async def compile(
@@ -88,8 +85,11 @@ class MIPROv2(Teleprompter):
         tip_aware_proposer: bool = True,
         fewshot_aware_proposer: bool = True,
         provide_traceback: bool | None = None,
+        run: RunContext,
     ) -> Any:
-        effective_max_errors = self.max_errors if self.max_errors is not None else settings.max_errors
+        self.task_model = get_prompt_model(self.task_model, run)
+        self.prompt_model = get_prompt_model(self.prompt_model, run)
+        effective_max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors
         effective_max_bootstrapped_demos = (
             max_bootstrapped_demos if max_bootstrapped_demos is not None else self.max_bootstrapped_demos
         )
@@ -133,7 +133,7 @@ class MIPROv2(Teleprompter):
             display_progress=True,
             provide_traceback=provide_traceback,
         )
-        with optimizer_lm_context(lm=self.task_model, phase="mipro.bootstrap", lm_role="task_model"):
+        with optimizer_lm_context(run, lm=self.task_model, phase="mipro.bootstrap", lm_role="task_model"):
             demo_candidates = await bootstrap_fewshot_examples(
                 self,
                 program,
@@ -145,6 +145,7 @@ class MIPROv2(Teleprompter):
                 max_labeled_demos=effective_max_labeled_demos,
                 max_errors=effective_max_errors,
                 metric_threshold=self.metric_threshold,
+                run=run,
             )
         instruction_candidates = await propose_instructions(
             self,
@@ -157,10 +158,11 @@ class MIPROv2(Teleprompter):
             tip_aware_proposer,
             fewshot_aware_proposer,
             num_instruct_candidates=num_instruct_candidates,
+            run=run,
         )
         if zeroshot_opt:
             demo_candidates = None
-        with optimizer_lm_context(lm=self.task_model, phase="mipro.optimize", lm_role="task_model"):
+        with optimizer_lm_context(run, lm=self.task_model, phase="mipro.optimize", lm_role="task_model"):
             return await optimize_prompt_parameters(
                 self,
                 program,
@@ -173,4 +175,5 @@ class MIPROv2(Teleprompter):
                 minibatch_size,
                 minibatch_full_eval_steps,
                 seed,
+                run=run,
             )

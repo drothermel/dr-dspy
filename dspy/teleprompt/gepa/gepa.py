@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 from typing_extensions import override
 
 from dspy.primitives.prediction import Prediction
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.annotation import experimental
 
@@ -214,6 +215,7 @@ class GEPA(Teleprompter):
         trainset: list[Example],
         teacher: Module | None = None,
         valset: list[Example] | None = None,
+        run: RunContext,
     ) -> Module:
         from gepa import optimize
 
@@ -282,6 +284,7 @@ class GEPA(Teleprompter):
             custom_instruction_proposer=self.custom_instruction_proposer,
             warn_on_score_mismatch=self.warn_on_score_mismatch,
             reflection_minibatch_size=self.reflection_minibatch_size,
+            run=run,
         )
         seed_candidate = {name: pred.task_spec.instructions for name, pred in student.named_predictors()}
         gepa_result: GEPAResult = optimize(

@@ -2,6 +2,7 @@ import random
 
 from typing_extensions import override
 
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.teleprompt import Teleprompter
 
 
@@ -10,7 +11,7 @@ class LabeledFewShot(Teleprompter):
         self.k = k
 
     @override
-    async def compile(self, student, *, trainset, sample=True):
+    async def compile(self, student, *, trainset, run: RunContext, sample=True):
         self.student = student.reset_copy()
         self.trainset = trainset
         if len(self.trainset) == 0:

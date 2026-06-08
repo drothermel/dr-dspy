@@ -4,25 +4,25 @@ from typing import Callable
 
 import orjson
 
-from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
+from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.formatting import get_field_spec_description_string
-from dspy.teleprompt.optimizer_context import optimizer_lm_context
-from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
+from dspy.teleprompt.task_spec_context import get_prompt_model, get_task_spec, set_task_spec
+from dspy.teleprompt.utils import optimizer_lm_context
 from dspy.utils.source_format import get_formatted_source
 
 logger = logging.getLogger(__name__)
 
 
-def prepare_models_for_resampling(*, program: Module, n: int, teacher_settings: dict | None = None):
-    lm = program.get_lm() or settings.lm
+def prepare_models_for_resampling(*, program: Module, n: int, run: RunContext, teacher_run: RunContext | None = None):
+    lm = program.get_lm() or run.lm
     models = []
-    if teacher_settings:
-        teacher_lm = teacher_settings.get("lm") or lm
+    if teacher_run:
+        teacher_lm = teacher_run.lm or lm
         teacher_lm.kwargs["temperature"] = 1.0
         models.append(teacher_lm)
         remaining = n - 1
@@ -32,16 +32,16 @@ def prepare_models_for_resampling(*, program: Module, n: int, teacher_settings: 
     return models
 
 
-def wrap_program(*, program: Module, metric: Callable):
+def wrap_program(*, program: Module, metric: Callable, run: RunContext):
 
     async def wrapped_program(example):
-        with settings.context(trace=[]):
-            prediction, trace, score = (None, None, 0.0)
-            try:
-                prediction = await program(**example.inputs())
-            except Exception as e:
-                logger.warning(e)
-            trace = settings.trace.copy()
+        item_run = run.fork(trace=[])
+        prediction, trace, score = (None, None, 0.0)
+        try:
+            prediction = await program(**example.inputs(), run=item_run)
+        except Exception as e:
+            logger.warning(e)
+        trace = list(item_run.trace)
         output = None
         score = 0.0
         output_metadata = {}
@@ -97,10 +97,10 @@ def append_a_demo(demo_input_field_maxlen):
     return append_a_demo_
 
 
-async def append_a_rule(bucket, system, **kwargs) -> bool:
+async def append_a_rule(bucket, system, *, run: RunContext, **kwargs) -> bool:
     predictor2name = kwargs["predictor2name"]
     batch_10p_score, batch_90p_score = (kwargs["batch_10p_score"], kwargs["batch_90p_score"])
-    prompt_model = kwargs["prompt_model"] or settings.lm
+    prompt_model = get_prompt_model(kwargs["prompt_model"], run)
     module_names = [name for name, _ in system.named_predictors()]
     good, bad = (bucket[0], bucket[-1])
     example = good["example"]
@@ -143,9 +143,11 @@ async def append_a_rule(bucket, system, **kwargs) -> bool:
         k: v if isinstance(v, str) else orjson.dumps(recursive_mask(v), option=orjson.OPT_INDENT_2).decode()
         for k, v in kwargs.items()
     }
-    with optimizer_lm_context(lm=prompt_model, phase="simba.offer_feedback", lm_role="prompt_model", trace=[]):
+    with optimizer_lm_context(
+        run, lm=prompt_model, phase="simba.offer_feedback", lm_role="prompt_model", trace=[]
+    ) as opt_run:
         advice_program = Predict(SimbaOfferFeedbackTaskSpec())
-        advice = (await advice_program(**kwargs)).module_advice
+        advice = (await advice_program(**kwargs, run=opt_run)).module_advice
     for name, predictor in system.named_predictors():
         if name in advice:
             logger.info(f"Advice for {name}: {advice[name]}")

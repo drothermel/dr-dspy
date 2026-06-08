@@ -6,9 +6,10 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 
 from typing_extensions import override
 
-from dspy.dsp.utils.settings import settings
 from dspy.predict.parallel import Parallel
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.simba_utils import append_a_demo, append_a_rule, prepare_models_for_resampling, wrap_program
+from dspy.teleprompt.task_spec_context import get_prompt_model
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.lazy_import import require
 
@@ -30,7 +31,7 @@ class SIMBA(Teleprompter):
         max_steps: int = 8,
         max_demos: int = 4,
         prompt_model: LM | None = None,
-        teacher_settings: dict | None = None,
+        teacher_run: RunContext | None = None,
         demo_input_field_maxlen: int = 100000,
         num_threads: int | None = None,
         temperature_for_sampling: float = 0.2,
@@ -41,8 +42,8 @@ class SIMBA(Teleprompter):
         self.num_candidates = num_candidates
         self.max_steps = max_steps
         self.max_demos = max_demos
-        self.prompt_model = prompt_model or settings.lm
-        self.teacher_settings = teacher_settings
+        self.prompt_model = prompt_model
+        self.teacher_run = teacher_run
         self.demo_input_field_maxlen = demo_input_field_maxlen
         self.num_threads = num_threads
         self.temperature_for_sampling = temperature_for_sampling
@@ -53,8 +54,9 @@ class SIMBA(Teleprompter):
             self.strategies = [append_a_rule]
 
     @override
-    async def compile(self, student: Module, *, trainset: list[Example], seed: int = 0) -> Module:
+    async def compile(self, student: Module, *, trainset: list[Example], run: RunContext, seed: int = 0) -> Module:
         assert len(trainset) >= self.bsize, f"Trainset too small: {len(trainset)} < {self.bsize}"
+        prompt_model = get_prompt_model(self.prompt_model, run)
         rng = random.Random(seed)
         rng_np = np.random.default_rng(seed)
         programs = []
@@ -101,7 +103,7 @@ class SIMBA(Teleprompter):
         data_indices = list(range(len(trainset)))
         rng.shuffle(data_indices)
         instance_idx = 0
-        run_parallel = Parallel(access_examples=False, num_threads=self.num_threads)
+        run_parallel = Parallel(run=run, access_examples=False, num_threads=self.num_threads)
         trial_logs = {}
         for batch_idx in range(self.max_steps):
             trial_logs[batch_idx] = {}
@@ -113,7 +115,7 @@ class SIMBA(Teleprompter):
             batch = [trainset[i] for i in batch_indices]
             instance_idx += self.bsize
             models = prepare_models_for_resampling(
-                program=programs[0], n=self.num_candidates, teacher_settings=self.teacher_settings
+                program=programs[0], n=self.num_candidates, run=run, teacher_run=self.teacher_run
             )
             top_programs = top_k_plus_baseline(self.num_candidates)
             exec_pairs = []
@@ -127,7 +129,7 @@ class SIMBA(Teleprompter):
                     candidate_system.set_lm(model)
                     for name, predictor in candidate_system.named_predictors():
                         predictor2name[id(predictor)] = name
-                    wrapped_candidate_system = wrap_program(program=candidate_system, metric=self.metric)
+                    wrapped_candidate_system = wrap_program(program=candidate_system, metric=self.metric, run=run)
                     exec_pairs.append((wrapped_candidate_system, example))
             logger.info(f"Sampling program trajectories on {self.bsize} examples x {self.num_candidates} samples.")
             outputs = cast("list[dict[str, Any]]", await run_parallel(exec_pairs))
@@ -184,11 +186,12 @@ class SIMBA(Teleprompter):
                     await strategy(
                         bucket,
                         system_candidate,
+                        run=run,
                         predictor2name=predictor2name,
                         name2predictor=name2predictor,
                         batch_10p_score=batch_10th_percentile_score,
                         batch_90p_score=batch_90th_percentile_score,
-                        prompt_model=self.prompt_model,
+                        prompt_model=prompt_model,
                     )
                 except Exception as e:
                     logger.exception(f"Strategy failed with error: {e}")
@@ -201,7 +204,7 @@ class SIMBA(Teleprompter):
                 f"Batch {batch_idx + 1}: Evaluating {len(system_candidates)} programs on {self.bsize} examples."
             )
             exec_pairs = [
-                (wrap_program(program=sys, metric=self.metric), ex) for sys in system_candidates for ex in batch
+                (wrap_program(program=sys, metric=self.metric, run=run), ex) for sys in system_candidates for ex in batch
             ]
             outputs = cast("list[dict[str, Any]]", await run_parallel(exec_pairs))
             assert len(outputs) == len(exec_pairs) == len(system_candidates) * self.bsize
@@ -231,7 +234,7 @@ class SIMBA(Teleprompter):
         candidate_programs = [winning_programs[i].deepcopy() for i in program_idxs]
         logger.info(f"VALIDATION: Evaluating {len(candidate_programs)} programs on the full trainset.")
         exec_pairs = [
-            (wrap_program(program=sys, metric=self.metric), ex) for sys in candidate_programs for ex in trainset
+            (wrap_program(program=sys, metric=self.metric, run=run), ex) for sys in candidate_programs for ex in trainset
         ]
         outputs = cast("list[dict[str, Any]]", await run_parallel(exec_pairs))
         scores = []

@@ -11,10 +11,10 @@ from typing_extensions import override
 from dspy.adapters.base import Adapter
 from dspy.clients.lm import LM
 from dspy.clients.utils_finetune import GRPOChatData, GRPOGroup, GRPORolloutGroup, GRPOStatus, TrainDataFormat
-from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_finetune import (
     FinetuneTeleprompter,
     all_predictors_have_lms,
@@ -268,6 +268,8 @@ class GRPO(FinetuneTeleprompter):
         trainset: list[Example],
         teacher: Module | list[Module] | None = None,
         valset: list[Example] | None = None,
+        *,
+        run: RunContext,
         **kwargs,
     ) -> Module:
         logger.info(
@@ -362,6 +364,7 @@ class GRPO(FinetuneTeleprompter):
                 round_data = await bootstrap_trace_data(
                     program=teacher,
                     dataset=subsample_training_dataset_repeated,
+                    run=run,
                     metric=self.metric,
                     num_threads=self.num_threads,
                     raise_on_error=False,
@@ -455,8 +458,8 @@ class GRPO(FinetuneTeleprompter):
                                 self.adapter[pred_lm] if isinstance(self.adapter, dict) else self.adapter
                             )
                             adapter, _ = resolve_adapter(
-                                configured_adapter or settings.adapter,
-                                transparency=settings.get("transparency", "strict"),
+                                configured_adapter or run.adapter,
+                                transparency=run.telemetry.transparency,
                             )
                             if not adapter.capabilities.supports_finetune:
                                 raise TypeError(

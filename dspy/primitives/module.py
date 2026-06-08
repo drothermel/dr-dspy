@@ -106,6 +106,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
     async def batch(
         self,
         examples: list[Example],
+        run: RunContext,
         num_threads: int | None = None,
         max_concurrency: int | None = None,
         max_errors: int | None = None,
@@ -117,6 +118,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
     ) -> list[Any] | tuple[list[Any], list[Any], list[BaseException]]:
         exec_pairs = [(self, example.inputs()) for example in examples]
         parallel_executor = Parallel(
+            run=run,
             num_threads=num_threads,
             max_concurrency=max_concurrency,
             max_errors=max_errors,

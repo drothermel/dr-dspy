@@ -3,6 +3,7 @@ import random
 from typing_extensions import override
 
 from dspy.primitives.module import Module
+from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.teleprompt.teleprompt import Teleprompter
 
 
@@ -14,7 +15,7 @@ class Ensemble(Teleprompter):
         self.deterministic = deterministic
 
     @override
-    async def compile(self, programs):
+    async def compile(self, programs, *, run: RunContext):
         size = self.size
         reduce_fn = self.reduce_fn
 
@@ -24,6 +25,8 @@ class Ensemble(Teleprompter):
                 self.programs = programs
 
             async def aforward(self, *args, **kwargs):
+                run = resolve_run(run=kwargs.pop("run", None), bound_run=self.run)
+                kwargs["run"] = run
                 programs = random.sample(self.programs, size) if size else self.programs
                 outputs = [await prog(*args, **kwargs) for prog in programs]
                 if reduce_fn:

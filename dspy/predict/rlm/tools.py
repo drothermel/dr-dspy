@@ -5,8 +5,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
 from dspy.adapters.types.tool import Tool
-from dspy.dsp.utils.settings import settings
 from dspy.predict.rlm.sync_bridge import _run_sub_lm_async
+from dspy.runtime.run_context import RunContext
 from dspy.utils.transparency import reset_active_call_metadata, set_active_call_metadata
 
 if TYPE_CHECKING:
@@ -59,7 +59,7 @@ def format_tool_docs(tools: dict[str, Tool]) -> str:
     return "\n".join(lines)
 
 
-def make_llm_tools(rlm: RLM, max_workers: int = 8) -> dict[str, Callable]:
+def make_llm_tools(rlm: RLM, run: RunContext | None = None, max_workers: int = 8) -> dict[str, Callable]:
     state = {"call_count": 0}
     lock = threading.Lock()
     lm = rlm.sub_lm
@@ -73,14 +73,14 @@ def make_llm_tools(rlm: RLM, max_workers: int = 8) -> dict[str, Callable]:
             state["call_count"] += n
 
     async def _aquery_lm(prompt: str) -> str:
-        target_lm = lm if lm is not None else settings.lm
+        target_lm = lm if lm is not None else (run.lm if run is not None else None)
         if target_lm is None:
             raise RuntimeError(
-                "No LM configured. Use `from dspy.dsp.utils.settings import settings; settings.configure(lm=...)` or pass sub_lm to RLM."
+                "No LM configured. Pass run=RunContext.create(lm=..., adapter=...) or pass sub_lm to RLM."
             )
         metadata_token = set_active_call_metadata(module="RLM", phase="rlm.sub_lm", lm_role="sub_lm")
         try:
-            prediction = await rlm._sub_query_predict(prompt=prompt, lm=target_lm)
+            prediction = await rlm._sub_query_predict(prompt=prompt, lm=target_lm, run=run)
         finally:
             reset_active_call_metadata(metadata_token)
         return prediction.response

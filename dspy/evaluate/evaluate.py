@@ -10,8 +10,6 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from dspy.dsp.utils.settings import settings
-
 if TYPE_CHECKING:
     import pandas as pd
 
@@ -20,6 +18,7 @@ if TYPE_CHECKING:
 import tqdm
 
 from dspy.primitives.prediction import Prediction
+from dspy.runtime.run_context import RunContext
 from dspy.utils.async_parallel import run_bounded
 from dspy.utils.callback import with_callbacks
 
@@ -67,6 +66,7 @@ class Evaluate:
     async def __call__(
         self,
         program: "Module",
+        run: RunContext,
         metric: Callable | None = None,
         devset: list["Example"] | None = None,
         num_threads: int | None = None,
@@ -97,19 +97,23 @@ class Evaluate:
         tqdm.tqdm._instances.clear()
 
         async def process_item(example):
-            with settings.context(trace=[]):
-                prediction = await program(**example.inputs())
-                trace = list(settings.trace)
+            item_run = run.fork(trace=[])
+            prediction = await program(**example.inputs(), run=item_run)
+            trace = list(item_run.trace)
             score = metric(example, prediction, trace)
             return (prediction, score)
 
+        max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors
+        provide_traceback = (
+            self.provide_traceback if self.provide_traceback is not None else run.execution.provide_traceback
+        )
         results, _stats = await run_bounded(
             items=devset,
             fn=process_item,
-            max_concurrency=concurrency or settings.num_threads,
+            max_concurrency=concurrency or run.execution.num_threads,
             disable_progress_bar=not display_progress,
-            max_errors=self.max_errors if self.max_errors is not None else settings.max_errors,
-            provide_traceback=self.provide_traceback,
+            max_errors=max_errors,
+            provide_traceback=provide_traceback,
             compare_results=True,
         )
         assert len(devset) == len(results)

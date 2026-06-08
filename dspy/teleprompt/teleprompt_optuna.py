@@ -5,6 +5,7 @@ from typing import Any, cast
 from typing_extensions import override
 
 from dspy.evaluate.evaluate import Evaluate
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.teleprompt import Teleprompter
 
 from .bootstrap import BootstrapFewShot
@@ -28,7 +29,7 @@ class BootstrapFewShotWithOptuna(Teleprompter):
     def __init__(
         self,
         metric,
-        teacher_settings=None,
+        teacher_run: RunContext | None = None,
         max_bootstrapped_demos=4,
         max_labeled_demos=16,
         max_rounds=1,
@@ -36,7 +37,7 @@ class BootstrapFewShotWithOptuna(Teleprompter):
         num_threads=None,
     ) -> None:
         self.metric = metric
-        self.teacher_settings = teacher_settings or {}
+        self.teacher_run = teacher_run
         self.max_rounds = max_rounds
         self.num_threads = num_threads
         self.min_num_samples = 1
@@ -44,7 +45,7 @@ class BootstrapFewShotWithOptuna(Teleprompter):
         self.num_candidate_sets = num_candidate_programs
         self.max_labeled_demos = max_labeled_demos
 
-    async def _evaluate_program(self, program):
+    async def _evaluate_program(self, program, *, run: RunContext):
         evaluate = Evaluate(
             devset=self.valset,
             metric=self.metric,
@@ -52,7 +53,7 @@ class BootstrapFewShotWithOptuna(Teleprompter):
             display_table=False,
             display_progress=True,
         )
-        return await evaluate(program)
+        return await evaluate(program, run=run)
 
     def objective(self, trial):
         program2 = self.student.reset_copy()
@@ -66,28 +67,29 @@ class BootstrapFewShotWithOptuna(Teleprompter):
         try:
             asyncio.get_running_loop()
         except RuntimeError:
-            result = asyncio.run(self._evaluate_program(program2))
+            result = asyncio.run(self._evaluate_program(program2, run=self.run))
         else:
-            result = _optuna_executor.submit(asyncio.run, self._evaluate_program(program2)).result()
+            result = _optuna_executor.submit(asyncio.run, self._evaluate_program(program2, run=self.run)).result()
         trial.set_user_attr("program", program2)
         return cast("Any", result).score
 
     @override
-    async def compile(self, student, *, teacher=None, max_demos, trainset, valset=None):
+    async def compile(self, student, *, teacher=None, max_demos, trainset, run: RunContext, valset=None):
         optuna = _import_optuna()
         self.trainset = trainset
         self.valset = valset or trainset
+        self.run = run
         self.student = student.reset_copy()
         self.teacher = teacher.deepcopy() if teacher is not None else student.reset_copy()
         teleprompter_optimize = BootstrapFewShot(
             metric=self.metric,
             max_bootstrapped_demos=max_demos,
             max_labeled_demos=self.max_labeled_demos,
-            teacher_settings=self.teacher_settings,
+            teacher_run=self.teacher_run,
             max_rounds=self.max_rounds,
         )
         self.compiled_teleprompter = await teleprompter_optimize.compile(
-            self.student, teacher=self.teacher, trainset=self.trainset
+            self.student, teacher=self.teacher, trainset=self.trainset, run=run
         )
         study = optuna.create_study(direction="maximize")
         study.optimize(self.objective, n_trials=self.num_candidate_sets)
