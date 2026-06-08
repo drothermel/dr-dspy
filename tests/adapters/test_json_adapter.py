@@ -1727,7 +1727,7 @@ def test_json_adapter_native_reasoning():
             ],
             model="anthropic/claude-3-7-sonnet-20250219",
         )
-        modified_signature = adapter._call_preprocess(
+        modified_signature, _, _ = adapter._call_preprocess(
             LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low", cache=False),
             {},
             MySignature,

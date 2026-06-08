@@ -16,13 +16,24 @@ from dspy.adapters.types.history import History
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.utils import serialize_for_json
-from dspy.core.types import LMMessage, LMRequest, LMResponse, LMToolCallPart
+from dspy.core.types import (
+    LMConfig,
+    LMMessage,
+    LMRequest,
+    LMResponse,
+    LMToolCallPart,
+    LMToolChoice,
+    LMToolSpec,
+    _coerce_tool_spec,
+    coerce_lm_config,
+    merge_lm_request_config,
+)
 from dspy.signatures.field import InputField
 from dspy.signatures.signature import Signature, make_signature
 from dspy.utils.exceptions import AdapterParseError
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     from dspy.clients.base_lm import BaseLM
     from dspy.utils.callback import BaseCallback
@@ -85,19 +96,22 @@ class Adapter:
     def _call_preprocess(
         self,
         lm: BaseLM,
-        lm_kwargs: dict[str, Any],
+        config: LMConfig | Mapping[str, Any],
         signature: type[Signature],
         inputs: dict[str, Any],
-    ) -> type[Signature]:
+    ) -> tuple[type[Signature], list[LMToolSpec], LMConfig]:
         # TODO(adapters-plan): This remains the pre-normalized planning hook. It
-        # mutates `lm_kwargs` and returns only the render signature, which loses
+        # mutates `config` and returns only the render signature, which loses
         # information we will need for plan-driven rendering/parsing. The next
         # stacked PR should replace this with an explicit `_AdapterPlan` that
         # records deleted fields, native tools, native output fields, inserted
         # messages/parts, and LM config patches.
+        if not isinstance(config, LMConfig):
+            config = coerce_lm_config(config)
+        tools: list[LMToolSpec] = []
         if not self.use_native_function_calling:
-            for key in ("tools", "tool_choice", "parallel_tool_calls"):
-                lm_kwargs.pop(key, None)
+            if config.tool_choice is not None:
+                config = config.model_copy(update={"tool_choice": None})
         else:
             tool_call_input_field_name = self._get_tool_call_input_field_name(signature)
             tool_call_output_field_name = self._get_tool_call_output_field_name(signature)
@@ -112,14 +126,23 @@ class Adapter:
             if tool_call_output_field_name and lm.supports_function_calling:
                 if tool_call_input_field_name is None:
                     raise ValueError("Tool call input field is required when native function calling is enabled.")
-                tools = inputs[tool_call_input_field_name]
-                tools = tools if isinstance(tools, list) else [tools]
+                input_tools = inputs[tool_call_input_field_name]
+                input_tools = input_tools if isinstance(input_tools, list) else [input_tools]
 
-                lm_tools = [tool.format_as_litellm_function_call() for tool in tools]
-
-                lm_kwargs["tools"] = lm_tools
-                if self.parallel_tool_calls is not None and lm_kwargs.get("parallel_tool_calls") is None:
-                    lm_kwargs["parallel_tool_calls"] = self.parallel_tool_calls
+                tools = [_coerce_tool_spec(tool.format_as_litellm_function_call()) for tool in input_tools]
+                if self.parallel_tool_calls is not None:
+                    if config.tool_choice is None:
+                        config = config.model_copy(
+                            update={"tool_choice": LMToolChoice(mode="auto", parallel=self.parallel_tool_calls)}
+                        )
+                    elif config.tool_choice.parallel is None:
+                        config = config.model_copy(
+                            update={
+                                "tool_choice": config.tool_choice.model_copy(
+                                    update={"parallel": self.parallel_tool_calls}
+                                )
+                            }
+                        )
 
                 signature = signature.delete(tool_call_output_field_name)
                 signature = signature.delete(tool_call_input_field_name)
@@ -133,9 +156,9 @@ class Adapter:
                 and field.annotation in self.native_response_types
                 and issubclass(field.annotation, Type)
             ):
-                signature = field.annotation.adapt_to_native_lm_feature(signature, name, lm, lm_kwargs)
+                signature = field.annotation.adapt_to_native_lm_feature(signature, name, lm, config)
 
-        return signature
+        return signature, tools, config
 
     def _call_postprocess(
         self,
@@ -143,7 +166,7 @@ class Adapter:
         original_signature: type[Signature],
         response: LMResponse,
         _lm: BaseLM,
-        lm_kwargs: dict[str, Any],
+        _config: LMConfig | Mapping[str, Any],
     ) -> list[dict[str, Any]]:
         values = []
 
@@ -202,7 +225,8 @@ class Adapter:
     def _render_request(
         self,
         lm: BaseLM,
-        lm_kwargs: dict[str, Any],
+        config: LMConfig,
+        tools: list[LMToolSpec],
         messages: Sequence[LMMessage | dict[str, Any]],
     ) -> LMRequest:
         """Build the normalized LM request for the current adapter call path.
@@ -211,9 +235,12 @@ class Adapter:
         Once planning lands, this should render from `_AdapterPlan` and apply
         planned message/part insertions before creating `LMRequest`.
         """
-        coerced_messages = cast("list[dict[str, Any] | LMMessage]", self._coerce_lm_messages(messages))
-        request_kwargs = {**getattr(lm, "kwargs", {}), **lm_kwargs}
-        return LMRequest.from_call(model=lm.model, messages=coerced_messages, **request_kwargs)
+        return LMRequest(
+            model=lm.model,
+            messages=self._coerce_lm_messages(messages),
+            tools=tools,
+            config=merge_lm_request_config(lm, config),
+        )
 
     def _call_lm(self, lm: BaseLM, request: LMRequest) -> LMResponse:
         return lm(request)
@@ -263,7 +290,7 @@ class Adapter:
     def __call__(
         self,
         lm: BaseLM,
-        lm_kwargs: dict[str, Any],
+        config: LMConfig | Mapping[str, Any] | None,
         signature: type[Signature],
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
@@ -274,8 +301,7 @@ class Adapter:
         Args:
             lm: The Language Model instance to use for generation. Must be an instance of
                 `dspy.clients.base_lm.BaseLM`.
-            lm_kwargs: Additional keyword arguments to pass to the LM call (e.g., temperature, max_tokens). These are
-                passed directly to the LM.
+            config: Generation controls for the LM call (e.g., temperature, max_tokens).
             signature: The DSPy signature associated with this LM call.
             demos: List of few-shot examples to include in the prompt. Each dictionary should contain keys matching the
                 signature's input and output field names. Examples are formatted as user/assistant message pairs.
@@ -285,31 +311,33 @@ class Adapter:
             List of dictionaries representing parsed LM responses. Each dictionary contains keys matching the
             signature's output field names. For multiple generations (n > 1), returns multiple dictionaries.
         """
-        processed_signature = self._call_preprocess(lm, lm_kwargs, signature, inputs)
+        resolved_config = coerce_lm_config(config)
+        processed_signature, tools, resolved_config = self._call_preprocess(lm, resolved_config, signature, inputs)
         messages = self.format(processed_signature, demos, inputs)
-        request = self._render_request(lm, lm_kwargs, messages)
+        request = self._render_request(lm, resolved_config, tools, messages)
         response = self._call_lm(lm, request)
         # TODO(adapters-response): We normalize at the LM boundary, but still
         # convert back to legacy postprocess dictionaries here to keep this PR
         # behavior-preserving. Replace with direct `LMResponse` parsing once the
         # explicit adapter plan exists.
-        return self._call_postprocess(processed_signature, signature, response, lm, lm_kwargs)
+        return self._call_postprocess(processed_signature, signature, response, lm, resolved_config)
 
     async def acall(
         self,
         lm: BaseLM,
-        lm_kwargs: dict[str, Any],
+        config: LMConfig | Mapping[str, Any] | None,
         signature: type[Signature],
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        processed_signature = self._call_preprocess(lm, lm_kwargs, signature, inputs)
+        resolved_config = coerce_lm_config(config)
+        processed_signature, tools, resolved_config = self._call_preprocess(lm, resolved_config, signature, inputs)
         messages = self.format(processed_signature, demos, inputs)
-        request = self._render_request(lm, lm_kwargs, messages)
+        request = self._render_request(lm, resolved_config, tools, messages)
         response = await self._acall_lm(lm, request)
         # TODO(adapters-response): Keep in sync with `__call__()` until both use
         # direct `LMResponse` parsing.
-        return self._call_postprocess(processed_signature, signature, response, lm, lm_kwargs)
+        return self._call_postprocess(processed_signature, signature, response, lm, resolved_config)
 
     def format(
         self,

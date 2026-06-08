@@ -3,6 +3,7 @@ import pytest
 
 from dspy.core.types import (
     LMAudioPart,
+    LMCacheConfig,
     LMConfig,
     LMDocumentPart,
     LMHistoryEntry,
@@ -12,7 +13,6 @@ from dspy.core.types import (
     LMPromptCacheConfig,
     LMReasoningConfig,
     LMRequest,
-    LMRequestPatch,
     LMResponse,
     LMStreamDeltaEvent,
     LMTextDelta,
@@ -165,10 +165,9 @@ def test_document_source_url_stays_url_and_round_trips_through_history_messages(
     assert round_tripped.data is None
 
 
-def test_config_extensions_flatten_when_converted_to_legacy_kwargs():
-    config = LMConfig.from_kwargs(temperature=0.2, provider_flag=True)
-    patch = LMRequestPatch(config=config)
-    request = LMRequest.from_call(model="model", prompt="hi", temperature=0.2, provider_flag=True)
+def test_config_extensions_surface_in_history_kwargs():
+    config = LMConfig(temperature=0.2, extensions={"provider_flag": True})
+    request = LMRequest(model="model", messages=[], config=config)
     entry = LMHistoryEntry(
         request=request,
         response=LMResponse.from_text("ok"),
@@ -176,21 +175,21 @@ def test_config_extensions_flatten_when_converted_to_legacy_kwargs():
         uuid="uuid",
     )
 
-    assert patch.as_lm_kwargs() == {"provider_flag": True, "temperature": 0.2}
     assert entry.kwargs == {"provider_flag": True, "temperature": 0.2}
 
 
-def test_lm_kwargs_aliases_normalize_for_existing_dspy_lm_callers():
-    config = LMConfig.from_kwargs(
-        reasoning={"effort": "low", "summary": "auto"},
-        reasoning_effort="high",
-        tool_choice={"mode": "auto"},
-        parallel_tool_calls=False,
-        cache=True,
-        rollout_id=7,
-        prompt_cache=True,
-        prompt_cache_key="prompt-cache",
-        provider_flag=True,
+def test_lm_config_rejects_unknown_top_level_keys():
+    with pytest.raises(pydantic.ValidationError):
+        LMConfig.from_kwargs(temperature=0.2, provider_flag=True)
+
+
+def test_lm_config_accepts_canonical_nested_fields():
+    config = LMConfig(
+        reasoning=LMReasoningConfig(effort="high", summary="auto"),
+        tool_choice=LMToolChoice(mode="auto", parallel=False),
+        cache=LMCacheConfig(enabled=True, rollout_id=7),
+        prompt_cache=LMPromptCacheConfig(enabled=True, key="prompt-cache"),
+        extensions={"provider_flag": True},
     )
 
     assert config.reasoning.effort == "high"  # ty:ignore[unresolved-attribute]
@@ -202,17 +201,6 @@ def test_lm_kwargs_aliases_normalize_for_existing_dspy_lm_callers():
     assert config.prompt_cache.enabled is True  # ty:ignore[unresolved-attribute]
     assert config.prompt_cache.key == "prompt-cache"  # ty:ignore[unresolved-attribute]
     assert config.extensions == {"provider_flag": True}
-
-
-def test_nested_config_aliases_remain_supported_for_existing_interfaces():
-    reasoning = LMReasoningConfig.from_value({"reasoning_effort": "high"})
-    tool_choice = LMToolChoice.from_value({"parallel_tool_calls": False})
-    prompt_cache = LMPromptCacheConfig.from_value({"prompt_cache_key": "prompt-cache"})
-
-    assert reasoning.effort == "high"
-    assert tool_choice.mode == "auto"
-    assert tool_choice.parallel is False
-    assert prompt_cache.key == "prompt-cache"
 
 
 def test_usage_normalizes_existing_user_visible_token_aliases():

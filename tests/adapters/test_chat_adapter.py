@@ -1056,7 +1056,12 @@ def test_chat_adapter_format_exact_messages_preserves_passthrough_lm_kwargs():
         PassthroughSignature,
         [],
         {"question": "Q?"},
-        lm_kwargs={"temperature": 0.7, "max_tokens": 42, "stream": True, "cache": False},
+        config={
+            "temperature": 0.7,
+            "max_tokens": 42,
+            "cache": {"enabled": False},
+            "extensions": {"stream": True},
+        },
     )
 
     expected_messages = [
@@ -1194,10 +1199,8 @@ def test_chat_adapter_nonnative_strips_native_tool_kwargs():
         NonNativeToolSignature,
         [],
         {"question": "Q?", "tools": [Tool(search)]},
-        lm_kwargs={
-            "tools": [{"type": "function", "function": {"name": "submit"}}],
-            "tool_choice": {"type": "function", "function": {"name": "submit"}},
-            "parallel_tool_calls": True,
+        config={
+            "tool_choice": {"mode": "required", "allowed": ["submit"], "parallel": True},
         },
     )
 
@@ -1400,7 +1403,7 @@ def test_adapter_native_tool_calling_respects_lm_kwargs_parallel_tool_call_overr
         NativeToolSignature,
         [],
         {"question": "Q?", "tools": [Tool(search)]},
-        lm_kwargs={"parallel_tool_calls": False},
+        config={"tool_choice": {"mode": "auto", "parallel": False}},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -2587,7 +2590,7 @@ def test_chat_adapter_fallback_preserves_native_function_calling_flag():
     adapter = ChatAdapter(use_native_function_calling=False)
     seen = {}
 
-    def fake_json_adapter_call(self, lm, lm_kwargs, signature, demos, inputs):
+    def fake_json_adapter_call(self, lm, config, signature, demos, inputs):
         seen["use_native_function_calling"] = self.use_native_function_calling
         return [{"answer": "Paris"}]
 
@@ -2652,7 +2655,7 @@ async def test_chat_adapter_async_fallback_preserves_native_function_calling_fla
     adapter = ChatAdapter(use_native_function_calling=False)
     seen = {}
 
-    async def fake_json_adapter_acall(self, lm, lm_kwargs, signature, demos, inputs):
+    async def fake_json_adapter_acall(self, lm, config, signature, demos, inputs):
         seen["use_native_function_calling"] = self.use_native_function_calling
         return [{"answer": "Paris"}]
 
@@ -2823,7 +2826,7 @@ def test_chat_adapter_native_reasoning():
             ],
             model="anthropic/claude-3-7-sonnet-20250219",
         )
-        modified_signature = adapter._call_preprocess(
+        modified_signature, _, _ = adapter._call_preprocess(
             LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low", cache=False),
             {},
             MySignature,

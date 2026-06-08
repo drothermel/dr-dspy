@@ -9,6 +9,7 @@ from typing_extensions import override
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.clients.base_lm import BaseLM
+from dspy.core.types import _merge_lm_config, coerce_lm_config
 from dspy.dsp.utils.settings import settings
 from dspy.predict.parameter import Parameter
 from dspy.primitives.module import Module
@@ -151,7 +152,13 @@ class Predict(Module, Parameter):
         if signature is None:
             raise ValueError("Invalid signature provided to Predict.")
         demos = kwargs.pop("demos", self.demos)
-        config = {**self.config, **kwargs.pop("config", {})}
+        base_config = coerce_lm_config(self.config)
+        override = kwargs.pop("config", {})
+        if override:
+            merged = _merge_lm_config(base_config, coerce_lm_config(override))
+            config = merged if merged is not None else coerce_lm_config(override)
+        else:
+            config = base_config
 
         lm = kwargs.pop("lm", self.lm) or settings.lm
 
@@ -178,11 +185,13 @@ class Predict(Module, Parameter):
             )
 
         # If temperature is unset or <=0.15, and n > 1, set temperature to 0.7 to keep randomness.
-        temperature = config.get("temperature") or lm.kwargs.get("temperature")
-        num_generations = config.get("n") or lm.kwargs.get("n") or lm.kwargs.get("num_generations") or 1
+        temperature = config.temperature if config.temperature is not None else lm.kwargs.get("temperature")
+        num_generations = (
+            config.n if config.n is not None else lm.kwargs.get("n") or lm.kwargs.get("num_generations") or 1
+        )
 
         if (temperature is None or temperature <= 0.15) and num_generations > 1:
-            config["temperature"] = 0.7
+            config = config.model_copy(update={"temperature": 0.7})
 
         if "prediction" in kwargs and (
             isinstance(kwargs["prediction"], dict)
@@ -191,8 +200,10 @@ class Predict(Module, Parameter):
         ):
             # If the `prediction` is the standard predicted outputs format
             # (https://platform.openai.com/docs/guides/predicted-outputs), we remove it from input kwargs and add it
-            # to the lm kwargs.
-            config["prediction"] = kwargs.pop("prediction")
+            # to provider-specific extensions.
+            extensions = dict(config.extensions)
+            extensions["prediction"] = kwargs.pop("prediction")
+            config = config.model_copy(update={"extensions": extensions})
 
         for k, v in signature.input_fields.items():
             if k not in kwargs and v.default is not PydanticUndefined:
@@ -262,10 +273,10 @@ class Predict(Module, Parameter):
 
         if self._should_stream():
             with settings.context(caller_predict=self):
-                completions = adapter(lm, lm_kwargs=config, signature=signature, demos=demos, inputs=kwargs)
+                completions = adapter(lm, config, signature, demos, kwargs)
         else:
             with settings.context(send_stream=None):
-                completions = adapter(lm, lm_kwargs=config, signature=signature, demos=demos, inputs=kwargs)
+                completions = adapter(lm, config, signature, demos, kwargs)
 
         return self._forward_postprocess(completions, signature, **kwargs)
 
@@ -275,10 +286,10 @@ class Predict(Module, Parameter):
         adapter = settings.adapter or ChatAdapter()
         if self._should_stream():
             with settings.context(caller_predict=self):
-                completions = await adapter.acall(lm, lm_kwargs=config, signature=signature, demos=demos, inputs=kwargs)
+                completions = await adapter.acall(lm, config, signature, demos, kwargs)
         else:
             with settings.context(send_stream=None):
-                completions = await adapter.acall(lm, lm_kwargs=config, signature=signature, demos=demos, inputs=kwargs)
+                completions = await adapter.acall(lm, config, signature, demos, kwargs)
 
         return self._forward_postprocess(completions, signature, **kwargs)
 

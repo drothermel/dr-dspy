@@ -195,9 +195,9 @@ class Citations(Type):
         signature: type[Signature],
         field_name: str,
         lm: BaseLM,
-        lm_kwargs: dict[str, Any],
+        config: Any,
     ) -> type[Signature]:
-        _ = lm_kwargs
+        _ = config
         if lm.model.startswith("anthropic/"):
             return signature.delete(field_name)
         return signature

@@ -1095,7 +1095,7 @@ async def test_streaming_allows_custom_streamable_type():
 
         @classmethod
         @override
-        def adapt_to_native_lm_feature(cls, signature, field_name, lm, lm_kwargs):
+        def adapt_to_native_lm_feature(cls, signature, field_name, lm, config):
             return signature.delete(field_name)
 
         @classmethod

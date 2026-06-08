@@ -4,7 +4,7 @@ from typing_extensions import override
 
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import message_to_openai_chat, to_openai_chat_request
-from dspy.core.types import LMRequest, LMResponse
+from dspy.core.types import LMRequest, LMResponse, coerce_lm_config
 from dspy.utils.dummies import DummyLM
 
 try:
@@ -103,10 +103,14 @@ class CapturingLM(BaseLM):
         raise StopAdapterCallCapture
 
 
-def format_messages_and_lm_kwargs(adapter, signature, demos, inputs, lm_kwargs=None, lm=None):
+def format_messages_and_lm_kwargs(adapter, signature, demos, inputs, config=None, lm=None, lm_kwargs=None):
+    if lm_kwargs is not None:
+        if config is not None:
+            raise TypeError("Pass either `config` or `lm_kwargs`, not both.")
+        config = lm_kwargs
     capturing_lm = CapturingLM(lm)
     with contextlib.suppress(StopAdapterCallCapture):
-        adapter(capturing_lm, dict(lm_kwargs or {}), signature, demos, inputs)
+        adapter(capturing_lm, coerce_lm_config(config), signature, demos, inputs)
 
     assert len(capturing_lm.calls) == 1
     call = capturing_lm.calls[0]

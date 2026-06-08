@@ -184,8 +184,8 @@ class ReActV2(Module):
                 history=history,
                 tools=list(self.tools.values()),
                 config={
-                    "tool_choice": {"type": "function", "function": {"name": "submit"}},
-                    "reasoning_effort": None,
+                    "tool_choice": {"mode": "required", "allowed": ["submit"]},
+                    "reasoning": None,
                 },
                 **pending_inputs,
             )

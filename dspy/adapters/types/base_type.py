@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from litellm import ModelResponseStream
 
     from dspy.clients.base_lm import BaseLM
-    from dspy.core.types import LMOutput
+    from dspy.core.types import LMConfig, LMOutput
     from dspy.signatures.signature import Signature
 
 CUSTOM_TYPE_START_IDENTIFIER = "<<CUSTOM-TYPE-START-IDENTIFIER>>"
@@ -84,24 +84,24 @@ class Type(pydantic.BaseModel):
         signature: type[Signature],
         field_name: str,
         lm: BaseLM,
-        lm_kwargs: dict[str, Any],
+        config: LMConfig,
     ) -> type[Signature]:
         """Adapt the custom type to the native LM feature if possible.
 
         When the LM and configuration supports the related native LM feature, e.g., native tool calling, native
-        reasoning, etc., we adapt the signature and `lm_kwargs` to enable the native LM feature.
+        reasoning, etc., we adapt the signature and `config` to enable the native LM feature.
 
         Args:
             signature: The DSPy signature for the LM call.
             field_name: The name of the field in the signature to adapt to the native LM feature.
             lm: The LM instance.
-            lm_kwargs: The keyword arguments for the LM call, subject to in-place updates if adaptation if required.
+            config: The generation controls for the LM call, subject to in-place updates if adaptation is required.
 
         Returns:
             The adapted signature. If the custom type is not natively supported by the LM, return the original
             signature.
         """
-        _ = (field_name, lm, lm_kwargs)
+        _ = (field_name, lm, config)
         return signature
 
     @classmethod

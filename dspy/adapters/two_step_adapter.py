@@ -1,4 +1,5 @@
-from typing import Any, cast
+from collections.abc import Mapping
+from typing import Any
 
 import json_repair
 from typing_extensions import override
@@ -8,7 +9,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import get_field_description_string
 from dspy.clients.base_lm import BaseLM
-from dspy.core.types import LMMessage, LMRequest, LMToolCallPart
+from dspy.core.types import LMConfig, LMRequest, LMToolCallPart, merge_lm_request_config
 from dspy.signatures.field import InputField
 from dspy.signatures.signature import Signature, make_signature
 from dspy.utils.exceptions import AdapterParseError, LMError
@@ -97,11 +98,11 @@ class TwoStepAdapter(Adapter):
 
         try:
             parsed_result = ChatAdapter()(
-                lm=self.extraction_model,
-                lm_kwargs={},
-                signature=extractor_signature,
-                demos=[],
-                inputs={"text": completion},
+                self.extraction_model,
+                LMConfig(),
+                extractor_signature,
+                [],
+                {"text": completion},
             )
             return parsed_result[0]
 
@@ -119,16 +120,18 @@ class TwoStepAdapter(Adapter):
     async def acall(
         self,
         lm: BaseLM,
-        lm_kwargs: dict[str, Any],
+        config: LMConfig | Mapping[str, Any] | None,
         signature: type[Signature],
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
+        from dspy.core.types import coerce_lm_config
+
         messages = self.format(signature, demos, inputs)
-        request = LMRequest.from_call(
+        request = LMRequest(
             model=lm.model,
-            messages=cast("list[dict[str, Any] | LMMessage]", messages),
-            **{**lm.kwargs, **lm_kwargs},
+            messages=self._coerce_lm_messages(messages),
+            config=merge_lm_request_config(lm, coerce_lm_config(config)),
         )
         response = await lm.acall(request)
         extractor_signature = self._create_extractor_signature(signature)
@@ -143,11 +146,11 @@ class TwoStepAdapter(Adapter):
 
             try:
                 value = await ChatAdapter().acall(
-                    lm=self.extraction_model,
-                    lm_kwargs={},
-                    signature=extractor_signature,
-                    demos=[],
-                    inputs={"text": text or ""},
+                    self.extraction_model,
+                    LMConfig(),
+                    extractor_signature,
+                    [],
+                    {"text": text or ""},
                 )
                 value = value[0]
 

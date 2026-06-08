@@ -85,13 +85,13 @@ class ChatAdapter(Adapter):
     def __call__(
         self,
         lm: BaseLM,
-        lm_kwargs: dict[str, Any],
+        config: Any,
         signature: type[Signature],
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
         try:
-            return super().__call__(lm, lm_kwargs, signature, demos, inputs)
+            return super().__call__(lm, config, signature, demos, inputs)
         except Exception as e:
             from dspy.adapters.json_adapter import JSONAdapter
 
@@ -99,19 +99,19 @@ class ChatAdapter(Adapter):
                 # On LM errors, already using JSONAdapter, or use_json_adapter_fallback is False, we don't want to
                 # retry with a different adapter. Raise the original error instead of the fallback error.
                 raise
-            return self._make_json_adapter_fallback()(lm, lm_kwargs, signature, demos, inputs)
+            return self._make_json_adapter_fallback()(lm, config, signature, demos, inputs)
 
     @override
     async def acall(
         self,
         lm: BaseLM,
-        lm_kwargs: dict[str, Any],
+        config: Any,
         signature: type[Signature],
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
         try:
-            return await super().acall(lm, lm_kwargs, signature, demos, inputs)
+            return await super().acall(lm, config, signature, demos, inputs)
         except Exception as e:
             from dspy.adapters.json_adapter import JSONAdapter
 
@@ -119,7 +119,7 @@ class ChatAdapter(Adapter):
                 # On LM errors, already using JSONAdapter, or use_json_adapter_fallback is False, we don't want to
                 # retry with a different adapter. Raise the original error instead of the fallback error.
                 raise
-            return await self._make_json_adapter_fallback().acall(lm, lm_kwargs, signature, demos, inputs)
+            return await self._make_json_adapter_fallback().acall(lm, config, signature, demos, inputs)
 
     @override
     def format_field_description(self, signature: type[Signature]) -> str:

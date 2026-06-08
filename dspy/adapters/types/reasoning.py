@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, cast
 
 import pydantic
 from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
+from dspy.core.types import LMConfig, LMReasoningConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -56,20 +58,24 @@ class Reasoning(Type):
         signature: type[Signature],
         field_name: str,
         lm: BaseLM,
-        lm_kwargs: dict[str, Any],
+        config: LMConfig,
     ) -> type[Signature]:
-        if "reasoning_effort" in lm_kwargs:
-            # `lm_kwargs` overrides `lm.kwargs`.
-            reasoning_effort = lm_kwargs["reasoning_effort"]
-        elif "reasoning_effort" in lm.kwargs:
+        if "reasoning" in config.model_fields_set and config.reasoning is None:
+            return signature
+
+        if config.reasoning is not None and config.reasoning.effort is not None:
+            reasoning_effort = config.reasoning.effort
+        elif isinstance(lm.kwargs.get("reasoning"), Mapping):
+            reasoning_effort = lm.kwargs["reasoning"].get("effort")
+        elif lm.kwargs.get("reasoning_effort") is not None:
             reasoning_effort = lm.kwargs["reasoning_effort"]
         else:
             # Turn on the native reasoning explicitly if Reasoning field is present in the signature and no explicit
-            # reasoning effort is set in `lm_kwargs` or `lm.kwargs`.
+            # reasoning effort is set in `config` or `lm.kwargs`.
             reasoning_effort = "low"
 
         if reasoning_effort is None or not lm.supports_reasoning:
-            # If users explicitly set `reasoning_effort` to None or the LM doesn't support reasoning, we don't enable
+            # If users explicitly set reasoning effort to None or the LM doesn't support reasoning, we don't enable
             # native reasoning.
             return signature
 
@@ -80,7 +86,7 @@ class Reasoning(Type):
             # Litellm issue: https://github.com/BerriAI/litellm/issues/14748
             return signature
 
-        lm_kwargs["reasoning_effort"] = reasoning_effort
+        config.reasoning = LMReasoningConfig(effort=reasoning_effort)
         # Delete the reasoning field from the signature to use the native reasoning feature.
         return signature.delete(field_name)
 

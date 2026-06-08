@@ -315,8 +315,6 @@ class LMReasoningConfig(BaseModel):
     @classmethod
     def from_value(cls, value: Any = None, **overrides: Any) -> LMReasoningConfig:
         data = _config_data(value, str_field="effort")
-        if "reasoning_effort" in data and "effort" not in data:
-            data["effort"] = data.pop("reasoning_effort")
         data.update({key: value for key, value in overrides.items() if value is not _MISSING})
         return cls(**data)
 
@@ -333,21 +331,9 @@ class LMToolChoice(BaseModel):
 
     @classmethod
     def from_value(cls, value: Any = None, **overrides: Any) -> LMToolChoice:
-        if (
-            isinstance(value, Mapping)
-            and value.get("type") == "function"
-            and isinstance(value.get("function"), Mapping)
-        ):
-            # Accept OpenAI/LiteLLM-shaped tool choices for the current BaseLM
-            # compatibility path. Internally, DSPy represents this as requiring
-            # one allowed tool.
-            data = {"mode": "required", "allowed": [value["function"].get("name", "")]}
-        else:
-            data = _config_data(value, str_field="mode")
-        if "parallel_tool_calls" in data and "parallel" not in data:
-            data["parallel"] = data.pop("parallel_tool_calls")
+        data = _config_data(value, str_field="mode")
         data.update({key: value for key, value in overrides.items() if value is not _MISSING})
-        return cls(**data)  # ty:ignore[invalid-argument-type]
+        return cls(**data)
 
 
 class LMCacheConfig(BaseModel):
@@ -386,8 +372,6 @@ class LMPromptCacheConfig(BaseModel):
     @classmethod
     def from_value(cls, value: Any = None, **overrides: Any) -> LMPromptCacheConfig:
         data = _config_data(value, bool_field="enabled")
-        if "prompt_cache_key" in data and "key" not in data:
-            data["key"] = data.pop("prompt_cache_key")
         data.update({key: value for key, value in overrides.items() if value is not _MISSING})
         return cls(**data)
 
@@ -407,68 +391,6 @@ def _config_data(value: Any, *, str_field: str | None = None, bool_field: str | 
     if bool_field is not None and isinstance(value, bool):
         return {bool_field: value}
     raise TypeError(f"Cannot convert {type(value)!r} to a config object.")
-
-
-# Keep existing `LM(...)` / `lm(...)` keyword aliases in the call compatibility path.
-_KNOWN_CONFIG_KEYS = {
-    "temperature",
-    "max_tokens",
-    "top_p",
-    "stop",
-    "n",
-    "logprobs",
-    "response_format",
-    "reasoning",
-    "reasoning_effort",
-    "tool_choice",
-    "parallel_tool_calls",
-    "cache",
-    "rollout_id",
-    "prompt_cache",
-    "prompt_cache_key",
-    "extensions",
-}
-
-
-def _split_config_kwargs(kwargs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
-    data: dict[str, Any] = {}
-    extensions = dict(kwargs.get("extensions", {}) or {})
-
-    for key, value in kwargs.items():
-        if key == "extensions":
-            continue
-        if key in _KNOWN_CONFIG_KEYS:
-            data[key] = value
-        else:
-            extensions[key] = value
-    return data, extensions
-
-
-def _normalize_reasoning_config(data: dict[str, Any]) -> None:
-    if "reasoning_effort" in data:
-        effort = data.pop("reasoning_effort")
-        if data.get("reasoning") is not None or effort is not None:
-            data["reasoning"] = LMReasoningConfig.from_value(data.get("reasoning"), effort=effort)
-    elif "reasoning" in data and data["reasoning"] is not None:
-        data["reasoning"] = LMReasoningConfig.from_value(data["reasoning"])
-
-
-def _normalize_tool_choice_config(data: dict[str, Any]) -> None:
-    parallel = data.pop("parallel_tool_calls", _MISSING)
-    if data.get("tool_choice") is not None or parallel not in (_MISSING, None):
-        data["tool_choice"] = LMToolChoice.from_value(data.get("tool_choice"), parallel=parallel)
-
-
-def _normalize_cache_config(data: dict[str, Any]) -> None:
-    rollout_id = data.pop("rollout_id", _MISSING)
-    if data.get("cache") is not None or rollout_id not in (_MISSING, None):
-        data["cache"] = LMCacheConfig.from_value(data.get("cache"), rollout_id=rollout_id)
-
-
-def _normalize_prompt_cache_config(data: dict[str, Any]) -> None:
-    prompt_cache_key = data.pop("prompt_cache_key", _MISSING)
-    if data.get("prompt_cache") is not None or prompt_cache_key not in (_MISSING, None):
-        data["prompt_cache"] = LMPromptCacheConfig.from_value(data.get("prompt_cache"), key=prompt_cache_key)
 
 
 class LMConfig(BaseModel):
@@ -491,13 +413,7 @@ class LMConfig(BaseModel):
 
     @classmethod
     def from_kwargs(cls, **kwargs: Any) -> LMConfig:
-        data, extensions = _split_config_kwargs(kwargs)
-        _normalize_reasoning_config(data)
-        _normalize_tool_choice_config(data)
-        _normalize_cache_config(data)
-        _normalize_prompt_cache_config(data)
-        data["extensions"] = extensions
-        return cls(**data)
+        return cls(**kwargs)
 
 
 def _merge_lm_config(left: LMConfig | None, right: LMConfig | None) -> LMConfig | None:
@@ -507,71 +423,87 @@ def _merge_lm_config(left: LMConfig | None, right: LMConfig | None) -> LMConfig 
         return left
 
     data = left.model_dump()
-    right_data = right.model_dump(exclude_none=True)
-    for key in ("reasoning", "tool_choice", "cache", "prompt_cache"):
-        if key in right_data and isinstance(data.get(key), dict) and isinstance(right_data[key], dict):
-            right_data[key] = {**data[key], **right_data[key]}
-    extensions = {**left.extensions, **right.extensions}
-    data.update(right_data)
+    extensions = {**left.extensions}
+    for key in right.model_fields_set:
+        value = getattr(right, key)
+        if key == "extensions":
+            extensions = dict(value) if value is not None else {}
+            continue
+        if key in ("reasoning", "tool_choice", "cache", "prompt_cache") and value is not None:
+            left_value = data.get(key)
+            right_value = value.model_dump(exclude_none=True)
+            if isinstance(left_value, dict) and right_value:
+                data[key] = {**left_value, **right_value}
+            else:
+                data[key] = right_value
+            continue
+        if isinstance(value, BaseModel):
+            data[key] = value.model_dump(exclude_none=True)
+        else:
+            data[key] = value
     data["extensions"] = extensions
     return LMConfig(**data)
 
 
 def _merge_config_overrides(config: LMConfig, kwargs: dict[str, Any]) -> LMConfig:
+    if not kwargs:
+        return config
+
     data = config.model_dump()
     extensions = dict(config.extensions)
+    field_names = set(LMConfig.model_fields)
 
-    direct_keys = {
-        "temperature",
-        "max_tokens",
-        "top_p",
-        "stop",
-        "n",
-        "logprobs",
-        "response_format",
-    }
-    for key in direct_keys & kwargs.keys():
-        data[key] = kwargs[key]
-
-    if "reasoning" in kwargs or "reasoning_effort" in kwargs:
-        data["reasoning"] = LMReasoningConfig.from_value(
-            kwargs.get("reasoning", data.get("reasoning")),
-            effort=kwargs.get("reasoning_effort", _MISSING),
-        )
-
-    if "tool_choice" in kwargs or "parallel_tool_calls" in kwargs:
-        data["tool_choice"] = LMToolChoice.from_value(
-            kwargs.get("tool_choice", data.get("tool_choice")),
-            parallel=kwargs.get("parallel_tool_calls", _MISSING),
-        )
-
-    if "cache" in kwargs or "rollout_id" in kwargs:
-        data["cache"] = LMCacheConfig.from_value(
-            kwargs.get("cache", data.get("cache")),
-            rollout_id=kwargs.get("rollout_id", _MISSING),
-        )
-
-    if "prompt_cache" in kwargs or "prompt_cache_key" in kwargs:
-        data["prompt_cache"] = LMPromptCacheConfig.from_value(
-            kwargs.get("prompt_cache", data.get("prompt_cache")),
-            key=kwargs.get("prompt_cache_key", _MISSING),
-        )
-
-    if "extensions" in kwargs:
-        extra = kwargs["extensions"]
-        if extra is None:
-            extensions = {}
-        elif isinstance(extra, Mapping):
-            extensions.update(extra)
-        else:
-            raise TypeError("`extensions` override must be a mapping or None.")
-
-    handled = _KNOWN_CONFIG_KEYS
     for key, value in kwargs.items():
-        if key not in handled:
-            extensions[key] = value
+        if key == "extensions":
+            if value is None:
+                extensions = {}
+            elif isinstance(value, Mapping):
+                extensions.update(value)
+            else:
+                raise TypeError("`extensions` override must be a mapping or None.")
+        elif key in field_names and key != "extensions":
+            data[key] = value
+        else:
+            raise ValueError(f"Unknown LM config override: {key!r}")
+
     data["extensions"] = extensions
     return LMConfig(**data)
+
+
+def _coerce_from_call_config_kwargs(kwargs: Mapping[str, Any]) -> dict[str, Any]:
+    data = dict(kwargs)
+    cache = data.get("cache")
+    if isinstance(cache, bool):
+        data["cache"] = LMCacheConfig(enabled=cache)
+    prompt_cache = data.get("prompt_cache")
+    if isinstance(prompt_cache, bool):
+        data["prompt_cache"] = LMPromptCacheConfig(enabled=prompt_cache)
+    return data
+
+
+def coerce_lm_config(value: LMConfig | Mapping[str, Any] | None = None) -> LMConfig:
+    if value is None:
+        return LMConfig()
+    if isinstance(value, LMConfig):
+        return value
+    return LMConfig(**dict(value))
+
+
+def lm_defaults_config(lm: Any) -> LMConfig:
+    raw = getattr(lm, "kwargs", None) or {}
+    if not raw:
+        return LMConfig()
+
+    field_names = set(LMConfig.model_fields) - {"extensions"}
+    data = {key: value for key, value in raw.items() if key in field_names and value is not None}
+    extensions = raw.get("extensions")
+    if isinstance(extensions, Mapping):
+        data["extensions"] = dict(extensions)
+    return LMConfig(**data)
+
+
+def merge_lm_request_config(lm: Any, config: LMConfig | None = None) -> LMConfig:
+    return _merge_lm_config(lm_defaults_config(lm), config or LMConfig()) or (config or LMConfig())
 
 
 @dataclass
@@ -609,21 +541,6 @@ class LMRequestPatch:
             metadata={**self.metadata, **other.metadata},
         )
 
-    def as_lm_kwargs(self) -> dict[str, Any]:
-        """Return the legacy kwargs implied by this patch.
-
-        This keeps the first implementation usable with today's adapter call
-        path, which still passes `lm_kwargs` rather than an `LMRequestPatch` all
-        the way down. Message and part patches are intentionally not flattened
-        here; they require the next adapter-call refactor.
-        """
-        kwargs = self.config.model_dump(exclude_none=True) if self.config is not None else {}
-        extensions = kwargs.pop("extensions", {}) or {}
-        kwargs = {**extensions, **kwargs}
-        if self.tools:
-            kwargs["tools"] = list(self.tools)
-        return kwargs
-
 
 class LMRequest(BaseModel):
     """A normalized request passed to a `LanguageModel`."""
@@ -657,7 +574,7 @@ class LMRequest(BaseModel):
             normalized_messages, positional_tools = _messages_from_items(items, prompt=prompt)
             collected_tools.extend(positional_tools)
 
-        config = LMConfig.from_kwargs(**kwargs)
+        config = LMConfig.from_kwargs(**_coerce_from_call_config_kwargs(kwargs))
         return cls(
             model=model,
             messages=normalized_messages,
