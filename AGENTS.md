@@ -29,3 +29,9 @@ compiled = await teleprompter.compile(student, trainset=trainset)
 ```
 
 `Module.acall` and `BaseLM.acall` are compatibility aliases for `__call__`.
+
+## Internal call-site conventions
+
+- Use keyword arguments for multi-arg calls to DSPy-internal functions when meaning is not obvious from position.
+- Do not add keyword-only `*` to public constructors or documented callback protocols (e.g. `metric(example, prediction, trace)`).
+- Spine APIs require keywords at call sites: `run_bounded(items=..., fn=...)`, `adapter.acall(lm=..., config=..., signature=..., demos=..., inputs=...)`.
