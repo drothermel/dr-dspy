@@ -468,7 +468,7 @@ def test_reject_legacy_union_string_signatures():
 
 
 def test_reject_legacy_union_class_signatures():
-    with pytest.raises(ValueError, match="typing.Union"):
+    with pytest.raises(ValueError, match=r"typing\.Union"):
 
         class LegacyUnionSignature(Signature):
             input: str = InputField()

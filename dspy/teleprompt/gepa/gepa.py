@@ -7,9 +7,6 @@ import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
-from dspy.clients.lm import LM
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.annotation import experimental
@@ -19,6 +16,9 @@ if TYPE_CHECKING:
     from gepa.core.adapter import ProposalFn
     from gepa.proposer.reflective_mutation.base import ReflectionComponentSelector
 
+    from dspy.clients.lm import LM
+    from dspy.primitives.example import Example
+    from dspy.primitives.module import Module
     from dspy.teleprompt.gepa.gepa_utils import DspyAdapter, DSPyTrace, PredictorFeedbackFn, ScoreWithFeedback
 
 logger = logging.getLogger(__name__)

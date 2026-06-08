@@ -702,9 +702,7 @@ def _reject_legacy_union_type(type_: object, *, field_name: str | None = None) -
             if get_origin(non_none) is typing.Literal:
                 return
         field_prefix = f"Field {field_name!r} " if field_name is not None else ""
-        raise ValueError(
-            f"{field_prefix}uses typing.Union[...]. Use PEP 604 union syntax (e.g. int | str) instead."
-        )
+        raise ValueError(f"{field_prefix}uses typing.Union[...]. Use PEP 604 union syntax (e.g. int | str) instead.")
 
 
 def _typing_names_for_signature_parse() -> dict[str, Any]:
@@ -760,9 +758,7 @@ def _parse_type_node(node, names=None) -> Any:
 
     def resolve_name(type_name: str):
         if type_name in {"Union", "Optional"}:
-            raise ValueError(
-                f"Use PEP 604 union syntax (e.g. int | str) instead of typing.{type_name}[...]."
-            )
+            raise ValueError(f"Use PEP 604 union syntax (e.g. int | str) instead of typing.{type_name}[...].")
         # Check if it's a built-in known type or in the provided names
         if type_name in names:
             return names[type_name]
