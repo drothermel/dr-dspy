@@ -5,12 +5,13 @@ import os
 import random
 import shutil
 import sys
+from typing import Any, cast
 
 from dspy.dsp.utils.settings import settings
 from dspy.primitives.prediction import Prediction
 
 try:
-    from IPython.core.magics.code import extract_symbols
+    from IPython.core.magics.code import extract_symbols  # ty: ignore[unresolved-import]
 except ImportError:
     # Won't be able to read code from jupyter notebooks
     extract_symbols = None
@@ -414,8 +415,9 @@ def old_getfile(object):
     if inspect.isclass(object):
         if hasattr(object, "__module__"):
             module = sys.modules.get(object.__module__)
-            if getattr(module, "__file__", None):
-                return module.__file__
+            module_file = getattr(cast(Any, module), "__file__", None) if module is not None else None
+            if module_file:
+                return module_file
             if object.__module__ == "__main__":
                 raise OSError("source code not available")
         raise TypeError(f"{object!r} is a built-in class")
@@ -441,8 +443,9 @@ def new_getfile(object):
     # Lookup by parent module (as in current inspect)
     if hasattr(object, "__module__"):
         object_ = sys.modules.get(object.__module__)
-        if hasattr(object_, "__file__"):
-            return object_.__file__
+        module_file = getattr(object_, "__file__", None)
+        if module_file:
+            return module_file
 
     # If parent module is __main__, lookup by methods (NEW)
     for _, member in inspect.getmembers(object):
@@ -451,4 +454,4 @@ def new_getfile(object):
     raise TypeError(f"Source for {object!r} not found")
 
 
-inspect.getfile = new_getfile
+inspect.getfile = cast(Any, new_getfile)

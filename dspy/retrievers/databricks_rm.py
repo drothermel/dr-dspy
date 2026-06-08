@@ -167,7 +167,7 @@ class DatabricksRM:
         self.use_with_databricks_agent_framework = use_with_databricks_agent_framework
         if self.use_with_databricks_agent_framework:
             try:
-                import mlflow
+                import mlflow  # ty: ignore[unresolved-import]
 
                 mlflow.models.set_retriever_schema(
                     primary_key="doc_id",
@@ -373,7 +373,7 @@ class DatabricksRM:
             dict[str, Any]: Parsed JSON response from the Databricks Vector Search Index query.
         """
 
-        from databricks.sdk import WorkspaceClient
+        from databricks.sdk import WorkspaceClient  # ty: ignore[unresolved-import]
 
         if (query_text, query_vector).count(None) != 1:
             raise ValueError("Exactly one of query_text or query_vector must be specified.")

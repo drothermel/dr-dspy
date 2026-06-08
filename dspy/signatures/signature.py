@@ -38,7 +38,7 @@ def _default_instructions(cls) -> str:
     return f"Given the fields {inputs_}, produce the fields {outputs_}."
 
 
-def _field_infos_to_signature_fields(fields: dict[str, FieldInfo]) -> dict[str, tuple[type, FieldInfo]]:
+def _field_infos_to_signature_fields(fields: dict[str, FieldInfo]) -> dict[str, tuple[type, FieldInfo] | FieldInfo]:
     return {name: (field.annotation or str, field) for name, field in fields.items()}
 
 
@@ -201,9 +201,9 @@ class SignatureMeta(type(BaseModel)):
         if cls.__doc__ is None:
             cls.__doc__ = _default_instructions(cls)
 
-        cls._validate_fields()
+        SignatureMeta._validate_fields(cast(Any, cls))
 
-        for name, field in cls.model_fields.items():
+        for name, field in cast(Any, cls).model_fields.items():
             if "prefix" not in field.json_schema_extra:
                 field.json_schema_extra["prefix"] = infer_prefix(name) + ":"
             if "desc" not in field.json_schema_extra:
@@ -211,8 +211,9 @@ class SignatureMeta(type(BaseModel)):
 
         return cls
 
-    def _validate_fields(cls) -> None:
-        for name, field in cls.model_fields.items():
+    @staticmethod
+    def _validate_fields(cls: Any) -> None:
+        for name, field in cast(Any, cls).model_fields.items():
             extra = _field_info_extra(field)
             field_type = extra.get("__dspy_field_type")
             if field_type not in ["input", "output"]:
@@ -250,7 +251,7 @@ class SignatureMeta(type(BaseModel)):
         return f"{input_fields} -> {output_fields}"
 
     def _get_fields_with_type(cls, field_type) -> dict[str, FieldInfo]:
-        return {k: v for k, v in cls.model_fields.items() if _field_info_extra(v)["__dspy_field_type"] == field_type}
+        return {k: v for k, v in cast(Any, cls).model_fields.items() if _field_info_extra(v)["__dspy_field_type"] == field_type}
 
     def __repr__(cls) -> str:
         """Output a representation of the signature.
@@ -482,7 +483,7 @@ class Signature(BaseModel, metaclass=SignatureMeta):
         lst.insert(index, (name, (type_, field)))
 
         new_fields = dict(input_fields + output_fields)
-        return make_signature(_field_infos_to_signature_fields(new_fields), cls.instructions)
+        return make_signature(cast(Any, new_fields), cls.instructions)
 
     @classmethod
     def equals(cls, other) -> bool:
@@ -611,9 +612,7 @@ def make_signature(
         # program of thought and teleprompters, so we just silently default to string.
         if type_ is None:
             type_ = str
-        if not isinstance(
-            type_, (type, typing._GenericAlias, types.GenericAlias, typing._SpecialForm, types.UnionType)
-        ):
+        if not isinstance(type_, (type, types.GenericAlias, typing._SpecialForm, types.UnionType)):  # ty: ignore[unresolved-attribute]
             raise ValueError(f"Field types must be types, but received: {type_} of type {type(type_)}.")
         if not isinstance(field, FieldInfo):
             raise ValueError(f"Field values must be Field instances, but received: {field}.")
@@ -628,7 +627,7 @@ def make_signature(
         signature_name,
         __base__=Signature,
         __doc__=instructions,
-        **fixed_fields,
+        **cast(Any, fixed_fields),
     )
 
 
@@ -666,7 +665,8 @@ def _parse_field_string(field_string: str, names=None) -> Iterator[tuple[str, ty
     fields and types.
     """
 
-    args = ast.parse(f"def f({field_string}): pass").body[0].args.args
+    function_def = cast(ast.FunctionDef, ast.parse(f"def f({field_string}): pass").body[0])
+    args = function_def.args.args
     field_names: list[str] = [arg.arg for arg in args]
     types_list: list[type] = [str if arg.annotation is None else _parse_type_node(arg.annotation, names) for arg in args]
     is_type_undefined: list[bool] = [arg.annotation is None for arg in args]

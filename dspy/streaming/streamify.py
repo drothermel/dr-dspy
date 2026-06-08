@@ -4,7 +4,7 @@ import logging
 import threading
 from asyncio import iscoroutinefunction
 from queue import Queue
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Awaitable, Callable, Generator
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Awaitable, Callable, Generator, cast
 
 import orjson
 from anyio import create_memory_object_stream, create_task_group
@@ -174,10 +174,11 @@ def streamify(
     else:
         predict_id_to_listener = {}
 
+    program_fn = cast(Any, program)
     if is_async_program:
-        program = program.acall
+        program_fn = program_fn.acall
     elif not iscoroutinefunction(program):
-        program = asyncify(program)
+        program_fn = asyncify(program)
 
     callbacks = list(settings.callbacks)
     status_streaming_callback = StatusStreamingCallback(status_message_provider)
@@ -186,7 +187,7 @@ def streamify(
 
     async def generator(args, kwargs, stream: MemoryObjectSendStream) -> None:
         with settings.context(send_stream=stream, callbacks=callbacks, stream_listeners=stream_listeners):
-            prediction = await program(*args, **kwargs)
+            prediction = await program_fn(*args, **kwargs)
 
         await stream.send(prediction)
 

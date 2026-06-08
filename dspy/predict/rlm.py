@@ -168,8 +168,8 @@ class RLM(Module):
 
         # Build the action and extract signatures
         action_sig, extract_sig = self._build_signatures()
-        self.generate_action = Predict(cast(type[Signature], action_sig))
-        self.extract = Predict(cast(type[Signature], extract_sig))
+        self.generate_action = Predict(action_sig)
+        self.extract = Predict(extract_sig)
 
     # =========================================================================
     # Tool Creation and Validation

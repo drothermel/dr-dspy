@@ -154,8 +154,8 @@ class ReAct(Module):
             trajectory[f"tool_args_{idx}"] = pred.next_tool_args
 
             try:
-                tool = cast(Tool, self.tools[pred.next_tool_name])
-                trajectory[f"observation_{idx}"] = await tool.acall(**pred.next_tool_args)
+                tool = self.tools[pred.next_tool_name]
+                trajectory[f"observation_{idx}"] = await cast(Any, tool).acall(**pred.next_tool_args)
             except Exception as err:
                 trajectory[f"observation_{idx}"] = f"Execution error in {pred.next_tool_name}: {_fmt_exc(err)}"
 

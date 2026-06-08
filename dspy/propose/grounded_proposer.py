@@ -302,7 +302,7 @@ class GroundedProposer(Proposer):
         demo_candidates,
         trial_logs,
         N, # noqa: N803
-    ) -> list[str]:
+    ) -> dict[int, list[str]]:
         """This method is responsible for returning the full set of new instructions for our program, given the specified criteria."""
 
         proposed_instructions = {}

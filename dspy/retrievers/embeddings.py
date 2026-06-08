@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol, cast
 
 import srsly
 
@@ -85,7 +85,7 @@ class Embeddings:
         dim = self.corpus_embeddings.shape[1]
 
         try:
-            import faiss
+            import faiss  # ty: ignore[unresolved-import]
         except ImportError:
             raise ImportError("Please `pip install faiss-cpu` or increase `brute_force_threshold` to avoid FAISS.")
 
@@ -147,7 +147,7 @@ class Embeddings:
 
         if self.index is not None:
             try:
-                import faiss
+                import faiss  # ty: ignore[unresolved-import]
                 faiss.write_index(self.index, str(save_path / "faiss_index.bin"))
             except ImportError:
                 # If FAISS is not available, we can't save the index
@@ -181,7 +181,7 @@ class Embeddings:
         if not embeddings_path.exists():
             raise FileNotFoundError(f"Embeddings file not found: {embeddings_path}")
 
-        config = srsly.read_json(config_path)
+        config = cast(dict[str, Any], srsly.read_json(config_path))
 
         required_fields = ["k", "normalize", "corpus", "has_faiss_index"]
         for field in required_fields:
@@ -198,7 +198,7 @@ class Embeddings:
         faiss_index_path = save_path / "faiss_index.bin"
         if config["has_faiss_index"] and faiss_index_path.exists():
             try:
-                import faiss
+                import faiss  # ty: ignore[unresolved-import]
                 self.index = faiss.read_index(str(faiss_index_path))
             except ImportError:
                 # If FAISS is not available, fall back to brute force

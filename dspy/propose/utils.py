@@ -1,11 +1,12 @@
 import inspect
+import linecache
 import json
 import re
 
 from dspy.primitives.module import Module
 
 try:
-    from IPython.core.magics.code import extract_symbols
+    from IPython.core.magics.code import extract_symbols  # ty: ignore[unresolved-import]
 except ImportError:
     # Won't be able to read code from jupyter notebooks
     extract_symbols = None
@@ -139,9 +140,12 @@ def get_dspy_source_code(module):
             base_code = inspect.getsource(type(module))
         except TypeError:
             obj = type(module)
-            cell_code = "".join(inspect.linecache.getlines(new_getfile(obj)))
-            class_code = extract_symbols(cell_code, obj.__name__)[0][0]
-            base_code = str(class_code)
+            cell_code = "".join(linecache.getlines(new_getfile(obj)))
+            if extract_symbols is None:
+                base_code = cell_code
+            else:
+                class_code = extract_symbols(cell_code, obj.__name__)[0][0]
+                base_code = str(class_code)
 
     completed_set = set()
     for attribute in module.__dict__:

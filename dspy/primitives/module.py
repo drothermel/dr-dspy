@@ -31,9 +31,9 @@ class ProgramMeta(type):
             # Guarantee existence of critical attributes if ``__init__`` didn't
             # create them.
             if not hasattr(obj, "callbacks"):
-                obj.callbacks = []
+                setattr(obj, "callbacks", [])
             if not hasattr(obj, "history"):
-                obj.history = []
+                setattr(obj, "history", [])
         return obj
 
 
@@ -67,10 +67,11 @@ class Module(BaseModule, metaclass=ProgramMeta):
         ...         return self.predictor(question=question)
     """
 
-    def _base_init(self) -> None:
-        self._compiled = False
-        self.callbacks = []
-        self.history = []
+    @staticmethod
+    def _base_init(obj: Any) -> None:
+        obj._compiled = False
+        obj.callbacks = []
+        obj.history = []
 
     def __init__(self, callbacks=None) -> None:
         self.callbacks = callbacks or []

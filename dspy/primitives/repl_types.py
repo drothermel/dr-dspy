@@ -65,12 +65,13 @@ class REPLVariable(pydantic.BaseModel):
         # Extract desc and constraints from field_info if provided
         desc = ""
         constraints = ""
-        if field_info and hasattr(field_info, "json_schema_extra") and field_info.json_schema_extra:
-            raw_desc = field_info.json_schema_extra.get("desc", "")
-            # Skip placeholder descs like "${name}"
-            if raw_desc and not raw_desc.startswith("${"):
-                desc = raw_desc
-            constraints = field_info.json_schema_extra.get("constraints", "")
+        extra_dict: dict[str, Any] = {}
+        if field_info and isinstance(field_info.json_schema_extra, dict):
+            extra_dict.update(field_info.json_schema_extra)
+        raw_desc = extra_dict.get("desc", "")
+        if raw_desc and not raw_desc.startswith("${"):
+            desc = raw_desc
+        constraints = extra_dict.get("constraints", "")
 
         return cls(
             name=name,
@@ -152,7 +153,7 @@ class REPLHistory(pydantic.BaseModel):
     def __len__(self) -> int:
         return len(self.entries)
 
-    def __iter__(self) -> Iterator[REPLEntry]:
+    def __iter__(self) -> Iterator[REPLEntry]:  # ty: ignore[invalid-method-override]
         return iter(self.entries)
 
     def __bool__(self) -> bool:

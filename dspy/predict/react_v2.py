@@ -69,12 +69,12 @@ class ReActV2(Module):
     def _make_react_signature(self) -> type[Signature]:
         fields = {}
         for name, field in self.signature.input_fields.items():
-            extra: dict[str, Any] = {}
+            extra_dict: dict[str, Any] = {}
             if isinstance(field.json_schema_extra, dict):
-                extra = field.json_schema_extra
+                extra_dict.update(field.json_schema_extra)
             fields[name] = (
                 _optional_annotation(field.annotation),
-                InputField(desc=extra.get("desc")),
+                InputField(desc=extra_dict.get("desc")),
             )
 
         fields["history"] = (History, InputField())
