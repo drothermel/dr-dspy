@@ -28,6 +28,7 @@ from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
+from dspy.core.types import LMOutput
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
@@ -1100,10 +1101,10 @@ async def test_streaming_allows_custom_streamable_type():
 
         @classmethod
         @override
-        def parse_lm_response(cls, response: str | dict[str, Any]) -> "CustomType":
-            if isinstance(response, dict):
-                response = response.get("message", "")
-            return CustomType(message=response.split("\n\n")[0])
+        def parse_lm_output(cls, output: LMOutput) -> "CustomType | None":
+            if output.text is None:
+                return None
+            return CustomType(message=output.text.split("\n\n")[0])
 
     class CustomSignature(Signature):
         question: str = InputField()

@@ -3078,3 +3078,20 @@ def test_provider_tool_calls_preserve_id_and_repair_arguments():
     assert result[0]["tool_calls"] == ToolCalls(
         tool_calls=[ToolCalls.ToolCall(id="call_from_responses", name="search", args={"query": "cats"})]
     )
+
+
+def test_native_response_type_without_parse_lm_output_raises():
+    class OpaqueType(DSPyType):
+        label: str
+
+        @override
+        def format(self) -> str:
+            return self.label
+
+    class OpaqueSignature(Signature):
+        question: str = InputField()
+        answer: OpaqueType = OutputField()
+
+    adapter = ChatAdapter(native_response_types=[OpaqueType])
+    with pytest.raises(TypeError, match="parse_lm_output"):
+        adapter(DummyLM([{}]), {}, OpaqueSignature, [], {"question": "test"})

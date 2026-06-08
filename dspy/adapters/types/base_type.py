@@ -121,24 +121,5 @@ class Type(pydantic.BaseModel):
     @classmethod
     def parse_lm_output(cls, output: LMOutput) -> Type | None:
         """Parse one typed LM output into the custom type."""
-        text = output.text
-        if text is not None:
-            parsed = cls.parse_lm_response(text)
-            if parsed is not None:
-                return parsed
-
-        output_dict = output.to_output_dict()
-        if output_dict:
-            parsed = cls.parse_lm_response(output_dict)
-            if parsed is not None:
-                return parsed
-
-        provider_output = output.provider_output
-        if isinstance(provider_output, (str, dict)):
-            return cls.parse_lm_response(provider_output)
-        return None
-
-    @classmethod
-    def parse_lm_response(cls, response: str | dict[str, Any]) -> Type | None:
-        _ = response
+        _ = output
         return None

@@ -152,6 +152,7 @@ class Adapter:
                 and issubclass(field.annotation, Type)
             ):
                 continue
+            self._ensure_native_response_type_parses_output(field.annotation)
             if field.annotation is Reasoning:
                 signature = self._adapt_reasoning_native(signature, name, lm, config)
             elif field.annotation is Citations:
@@ -160,6 +161,14 @@ class Adapter:
                 signature = signature.delete(name)
 
         return signature, tools, config
+
+    @staticmethod
+    def _ensure_native_response_type_parses_output(native_type: type[Type]) -> None:
+        if native_type.parse_lm_output.__func__ is Type.parse_lm_output.__func__:
+            raise TypeError(
+                f"{native_type.__name__} is listed in native_response_types but does not implement "
+                "parse_lm_output(). Native response fields must parse typed LMOutput values."
+            )
 
     def _adapt_reasoning_native(
         self,

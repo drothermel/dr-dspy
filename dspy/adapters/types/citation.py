@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
     from litellm import ModelResponseStream
 
+    from dspy.core.types import LMOutput
+
 
 @experimental(version="3.0.4")
 class Citations(Type):
@@ -217,11 +219,10 @@ class Citations(Type):
 
     @classmethod
     @override
-    def parse_lm_output(cls, output: object) -> Type | None:
+    def parse_lm_output(cls, output: LMOutput) -> Type | None:
         """Parse a typed LM output into Citations."""
-        citations = getattr(output, "citations", None)
-        if citations:
-            return cls.from_dict_list([cls._citation_part_to_dict(citation) for citation in citations])
+        if output.citations:
+            return cls.from_dict_list([cls._citation_part_to_dict(citation) for citation in output.citations])
         return None
 
     @staticmethod
@@ -234,13 +235,3 @@ class Citations(Type):
         if getattr(citation, "url", None) is not None:
             data["url"] = citation.url
         return data
-
-    @classmethod
-    @override
-    def parse_lm_response(cls, response: str | dict[str, Any]) -> Type | None:
-        """Parse a LM response into Citations."""
-        if isinstance(response, dict) and "citations" in response:
-            citations_data = response["citations"]
-            if isinstance(citations_data, list):
-                return cls.from_dict_list(citations_data)
-        return None

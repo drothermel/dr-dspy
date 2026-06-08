@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 import pydantic
 from typing_extensions import override
@@ -9,6 +9,8 @@ from dspy.adapters.types.base_type import Type
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from dspy.core.types import LMOutput
 
 
 class Reasoning(Type):
@@ -48,19 +50,10 @@ class Reasoning(Type):
 
     @classmethod
     @override
-    def parse_lm_output(cls, output: object) -> Reasoning | None:
+    def parse_lm_output(cls, output: LMOutput) -> Reasoning | None:
         """Parse the typed LM output into a Reasoning object."""
-        reasoning_content = getattr(output, "reasoning_content", None)
-        if reasoning_content:
-            return Reasoning(content=reasoning_content)
-        return None
-
-    @classmethod
-    @override
-    def parse_lm_response(cls, response: str | dict[str, Any]) -> Reasoning | None:
-        """Parse the LM response into a Reasoning object."""
-        if isinstance(response, dict) and "reasoning_content" in response:
-            return Reasoning(content=response["reasoning_content"])
+        if output.reasoning_content:
+            return Reasoning(content=output.reasoning_content)
         return None
 
     @classmethod

@@ -94,6 +94,8 @@ class ChatAdapter(Adapter):
     ) -> list[dict[str, Any]]:
         try:
             return super().__call__(lm, config, signature, demos, inputs)
+        except TypeError:
+            raise
         except Exception as e:
             from dspy.adapters.json_adapter import JSONAdapter
 
