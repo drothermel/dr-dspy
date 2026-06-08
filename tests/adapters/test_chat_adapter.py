@@ -1121,7 +1121,6 @@ def test_chat_adapter_format_exact_messages_preserves_passthrough_lm_kwargs():
         config={
             "temperature": 0.7,
             "max_tokens": 42,
-            "cache": {"enabled": False},
             "extensions": {"stream": True},
         },
     )
@@ -1156,7 +1155,7 @@ def test_chat_adapter_format_exact_messages_preserves_passthrough_lm_kwargs():
         },
     ]
     assert messages == expected_messages
-    expected_lm_kwargs = {"temperature": 0.7, "max_tokens": 42, "stream": True, "cache": False}
+    expected_lm_kwargs = {"temperature": 0.7, "max_tokens": 42, "stream": True}
     assert lm_kwargs == expected_lm_kwargs
 
 
@@ -2651,7 +2650,7 @@ def test_chat_adapter_with_code():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                lm=LM(model="openai/gpt-4o-mini"),
                 config={},
                 task_spec=CodeGeneration,
                 demos=[],
@@ -2745,7 +2744,7 @@ def test_chat_adapter_fallback_to_json_adapter_on_exception():
             model="openai/gpt-4o-mini",
         )
 
-        lm = LM("openai/gpt-4o-mini", cache=False)
+        lm = LM("openai/gpt-4o-mini")
 
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall") as mock_json_adapter_acall:
             asyncio.run(
@@ -2782,7 +2781,7 @@ def test_chat_adapter_fallback_preserves_native_function_calling_flag():
             choices=[Choices(message=Message(content="nonsense"))],
             model="openai/gpt-4o-mini",
         )
-        lm = LM("openai/gpt-4o-mini", cache=False)
+        lm = LM("openai/gpt-4o-mini")
 
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall", new=fake_json_adapter_acall):
             result = asyncio.run(
@@ -2809,7 +2808,7 @@ def test_chat_adapter_respects_use_json_adapter_fallback_flag():
             model="openai/gpt-4o-mini",
         )
 
-        lm = LM("openai/gpt-4o-mini", cache=False)
+        lm = LM("openai/gpt-4o-mini")
 
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall") as mock_json_adapter_acall:  # noqa: SIM117
             with pytest.raises(AdapterParseError):
@@ -2837,7 +2836,7 @@ async def test_chat_adapter_fallback_to_json_adapter_on_exception_async():
             model="openai/gpt-4o-mini",
         )
 
-        lm = LM("openai/gpt-4o-mini", cache=False)
+        lm = LM("openai/gpt-4o-mini")
 
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall") as mock_json_adapter_acall:
             await adapter.acall(
@@ -2867,7 +2866,7 @@ async def test_chat_adapter_async_fallback_preserves_native_function_calling_fla
             choices=[Choices(message=Message(content="nonsense"))],
             model="openai/gpt-4o-mini",
         )
-        lm = LM("openai/gpt-4o-mini", cache=False)
+        lm = LM("openai/gpt-4o-mini")
 
         with mock.patch("dspy.adapters.json_adapter.JSONAdapter.acall", new=fake_json_adapter_acall):
             result = await adapter.acall(
@@ -2920,7 +2919,7 @@ def test_chat_adapter_toolcalls_native_function_calling():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                lm=LM(model="openai/gpt-4o-mini"),
                 config={},
                 task_spec=MySignature,
                 demos=[],
@@ -2948,7 +2947,7 @@ def test_chat_adapter_toolcalls_native_function_calling():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                lm=LM(model="openai/gpt-4o-mini"),
                 config={},
                 task_spec=MySignature,
                 demos=[],
@@ -2990,7 +2989,7 @@ def test_chat_adapter_toolcalls_vague_match():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                lm=LM(model="openai/gpt-4o-mini"),
                 config={},
                 task_spec=MySignature,
                 demos=[],
@@ -3015,7 +3014,7 @@ def test_chat_adapter_toolcalls_vague_match():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                lm=LM(model="openai/gpt-4o-mini"),
                 config={},
                 task_spec=MySignature,
                 demos=[],
@@ -3051,7 +3050,7 @@ def test_chat_adapter_native_reasoning():
             model="anthropic/claude-3-7-sonnet-20250219",
         )
         modified_signature, _, _ = adapter._call_preprocess(
-            LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low", cache=False),
+            LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low"),
             {},
             MySignature,
             {"question": "What is the capital of France?"},
@@ -3060,7 +3059,7 @@ def test_chat_adapter_native_reasoning():
 
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low", cache=False),
+                lm=LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low"),
                 config={},
                 task_spec=MySignature,
                 demos=[],
@@ -3097,7 +3096,7 @@ def test_chat_adapter_parses_float_with_underscores():
             model="openai/gpt-4o-mini",
         )
 
-        lm = LM("openai/gpt-4o-mini", cache=False)
+        lm = LM("openai/gpt-4o-mini")
         result = asyncio.run(
             adapter.acall(lm=lm, config={}, task_spec=MySignature, demos=[], inputs={"question": "What is the score?"})
         )
@@ -3144,7 +3143,7 @@ def test_null_content_raises_adapter_parse_error():
     the adapter should raise AdapterParseError instead of silently returning None fields."""
     from dspy.utils.exceptions import AdapterParseError
 
-    lm = LM("openai/gpt-4o-mini", cache=False)
+    lm = LM("openai/gpt-4o-mini")
     response = ModelResponse(
         choices=[Choices(message=Message(content=None))],
         model="openai/gpt-4o-mini",
@@ -3160,7 +3159,7 @@ def test_empty_string_content_raises_adapter_parse_error():
     """Same as above but with empty string content."""
     from dspy.utils.exceptions import AdapterParseError
 
-    lm = LM("openai/gpt-4o-mini", cache=False)
+    lm = LM("openai/gpt-4o-mini")
     response = ModelResponse(
         choices=[Choices(message=Message(content=""))],
         model="openai/gpt-4o-mini",

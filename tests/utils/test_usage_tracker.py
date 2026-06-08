@@ -144,7 +144,7 @@ def test_track_usage_with_multiple_models():
 
 
 def test_track_usage_context_manager(lm_for_test):
-    lm = LM(lm_for_test, cache=False, temperature=0.0)
+    lm = LM(lm_for_test, temperature=0.0)
     settings.configure(lm=lm)
 
     predict = ChainOfThought(ts("question -> answer"))

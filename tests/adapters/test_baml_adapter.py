@@ -520,7 +520,7 @@ def test_baml_adapter_with_code():
 
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                lm=LM(model="openai/gpt-4o-mini"),
                 config={},
                 task_spec=CodeGenSignature,
                 demos=[],
@@ -632,7 +632,7 @@ async def test_baml_adapter_async_functionality():
 
         adapter = BAMLAdapter()
         result = await adapter.acall(
-            lm=LM(model="openai/gpt-4o", cache=False),
+            lm=LM(model="openai/gpt-4o"),
             config={},
             task_spec=TestSignature,
             demos=[],

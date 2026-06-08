@@ -2,7 +2,6 @@ import asyncio
 import json
 import tempfile
 import time
-import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest import mock
@@ -25,7 +24,6 @@ from openai import RateLimitError
 from openai.types.responses import ResponseOutputMessage, ResponseReasoningItem
 from openai.types.responses.response_reasoning_item import Summary
 
-import dspy.clients as dspy_clients
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm import LM
 from dspy.core.types import Assistant, LMHistoryEntry, LMRequest, LMResponse, System, ToolCall, ToolResult, User
@@ -88,152 +86,6 @@ def test_chat_lms_can_be_queried(litellm_test_server):
     assert asyncio.run(azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query"))).text == "Hi!"
 
 
-def test_dspy_cache(litellm_test_server, tmp_path):
-    api_base, _ = litellm_test_server
-
-    original_cache = dspy_clients.DSPY_CACHE
-    dspy_clients.configure_cache(
-        enable_disk_cache=True,
-        enable_memory_cache=True,
-        disk_cache_dir=tmp_path / ".disk_cache",
-    )
-    cache = dspy_clients.DSPY_CACHE
-
-    lm = LM(
-        model="openai/dspy-test-model",
-        api_base=api_base,
-        api_key="fakekey",
-        model_type="text",
-    )
-    with track_usage() as usage_tracker:
-        asyncio.run(lm(_request(lm, prompt="Query")))
-
-    assert len(cache.memory_cache) == 1
-    cache_key = next(iter(cache.memory_cache.keys()))
-    assert cache_key in cache.disk_cache
-    assert len(usage_tracker.usage_data) == 1
-
-    with track_usage() as usage_tracker:
-        asyncio.run(lm(_request(lm, prompt="Query")))
-
-    assert len(usage_tracker.usage_data) == 0
-
-    dspy_clients.DSPY_CACHE = original_cache
-
-
-def test_disabled_cache_skips_cache_key(monkeypatch):
-    original_cache = dspy_clients.DSPY_CACHE
-    dspy_clients.configure_cache(enable_disk_cache=False, enable_memory_cache=False)
-    cache = dspy_clients.DSPY_CACHE
-
-    try:
-        with (
-            mock.patch.object(cache, "cache_key", wraps=cache.cache_key) as cache_key_spy,
-            mock.patch.object(cache, "get", wraps=cache.get) as cache_get_spy,
-            mock.patch.object(cache, "put", wraps=cache.put) as cache_put_spy,
-        ):
-
-            async def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
-                return ModelResponse(
-                    choices=[Choices(message=Message(role="assistant", content="Hi!"))],
-                    usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
-                    model="dummy",
-                )
-
-            monkeypatch.setattr(litellm, "acompletion", fake_completion)
-
-            lm = LM("dummy", model_type="chat")
-            asyncio.run(lm(_request(lm, messages=[{"role": "user", "content": "Hello"}])))
-
-            cache_key_spy.assert_not_called()
-            cache_get_spy.assert_called_once()
-            cache_put_spy.assert_called_once()
-    finally:
-        dspy_clients.DSPY_CACHE = original_cache
-
-
-def test_rollout_id_bypasses_cache(monkeypatch, tmp_path):
-    calls: list[dict] = []
-
-    async def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
-        calls.append(request)
-        return ModelResponse(
-            choices=[Choices(message=Message(role="assistant", content="Hi!"))],
-            usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
-            model="openai/dspy-test-model",
-        )
-
-    monkeypatch.setattr(litellm, "acompletion", fake_completion)
-
-    original_cache = dspy_clients.DSPY_CACHE
-    dspy_clients.configure_cache(
-        enable_disk_cache=True,
-        enable_memory_cache=True,
-        disk_cache_dir=tmp_path / ".disk_cache",
-    )
-
-    lm = LM(model="openai/dspy-test-model", model_type="chat")
-
-    with track_usage() as usage_tracker:
-        asyncio.run(lm(_request(lm, messages=[{"role": "user", "content": "Query"}], rollout_id=1)))
-    assert len(usage_tracker.usage_data) == 1
-
-    with track_usage() as usage_tracker:
-        asyncio.run(lm(_request(lm, messages=[{"role": "user", "content": "Query"}], rollout_id=1)))
-    assert len(usage_tracker.usage_data) == 0
-
-    with track_usage() as usage_tracker:
-        asyncio.run(lm(_request(lm, messages=[{"role": "user", "content": "Query"}], rollout_id=2)))
-    assert len(usage_tracker.usage_data) == 1
-
-    with track_usage() as usage_tracker:
-        asyncio.run(lm(_request(lm, messages=[{"role": "user", "content": "NoRID"}])))
-    assert len(usage_tracker.usage_data) == 1
-
-    with track_usage() as usage_tracker:
-        asyncio.run(lm(_request(lm, messages=[{"role": "user", "content": "NoRID"}], rollout_id=None)))
-    assert len(usage_tracker.usage_data) == 0
-
-    assert len(dspy_clients.DSPY_CACHE.memory_cache) == 3
-    assert all("rollout_id" not in r for r in calls)
-    dspy_clients.DSPY_CACHE = original_cache
-
-
-def test_zero_temperature_rollout_warns_once(monkeypatch):
-    async def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
-        return ModelResponse(
-            choices=[Choices(message=Message(role="assistant", content="Hi!"))],
-            usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
-            model="openai/dspy-test-model",
-        )
-
-    monkeypatch.setattr(litellm, "acompletion", fake_completion)
-
-    lm = LM(model="openai/dspy-test-model", model_type="chat", temperature=0)
-    with pytest.warns(UserWarning, match="rollout_id has no effect"):
-        asyncio.run(lm(_request(lm, prompt="Query", rollout_id=1)))
-    with warnings.catch_warnings(record=True) as record:
-        warnings.simplefilter("always")
-        asyncio.run(lm(_request(lm, prompt="Query", rollout_id=2)))
-        assert len(record) == 0
-
-
-def test_rollout_id_with_default_temperature_does_not_warn(monkeypatch):
-    async def fake_completion(*, cache, num_retries, retry_strategy, **request: object):
-        return ModelResponse(
-            choices=[Choices(message=Message(role="assistant", content="Hi!"))],
-            usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
-            model="openai/gpt-5-nano",
-        )
-
-    monkeypatch.setattr(litellm, "acompletion", fake_completion)
-
-    with warnings.catch_warnings(record=True) as record:
-        warnings.simplefilter("always")
-        lm = LM(model="openai/gpt-5-nano", model_type="chat", rollout_id=1)
-        asyncio.run(lm(_request(lm, prompt="Query")))
-        assert len(record) == 0
-
 
 def test_text_lms_can_be_queried(litellm_test_server):
     api_base, _ = litellm_test_server
@@ -267,7 +119,6 @@ def test_lm_calls_support_callables(litellm_test_server):
             api_base=api_base,
             api_key="fakekey",
             azure_ad_token_provider=azure_ad_token_provider,
-            cache=False,
         )
 
         asyncio.run(lm_with_callable(_request(lm_with_callable, prompt="Query")))
@@ -336,7 +187,7 @@ def test_lm_wraps_unknown_boundary_error_as_unexpected_error():
 
 def test_lm_preserves_existing_lm_error_without_self_cause():
     error = LMRateLimitError("rate limited", model="openai/gpt-4o-mini")
-    lm = LM("openai/gpt-4o-mini", cache=False)
+    lm = LM("openai/gpt-4o-mini")
 
     with mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error):  # noqa: SIM117
         with pytest.raises(LMRateLimitError) as exc_info:
@@ -349,7 +200,7 @@ def test_lm_preserves_existing_lm_error_without_self_cause():
 @pytest.mark.asyncio
 async def test_lm_preserves_existing_lm_error_without_self_cause_async():
     error = LMRateLimitError("rate limited", model="openai/gpt-4o-mini")
-    lm = LM("openai/gpt-4o-mini", cache=False)
+    lm = LM("openai/gpt-4o-mini")
 
     with mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error):  # noqa: SIM117
         with pytest.raises(LMRateLimitError) as exc_info:
@@ -567,7 +418,7 @@ def _direct_lm_case(lm_kind: str, outputs: list[str]):
             side_effect=[_model_response(output) for output in outputs],
         )
         completion = patcher.start()
-        lm = LM("custom-model", cache=False)
+        lm = LM("custom-model")
 
         def get_messages(index: int) -> list[dict[str, object]]:
             return completion.call_args_list[index].kwargs["request"]["messages"]
@@ -741,7 +592,7 @@ def test_base_lm_copy_is_shallow_runtime_copy_with_isolated_dspy_state():
         )
     ]
 
-    copied_lm = lm.copy(temperature=0.2, rollout_id=1)
+    copied_lm = lm.copy(temperature=0.2)
 
     assert copied_lm is not lm
     assert copied_lm.client is client
@@ -750,7 +601,7 @@ def test_base_lm_copy_is_shallow_runtime_copy_with_isolated_dspy_state():
     assert copied_lm.history is not lm.history
     assert copied_lm.callbacks == [callback]
     assert copied_lm.callbacks is not lm.callbacks
-    assert copied_lm.kwargs == {"temperature": 0.2, "max_tokens": None, "rollout_id": 1}
+    assert copied_lm.kwargs == {"temperature": 0.2, "max_tokens": None}
     assert lm.kwargs == {"temperature": 0.1, "max_tokens": None}
 
 
@@ -772,7 +623,6 @@ def test_dump_state():
         "temperature": 1,
         "max_tokens": 100,
         "num_retries": 10,
-        "cache": True,
         "finetuning_model": None,
         "launch_kwargs": {"temperature": 1},
         "train_kwargs": {"temperature": 5},
@@ -784,7 +634,6 @@ def test_reasoning_model_dump_state_uses_constructor_max_tokens():
         model="openai/gpt-5-nano",
         temperature=1.0,
         max_tokens=16_000,
-        cache=False,
         num_retries=1,
     )
 
@@ -836,7 +685,6 @@ def test_reasoning_model_load_state_round_trips_canonical_state():
         model="openai/gpt-5-nano",
         temperature=1.0,
         max_tokens=16_000,
-        cache=False,
         num_retries=1,
     )
 
@@ -852,8 +700,7 @@ def test_reasoning_model_load_state_accepts_max_completion_tokens_alias():
         "_dspy_lm_class": "dspy.clients.lm.LM",
         "model": "openai/gpt-5-nano",
         "model_type": "chat",
-        "cache": False,
-        "num_retries": 1,
+                "num_retries": 1,
         "temperature": 1.0,
         "max_completion_tokens": 16_000,
         "finetuning_model": None,
@@ -906,7 +753,7 @@ def test_exponential_backoff_retry():
 
 
 def test_logprobs_included_when_requested():
-    lm = LM(model="dspy-test-model", logprobs=True, cache=False)
+    lm = LM(model="dspy-test-model", logprobs=True)
     with mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
@@ -952,7 +799,7 @@ async def test_async_lm_call():
     with patch("litellm.acompletion") as mock_acompletion:
         mock_acompletion.return_value = mock_response
 
-        lm = LM(model="openai/gpt-4o-mini", cache=False)
+        lm = LM(model="openai/gpt-4o-mini")
         result = await lm.acall(_request(lm, prompt="question"))
 
         assert result.text == "answer"
@@ -960,42 +807,7 @@ async def test_async_lm_call():
 
 
 @pytest.mark.asyncio
-async def test_async_lm_call_with_cache(tmp_path):
-    """Test the async LM call with caching."""
-    original_cache = dspy_clients.DSPY_CACHE
-    dspy_clients.configure_cache(
-        enable_disk_cache=True,
-        enable_memory_cache=True,
-        disk_cache_dir=tmp_path / ".disk_cache",
-    )
-    cache = dspy_clients.DSPY_CACHE
-
-    lm = LM(model="openai/gpt-4o-mini")
-
-    with mock.patch("dspy.clients.lm.alitellm_completion") as mock_alitellm_completion:
-        mock_alitellm_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="answer"))], model="openai/gpt-4o-mini"
-        )
-        mock_alitellm_completion.__qualname__ = "alitellm_completion"
-        await lm.acall(_request(lm, prompt="Query"))
-
-        assert len(cache.memory_cache) == 1
-        cache_key = next(iter(cache.memory_cache.keys()))
-        assert cache_key in cache.disk_cache
-        assert mock_alitellm_completion.call_count == 1
-
-        await lm.acall(_request(lm, prompt="Query"))
-        assert mock_alitellm_completion.call_count == 1
-
-        await lm.acall(_request(lm, prompt="New query"))
-
-        assert len(cache.memory_cache) == 2
-        assert mock_alitellm_completion.call_count == 2
-
-    dspy_clients.DSPY_CACHE = original_cache
-
-
-def test_lm_history_size_limit():
+async def test_lm_history_size_limit():
     lm = LM(model="openai/gpt-4o-mini")
     with settings.context(max_history_size=5), mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -1004,7 +816,7 @@ def test_lm_history_size_limit():
         )
 
         for _ in range(10):
-            asyncio.run(lm(_request(lm, prompt="query")))
+            await lm(_request(lm, prompt="query"))
 
     assert len(lm.history) == 5
 
@@ -1052,7 +864,6 @@ def test_responses_api():
         lm = LM(
             model="openai/gpt-5-mini",
             model_type="responses",
-            cache=False,
             temperature=1.0,
             max_tokens=16000,
         )
@@ -1069,7 +880,6 @@ def test_lm_replaces_system_with_developer_role():
     with mock.patch("dspy.clients.lm.alitellm_responses_completion", return_value={"choices": []}) as mock_completion:
         lm = LM(
             "openai/gpt-4o-mini",
-            cache=False,
             model_type="responses",
             use_developer_role=True,
         )
@@ -1097,7 +907,6 @@ def test_responses_api_tool_calls(litellm_test_server):
             api_base=api_base,
             api_key="fakekey",
             model_type="responses",
-            cache=False,
         )
         lm_result = asyncio.run(lm(_request(lm, prompt="openai query")))
         tool_call = lm_result.outputs[0].tool_calls[0]
@@ -1146,7 +955,6 @@ def test_call_reasoning_model_with_chat_api():
                 temperature=1.0,
                 max_tokens=16000,
                 reasoning_effort="low",
-                cache=False,
             )
 
             # Test the call
@@ -1388,7 +1196,6 @@ def test_responses_api_with_image_input():
         lm = LM(
             model="openai/gpt-5-mini",
             model_type="responses",
-            cache=False,
             temperature=1.0,
             max_tokens=16000,
         )
@@ -1451,7 +1258,6 @@ def test_responses_api_with_pydantic_model_input():
     lm = LM(
         model="openai/gpt-5-mini",
         model_type="responses",
-        cache=False,
         temperature=1.0,
         max_tokens=16000,
     )
@@ -1520,7 +1326,6 @@ def test_responses_api_with_none_usage():
         lm = LM(
             model="openai/gpt-5-mini",
             model_type="responses",
-            cache=False,
             temperature=1.0,
             max_tokens=16000,
         )
@@ -1573,7 +1378,6 @@ async def test_responses_api_with_none_usage_async():
         lm = LM(
             model="openai/gpt-5-mini",
             model_type="responses",
-            cache=False,
             temperature=1.0,
             max_tokens=16000,
         )

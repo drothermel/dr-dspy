@@ -72,7 +72,7 @@ def test_concurrent_lm_first_use_materializes_litellm_once():
 
         def supports_function_calling(_):
             barrier.wait()
-            lm = LM("openai/gpt-4o-mini", cache=False, num_retries=0)
+            lm = LM("openai/gpt-4o-mini", num_retries=0)
             return lm.supports_function_calling
 
         with ThreadPoolExecutor(max_workers=threads) as executor:

@@ -195,7 +195,7 @@ def test_react_v2_forced_submit_on_empty_tool_calls():
 
 class NativeToolLM(BaseLM):
     def __init__(self):
-        super().__init__("native-tool-lm", "chat", 0.0, 1000, True)
+        super().__init__("native-tool-lm", "chat", temperature=0.0, max_tokens=1000)
         self.calls = []
 
     @property
@@ -234,7 +234,7 @@ class NativeToolLM(BaseLM):
 
 class ParallelNativeToolLM(BaseLM):
     def __init__(self):
-        super().__init__("parallel-native-tool-lm", "chat", 0.0, 1000, True)
+        super().__init__("parallel-native-tool-lm", "chat", temperature=0.0, max_tokens=1000)
         self.calls = []
 
     @property

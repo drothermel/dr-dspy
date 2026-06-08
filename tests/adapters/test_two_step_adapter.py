@@ -18,7 +18,7 @@ from tests.task_spec.helpers import ts
 
 class RecordingTextLM(BaseLM):
     def __init__(self, texts: list[str], *, model: str = "openai/gpt-4o-mini", temperature: float = 1.0):
-        super().__init__(model, "chat", temperature, 1000, True)
+        super().__init__(model, "chat", temperature=temperature, max_tokens=1000)
         self.texts = list(texts)
         self.requests: list[LMRequest] = []
 

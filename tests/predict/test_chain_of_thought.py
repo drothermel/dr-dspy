@@ -43,7 +43,7 @@ async def test_async_chain_of_thought():
 def test_chain_of_thought_with_native_reasoning():
     """Test ChainOfThought with a model that supports native reasoning, but using manual fields."""
 
-    lm = LM(model="anthropic/claude-3-7-sonnet-20250219", cache=False)
+    lm = LM(model="anthropic/claude-3-7-sonnet-20250219")
     settings.configure(lm=lm)
 
     with mock.patch("litellm.acompletion") as mock_completion:

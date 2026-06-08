@@ -41,11 +41,6 @@ def captured_lm_kwargs(request: LMRequest) -> dict:
     data = to_openai_chat_request(request)
     data.pop("model", None)
     data.pop("messages", None)
-    if request.config.cache is not None:
-        if request.config.cache.enabled is not None:
-            data["cache"] = request.config.cache.enabled
-        if request.config.cache.rollout_id is not None:
-            data["rollout_id"] = request.config.cache.rollout_id
     return data
 
 
@@ -55,7 +50,6 @@ class CapturingLM(BaseLM):
         super().__init__(
             model=source_lm.model,
             model_type=source_lm.model_type,
-            cache=source_lm.cache,
         )
         self.source_lm = source_lm
         self.calls = []

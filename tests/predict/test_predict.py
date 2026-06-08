@@ -122,7 +122,6 @@ def test_lm_after_dump_and_load_state():
         "temperature": 1,
         "max_tokens": 100,
         "num_retries": 10,
-        "cache": True,
         "finetuning_model": None,
         "launch_kwargs": {},
         "train_kwargs": {},
@@ -459,7 +458,6 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
     loaded_predict.load(file_path)
 
     class FakeResp(dict):
-        cache_hit = False
         usage = {}  # noqa: RUF012
 
         def __init__(self):
@@ -470,7 +468,7 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
     ) as completion_mock:
         lm = loaded_predict.lm
         assert lm is not None
-        asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
+        asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello")))
 
     assert completion_mock.call_count == 1
     assert completion_mock.call_args.kwargs["request"].get(endpoint_override_key) != override_url
@@ -498,7 +496,6 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
         f.write(orjson.dumps(saved_state))
 
     class FakeResp(dict):
-        cache_hit = False
         usage = {}  # noqa: RUF012
 
         def __init__(self):
@@ -512,7 +509,7 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
         ) as completion_mock:
             lm = safe_loaded_predict.lm
             assert lm is not None
-            asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
+            asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello")))
 
     assert completion_mock.called
     assert not batch_completion_mock.called
@@ -524,7 +521,7 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
     ) as batch_completion_mock:
         lm = opt_in_loaded_predict.lm
         assert lm is not None
-        asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
+        asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello")))
 
     opt_in_deployments = batch_completion_mock.call_args.kwargs["deployments"]
     assert opt_in_deployments[0]["api_base"] == override_url
@@ -549,7 +546,6 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     monkeypatch.setenv("openai_API_KEY", env_api_key)
 
     class FakeResp(dict):
-        cache_hit = False
         usage = {}  # noqa: RUF012
 
         def __init__(self):
@@ -561,7 +557,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     with patch("litellm.atext_completion", new_callable=AsyncMock, return_value=FakeResp()) as text_completion_mock:
         lm = opt_in_loaded_predict.lm
         assert lm is not None
-        asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
+        asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello")))
 
     assert text_completion_mock.call_args.kwargs["api_base"] == override_url
     assert text_completion_mock.call_args.kwargs["api_key"] == env_api_key
@@ -571,7 +567,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     with patch("litellm.atext_completion", new_callable=AsyncMock, return_value=FakeResp()) as text_completion_mock:
         lm = safe_loaded_predict.lm
         assert lm is not None
-        asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
+        asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello")))
 
     # In the safe path, the key still comes from the environment, but the serialized endpoint override does not.
     assert text_completion_mock.call_args.kwargs["api_key"] == env_api_key
@@ -832,7 +828,7 @@ def test_call_predict_with_chat_history(adapter_type):
 
 def test_lm_usage():
     program = Predict(pspec("question -> answer"))
-    settings.configure(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True)
+    settings.configure(lm=LM("openai/gpt-4o-mini"), track_usage=True)
     with patch(
         "dspy.clients.lm.alitellm_completion",
         return_value=ModelResponse(
@@ -853,7 +849,7 @@ def test_lm_usage_with_parallel():
         await asyncio.sleep(0.5)
         return await program(question=question)
 
-    settings.configure(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True)
+    settings.configure(lm=LM("openai/gpt-4o-mini"), track_usage=True)
     with patch(
         "dspy.clients.lm.alitellm_completion",
         return_value=ModelResponse(
@@ -886,7 +882,7 @@ async def test_lm_usage_with_async():
     program.aforward = types.MethodType(patched_aforward, program)  # ty:ignore[invalid-assignment]
 
     with (
-        settings.context(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True),
+        settings.context(lm=LM("openai/gpt-4o-mini"), track_usage=True),
         patch(
             "litellm.acompletion",
             return_value=ModelResponse(
@@ -1011,7 +1007,7 @@ async def test_async_predict():
 
 def test_predicted_outputs_piped_from_predict_to_lm_call():
     program = Predict(pspec("question -> answer"))
-    settings.configure(lm=LM("openai/gpt-4o-mini", cache=False))
+    settings.configure(lm=LM("openai/gpt-4o-mini"))
     mock_response = ModelResponse(choices=[{"message": {"content": "[[ ## answer ## ]]\nParis"}}])
 
     with patch("litellm.acompletion", return_value=mock_response) as mock_completion:

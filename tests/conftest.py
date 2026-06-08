@@ -1,42 +1,25 @@
 import copy
 import os
 from collections.abc import Iterator
-from pathlib import Path
-from typing import Any
 
 import pytest
 
-import dspy.clients as dspy_clients
 from dspy.dsp.utils.settings import settings
 from tests.test_utils.server import litellm_test_server, read_litellm_test_server_request_logs  # noqa: F401
 
 SKIP_DEFAULT_FLAGS = ["reliability", "extra", "llm_call", "deno"]
 
 
-def _close_cache(cache: Any) -> None:
-    disk_cache = getattr(cache, "disk_cache", None)
-    if hasattr(disk_cache, "close"):
-        disk_cache.close()
-
-
 @pytest.fixture(autouse=True)
-def clear_settings(tmp_path: Path) -> Iterator[None]:
-    """Ensure each test gets fresh DSPy settings and an isolated cache."""
+def clear_settings() -> Iterator[None]:
+    """Ensure each test gets fresh DSPy settings."""
 
-    original_cache = dspy_clients.DSPY_CACHE
-    dspy_clients.configure_cache(disk_cache_dir=tmp_path / ".dspy_cache")  # ty:ignore[invalid-argument-type]
     try:
         yield
     finally:
         from dspy.dsp.utils.settings import DEFAULT_CONFIG
 
-        try:
-            settings.configure(**copy.deepcopy(DEFAULT_CONFIG), inherit_config=False)
-        finally:
-            try:
-                _close_cache(dspy_clients.DSPY_CACHE)
-            finally:
-                dspy_clients.DSPY_CACHE = original_cache
+        settings.configure(**copy.deepcopy(DEFAULT_CONFIG), inherit_config=False)
 
 
 @pytest.fixture

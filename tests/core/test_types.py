@@ -3,7 +3,6 @@ import pytest
 
 from dspy.core.types import (
     LMAudioPart,
-    LMCacheConfig,
     LMConfig,
     LMDocumentPart,
     LMHistoryEntry,
@@ -187,7 +186,6 @@ def test_lm_config_accepts_canonical_nested_fields():
     config = LMConfig(
         reasoning=LMReasoningConfig(effort="high", summary="auto"),
         tool_choice=LMToolChoice(mode="auto", parallel=False),
-        cache=LMCacheConfig(enabled=True, rollout_id=7),
         prompt_cache=LMPromptCacheConfig(enabled=True, key="prompt-cache"),
         extensions={"provider_flag": True},
     )
@@ -196,8 +194,6 @@ def test_lm_config_accepts_canonical_nested_fields():
     assert config.reasoning.summary == "auto"  # ty:ignore[unresolved-attribute]
     assert config.tool_choice.mode == "auto"  # ty:ignore[unresolved-attribute]
     assert config.tool_choice.parallel is False  # ty:ignore[unresolved-attribute]
-    assert config.cache.enabled is True  # ty:ignore[unresolved-attribute]
-    assert config.cache.rollout_id == 7  # ty:ignore[unresolved-attribute]
     assert config.prompt_cache.enabled is True  # ty:ignore[unresolved-attribute]
     assert config.prompt_cache.key == "prompt-cache"  # ty:ignore[unresolved-attribute]
     assert config.extensions == {"provider_flag": True}

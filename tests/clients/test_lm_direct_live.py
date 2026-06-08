@@ -40,7 +40,6 @@ def test_live_openai_chat_direct_system_user_assistant_multiturn():
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-5.5"),
         model_type="chat",
-        cache=False,
         max_completion_tokens=64,
     )
 
@@ -65,7 +64,6 @@ def test_live_openai_chat_direct_tool_call_transcript():
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-4o-mini"),
         model_type="chat",
-        cache=False,
         max_tokens=64,
     )
 
@@ -92,7 +90,6 @@ def test_live_openai_chat_direct_reuse_lm_response_as_assistant_turn():
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-4o-mini"),
         model_type="chat",
-        cache=False,
         max_tokens=64,
     )
 
@@ -117,7 +114,6 @@ def test_live_openai_responses_direct_system_user_assistant_multiturn():
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_OPENAI_RESPONSES", "openai/gpt-4.1-mini"),
         model_type="responses",
-        cache=False,
         temperature=1.0,
         max_tokens=16000,
     )
@@ -142,7 +138,6 @@ def test_live_openai_responses_direct_tool_call_transcript():
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_OPENAI_RESPONSES", "openai/gpt-4.1-mini"),
         model_type="responses",
-        cache=False,
         temperature=1.0,
         max_tokens=16000,
     )
@@ -170,7 +165,6 @@ def test_live_openai_responses_direct_reuse_lm_response_as_assistant_turn():
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_OPENAI_RESPONSES", "openai/gpt-4.1-mini"),
         model_type="responses",
-        cache=False,
         temperature=1.0,
         max_tokens=16000,
     )
@@ -196,7 +190,6 @@ def test_live_anthropic_chat_direct_system_user_assistant_multiturn():
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_ANTHROPIC", "anthropic/claude-3-5-haiku-latest"),
         model_type="chat",
-        cache=False,
         max_tokens=64,
     )
 
@@ -220,7 +213,6 @@ def test_live_anthropic_chat_direct_tool_call_transcript():
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_ANTHROPIC", "anthropic/claude-3-5-haiku-latest"),
         model_type="chat",
-        cache=False,
         max_tokens=64,
     )
 
@@ -247,7 +239,6 @@ def test_live_anthropic_chat_direct_reuse_lm_response_as_assistant_turn():
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_ANTHROPIC", "anthropic/claude-3-5-haiku-latest"),
         model_type="chat",
-        cache=False,
         max_tokens=64,
     )
 
@@ -272,7 +263,6 @@ def test_live_gemini_chat_direct_system_user_assistant_multiturn():
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_GEMINI", "gemini/gemini-2.0-flash"),
         model_type="chat",
-        cache=False,
         max_tokens=64,
     )
 
@@ -296,7 +286,6 @@ def test_live_gemini_chat_direct_tool_call_transcript():
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_GEMINI", "gemini/gemini-2.0-flash"),
         model_type="chat",
-        cache=False,
         max_tokens=64,
     )
 
@@ -323,7 +312,6 @@ def test_live_gemini_chat_direct_reuse_lm_response_as_assistant_turn():
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_GEMINI", "gemini/gemini-2.0-flash"),
         model_type="chat",
-        cache=False,
         max_tokens=64,
     )
 

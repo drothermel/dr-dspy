@@ -937,7 +937,7 @@ def test_json_adapter_not_using_structured_outputs_when_not_supported_by_model()
     program = Predict(TestSignature)
 
     # Configure DSPy to use a model from a fake provider that doesn't support structured outputs
-    settings.configure(lm=LM(model="fakeprovider/fakemodel", cache=False), adapter=JSONAdapter())
+    settings.configure(lm=LM(model="fakeprovider/fakemodel"), adapter=JSONAdapter())
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content=("{'output1': 'Test output', 'output2': True}")))],
@@ -1022,7 +1022,7 @@ def test_json_adapter_on_pydantic_model():
     )
     program = Predict(TestSignature)
 
-    settings.configure(lm=LM(model="openai/gpt-4o", cache=False), adapter=JSONAdapter())
+    settings.configure(lm=LM(model="openai/gpt-4o"), adapter=JSONAdapter())
 
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -1451,7 +1451,7 @@ def test_json_adapter_with_code():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                lm=LM(model="openai/gpt-4o-mini"),
                 config={},
                 task_spec=CodeGeneration,
                 demos=[],
@@ -1527,7 +1527,7 @@ async def test_json_adapter_on_pydantic_model_async():
             model="openai/gpt-4o",
         )
 
-        with settings.context(lm=LM(model="openai/gpt-4o", cache=False), adapter=JSONAdapter()):
+        with settings.context(lm=LM(model="openai/gpt-4o"), adapter=JSONAdapter()):
             result = await program.acall(
                 user={"id": 5, "name": "name_test", "email": "email_test"}, question="What is the capital of France?"
             )
@@ -1591,7 +1591,7 @@ def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_lm_err
         },
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
-    settings.configure(lm=LM(model="openai/gpt-4o-mini", cache=False), adapter=JSONAdapter())
+    settings.configure(lm=LM(model="openai/gpt-4o-mini"), adapter=JSONAdapter())
     program = Predict(TestSignature)
 
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
@@ -1613,7 +1613,7 @@ def test_json_adapter_json_mode_no_structured_outputs():
         },
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
-    settings.configure(lm=LM(model="openai/gpt-4o", cache=False), adapter=JSONAdapter())
+    settings.configure(lm=LM(model="openai/gpt-4o"), adapter=JSONAdapter())
     program = Predict(TestSignature)
 
     with (
@@ -1660,7 +1660,7 @@ async def test_json_adapter_json_mode_no_structured_outputs_async():
         mock_get_supported_openai_params.return_value = ["response_format"]
         mock_supports_response_schema.return_value = False
 
-        with settings.context(lm=LM(model="openai/gpt-4o", cache=False), adapter=JSONAdapter()):
+        with settings.context(lm=LM(model="openai/gpt-4o"), adapter=JSONAdapter()):
             result = await program.acall(question="Dummy question!")
 
         assert mock_acompletion.call_count == 1
@@ -1684,7 +1684,7 @@ async def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_acompletion:
         mock_acompletion.side_effect = RuntimeError("Structured output failed!")
 
-        with settings.context(lm=LM(model="openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()):  # noqa: SIM117
+        with settings.context(lm=LM(model="openai/gpt-4o-mini"), adapter=JSONAdapter()):  # noqa: SIM117
             with pytest.raises(LMUnexpectedError, match="Structured output failed"):
                 await program.acall(question="Dummy question!")
 
@@ -1703,7 +1703,7 @@ def test_error_message_on_json_adapter_failure():
     )
     program = Predict(TestSignature)
 
-    settings.configure(lm=LM(model="openai/gpt-4o-mini", cache=False), adapter=JSONAdapter())
+    settings.configure(lm=LM(model="openai/gpt-4o-mini"), adapter=JSONAdapter())
 
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.side_effect = RuntimeError("RuntimeError!")
@@ -1732,7 +1732,7 @@ async def test_error_message_on_json_adapter_failure_async():
     program = Predict(TestSignature)
 
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_acompletion:  # noqa: SIM117
-        with settings.context(lm=LM(model="openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()):
+        with settings.context(lm=LM(model="openai/gpt-4o-mini"), adapter=JSONAdapter()):
             mock_acompletion.side_effect = RuntimeError("RuntimeError!")
             with pytest.raises(LMUnexpectedError) as error:
                 await program.acall(question="Dummy question!")
@@ -1788,7 +1788,7 @@ def test_json_adapter_toolcalls_native_function_calling():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                lm=LM(model="openai/gpt-4o-mini"),
                 config={},
                 task_spec=MySignature,
                 demos=[],
@@ -1816,7 +1816,7 @@ def test_json_adapter_toolcalls_native_function_calling():
         )
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="openai/gpt-4o-mini", cache=False),
+                lm=LM(model="openai/gpt-4o-mini"),
                 config={},
                 task_spec=MySignature,
                 demos=[],
@@ -1852,7 +1852,7 @@ def test_json_adapter_toolcalls_no_native_function_calling():
                 model="openai/gpt-4o-mini",
             )
             adapter = JSONAdapter(use_native_function_calling=False)
-            lm = LM(model="openai/gpt-4o-mini", cache=False)
+            lm = LM(model="openai/gpt-4o-mini")
             asyncio.run(
                 adapter.acall(
                     lm=lm,
@@ -1895,7 +1895,7 @@ def test_json_adapter_native_reasoning():
             model="anthropic/claude-3-7-sonnet-20250219",
         )
         modified_signature, _, _ = adapter._call_preprocess(
-            LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low", cache=False),
+            LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low"),
             {},
             MySignature,
             {"question": "What is the capital of France?"},
@@ -1904,7 +1904,7 @@ def test_json_adapter_native_reasoning():
 
         result = asyncio.run(
             adapter.acall(
-                lm=LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low", cache=False),
+                lm=LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low"),
                 config={},
                 task_spec=MySignature,
                 demos=[],
@@ -1949,7 +1949,7 @@ def test_json_adapter_with_responses_api():
         user=None,
     )
 
-    lm = LM(model="openai/gpt-4o", model_type="responses", cache=False)
+    lm = LM(model="openai/gpt-4o", model_type="responses")
     settings.configure(lm=lm, adapter=JSONAdapter())
 
     program = Predict(TestSignature)
