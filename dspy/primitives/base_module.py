@@ -7,6 +7,7 @@ from pathlib import Path
 import cloudpickle
 import orjson
 
+from dspy.predict.protocol import Predictor
 from dspy.utils.saving import get_dependency_versions
 
 logger = logging.getLogger(__name__)
@@ -112,11 +113,9 @@ class BaseModule:
         return {name: param.dump_state(json_mode=json_mode) for name, param in self.named_parameters()}
 
     def load_state(self, state, *, allow_unsafe_lm_state=False) -> "BaseModule":
-        from dspy.predict.predict import Predict
-
         def _apply(module) -> None:
             for name, param in module.named_parameters():
-                if isinstance(param, Predict):
+                if isinstance(param, Predictor):
                     param.load_state(state[name], allow_unsafe_lm_state=allow_unsafe_lm_state)
                 else:
                     param.load_state(state[name])

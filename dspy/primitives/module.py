@@ -4,8 +4,9 @@ from typing import Any, TextIO
 
 from typing_extensions import override
 
-from dspy.dsp.utils.settings import settings
+from dspy.dsp.utils.settings import settings, thread_local_overrides
 from dspy.predict.parallel import Parallel
+from dspy.predict.protocol import Predictor
 from dspy.primitives.base_module import BaseModule
 from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
@@ -54,8 +55,6 @@ class Module(BaseModule, metaclass=ProgramMeta):
 
     @with_callbacks
     async def __call__(self, *args, **kwargs) -> Prediction:
-        from dspy.dsp.utils.settings import thread_local_overrides
-
         caller_modules = settings.caller_modules or []
         caller_modules = list(caller_modules)
         caller_modules.append(self)
@@ -71,9 +70,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
     acall = __call__
 
     def named_predictors(self):
-        from dspy.predict.predict import Predict
-
-        return [(name, param) for name, param in self.named_parameters() if isinstance(param, Predict)]
+        return [(name, param) for name, param in self.named_parameters() if isinstance(param, Predictor)]
 
     def predictors(self):
         return [param for _, param in self.named_predictors()]
