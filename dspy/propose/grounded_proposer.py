@@ -3,7 +3,6 @@ import random
 
 from typing_extensions import override
 
-from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
@@ -34,7 +33,7 @@ TIPS = {
 
 
 class DescribeProgramTaskSpec(TaskSpec):
-    name: str = "DescribeProgram"
+    name: str = "framework.propose.describe_program"
     instructions: str = (
         "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe what "
         "type of task this program appears to be designed to solve, and how it appears to work."
@@ -57,7 +56,7 @@ class DescribeProgramTaskSpec(TaskSpec):
 
 
 class DescribeModuleTaskSpec(TaskSpec):
-    name: str = "DescribeModule"
+    name: str = "framework.propose.describe_module"
     instructions: str = (
         "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe the "
         "purpose of one of the specified module in this pipeline."
@@ -444,7 +443,9 @@ class GroundedProposer(Proposer):
 
         rollout_lm = self.prompt_model.copy(temperature=self.init_temperature)
 
-        with settings.context(lm=rollout_lm):
+        from dspy.teleprompt.utils import optimizer_lm_context
+
+        with optimizer_lm_context(lm=rollout_lm, phase="propose.grounded", lm_role="prompt_model"):
             proposed_instruction = (
                 await instruction_generator(
                     demo_candidates=demo_candidates,

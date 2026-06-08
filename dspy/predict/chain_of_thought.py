@@ -26,7 +26,11 @@ class ChainOfThought(Module):
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"ChainOfThought requires a TaskSpec instance, got {type(task_spec).__name__}.")
         extended_task_spec = task_spec.prepend(
-            output_field("reasoning", Reasoning, desc="${reasoning}"),
+            output_field(
+                "reasoning",
+                Reasoning,
+                desc="Step-by-step reasoning before producing the final outputs.",
+            ),
         )
         callbacks = cast("list[BaseCallback] | None", config.pop("callbacks", None))
         self.task_spec = task_spec

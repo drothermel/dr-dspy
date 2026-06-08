@@ -162,7 +162,9 @@ async def append_a_rule(bucket, system, **kwargs) -> bool:
         for k, v in kwargs.items()
     }
 
-    with settings.context(trace=[], lm=prompt_model):
+    from dspy.teleprompt.utils import optimizer_lm_context
+
+    with optimizer_lm_context(lm=prompt_model, phase="simba.offer_feedback", lm_role="prompt_model", trace=[]):
         advice_program = Predict(SimbaOfferFeedbackTaskSpec())
         advice = (await advice_program(**kwargs)).module_advice
 
@@ -177,7 +179,7 @@ async def append_a_rule(bucket, system, **kwargs) -> bool:
 
 
 class SimbaOfferFeedbackTaskSpec(TaskSpec):
-    name: str = "OfferFeedback"
+    name: str = "framework.simba.offer_feedback"
     instructions: str = (
         "You will be given two trajectories of an LLM-driven program's execution. Your goal is to help the program's "
         "modules build up experience on how to maximize the reward value assigned to the program's outputs if it were "

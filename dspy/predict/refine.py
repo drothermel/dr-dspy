@@ -5,8 +5,8 @@ from typing import Any, cast
 
 import orjson
 
-from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.utils import get_field_description_string
+from dspy.compile.resolve import resolve_adapter
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict, Prediction
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
@@ -16,7 +16,7 @@ from .predict import Module
 
 
 class OfferFeedbackTaskSpec(TaskSpec):
-    name: str = "OfferFeedback"
+    name: str = "framework.refine.offer_feedback"
     instructions: str = (
         "In the discussion, assign blame to each module that contributed to the final reward being below the "
         "threshold, if any. Then, prescribe concrete advice of how the module should act on its future input when we "
@@ -150,7 +150,7 @@ class Refine(Module):
         lm = self.module.get_lm() or settings.lm
         best_pred, best_trace, best_reward = None, None, -float("inf")
         advice = None
-        adapter = settings.adapter or ChatAdapter()
+        adapter, _ = resolve_adapter(settings.adapter, transparency=settings.get("transparency", "strict"))
 
         for idx in range(self.N):
             lm_ = lm.copy(temperature=1.0)

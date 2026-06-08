@@ -5,15 +5,15 @@ from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 
 
 class SemanticRecallPrecisionTaskSpec(TaskSpec):
-    name: str = "SemanticRecallPrecision"
+    name: str = "framework.evaluate.semantic_recall_precision"
     instructions: str = (
         "Compare a system's response to the ground truth to compute its recall and precision. "
         "If asked to reason, enumerate key ideas in each response, and whether they are present in the other response."
     )
     inputs: tuple[FieldSpec, ...] = (
-        input_field("question", str),
-        input_field("ground_truth", str),
-        input_field("system_response", str),
+        input_field("question", str, desc="The evaluation question."),
+        input_field("ground_truth", str, desc="The reference ground-truth answer."),
+        input_field("system_response", str, desc="The system response being evaluated."),
     )
     outputs: tuple[FieldSpec, ...] = (
         output_field(
@@ -30,15 +30,15 @@ class SemanticRecallPrecisionTaskSpec(TaskSpec):
 
 
 class DecompositionalSemanticRecallPrecisionTaskSpec(TaskSpec):
-    name: str = "DecompositionalSemanticRecallPrecision"
+    name: str = "framework.evaluate.decompositional_semantic_recall_precision"
     instructions: str = (
         "Compare a system's response to the ground truth to compute recall and precision of key ideas. "
         "You will first enumerate key ideas in each response, discuss their overlap, and then report recall and precision."
     )
     inputs: tuple[FieldSpec, ...] = (
-        input_field("question", str),
-        input_field("ground_truth", str),
-        input_field("system_response", str),
+        input_field("question", str, desc="The evaluation question."),
+        input_field("ground_truth", str, desc="The reference ground-truth answer."),
+        input_field("system_response", str, desc="The system response being evaluated."),
     )
     outputs: tuple[FieldSpec, ...] = (
         output_field(
@@ -104,15 +104,15 @@ class SemanticF1(Module):
 
 
 class AnswerCompletenessTaskSpec(TaskSpec):
-    name: str = "AnswerCompleteness"
+    name: str = "framework.evaluate.answer_completeness"
     instructions: str = (
         "Estimate the completeness of a system's responses, against the ground truth. "
         "You will first enumerate key ideas in each response, discuss their overlap, and then report completeness."
     )
     inputs: tuple[FieldSpec, ...] = (
-        input_field("question", str),
-        input_field("ground_truth", str),
-        input_field("system_response", str),
+        input_field("question", str, desc="The evaluation question."),
+        input_field("ground_truth", str, desc="The reference ground-truth answer."),
+        input_field("system_response", str, desc="The system response being evaluated."),
     )
     outputs: tuple[FieldSpec, ...] = (
         output_field(
@@ -139,16 +139,16 @@ class AnswerCompletenessTaskSpec(TaskSpec):
 
 
 class AnswerGroundednessTaskSpec(TaskSpec):
-    name: str = "AnswerGroundedness"
+    name: str = "framework.evaluate.answer_groundedness"
     instructions: str = (
         "Estimate the groundedness of a system's responses, against real retrieved documents written by people. "
         "You will first enumerate whatever non-trivial or check-worthy claims are made in the system response, and then "
         "discuss the extent to which some or all of them can be deduced from the retrieved context and basic commonsense."
     )
     inputs: tuple[FieldSpec, ...] = (
-        input_field("question", str),
-        input_field("retrieved_context", str),
-        input_field("system_response", str),
+        input_field("question", str, desc="The evaluation question."),
+        input_field("retrieved_context", str, desc="Retrieved documents used as grounding context."),
+        input_field("system_response", str, desc="The system response being evaluated."),
     )
     outputs: tuple[FieldSpec, ...] = (
         output_field(

@@ -25,7 +25,7 @@ class EvalResult(BaseModel):
 
 
 class ComparatorTaskSpec(TaskSpec):
-    name: str = "Comparator"
+    name: str = "framework.avatar.comparator"
     instructions: str = (
         "After executing the given actions on user inputs using the given instruction, some inputs have yielded good, "
         "results, while others have not. I'll provide you the inputs along with their, corresponding evaluation "
@@ -60,7 +60,7 @@ class ComparatorTaskSpec(TaskSpec):
 
 
 class FeedbackBasedInstructionTaskSpec(TaskSpec):
-    name: str = "FeedbackBasedInstruction"
+    name: str = "framework.avatar.feedback_instruction"
     instructions: str = (
         "There is a task that needs to be completed for which one can use multiple tools to achieve the desired "
         "outcome. A group's performance was evaluated on a dataset of inputs, the inputs that did well are positive "

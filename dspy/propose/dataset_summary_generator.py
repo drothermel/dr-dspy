@@ -4,10 +4,11 @@ from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.propose.utils import strip_prefix
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
+from dspy.teleprompt.utils import optimizer_lm_context
 
 
 class ObservationSummarizerTaskSpec(TaskSpec):
-    name: str = "ObservationSummarizer"
+    name: str = "framework.propose.observation_summarizer"
     instructions: str = (
         "Given a series of observations I have made about my dataset, please summarize them into a brief 2-3 sentence "
         "summary which highlights only the most important details."
@@ -25,7 +26,7 @@ class ObservationSummarizerTaskSpec(TaskSpec):
 
 
 class DatasetDescriptorTaskSpec(TaskSpec):
-    name: str = "DatasetDescriptor"
+    name: str = "framework.propose.dataset_descriptor"
     instructions: str = (
         "Given several examples from a dataset please write observations about trends that hold for most or all of "
         "the samples. Some areas you may consider in your observations: topics, content, syntax, conciseness, etc. "
@@ -43,7 +44,7 @@ class DatasetDescriptorTaskSpec(TaskSpec):
 
 
 class DatasetDescriptorWithPriorObservationsTaskSpec(TaskSpec):
-    name: str = "DatasetDescriptorWithPriorObservations"
+    name: str = "framework.propose.dataset_descriptor_with_prior"
     instructions: str = (
         "Given several examples from a dataset please write observations about trends that hold for most or all of the "
         "samples. I will also provide you with a few observations I have already made. Please add your own observations "
@@ -81,7 +82,7 @@ async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model
         pass
     upper_lim = min(len(trainset), view_data_batch_size)
     prompt_model = prompt_model if prompt_model else settings.lm
-    with settings.context(lm=prompt_model):
+    with optimizer_lm_context(lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model"):
         observation = await Predict(DatasetDescriptorTaskSpec(), n=1, temperature=1.0)(
             examples=order_input_keys_in_string(trainset[0:upper_lim].__repr__())
         )
@@ -101,7 +102,7 @@ async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model
             if verbose:
                 pass
             upper_lim = min(len(trainset), b + view_data_batch_size)
-            with settings.context(lm=prompt_model):
+            with optimizer_lm_context(lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model"):
                 output = await Predict(DatasetDescriptorWithPriorObservationsTaskSpec(), n=1, temperature=1.0)(
                     prior_observations=observations,
                     examples=order_input_keys_in_string(trainset[b:upper_lim].__repr__()),
@@ -120,7 +121,7 @@ async def create_dataset_summary(*, trainset, view_data_batch_size, prompt_model
             pass
 
     if prompt_model:
-        with settings.context(lm=prompt_model):
+        with optimizer_lm_context(lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model"):
             summary = await Predict(ObservationSummarizerTaskSpec(), n=1, temperature=1.0)(observations=observations)
     else:
         summary = await Predict(ObservationSummarizerTaskSpec(), n=1, temperature=1.0)(observations=observations)
