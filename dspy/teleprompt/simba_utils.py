@@ -57,9 +57,12 @@ def wrap_program(program: Module, metric: Callable):
                 score = output
             elif isinstance(output, Prediction):
                 if not hasattr(output, "score"):
-                    raise ValueError("When `metric` returns a `dspy.Prediction`, it must contain a `score` field.")
+                    raise ValueError(
+                        "When `metric` returns a `dspy.primitives.prediction.Prediction`, it must contain a "
+                        "`score` field."
+                    )
                 score = output.score
-                # Extract fields from the output dspy.Prediction, excluding `score``
+                # Extract fields from the output Prediction, excluding `score`.
                 output_metadata = {
                     k: v for k, v in output.items() if k != "score"
                 }

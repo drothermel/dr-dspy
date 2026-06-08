@@ -57,11 +57,12 @@ class Settings:
     - 'context' sets thread-local overrides. These overrides propagate to threads spawned
       inside that context block, when (and only when!) using a ParallelExecutor that copies overrides.
 
-      1. Only one unique thread (which can be any thread!) can call dspy.configure.
+      1. Only one unique thread (which can be any thread!) can call settings.configure.
       2. It affects a global state, visible to all. As a result, user threads work, but they shouldn't be
-         mixed with concurrent changes to dspy.configure from the "main" thread.
+         mixed with concurrent changes to settings.configure from the "main" thread.
          (TODO: In the future, add warnings: if there are near-in-time user-thread reads followed by .configure calls.)
-      3. Any thread can use dspy.context. It propagates to child threads created with DSPy primitives: Parallel, asyncify, etc.
+      3. Any thread can use settings.context. It propagates to child threads created with DSPy primitives: Parallel,
+         asyncify, etc.
     """
 
     _instance = None
@@ -124,9 +125,9 @@ class Settings:
 
         if config_owner_thread_id != current_thread_id:
             # Disallow a second `configure` calls from other threads.
-            raise RuntimeError("dspy.settings can only be changed by the thread that initially configured it.")
+            raise RuntimeError("settings can only be changed by the thread that initially configured it.")
 
-        # Async task doesn't allow a second `configure` call, must use dspy.context(...) instead.
+        # Async task doesn't allow a second `configure` call, must use settings.context(...) instead.
         is_async_task = False
         try:
             if asyncio.current_task() is not None:
@@ -158,50 +159,53 @@ class Settings:
 
         if not in_ipython and config_owner_async_task != asyncio.current_task():
             raise RuntimeError(
-                "dspy.configure(...) can only be called from the same async task that called it first. Please "
-                "use `dspy.context(...)` in other async tasks instead."
+                "settings.configure(...) can only be called from the same async task that called it first. Please "
+                "use `settings.context(...)` in other async tasks instead."
             )
 
     def configure(self, **kwargs):
         """Set the default language model, adapter, and other settings for DSPy.
 
-        Call `dspy.configure(...)` once near the top of your script. Every
+        Call `settings.configure(...)` once near the top of your script. Every
         DSPy module will use these defaults unless you override them with
-        `dspy.context(...)`. The values persist until you call
-        `dspy.configure(...)` again.
+        `settings.context(...)`. The values persist until you call
+        `settings.configure(...)` again.
 
-        Only the thread that first calls `dspy.configure(...)` may call it
-        again. Use `dspy.context(...)` for temporary overrides in other
+        Only the thread that first calls `settings.configure(...)` may call it
+        again. Use `settings.context(...)` for temporary overrides in other
         threads or async tasks.
 
         Args:
             **kwargs: Settings to update. Common keys include `lm` (a
-                `dspy.LM`), `adapter` (e.g. `dspy.JSONAdapter()`),
+                `dspy.clients.lm.LM`), `adapter` (e.g. `dspy.adapters.json_adapter.JSONAdapter()`),
                 `callbacks`, `track_usage`, `async_max_workers`, and
                 `num_threads`.
 
         Examples:
             Set a default LM:
             ```python
-            import dspy
+            from dspy.clients.lm import LM
+            from dspy.dsp.utils.settings import settings
 
-            dspy.configure(lm=dspy.LM("openai/gpt-5-mini"))
+            settings.configure(lm=LM("openai/gpt-5-mini"))
             ```
 
             Set multiple defaults at once:
             ```python
-            import dspy
+            from dspy.adapters.json_adapter import JSONAdapter
+            from dspy.clients.lm import LM
+            from dspy.dsp.utils.settings import settings
 
-            dspy.configure(
-                lm=dspy.LM("anthropic/claude-sonnet-4-6"),
-                adapter=dspy.JSONAdapter(),
+            settings.configure(
+                lm=LM("anthropic/claude-sonnet-4-6"),
+                adapter=JSONAdapter(),
                 track_usage=True,
             )
             ```
 
         See Also:
-            [`dspy.LM`][dspy.LM]: create the language model you pass as `lm`.
-            `dspy.context`: temporary overrides inside one block.
+            `dspy.clients.lm.LM`: create the language model you pass as `lm`.
+            `settings.context`: temporary overrides inside one block.
         """
         # If no exception is raised, the `configure` call is allowed.
         self._ensure_configure_allowed()
@@ -214,12 +218,12 @@ class Settings:
     def context(self, **kwargs):
         """Override DSPy settings for one `with` block.
 
-        Use `dspy.context(...)` when you need temporary settings—a different
+        Use `settings.context(...)` when you need temporary settings—a different
         LM, adapter, or flag—without changing the process-wide defaults from
-        `dspy.configure(...)`. The block inherits every current setting,
+        `settings.configure(...)`. The block inherits every current setting,
         overrides only the keys you pass, and restores the originals on exit.
 
-        Unlike `dspy.configure(...)`, you can call `dspy.context(...)` from
+        Unlike `settings.configure(...)`, you can call `settings.context(...)` from
         any thread or async task.
 
         Args:
@@ -229,19 +233,21 @@ class Settings:
         Examples:
             Use a different LM for one call:
             ```python
-            import dspy
+            from dspy.clients.lm import LM
+            from dspy.dsp.utils.settings import settings
+            from dspy.predict.predict import Predict
 
-            dspy.configure(lm=dspy.LM("openai/gpt-5-mini"))
-            qa = dspy.Predict("question -> answer")
+            settings.configure(lm=LM("openai/gpt-5-mini"))
+            qa = Predict("question -> answer")
 
-            with dspy.context(lm=dspy.LM("anthropic/claude-sonnet-4-6")):
+            with settings.context(lm=LM("anthropic/claude-sonnet-4-6")):
                 result = qa(question="What is the capital of France?")
                 # uses claude-sonnet-4-6 inside this block
             # back to gpt-5-mini here
             ```
 
         See Also:
-            `dspy.configure`: set process-wide defaults.
+            `settings.configure`: set process-wide defaults.
         """
         original_overrides = thread_local_overrides.get().copy()
         new_overrides = dotdict({**main_thread_config, **original_overrides, **kwargs})

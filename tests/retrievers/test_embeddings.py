@@ -2,8 +2,12 @@ import os
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
-import numpy as np
 import pytest
+
+try:
+    import numpy as np
+except ImportError:
+    pytest.skip("numpy is not installed", allow_module_level=True)
 
 from dspy.retrievers.embeddings import Embeddings, EmbeddingsWithScores
 

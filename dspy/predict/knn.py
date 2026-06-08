@@ -17,12 +17,13 @@ class KNN:
 
         Examples:
             ```python
-            import dspy
+            from dspy.clients.embedding import Embedder
+            from dspy.primitives.example import Example
             from sentence_transformers import SentenceTransformer
 
             # Create a training dataset with examples
             trainset = [
-                dspy.Example(input="hello", output="world"),
+                Example(input="hello", output="world"),
                 # ... more examples ...
             ]
 
@@ -30,7 +31,7 @@ class KNN:
             knn = KNN(
                 k=3,
                 trainset=trainset,
-                vectorizer=dspy.Embedder(SentenceTransformer("all-MiniLM-L6-v2").encode)
+                vectorizer=Embedder(SentenceTransformer("all-MiniLM-L6-v2").encode)
             )
 
             # Find similar examples

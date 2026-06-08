@@ -21,8 +21,8 @@ class Example:
     Examples:
         Build one from keyword arguments:
 
-        >>> import dspy
-        >>> example = dspy.Example(
+        >>> from dspy.primitives.example import Example
+        >>> example = Example(
         ...     question="What is the capital of France?",
         ...     answer="Paris",
         ... ).with_inputs("question")
@@ -36,7 +36,7 @@ class Example:
         Build one from an existing record:
 
         >>> record = {"question": "What is 2+2?", "answer": "4"}
-        >>> example = dspy.Example(**record).with_inputs("question")
+        >>> example = Example(**record).with_inputs("question")
         >>> example["question"]
         'What is 2+2?'
         >>> example.labels().answer
@@ -44,7 +44,7 @@ class Example:
 
         Mark which fields are inputs:
 
-        >>> example = dspy.Example(
+        >>> example = Example(
         ...     question="What is the weather?",
         ...     answer="It's sunny",
         ... ).with_inputs("question")
@@ -56,8 +56,8 @@ class Example:
         Use examples in a trainset:
 
         >>> trainset = [
-        ...     dspy.Example(question="What is 2+2?", answer="4").with_inputs("question"),
-        ...     dspy.Example(question="What is 3+3?", answer="6").with_inputs("question"),
+        ...     Example(question="What is 2+2?", answer="4").with_inputs("question"),
+        ...     Example(question="What is 3+3?", answer="6").with_inputs("question"),
         ... ]
         >>> trainset[0].inputs().toDict()
         {'question': 'What is 2+2?'}
@@ -66,21 +66,22 @@ class Example:
 
         >>> def exact_match_metric(example, pred, trace=None):
         ...     return example.answer.lower() == pred.answer.lower()
-        >>> gold = dspy.Example(question="What is 1+1?", answer="2").with_inputs("question")
-        >>> pred = dspy.Prediction(answer="2")
+        >>> from dspy.primitives.prediction import Prediction
+        >>> gold = Example(question="What is 1+1?", answer="2").with_inputs("question")
+        >>> pred = Prediction(answer="2")
         >>> exact_match_metric(gold, pred)
         True
 
         Use it like a dictionary:
 
-        >>> example = dspy.Example(name="Alice", age=30).with_inputs("name")
+        >>> example = Example(name="Alice", age=30).with_inputs("name")
         >>> "name" in example
         True
         >>> example.get("city", "Unknown")
         'Unknown'
 
     See Also:
-        [`dspy.Evaluate`][dspy.Evaluate]: Evaluate a program on a list of
+        `dspy.evaluate.evaluate.Evaluate`: Evaluate a program on a list of
             `Example`s.
         [`Metrics`](../../learn/evaluation/metrics.md): Write metric functions
             that compare an `Example` with a prediction.
@@ -92,7 +93,7 @@ class Example:
         """Create an `Example` from fields or from an existing record.
 
         In the common case, pass fields as keyword arguments, like
-        `dspy.Example(question="...", answer="...")`. Use `base` when you
+        `Example(question="...", answer="...")`. Use `base` when you
         already have a dictionary or another `Example` and want to copy its
         fields before adding or overriding a few values.
 
@@ -169,8 +170,8 @@ class Example:
                 with `dspy_`. Normally you can ignore these.
 
         Examples:
-            >>> import dspy
-            >>> dspy.Example(question="Why?", answer="Because.").keys()
+            >>> from dspy.primitives.example import Example
+            >>> Example(question="Why?", answer="Because.").keys()
             ['question', 'answer']
         """
         return [k for k in self._store.keys() if not k.startswith("dspy_") or include_dspy]
@@ -183,8 +184,8 @@ class Example:
                 with `dspy_`.
 
         Examples:
-            >>> import dspy
-            >>> dspy.Example(question="Why?", answer="Because.").values()
+            >>> from dspy.primitives.example import Example
+            >>> Example(question="Why?", answer="Because.").values()
             ['Why?', 'Because.']
         """
         return [v for k, v in self._store.items() if not k.startswith("dspy_") or include_dspy]
@@ -197,8 +198,8 @@ class Example:
                 with `dspy_`.
 
         Examples:
-            >>> import dspy
-            >>> dspy.Example(question="Why?", answer="Because.").items()
+            >>> from dspy.primitives.example import Example
+            >>> Example(question="Why?", answer="Because.").items()
             [('question', 'Why?'), ('answer', 'Because.')]
         """
         return [(k, v) for k, v in self._store.items() if not k.startswith("dspy_") or include_dspy]
@@ -211,8 +212,8 @@ class Example:
             default: Value to return when `key` is missing.
 
         Examples:
-            >>> import dspy
-            >>> ex = dspy.Example(name="Alice")
+            >>> from dspy.primitives.example import Example
+            >>> ex = Example(name="Alice")
             >>> ex.get("name")
             'Alice'
             >>> ex.get("city", "Unknown")
@@ -235,8 +236,8 @@ class Example:
             A copy of this `Example` with the input keys set.
 
         Examples:
-            >>> import dspy
-            >>> ex = dspy.Example(question="Why?", answer="Because.").with_inputs("question")
+            >>> from dspy.primitives.example import Example
+            >>> ex = Example(question="Why?", answer="Because.").with_inputs("question")
             >>> ex.inputs().keys()
             ['question']
             >>> ex.labels().keys()
@@ -255,8 +256,8 @@ class Example:
             ValueError: If `with_inputs` was not called on this example.
 
         Examples:
-            >>> import dspy
-            >>> ex = dspy.Example(question="Why?", answer="Because.").with_inputs("question")
+            >>> from dspy.primitives.example import Example
+            >>> ex = Example(question="Why?", answer="Because.").with_inputs("question")
             >>> ex.inputs()
             Example({'question': 'Why?'}) (input_keys={'question'})
         """
@@ -277,8 +278,8 @@ class Example:
         everything that is *not* an input.
 
         Examples:
-            >>> import dspy
-            >>> ex = dspy.Example(question="Why?", answer="Because.").with_inputs("question")
+            >>> from dspy.primitives.example import Example
+            >>> ex = Example(question="Why?", answer="Because.").with_inputs("question")
             >>> ex.labels()
             Example({'answer': 'Because.'}) (input_keys=None)
         """
@@ -297,8 +298,8 @@ class Example:
             **kwargs: Fields to add or override in the copy.
 
         Examples:
-            >>> import dspy
-            >>> ex = dspy.Example(question="Why?", answer="Because.")
+            >>> from dspy.primitives.example import Example
+            >>> ex = Example(question="Why?", answer="Because.")
             >>> ex.copy(answer="No reason.")
             Example({'question': 'Why?', 'answer': 'No reason.'}) (input_keys=None)
         """
@@ -311,8 +312,8 @@ class Example:
             *keys: Field names to drop.
 
         Examples:
-            >>> import dspy
-            >>> ex = dspy.Example(question="Why?", answer="Because.", source="web")
+            >>> from dspy.primitives.example import Example
+            >>> ex = Example(question="Why?", answer="Because.", source="web")
             >>> ex.without("source")
             Example({'question': 'Why?', 'answer': 'Because.'}) (input_keys=None)
         """
@@ -328,15 +329,15 @@ class Example:
         converted so the result is JSON-friendly.
 
         Examples:
-            >>> import dspy
-            >>> dspy.Example(question="Why?", answer="Because.").toDict()
+            >>> from dspy.primitives.example import Example
+            >>> Example(question="Why?", answer="Because.").toDict()
             {'question': 'Why?', 'answer': 'Because.'}
         """
         def convert_to_serializable(value):
             if hasattr(value, "toDict"):
                 return value.toDict()
             elif isinstance(value, BaseModel):
-                # Handle Pydantic models (e.g., dspy.History)
+                # Handle Pydantic models (e.g., History)
                 return value.model_dump()
             elif isinstance(value, list):
                 return [convert_to_serializable(item) for item in value]

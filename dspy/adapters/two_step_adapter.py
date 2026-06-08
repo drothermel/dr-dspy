@@ -30,11 +30,15 @@ class TwoStepAdapter(Adapter):
 
     Examples:
     ```
-    import dspy
-    lm = dspy.LM(model="openai/o3-mini", max_tokens=16000, temperature = 1.0)
-    adapter = dspy.TwoStepAdapter(dspy.LM("openai/gpt-4o-mini"))
-    dspy.configure(lm=lm, adapter=adapter)
-    program = dspy.ChainOfThought("question->answer")
+    from dspy.adapters.two_step_adapter import TwoStepAdapter
+    from dspy.clients.lm import LM
+    from dspy.dsp.utils.settings import settings
+    from dspy.predict.chain_of_thought import ChainOfThought
+
+    lm = LM(model="openai/o3-mini", max_tokens=16000, temperature = 1.0)
+    adapter = TwoStepAdapter(LM("openai/gpt-4o-mini"))
+    settings.configure(lm=lm, adapter=adapter)
+    program = ChainOfThought("question->answer")
     result = program("What is the capital of France?")
     print(result)
     ```
@@ -43,7 +47,7 @@ class TwoStepAdapter(Adapter):
     def __init__(self, extraction_model: BaseLM, **kwargs):
         super().__init__(**kwargs)
         if not isinstance(extraction_model, BaseLM):
-            raise ValueError("extraction_model must be an instance of dspy.BaseLM")
+            raise ValueError("extraction_model must be an instance of dspy.clients.base_lm.BaseLM")
         self.extraction_model = extraction_model
 
     def format(

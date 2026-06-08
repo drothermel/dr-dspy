@@ -1,4 +1,5 @@
 import asyncio
+import importlib.util
 from typing import Any
 
 import pytest
@@ -9,6 +10,11 @@ from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls, convert_i
 from dspy.clients.openai_format import to_openai_chat_request
 from dspy.core.types import LMMessage, LMRequest, LMToolResultPart
 from dspy.dsp.utils.settings import settings
+
+requires_jsonschema = pytest.mark.skipif(
+    importlib.util.find_spec("jsonschema") is None,
+    reason="jsonschema is not installed",
+)
 
 
 # Test fixtures
@@ -196,12 +202,14 @@ def test_tool_from_function_with_pydantic_nesting():
     assert tool.args["notes"]["anyOf"][0]["items"]["properties"]["author"]["type"] == "string"
 
 
+@requires_jsonschema
 def test_tool_callable():
     tool = Tool(dummy_function)
     result = tool(x=42, y="hello")
     assert result == "hello 42"
 
 
+@requires_jsonschema
 def test_tool_with_pydantic_callable():
     tool = Tool(dummy_with_pydantic)
     model = DummyModel(field1="test", field2=123)
@@ -209,6 +217,7 @@ def test_tool_with_pydantic_callable():
     assert result == "test 123"
 
 
+@requires_jsonschema
 def test_invalid_function_call():
     tool = Tool(dummy_function)
     with pytest.raises(ValueError):
@@ -229,6 +238,7 @@ def test_tool_with_default_args_without_type_hints():
     assert not hasattr(tool.args["x"], "type")
 
 
+@requires_jsonschema
 def test_tool_call_parses_args():
     tool = Tool(dummy_with_pydantic)
 
@@ -243,6 +253,7 @@ def test_tool_call_parses_args():
     assert result == "hello 123"
 
 
+@requires_jsonschema
 def test_tool_call_parses_nested_list_of_pydantic_model():
     def dummy_function(x: list[list[DummyModel]]):
         return x
@@ -263,6 +274,7 @@ def test_tool_call_parses_nested_list_of_pydantic_model():
     assert result == [[DummyModel(field1="hello", field2=123)]]
 
 
+@requires_jsonschema
 def test_tool_call_kwarg():
     def fn(x: int, **kwargs):
         return kwargs
@@ -284,6 +296,7 @@ def test_tool_str():
     )
 
 
+@requires_jsonschema
 @pytest.mark.asyncio
 async def test_async_tool_from_function():
     tool = Tool(async_dummy_function)
@@ -301,6 +314,7 @@ async def test_async_tool_from_function():
     assert result == "hello 42"
 
 
+@requires_jsonschema
 @pytest.mark.asyncio
 async def test_async_tool_with_pydantic():
     tool = Tool(async_dummy_with_pydantic)
@@ -321,6 +335,7 @@ async def test_async_tool_with_pydantic():
     assert result == "test 123"
 
 
+@requires_jsonschema
 @pytest.mark.asyncio
 async def test_async_tool_with_complex_pydantic():
     tool = Tool(async_complex_dummy_function)
@@ -345,6 +360,7 @@ async def test_async_tool_with_complex_pydantic():
     assert result["primary_address"]["street"] == "123 Main St"
 
 
+@requires_jsonschema
 @pytest.mark.asyncio
 async def test_async_tool_invalid_call():
     tool = Tool(async_dummy_function)
@@ -352,6 +368,7 @@ async def test_async_tool_invalid_call():
         await tool.acall(x="not an integer", y="hello")
 
 
+@requires_jsonschema
 @pytest.mark.asyncio
 async def test_async_tool_with_kwargs():
     async def fn(x: int, **kwargs):
@@ -363,6 +380,7 @@ async def test_async_tool_with_kwargs():
     assert result == {"y": 2, "z": 3}
 
 
+@requires_jsonschema
 @pytest.mark.asyncio
 async def test_async_concurrent_calls():
     """Test that multiple async tools can run concurrently."""
@@ -384,6 +402,7 @@ async def test_async_concurrent_calls():
     assert end_time - start_time < 0.3
 
 
+@requires_jsonschema
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_async_tool_call_in_sync_mode():
     tool = Tool(async_dummy_function)
@@ -690,6 +709,7 @@ def test_tool_convert_input_schema_to_tool_args_lang_chain():
 
 
 
+@requires_jsonschema
 def test_tool_call_execute():
     def get_weather(city: str) -> str:
         return f"The weather in {city} is sunny"
@@ -726,6 +746,7 @@ def test_tool_call_execute():
     assert "not found" in str(exc_info.value)
 
 
+@requires_jsonschema
 def test_tool_call_execute_with_local_functions():
     def main():
         def local_add(a: int, b: int) -> int:

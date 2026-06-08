@@ -10,7 +10,7 @@ np = require("numpy")
 
 
 def _get_litellm():
-    return get_litellm(feature="dspy.Embedder")
+    return get_litellm(feature="dspy.clients.embedding.Embedder")
 
 
 class Embedder:
@@ -43,9 +43,9 @@ class Embedder:
         Example 1: Using a hosted model.
 
         ```python
-        import dspy
+        from dspy.clients.embedding import Embedder
 
-        embedder = dspy.Embedder("openai/text-embedding-3-small", batch_size=100)
+        embedder = Embedder("openai/text-embedding-3-small", batch_size=100)
         embeddings = embedder(["hello", "world"])
 
         assert embeddings.shape == (2, 1536)
@@ -55,13 +55,13 @@ class Embedder:
 
         ```python
         # pip install sentence_transformers
-        import dspy
+        from dspy.clients.embedding import Embedder
         from sentence_transformers import SentenceTransformer
 
         # Load an extremely efficient local model for retrieval
         model = SentenceTransformer("sentence-transformers/static-retrieval-mrl-en-v1", device="cpu")
 
-        embedder = dspy.Embedder(model.encode)
+        embedder = Embedder(model.encode)
         embeddings = embedder(["hello", "world"], batch_size=1)
 
         assert embeddings.shape == (2, 1024)
@@ -70,13 +70,13 @@ class Embedder:
         Example 3: Using a custom function.
 
         ```python
-        import dspy
         import numpy as np
+        from dspy.clients.embedding import Embedder
 
         def my_embedder(texts):
             return np.random.rand(len(texts), 10)
 
-        embedder = dspy.Embedder(my_embedder)
+        embedder = Embedder(my_embedder)
         embeddings = embedder(["hello", "world"], batch_size=1)
 
         assert embeddings.shape == (2, 10)
@@ -162,7 +162,9 @@ def _compute_embeddings(model, batch_inputs, caching=False, **kwargs):
     elif callable(model):
         return model(batch_inputs, **kwargs)
     else:
-        raise ValueError(f"`model` in `dspy.Embedder` must be a string or a callable, but got {type(model)}.")
+        raise ValueError(
+            f"`model` in `dspy.clients.embedding.Embedder` must be a string or a callable, but got {type(model)}."
+        )
 
 
 @request_cache(ignored_args_for_cache_key=["api_key", "api_base", "base_url"])
@@ -178,7 +180,9 @@ async def _acompute_embeddings(model, batch_inputs, caching=False, **kwargs):
     elif callable(model):
         return model(batch_inputs, **kwargs)
     else:
-        raise ValueError(f"`model` in `dspy.Embedder` must be a string or a callable, but got {type(model)}.")
+        raise ValueError(
+            f"`model` in `dspy.clients.embedding.Embedder` must be a string or a callable, but got {type(model)}."
+        )
 
 
 @request_cache(ignored_args_for_cache_key=["api_key", "api_base", "base_url"])

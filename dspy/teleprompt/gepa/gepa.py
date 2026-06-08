@@ -48,7 +48,7 @@ class GEPAFeedbackMetric(Protocol):
         Note the `pred_name` and `pred_trace` arguments. During optimization, GEPA will call the metric to obtain
         feedback for individual predictors being optimized. GEPA provides the name of the predictor in `pred_name`
         and the sub-trace (of the trace) corresponding to the predictor in `pred_trace`.
-        If available at the predictor level, the metric should return dspy.Prediction(score: float, feedback: str)
+        If available at the predictor level, the metric should return Prediction(score: float, feedback: str)
         corresponding to the predictor.
         If not available at the predictor level, the metric can also return a text feedback at the program level
         (using just the gold, pred and trace).
@@ -205,7 +205,7 @@ class GEPA(Teleprompter):
     Examples:
     ```
     gepa = GEPA(metric=metric, track_stats=True)
-    batch_of_tasks = [dspy.Example(...) for task in tasks]
+    batch_of_tasks = [Example(...) for task in tasks]
     new_prog = gepa.compile(student, trainset=trainset, valset=batch_of_tasks)
     pareto_frontier = new_prog.detailed_results.val_aggregate_scores
     # pareto_frontier is a list of scores, one for each task in the batch.
@@ -221,7 +221,8 @@ class GEPA(Teleprompter):
             which stochastically selects candidates from the Pareto frontier of all validation scores.
             Options: "pareto", "current_best".
         reflection_lm: The language model to use for reflection. Required parameter. GEPA benefits from
-            a strong reflection model. Consider using `dspy.LM(model='gpt-5', temperature=1.0, max_tokens=32000)`
+            a strong reflection model. Consider using
+            `from dspy.clients.lm import LM; LM(model='gpt-5', temperature=1.0, max_tokens=32000)`
             for optimal performance.
         skip_perfect_score: Whether to skip examples with perfect scores during reflection. Default is True.
         instruction_proposer: Optional custom instruction proposer implementing GEPA's ProposalFn protocol.
@@ -235,7 +236,7 @@ class GEPA(Teleprompter):
             [here](https://dspy.ai/api/optimizers/GEPA/GEPA_Advanced/#custom-instruction-proposers).
 
             **Advanced Feature**: Only needed for specialized scenarios:
-            - **Multi-modal handling**: Processing dspy.Image inputs alongside textual information
+            - **Multi-modal handling**: Processing Image inputs alongside textual information
             - **Nuanced control over constraints**: Fine-grained control over instruction length, format,
               and structural requirements beyond standard feedback mechanisms
             - **Domain-specific knowledge injection**: Specialized terminology or context that cannot be
@@ -319,7 +320,8 @@ class GEPA(Teleprompter):
         balanced optimization, and "heavy" for thorough optimization.
 
         Reflection Configuration: The `reflection_lm` parameter is required and should be a strong language model.
-        GEPA performs best with models like `dspy.LM(model='gpt-5', temperature=1.0, max_tokens=32000)`.
+        GEPA performs best with models like
+        `from dspy.clients.lm import LM; LM(model='gpt-5', temperature=1.0, max_tokens=32000)`.
         The reflection process analyzes failed examples to generate feedback for program improvement.
 
         Merge Configuration: GEPA can merge successful program variants using `use_merge=True`.
@@ -399,7 +401,8 @@ class GEPA(Teleprompter):
 
         assert reflection_lm is not None or instruction_proposer is not None, (
             "GEPA requires a reflection language model, or custom instruction proposer to be provided. "
-            "Typically, you can use `dspy.LM(model='gpt-5', temperature=1.0, max_tokens=32000)` to get a good reflection model. "
+            "Typically, you can use `from dspy.clients.lm import LM; "
+            "LM(model='gpt-5', temperature=1.0, max_tokens=32000)` to get a good reflection model. "
             "Reflection LM is used by GEPA to reflect on the behavior of the program and propose new instructions, and will benefit from a strong model. "
         )
 

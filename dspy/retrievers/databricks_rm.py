@@ -227,7 +227,7 @@ class DatabricksRM(Retrieve):
 
         Returns:
             A list of dictionaries when ``use_with_databricks_agent_framework`` is ``True``,
-            or a ``dspy.Prediction`` object when ``use_with_databricks_agent_framework`` is
+            or a ``dspy.primitives.prediction.Prediction`` object when ``use_with_databricks_agent_framework`` is
             ``False``.
         """
         if query_type in ["vector", "text"]:

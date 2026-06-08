@@ -133,7 +133,8 @@ class DataLoader(Dataset):
                 )
         except AttributeError:
             raise ValueError(
-                "Retrieval module not found. Please set a retrieval module using `dspy.configure`."
+                "Retrieval module not found. Please set a retrieval module using "
+                "`from dspy.dsp.utils.settings import settings; settings.configure(rm=...)`."
             )
 
     def sample(
@@ -145,7 +146,8 @@ class DataLoader(Dataset):
     ) -> list[Example]:
         if not isinstance(dataset, list):
             raise ValueError(
-                f"Invalid dataset provided of type {type(dataset)}. Please provide a list of `dspy.Example`s."
+                f"Invalid dataset provided of type {type(dataset)}. Please provide a list of "
+                "`dspy.primitives.example.Example`s."
             )
 
         return random.sample(dataset, n, *args, **kwargs)

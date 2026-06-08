@@ -46,7 +46,7 @@ def test_lm_litellm_use_raises_helpful_error_without_litellm(monkeypatch):
 
     msg = str(exc_info.value)
     assert "[litellm]" in msg
-    assert "dspy.LM" in msg
+    assert "dspy.clients.lm.LM" in msg
 
 
 def test_embedder_litellm_use_raises_helpful_error_without_litellm(monkeypatch):
@@ -58,10 +58,12 @@ def test_embedder_litellm_use_raises_helpful_error_without_litellm(monkeypatch):
 
     msg = str(exc_info.value)
     assert "[litellm]" in msg
-    assert "dspy.Embedder" in msg
+    assert "dspy.clients.embedding.Embedder" in msg
 
 
 def test_concurrent_lm_first_use_materializes_litellm_once():
+    pytest.importorskip("litellm")
+
     from dspy.clients._litellm import get_litellm
 
     original_litellm = sys.modules.pop("litellm", None)

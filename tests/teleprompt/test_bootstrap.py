@@ -39,7 +39,7 @@ class SimpleModule(Module):
 
 def test_compile_with_predict_instances():
     # Create Predict instances for student and teacher
-    # Note that dspy.Predict is not itself a module, so we can't use it directly here
+    # Note that Predict is not itself a module, so we can't use it directly here
     student = SimpleModule("input -> output")
     teacher = SimpleModule("input -> output")
 

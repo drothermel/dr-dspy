@@ -7,11 +7,19 @@ import sys
 from dataclasses import dataclass
 
 import diskcache
-import numpy as np
 import pydantic
 import pytest
-from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
-from litellm.types.utils import EmbeddingResponse, ModelResponse, TextCompletionResponse
+
+try:
+    import numpy as np
+except ImportError:
+    pytest.skip("numpy is not installed", allow_module_level=True)
+
+try:
+    from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
+    from litellm.types.utils import EmbeddingResponse, ModelResponse, TextCompletionResponse
+except ImportError:
+    pytest.skip("litellm is not installed", allow_module_level=True)
 from openai.types.responses import ResponseFunctionToolCall, ResponseOutputMessage, ResponseOutputText
 
 from dspy.clients.disk_serialization import (

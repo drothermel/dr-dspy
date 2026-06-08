@@ -4,7 +4,11 @@ from unittest import mock
 
 import pydantic
 import pytest
-from litellm import Choices, Message, ModelResponse
+
+try:
+    from litellm import Choices, Message, ModelResponse
+except ImportError:
+    pytest.skip("litellm is not installed", allow_module_level=True)
 
 from dspy.adapters.chat_adapter import FieldInfoWithName
 from dspy.adapters.types.code import Code

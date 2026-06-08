@@ -142,7 +142,7 @@ class LMBinaryPart(LMSourcePart):
 class LMToolCallPart(LMBasePart):
     """A model request to call a tool.
 
-    Use `dspy.ToolCall(...)` as a shorter public alias when constructing
+    Use `ToolCall(...)` as a shorter alias when constructing
     assistant messages by hand.
 
     Args:
@@ -153,10 +153,10 @@ class LMToolCallPart(LMBasePart):
 
     Examples:
         ```python
-        import dspy
+        from dspy.core.types import Assistant, ToolCall
 
-        assistant = dspy.Assistant(
-            dspy.ToolCall(
+        assistant = Assistant(
+            ToolCall(
                 id="call_1",
                 name="search",
                 args={"query": "DSPy"},
@@ -404,7 +404,7 @@ def _config_data(value: Any, *, str_field: str | None = None, bool_field: str | 
     raise TypeError(f"Cannot convert {type(value)!r} to a config object.")
 
 
-# Keep existing `dspy.LM(...)` / `lm(...)` keyword aliases in the call compatibility path.
+# Keep existing `LM(...)` / `lm(...)` keyword aliases in the call compatibility path.
 _KNOWN_CONFIG_KEYS = {
     "temperature",
     "max_tokens",
@@ -1295,27 +1295,27 @@ def System(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None
         metadata: Extra information to keep with the message.
 
     Returns:
-        An `LMMessage` that can be passed to `dspy.LM` or `dspy.LMRequest`.
+        An `LMMessage` that can be passed to `dspy.clients.lm.LM` or `LMRequest`.
 
     Examples:
         System instruction with a user turn:
 
         ```python
-        import dspy
+        from dspy.core.types import LMRequest, System, User
 
-        request = dspy.LMRequest.from_call(
+        request = LMRequest.from_call(
             model="openai/gpt-4o-mini",
             items=(
-                dspy.System("You are concise."),
-                dspy.User("What is DSPy?"),
+                System("You are concise."),
+                User("What is DSPy?"),
             ),
         )
         ```
 
     See Also:
-        [`dspy.User`][dspy.User]
-        [`dspy.Assistant`][dspy.Assistant]
-        [`dspy.LMRequest`][dspy.LMRequest]
+        `User`
+        `Assistant`
+        `LMRequest`
     """
     return LMMessage(role="system", parts=[_coerce_part(part) for part in parts], name=name, metadata=metadata or {})
 
@@ -1339,14 +1339,14 @@ def Developer(*parts: Any, name: str | None = None, metadata: dict[str, Any] | N
         Add house-style instructions:
 
         ```python
-        import dspy
+        from dspy.core.types import Developer, LMRequest, System, User
 
-        request = dspy.LMRequest.from_call(
+        request = LMRequest.from_call(
             model="openai/gpt-4o-mini",
             items=(
-                dspy.System("You are a technical editor."),
-                dspy.Developer("Prefer short examples."),
-                dspy.User("Explain callbacks."),
+                System("You are a technical editor."),
+                Developer("Prefer short examples."),
+                User("Explain callbacks."),
             ),
         )
         ```
@@ -1377,28 +1377,31 @@ def User(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None =
         Multi-turn LM call:
 
         ```python
-        import dspy
+        from dspy.clients.lm import LM
+        from dspy.core.types import Assistant, User
+        from dspy.dsp.utils.settings import settings
 
-        lm = dspy.LM("openai/gpt-4o-mini")
-        with dspy.context(experimental=True):
+        lm = LM("openai/gpt-4o-mini")
+        with settings.context(experimental=True):
             response = lm(
-                dspy.User("What is DSPy?"),
-                dspy.Assistant("DSPy is a framework for programming LM pipelines."),
-                dspy.User("Say that in five words."),
+                User("What is DSPy?"),
+                Assistant("DSPy is a framework for programming LM pipelines."),
+                User("Say that in five words."),
             )
         ```
 
         Multi-turn call with media:
 
         ```python
-        import dspy
-        from dspy.core.types import LMImagePart
+        from dspy.clients.lm import LM
+        from dspy.core.types import LMImagePart, System, User
+        from dspy.dsp.utils.settings import settings
 
-        lm = dspy.LM("openai/gpt-4o-mini")
-        with dspy.context(experimental=True):
+        lm = LM("openai/gpt-4o-mini")
+        with settings.context(experimental=True):
             response = lm(
-                dspy.System("Answer in one sentence."),
-                dspy.User(
+                System("Answer in one sentence."),
+                User(
                     "Describe this image.",
                     LMImagePart(url="https://example.com/dog.png"),
                 ),
@@ -1408,27 +1411,27 @@ def User(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None =
         For a single user turn, pass the parts directly to `lm(...)` instead:
 
         ```python
-        with dspy.context(experimental=True):
+        with settings.context(experimental=True):
             response = lm("Describe this image.", LMImagePart(url="https://example.com/dog.png"))
         ```
 
         Explicit `LMRequest` for custom LM authors and advanced users:
 
         ```python
-        import dspy
-        from dspy.core.types import LMImagePart
+        from dspy.clients.lm import LM
+        from dspy.core.types import LMConfig, LMImagePart, LMRequest, System, User
 
-        lm = dspy.LM("openai/gpt-4o-mini")
-        request = dspy.LMRequest(
+        lm = LM("openai/gpt-4o-mini")
+        request = LMRequest(
             model="openai/gpt-4o-mini",
             messages=[
-                dspy.System("You are concise."),
-                dspy.User(
+                System("You are concise."),
+                User(
                     "Describe this image.",
                     LMImagePart(url="https://example.com/dog.png"),
                 ),
             ],
-            config=dspy.LMConfig(temperature=0.2, max_tokens=200),
+            config=LMConfig(temperature=0.2, max_tokens=200),
         )
 
         response = lm(request)
@@ -1462,14 +1465,14 @@ def Assistant(*parts: Any, name: str | None = None, metadata: dict[str, Any] | N
         Continue a conversation:
 
         ```python
-        import dspy
+        from dspy.core.types import Assistant, LMRequest, User
 
-        request = dspy.LMRequest.from_call(
+        request = LMRequest.from_call(
             model="openai/gpt-4o-mini",
             items=(
-                dspy.User("What is DSPy?"),
-                dspy.Assistant("DSPy is a framework for programming LM pipelines."),
-                dspy.User("Say that in five words."),
+                User("What is DSPy?"),
+                Assistant("DSPy is a framework for programming LM pipelines."),
+                User("Say that in five words."),
             ),
         )
         ```
@@ -1485,7 +1488,7 @@ def Assistant(*parts: Any, name: str | None = None, metadata: dict[str, Any] | N
 ToolCall = LMToolCallPart
 """Create a tool-call part for an assistant message.
 
-`ToolCall` is an alias for `LMToolCallPart`. Use it inside `dspy.Assistant(...)`
+`ToolCall` is an alias for `LMToolCallPart`. Use it inside `Assistant(...)`
 when you want to include a model-requested tool call in a normalized
 conversation.
 """
@@ -1521,30 +1524,30 @@ def ToolResult(  # noqa: N802
         Send a weather result back to the model:
 
         ```python
-        import dspy
+        from dspy.core.types import Assistant, ToolCall, ToolResult, User
 
         messages = [
-            dspy.User("What is the weather in Paris?"),
-            dspy.Assistant(
-                dspy.ToolCall(
+            User("What is the weather in Paris?"),
+            Assistant(
+                ToolCall(
                     id="call_1",
                     name="get_weather",
                     args={"location": "Paris"},
                 )
             ),
-            dspy.ToolResult(
+            ToolResult(
                 '{"temperature": "22", "unit": "celsius"}',
                 call_id="call_1",
                 name="get_weather",
             ),
-            dspy.User("Summarize the result."),
+            User("Summarize the result."),
         ]
         ```
 
     See Also:
         [`dspy.ToolCall`][dspy.ToolCall]
         [`dspy.Assistant`][dspy.Assistant]
-        [`dspy.Tool`][dspy.Tool]
+        `dspy.adapters.types.tool.Tool`
     """
     if content is not None:
         if parts:

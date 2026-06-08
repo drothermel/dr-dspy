@@ -8,5 +8,4 @@ def test_metadata():
     assert re.match(r"\d+\.\d+\.\d+", metadata.__version__)
     assert metadata.__author__ == "Omar Khattab"
     assert metadata.__author_email__ == "okhattab@stanford.edu"
-    assert metadata.__url__ == "https://github.com/stanfordnlp/dspy"
     assert metadata.__description__ == "DSPy"

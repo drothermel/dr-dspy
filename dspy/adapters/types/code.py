@@ -12,43 +12,53 @@ class Code(Type):
 
     This type is useful for code generation and code analysis.
 
-    Example 1: dspy.Code as output type in code generation:
+    Example 1: `Code` as output type in code generation:
 
     ```python
-    import dspy
+    from dspy.adapters.types.code import Code
+    from dspy.clients.lm import LM
+    from dspy.dsp.utils.settings import settings
+    from dspy.predict.predict import Predict
+    from dspy.signatures.field import InputField, OutputField
+    from dspy.signatures.signature import Signature
 
-    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
+    settings.configure(lm=LM("openai/gpt-4o-mini"))
 
 
-    class CodeGeneration(dspy.Signature):
+    class CodeGeneration(Signature):
         '''Generate python code to answer the question.'''
 
-        question: str = dspy.InputField(description="The question to answer")
-        code: dspy.Code["java"] = dspy.OutputField(description="The code to execute")
+        question: str = InputField(description="The question to answer")
+        code: Code["java"] = OutputField(description="The code to execute")
 
 
-    predict = dspy.Predict(CodeGeneration)
+    predict = Predict(CodeGeneration)
 
     result = predict(question="Given an array, find if any of the two numbers sum up to 10")
     print(result.code)
     ```
 
-    Example 2: dspy.Code as input type in code analysis:
+    Example 2: `Code` as input type in code analysis:
 
     ```python
-    import dspy
     import inspect
+    from dspy.adapters.types.code import Code
+    from dspy.clients.lm import LM
+    from dspy.dsp.utils.settings import settings
+    from dspy.predict.predict import Predict
+    from dspy.signatures.field import InputField, OutputField
+    from dspy.signatures.signature import Signature
 
-    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
+    settings.configure(lm=LM("openai/gpt-4o-mini"))
 
-    class CodeAnalysis(dspy.Signature):
+    class CodeAnalysis(Signature):
         '''Analyze the time complexity of the function.'''
 
-        code: dspy.Code["python"] = dspy.InputField(description="The function to analyze")
-        result: str = dspy.OutputField(description="The time complexity of the function")
+        code: Code["python"] = InputField(description="The function to analyze")
+        result: str = OutputField(description="The time complexity of the function")
 
 
-    predict = dspy.Predict(CodeAnalysis)
+    predict = Predict(CodeAnalysis)
 
 
     def sleepsort(x):
@@ -94,12 +104,12 @@ class Code(Type):
 
         if isinstance(data, dict):
             if "code" not in data:
-                raise ValueError("`code` field is required for `dspy.Code`")
+                raise ValueError("`code` field is required for `dspy.adapters.types.code.Code`")
             if not isinstance(data["code"], str):
                 raise ValueError(f"`code` field must be a string, but received type: {type(data['code'])}")
             return {"code": _filter_code(data["code"])}
 
-        raise ValueError(f"Received invalid value for `dspy.Code`: {data}")
+        raise ValueError(f"Received invalid value for `dspy.adapters.types.code.Code`: {data}")
 
 
 def _filter_code(code: str) -> str:
@@ -121,7 +131,7 @@ def _filter_code(code: str) -> str:
     return code
 
 
-# Patch __class_getitem__ directly on the class to support dspy.Code["python"] syntax
+# Patch __class_getitem__ directly on the class to support Code["python"] syntax.
 def _code_class_getitem(cls, language):
     code_with_language_cls = create_model(f"{cls.__name__}_{language}", __base__=cls)
     code_with_language_cls.language = language

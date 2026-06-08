@@ -5,8 +5,12 @@ import threading
 from unittest.mock import patch
 
 import pytest
-from litellm import Choices, Message, ModelResponse
-from litellm.types.utils import Usage
+
+try:
+    from litellm import Choices, Message, ModelResponse
+    from litellm.types.utils import Usage
+except ImportError:
+    pytest.skip("litellm is not installed", allow_module_level=True)
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
@@ -147,11 +151,13 @@ def test_save_with_extra_modules(tmp_path):
     custom_module_path = tmp_path / "custom_module.py"
     with open(custom_module_path, "w") as f:
         f.write("""
-import dspy
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.primitives.module import Module
+from dspy.signatures.signature import Signature
 
-class MyModule(dspy.Module):
+class MyModule(Module):
     def __init__(self):
-        self.cot = dspy.ChainOfThought(dspy.Signature("q -> a"))
+        self.cot = ChainOfThought(Signature("q -> a"))
 
     def forward(self, q):
         return self.cot(q=q)

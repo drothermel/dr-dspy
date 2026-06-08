@@ -5,7 +5,11 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest import mock
 
 import pytest
-from litellm import Choices, Message, ModelResponse
+
+try:
+    from litellm import Choices, Message, ModelResponse
+except ImportError:
+    pytest.skip("litellm is not installed", allow_module_level=True)
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
@@ -27,7 +31,7 @@ def test_forbid_configure_call_in_child_thread():
     settings.configure(lm=LM("openai/gpt-4o"), adapter=JSONAdapter(), callbacks=[lambda x: x])
 
     def worker():
-        with pytest.raises(RuntimeError, match="Cannot call dspy.configure"):
+        with pytest.raises(RuntimeError, match="settings can only be changed"):
             settings.configure(lm=LM("openai/gpt-4o-mini"), callbacks=[])
 
     with ThreadPoolExecutor(max_workers=1) as executor:
@@ -163,25 +167,25 @@ async def test_dspy_context_with_async_task_group():
 @pytest.mark.asyncio
 async def test_dspy_configure_allowance_async():
     def bar1():
-        # `dspy.configure` is disallowed in different async tasks from the initial one.
+        # `settings.configure` is disallowed in different async tasks from the initial one.
         # In this case, foo1 (async) calls bar1 (sync), and bar1 uses the async task from foo1.
         with pytest.raises(RuntimeError) as e:
             settings.configure(lm=LM("openai/gpt-4o"))
-        assert "dspy.configure(...) can only be called from the same async" in str(e.value)
+        assert "settings.configure(...) can only be called from the same async" in str(e.value)
 
     async def foo1():
         bar1()
         await asyncio.sleep(0.1)
 
     async def foo2():
-        # `dspy.configure` is disallowed in different async tasks from the initial one.
+        # `settings.configure` is disallowed in different async tasks from the initial one.
         with pytest.raises(RuntimeError) as e:
             settings.configure(lm=LM("openai/gpt-4o"))
-        assert "dspy.configure(...) can only be called from the same async" in str(e.value)
+        assert "settings.configure(...) can only be called from the same async" in str(e.value)
         await asyncio.sleep(0.1)
 
     async def foo3():
-        # `dspy.context` is allowed in different async tasks from the initial one.
+        # `settings.context` is allowed in different async tasks from the initial one.
         with settings.context(lm=LM("openai/gpt-4o")):
             await asyncio.sleep(0.1)
 
@@ -190,7 +194,7 @@ async def test_dspy_configure_allowance_async():
         settings.configure(lm=LM("openai/gpt-4o"))
         await asyncio.sleep(0.1)
 
-    # `dspy.configure` is allowed to be called multiple times in the same async task.
+    # `settings.configure` is allowed to be called multiple times in the same async task.
     settings.configure(lm=LM("openai/gpt-4o-mini"))
     settings.configure(lm=LM("openai/gpt-4o"))
     settings.configure(adapter=JSONAdapter())

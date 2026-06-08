@@ -54,7 +54,7 @@ class GenerateEnhancedMultimodalInstructionFromFeedback(Signature):
 
 class SingleComponentMultiModalProposer(Module):
     """
-    dspy.Module for proposing improved instructions based on feedback.
+    Module for proposing improved instructions based on feedback.
     """
 
     def __init__(self):
@@ -68,7 +68,7 @@ class SingleComponentMultiModalProposer(Module):
         Args:
             current_instruction: The current instruction that needs improvement
             reflective_dataset: List of examples with inputs, outputs, and feedback
-                               May contain dspy.Image objects in inputs
+                               May contain Image objects in inputs
 
         Returns:
             str: Improved instruction text
@@ -275,7 +275,7 @@ class SingleComponentMultiModalProposer(Module):
 class MultiModalInstructionProposer(ProposalFn):
     """GEPA-compatible multimodal instruction proposer.
 
-    This class handles multimodal inputs (like dspy.Image) during GEPA optimization by using
+    This class handles multimodal inputs (like Image) during GEPA optimization by using
     a single-component proposer for each component that needs to be updated.
     """
 

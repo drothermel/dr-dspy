@@ -33,9 +33,12 @@ class WeaviateRM(Retrieve):
         llm = dspy.Cohere(model="command-r-plus", api_key=api_key)
         weaviate_client = weaviate.connect_to_[local, wcs, custom, embedded]("your-path-here")
         retriever_model = WeaviateRM("my_collection_name", weaviate_client=weaviate_client)
-        dspy.configure(lm=llm, rm=retriever_model)
+        from dspy.dsp.utils.settings import settings
+        from dspy.retrievers.retrieve import Retrieve
 
-        retrieve = dspy.Retrieve(k=1)
+        settings.configure(lm=llm, rm=retriever_model)
+
+        retrieve = Retrieve(k=1)
         topK_passages = retrieve("what are the stages in planning, sanctioning and execution of public works").passages
         ```
 
@@ -78,7 +81,7 @@ class WeaviateRM(Retrieve):
             kwargs :
 
         Returns:
-            dspy.Prediction: An object containing the retrieved passages.
+            dspy.primitives.prediction.Prediction: An object containing the retrieved passages.
         """
         k = k if k is not None else self.k
         queries = [query_or_queries] if isinstance(query_or_queries, str) else query_or_queries

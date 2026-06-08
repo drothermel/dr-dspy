@@ -20,7 +20,7 @@ CUSTOM_TYPE_END_IDENTIFIER = "<<CUSTOM-TYPE-END-IDENTIFIER>>"
 class Type(pydantic.BaseModel):
     """Base class to support creating custom types for DSPy signatures.
 
-    This is the parent class of DSPy custom types, e.g, dspy.Image. Subclasses must implement the `format` method to
+    This is the parent class of DSPy custom types, e.g, Image. Subclasses must implement the `format` method to
     return a list of dictionaries (same as the Array of content parts in the OpenAI API user message's content field).
 
     Examples:
@@ -137,8 +137,8 @@ def split_message_content_for_custom_types(messages: list[dict[str, Any]]) -> li
     """Split user message content into a list of content blocks.
 
     This method splits each user message's content in the `messages` list to be a list of content block, so that
-    the custom types like `dspy.Image` can be properly formatted for better quality. For example, the split content
-    may look like below if the user message has a `dspy.Image` object:
+    the custom types like `Image` can be properly formatted for better quality. For example, the split content
+    may look like below if the user message has an `Image` object:
 
     ```
     [

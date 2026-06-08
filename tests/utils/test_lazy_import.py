@@ -102,7 +102,7 @@ def test_require_stub_uses_install_hint_for_litellm(monkeypatch):
     monkeypatch.delitem(sys.modules, "litellm", raising=False)
     monkeypatch.setattr(importlib.util, "find_spec", lambda module: None if module == "litellm" else find_spec(module))
 
-    stub = require("litellm", feature="dspy.LM")
+    stub = require("litellm", feature="dspy.clients.lm.LM")
     with pytest.raises(ImportError) as exc_info:
         _ = stub.something
     assert f"{dist}[litellm]" in str(exc_info.value)

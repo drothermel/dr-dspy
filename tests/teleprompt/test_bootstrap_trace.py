@@ -1,7 +1,12 @@
 from typing import Any, ClassVar
 from unittest import mock
 
-from litellm import Choices, Message, ModelResponse
+import pytest
+
+try:
+    from litellm import Choices, Message, ModelResponse
+except ImportError:
+    pytest.skip("litellm is not installed", allow_module_level=True)
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
@@ -16,7 +21,7 @@ from dspy.teleprompt.bootstrap_trace import FailedPrediction, bootstrap_trace_da
 
 
 def test_bootstrap_trace_data():
-    """Test bootstrap_trace_data function with single dspy.Predict program."""
+    """Test bootstrap_trace_data function with a single Predict program."""
 
     # Define signature for string -> int conversion
     class StringToIntSignature(Signature):
@@ -25,7 +30,7 @@ def test_bootstrap_trace_data():
         text: str = InputField()
         number: int = OutputField()
 
-    # Create program with single dspy.Predict
+    # Create program with a single Predict.
     program = Predict(StringToIntSignature)
 
     # Create dummy dataset of size 5

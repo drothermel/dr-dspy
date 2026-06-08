@@ -139,7 +139,7 @@ class TestToReplVariableMethod:
 
 
 class TestSignatureAnnotation:
-    """Subclasses should be usable as dspy.Signature field annotations."""
+    """Subclasses should be usable as Signature field annotations."""
 
     def test_subclass_supports_signature_annotation(self):
         class ExampleSignature(Signature):

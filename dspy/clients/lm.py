@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_litellm():
-    return get_litellm(feature="dspy.LM")
+    return get_litellm(feature="dspy.clients.lm.LM")
 
 
 def _is_openai_reasoning_model(model: str) -> bool:
@@ -126,7 +126,8 @@ class LM(BaseLM):
             if (temperature and temperature != 1.0) or (max_tokens and max_tokens < 16000):
                 raise LMConfigurationError(
                     "OpenAI's reasoning models require passing temperature=1.0 or None and max_tokens >= 16000 or None to "
-                    "`dspy.LM(...)`, e.g., dspy.LM('openai/gpt-5', temperature=1.0, max_tokens=16000)",
+                    "`dspy.clients.lm.LM(...)`, e.g., "
+                    "`from dspy.clients.lm import LM; LM('openai/gpt-5', temperature=1.0, max_tokens=16000)`",
                     model=self.model,
                     provider=self._provider_name,
                 )
@@ -223,9 +224,9 @@ class LM(BaseLM):
             **kwargs: Per-call LM parameters that override defaults from `LM(...)`.
 
         Raises:
-            dspy.LMError: Base class for wrapped LM configuration, transport,
+            dspy.utils.exceptions.LMError: Base class for wrapped LM configuration, transport,
                 provider, and unsupported-feature failures. Notable subclasses
-                include `dspy.ContextWindowExceededError` for context-window
+                include `dspy.utils.exceptions.ContextWindowExceededError` for context-window
                 failures, which adapters use to avoid inappropriate fallback
                 retries when the prompt is too long.
         """
@@ -281,9 +282,9 @@ class LM(BaseLM):
             **kwargs: Per-call LM parameters that override defaults from `LM(...)`.
 
         Raises:
-            dspy.LMError: Base class for wrapped LM configuration, transport,
+            dspy.utils.exceptions.LMError: Base class for wrapped LM configuration, transport,
                 provider, and unsupported-feature failures. Notable subclasses
-                include `dspy.ContextWindowExceededError` for context-window
+                include `dspy.utils.exceptions.ContextWindowExceededError` for context-window
                 failures, which adapters use to avoid inappropriate fallback
                 retries when the prompt is too long.
         """
@@ -338,8 +339,9 @@ class LM(BaseLM):
         if not self.provider.finetunable:
             raise LMUnsupportedFeatureError(
                 f"Provider {self.provider} does not support fine-tuning, please specify your provider by explicitly "
-                "setting `provider` when creating the `dspy.LM` instance. For example, "
-                "`dspy.LM('openai/gpt-4.1-mini-2025-04-14', provider=dspy.OpenAIProvider())`.",
+                "setting `provider` when creating the `dspy.clients.lm.LM` instance. For example, "
+                "`from dspy.clients.lm import LM; from dspy.clients.openai import OpenAIProvider; "
+                "LM('openai/gpt-4.1-mini-2025-04-14', provider=OpenAIProvider())`.",
                 model=self.model,
                 provider=self._provider_name,
                 features=["finetuning"],
@@ -436,8 +438,9 @@ class LM(BaseLM):
         if self.model_type != "responses" and any(c.finish_reason == "length" for c in results["choices"]):
             logger.warning(
                 f"LM response was truncated due to exceeding max_tokens={self.kwargs['max_tokens']}. "
-                "You can inspect the latest LM interactions with `dspy.inspect_history()`. "
-                "To avoid truncation, consider passing a larger max_tokens when setting up dspy.LM. "
+                "You can inspect the latest LM interactions with `lm.inspect_history()` or "
+                "`dspy.clients.base_lm.inspect_history()`. "
+                "To avoid truncation, consider passing a larger max_tokens when setting up LM. "
                 f"You may also consider increasing the temperature (currently {self.kwargs['temperature']}) "
                 " if the reason for truncation is repetition."
             )

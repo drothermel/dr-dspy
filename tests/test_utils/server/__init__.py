@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 import socket
@@ -9,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from tests.test_utils.server.litellm_server import LITELLM_TEST_SERVER_LOG_FILE_PATH_ENV_VAR
+LITELLM_TEST_SERVER_LOG_FILE_PATH_ENV_VAR = "LITELLM_TEST_SERVER_LOG_FILE_PATH"
 
 
 @pytest.fixture()
@@ -18,6 +19,8 @@ def litellm_test_server() -> tuple[str, str]:
     Start a LiteLLM test server for a DSPy integration test case, and tear down the
     server when the test case completes.
     """
+    if importlib.util.find_spec("litellm") is None:
+        pytest.skip("litellm is not installed")
     if sys.version_info[:2] == (3, 14):
         pytest.skip("Litellm proxy server is not supported on Python 3.14.")
     with tempfile.TemporaryDirectory() as server_log_dir_path:

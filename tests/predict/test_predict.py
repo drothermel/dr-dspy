@@ -10,7 +10,11 @@ from unittest.mock import patch
 import orjson
 import pydantic
 import pytest
-from litellm import ModelResponse
+
+try:
+    from litellm import ModelResponse
+except ImportError:
+    pytest.skip("litellm is not installed", allow_module_level=True)
 from pydantic import BaseModel, HttpUrl
 
 from dspy.adapters.chat_adapter import ChatAdapter
@@ -247,48 +251,6 @@ def test_typed_demos_after_dump_and_load_state():
     assert len(loaded_demo["translated_items"]) == 2
     assert loaded_demo["translated_items"][0]["name"] == "manzana"
     assert loaded_demo["translated_items"][1]["name"] == "plátano"
-
-
-# def test_typed_demos_after_dump_and_load_state():
-#     class TypedTranslateToEnglish(dspy.Signature):
-#         """Translate content from a language to English."""
-
-#         class Input(pydantic.BaseModel):
-#             content: str
-#             language: str
-
-#         class Output(pydantic.BaseModel):
-#             translation: str
-
-#         input: Input = dspy.InputField()
-#         output: Output = dspy.OutputField()
-
-#     original_instance = TypedPredictor(TypedTranslateToEnglish).predictor
-#     original_instance.demos = [
-#         dspy.Example(
-#             input=TypedTranslateToEnglish.Input(
-#                 content="¿Qué tal?",
-#                 language="SPANISH",
-#             ),
-#             output=TypedTranslateToEnglish.Output(
-#                 translation="Hello there",
-#             ),
-#         ).with_inputs("input"),
-#     ]
-
-#     dumped_state = original_instance.dump_state()
-#     assert len(dumped_state["demos"]) == len(original_instance.demos)
-#     assert dumped_state["demos"][0]["input"] == original_instance.demos[0].input.model_dump_json()
-
-#     saved_state = orjson.dumps(dumped_state).decode()
-#     loaded_state = orjson.loads(saved_state)
-
-#     new_instance = TypedPredictor(TypedTranslateToEnglish).predictor
-#     new_instance.load_state(loaded_state)
-#     assert len(new_instance.demos) == len(original_instance.demos)
-#     # Demos don't need to keep the same types after saving and loading the state.
-#     assert new_instance.demos[0]["input"] == original_instance.demos[0].input.model_dump_json()
-
 
 def test_signature_fields_after_dump_and_load_state(tmp_path):
     class CustomSignature(Signature):
@@ -885,9 +847,11 @@ def test_positional_arguments():
     with pytest.raises(ValueError) as e:
         program("What is the capital of France?")
     assert str(e.value) == (
-        "Positional arguments are not allowed when calling `dspy.Predict`, must use keyword arguments that match "
+        "Positional arguments are not allowed when calling `dspy.predict.predict.Predict`, must use keyword arguments "
+        "that match "
         "your signature input fields: 'question'. For example: `predict(question=input_value, ...)`."
     )
+
 
 def test_error_message_on_invalid_lm_setup():
     # No LM is loaded.
@@ -899,16 +863,16 @@ def test_error_message_on_invalid_lm_setup():
     with pytest.raises(ValueError) as e:
         Predict("question -> answer")(question="Why did a chicken cross the kitchen?")
 
-    assert "LM must be an instance of `dspy.BaseLM`, not a string." in str(e.value)
+    assert "LM must be an instance of `dspy.clients.base_lm.BaseLM`, not a string." in str(e.value)
 
     def dummy_lm():
         pass
 
-    # LM is not an instance of dspy.BaseLM.
+    # LM is not an instance of BaseLM.
     settings.configure(lm=dummy_lm)
     with pytest.raises(ValueError) as e:
         Predict("question -> answer")(question="Why did a chicken cross the kitchen?")
-    assert "LM must be an instance of `dspy.BaseLM`, not <class 'function'>." in str(e.value)
+    assert "LM must be an instance of `dspy.clients.base_lm.BaseLM`, not <class 'function'>." in str(e.value)
 
 
 @pytest.mark.parametrize("adapter_type", ["chat", "json"])

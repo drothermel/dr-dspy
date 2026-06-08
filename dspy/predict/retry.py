@@ -1,6 +1,6 @@
 # import copy
 
-# import dspy
+# from dspy.signatures.field import InputField
 
 # from .predict import Predict
 
@@ -17,13 +17,13 @@
 #         # Add "Past" input fields for each output field
 #         for key, value in signature.output_fields.items():
 #             actual_prefix = value.json_schema_extra["prefix"].split(":")[0] + ":"
-#             signature = signature.append(f"past_{key}", dspy.InputField(
+#             signature = signature.append(f"past_{key}", InputField(
 #                 prefix="Previous " + actual_prefix,
 #                 desc=f"past {actual_prefix[:-1]} with errors",
 #                 format=value.json_schema_extra.get("format"),
 #             ))
 
-#         signature = signature.append("feedback", dspy.InputField(
+#         signature = signature.append("feedback", InputField(
 #             prefix="Instructions:",
 #             desc="Some instructions you must satisfy",
 #             format=str,

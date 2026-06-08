@@ -66,18 +66,22 @@ def streamify(
 
     ```python
     import asyncio
-    import dspy
+    from dspy.clients.lm import LM
+    from dspy.dsp.utils.settings import settings
+    from dspy.predict.predict import Predict
+    from dspy.primitives.prediction import Prediction
+    from dspy.streaming.streamify import streamify
 
-    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
+    settings.configure(lm=LM("openai/gpt-4o-mini"))
     # Create the program and wrap it with streaming functionality
-    program = dspy.streamify(dspy.Predict("q->a"))
+    program = streamify(Predict("q->a"))
 
     # Use the program with streaming output
     async def use_streaming():
         output = program(q="Why did a chicken cross the kitchen?")
         return_value = None
         async for value in output:
-            if isinstance(value, dspy.Prediction):
+            if isinstance(value, Prediction):
                 return_value = value
             else:
                 print(value)
@@ -90,9 +94,14 @@ def streamify(
     Example with custom status message provider:
     ```python
     import asyncio
-    import dspy
+    from dspy.clients.lm import LM
+    from dspy.dsp.utils.settings import settings
+    from dspy.predict.predict import Predict
+    from dspy.primitives.prediction import Prediction
+    from dspy.streaming.messages import StatusMessageProvider
+    from dspy.streaming.streamify import streamify
 
-    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
+    settings.configure(lm=LM("openai/gpt-4o-mini"))
 
     class MyStatusMessageProvider(StatusMessageProvider):
         def module_start_status_message(self, instance, inputs):
@@ -102,14 +111,14 @@ def streamify(
             return f"Tool calling finished with output: {outputs}!"
 
     # Create the program and wrap it with streaming functionality
-    program = dspy.streamify(dspy.Predict("q->a"), status_message_provider=MyStatusMessageProvider())
+    program = streamify(Predict("q->a"), status_message_provider=MyStatusMessageProvider())
 
     # Use the program with streaming output
     async def use_streaming():
         output = program(q="Why did a chicken cross the kitchen?")
         return_value = None
         async for value in output:
-            if isinstance(value, dspy.Prediction):
+            if isinstance(value, Prediction):
                 return_value = value
             else:
                 print(value)
@@ -123,17 +132,22 @@ def streamify(
 
     ```python
     import asyncio
-    import dspy
+    from dspy.clients.lm import LM
+    from dspy.dsp.utils.settings import settings
+    from dspy.predict.predict import Predict
+    from dspy.primitives.prediction import Prediction
+    from dspy.streaming.streaming_listener import StreamListener
+    from dspy.streaming.streamify import streamify
 
-    dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
+    settings.configure(lm=LM("openai/gpt-4o-mini", cache=False))
 
     # Create the program and wrap it with streaming functionality
-    predict = dspy.Predict("question->answer, reasoning")
+    predict = Predict("question->answer, reasoning")
     stream_listeners = [
-        dspy.streaming.StreamListener(signature_field_name="answer"),
-        dspy.streaming.StreamListener(signature_field_name="reasoning"),
+        StreamListener(signature_field_name="answer"),
+        StreamListener(signature_field_name="reasoning"),
     ]
-    stream_predict = dspy.streamify(predict, stream_listeners=stream_listeners)
+    stream_predict = streamify(predict, stream_listeners=stream_listeners)
 
     async def use_streaming():
         output = stream_predict(
@@ -142,7 +156,7 @@ def streamify(
         )
         return_value = None
         async for value in output:
-            if isinstance(value, dspy.Prediction):
+            if isinstance(value, Prediction):
                 return_value = value
             else:
                 print(value)
@@ -152,7 +166,7 @@ def streamify(
     print(output)
     ```
 
-    You should see the streaming chunks (in the format of `dspy.streaming.StreamResponse`) in the console output.
+    You should see the streaming chunks (in the format of `dspy.streaming.messages.StreamResponse`) in the console output.
     """
     stream_listeners = stream_listeners or []
     if len(stream_listeners) > 0:

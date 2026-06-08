@@ -19,11 +19,13 @@ class ProgramOfThought(Module):
 
     Examples:
     ```
-    import dspy
+    from dspy.clients.lm import LM
+    from dspy.dsp.utils.settings import settings
+    from dspy.predict.program_of_thought import ProgramOfThought
 
-    lm = dspy.LM('openai/gpt-4o-mini')
-    dspy.configure(lm=lm)
-    pot = dspy.ProgramOfThought("question -> answer")
+    lm = LM('openai/gpt-4o-mini')
+    settings.configure(lm=lm)
+    pot = ProgramOfThought("question -> answer")
     pot(question="what is 1+1?")
     ```
     """

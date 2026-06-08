@@ -1,7 +1,7 @@
 """Signature class for DSPy.
 
 You typically subclass the Signature class, like this:
-    class MySignature(dspy.Signature):
+    class MySignature(Signature):
         input: str = InputField(desc="...")
         output: int = OutputField(desc="...")
 
@@ -290,11 +290,12 @@ class Signature(BaseModel, metaclass=SignatureMeta):
 
         Examples:
             ```python
-            import dspy
+            from dspy.signatures.field import InputField, OutputField
+            from dspy.signatures.signature import Signature
 
-            class MySig(dspy.Signature):
-                input_text: str = dspy.InputField(desc="Input text")
-                output_text: str = dspy.OutputField(desc="Output text")
+            class MySig(Signature):
+                input_text: str = InputField(desc="Input text")
+                output_text: str = OutputField(desc="Output text")
 
             NewSig = MySig.with_instructions("Translate to French.")
             assert NewSig is not MySig
@@ -344,13 +345,14 @@ class Signature(BaseModel, metaclass=SignatureMeta):
 
         Examples:
             ```python
-            import dspy
+            from dspy.signatures.field import InputField, OutputField
+            from dspy.signatures.signature import Signature
 
-            class MySig(dspy.Signature):
-                input_text: str = dspy.InputField(desc="Input sentence")
-                output_text: str = dspy.OutputField(desc="Translated sentence")
+            class MySig(Signature):
+                input_text: str = InputField(desc="Input sentence")
+                output_text: str = OutputField(desc="Translated sentence")
 
-            NewSig = MySig.prepend("context", dspy.InputField(desc="Context for translation"))
+            NewSig = MySig.prepend("context", InputField(desc="Context for translation"))
             print(list(NewSig.fields.keys()))
             ```
         """
@@ -371,13 +373,14 @@ class Signature(BaseModel, metaclass=SignatureMeta):
 
         Examples:
             ```python
-            import dspy
+            from dspy.signatures.field import InputField, OutputField
+            from dspy.signatures.signature import Signature
 
-            class MySig(dspy.Signature):
-                input_text: str = dspy.InputField(desc="Input sentence")
-                output_text: str = dspy.OutputField(desc="Translated sentence")
+            class MySig(Signature):
+                input_text: str = InputField(desc="Input sentence")
+                output_text: str = OutputField(desc="Translated sentence")
 
-            NewSig = MySig.append("confidence", dspy.OutputField(desc="Translation confidence"))
+            NewSig = MySig.append("confidence", OutputField(desc="Translation confidence"))
             print(list(NewSig.fields.keys()))
             ```
         """
@@ -397,12 +400,13 @@ class Signature(BaseModel, metaclass=SignatureMeta):
 
         Examples:
             ```python
-            import dspy
+            from dspy.signatures.field import InputField, OutputField
+            from dspy.signatures.signature import Signature
 
-            class MySig(dspy.Signature):
-                input_text: str = dspy.InputField(desc="Input sentence")
-                temp_field: str = dspy.InputField(desc="Temporary debug field")
-                output_text: str = dspy.OutputField(desc="Translated sentence")
+            class MySig(Signature):
+                input_text: str = InputField(desc="Input sentence")
+                temp_field: str = InputField(desc="Temporary debug field")
+                output_text: str = OutputField(desc="Translated sentence")
 
             NewSig = MySig.delete("temp_field")
             print(list(NewSig.fields.keys()))
@@ -439,16 +443,17 @@ class Signature(BaseModel, metaclass=SignatureMeta):
 
         Examples:
             ```python
-            import dspy
+            from dspy.signatures.field import InputField, OutputField
+            from dspy.signatures.signature import Signature
 
-            class MySig(dspy.Signature):
-                input_text: str = dspy.InputField(desc="Input sentence")
-                output_text: str = dspy.OutputField(desc="Translated sentence")
+            class MySig(Signature):
+                input_text: str = InputField(desc="Input sentence")
+                output_text: str = OutputField(desc="Translated sentence")
 
-            NewSig = MySig.insert(0, "context", dspy.InputField(desc="Context for translation"))
+            NewSig = MySig.insert(0, "context", InputField(desc="Context for translation"))
             print(list(NewSig.fields.keys()))
 
-            NewSig2 = NewSig.insert(-1, "confidence", dspy.OutputField(desc="Translation confidence"))
+            NewSig2 = NewSig.insert(-1, "confidence", OutputField(desc="Translation confidence"))
             print(list(NewSig2.fields.keys()))
             ```
         """
@@ -716,7 +721,7 @@ def _parse_type_node(node, names=None) -> Any:
             return resolved_type
 
         # Attempt to import a module with this name dynamically
-        # This allows handling of module-based annotations like `dspy.Image`.
+        # This allows handling of module-based annotations like Image.
         try:
             mod = importlib.import_module(type_name)
             names[type_name] = mod

@@ -49,7 +49,8 @@ class BaseCallback:
     Example 1: Set a global callback using `dspy.configure`.
 
     ```
-    import dspy
+    from dspy.dsp.utils.settings import settings
+    from dspy.predict.chain_of_thought import ChainOfThought
     from dspy.utils.callback import BaseCallback
 
     class LoggingCallback(BaseCallback):
@@ -60,11 +61,11 @@ class BaseCallback:
         def on_lm_end(self, call_id, outputs, exception):
             print(f"LM is finished with outputs: {outputs}")
 
-    dspy.configure(
+    settings.configure(
         callbacks=[LoggingCallback()]
     )
 
-    cot = dspy.ChainOfThought("question -> answer")
+    cot = ChainOfThought("question -> answer")
     cot(question="What is the meaning of life?")
 
     # > LM is called with inputs: {'question': 'What is the meaning of life?'}
@@ -74,13 +75,15 @@ class BaseCallback:
     Example 2: Set a local callback by passing it to the component constructor.
 
     ```
-    lm_1 = dspy.LM("gpt-3.5-turbo", callbacks=[LoggingCallback()])
+    from dspy.clients.lm import LM
+
+    lm_1 = LM("gpt-3.5-turbo", callbacks=[LoggingCallback()])
     lm_1(question="What is the meaning of life?")
 
     # > LM is called with inputs: {'question': 'What is the meaning of life?'}
     # > LM is finished with outputs: {'answer': '42'}
 
-    lm_2 = dspy.LM("gpt-3.5-turbo")
+    lm_2 = LM("gpt-3.5-turbo")
     lm_2(question="What is the meaning of life?")
     # No logging here because only `lm_1` has the callback set.
     ```
@@ -92,7 +95,7 @@ class BaseCallback:
         instance: Any,
         inputs: dict[str, Any],
     ):
-        """A handler triggered when forward() method of a module (subclass of dspy.Module) is called.
+        """A handler triggered when forward() method of a module (subclass of Module) is called.
 
         Args:
             call_id: A unique identifier for the call. Can be used to connect start/end handlers.
@@ -108,7 +111,7 @@ class BaseCallback:
         outputs: Any | None,
         exception: Exception | None = None,
     ):
-        """A handler triggered after forward() method of a module (subclass of dspy.Module) is executed.
+        """A handler triggered after forward() method of a module (subclass of Module) is executed.
 
         Args:
             call_id: A unique identifier for the call. Can be used to connect start/end handlers.
@@ -124,7 +127,7 @@ class BaseCallback:
         instance: Any,
         inputs: dict[str, Any],
     ):
-        """A handler triggered when __call__ method of dspy.LM instance is called.
+        """A handler triggered when __call__ method of LM instance is called.
 
         Args:
             call_id: A unique identifier for the call. Can be used to connect start/end handlers.
@@ -140,7 +143,7 @@ class BaseCallback:
         outputs: dict[str, Any] | None,
         exception: Exception | None = None,
     ):
-        """A handler triggered after __call__ method of dspy.LM instance is executed.
+        """A handler triggered after __call__ method of LM instance is executed.
 
         Args:
             call_id: A unique identifier for the call. Can be used to connect start/end handlers.

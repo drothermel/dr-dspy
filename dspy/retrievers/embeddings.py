@@ -52,7 +52,7 @@ class Embeddings:
             query (str): The search query string
 
         Returns:
-            dspy.Prediction: A prediction containing passages and their corpus indices.
+            dspy.primitives.prediction.Prediction: A prediction containing passages and their corpus indices.
         """
 
         passages, indices, _scores = self.search_fn(query)
@@ -253,7 +253,7 @@ class EmbeddingsWithScores(Embeddings):
             query (str): The search query string.
 
         Returns:
-            dspy.Prediction: A prediction containing passages, indices, and similarity scores.
+            dspy.primitives.prediction.Prediction: A prediction containing passages, indices, and similarity scores.
         """
 
         passages, indices, scores = self.search_fn(query)

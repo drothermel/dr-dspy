@@ -172,10 +172,16 @@ class BAMLAdapter(JSONAdapter):
 
     Example Usage:
     ```python
-    import dspy
-    from pydantic import BaseModel, Field
     from typing import Literal
-    from baml_adapter import BAMLAdapter  # Import from your module
+
+    from pydantic import BaseModel, Field
+
+    from dspy.adapters.baml_adapter import BAMLAdapter
+    from dspy.clients.lm import LM
+    from dspy.dsp.utils.settings import settings
+    from dspy.predict.predict import Predict
+    from dspy.signatures.field import InputField, OutputField
+    from dspy.signatures.signature import Signature
 
     # 1. Define your Pydantic models
     class PatientAddress(BaseModel):
@@ -189,17 +195,17 @@ class BAMLAdapter(JSONAdapter):
         address: PatientAddress | None
 
     # 2. Define a signature using the Pydantic model as an output field
-    class ExtractPatientInfo(dspy.Signature):
+    class ExtractPatientInfo(Signature):
         '''Extract patient information from the clinical note.'''
-        clinical_note: str = dspy.InputField()
-        patient_info: PatientDetails = dspy.OutputField()
+        clinical_note: str = InputField()
+        patient_info: PatientDetails = OutputField()
 
-    # 3. Configure dspy to use the new adapter
-    llm = dspy.OpenAI(model="gpt-4.1-mini")
-    dspy.configure(lm=llm, adapter=BAMLAdapter())
+    # 3. Configure DSPy to use the new adapter
+    lm = LM("openai/gpt-4.1-mini")
+    settings.configure(lm=lm, adapter=BAMLAdapter())
 
     # 4. Run your program
-    extractor = dspy.Predict(ExtractPatientInfo)
+    extractor = Predict(ExtractPatientInfo)
     note = "John Doe, 45 years old, lives at 123 Main St, Anytown. Resident of the US."
     result = extractor(clinical_note=note)
     print(result.patient_info)

@@ -50,7 +50,9 @@ class Predict(Module, Parameter):
             invocation by passing a ``config`` dictionary when calling the
             module. For example::
 
-                predict = dspy.Predict("q -> a", rollout_id=1, temperature=1.0)
+                from dspy.predict.predict import Predict
+
+                predict = Predict("q -> a", rollout_id=1, temperature=1.0)
                 predict(q="What is 1 + 52?", config={"rollout_id": 2, "temperature": 1.0})
     """
 
@@ -121,7 +123,8 @@ class Predict(Module, Parameter):
     def _get_positional_args_error_message(self):
         input_fields = list(self.signature.input_fields.keys())
         return (
-            "Positional arguments are not allowed when calling `dspy.Predict`, must use keyword arguments "
+            "Positional arguments are not allowed when calling `dspy.predict.predict.Predict`, must use keyword "
+            "arguments "
             f"that match your signature input fields: '{', '.join(input_fields)}'. For example: "
             f"`predict({input_fields[0]}=input_value, ...)`."
         )
@@ -150,19 +153,25 @@ class Predict(Module, Parameter):
 
         if lm is None:
             raise ValueError(
-                "No LM is loaded. Please configure the LM using `dspy.configure(lm=dspy.LM(...))`. e.g, "
-                "`dspy.configure(lm=dspy.LM('openai/gpt-4o-mini'))`"
+                "No LM is loaded. Configure one with "
+                "`from dspy.clients.lm import LM; from dspy.dsp.utils.settings import settings; "
+                "settings.configure(lm=LM('openai/gpt-4o-mini'))`."
             )
 
         if isinstance(lm, str):
-            # Many users mistakenly use `dspy.configure(lm="openai/gpt-4o-mini")` instead of
-            # `dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))`, so we are providing a specific error message.
+            # Many users mistakenly pass a model string instead of constructing an LM, so provide
+            # a specific error message at the call site.
             raise ValueError(
-                f"LM must be an instance of `dspy.BaseLM`, not a string. Instead of using a string like "
-                f"'dspy.configure(lm=\"{lm}\")', please configure the LM like 'dspy.configure(lm=dspy.LM(\"{lm}\"))'"
+                f"LM must be an instance of `dspy.clients.base_lm.BaseLM`, not a string. Instead of using a string "
+                f"like "
+                f"'settings.configure(lm=\"{lm}\")', configure the LM like "
+                f"'settings.configure(lm=LM(\"{lm}\"))' after importing "
+                "`LM` from `dspy.clients.lm` and `settings` from `dspy.dsp.utils.settings`."
             )
         elif not isinstance(lm, BaseLM):
-            raise ValueError(f"LM must be an instance of `dspy.BaseLM`, not {type(lm)}. Received `lm={lm}`.")
+            raise ValueError(
+                f"LM must be an instance of `dspy.clients.base_lm.BaseLM`, not {type(lm)}. Received `lm={lm}`."
+            )
 
         # If temperature is unset or <=0.15, and n > 1, set temperature to 0.7 to keep randomness.
         temperature = config.get("temperature") or lm.kwargs.get("temperature")

@@ -220,7 +220,7 @@ def build_call_data_from_trace(
 # ) -> dict[str, Any]:
 #     # Return a dict with the following keys:
 #     #     example, prediction, trace, and score (if metric != None)
-#     with dspy.context(trace=[]):
+#     with settings.context(trace=[]):
 #         prediction = program(**example.inputs())
 #         trace = dspy.settings.trace
 #         score = metric(example, prediction, trace) if metric else None

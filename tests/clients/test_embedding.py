@@ -1,7 +1,15 @@
+import importlib.util
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pytest
+
+try:
+    import numpy as np
+except ImportError:
+    pytest.skip("numpy is not installed", allow_module_level=True)
+
+if importlib.util.find_spec("litellm") is None:
+    pytest.skip("litellm is not installed", allow_module_level=True)
 
 import dspy.clients as dspy_clients
 from dspy.clients.embedding import Embedder

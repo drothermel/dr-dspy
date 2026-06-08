@@ -1,7 +1,11 @@
 from unittest import mock
 
 import pytest
-from litellm.utils import Choices, Message, ModelResponse
+
+try:
+    from litellm.utils import Choices, Message, ModelResponse
+except ImportError:
+    pytest.skip("litellm is not installed", allow_module_level=True)
 
 from dspy.clients.lm import LM
 from dspy.dsp.utils.settings import settings

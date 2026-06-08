@@ -65,10 +65,10 @@ class Adapter:
             callbacks: List of callback functions to execute during `format()` and `parse()` methods. Callbacks can be
                 used for logging, monitoring, or custom processing. Defaults to None (empty list).
             use_native_function_calling: Whether to enable native function calling capabilities when the LM supports it.
-                If True, the adapter will automatically configure function calling when input fields contain `dspy.Tool`
-                or `list[dspy.Tool]` types. Defaults to False.
+                If True, the adapter will automatically configure function calling when input fields contain
+                `dspy.adapters.types.tool.Tool` or `list[dspy.adapters.types.tool.Tool]` types. Defaults to False.
             native_response_types: List of output field types that should be handled by native LM features rather than
-                adapter parsing. For example, `dspy.Citations` can be populated directly by citation APIs
+                adapter parsing. For example, `dspy.adapters.types.citation.Citations` can be populated directly by citation APIs
                 (e.g., Anthropic's citation feature). Defaults to `[Citations]`.
             parallel_tool_calls: Whether to request provider-side parallel tool-call generation when native function
                 calling is active. If None, the adapter does not set the provider option. Defaults to None.
@@ -110,7 +110,7 @@ class Adapter:
                 raise ValueError(
                     f"You provided an output field {tool_call_output_field_name} to receive the tool calls information, "
                     "but did not provide any tools as the input. Please provide a list of tools as the input by adding an "
-                    "input field with type `list[dspy.Tool]`."
+                    "input field with type `list[dspy.adapters.types.tool.Tool]`."
                 )
 
             if tool_call_output_field_name and lm.supports_function_calling:
@@ -329,7 +329,8 @@ class Adapter:
         Execute the adapter pipeline: format inputs, call LM, and parse outputs.
 
         Args:
-            lm: The Language Model instance to use for generation. Must be an instance of `dspy.BaseLM`.
+            lm: The Language Model instance to use for generation. Must be an instance of
+                `dspy.clients.base_lm.BaseLM`.
             lm_kwargs: Additional keyword arguments to pass to the LM call (e.g., temperature, max_tokens). These are
                 passed directly to the LM.
             signature: The DSPy signature associated with this LM call.
@@ -614,7 +615,7 @@ class Adapter:
 
     def _get_tool_call_input_field_name(self, signature: type[Signature]) -> bool:
         for name, field in signature.input_fields.items():
-            # Look for annotation `list[dspy.Tool]` or `dspy.Tool`
+            # Look for annotation `list[Tool]` or `Tool`.
             origin = get_origin(field.annotation)
             if origin is list and field.annotation.__args__[0] == Tool:
                 return name

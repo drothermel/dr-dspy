@@ -59,6 +59,9 @@ class StatusMessageProvider:
 
     Examples:
     ```python
+    from dspy.predict.predict import Predict
+    from dspy.streaming.streamify import streamify
+
     class MyStatusMessageProvider(StatusMessageProvider):
         def lm_start_status_message(self, instance, inputs):
             return f"Calling LM with inputs {inputs}..."
@@ -66,32 +69,32 @@ class StatusMessageProvider:
         def module_end_status_message(self, outputs):
             return f"Module finished with output: {outputs}!"
 
-    program = dspy.streamify(dspy.Predict("q->a"), status_message_provider=MyStatusMessageProvider())
+    program = streamify(Predict("q->a"), status_message_provider=MyStatusMessageProvider())
     ```
     """
 
     def tool_start_status_message(self, instance: Any, inputs: dict[str, Any]):
-        """Status message before a `dspy.Tool` is called."""
+        """Status message before a `dspy.adapters.types.tool.Tool` is called."""
         return f"Calling tool {instance.name}..."
 
     def tool_end_status_message(self, outputs: Any):
-        """Status message after a `dspy.Tool` is called."""
+        """Status message after a `dspy.adapters.types.tool.Tool` is called."""
         return "Tool calling finished! Querying the LLM with tool calling results..."
 
     def module_start_status_message(self, instance: Any, inputs: dict[str, Any]):
-        """Status message before a `dspy.Module` or `dspy.Predict` is called."""
+        """Status message before a `dspy.primitives.module.Module` or `dspy.predict.predict.Predict` is called."""
         pass
 
     def module_end_status_message(self, outputs: Any):
-        """Status message after a `dspy.Module` or `dspy.Predict` is called."""
+        """Status message after a `dspy.primitives.module.Module` or `dspy.predict.predict.Predict` is called."""
         pass
 
     def lm_start_status_message(self, instance: Any, inputs: dict[str, Any]):
-        """Status message before a `dspy.LM` is called."""
+        """Status message before a `dspy.clients.lm.LM` is called."""
         pass
 
     def lm_end_status_message(self, outputs: Any):
-        """Status message after a `dspy.LM` is called."""
+        """Status message after a `dspy.clients.lm.LM` is called."""
         pass
 
 

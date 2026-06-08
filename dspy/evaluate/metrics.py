@@ -290,8 +290,8 @@ def answer_exact_match(example, pred, trace=None, frac=1.0):
     otherwise require that the maximum F1 across references is at least `frac`.
 
     Args:
-        example: `dspy.Example` object with field `answer` (str or list[str]).
-        pred: `dspy.Prediction` object with field `answer` (str).
+        example: `dspy.primitives.example.Example` object with field `answer` (str or list[str]).
+        pred: `dspy.primitives.prediction.Prediction` object with field `answer` (str).
         trace: Unused; reserved for compatibility.
         frac (float, optional): Threshold in [0.0, 1.0]. `1.0` means EM.
 
@@ -300,10 +300,11 @@ def answer_exact_match(example, pred, trace=None, frac=1.0):
 
     Examples:
         ```python
-        import dspy
+        from dspy.primitives.example import Example
+        from dspy.primitives.prediction import Prediction
 
-        example = dspy.Example(answer=["Eiffel Tower", "Louvre"])
-        pred = dspy.Prediction(answer="The Eiffel Tower")
+        example = Example(answer=["Eiffel Tower", "Louvre"])
+        pred = Prediction(answer="The Eiffel Tower")
 
         answer_exact_match(example, pred, frac=1.0)  # equivalent to EM, True
         answer_exact_match(example, pred, frac=0.5)  # True
@@ -323,8 +324,8 @@ def answer_passage_match(example, pred, trace=None):
     Strings are normalized (and passages also use DPR normalization internally).
 
     Args:
-        example: `dspy.Example` object with field `answer` (str or list[str]).
-        pred: `dspy.Prediction` object with field `context` (list[str]) containing passages.
+        example: `dspy.primitives.example.Example` object with field `answer` (str or list[str]).
+        pred: `dspy.primitives.prediction.Prediction` object with field `context` (list[str]) containing passages.
         trace: Unused; reserved for compatibility.
 
     Returns:
@@ -332,10 +333,11 @@ def answer_passage_match(example, pred, trace=None):
 
     Examples:
         ```python
-        import dspy
+        from dspy.primitives.example import Example
+        from dspy.primitives.prediction import Prediction
 
-        example = dspy.Example(answer="Eiffel Tower")
-        pred = dspy.Prediction(context=["The Eiffel Tower is in Paris.", "..."])
+        example = Example(answer="Eiffel Tower")
+        pred = Prediction(context=["The Eiffel Tower is in Paris.", "..."])
 
         answer_passage_match(example, pred)  # True
         ```

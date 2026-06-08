@@ -23,15 +23,17 @@ class KNNFewShot(Teleprompter):
 
         Examples:
             ```python
-            import dspy
+            from dspy.clients.embedding import Embedder
+            from dspy.predict.chain_of_thought import ChainOfThought
+            from dspy.primitives.example import Example
             from sentence_transformers import SentenceTransformer
 
             # Define a QA module with chain of thought
-            qa = dspy.ChainOfThought("question -> answer")
+            qa = ChainOfThought("question -> answer")
 
             # Create a training dataset with examples
             trainset = [
-                dspy.Example(question="What is the capital of France?", answer="Paris").with_inputs("question"),
+                Example(question="What is the capital of France?", answer="Paris").with_inputs("question"),
                 # ... more examples ...
             ]
 
@@ -39,7 +41,7 @@ class KNNFewShot(Teleprompter):
             knn_few_shot = KNNFewShot(
                 k=3,
                 trainset=trainset,
-                vectorizer=dspy.Embedder(SentenceTransformer("all-MiniLM-L6-v2").encode)
+                vectorizer=Embedder(SentenceTransformer("all-MiniLM-L6-v2").encode)
             )
 
             # Compile the QA module with few-shot learning

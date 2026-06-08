@@ -34,7 +34,7 @@ def load(path: str, allow_pickle: bool = False) -> "Module":
         allow_pickle (bool): Whether to allow loading the model with pickle. This is dangerous and should only be used if you are sure you trust the source of the model.
 
     Returns:
-        The loaded model, a `dspy.Module` instance.
+        The loaded model, a `dspy.primitives.module.Module` instance.
     """
     if not allow_pickle:
         raise ValueError("Loading with pickle is not allowed. Please set `allow_pickle=True` if you are sure you trust the source of the model.")

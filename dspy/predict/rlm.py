@@ -146,7 +146,7 @@ class RLM(Module):
             max_llm_calls: Maximum sub-LLM calls (llm_query/llm_query_batched) per execution.
             max_output_chars: Maximum characters to include from REPL output.
             verbose: Whether to log detailed execution info.
-            tools: List of tool functions or dspy.Tool objects callable from interpreter code.
+            tools: List of tool functions or dspy.adapters.types.tool.Tool objects callable from interpreter code.
                   Built-in tools: llm_query(prompt), llm_query_batched(prompts).
             sub_lm: LM for llm_query/llm_query_batched. Defaults to dspy.settings.lm.
                    Allows using a different (e.g., cheaper) model for sub-queries.
@@ -184,7 +184,7 @@ class RLM(Module):
             raise TypeError(
                 "tools must be a list, not a dict. "
                 "Change tools={'name': func} to tools=[func] "
-                "(tool names are inferred from function names, or use dspy.Tool(func, name='custom_name'))"
+                "(tool names are inferred from function names, or use Tool(func, name='custom_name'))"
             )
 
         def to_tool(func: Callable | Tool) -> Tool:
@@ -245,7 +245,10 @@ class RLM(Module):
         def _query_lm(prompt: str) -> str:
             target_lm = lm if lm is not None else settings.lm
             if target_lm is None:
-                raise RuntimeError("No LM configured. Use dspy.configure(lm=...) or pass sub_lm to RLM.")
+                raise RuntimeError(
+                    "No LM configured. Use `from dspy.dsp.utils.settings import settings; "
+                    "settings.configure(lm=...)` or pass sub_lm to RLM."
+                )
             response = target_lm(prompt)
             if isinstance(response, list) and response:
                 item = response[0]

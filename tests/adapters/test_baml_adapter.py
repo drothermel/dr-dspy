@@ -4,8 +4,12 @@ from unittest import mock
 
 import pydantic
 import pytest
-from litellm import Choices, Message
-from litellm.files.main import ModelResponse
+
+try:
+    from litellm import Choices, Message
+    from litellm.files.main import ModelResponse
+except ImportError:
+    pytest.skip("litellm is not installed", allow_module_level=True)
 
 from dspy.adapters.baml_adapter import COMMENT_SYMBOL, INDENTATION, BAMLAdapter
 from dspy.adapters.json_adapter import JSONAdapter

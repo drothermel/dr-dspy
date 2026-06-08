@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 class EvaluationResult(Prediction):
     """
     A class that represents the result of an evaluation.
-    It is a subclass of `dspy.Prediction` that contains the following fields
+    It is a subclass of `dspy.primitives.prediction.Prediction` that contains the following fields
 
     - score: An float value (e.g., 67.30) representing the overall performance
     - results: a list of (example, prediction, score) tuples for each example in devset
@@ -89,7 +89,7 @@ class Evaluate:
     ):
         """
         Args:
-            devset (list[dspy.Example]): the evaluation dataset.
+            devset (list[dspy.primitives.example.Example]): the evaluation dataset.
             metric (Callable): The metric function to use for evaluation.
             num_threads (Optional[int]): The number of threads to use for parallel evaluation.
             display_progress (bool): Whether to display progress during evaluation.
@@ -132,9 +132,9 @@ class Evaluate:
     ) -> EvaluationResult:
         """
         Args:
-            program (dspy.Module): The DSPy program to evaluate.
+            program (dspy.primitives.module.Module): The DSPy program to evaluate.
             metric (Callable): The metric function to use for evaluation. if not provided, use `self.metric`.
-            devset (list[dspy.Example]): the evaluation dataset. if not provided, use `self.devset`.
+            devset (list[dspy.primitives.example.Example]): the evaluation dataset. if not provided, use `self.devset`.
             num_threads (Optional[int]): The number of threads to use for parallel evaluation. if not provided, use
                 `self.num_threads`.
             display_progress (bool): Whether to display progress during evaluation. if not provided, use

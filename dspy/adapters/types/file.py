@@ -17,13 +17,17 @@ class File(Type):
 
     Examples:
         ```python
-        import dspy
+        from dspy.adapters.types.file import File
+        from dspy.predict.predict import Predict
+        from dspy.signatures.field import InputField, OutputField
+        from dspy.signatures.signature import Signature
 
-        class QA(dspy.Signature):
-            file: dspy.File = dspy.InputField()
-            summary = dspy.OutputField()
-        program = dspy.Predict(QA)
-        result = program(file=dspy.File.from_path("./research.pdf"))
+        class QA(Signature):
+            file: File = InputField()
+            summary = OutputField()
+
+        program = Predict(QA)
+        result = program(file=File.from_path("./research.pdf"))
         print(result.summary)
         ```
     """
@@ -52,7 +56,10 @@ class File(Type):
         if isinstance(values, dict):
             if "file_data" in values or "file_id" in values or "filename" in values:
                 return values
-            raise ValueError("Value of `dspy.File` must contain at least one of: file_data, file_id, or filename")
+            raise ValueError(
+                "Value of `dspy.adapters.types.file.File` must contain at least one of: "
+                "file_data, file_id, or filename"
+            )
 
         return encode_file_to_dict(values)
 

@@ -33,10 +33,13 @@ class Parallel:
 
         Example:
             ```python
-            import dspy
-            from dspy import Parallel
-            lm = dspy.LM("openai/gpt-4o-mini")
-            dspy.configure(lm=lm)
+            from dspy.clients.lm import LM
+            from dspy.dsp.utils.settings import settings
+            from dspy.predict.parallel import Parallel
+            from dspy.predict.predict import Predict
+
+            lm = LM("openai/gpt-4o-mini")
+            settings.configure(lm=lm)
 
             examples = [
                 {"question": "What is the capital of Spain?"},
@@ -44,7 +47,7 @@ class Parallel:
                 {"question": "Who wrote Hamlet?"},
             ]
 
-            module = dspy.Predict("question->answer")
+            module = Predict("question->answer")
             exec_pairs = [(module, example) for example in examples]
             parallel = Parallel(num_threads=3, disable_progress_bar=False)
             results = parallel(exec_pairs)

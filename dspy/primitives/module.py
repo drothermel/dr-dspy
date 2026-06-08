@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProgramMeta(type):
-    """Metaclass ensuring every ``dspy.Module`` instance is properly initialised."""
+    """Metaclass ensuring every ``Module`` instance is properly initialised."""
 
     def __call__(cls, *args, **kwargs):
         # Create the instance without invoking ``__init__`` so we can inject
@@ -56,11 +56,12 @@ class Module(BaseModule, metaclass=ProgramMeta):
         history: List of LM call history for this module.
 
     Examples:
-        >>> import dspy
-        >>> class MyProgram(dspy.Module):
+        >>> from dspy.predict.predict import Predict
+        >>> from dspy.primitives.module import Module
+        >>> class MyProgram(Module):
         ...     def __init__(self):
         ...         super().__init__()
-        ...         self.predictor = dspy.Predict("question -> answer")
+        ...         self.predictor = Predict("question -> answer")
         ...
         ...     def forward(self, question):
         ...         return self.predictor(question=question)
@@ -132,7 +133,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
         """Return all named Predict modules in this module.
 
         Iterates through all parameters and returns those that are instances
-        of ``dspy.Predict``, along with their names.
+        of ``Predict``, along with their names.
 
         Returns:
             list[tuple[str, Predict]]: A list of (name, predictor) tuples
@@ -140,12 +141,13 @@ class Module(BaseModule, metaclass=ProgramMeta):
                 Predict instance.
 
         Examples:
-            >>> import dspy
-            >>> class MyProgram(dspy.Module):
+            >>> from dspy.predict.predict import Predict
+            >>> from dspy.primitives.module import Module
+            >>> class MyProgram(Module):
             ...     def __init__(self):
             ...         super().__init__()
-            ...         self.qa = dspy.Predict("question -> answer")
-            ...         self.summarize = dspy.Predict("text -> summary")
+            ...         self.qa = Predict("question -> answer")
+            ...         self.summarize = Predict("text -> summary")
             ...
             >>> program = MyProgram()
             >>> for name, p in program.named_predictors():
@@ -164,11 +166,12 @@ class Module(BaseModule, metaclass=ProgramMeta):
             list[Predict]: A list of all Predict instances in this module.
 
         Examples:
-            >>> import dspy
-            >>> class MyProgram(dspy.Module):
+            >>> from dspy.predict.predict import Predict
+            >>> from dspy.primitives.module import Module
+            >>> class MyProgram(Module):
             ...     def __init__(self):
             ...         super().__init__()
-            ...         self.qa = dspy.Predict("question -> answer")
+            ...         self.qa = Predict("question -> answer")
             ...
             >>> program = MyProgram()
             >>> len(program.predictors())
@@ -186,9 +189,10 @@ class Module(BaseModule, metaclass=ProgramMeta):
             lm: The language model instance to use for all predictors.
 
         Examples:
-            >>> import dspy
-            >>> lm = dspy.LM("openai/gpt-4o-mini")
-            >>> program = dspy.Predict("question -> answer")
+            >>> from dspy.clients.lm import LM
+            >>> from dspy.predict.predict import Predict
+            >>> lm = LM("openai/gpt-4o-mini")
+            >>> program = Predict("question -> answer")
             >>> program.set_lm(lm)
         """
         for _, param in self.named_predictors():
@@ -237,11 +241,12 @@ class Module(BaseModule, metaclass=ProgramMeta):
             Module: Returns self for method chaining.
 
         Examples:
-            >>> import dspy
-            >>> class MyProgram(dspy.Module):
+            >>> from dspy.predict.predict import Predict
+            >>> from dspy.primitives.module import Module
+            >>> class MyProgram(Module):
             ...     def __init__(self):
             ...         super().__init__()
-            ...         self.qa = dspy.Predict("question -> answer")
+            ...         self.qa = Predict("question -> answer")
             ...
             >>> program = MyProgram()
             >>> program.map_named_predictors(lambda p: p)
@@ -278,10 +283,10 @@ class Module(BaseModule, metaclass=ProgramMeta):
         straggler_limit: int = 3,
     ) -> list[Example] | tuple[list[Example], list[Example], list[Exception]]:
         """
-        Processes a list of dspy.Example instances in parallel using the Parallel module.
+        Processes a list of Example instances in parallel using the Parallel module.
 
         Args:
-            examples: List of dspy.Example instances to process.
+            examples: List of Example instances to process.
             num_threads: Number of threads to use for parallel processing.
             max_errors: Maximum number of errors allowed before stopping execution.
                 If ``None``, inherits from ``dspy.settings.max_errors``.
@@ -329,7 +334,10 @@ class Module(BaseModule, metaclass=ProgramMeta):
         if prediction_in_output:
             prediction_in_output.set_lm_usage(tokens)
         else:
-            logger.warning("Failed to set LM usage. Please return `dspy.Prediction` object from dspy.Module to enable usage tracking.")
+            logger.warning(
+                "Failed to set LM usage. Please return `dspy.primitives.prediction.Prediction` object from "
+                "Module to enable usage tracking."
+            )
 
 
     def __getattribute__(self, name):

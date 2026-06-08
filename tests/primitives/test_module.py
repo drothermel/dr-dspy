@@ -194,7 +194,7 @@ def test_load_dspy_program_cross_version():
 
     This test verifies that DSPy can load a program saved in version 3.0.1, ensuring compatibility with older versions.
     The saved state is located in 'test/primitives/resources/saved_program.json' and represents an optimized
-    `dspy.ReAct` program.
+    `ReAct` program.
     """
     path = Path(__file__).parent / "resources" / "saved_program.json"
     loaded_react = ReAct("question->answer", tools=[])

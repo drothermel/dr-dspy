@@ -27,19 +27,22 @@ class BestOfN(Module):
 
         Examples:
             ```python
-            import dspy
+            from dspy.clients.lm import LM
+            from dspy.dsp.utils.settings import settings
+            from dspy.predict.best_of_n import BestOfN
+            from dspy.predict.chain_of_thought import ChainOfThought
 
-            dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
+            settings.configure(lm=LM("openai/gpt-4o-mini"))
 
             # Define a QA module with chain of thought
-            qa = dspy.ChainOfThought("question -> answer")
+            qa = ChainOfThought("question -> answer")
 
             # Define a reward function that checks for one-word answers
             def one_word_answer(args, pred):
                 return 1.0 if len(pred.answer.split()) == 1 else 0.0
 
             # Create a refined module that tries up to 3 times
-            best_of_3 = dspy.BestOfN(module=qa, N=3, reward_fn=one_word_answer, threshold=1.0)
+            best_of_3 = BestOfN(module=qa, N=3, reward_fn=one_word_answer, threshold=1.0)
 
             # Use the refined module
             result = best_of_3(question="What is the capital of Belgium?").answer

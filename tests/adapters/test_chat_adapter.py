@@ -6,7 +6,11 @@ from unittest import mock
 
 import pydantic
 import pytest
-from litellm.utils import ChatCompletionMessageToolCall, Choices, Function, Message, ModelResponse
+
+try:
+    from litellm.utils import ChatCompletionMessageToolCall, Choices, Function, Message, ModelResponse
+except ImportError:
+    pytest.skip("litellm is not installed", allow_module_level=True)
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
@@ -824,14 +828,17 @@ def test_chat_adapter_format_exact_messages_with_citations_output_demo():
                  'citations returned by language models that support\\n    citation extraction, '
                  "particularly Anthropic's Citations API through LiteLLM.\\n    Citations include the "
                  'quoted text and source information.\\n\\n    Examples:\\n        ```python\\n        '
-                 'import os\\n        import dspy\\n        from dspy.signatures import '
-                 'Signature\\n        from dspy.experimental import Citations, Document\\n        '
+                 'import os\\n        from dspy.adapters.types.citation import Citations\\n        from '
+                 'dspy.adapters.types.document import Document\\n        from dspy.clients.lm import '
+                 'LM\\n        from dspy.predict.predict import Predict\\n        from '
+                 'dspy.signatures.field import InputField, OutputField\\n        from '
+                 'dspy.signatures.signature import Signature\\n\\n        '
                  'os.environ[\\"ANTHROPIC_API_KEY\\"] = \\"YOUR_ANTHROPIC_API_KEY\\"\\n\\n        '
                  "class AnswerWithSources(Signature):\\n            '''Answer questions using provided "
                  "documents with citations.'''\\n            documents: list[Document] = "
-                 'dspy.InputField()\\n            question: str = dspy.InputField()\\n            '
-                 'answer: str = dspy.OutputField()\\n            citations: Citations = '
-                 'dspy.OutputField()\\n\\n        # Create documents to provide as sources\\n        '
+                 'InputField()\\n            question: str = InputField()\\n            '
+                 'answer: str = OutputField()\\n            citations: Citations = '
+                 'OutputField()\\n\\n        # Create documents to provide as sources\\n        '
                  'docs = [\\n            Document(\\n                data=\\"The Earth orbits the Sun '
                  'in an elliptical path.\\",\\n                title=\\"Basic Astronomy '
                  'Facts\\"\\n            ),\\n            Document(\\n                data=\\"Water '
@@ -839,8 +846,8 @@ def test_chat_adapter_format_exact_messages_with_citations_output_demo():
                  'title=\\"Physics Fundamentals\\",\\n                metadata={\\"author\\": \\"Dr. '
                  'Smith\\", \\"year\\": 2023}\\n            )\\n        ]\\n\\n        # Use with a '
                  'model that supports citations like Claude\\n        lm = '
-                 'dspy.LM(\\"anthropic/claude-opus-4-1-20250805\\")\\n        predictor = '
-                 'dspy.Predict(AnswerWithSources)\\n        result = predictor(documents=docs, '
+                 'LM(\\"anthropic/claude-opus-4-1-20250805\\")\\n        predictor = '
+                 'Predict(AnswerWithSources)\\n        result = predictor(documents=docs, '
                  'question=\\"What temperature does water boil?\\", lm=lm)\\n\\n        for citation '
                  'in result.citations.citations:\\n            print(citation.format())\\n        '
                  '```\\n    ", "properties": {"citations": {"type": "array", "items": {"$ref": '

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from langchain.tools import BaseTool
 
 _TYPE_MAPPING = {"string": str, "integer": int, "number": float, "boolean": bool, "array": list, "object": dict}
-jsonschema = require("jsonschema", extra="tools", feature="dspy.Tool argument validation")
+jsonschema = require("jsonschema", extra="tools", feature="dspy.adapters.types.tool.Tool argument validation")
 
 
 def _with_callbacks(fn: Callable) -> Callable:
@@ -74,7 +74,7 @@ class Tool(Type):
     ):
         """Initialize the Tool class.
 
-        Users can choose to specify the `name`, `desc`, `args`, and `arg_types`, or let the `dspy.Tool`
+        Users can choose to specify the `name`, `desc`, `args`, and `arg_types`, or let the `Tool`
         automatically infer the values from the function. For values that are specified by the user, automatic inference
         will not be performed on them.
 
@@ -211,8 +211,9 @@ class Tool(Type):
             else:
                 raise ValueError(
                     "You are calling `__call__` on an async tool, please use `acall` instead or enable "
-                    "async-to-sync conversion with `dspy.configure(allow_tool_async_sync_conversion=True)` "
-                    "or `with dspy.context(allow_tool_async_sync_conversion=True):`."
+                    "async-to-sync conversion with `settings.configure(allow_tool_async_sync_conversion=True)` "
+                    "or `with settings.context(allow_tool_async_sync_conversion=True):` from "
+                    "`dspy.dsp.utils.settings`."
                 )
         return result
 
@@ -257,7 +258,7 @@ class Tool(Type):
 
         ```python
         import asyncio
-        import dspy
+        from dspy.adapters.types.tool import Tool
         from langchain.tools import tool as lc_tool
 
         @lc_tool
@@ -265,7 +266,7 @@ class Tool(Type):
             "Add two numbers together."
             return x + y
 
-        dspy_tool = dspy.Tool.from_langchain(add)
+        dspy_tool = Tool.from_langchain(add)
 
         async def run_tool():
             return await dspy_tool.acall(x=1, y=2)
@@ -442,7 +443,7 @@ class ToolCalls(Type):
                 # Handle case where data is a dict with "name" and "args" keys
                 return {"tool_calls": [cls.ToolCall(**_normalize_tool_call_dict(data))]}
 
-        raise ValueError(f"Received invalid value for `dspy.ToolCalls`: {data}")
+        raise ValueError(f"Received invalid value for `dspy.adapters.types.tool.ToolCalls`: {data}")
 
 
 class ToolCallResults(pydantic.BaseModel):
@@ -494,7 +495,7 @@ class ToolCallResults(pydantic.BaseModel):
             if {"name", "value"}.issubset(data):
                 return {"tool_call_results": [data]}
 
-        raise ValueError(f"Received invalid value for `dspy.ToolCallResults`: {data}")
+        raise ValueError(f"Received invalid value for `dspy.adapters.types.tool.ToolCallResults`: {data}")
 
 
 def _is_tool_call_dict(data: dict[str, Any]) -> bool:
@@ -503,12 +504,12 @@ def _is_tool_call_dict(data: dict[str, Any]) -> bool:
 
 def _normalize_tool_call_dict(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
-        raise ValueError(f"Received invalid tool call value for `dspy.ToolCalls`: {data}")
+        raise ValueError(f"Received invalid tool call value for `dspy.adapters.types.tool.ToolCalls`: {data}")
 
     if "function" in data:
         function = data.get("function") or {}
         if not isinstance(function, dict):
-            raise ValueError(f"Received invalid function value for `dspy.ToolCalls`: {function}")
+            raise ValueError(f"Received invalid function value for `dspy.adapters.types.tool.ToolCalls`: {function}")
 
         arguments = function.get("arguments", {})
         name = function.get("name") or data.get("name")

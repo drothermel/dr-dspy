@@ -6,11 +6,15 @@ from pathlib import Path
 from unittest import mock
 from unittest.mock import patch
 
-import litellm
 import pydantic
 import pytest
-from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
-from litellm.utils import Choices, Message, ModelResponse
+
+try:
+    import litellm
+    from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
+    from litellm.utils import Choices, Message, ModelResponse
+except ImportError:
+    pytest.skip("litellm is not installed", allow_module_level=True)
 from openai import RateLimitError
 from openai.types.responses import ResponseOutputMessage, ResponseReasoningItem
 from openai.types.responses.response_reasoning_item import Summary
@@ -499,7 +503,7 @@ def test_base_lm_validates_typed_lm_response():
 
     assert lm._validate_typed_lm_response(response) is response
 
-    with pytest.raises(TypeError, match=r"requires forward\(request\).*dspy.LMResponse"):
+    with pytest.raises(TypeError, match=r"requires forward\(request\).*dspy\.core\.types\.LMResponse"):
         lm._validate_typed_lm_response(["ok"])
 
 
@@ -523,7 +527,7 @@ def test_base_lm_errors_when_explicit_legacy_forward_returns_lm_response():
     lm = CustomLM("custom-model")
     response = LMResponse.from_text("ok", model="custom-model")
 
-    with pytest.raises(TypeError, match=r"forward_contract='legacy'.*got dspy.LMResponse"):
+    with pytest.raises(TypeError, match=r"forward_contract='legacy'.*got dspy\.core\.types\.LMResponse"):
         lm._validate_legacy_lm_response(response)
 
 

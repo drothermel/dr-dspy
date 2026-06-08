@@ -32,7 +32,7 @@ def test_signature_optimizer_initialization():
 class SimpleModule(Module):
     def __init__(self, signature):
         super().__init__()
-        # COPRO doesn't work with dspy.Predict
+        # COPRO doesn't work with Predict.
         self.predictor = ChainOfThought(signature)
 
     def forward(self, **kwargs):

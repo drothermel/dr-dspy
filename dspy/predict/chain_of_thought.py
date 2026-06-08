@@ -22,8 +22,8 @@ class ChainOfThought(Module):
         A module that reasons step by step in order to predict the output of a task.
 
         Args:
-            signature (Type[dspy.Signature]): The signature of the module.
-            rationale_field (Optional[Union[dspy.OutputField, pydantic.fields.FieldInfo]]): The field that will contain the reasoning.
+            signature (Type[dspy.signatures.signature.Signature]): The signature of the module.
+            rationale_field (Optional[Union[dspy.signatures.field.OutputField, pydantic.fields.FieldInfo]]): The field that will contain the reasoning.
             rationale_field_type (Type): The type of the rationale field.
             **config: The configuration for the module.
         """

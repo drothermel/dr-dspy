@@ -22,16 +22,19 @@ class Document(Type):
 
     Examples:
         ```python
-        import dspy
-        from dspy.signatures import Signature
-        from dspy.experimental import Document, Citations
+        from dspy.adapters.types.citation import Citations
+        from dspy.adapters.types.document import Document
+        from dspy.clients.lm import LM
+        from dspy.predict.predict import Predict
+        from dspy.signatures.field import InputField, OutputField
+        from dspy.signatures.signature import Signature
 
         class AnswerWithSources(Signature):
             '''Answer questions using provided documents with citations.'''
-            documents: list[Document] = dspy.InputField()
-            question: str = dspy.InputField()
-            answer: str = dspy.OutputField()
-            citations: Citations = dspy.OutputField()
+            documents: list[Document] = InputField()
+            question: str = InputField()
+            answer: str = OutputField()
+            citations: Citations = OutputField()
 
         # Create documents
         docs = [
@@ -46,8 +49,8 @@ class Document(Type):
         ]
 
         # Use with a citation-supporting model
-        lm = dspy.LM("anthropic/claude-opus-4-1-20250805")
-        predictor = dspy.Predict(AnswerWithSources)
+        lm = LM("anthropic/claude-opus-4-1-20250805")
+        predictor = Predict(AnswerWithSources)
         result = predictor(documents=docs, question="What temperature does water boil?", lm=lm)
         print(result.citations)
         ```

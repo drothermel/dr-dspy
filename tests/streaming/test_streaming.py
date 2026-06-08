@@ -10,7 +10,11 @@ from unittest.mock import AsyncMock
 import anyio.from_thread
 import pydantic
 import pytest
-from litellm.types.utils import Delta, ModelResponseStream, StreamingChoices
+
+try:
+    from litellm.types.utils import Delta, ModelResponseStream, StreamingChoices
+except ImportError:
+    pytest.skip("litellm is not installed", allow_module_level=True)
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter

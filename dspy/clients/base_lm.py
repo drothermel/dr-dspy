@@ -57,7 +57,7 @@ def _import_lm_class(class_path: str) -> type:
 class BaseLM:
     """Base class for DSPy language models.
 
-    Most users should use `dspy.LM`, which is a `BaseLM` subclass.
+    Most users should use `dspy.clients.lm.LM`, which is a `BaseLM` subclass.
 
     For advanced use cases, such as custom language model backends, users can
     subclass `BaseLM` and implement `forward()`.
@@ -67,7 +67,7 @@ class BaseLM:
     declare which contract they implement with `forward_contract`:
 
     - `forward_contract = "typed_lm"`: implement
-      `forward(request: dspy.LMRequest) -> dspy.LMResponse`. This is the
+      `forward(request: dspy.core.types.LMRequest) -> dspy.core.types.LMResponse`. This is the
       preferred contract for new custom LMs.
     - `forward_contract = "legacy"`: implement
       `forward(prompt=None, messages=None, **kwargs)` and return an OpenAI-like
@@ -83,21 +83,24 @@ class BaseLM:
 
     Calls can flow internally through the typed `LMRequest` / `LMResponse` path
     without changing the public return shape. The typed path is used when the
-    caller passes an explicit `dspy.LMRequest`, when
-    `dspy.context(experimental=True)` is active, or when the subclass declares
+    caller passes an explicit `dspy.core.types.LMRequest`, when
+    `settings.context(experimental=True)` is active, or when the subclass declares
     `forward_contract = "typed_lm"`. It accepts richer direct-call inputs,
-    including `dspy.System`, `dspy.User`, `dspy.Assistant`, `dspy.ToolResult`,
-    content parts, and prior `dspy.LMResponse` objects. The public return value
+    including `System`, `User`, `Assistant`, `ToolResult`, content parts, and prior
+    `dspy.core.types.LMResponse` objects. The public return value
     remains legacy outputs unless the caller explicitly opts into typed output
     with an `LMRequest` or `experimental=True`.
 
     Example typed direct call:
 
     ```python
-    with dspy.context(experimental=True):
+    from dspy.core.types import System, User
+    from dspy.dsp.utils.settings import settings
+
+    with settings.context(experimental=True):
         response = lm(
-            dspy.System("You are concise."),
-            dspy.User("What is DSPy?"),
+            System("You are concise."),
+            User("What is DSPy?"),
         )
         print(response.text)
     ```
@@ -116,20 +119,22 @@ class BaseLM:
         Preferred typed custom LM:
 
         ```python
-        import dspy
+        from dspy.clients.base_lm import BaseLM
+        from dspy.core.types import LMResponse, User
+        from dspy.dsp.utils.settings import settings
 
 
-        class EchoLM(dspy.BaseLM):
+        class EchoLM(BaseLM):
             forward_contract = "typed_lm"
 
-            def forward(self, request: dspy.LMRequest) -> dspy.LMResponse:
-                return dspy.LMResponse.from_text("hello", model=request.model)
+            def forward(self, request):
+                return LMResponse.from_text("hello", model=request.model)
 
 
         lm = EchoLM(model="test/echo")
 
-        with dspy.context(experimental=True):
-            response = lm(dspy.User("Say hello."))
+        with settings.context(experimental=True):
+            response = lm(User("Say hello."))
             print(response.text)
         ```
 
@@ -138,10 +143,12 @@ class BaseLM:
         ```python
         from openai import OpenAI
 
-        import dspy
+        from dspy.clients.base_lm import BaseLM
+        from dspy.dsp.utils.settings import settings
+        from dspy.predict.predict import Predict
 
 
-        class MyLegacyLM(dspy.BaseLM):
+        class MyLegacyLM(BaseLM):
             forward_contract = "legacy"
 
             def forward(self, prompt=None, messages=None, **kwargs):
@@ -155,8 +162,8 @@ class BaseLM:
 
 
         lm = MyLegacyLM(model="gpt-4o-mini")
-        dspy.configure(lm=lm)
-        print(dspy.Predict("q -> a")(q="Why did the chicken cross the kitchen?"))
+        settings.configure(lm=lm)
+        print(Predict("q -> a")(q="Why did the chicken cross the kitchen?"))
         ```
     """
 
@@ -165,7 +172,7 @@ class BaseLM:
 
     `"legacy"` means `forward(prompt=None, messages=None, **kwargs)` returns an
     OpenAI-like provider response. `"typed_lm"` means
-    `forward(request: dspy.LMRequest) -> dspy.LMResponse`.
+    `forward(request: dspy.core.types.LMRequest) -> dspy.core.types.LMResponse`.
     """
 
     def __init__(
@@ -231,7 +238,7 @@ class BaseLM:
             return response
         raise TypeError(
             f"{type(self).__name__}.forward_contract='typed_lm' requires forward(request) "
-            f"to return dspy.LMResponse, but got {type(response).__name__}."
+            f"to return dspy.core.types.LMResponse, but got {type(response).__name__}."
         )
 
     def _validate_legacy_lm_response(
@@ -253,10 +260,11 @@ class BaseLM:
         if self._declares_forward_contract():
             raise TypeError(
                 f"{type(self).__name__}.forward_contract='legacy' requires forward() to return an "
-                "OpenAI-like provider response, but got dspy.LMResponse. Set forward_contract='typed_lm'."
+                "OpenAI-like provider response, but got dspy.core.types.LMResponse. "
+                "Set forward_contract='typed_lm'."
             )
         warnings.warn(
-            f"{type(self).__name__}.forward() returned dspy.LMResponse while using the default legacy "
+            f"{type(self).__name__}.forward() returned dspy.core.types.LMResponse while using the default legacy "
             "forward_contract. Set forward_contract='typed_lm' before the typed LM API becomes the default.",
             DeprecationWarning,
             stacklevel=stacklevel,
@@ -333,7 +341,7 @@ class BaseLM:
         through `LMRequest` / `LMResponse` when either:
 
         - `request=` is provided or the first positional argument is an `LMRequest`, or
-        - `dspy.context(experimental=True)` is active, or
+        - `settings.context(experimental=True)` is active, or
         - the subclass declares `forward_contract = "typed_lm"`.
 
         In the typed request path, positional `items` are normalized with `LMRequest.from_call()`. This supports
@@ -384,7 +392,7 @@ class BaseLM:
         """Asynchronously call the language model.
 
         This is the async equivalent of `__call__()`. It preserves legacy outputs by default and returns
-        `dspy.LMResponse` for explicit `LMRequest` calls or experimental direct calls.
+        `dspy.core.types.LMResponse` for explicit `LMRequest` calls or experimental direct calls.
         """
         return_typed_response, forward_contract, normalized_request = self._prepare_lm_call(
             items=items,
@@ -441,8 +449,8 @@ class BaseLM:
         response = self.forward(prompt=prompt, messages=messages, **kwargs)
         if isinstance(response, LMResponse):
             raise TypeError(
-                f"{type(self).__name__}.forward() returned dspy.LMResponse on the legacy direct path. "
-                "Set forward_contract='typed_lm' or pass an LMRequest/use dspy.context(experimental=True)."
+                f"{type(self).__name__}.forward() returned dspy.core.types.LMResponse on the legacy direct path. "
+                "Set forward_contract='typed_lm' or pass an LMRequest/use settings.context(experimental=True)."
             )
         return self._process_lm_response(response, prompt, messages, **kwargs)
 
@@ -458,8 +466,8 @@ class BaseLM:
         response = await self.aforward(prompt=prompt, messages=messages, **kwargs)
         if isinstance(response, LMResponse):
             raise TypeError(
-                f"{type(self).__name__}.aforward() returned dspy.LMResponse on the legacy direct path. "
-                "Set forward_contract='typed_lm' or pass an LMRequest/use dspy.context(experimental=True)."
+                f"{type(self).__name__}.aforward() returned dspy.core.types.LMResponse on the legacy direct path. "
+                "Set forward_contract='typed_lm' or pass an LMRequest/use settings.context(experimental=True)."
             )
         return self._process_lm_response(response, prompt, messages, **kwargs)
 
@@ -468,7 +476,7 @@ class BaseLM:
         if len(items) > 1:
             raise TypeError(
                 "Legacy BaseLM calls accept at most one positional prompt. "
-                "Use dspy.context(experimental=True) or pass an LMRequest for typed multi-item LM calls."
+                "Use settings.context(experimental=True) or pass an LMRequest for typed multi-item LM calls."
             )
         if items and prompt is not None:
             raise TypeError("Pass a prompt either positionally or by keyword, not both.")
@@ -620,16 +628,17 @@ class BaseLM:
         - [OpenAI chat completion format](https://platform.openai.com/docs/api-reference/chat/object)
         - [OpenAI text completion format](https://platform.openai.com/docs/api-reference/completions/object)
 
-        For `forward_contract = "typed_lm"`, implement `forward(request: dspy.LMRequest) -> dspy.LMResponse`.
+        For `forward_contract = "typed_lm"`, implement
+        `forward(request: dspy.core.types.LMRequest) -> dspy.core.types.LMResponse`.
 
         Raises:
-            dspy.LMError: Base class for LM configuration, transport, provider,
+            dspy.utils.exceptions.LMError: Base class for LM configuration, transport, provider,
                 and unsupported-feature failures. Notable subclasses include
-                `dspy.ContextWindowExceededError` for context-window failures,
+                `dspy.utils.exceptions.ContextWindowExceededError` for context-window failures,
                 which adapters use to avoid inappropriate fallback retries when
                 the prompt is too long. Each subclass should catch its
                 provider's native context-window error and re-raise it as
-                `dspy.ContextWindowExceededError`.
+                `dspy.utils.exceptions.ContextWindowExceededError`.
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
@@ -650,16 +659,17 @@ class BaseLM:
         - [OpenAI chat completion format](https://platform.openai.com/docs/api-reference/chat/object)
         - [OpenAI text completion format](https://platform.openai.com/docs/api-reference/completions/object)
 
-        For `forward_contract = "typed_lm"`, implement `aforward(request: dspy.LMRequest) -> dspy.LMResponse`.
+        For `forward_contract = "typed_lm"`, implement
+        `aforward(request: dspy.core.types.LMRequest) -> dspy.core.types.LMResponse`.
 
         Raises:
-            dspy.LMError: Base class for LM configuration, transport, provider,
+            dspy.utils.exceptions.LMError: Base class for LM configuration, transport, provider,
                 and unsupported-feature failures. Notable subclasses include
-                `dspy.ContextWindowExceededError` for context-window failures,
+                `dspy.utils.exceptions.ContextWindowExceededError` for context-window failures,
                 which adapters use to avoid inappropriate fallback retries when
                 the prompt is too long. Each subclass should catch its
                 provider's native context-window error and re-raise it as
-                `dspy.ContextWindowExceededError`.
+                `dspy.utils.exceptions.ContextWindowExceededError`.
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
@@ -688,7 +698,7 @@ class BaseLM:
     def load_state(cls, state: dict[str, Any], *, allow_custom_lm_class: bool = False) -> "BaseLM":
         """Reconstruct an LM from `dump_state` output.
 
-        Legacy states without a class marker load as `dspy.LM`. Custom LM
+        Legacy states without a class marker load as `dspy.clients.lm.LM`. Custom LM
         classes must be importable by their module-qualified class path and are
         only loaded when `allow_custom_lm_class=True`.
 
@@ -725,7 +735,9 @@ class BaseLM:
 
             lm_cls = _import_lm_class(class_path)
             if not issubclass(lm_cls, BaseLM):
-                raise TypeError(f"Serialized LM class `{class_path}` must be a subclass of dspy.BaseLM.")
+                raise TypeError(
+                    f"Serialized LM class `{class_path}` must be a subclass of dspy.clients.base_lm.BaseLM."
+                )
             if "allow_custom_lm_class" in inspect.signature(lm_cls.load_state).parameters:
                 return lm_cls.load_state(state, allow_custom_lm_class=allow_custom_lm_class)
             return lm_cls.load_state(state)
@@ -786,7 +798,7 @@ class BaseLM:
         if settings.max_history_size == 0:
             return
 
-        # dspy.LM.history
+        # LM.history
         if len(self.history) >= settings.max_history_size:
             self.history.pop(0)
 

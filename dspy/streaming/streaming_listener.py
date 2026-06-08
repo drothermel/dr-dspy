@@ -241,7 +241,7 @@ class StreamListener:
     def _json_adapter_handle_stream_chunk(self, token: str, chunk_message: str) -> StreamResponse | None:
         self.json_adapter_state["field_accumulated_messages"] += chunk_message
         if self.json_adapter_state["field_accumulated_messages"].rstrip().endswith("}"):
-            # When the accumulated tokens end with a curly bracket, that means the streaming for the `dspy.Predict` we
+            # When the accumulated tokens end with a curly bracket, that means the streaming for the `Predict` we
             # are listening to is probably finished, we need to run a check and decide whether to end the stream.
             try:
                 # If the parse doesn't raise an error, that means the accumulated tokens is a valid json object. Because

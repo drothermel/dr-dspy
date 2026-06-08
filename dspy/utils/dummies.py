@@ -26,8 +26,10 @@ class DummyLM(BaseLM):
     Examples:
 
     ```
+    from dspy.dsp.utils.settings import settings
+
     lm = DummyLM([{"answer": "red"}, {"answer": "blue"}])
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     predictor("What color is the sky?")
     # Output:
     # [[## answer ##]]
@@ -45,8 +47,10 @@ class DummyLM(BaseLM):
     formatted according to the `format_field_with_value` function from the chat adapter.
 
     ```
+    from dspy.dsp.utils.settings import settings
+
     lm = DummyLM({"What color is the sky?": {"answer": "blue"}})
-    dspy.configure(lm=lm)
+    settings.configure(lm=lm)
     predictor("What color is the sky?")
     # Output:
     # [[## answer ##]]
@@ -59,9 +63,12 @@ class DummyLM(BaseLM):
     the dummy model will return the output from that example.
 
     ```
+    from dspy.dsp.utils.settings import settings
+    from dspy.primitives.example import Example
+
     lm = DummyLM([{"answer": "red"}], follow_examples=True)
-    dspy.configure(lm=lm)
-    predictor("What color is the sky?, demos=dspy.Example(input="What color is the sky?", output="blue"))
+    settings.configure(lm=lm)
+    predictor("What color is the sky?", demos=Example(input="What color is the sky?", output="blue"))
     # Output:
     # [[## answer ##]]
     # blue

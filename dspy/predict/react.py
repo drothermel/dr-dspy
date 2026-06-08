@@ -29,7 +29,8 @@ class ReAct(Module):
 
         Args:
             signature: The signature of the module, which defines the input and output of the react module.
-            tools (list[Callable]): A list of functions, callable objects, or `dspy.Tool` instances.
+            tools (list[Callable]): A list of functions, callable objects, or `dspy.adapters.types.tool.Tool`
+                instances.
             max_iters (Optional[int]): The maximum number of iterations to run. Defaults to 10.
 
         Examples:
@@ -38,7 +39,9 @@ class ReAct(Module):
         def get_weather(city: str) -> str:
             return f"The weather in {city} is sunny."
 
-        react = dspy.ReAct(signature="question->answer", tools=[get_weather])
+        from dspy.predict.react import ReAct
+
+        react = ReAct(signature="question->answer", tools=[get_weather])
         pred = react(question="What is the weather in Tokyo?")
         ```
         """
@@ -202,7 +205,7 @@ def _fmt_exc(err: BaseException, *, limit: int = 5) -> str:
 
 
 """
-Thoughts and Planned Improvements for dspy.ReAct.
+Thoughts and Planned Improvements for ReAct.
 
 TOPIC 01: How Trajectories are Formatted, or rather when they are formatted.
 
@@ -212,7 +215,7 @@ the formatter uses a general adapter.format_fields, the tracing of DSPy only see
 What this means is that, in demonstrations, even if the user adjusts the adapter for a fixed program, the demos' format
 will not update accordingly, but the inference-time trajectories will.
 
-One way to fix this is to support `format=fn` in the dspy.InputField() for "trajectory" in the signatures. But this
+One way to fix this is to support `format=fn` in the InputField for "trajectory" in the signatures. But this
 means that care must be taken that the adapter is accessed at `forward` runtime, not signature definition time.
 
 Another potential fix is to more natively support a "variadic" input field, where the input is a list of dictionaries,

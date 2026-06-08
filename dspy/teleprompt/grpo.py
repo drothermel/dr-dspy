@@ -411,7 +411,8 @@ class GRPO(FinetuneTeleprompter):
                     # Each example_data is a list of teacher_idx -> [num_samples_per_input * Dict(example, prediction, trace, example_ind, score)]
                     # We need to flatten this list and create a batch for each predictor
 
-                    # TODO(Lakshya, Omar, Noah): Discuss what to do with the same module being invoked multiple times within a single dspy.Example
+                    # TODO(Lakshya, Omar, Noah): Discuss what to do with the same module being invoked multiple
+                    # times within a single Example.
                     predictor_example_invocations: list[list[tuple]] = []
 
                     for teacher_data in example_data:

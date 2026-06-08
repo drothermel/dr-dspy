@@ -50,7 +50,7 @@ class _RestrictedUnpickler(pickle.Unpickler):
             return super().find_class(module, name)
         raise DeserializationError(
             f"Type {module}.{name} is not in the safe_types allowlist. "
-            f"Register it via dspy.configure_cache(safe_types=[...])."
+            f"Register it via `from dspy.clients import configure_cache; configure_cache(safe_types=[...])`."
         )
 
 
