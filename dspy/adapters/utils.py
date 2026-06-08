@@ -344,10 +344,6 @@ def get_annotation_name(annotation: object) -> str:
     origin = get_origin(annotation)
     args = get_args(annotation)
     if origin is None:
-        if annotation is Reasoning:
-            # Keep backward compatibility with the old behavior in `ChainOfThought`, where reasoning
-            # field type is treated as a string.
-            return "str"
         if hasattr(annotation, "__name__"):
             return cast("str", annotation.__name__)
         return str(annotation)

@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel
 from typing_extensions import override
 
@@ -31,7 +33,7 @@ class Example:
         'What is the capital of France?'
         >>> example.answer
         'Paris'
-        >>> example.inputs().toDict()
+        >>> example.inputs().to_dict()
         {'question': 'What is the capital of France?'}
 
         Build one from an existing record:
@@ -60,7 +62,7 @@ class Example:
         ...     Example(question="What is 2+2?", answer="4").with_inputs("question"),
         ...     Example(question="What is 3+3?", answer="6").with_inputs("question"),
         ... ]
-        >>> trainset[0].inputs().toDict()
+        >>> trainset[0].inputs().to_dict()
         {'question': 'What is 2+2?'}
 
         Use an example in a metric:
@@ -321,7 +323,7 @@ class Example:
             del copied[key]
         return copied
 
-    def toDict(self):  # noqa: N802
+    def to_dict(self) -> dict[str, Any]:
         """Convert to a plain dictionary, recursively serializing nested objects.
 
         Nested `Example` objects, Pydantic models, lists, and dicts are
@@ -329,13 +331,13 @@ class Example:
 
         Examples:
             >>> from dspy.primitives.example import Example
-            >>> Example(question="Why?", answer="Because.").toDict()
+            >>> Example(question="Why?", answer="Because.").to_dict()
             {'question': 'Why?', 'answer': 'Because.'}
         """
 
         def convert_to_serializable(value):
-            if hasattr(value, "toDict"):
-                return value.toDict()
+            if hasattr(value, "to_dict") and callable(value.to_dict):
+                return value.to_dict()
             if isinstance(value, BaseModel):
                 # Handle Pydantic models (e.g., History)
                 return value.model_dump()

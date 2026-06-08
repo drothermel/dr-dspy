@@ -52,7 +52,7 @@ def wrap_program(program: Module, metric: Callable):
         output_metadata = {}
 
         try:
-            output = metric(example, prediction)
+            output = metric(example, prediction, trace)
             if isinstance(output, (int, float)):
                 score = output
             elif isinstance(output, Prediction):

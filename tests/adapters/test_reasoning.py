@@ -81,7 +81,7 @@ def test_reasoning_with_chain_of_thought():
     cot = ChainOfThought("question -> answer")
     result = cot(question="What is the answer?")
 
-    assert isinstance(result.reasoning, str)
+    assert isinstance(result.reasoning, Reasoning)
     assert result.reasoning.strip() == "Let me think step by step"
     assert result.reasoning.lower() == "let me think step by step"
     assert "step by step" in result.reasoning

@@ -67,9 +67,9 @@ def test_evaluate_single_thread_runs_in_main_thread():
 
     original_metric = answer_exact_match
 
-    def tracking_metric(example, prediction, **kwargs: object):
+    def tracking_metric(example, prediction, trace=None):
         execution_threads.append(threading.current_thread())
-        return original_metric(example, prediction, **kwargs)
+        return original_metric(example, prediction, trace)
 
     program = Predict("question -> answer")
     ev = Evaluate(
@@ -206,7 +206,7 @@ def test_evaluate_call_wrong_answer():
 def test_evaluate_display_table(program_with_example, display_table, capfd):
     program, example = program_with_example
     example_input = next(iter(example.inputs().values()))
-    example_output = {key: value for key, value in example.toDict().items() if key not in example.inputs()}
+    example_output = {key: value for key, value in example.to_dict().items() if key not in example.inputs()}
 
     settings.configure(
         lm=DummyLM(

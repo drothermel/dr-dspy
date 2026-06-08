@@ -96,8 +96,8 @@ def test_save_and_load_with_json(tmp_path):
     new_model.load(save_path)
 
     assert str(new_model.predict.signature) == str(model.predict.signature)
-    assert new_model.predict.demos[0] == model.predict.demos[0].toDict()
-    assert new_model.predict.demos[1] == model.predict.demos[1].toDict()
+    assert new_model.predict.demos[0] == model.predict.demos[0].to_dict()
+    assert new_model.predict.demos[1] == model.predict.demos[1].to_dict()
 
 
 @pytest.mark.extra

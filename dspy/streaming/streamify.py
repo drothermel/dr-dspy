@@ -199,8 +199,7 @@ def streamify(
             async for value in receive_stream:
                 if _is_litellm_model_response_stream(value):
                     if len(predict_id_to_listener) == 0:
-                        # No listeners are configured, yield the chunk directly for backwards compatibility.
-                        yield value
+                        continue
                     else:
                         # We are receiving a chunk from the LM's response stream, delegate it to the listeners to
                         # determine if we should yield a value to the user.

@@ -7,7 +7,6 @@ import pytest
 from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
-from dspy.predict.react import ReAct
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module, set_attribute_by_name
 from dspy.signatures.field import InputField, OutputField
@@ -186,27 +185,6 @@ def test_named_parameters_duplicate_references():
     # Only testing for whether exceptions are thrown or not
     # As Module.named_parameters() is recursive, this is mainly for catching infinite recursion
     module.named_parameters()
-
-
-def test_load_dspy_program_cross_version():
-    """
-    Test backward compatibility for loading a saved DSPy program.
-
-    This test verifies that DSPy can load a program saved in version 3.0.1, ensuring compatibility with older versions.
-    The saved state is located in 'test/primitives/resources/saved_program.json' and represents an optimized
-    `ReAct` program.
-    """
-    path = Path(__file__).parent / "resources" / "saved_program.json"
-    loaded_react = ReAct("question->answer", tools=[])
-    loaded_react.load(path)
-    assert (
-        "Imagine you are a detective racing against time to solve a high-profile"
-        in loaded_react.react.signature.instructions
-    )
-    assert "Given the very verbose fields `question`" in loaded_react.extract.predict.signature.instructions
-
-    assert len(loaded_react.react.demos) == 2
-    assert len(loaded_react.extract.predict.demos) == 2
 
 
 def test_load_state_is_transactional():

@@ -104,9 +104,9 @@ def test_example_with_inputs():
 def test_example_inputs_labels():
     example = Example(a=1, b=2).with_inputs("a")
     inputs = example.inputs()
-    assert inputs.toDict() == {"a": 1}
+    assert inputs.to_dict() == {"a": 1}
     labels = example.labels()
-    assert labels.toDict() == {"b": 2}
+    assert labels.to_dict() == {"b": 2}
 
 
 def test_example_copy_without():
@@ -121,11 +121,11 @@ def test_example_copy_without():
 
 def test_example_to_dict():
     example = Example(a=1, b=2)
-    assert example.toDict() == {"a": 1, "b": 2}
+    assert example.to_dict() == {"a": 1, "b": 2}
 
 
 def test_example_to_dict_with_history():
-    """Test that Example.toDict() properly serializes History objects."""
+    """Test that Example.to_dict() properly serializes History objects."""
     history = History(
         messages=[
             {"question": "What is the capital of France?", "answer": "Paris"},
@@ -134,7 +134,7 @@ def test_example_to_dict_with_history():
     )
     example = Example(question="Test question", history=history, answer="Test answer")
 
-    result = example.toDict()
+    result = example.to_dict()
 
     # Verify the result is a dictionary
     assert isinstance(result, dict)

@@ -100,8 +100,10 @@ class AvatarOptimizer(Teleprompter):
         actor = deepcopy(actor)
 
         try:
-            prediction = actor(**example.inputs().toDict())
-            score = self.metric(example, prediction)
+            with settings.context(trace=[]):
+                prediction = actor(**example.inputs())
+                trace = list(settings.trace)
+            score = self.metric(example, prediction, trace)
 
             if return_outputs:
                 return example, prediction, score
@@ -148,7 +150,7 @@ class AvatarOptimizer(Teleprompter):
             if score >= self.upper_bound:
                 pos_inputs.append(
                     EvalResult(
-                        example=example.inputs().toDict(),
+                        example=example.inputs().to_dict(),
                         score=score,
                         actions=prediction.actions if prediction else None,
                     )
@@ -156,7 +158,7 @@ class AvatarOptimizer(Teleprompter):
             elif score <= self.lower_bound:
                 neg_inputs.append(
                     EvalResult(
-                        example=example.inputs().toDict(),
+                        example=example.inputs().to_dict(),
                         score=score,
                         actions=prediction.actions if prediction else None,
                     )

@@ -1249,7 +1249,7 @@ def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
             "content": "Your input fields are:\n"
             "1. `question` (str):\n"
             "Your output fields are:\n"
-            "1. `reasoning` (str): \n"
+            "1. `reasoning` (Reasoning): \n"
             "2. `code` (Code_python): \n"
             "    Type description of Code_python: Code represented in a string, specified in the "
             "`code` field. If this is an output field, the code field should follow the markdown "
@@ -1285,7 +1285,7 @@ def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
             "Q2\n"
             "\n"
             "Respond with the corresponding output fields, starting with the field `[[ ## "
-            "reasoning ## ]]` (must be formatted as a valid Python str), then `[[ ## code ## ]]` "
+            "reasoning ## ]]` (must be formatted as a valid Python Reasoning), then `[[ ## code ## ]]` "
             "(must be formatted as a valid Python Code_python), and then ending with the marker "
             "for `[[ ## completed ## ]]`.",
         },

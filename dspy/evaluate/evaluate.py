@@ -150,8 +150,10 @@ class Evaluate:
         )
 
         def process_item(example):
-            prediction = program(**example.inputs())
-            score = metric(example, prediction)
+            with settings.context(trace=[]):
+                prediction = program(**example.inputs())
+                trace = list(settings.trace)
+            score = metric(example, prediction, trace)
             return prediction, score
 
         results = executor.execute(process_item, devset)
@@ -202,7 +204,7 @@ class Evaluate:
             (
                 merge_dicts(example, prediction) | {metric_name: score}
                 if prediction_is_dictlike(prediction)
-                else example.toDict() | {"prediction": prediction, metric_name: score}
+                else example.to_dict() | {"prediction": prediction, metric_name: score}
             )
             for example, prediction, score in results
         ]
@@ -263,10 +265,10 @@ def prediction_is_dictlike(prediction):
 
 
 def merge_dicts(d1, d2) -> dict:
-    if hasattr(d1, "toDict"):
-        d1 = d1.toDict()
-    if hasattr(d2, "toDict"):
-        d2 = d2.toDict()
+    if hasattr(d1, "to_dict"):
+        d1 = d1.to_dict()
+    if hasattr(d2, "to_dict"):
+        d2 = d2.to_dict()
 
     merged = {}
     for k, v in d1.items():

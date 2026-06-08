@@ -7,7 +7,7 @@ from dspy.utils.dummies import DummyLM
 
 
 # Define a simple metric function for testing
-def simple_metric(example, prediction):
+def simple_metric(example, prediction, trace=None):
     # Simplified metric for testing: true if prediction matches expected output
     return example.output == prediction.output
 

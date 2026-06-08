@@ -87,10 +87,10 @@ class Predict(Module, Parameter):
                 # Demos are serialized for state round-trips; nested model object types are not preserved after load.
                 demo[field] = serialize_object(demo[field])
 
-            if isinstance(demo, dict) or not json_mode:
-                state["demos"].append(demo)
+            if json_mode and not isinstance(demo, dict):
+                state["demos"].append(demo.to_dict())
             else:
-                state["demos"].append(demo.toDict())
+                state["demos"].append(demo)
 
         state["signature"] = self.signature.dump_state()
         state["lm"] = self.lm.dump_state() if self.lm else None
