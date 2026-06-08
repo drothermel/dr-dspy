@@ -21,6 +21,13 @@ from dspy.primitives.module import Module
 from tests.task_spec.helpers import ts
 
 
+def test_default_config_uses_strict_transparency():
+    from dspy.dsp.utils.settings import DEFAULT_CONFIG
+
+    assert DEFAULT_CONFIG.transparency == "strict"
+    assert DEFAULT_CONFIG.run_log_enabled is True
+
+
 def test_basic_dspy_settings():
     settings.configure(lm=LM("openai/gpt-4o"), adapter=JSONAdapter(), callbacks=[lambda x: x])
     assert settings.lm.model == "openai/gpt-4o"

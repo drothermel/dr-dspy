@@ -1,0 +1,162 @@
+"""JSONL run logging for LM calls."""
+
+from __future__ import annotations
+
+import datetime
+import hashlib
+import json
+import logging
+import os
+import re
+import threading
+from pathlib import Path
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+_SESSION_LOCK = threading.Lock()
+_SESSION: dict[str, Any] | None = None
+
+_SECRET_KEY_PATTERN = re.compile(r"(api[_-]?key|authorization|token|secret)", re.IGNORECASE)
+
+
+def slug_run_id(raw: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9._-]+", "_", raw.strip())
+    return slug or "default_run"
+
+
+def resolve_log_root(run_log_dir: str | None) -> Path:
+    if run_log_dir:
+        return Path(run_log_dir)
+    return Path(os.environ.get("DSPY_LOG_DIR", "logs"))
+
+
+def resolve_run_bucket() -> str:
+    return slug_run_id(os.environ.get("DSPY_RUN_ID", "default_run"))
+
+
+def _serialize_for_json(value: Any) -> Any:
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, dict):
+        return {str(k): _serialize_for_json(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_serialize_for_json(item) for item in value]
+    if hasattr(value, "model_dump"):
+        return value.model_dump(exclude_none=True)
+    if hasattr(value, "to_dict"):
+        return value.to_dict()
+    return repr(value)
+
+
+def _hash_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _redact_content_part(part: dict[str, Any]) -> dict[str, Any]:
+    part_type = part.get("type")
+    if part_type == "text":
+        return part
+    if part_type == "image_url":
+        url = part.get("image_url", {})
+        url_value = url.get("url", "") if isinstance(url, dict) else str(url)
+        if url_value.startswith("data:"):
+            payload = url_value.split(",", 1)[-1]
+            byte_length = len(payload.encode("utf-8"))
+            return {
+                "type": "image_url",
+                "redacted": True,
+                "sha256": _hash_bytes(payload.encode("utf-8")),
+                "byte_length": byte_length,
+            }
+        return {"type": "image_url", "redacted": True, "uri": url_value}
+    if part_type in {"input_audio", "audio"}:
+        data = part.get("input_audio", part.get("audio", {}))
+        raw = data.get("data", "") if isinstance(data, dict) else ""
+        encoded = raw.encode("utf-8") if isinstance(raw, str) else b""
+        return {
+            "type": part_type,
+            "redacted": True,
+            "sha256": _hash_bytes(encoded),
+            "byte_length": len(encoded),
+        }
+    return {"type": part_type, "redacted": True, "keys": sorted(part.keys())}
+
+
+def redact_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    redacted: list[dict[str, Any]] = []
+    for message in messages:
+        item = {"role": message.get("role")}
+        content = message.get("content")
+        if isinstance(content, str):
+            item["content"] = content
+        elif isinstance(content, list):
+            item["content"] = [_redact_content_part(part) if isinstance(part, dict) else part for part in content]
+        else:
+            item["content"] = content
+        if "tool_calls" in message:
+            item["tool_calls"] = message["tool_calls"]
+        redacted.append(item)
+    return redacted
+
+
+def redact_config(config: dict[str, Any]) -> dict[str, Any]:
+    cleaned: dict[str, Any] = {}
+    for key, value in config.items():
+        if _SECRET_KEY_PATTERN.search(str(key)):
+            cleaned[key] = "<redacted>"
+        else:
+            cleaned[key] = _serialize_for_json(value)
+    return cleaned
+
+
+def get_run_session() -> dict[str, Any] | None:
+    return _SESSION
+
+
+def init_run_session(
+    *,
+    run_log_enabled: bool,
+    run_log_dir: str | None,
+    settings_snapshot: dict[str, Any] | None = None,
+) -> Path | None:
+    """Create a new timestamped run directory and write run.json."""
+    global _SESSION
+    if not run_log_enabled:
+        with _SESSION_LOCK:
+            _SESSION = None
+        return None
+
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+    run_dir = resolve_log_root(run_log_dir) / resolve_run_bucket() / timestamp
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    snapshot = _serialize_for_json(settings_snapshot or {})
+    run_json = {
+        "timestamp": timestamp,
+        "run_id": resolve_run_bucket(),
+        "log_root": str(resolve_log_root(run_log_dir)),
+        "settings": snapshot,
+    }
+    (run_dir / "run.json").write_text(json.dumps(run_json, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    with _SESSION_LOCK:
+        _SESSION = {
+            "run_dir": run_dir,
+            "calls_path": run_dir / "calls.jsonl",
+            "timestamp": timestamp,
+        }
+    return run_dir
+
+
+def append_call_record(record: dict[str, Any]) -> None:
+    """Append one JSON object as a line to calls.jsonl (thread-safe)."""
+    with _SESSION_LOCK:
+        session = _SESSION
+    if session is None:
+        return
+
+    line = json.dumps(_serialize_for_json(record), ensure_ascii=False) + "\n"
+    calls_path: Path = session["calls_path"]
+    with _SESSION_LOCK, calls_path.open("a", encoding="utf-8") as handle:
+        handle.write(line)

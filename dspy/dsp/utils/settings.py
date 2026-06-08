@@ -34,6 +34,9 @@ DEFAULT_CONFIG = dotdict(
     max_history_size=10000,
     max_trace_size=10000,
     warn_on_type_mismatch=True,  # Whether to log warnings when a module's input type doesn't match the signature type.
+    transparency="strict",
+    run_log_enabled=True,
+    run_log_dir=None,
 )
 
 main_thread_config = copy.deepcopy(DEFAULT_CONFIG)
@@ -195,6 +198,20 @@ class Settings:
 
         for k, v in kwargs.items():
             main_thread_config[k] = v
+
+        if kwargs:
+            from dspy.utils.run_log import init_run_session
+
+            snapshot = {
+                key: value
+                for key, value in self.copy().items()
+                if key not in {"callbacks", "trace", "usage_tracker", "caller_modules"}
+            }
+            init_run_session(
+                run_log_enabled=main_thread_config.get("run_log_enabled", True),
+                run_log_dir=main_thread_config.get("run_log_dir"),
+                settings_snapshot=snapshot,
+            )
 
     @contextmanager
     def context(self, **kwargs):
