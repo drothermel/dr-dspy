@@ -79,7 +79,7 @@ class BetterTogether(Teleprompter):
     You can pass optimizer-specific arguments to each optimizer's ``compile()`` method using
     ``optimizer_compile_args``. This allows you to customize each optimizer's behavior:
 
-        >>> from dspy.teleprompt import MIPROv2
+        >>> from dspy.teleprompt.mipro import MIPROv2
         >>>
         >>> # Use MIPROv2 for prompt optimization with custom parameters
         >>> optimizer = BetterTogether(
@@ -105,7 +105,8 @@ class BetterTogether(Teleprompter):
     optimizers can be alternated multiple times (though note this is just an illustration of
     BetterTogether's flexibility, not a recommended configuration):
 
-        >>> from dspy.teleprompt import MIPROv2, GEPA
+        >>> from dspy.teleprompt.mipro import MIPROv2
+        >>> from dspy.teleprompt import GEPA
         >>>
         >>> # Chain two optimizers three times: MIPROv2 -> GEPA -> MIPROv2
         >>> optimizer = BetterTogether(
