@@ -58,9 +58,7 @@ def make_task_spec(
         _validate_field_roles(output_fields, FieldRole.OUTPUT)
         if not input_fields and not output_fields:
             raise ValueError("inputs and outputs must contain at least one field.")
-        resolved_name = name or (
-            input_fields[0].name if input_fields else output_fields[0].name
-        )
+        resolved_name = name or (input_fields[0].name if input_fields else output_fields[0].name)
         return TaskSpec(
             name=resolved_name,
             instructions=instructions,
@@ -96,6 +94,4 @@ def make_task_spec(
 def _validate_field_roles(fields: tuple[FieldSpec, ...], expected_role: FieldRole) -> None:
     for field in fields:
         if field.role != expected_role:
-            raise ValueError(
-                f"Field {field.name!r} has role {field.role!r}, expected {expected_role.value!r}."
-            )
+            raise ValueError(f"Field {field.name!r} has role {field.role!r}, expected {expected_role.value!r}.")

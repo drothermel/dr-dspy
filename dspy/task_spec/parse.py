@@ -33,8 +33,7 @@ def parse_task_spec_string(
         )
 
     inputs = tuple(
-        input_field(name, type_, is_type_undefined=is_type_undefined)
-        for name, type_, is_type_undefined in input_fields
+        input_field(name, type_, is_type_undefined=is_type_undefined) for name, type_, is_type_undefined in input_fields
     )
     outputs = tuple(output_field(name, type_) for name, type_, _ in output_fields)
     return inputs, outputs
