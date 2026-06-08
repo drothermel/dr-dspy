@@ -3,12 +3,16 @@ import tempfile
 import time
 import warnings
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest import mock
 from unittest.mock import patch
 
 import pydantic
 import pytest
+from typing_extensions import override
+
+if TYPE_CHECKING:
+    from litellm.utils import ModelResponse
 
 try:
     import litellm
@@ -473,6 +477,7 @@ def _request(
 
 def test_base_lm_requires_lm_request():
     class CustomLM(BaseLM):
+        @override
         def forward(self, request: LMRequest) -> LMResponse:
             return LMResponse.from_text("ok", model=request.model)
 
@@ -482,6 +487,7 @@ def test_base_lm_requires_lm_request():
 
 def test_base_lm_typed_call_returns_lm_response_and_records_history():
     class CustomLM(BaseLM):
+        @override
         def forward(self, request: LMRequest) -> LMResponse:
             assert request.model == "custom-model"
             assert request.messages[0].text == "Query"
@@ -510,6 +516,7 @@ def test_base_lm_typed_call_returns_lm_response_and_records_history():
 
 def test_base_lm_rejects_non_lm_response():
     class CustomLM(BaseLM):
+        @override
         def forward(self, request: LMRequest):
             return ["not typed"]
 
@@ -533,6 +540,7 @@ class _TypedContractLM(BaseLM):
         self.outputs = outputs
         self.requests = []
 
+    @override
     def forward(self, request: LMRequest) -> LMResponse:
         assert isinstance(request, LMRequest)
         self.requests.append(request)
@@ -667,6 +675,7 @@ def test_base_lm_experimental_direct_messages_can_reuse_lm_response_as_assistant
 @pytest.mark.asyncio
 async def test_base_lm_async_explicit_lm_request_returns_lm_response():
     class CustomLM(BaseLM):
+        @override
         async def aforward(self, request: LMRequest) -> LMResponse:
             assert request.model == "custom-model"
             return LMResponse.from_text("Hi async!", model=request.model)
@@ -680,6 +689,7 @@ async def test_base_lm_async_explicit_lm_request_returns_lm_response():
 
 def test_base_lm_tracks_usage_for_custom_subclasses():
     class CustomLM(BaseLM):
+        @override
         def forward(self, request: LMRequest) -> LMResponse:
             assert request.model == "custom-model"
             return LMResponse.from_text(

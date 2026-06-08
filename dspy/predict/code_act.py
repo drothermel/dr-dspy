@@ -3,6 +3,8 @@ import logging
 from collections.abc import Callable
 from typing import Any, cast
 
+from typing_extensions import override
+
 from dspy.adapters.types.tool import Tool
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
@@ -116,6 +118,7 @@ class CodeAct(ReAct, ProgramOfThought):
 
         return instructions
 
+    @override
     def forward(self, **kwargs):
         for tool in self.tools.values():
             self.interpreter(inspect.getsource(tool.func))

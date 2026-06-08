@@ -2,6 +2,7 @@ import logging
 from unittest.mock import patch
 
 import pytest
+from typing_extensions import override
 
 from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
@@ -107,6 +108,7 @@ def test_load_with_version_mismatch(tmp_path):
             super().__init__()
             self.messages = []
 
+        @override
         def emit(self, record):
             self.messages.append(record.getMessage())
 

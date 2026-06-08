@@ -1,5 +1,7 @@
 import random
 
+from typing_extensions import override
+
 from dspy.primitives.module import Module
 from dspy.teleprompt.teleprompt import Teleprompter
 
@@ -18,6 +20,7 @@ class Ensemble(Teleprompter):
         self.size = size
         self.deterministic = deterministic
 
+    @override
     def compile(self, programs):
         size = self.size
         reduce_fn = self.reduce_fn

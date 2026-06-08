@@ -3,6 +3,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 from gepa.core.adapter import ProposalFn
+from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
 from dspy.predict.predict import Predict
@@ -282,6 +283,7 @@ class MultiModalInstructionProposer(ProposalFn):
     def __init__(self) -> None:
         self.single_proposer = SingleComponentMultiModalProposer()
 
+    @override
     def __call__(
         self,
         candidate: dict[str, str],

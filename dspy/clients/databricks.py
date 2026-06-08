@@ -5,6 +5,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 import orjson
+from typing_extensions import override
 
 from dspy.clients.provider import Provider, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat, get_finetune_directory
@@ -23,6 +24,7 @@ class TrainingJobDatabricks(TrainingJob):
         self.launch_completed = False
         self.endpoint_name = None
 
+    @override
     def status(self):
         if not self.finetuning_run:
             return None
@@ -42,7 +44,8 @@ class DatabricksProvider(Provider):
     TrainingJob = TrainingJobDatabricks
 
     @staticmethod
-    def is_provider_model(model: str) -> bool:  # noqa: ARG004 dynamic typing/lint migration for scoped ty adoption
+    @override
+    def is_provider_model(model: str) -> bool:
         # We don't automatically infer Databricks models because Databricks is not a proprietary model provider.
         return False
 
@@ -161,6 +164,7 @@ class DatabricksProvider(Provider):
         )
 
     @staticmethod
+    @override
     def finetune(
         job: TrainingJobDatabricks,
         model: str,
@@ -283,8 +287,8 @@ def _create_directory_in_databricks_unity_catalog(w: "WorkspaceClient", databric
     schema = match.group("schema")
     volume = match.group("volume")
 
+    volume_path = f"{catalog}.{schema}.{volume}"
     try:
-        volume_path = f"{catalog}.{schema}.{volume}"
         w.volumes.read(volume_path)
     except Exception:
         raise ValueError(

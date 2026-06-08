@@ -10,6 +10,7 @@ import base64
 from contextlib import contextmanager
 
 import pytest
+from typing_extensions import override
 
 from dspy.adapters.types.tool import Tool
 from dspy.clients.lm import LM
@@ -1270,15 +1271,19 @@ class _StubSerializable(SandboxSerializable):
     def __init__(self, data: str = "stub_data"):
         self.data = data
 
+    @override
     def sandbox_setup(self) -> str:
         return "import json"
 
+    @override
     def to_sandbox(self) -> bytes:
         return self.data.encode("utf-8")
 
+    @override
     def sandbox_assignment(self, var_name: str, data_expr: str) -> str:
         return f"{var_name} = {data_expr}"
 
+    @override
     def rlm_preview(self, max_chars: int = 500) -> str:
         return f"StubData({self.data})"
 
@@ -1286,15 +1291,19 @@ class _StubSerializable(SandboxSerializable):
 class _BinarySerializable(SandboxSerializable):
     """Serializable that emits non-UTF8 bytes to exercise binary payload path."""
 
+    @override
     def sandbox_setup(self) -> str:
         return ""
 
+    @override
     def to_sandbox(self) -> bytes:
         return b"\xff\xfe\xfd"
 
+    @override
     def sandbox_assignment(self, var_name: str, data_expr: str) -> str:
         return f"{var_name} = {data_expr}"
 
+    @override
     def rlm_preview(self, max_chars: int = 500) -> str:
         return "BinaryPayload"
 
@@ -1389,15 +1398,19 @@ class TestPrepareSerializableVars:
         large_text = "x" * (2 * 1024 * 1024)  # 2 MB UTF-8 payload
 
         class _LargeText(SandboxSerializable):
+            @override
             def sandbox_setup(self) -> str:
                 return ""
 
+            @override
             def to_sandbox(self) -> bytes:
                 return large_text.encode("utf-8")
 
+            @override
             def sandbox_assignment(self, var_name: str, data_expr: str) -> str:
                 return f"{var_name} = {data_expr}"
 
+            @override
             def rlm_preview(self, max_chars: int = 500) -> str:
                 return f"LargeText({len(large_text)} chars)"
 
@@ -1443,15 +1456,19 @@ class TestLargeSerializableRoundTrip:
         large_text = "abc123" * (200 * 1024)  # ~1.2 MB UTF-8
 
         class _LargeText(SandboxSerializable):
+            @override
             def sandbox_setup(self) -> str:
                 return ""
 
+            @override
             def to_sandbox(self) -> bytes:
                 return large_text.encode("utf-8")
 
+            @override
             def sandbox_assignment(self, var_name: str, data_expr: str) -> str:
                 return f"{var_name} = {data_expr}"
 
+            @override
             def rlm_preview(self, max_chars: int = 500) -> str:
                 return f"LargeText({len(large_text)} chars)"
 

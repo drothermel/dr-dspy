@@ -2,6 +2,8 @@ import logging
 import math
 import random
 
+from typing_extensions import override
+
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.chain_of_thought import ChainOfThought
@@ -24,6 +26,7 @@ class InferRules(BootstrapFewShot):
         self.metric = kwargs.get("metric")
         self.max_errors = kwargs.get("max_errors")
 
+    @override
     def compile(self, student, *, teacher=None, trainset, valset=None):
         if valset is None:
             train_size = int(0.5 * len(trainset))

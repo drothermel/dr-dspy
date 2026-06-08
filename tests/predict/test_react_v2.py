@@ -1,5 +1,7 @@
 import json
 
+from typing_extensions import override
+
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import ToolCalls
 from dspy.clients.base_lm import BaseLM
@@ -14,6 +16,7 @@ from tests.adapters.conftest import captured_lm_kwargs
 
 class ReasoningDummyLM(DummyLM):
     @property
+    @override
     def supports_reasoning(self):
         return True
 
@@ -194,9 +197,11 @@ class NativeToolLM(BaseLM):
         self.calls = []
 
     @property
+    @override
     def supports_function_calling(self):
         return True
 
+    @override
     def forward(self, request: LMRequest) -> LMResponse:
         self.calls.append({"messages": request.messages, "kwargs": captured_lm_kwargs(request)})
         if len(self.calls) == 1:
@@ -231,9 +236,11 @@ class ParallelNativeToolLM(BaseLM):
         self.calls = []
 
     @property
+    @override
     def supports_function_calling(self):
         return True
 
+    @override
     def forward(self, request: LMRequest) -> LMResponse:
         self.calls.append({"messages": request.messages, "kwargs": captured_lm_kwargs(request)})
         if len(self.calls) == 1:

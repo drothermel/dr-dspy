@@ -7,6 +7,8 @@ import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
+from typing_extensions import override
+
 from dspy.primitives.prediction import Prediction
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.annotation import experimental
@@ -481,6 +483,7 @@ class GEPA(Teleprompter):
         total += (periodic_fulls + extra_final) * V
         return total
 
+    @override
     def compile(
         self,
         student: Module,

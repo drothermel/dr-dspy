@@ -1,5 +1,7 @@
 import random
 
+from typing_extensions import override
+
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
@@ -297,13 +299,14 @@ class GroundedProposer(Proposer):
             except Exception:
                 self.use_dataset_summary = False
 
+    @override
     def propose_instructions_for_program(
         self,
         trainset,
         program,
         demo_candidates,
         trial_logs,
-        N,  # noqa: N803
+        N,
     ) -> dict[int, list[str]]:
         """This method is responsible for returning the full set of new instructions for our program, given the specified criteria."""
 
@@ -353,6 +356,7 @@ class GroundedProposer(Proposer):
 
         return proposed_instructions
 
+    @override
     def propose_instruction_for_predictor(
         self,
         program,

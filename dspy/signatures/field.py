@@ -1,6 +1,7 @@
 import warnings
 
 import pydantic
+from typing_extensions import override
 
 from dspy.utils.constants import IS_TYPE_UNDEFINED
 
@@ -108,9 +109,11 @@ class OldField:
         if self.desc is None:
             self.desc = f"${{{key}}}"
 
+    @override
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(prefix={self.prefix}, desc={self.desc})"
 
+    @override
     def __eq__(self, __value: object) -> bool:
         return self.__dict__ == __value.__dict__
 

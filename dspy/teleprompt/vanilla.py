@@ -1,5 +1,7 @@
 import random
 
+from typing_extensions import override
+
 from dspy.teleprompt.teleprompt import Teleprompter
 
 
@@ -7,6 +9,7 @@ class LabeledFewShot(Teleprompter):
     def __init__(self, k=16) -> None:
         self.k = k
 
+    @override
     def compile(self, student, *, trainset, sample=True):
         self.student = student.reset_copy()
         self.trainset = trainset

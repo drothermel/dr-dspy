@@ -7,6 +7,7 @@ import json_repair
 import pydantic
 import regex
 from pydantic.fields import FieldInfo
+from typing_extensions import override
 
 from dspy.adapters.chat_adapter import ChatAdapter, FieldInfoWithName
 from dspy.adapters.types.tool import ToolCalls
@@ -81,6 +82,7 @@ class JSONAdapter(ChatAdapter):
             return call_fn(lm, lm_kwargs, signature, demos, inputs)
         return None
 
+    @override
     def __call__(
         self,
         lm: BaseLM,
@@ -108,6 +110,7 @@ class JSONAdapter(ChatAdapter):
             lm_kwargs["response_format"] = {"type": "json_object"}
             return super().__call__(lm, lm_kwargs, signature, demos, inputs)
 
+    @override
     async def acall(
         self,
         lm: BaseLM,
@@ -135,6 +138,7 @@ class JSONAdapter(ChatAdapter):
             lm_kwargs["response_format"] = {"type": "json_object"}
             return await super().acall(lm, lm_kwargs, signature, demos, inputs)
 
+    @override
     def format_field_structure(self, signature: type[Signature]) -> str:
         parts = []
         parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
@@ -154,6 +158,7 @@ class JSONAdapter(ChatAdapter):
         parts.append(format_signature_fields_for_instructions(signature.output_fields, role="assistant"))
         return "\n\n".join(parts).strip()
 
+    @override
     def user_message_output_requirements(self, signature: type[Signature]) -> str:
         def type_info(v: FieldInfo) -> str:
             if v.annotation == ToolCalls:
@@ -169,6 +174,7 @@ class JSONAdapter(ChatAdapter):
         message += "."
         return message
 
+    @override
     def format_assistant_message_content(
         self,
         signature: type[Signature],
@@ -181,6 +187,7 @@ class JSONAdapter(ChatAdapter):
         }
         return self.format_field_with_value(fields_with_values, role="assistant")
 
+    @override
     def parse(self, signature: type[Signature], completion: str) -> dict[str, Any]:
         fields = json_repair.loads(completion)
 
@@ -216,6 +223,7 @@ class JSONAdapter(ChatAdapter):
 
         return fields
 
+    @override
     def format_field_with_value(self, fields_with_values: dict[FieldInfoWithName, Any], role: str = "user") -> str:
         """
         Formats the values of the specified fields according to the field's DSPy type (input or output),
@@ -237,6 +245,7 @@ class JSONAdapter(ChatAdapter):
         d = {k.name: v for k, v in d}
         return json.dumps(serialize_for_json(d), indent=2, ensure_ascii=False)
 
+    @override
     def format_finetune_data(
         self, signature: type[Signature], demos: list[dict[str, Any]], inputs: dict[str, Any], outputs: dict[str, Any]
     ) -> dict[str, list[Any]]:

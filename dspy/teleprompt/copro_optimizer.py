@@ -2,6 +2,8 @@ import logging
 import statistics
 from collections import defaultdict
 
+from typing_extensions import override
+
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.predict import Predict
@@ -123,6 +125,7 @@ class COPRO(Teleprompter):
         assert hasattr(predictor, "signature")
         predictor.signature = updated_signature
 
+    @override
     def compile(self, student, *, trainset, eval_kwargs):
         """
         optimizes `signature` of `student` program - note that it may be zero-shot or already pre-optimized (demos already chosen - `demos != []`)
@@ -335,7 +338,7 @@ class COPRO(Teleprompter):
                 best_predictors.sort(key=lambda x: x["score"], reverse=True)
 
                 scores = [x["score"] for x in best_predictors][:10]
-                results_best[id(predictor)]["depth"].append(d)
+                results_best[id(predictor)]["depth"].append(self.depth - 1)
                 results_best[id(predictor)]["max"].append(max(scores))
                 results_best[id(predictor)]["average"].append(sum(scores) / len(scores))
                 results_best[id(predictor)]["min"].append(min(scores))

@@ -9,6 +9,7 @@ import logging
 import unicodedata
 
 import regex
+from typing_extensions import override
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +166,7 @@ class SimpleTokenizer(Tokenizer):
             )
         self.annotators = set()
 
+    @override
     def tokenize(self, text):
         data = []
         matches = list(self._regexp.finditer(text))

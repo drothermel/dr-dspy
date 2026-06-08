@@ -4,6 +4,8 @@ import re
 import textwrap
 from typing import TYPE_CHECKING, Any, NamedTuple
 
+from typing_extensions import override
+
 from dspy.adapters.base import Adapter
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import (
@@ -79,6 +81,7 @@ class ChatAdapter(Adapter):
             parallel_tool_calls=self.parallel_tool_calls,
         )
 
+    @override
     def __call__(
         self,
         lm: BaseLM,
@@ -98,6 +101,7 @@ class ChatAdapter(Adapter):
                 raise
             return self._make_json_adapter_fallback()(lm, lm_kwargs, signature, demos, inputs)
 
+    @override
     async def acall(
         self,
         lm: BaseLM,
@@ -117,12 +121,14 @@ class ChatAdapter(Adapter):
                 raise
             return await self._make_json_adapter_fallback().acall(lm, lm_kwargs, signature, demos, inputs)
 
+    @override
     def format_field_description(self, signature: type[Signature]) -> str:
         return (
             f"Your input fields are:\n{get_field_description_string(signature.input_fields)}\n"
             f"Your output fields are:\n{get_field_description_string(signature.output_fields)}"
         )
 
+    @override
     def format_field_structure(self, signature: type[Signature]) -> str:
         """
         `ChatAdapter` requires input and output fields to be in their own sections, with section header using markers
@@ -145,11 +151,13 @@ class ChatAdapter(Adapter):
         parts.append("[[ ## completed ## ]]\n")
         return "\n\n".join(parts).strip()
 
+    @override
     def format_task_description(self, signature: type[Signature]) -> str:
         instructions = textwrap.dedent(signature.instructions)
         objective = ("\n" + " " * 8).join([""] + instructions.splitlines())
         return f"In adhering to this structure, your objective is: {objective}"
 
+    @override
     def format_user_message_content(
         self,
         signature: type[Signature],
@@ -203,6 +211,7 @@ class ChatAdapter(Adapter):
         message += ", and then ending with the marker for `[[ ## completed ## ]]`."
         return message
 
+    @override
     def format_assistant_message_content(
         self,
         signature: type[Signature],
@@ -218,6 +227,7 @@ class ChatAdapter(Adapter):
         assistant_message_content += "\n\n[[ ## completed ## ]]\n"
         return assistant_message_content
 
+    @override
     def parse(self, signature: type[Signature], completion: str) -> dict[str, Any]:
         sections = [(None, [])]
 

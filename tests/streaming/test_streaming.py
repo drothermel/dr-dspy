@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 import anyio.from_thread
 import pydantic
 import pytest
+from typing_extensions import override
 
 from dspy.streaming.streamify import apply_sync_streaming
 from dspy.streaming.streaming_listener import StreamListener
@@ -100,6 +101,7 @@ async def test_default_status_streaming():
             self.generate_question = Tool(lambda x: f"What color is the {x}?", name="generate_question")
             self.predict = Predict("question->answer")
 
+        @override
         def __call__(self, x: str):
             question = self.generate_question(x=x)
             return self.predict(question=question)
@@ -126,17 +128,21 @@ async def test_custom_status_streaming():
             self.generate_question = Tool(lambda x: f"What color is the {x}?", name="generate_question")
             self.predict = Predict("question->answer")
 
+        @override
         def __call__(self, x: str):
             question = self.generate_question(x=x)
             return self.predict(question=question)
 
     class MyStatusMessageProvider(StatusMessageProvider):
+        @override
         def tool_start_status_message(self, instance, inputs):
             return "Tool starting!"
 
+        @override
         def tool_end_status_message(self, outputs):
             return "Tool finished!"
 
+        @override
         def module_start_status_message(self, instance, inputs):
             if isinstance(instance, Predict):
                 return "Predict starting!"
@@ -165,29 +171,36 @@ async def test_concurrent_status_message_providers():
             self.generate_question = Tool(lambda x: f"What color is the {x}?", name="generate_question")
             self.predict = Predict("question->answer")
 
+        @override
         def __call__(self, x: str):
             question = self.generate_question(x=x)
             return self.predict(question=question)
 
     class MyStatusMessageProvider1(StatusMessageProvider):
+        @override
         def tool_start_status_message(self, instance, inputs):
             return "Provider1: Tool starting!"
 
+        @override
         def tool_end_status_message(self, outputs):
             return "Provider1: Tool finished!"
 
+        @override
         def module_start_status_message(self, instance, inputs):
             if isinstance(instance, Predict):
                 return "Provider1: Predict starting!"
             return None
 
     class MyStatusMessageProvider2(StatusMessageProvider):
+        @override
         def tool_start_status_message(self, instance, inputs):
             return "Provider2: Tool starting!"
 
+        @override
         def tool_end_status_message(self, outputs):
             return "Provider2: Tool finished!"
 
+        @override
         def module_start_status_message(self, instance, inputs):
             if isinstance(instance, Predict):
                 return "Provider2: Predict starting!"
@@ -252,6 +265,7 @@ async def test_stream_listener_chat_adapter(lm_for_test):
             self.predict1 = Predict("question->answer")
             self.predict2 = Predict("question, answer->judgement")
 
+        @override
         def __call__(self, x: str, **kwargs: object):
             answer = self.predict1(question=x, **kwargs)
             return self.predict2(question=x, answer=answer, **kwargs)
@@ -288,6 +302,7 @@ async def test_default_status_streaming_in_async_program():
             self.generate_question = Tool(lambda x: f"What color is the {x}?", name="generate_question")
             self.predict = Predict("question->answer")
 
+        @override
         async def acall(self, x: str):
             question = await cast("Any", self.generate_question).acall(x=x)
             return await self.predict.acall(question=question)
@@ -315,6 +330,7 @@ async def test_stream_listener_json_adapter(lm_for_test):
             self.predict1 = Predict("question->answer")
             self.predict2 = Predict("question, answer->judgement")
 
+        @override
         def __call__(self, x: str, **kwargs: object):
             answer = self.predict1(question=x, **kwargs)
             return self.predict2(question=x, answer=answer, **kwargs)
@@ -379,6 +395,7 @@ def test_sync_streaming(lm_for_test):
             self.predict1 = Predict("question->answer")
             self.predict2 = Predict("question, answer->judgement")
 
+        @override
         def __call__(self, x: str, **kwargs: object):
             answer = self.predict1(question=x, **kwargs)
             return self.predict2(question=x, answer=answer, **kwargs)
@@ -416,6 +433,7 @@ def test_sync_status_streaming():
             self.generate_question = Tool(lambda x: f"What color is the {x}?", name="generate_question")
             self.predict = Predict("question->answer")
 
+        @override
         def __call__(self, x: str):
             question = self.generate_question(x=x)
             return self.predict(question=question)
@@ -1071,18 +1089,22 @@ async def test_streaming_allows_custom_streamable_type():
         message: str
 
         @classmethod
+        @override
         def is_streamable(cls) -> bool:
             return True
 
         @classmethod
-        def adapt_to_native_lm_feature(cls, signature, field_name, lm, lm_kwargs):  # noqa: ARG003
+        @override
+        def adapt_to_native_lm_feature(cls, signature, field_name, lm, lm_kwargs):
             return signature.delete(field_name)
 
         @classmethod
+        @override
         def parse_stream_chunk(cls, chunk):
             return CustomType(message=chunk.choices[0].delta.content)
 
         @classmethod
+        @override
         def parse_lm_response(cls, response: str | dict[str, Any]) -> "CustomType":
             if isinstance(response, dict):
                 response = response.get("message", "")

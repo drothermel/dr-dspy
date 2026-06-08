@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 
 import srsly
+from typing_extensions import override
 
 from dspy.primitives.prediction import Prediction
 from dspy.utils.lazy_import import require
@@ -248,6 +249,7 @@ class EmbeddingsWithScores(Embeddings):
     Similarity scores enable downstream such as thresholding and re-ranking.
     """
 
+    @override
     def forward(self, query: str) -> Prediction:
         """Search for the top-k passages most similar to the query.
 

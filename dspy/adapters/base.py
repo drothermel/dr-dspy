@@ -360,6 +360,8 @@ class Adapter:
 
         # Render conversation history as prior messages; omit the History field from history/current user content while keeping the original signature for system instructions.
         history_field_name = self._get_history_field_name(signature)
+        signature_without_history = signature
+        conversation_history: list[dict[str, Any]] = []
         if history_field_name:
             signature_without_history = signature.delete(history_field_name)
             conversation_history = self.format_conversation_history(

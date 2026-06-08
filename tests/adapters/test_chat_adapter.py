@@ -5,6 +5,7 @@ from unittest import mock
 
 import pydantic
 import pytest
+from typing_extensions import override
 
 from dspy.utils.dummies import DummyLM
 
@@ -808,10 +809,12 @@ def test_chat_adapter_format_exact_messages_with_base_custom_type_input():
     class Event(DSPyType):
         label: str
 
+        @override
         def format(self):
             return [{"type": "event", "event": {"label": self.label}}]
 
         @classmethod
+        @override
         def description(cls) -> str:
             return "An event block."
 
@@ -1093,6 +1096,7 @@ def test_chat_adapter_format_exact_messages_preserves_passthrough_lm_kwargs():
 def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_reasoning():
     class ReasoningLM(DummyLM):
         @property
+        @override
         def supports_reasoning(self):
             return True
 
@@ -1146,10 +1150,12 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_reasoning(
 def test_chat_adapter_native_tool_calling_still_enables_native_reasoning():
     class NativeToolReasoningLM(DummyLM):
         @property
+        @override
         def supports_function_calling(self):
             return True
 
         @property
+        @override
         def supports_reasoning(self):
             return True
 
@@ -1270,6 +1276,7 @@ def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
 def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calling():
     class FunctionCallingLM(DummyLM):
         @property
+        @override
         def supports_function_calling(self):
             return True
 
@@ -1349,6 +1356,7 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
 def test_adapter_native_tool_calling_can_request_parallel_tool_calls(adapter):
     class FunctionCallingLM(DummyLM):
         @property
+        @override
         def supports_function_calling(self):
             return True
 
@@ -1375,6 +1383,7 @@ def test_adapter_native_tool_calling_can_request_parallel_tool_calls(adapter):
 def test_adapter_native_tool_calling_respects_lm_kwargs_parallel_tool_call_override():
     class FunctionCallingLM(DummyLM):
         @property
+        @override
         def supports_function_calling(self):
             return True
 
@@ -1402,6 +1411,7 @@ def test_adapter_native_tool_calling_respects_lm_kwargs_parallel_tool_call_overr
 def test_chat_adapter_native_tool_history_replay():
     class FunctionCallingLM(DummyLM):
         @property
+        @override
         def supports_function_calling(self):
             return True
 
@@ -1468,6 +1478,7 @@ def test_chat_adapter_native_tool_history_replay():
 def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
     class FunctionCallingLM(DummyLM):
         @property
+        @override
         def supports_function_calling(self):
             return True
 
@@ -1519,6 +1530,7 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
 def test_chat_adapter_native_tool_history_skips_empty_user_message():
     class FunctionCallingLM(DummyLM):
         @property
+        @override
         def supports_function_calling(self):
             return True
 
@@ -1577,6 +1589,7 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
 def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_id, tool_call_results):
     class FunctionCallingLM(DummyLM):
         @property
+        @override
         def supports_function_calling(self):
             return True
 
@@ -1768,6 +1781,7 @@ def test_non_native_tool_history_remains_text_based(adapter):
 
 def test_chat_adapter_format_accepts_custom_history_formatter_returning_messages_only():
     class CustomHistoryAdapter(ChatAdapter):
+        @override
         def format_conversation_history(self, signature, history_field_name, inputs):
             del inputs[history_field_name]
             return [{"role": "user", "content": "custom history"}]
@@ -1859,10 +1873,12 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
     class Event(DSPyType):
         label: str
 
+        @override
         def format(self):
             return [{"type": "event", "event": {"label": self.label}}]
 
         @classmethod
+        @override
         def description(cls) -> str:
             return "An event block."
 

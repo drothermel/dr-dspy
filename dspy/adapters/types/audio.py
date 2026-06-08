@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pydantic
+from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
 
@@ -30,6 +31,7 @@ class Audio(Type):
         extra="forbid",
     )
 
+    @override
     def format(self) -> list[dict[str, Any]]:
         return [
             {
@@ -112,9 +114,11 @@ class Audio(Type):
         encoded_data = base64.b64encode(byte_buffer.getvalue()).decode("utf-8")
         return cls(data=encoded_data, audio_format=format)
 
+    @override
     def __str__(self) -> str:
         return str(self.serialize_model())
 
+    @override
     def __repr__(self) -> str:
         length = len(self.data)
         return f"Audio(data=<AUDIO_BASE_64_ENCODED({length})>, audio_format='{self.audio_format}')"

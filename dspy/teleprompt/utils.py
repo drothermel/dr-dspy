@@ -77,6 +77,7 @@ def eval_candidate_program_with_pruning(
     total_score = 0
     num_batches = math.ceil(len(trainset) / batch_size)
     total_eval_size = 0
+    curr_weighted_avg_score = 0.0
 
     for i in range(num_batches):
         start_index = i * batch_size
@@ -133,8 +134,7 @@ def get_program_with_highest_avg_score(param_score_dict, fully_evaled_param_comb
 
         return program, mean, key, params
 
-    # If no valid program is found, we return the last valid one that we found
-    return program, mean, key, params
+    raise ValueError("No unevaluated parameter combination found with a recorded score.")
 
 
 def calculate_last_n_proposed_quality(

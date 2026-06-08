@@ -1,3 +1,5 @@
+from typing_extensions import override
+
 from .copro_optimizer import COPRO
 
 """
@@ -53,5 +55,6 @@ class SignatureOptimizer(COPRO):
             verbose=verbose,
         )
 
+    @override
     def compile(self, student, *, devset, eval_kwargs):  # ty:ignore[invalid-method-override]
         return super().compile(student, trainset=devset, eval_kwargs=eval_kwargs)

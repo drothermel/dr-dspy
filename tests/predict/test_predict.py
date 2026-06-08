@@ -10,6 +10,7 @@ from unittest.mock import patch
 import orjson
 import pydantic
 import pytest
+from typing_extensions import override
 
 try:
     from litellm import ModelResponse
@@ -40,12 +41,14 @@ class CustomStateLM(BaseLM):
         super().__init__(model=model, **kwargs)  # ty:ignore[invalid-argument-type]
         self.deployment = deployment
 
+    @override
     def dump_state(self):
         state = super().dump_state()
         state["deployment"] = self.deployment
         return state
 
     @classmethod
+    @override
     def load_state(cls, state):  # ty:ignore[invalid-method-override]
         state = dict(state)
         state.pop(LM_CLASS_STATE_KEY, None)

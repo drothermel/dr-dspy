@@ -5,6 +5,7 @@ import threading
 from unittest.mock import patch
 
 import pytest
+from typing_extensions import override
 
 try:
     from litellm import Choices, Message, ModelResponse
@@ -222,6 +223,7 @@ def test_load_with_version_mismatch(tmp_path):
             super().__init__()
             self.messages = []
 
+        @override
         def emit(self, record):
             self.messages.append(record.getMessage())
 
@@ -292,6 +294,7 @@ def test_multi_module_call_with_usage_tracker(lm_for_test):
             self.predict1 = ChainOfThought("question -> answer")
             self.predict2 = ChainOfThought("question, answer -> score")
 
+        @override
         def __call__(self, question: str) -> Prediction:
             answer = self.predict1(question=question)
             return self.predict2(question=question, answer=answer)
@@ -316,6 +319,7 @@ def test_usage_tracker_in_parallel():
             self.predict1 = ChainOfThought("question -> answer")
             self.predict2 = ChainOfThought("question, answer -> score")
 
+        @override
         def __call__(self, question: str) -> Prediction:
             with settings.context(lm=self.lm):
                 answer = self.predict1(question=question)

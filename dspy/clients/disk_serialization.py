@@ -19,6 +19,7 @@ from typing import Any
 
 from diskcache import Disk
 from diskcache.core import MODE_PICKLE
+from typing_extensions import override
 
 _TRUSTED_MODULE_PREFIXES = (
     "litellm.types.",
@@ -45,6 +46,7 @@ class DeserializationError(Exception):
 class _RestrictedUnpickler(pickle.Unpickler):
     _allowed: frozenset[tuple[str, str]] = frozenset()
 
+    @override
     def find_class(self, module: str, name: str) -> type:
         if any(module.startswith(p) for p in _TRUSTED_MODULE_PREFIXES):
             return super().find_class(module, name)
@@ -72,6 +74,7 @@ class _RestrictedDisk(Disk):
 
     _allowed: frozenset[tuple[str, str]]
 
+    @override
     def fetch(self, mode, filename, value, read):
         if mode == MODE_PICKLE:
             if value is None:

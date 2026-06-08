@@ -1,4 +1,5 @@
 import pytest
+from typing_extensions import override
 
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
@@ -38,6 +39,7 @@ def test_propose_instructions_for_program(demo_candidates):
 )
 def test_propose_instruction_for_predictor(demo_candidates):
     class TrackingDummyLM(DummyLM):
+        @override
         def copy(self, **kwargs: object):
             self.last_copy_kwargs = kwargs
             return super().copy(**kwargs)

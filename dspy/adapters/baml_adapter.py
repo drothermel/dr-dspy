@@ -8,6 +8,7 @@ import types
 from typing import Any, Literal, Union, cast, get_args, get_origin
 
 from pydantic import BaseModel
+from typing_extensions import override
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.utils import format_field_value as original_format_field_value
@@ -199,6 +200,7 @@ class BAMLAdapter(JSONAdapter):
     ```
     """
 
+    @override
     def format_field_structure(self, signature: type[Signature]) -> str:
         """Overrides the base method to generate a simplified schema for Pydantic models."""
 
@@ -224,6 +226,7 @@ class BAMLAdapter(JSONAdapter):
 
         return "\n".join(sections)
 
+    @override
     def format_user_message_content(
         self,
         signature: type[Signature],

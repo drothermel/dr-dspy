@@ -1,5 +1,7 @@
 import contextlib
 
+from typing_extensions import override
+
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import message_to_openai_chat, to_openai_chat_request
 from dspy.core.types import LMRequest, LMResponse
@@ -76,21 +78,26 @@ class CapturingLM(BaseLM):
         self.calls = []
 
     @property
+    @override
     def supports_function_calling(self):
         return self.source_lm.supports_function_calling
 
     @property
+    @override
     def supports_reasoning(self):
         return self.source_lm.supports_reasoning
 
     @property
+    @override
     def supports_response_schema(self):
         return self.source_lm.supports_response_schema
 
     @property
+    @override
     def supported_params(self):
         return self.source_lm.supported_params
 
+    @override
     def __call__(self, request: LMRequest):
         self.calls.append({"request": request})
         raise StopAdapterCallCapture

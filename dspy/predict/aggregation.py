@@ -39,8 +39,10 @@ def majority(prediction_or_completions, normalize=default_normalize, field=None)
 
     majority_value = max(value_counts, key=lambda value: value_counts[value])
 
-    for completion in completions:
-        if normalize(completion[field]) == majority_value:
+    completion = completions[0]
+    for candidate in completions:
+        if normalize(candidate[field]) == majority_value:
+            completion = candidate
             break
 
     return Prediction.from_completions([completion], signature=signature)

@@ -2,6 +2,7 @@ import re
 
 import pytest
 from pydantic import BaseModel
+from typing_extensions import override
 
 import dspy.adapters.base as adapter_base
 import dspy.adapters.utils as adapter_utils
@@ -23,6 +24,7 @@ def test_tool_observation_preserves_custom_type():
     captured_calls = []
 
     class SpyChatAdapter(ChatAdapter):
+        @override
         def format_user_message_content(self, signature, inputs, *args: object, **kwargs: object):
             captured_calls.append((signature, dict(inputs)))
             return super().format_user_message_content(signature, inputs, *args, **kwargs)  # ty:ignore[invalid-argument-type]

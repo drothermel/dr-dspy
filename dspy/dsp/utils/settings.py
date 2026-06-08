@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import cloudpickle
+from typing_extensions import override
 
 from dspy.dsp.utils.utils import dotdict
 
@@ -84,6 +85,7 @@ class Settings:
             return main_thread_config[name]
         raise AttributeError(f"'Settings' object has no attribute '{name}'")
 
+    @override
     def __setattr__(self, name, value) -> None:
         if name in ("_instance",):
             super().__setattr__(name, value)
@@ -254,6 +256,7 @@ class Settings:
         finally:
             thread_local_overrides.reset(token)
 
+    @override
     def __repr__(self) -> str:
         overrides = thread_local_overrides.get()
         combined_config = {**main_thread_config, **overrides}

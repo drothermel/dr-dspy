@@ -7,6 +7,7 @@ to correctly test the BetterTogether optimizer functionality.
 from unittest.mock import Mock, patch
 
 import pytest
+from typing_extensions import override
 
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
@@ -54,6 +55,7 @@ class SimpleModule(Module):
 class SimpleOptimizer(Teleprompter):
     """A simple optimizer that returns the student unchanged."""
 
+    @override
     def compile(self, student, **kwargs: object):
         return student
 
@@ -64,6 +66,7 @@ class MarkedOptimizer(Teleprompter):
     def __init__(self, marker):
         self.marker = marker
 
+    @override
     def compile(self, student, **kwargs: object):
         prog = SimpleModule("input -> output")
         prog.marker = self.marker  # ty:ignore[unresolved-attribute]
@@ -76,6 +79,7 @@ class CapturingOptimizer(Teleprompter):
     def __init__(self):
         self.received_kwargs = {}
 
+    @override
     def compile(
         self, student, trainset=None, valset=None, teacher=None, num_trials=None, max_bootstrapped_demos=None, **kwargs
     ):
@@ -192,6 +196,7 @@ def test_compile_basic():
         def __init__(self):
             self.compile_called = False
 
+        @override
         def compile(self, student, **kwargs: object):
             self.compile_called = True
             return student
@@ -311,6 +316,7 @@ def test_compile_args_multi_optimizer_strategy():
         def __init__(self):
             self.received_kwargs = {}
 
+        @override
         def compile(self, student, trainset=None, num_trials=None, **kwargs: object):
             self.received_kwargs = {"trainset": trainset, "num_trials": num_trials, **kwargs}
             return student
@@ -319,6 +325,7 @@ def test_compile_args_multi_optimizer_strategy():
         def __init__(self):
             self.received_kwargs = {}
 
+        @override
         def compile(self, student, trainset=None, num_batches=None, **kwargs: object):
             self.received_kwargs = {"trainset": trainset, "num_batches": num_batches, **kwargs}
             return student
@@ -368,6 +375,7 @@ def test_compile_args_override_global_params():
         def __init__(self):
             self.received_kwargs = {}
 
+        @override
         def compile(self, student, trainset=None, valset=None, teacher=None, **kwargs: object):
             self.received_kwargs = {"trainset": trainset, "valset": valset, "teacher": teacher, **kwargs}
             return student
@@ -430,6 +438,7 @@ def test_trainset_shuffling_between_steps():
     trainsets_received = []
 
     class TrainsetCapturingOptimizer(Teleprompter):
+        @override
         def compile(self, student, trainset=None, **kwargs: object):
             trainsets_received.append(trainset)
             return student
@@ -480,6 +489,7 @@ def test_strategy_execution_order():
         def __init__(self, name):
             self.name = name
 
+        @override
         def compile(self, student, **kwargs: object):
             # Create a new student with a marker to track the optimization path
             optimized = SimpleModule("input -> output")
@@ -517,6 +527,7 @@ def test_lm_lifecycle_management():
     student.set_lm(lm)
 
     class SimpleOptimizer(Teleprompter):
+        @override
         def compile(self, student, **kwargs: object):
             return student
 
@@ -547,12 +558,14 @@ def test_error_handling_returns_best_program():
 
     # Create optimizers where the second one will fail
     class SuccessfulOptimizer(Teleprompter):
+        @override
         def compile(self, student, **kwargs: object):
             optimized = SimpleModule("input -> output")
             optimized.step_name = "p_success"  # ty:ignore[unresolved-attribute]
             return optimized
 
     class FailingOptimizer(Teleprompter):
+        @override
         def compile(self, student, **kwargs: object):
             raise RuntimeError("Intentional failure for testing")
 

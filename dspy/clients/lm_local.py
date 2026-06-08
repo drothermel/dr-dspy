@@ -9,6 +9,8 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import override
+
 from dspy.clients.provider import Provider, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat, save_data
 
@@ -25,6 +27,7 @@ class LocalProvider(Provider):
         self.TrainingJob = TrainingJob
 
     @staticmethod
+    @override
     def launch(lm: "LM", launch_kwargs: dict[str, Any] | None = None) -> None:
         try:
             import sglang  # noqa: F401  # ty:ignore[unresolved-import]
@@ -118,7 +121,8 @@ class LocalProvider(Provider):
         lm.thread = thread  # ty:ignore[invalid-assignment]
 
     @staticmethod
-    def kill(lm: "LM", launch_kwargs: dict[str, Any] | None = None) -> None:  # noqa: ARG004 dynamic typing/lint migration for scoped ty adoption
+    @override
+    def kill(lm: "LM", launch_kwargs: dict[str, Any] | None = None) -> None:
         from sglang.utils import terminate_process  # ty:ignore[unresolved-import]
 
         if not hasattr(lm, "process"):
@@ -133,8 +137,9 @@ class LocalProvider(Provider):
         logger.info("Server killed.")
 
     @staticmethod
+    @override
     def finetune(
-        job: TrainingJob,  # noqa: ARG004 dynamic typing/lint migration for scoped ty adoption
+        job: TrainingJob,
         model: str,
         train_data: list[dict[str, Any]],
         train_data_format: TrainDataFormat | None,

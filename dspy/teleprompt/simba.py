@@ -4,6 +4,8 @@ import logging
 import random
 from typing import TYPE_CHECKING, Any, Callable, cast
 
+from typing_extensions import override
+
 from dspy.dsp.utils.settings import settings
 from dspy.predict.parallel import Parallel
 from dspy.teleprompt.simba_utils import append_a_demo, append_a_rule, prepare_models_for_resampling, wrap_program
@@ -89,6 +91,7 @@ class SIMBA(Teleprompter):
         else:
             self.strategies = [append_a_rule]
 
+    @override
     def compile(self, student: Module, *, trainset: list[Example], seed: int = 0) -> Module:
         """
         Compile and optimize the student module using SIMBA.

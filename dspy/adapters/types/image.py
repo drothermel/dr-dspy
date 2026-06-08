@@ -8,6 +8,7 @@ from typing import Any, cast
 from urllib.parse import urlparse
 
 import pydantic
+from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
 
@@ -105,9 +106,11 @@ class Image(Type):
         )
         return cls(pil_image)
 
+    @override
     def __str__(self) -> str:
         return str(self.serialize_model())
 
+    @override
     def __repr__(self) -> str:
         if "base64" in self.url:
             len_base64 = len(self.url.split("base64,")[1])

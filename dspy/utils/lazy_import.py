@@ -27,6 +27,8 @@ import threading
 import types
 from typing import Any
 
+from typing_extensions import override
+
 
 def _detect_dspy_dist() -> str:
     for dist in ("dspy", "dspy-ai"):
@@ -71,6 +73,7 @@ class _MissingModule(types.ModuleType):
         self._message = message
         self._frame_data = frame_data
 
+    @override
     def __getattr__(self, attr: str):  # ty:ignore[invalid-method-override]
         fd = self._frame_data
         raise ImportError(
@@ -117,15 +120,18 @@ class _LazyModule(types.ModuleType):
                 raise
             return sys.modules.get(module_name, module)
 
+    @override
     def __getattr__(self, attr: str) -> Any:  # ty:ignore[invalid-method-override]
         return getattr(self._load(), attr)
 
+    @override
     def __setattr__(self, attr: str, value: Any) -> None:
         if attr.startswith("_dspy_lazy_") or attr in {"__spec__", "__loader__", "__package__", "__path__"}:
             super().__setattr__(attr, value)
         else:
             setattr(self._load(), attr, value)
 
+    @override
     def __dir__(self) -> list[str]:
         return dir(self._load())
 

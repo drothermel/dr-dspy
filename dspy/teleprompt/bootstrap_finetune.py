@@ -2,6 +2,8 @@ import logging
 from collections import defaultdict
 from typing import Any, Callable, cast
 
+from typing_extensions import override
+
 from dspy.adapters.base import Adapter
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.clients.lm import LM
@@ -51,6 +53,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
         self.exclude_demos = exclude_demos
         self.num_threads = num_threads
 
+    @override
     def compile(self, student: Module, trainset: list[Example], teacher: Module | list[Module] | None = None) -> Module:
         # TODO: Print statements can be converted to logger.info if we ensure
         # that the default DSPy logger logs info level messages in notebook

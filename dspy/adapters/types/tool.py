@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable, Protocol, cast, get_origin, get
 import json_repair
 import pydantic
 from pydantic import BaseModel, TypeAdapter, create_model
+from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
 from dspy.dsp.utils.settings import settings
@@ -172,6 +173,7 @@ class Tool(Type):
                 parsed_kwargs[k] = v
         return parsed_kwargs
 
+    @override
     def format(self) -> str:
         return str(self)
 
@@ -277,9 +279,11 @@ class Tool(Type):
 
         return convert_langchain_tool(tool)
 
+    @override
     def __repr__(self) -> str:
         return f"Tool(name={self.name}, desc={self.desc}, args={self.args})"
 
+    @override
     def __str__(self) -> str:
         desc = f", whose description is <desc>{self.desc}</desc>.".replace("\n", "  ") if self.desc else "."
         arg_desc = f"It takes arguments {self.args}."
@@ -293,6 +297,7 @@ class ToolCalls(Type):
         args: dict[str, Any]
 
         @classmethod
+        @override
         def __get_pydantic_json_schema__(  # ty: ignore[invalid-method-override]
             cls,
             core_schema: object,
@@ -308,6 +313,7 @@ class ToolCalls(Type):
                 schema["required"] = [field for field in required if field != "id"]
             return schema
 
+        @override
         def format(self) -> dict[str, Any]:
             return {"name": self.name, "args": self.args}
 
@@ -364,6 +370,7 @@ class ToolCalls(Type):
     tool_call_results: Any | None = None
 
     @classmethod
+    @override
     def __get_pydantic_json_schema__(  # ty: ignore[invalid-method-override]
         cls,
         core_schema: object,
@@ -403,6 +410,7 @@ class ToolCalls(Type):
         return cls(tool_calls=tool_calls)
 
     @classmethod
+    @override
     def description(cls) -> str:
         return (
             "Tool calls must be a JSON object with `tool_calls`, a list of calls. "
@@ -410,12 +418,14 @@ class ToolCalls(Type):
             'Example: {"tool_calls": [{"name": "search", "args": {"query": "cats"}}]}'
         )
 
+    @override
     def format(self) -> dict[str, Any]:
         return {
             "tool_calls": [tool_call.format() for tool_call in self.tool_calls],
         }
 
     @pydantic.model_serializer()
+    @override
     def serialize_model(self) -> dict[str, Any]:
         data = self.format()
         if self.tool_call_results is not None:

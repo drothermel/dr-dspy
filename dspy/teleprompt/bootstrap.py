@@ -3,6 +3,7 @@ import random
 import threading
 
 import tqdm
+from typing_extensions import override
 
 from dspy.dsp.utils.settings import settings
 from dspy.primitives.example import Example
@@ -83,6 +84,7 @@ class BootstrapFewShot(Teleprompter):
         self.error_count = 0
         self.error_lock = threading.Lock()
 
+    @override
     def compile(self, student, *, teacher=None, trainset):
         self.trainset = trainset
 
@@ -181,6 +183,7 @@ class BootstrapFewShot(Teleprompter):
         teacher = self.teacher
         predictor_cache = {}
 
+        trace: list = []
         try:
             with settings.context(trace=[], **self.teacher_settings):
                 lm = settings.lm

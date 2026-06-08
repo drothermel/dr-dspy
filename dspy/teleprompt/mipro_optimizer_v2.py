@@ -4,6 +4,8 @@ import random
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
+from typing_extensions import override
+
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.propose.grounded_proposer import GroundedProposer
@@ -105,6 +107,7 @@ class MIPROv2(Teleprompter):
                 "settings.configure(lm=...) from dspy.dsp.utils.settings."
             )
 
+    @override
     def compile(
         self,
         student: Any,

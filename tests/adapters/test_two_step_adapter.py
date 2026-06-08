@@ -1,4 +1,5 @@
 import pytest
+from typing_extensions import override
 
 from dspy.adapters.two_step_adapter import TwoStepAdapter
 from dspy.clients.base_lm import BaseLM
@@ -19,11 +20,13 @@ class RecordingTextLM(BaseLM):
         self.texts = list(texts)
         self.requests: list[LMRequest] = []
 
+    @override
     def forward(self, request: LMRequest) -> LMResponse:
         self.requests.append(request)
         text = self.texts.pop(0) if self.texts else "No more responses"
         return LMResponse.from_text(text, model=self.model)
 
+    @override
     async def aforward(self, request: LMRequest) -> LMResponse:
         return self.forward(request)
 

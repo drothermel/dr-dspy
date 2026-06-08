@@ -1,5 +1,7 @@
 import random
 
+from typing_extensions import override
+
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.teleprompt.teleprompt import Teleprompter
@@ -51,6 +53,7 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         self.num_candidate_sets = num_candidate_programs
         self.max_labeled_demos = max_labeled_demos
 
+    @override
     def compile(self, student, *, teacher=None, trainset, valset=None, restrict=None, labeled_sample=True):
         self.trainset = trainset
         self.valset = valset or trainset  # TODO: FIXME: Note this choice.
@@ -60,6 +63,7 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         scores = []
         all_subscores = []
         score_data = []
+        best_program = student.reset_copy()
 
         for seed in range(-3, self.num_candidate_sets):
             if (restrict is not None) and (seed not in restrict):

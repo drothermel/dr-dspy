@@ -5,6 +5,7 @@ from typing import Annotated, Any, Literal, Union, get_args, get_origin
 
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
+from typing_extensions import override
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.clients.base_lm import BaseLM
@@ -72,6 +73,7 @@ class Predict(Module, Parameter):
         self.train = []
         self.demos = []
 
+    @override
     def dump_state(self, json_mode=True):
         state_keys = ["traces", "train"]
         state = {k: getattr(self, k) for k in state_keys}
@@ -93,6 +95,7 @@ class Predict(Module, Parameter):
         state["lm"] = self.lm.dump_state() if self.lm else None
         return state
 
+    @override
     def load_state(self, state: dict, *, allow_unsafe_lm_state: bool = False) -> "Predict":
         """Load the saved state of a `Predict` object.
 
@@ -131,12 +134,14 @@ class Predict(Module, Parameter):
             f"`predict({input_fields[0]}=input_value, ...)`."
         )
 
+    @override
     def __call__(self, *args, **kwargs):
         if args:
             raise ValueError(self._get_positional_args_error_message())
 
         return super().__call__(**kwargs)
 
+    @override
     async def acall(self, *args, **kwargs):
         if args:
             raise ValueError(self._get_positional_args_error_message())
@@ -286,6 +291,7 @@ class Predict(Module, Parameter):
     def get_config(self):
         return self.config
 
+    @override
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.signature})"
 

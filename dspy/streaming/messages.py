@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import anyio.from_thread
+from typing_extensions import override
 
 from dspy.dsp.utils.settings import settings
 from dspy.utils.callback import BaseCallback
@@ -98,6 +99,7 @@ class StatusStreamingCallback(BaseCallback):
     def __init__(self, status_message_provider: StatusMessageProvider | None = None) -> None:
         self.status_message_provider = status_message_provider or StatusMessageProvider()
 
+    @override
     def on_tool_start(
         self,
         call_id: str,
@@ -112,6 +114,7 @@ class StatusStreamingCallback(BaseCallback):
         if status_message:
             sync_send_to_stream(stream, StatusMessage(status_message))
 
+    @override
     def on_tool_end(
         self,
         call_id: str,
@@ -126,6 +129,7 @@ class StatusStreamingCallback(BaseCallback):
         if status_message:
             sync_send_to_stream(stream, StatusMessage(status_message))
 
+    @override
     def on_lm_start(
         self,
         call_id: str,
@@ -140,6 +144,7 @@ class StatusStreamingCallback(BaseCallback):
         if status_message:
             sync_send_to_stream(stream, StatusMessage(status_message))
 
+    @override
     def on_lm_end(
         self,
         call_id: str,
@@ -154,6 +159,7 @@ class StatusStreamingCallback(BaseCallback):
         if status_message:
             sync_send_to_stream(stream, StatusMessage(status_message))
 
+    @override
     def on_module_start(
         self,
         call_id: str,
@@ -168,6 +174,7 @@ class StatusStreamingCallback(BaseCallback):
         if status_message:
             sync_send_to_stream(stream, StatusMessage(status_message))
 
+    @override
     def on_module_end(
         self,
         call_id: str,

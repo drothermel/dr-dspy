@@ -6,6 +6,8 @@ import time
 from collections import Counter, deque
 from typing import Any, Callable, Literal, cast
 
+from typing_extensions import override
+
 from dspy.adapters.base import Adapter
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.xml_adapter import XMLAdapter
@@ -284,6 +286,7 @@ class GRPO(FinetuneTeleprompter):
         selected_ids = self.shuffled_trainset_ids[base_idx:end_idx]
         return [original_trainset[i] for i in selected_ids]
 
+    @override
     def compile(
         self,
         student: Module,

@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing_extensions import override
 
 
 class Example:
@@ -124,6 +125,7 @@ class Example:
             return self._store[key]
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
 
+    @override
     def __setattr__(self, key, value) -> None:
         if key.startswith("_") or key in dir(self.__class__):
             super().__setattr__(key, value)
@@ -145,16 +147,20 @@ class Example:
     def __len__(self) -> int:
         return len([k for k in self._store if not k.startswith("dspy_")])
 
+    @override
     def __repr__(self) -> str:
         d = {k: v for k, v in self._store.items() if not k.startswith("dspy_")}
         return f"Example({d})" + f" (input_keys={self._input_keys})"
 
+    @override
     def __str__(self) -> str:
         return self.__repr__()
 
+    @override
     def __eq__(self, other):
         return isinstance(other, Example) and self._store == other._store
 
+    @override
     def __hash__(self):
         return hash(tuple(self._store.items()))
 

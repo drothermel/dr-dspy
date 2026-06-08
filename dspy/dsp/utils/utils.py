@@ -5,6 +5,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import tqdm
+from typing_extensions import override
 
 
 def print_message(*s, condition=True, pad=False, sep=None):
@@ -104,12 +105,14 @@ class dotdict(dict):  # noqa: N801
         except KeyError:
             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
 
+    @override
     def __setattr__(self, key, value) -> None:
         if key.startswith("__") and key.endswith("__"):
             super().__setattr__(key, value)
         else:
             self[key] = value
 
+    @override
     def __delattr__(self, key) -> None:
         if key.startswith("__") and key.endswith("__"):
             super().__delattr__(key)

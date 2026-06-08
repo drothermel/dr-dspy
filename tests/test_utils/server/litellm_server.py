@@ -5,19 +5,23 @@ from typing import AsyncIterator, Iterator
 import litellm
 from litellm import CustomLLM
 from litellm.types.utils import GenericStreamingChunk
+from typing_extensions import override
 
 LITELLM_TEST_SERVER_LOG_FILE_PATH_ENV_VAR = "LITELLM_TEST_SERVER_LOG_FILE_PATH"
 
 
 class DSPyTestModel(CustomLLM):
+    @override
     def completion(self, *args: object, **kwargs: object) -> litellm.ModelResponse:
         _append_request_to_log_file(kwargs)
         return _get_mock_llm_response(kwargs)
 
+    @override
     async def acompletion(self, *args: object, **kwargs: object) -> litellm.ModelResponse:
         _append_request_to_log_file(kwargs)
         return _get_mock_llm_response(kwargs)
 
+    @override
     def streaming(self, *args: object, **kwargs: object) -> Iterator[GenericStreamingChunk]:
         generic_streaming_chunk: GenericStreamingChunk = {
             "finish_reason": "stop",
@@ -29,6 +33,7 @@ class DSPyTestModel(CustomLLM):
         }
         return generic_streaming_chunk  # type: ignore
 
+    @override
     async def astreaming(self, *args: object, **kwargs: object) -> AsyncIterator[GenericStreamingChunk]:  # ty:ignore[invalid-method-override]
         generic_streaming_chunk: GenericStreamingChunk = {
             "finish_reason": "stop",

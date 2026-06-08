@@ -1,6 +1,7 @@
 from typing import Any, Literal
 
 import pydantic
+from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
 from dspy.utils.annotation import experimental
@@ -61,6 +62,7 @@ class Document(Type):
     media_type: Literal["text/plain", "application/pdf"] = "text/plain"
     context: str | None = None
 
+    @override
     def format(self) -> list[dict[str, Any]]:
         """Format document for LM consumption.
 
@@ -82,6 +84,7 @@ class Document(Type):
         return [document_block]
 
     @classmethod
+    @override
     def description(cls) -> str:
         """Description of the document type for use in prompts."""
         return (
@@ -105,6 +108,7 @@ class Document(Type):
 
         raise ValueError(f"Received invalid value for `Document`: {data}")
 
+    @override
     def __str__(self) -> str:
         """String representation showing title and content length."""
         title_part = f"'{self.title}': " if self.title else ""

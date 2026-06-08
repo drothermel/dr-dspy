@@ -1,6 +1,8 @@
 import types
 from typing import Any
 
+from typing_extensions import override
+
 from dspy.clients.embedding import Embedder
 from dspy.predict.knn import KNN
 from dspy.primitives.example import Example
@@ -56,6 +58,7 @@ class KNNFewShot(Teleprompter):
         self.KNN = KNN(k, trainset, vectorizer=vectorizer)
         self.few_shot_bootstrap_args = few_shot_bootstrap_args
 
+    @override
     def compile(self, student, *, teacher=None):
         student_copy = student.reset_copy()
 

@@ -3,6 +3,8 @@ from concurrent.futures import Future
 from threading import Thread
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import override
+
 from dspy.clients.utils_finetune import TrainDataFormat
 
 if TYPE_CHECKING:
@@ -53,6 +55,7 @@ class TrainingJob(Future):
         self.train_kwargs = train_kwargs or {}
         super().__init__()
 
+    @override
     def cancel(self) -> bool:  # ty:ignore[invalid-return-type]
         """Cancel the training job.
 

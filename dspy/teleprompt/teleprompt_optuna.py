@@ -1,3 +1,5 @@
+from typing_extensions import override
+
 from dspy.evaluate.evaluate import Evaluate
 from dspy.teleprompt.teleprompt import Teleprompter
 
@@ -65,6 +67,7 @@ class BootstrapFewShotWithOptuna(Teleprompter):
         trial.set_user_attr("program", program2)
         return result.score
 
+    @override
     def compile(self, student, *, teacher=None, max_demos, trainset, valset=None):
         optuna = _import_optuna()
         self.trainset = trainset

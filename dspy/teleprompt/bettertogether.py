@@ -3,6 +3,8 @@ import logging
 import random
 from typing import Any, Callable, cast
 
+from typing_extensions import override
+
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
@@ -186,6 +188,7 @@ class BetterTogether(Teleprompter):
                 raise TypeError(f"Optimizer '{key}' must be a Teleprompter, got {type(optimizer).__name__}")
         self.optimizers: dict[str, Teleprompter] = optimizers
 
+    @override
     def compile(
         self,
         student: Module,

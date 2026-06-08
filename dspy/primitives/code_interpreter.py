@@ -10,6 +10,8 @@ code-executing modules to work with different interpreter implementations:
 from collections.abc import Callable
 from typing import Any, Protocol, runtime_checkable
 
+from typing_extensions import override
+
 # Types that can be used directly in Python function signatures for SUBMIT()
 SIMPLE_TYPES = (str, int, float, bool, list, dict, type(None))
 
@@ -47,9 +49,11 @@ class FinalOutput:
     def __init__(self, output: Any) -> None:
         self.output = output
 
+    @override
     def __repr__(self) -> str:
         return f"FinalOutput({self.output!r})"
 
+    @override
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, FinalOutput):
             return NotImplemented

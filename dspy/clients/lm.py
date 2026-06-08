@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 import anyio.from_thread
 import pydantic
+from typing_extensions import override
 
 from dspy.__metadata__ import __version__
 from dspy.clients._litellm import get_litellm, is_litellm_context_window_error
@@ -133,6 +134,7 @@ class LM(BaseLM):
 
         self._warn_zero_temp_rollout(self.kwargs.get("temperature"), self.kwargs.get("rollout_id"))
 
+    @override
     def _get_initial_kwargs(self, *, temperature, max_tokens, **kwargs) -> dict[str, Any]:
         # Override BaseLM's default kwargs shape for LiteLLM/model-family-specific token parameters.
         if _is_openai_reasoning_model(self.model):
@@ -160,18 +162,22 @@ class LM(BaseLM):
         return "openai"
 
     @property
+    @override
     def supports_function_calling(self) -> bool:
         return _get_litellm().supports_function_calling(model=self.model)
 
     @property
+    @override
     def supports_reasoning(self) -> bool:
         return _get_litellm().supports_reasoning(self.model)
 
     @property
+    @override
     def supports_response_schema(self) -> bool:
         return _get_litellm().supports_response_schema(model=self.model, custom_llm_provider=self._provider_name)
 
     @property
+    @override
     def supported_params(self) -> set[str]:
         params = _get_litellm().get_supported_openai_params(model=self.model, custom_llm_provider=self._provider_name)
         return set(params) if params else set()
@@ -220,6 +226,7 @@ class LM(BaseLM):
         exc_cls = _lm_error_class_from_litellm_exception(exc) or _lm_error_class_from_status(status)
         return exc_cls(message, **metadata)  # ty:ignore[invalid-argument-type]
 
+    @override
     def forward(self, request: LMRequest) -> LMResponse:
         """Call the configured LM synchronously."""
         rollout_id = request.config.cache.rollout_id if request.config.cache is not None else None
@@ -259,6 +266,7 @@ class LM(BaseLM):
         self._check_truncation(results)
         return self._response_from_provider(results, request)
 
+    @override
     async def aforward(self, request: LMRequest) -> LMResponse:
         """Call the configured LM asynchronously."""
         rollout_id = request.config.cache.rollout_id if request.config.cache is not None else None
@@ -432,6 +440,7 @@ class LM(BaseLM):
             return OpenAIProvider()
         return Provider()
 
+    @override
     def dump_state(self):
         """Return a sanitized reconstruction state for this LM.
 
@@ -454,6 +463,7 @@ class LM(BaseLM):
         return state
 
     @classmethod
+    @override
     def load_state(cls, state: dict[str, Any], *, allow_custom_lm_class: bool = False):
         state = dict(state)
 

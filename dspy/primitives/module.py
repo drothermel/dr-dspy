@@ -2,6 +2,8 @@ import inspect
 import logging
 from typing import Any, TextIO
 
+from typing_extensions import override
+
 from dspy.dsp.utils.settings import settings
 from dspy.predict.parallel import Parallel
 from dspy.primitives.base_module import BaseModule
@@ -18,6 +20,7 @@ logger = logging.getLogger(__name__)
 class ProgramMeta(type):
     """Metaclass ensuring every ``Module`` instance is properly initialised."""
 
+    @override
     def __call__(cls, *args, **kwargs):
         # Create the instance without invoking ``__init__`` so we can inject
         # the base initialization beforehand.
@@ -212,6 +215,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
 
         raise ValueError("Multiple LMs are being used in the module. There's no unique LM to return.")
 
+    @override
     def __repr__(self) -> str:
         s = []
 
@@ -328,6 +332,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
                 "Module to enable usage tracking."
             )
 
+    @override
     def __getattribute__(self, name):
         attr = super().__getattribute__(name)
 

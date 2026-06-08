@@ -1,6 +1,7 @@
 """Tests for the SandboxSerializable ABC and build_repl_variable helper."""
 
 import pytest
+from typing_extensions import override
 
 from dspy.primitives.repl_types import REPLVariable
 from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
@@ -16,15 +17,19 @@ class ExampleSerializable(SandboxSerializable):
     def __init__(self, data: str = "example_data"):
         self.data = data
 
+    @override
     def sandbox_setup(self) -> str:
         return "import json"
 
+    @override
     def to_sandbox(self) -> bytes:
         return self.data.encode("utf-8")
 
+    @override
     def sandbox_assignment(self, var_name: str, data_expr: str) -> str:
         return f"{var_name} = json.loads({data_expr})"
 
+    @override
     def rlm_preview(self, max_chars: int = 500) -> str:
         preview = f"ExampleData: {self.data}"
         return preview[:max_chars] + "..." if len(preview) > max_chars else preview
@@ -33,6 +38,7 @@ class ExampleSerializable(SandboxSerializable):
 class IncompleteSerializable(SandboxSerializable):
     """Missing the other three abstract methods — should not be instantiable."""
 
+    @override
     def sandbox_setup(self) -> str:
         return ""
 

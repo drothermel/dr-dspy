@@ -5,6 +5,7 @@ from typing import Callable
 
 from pydantic import BaseModel
 from tqdm import tqdm
+from typing_extensions import override
 
 from dspy.dsp.utils.settings import settings
 from dspy.predict.avatar.models import ActionOutput
@@ -168,6 +169,7 @@ class AvatarOptimizer(Teleprompter):
 
         return (avg_score, pos_inputs, neg_inputs)
 
+    @override
     def compile(self, student, *, trainset):
         best_actor = deepcopy(student)
         best_score = -999 if self.optimize_for == "max" else 999

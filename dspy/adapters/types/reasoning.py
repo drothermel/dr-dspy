@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 import pydantic
+from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
 
@@ -25,6 +26,7 @@ class Reasoning(Type):
 
     content: str
 
+    @override
     def format(self) -> str:
         return f"{self.content}"
 
@@ -48,6 +50,7 @@ class Reasoning(Type):
         raise ValueError(f"Received invalid value for `dspy.Reasoning`: {data}")
 
     @classmethod
+    @override
     def adapt_to_native_lm_feature(
         cls,
         signature: type[Signature],
@@ -82,6 +85,7 @@ class Reasoning(Type):
         return signature.delete(field_name)
 
     @classmethod
+    @override
     def parse_lm_output(cls, output: object) -> Reasoning | None:
         """Parse the typed LM output into a Reasoning object."""
         reasoning_content = getattr(output, "reasoning_content", None)
@@ -90,6 +94,7 @@ class Reasoning(Type):
         return None
 
     @classmethod
+    @override
     def parse_lm_response(cls, response: str | dict[str, Any]) -> Reasoning | None:
         """Parse the LM response into a Reasoning object."""
         if isinstance(response, dict) and "reasoning_content" in response:
@@ -97,6 +102,7 @@ class Reasoning(Type):
         return None
 
     @classmethod
+    @override
     def parse_stream_chunk(cls, chunk: object) -> str | None:
         """
         Parse a stream chunk into reasoning content if available.
@@ -114,15 +120,19 @@ class Reasoning(Type):
             return None
 
     @classmethod
+    @override
     def is_streamable(cls) -> bool:
         return True
 
+    @override
     def __repr__(self) -> str:
         return f"{self.content!r}"
 
+    @override
     def __str__(self) -> str:
         return self.content
 
+    @override
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Reasoning):
             return self.content == other.content
@@ -130,6 +140,7 @@ class Reasoning(Type):
             return self.content == other
         return False
 
+    @override
     def __ne__(self, other: object) -> bool:
         return not self.__eq__(other)
 
@@ -144,6 +155,7 @@ class Reasoning(Type):
             return False
         return item in self.content
 
+    @override
     def __iter__(self) -> Iterator[str]:  # ty: ignore[invalid-method-override]
         return iter(self.content)
 

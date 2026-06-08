@@ -5,6 +5,7 @@ import threading
 from unittest.mock import patch
 
 import pytest
+from typing_extensions import override
 
 from dspy.adapters.types.history import History
 from dspy.dsp.utils.settings import settings
@@ -133,6 +134,7 @@ def test_multithread_evaluate_call():
 def test_multi_thread_evaluate_call_cancelled(monkeypatch):
     # slow LM that sleeps for 1 second before returning the answer
     class SlowLM(DummyLM):
+        @override
         def __call__(self, *args: object, **kwargs: object):
             import time
 
@@ -243,6 +245,7 @@ def test_evaluate_callback():
             self.end_call_outputs = None
             self.end_call_count = 0
 
+        @override
         def on_evaluate_start(
             self,
             call_id: str,
@@ -252,6 +255,7 @@ def test_evaluate_callback():
             self.start_call_inputs = inputs
             self.start_call_count += 1
 
+        @override
         def on_evaluate_end(
             self,
             call_id: str,

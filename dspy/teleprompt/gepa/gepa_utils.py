@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, Protocol, TypedDict, cast
 
 from gepa import EvaluationBatch, GEPAAdapter
 from gepa.strategies.instruction_proposal import InstructionProposalSignature
+from typing_extensions import override
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.base_type import Type
@@ -104,6 +105,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         self.warn_on_score_mismatch = warn_on_score_mismatch
         self.reflection_minibatch_size = reflection_minibatch_size
 
+    @override
     def propose_new_texts(
         self,
         candidate: dict[str, str],
@@ -145,6 +147,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
 
         return new_prog
 
+    @override
     def evaluate(self, batch, candidate, capture_traces=False):
         program = self.build_program(candidate)
         callback_metadata = (
@@ -199,6 +202,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         scores = [s["score"] if hasattr(s, "score") else s for s in scores]
         return EvaluationBatch(outputs=outputs, scores=scores, trajectories=None)
 
+    @override
     def make_reflective_dataset(
         self, candidate, eval_batch, components_to_update
     ) -> dict[str, list[ReflectiveExample]]:

@@ -3,6 +3,7 @@ from typing import ClassVar, cast
 
 import pydantic
 from pydantic import create_model
+from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
 
@@ -77,15 +78,18 @@ class Code(Type):
 
     language: ClassVar[str] = "python"
 
+    @override
     def format(self) -> str:
         return f"{self.code}"
 
     @pydantic.model_serializer()
+    @override
     def serialize_model(self) -> str:
         """Override to bypass the <<CUSTOM-TYPE-START-IDENTIFIER>> and <<CUSTOM-TYPE-END-IDENTIFIER>> tags."""
         return self.format()
 
     @classmethod
+    @override
     def description(cls) -> str:
         return (
             "Code represented in a string, specified in the `code` field. If this is an output field, the code "

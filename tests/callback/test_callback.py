@@ -1,6 +1,7 @@
 import time
 
 import pytest
+from typing_extensions import override
 
 from dspy.adapters.types.tool import Tool
 from dspy.dsp.utils.settings import settings
@@ -26,33 +27,43 @@ class MyCallback(BaseCallback):
     def __init__(self):
         self.calls = []
 
+    @override
     def on_module_start(self, call_id, instance, inputs):
         self.calls.append({"handler": "on_module_start", "instance": instance, "inputs": inputs})
 
+    @override
     def on_module_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
         self.calls.append({"handler": "on_module_end", "outputs": outputs, "exception": exception})
 
+    @override
     def on_lm_start(self, call_id, instance, inputs):
         self.calls.append({"handler": "on_lm_start", "instance": instance, "inputs": inputs})
 
+    @override
     def on_lm_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
         self.calls.append({"handler": "on_lm_end", "outputs": outputs, "exception": exception})
 
+    @override
     def on_adapter_format_start(self, call_id, instance, inputs):
         self.calls.append({"handler": "on_adapter_format_start", "instance": instance, "inputs": inputs})
 
+    @override
     def on_adapter_format_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
         self.calls.append({"handler": "on_adapter_format_end", "outputs": outputs, "exception": exception})
 
+    @override
     def on_adapter_parse_start(self, call_id, instance, inputs):
         self.calls.append({"handler": "on_adapter_parse_start", "instance": instance, "inputs": inputs})
 
+    @override
     def on_adapter_parse_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
         self.calls.append({"handler": "on_adapter_parse_end", "outputs": outputs, "exception": exception})
 
+    @override
     def on_tool_start(self, call_id, instance, inputs):
         self.calls.append({"handler": "on_tool_start", "instance": instance, "inputs": inputs})
 
+    @override
     def on_tool_end(self, call_id, outputs, exception):  # ty:ignore[invalid-method-override]
         self.calls.append({"handler": "on_tool_end", "outputs": outputs, "exception": exception})
 
@@ -264,6 +275,7 @@ def test_active_id():
             self.parent_call_ids = []
             self.call_ids = []
 
+        @override
         def on_module_start(self, call_id, instance, inputs):
             parent_call_id = ACTIVE_CALL_ID.get()
             self.parent_call_ids.append(parent_call_id)

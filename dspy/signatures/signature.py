@@ -27,6 +27,7 @@ from typing import Any, Iterator, cast, get_args, get_origin, overload
 
 from pydantic import BaseModel, Field, create_model
 from pydantic.fields import FieldInfo
+from typing_extensions import override
 
 from dspy.signatures.field import InputField, OutputField
 from dspy.utils.constants import IS_TYPE_UNDEFINED
@@ -47,6 +48,7 @@ def _field_info_extra(field: FieldInfo) -> dict[str, Any]:
 
 
 class SignatureMeta(type(BaseModel)):
+    @override
     def __call__(cls, *args, **kwargs):
         if cls is Signature:
             # We don't create an actual Signature instance, instead, we create a new Signature class.
@@ -260,6 +262,7 @@ class SignatureMeta(type(BaseModel)):
             if _field_info_extra(v)["__dspy_field_type"] == field_type
         }
 
+    @override
     def __repr__(cls) -> str:
         """Output a representation of the signature.
 

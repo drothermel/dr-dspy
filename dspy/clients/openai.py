@@ -2,6 +2,8 @@ import time
 from datetime import datetime
 from typing import Any
 
+from typing_extensions import override
+
 from dspy.clients.provider import Provider, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat, TrainingStatus, save_data
 
@@ -18,6 +20,7 @@ class TrainingJobOpenAI(TrainingJob):
         self.provider_file_id = None
         self.provider_job_id = None
 
+    @override
     def cancel(self) -> None:  # ty:ignore[invalid-method-override]
         # Cancel the provider job
         if OpenAIProvider.does_job_exist(self.provider_job_id):  # ty:ignore[invalid-argument-type]
@@ -38,6 +41,7 @@ class TrainingJobOpenAI(TrainingJob):
         # Call the super's cancel method after the custom cancellation logic
         super().cancel()
 
+    @override
     def status(self) -> TrainingStatus:
         return OpenAIProvider.get_training_status(self.provider_job_id)  # ty:ignore[invalid-argument-type]
 
@@ -49,6 +53,7 @@ class OpenAIProvider(Provider):
         self.TrainingJob = TrainingJobOpenAI
 
     @staticmethod
+    @override
     def is_provider_model(model: str) -> bool:
         if model.startswith(("openai/", "ft:")):  # noqa: SIM103 dynamic typing/lint migration for scoped ty adoption
             # In LiteLLM, ft: uniquely identifies OpenAI fine-tuned models:
@@ -63,6 +68,7 @@ class OpenAIProvider(Provider):
         return model.replace(provider_prefix, "")
 
     @staticmethod
+    @override
     def finetune(
         job: TrainingJobOpenAI,
         model: str,

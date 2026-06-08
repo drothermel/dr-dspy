@@ -1,6 +1,7 @@
 from typing import Any
 
 from pydantic import BaseModel, Field
+from typing_extensions import override
 
 
 class Tool(BaseModel):
@@ -9,9 +10,11 @@ class Tool(BaseModel):
     desc: str | None
     input_type: str | None = None
 
+    @override
     def __str__(self) -> str:
         return f"{self.name}{f'(valid_input: {self.input_type})' if self.input_type else ''}: {self.desc}"
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 

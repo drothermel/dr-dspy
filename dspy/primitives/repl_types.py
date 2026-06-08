@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pydantic
 from pydantic import Field
+from typing_extensions import override
 
 from dspy.adapters.utils import serialize_for_json
 
@@ -155,6 +156,7 @@ class REPLHistory(pydantic.BaseModel):
     def __len__(self) -> int:
         return len(self.entries)
 
+    @override
     def __iter__(self) -> Iterator[REPLEntry]:  # ty: ignore[invalid-method-override]
         return iter(self.entries)
 

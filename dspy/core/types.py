@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 import pydantic
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing_extensions import override
 
 __all__ = [
     "Assistant",
@@ -852,6 +853,7 @@ class LMResponse(BaseModel):
             **kwargs,
         )
 
+    @override
     def __iter__(self):
         return iter(self.to_values())
 
@@ -984,19 +986,24 @@ class LMHistoryEntry(BaseModel, Mapping[str, Any]):
     def response_model(self) -> str | None:
         return self.response.model
 
+    @override
     def __getitem__(self, key: str) -> Any:
         return self._mapping()[key]
 
+    @override
     def __iter__(self) -> Iterator[str]:  # ty:ignore[invalid-method-override]
         return iter(self._mapping())
 
+    @override
     def __len__(self) -> int:
         return len(self._mapping())
 
+    @override
     def __repr__(self) -> str:
         formatted = pformat(self._essential_mapping(), width=100, sort_dicts=False)
         return f"LMHistoryEntry(\n{formatted}\n)"
 
+    @override
     def __str__(self) -> str:
         return repr(self)
 

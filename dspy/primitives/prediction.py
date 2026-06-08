@@ -1,3 +1,5 @@
+from typing_extensions import override
+
 from dspy.primitives.example import Example
 
 
@@ -38,6 +40,7 @@ class Prediction(Example):
 
         return obj
 
+    @override
     def __repr__(self) -> str:
         store_repr = ",\n    ".join(f"{k}={v!r}" for k, v in self._store.items())
 
@@ -47,6 +50,7 @@ class Prediction(Example):
         num_completions = len(self._completions)
         return f"Prediction(\n    {store_repr},\n    completions=Completions(...)\n) ({num_completions - 1} completions omitted)"
 
+    @override
     def __str__(self) -> str:
         return self.__repr__()
 
@@ -162,9 +166,11 @@ class Completions:
     def __contains__(self, key) -> bool:
         return key in self._completions
 
+    @override
     def __repr__(self) -> str:
         items_repr = ",\n    ".join(f"{k}={v!r}" for k, v in self._completions.items())
         return f"Completions(\n    {items_repr}\n)"
 
+    @override
     def __str__(self) -> str:
         return self.__repr__()

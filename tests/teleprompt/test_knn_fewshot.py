@@ -1,4 +1,5 @@
 import pytest
+from typing_extensions import override
 
 from dspy.clients.embedding import Embedder
 from dspy.dsp.utils.settings import settings
@@ -40,6 +41,7 @@ class SimpleModule(Module):
     def forward(self, *args: object, **kwargs: object):
         return self.predictor(**kwargs)
 
+    @override
     def reset_copy(self):
         # Creates a new instance of SimpleModule with the same predictor
         return SimpleModule(self.predictor.signature)

@@ -8,6 +8,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import override
+
 from dspy.dsp.utils.settings import settings
 
 if TYPE_CHECKING:
@@ -62,6 +64,7 @@ class EvaluationResult(Prediction):
     def __init__(self, score: float, results: list[tuple["Example", "Example", Any]]) -> None:
         super().__init__(score=score, results=results)
 
+    @override
     def __repr__(self) -> str:
         return f"EvaluationResult(score={self.score}, results=<list of {len(self.results)} results>)"
 

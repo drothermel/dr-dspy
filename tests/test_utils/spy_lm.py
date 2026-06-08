@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import override
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -32,6 +34,7 @@ class SpyLM(LM):
         self.return_json = return_json
         self.response_text = response_text
 
+    @override
     def forward(self, request: LMRequest) -> LMResponse:
         messages = [message_to_openai_chat(message) for message in request.messages]
         kwargs = {**self.kwargs, **request.config.model_dump(exclude_none=True)}

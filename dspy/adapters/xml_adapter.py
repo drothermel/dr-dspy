@@ -2,6 +2,7 @@ import re
 from typing import Any
 
 from pydantic.fields import FieldInfo
+from typing_extensions import override
 
 from dspy.adapters.chat_adapter import ChatAdapter, FieldInfoWithName
 from dspy.adapters.utils import format_field_value, translate_field_type
@@ -11,6 +12,7 @@ from dspy.signatures.signature import Signature
 class XMLAdapter(ChatAdapter):
     field_pattern = re.compile(r"<(?P<name>\w+)>((?P<content>.*?))</\1>", re.DOTALL)
 
+    @override
     def format_field_with_value(self, fields_with_values: dict[FieldInfoWithName, Any]) -> str:
         output = []
         for field, field_value in fields_with_values.items():
@@ -18,6 +20,7 @@ class XMLAdapter(ChatAdapter):
             output.append(f"<{field.name}>\n{formatted}\n</{field.name}>")
         return "\n\n".join(output).strip()
 
+    @override
     def format_field_structure(self, signature: type[Signature]) -> str:
         """
         XMLAdapter requires input and output fields to be wrapped in XML tags like `<field_name>`.
@@ -38,6 +41,7 @@ class XMLAdapter(ChatAdapter):
         parts.append(format_signature_fields_for_instructions(signature.output_fields))
         return "\n\n".join(parts).strip()
 
+    @override
     def format_user_message_content(
         self,
         signature: type[Signature],
@@ -66,6 +70,7 @@ class XMLAdapter(ChatAdapter):
         messages.append(suffix)
         return "\n\n".join(messages).strip()
 
+    @override
     def format_assistant_message_content(
         self,
         signature: type[Signature],
@@ -79,12 +84,14 @@ class XMLAdapter(ChatAdapter):
             },
         )
 
+    @override
     def user_message_output_requirements(self, signature: type[Signature]) -> str:
         message = "Respond with the corresponding output fields wrapped in XML tags "
         message += ", then ".join(f"`<{f}>`" for f in signature.output_fields)
         message += "."
         return message
 
+    @override
     def parse(self, signature: type[Signature], completion: str) -> dict[str, Any]:
         raw_fields: dict[str, str] = {}
         for match in self.field_pattern.finditer(completion):

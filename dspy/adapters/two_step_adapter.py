@@ -1,6 +1,7 @@
 from typing import Any, cast
 
 import json_repair
+from typing_extensions import override
 
 from dspy.adapters.base import Adapter
 from dspy.adapters.chat_adapter import ChatAdapter
@@ -51,6 +52,7 @@ class TwoStepAdapter(Adapter):
             raise ValueError("extraction_model must be an instance of dspy.clients.base_lm.BaseLM")
         self.extraction_model = extraction_model
 
+    @override
     def format(
         self, signature: type[Signature], demos: list[dict[str, Any]], inputs: dict[str, Any]
     ) -> list[dict[str, Any]]:
@@ -78,6 +80,7 @@ class TwoStepAdapter(Adapter):
 
         return messages
 
+    @override
     def parse(self, signature: type[Signature], completion: str) -> dict[str, Any]:
         """
         Use a smaller LM (extraction_model) with chat adapter to extract structured data
@@ -112,6 +115,7 @@ class TwoStepAdapter(Adapter):
                 message=f"Failed to parse response from the original completion: {e}",
             ) from e
 
+    @override
     async def acall(
         self,
         lm: BaseLM,
@@ -179,6 +183,7 @@ class TwoStepAdapter(Adapter):
             values.append(value)
         return values
 
+    @override
     def format_task_description(self, signature: type[Signature]) -> str:
         """Create a description of the task based on the signature"""
         parts = []
@@ -193,6 +198,7 @@ class TwoStepAdapter(Adapter):
 
         return "\n".join(parts)
 
+    @override
     def format_user_message_content(
         self,
         signature: type[Signature],
@@ -209,6 +215,7 @@ class TwoStepAdapter(Adapter):
         parts.append(suffix)
         return "\n\n".join(parts).strip()
 
+    @override
     def format_assistant_message_content(
         self,
         signature: type[Signature],

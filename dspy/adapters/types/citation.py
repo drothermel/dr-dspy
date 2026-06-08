@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 import pydantic
+from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
 from dspy.utils.annotation import experimental
@@ -77,6 +78,7 @@ class Citations(Type):
         end_char_index: int
         supported_text: str | None = None
 
+        @override
         def format(self) -> dict[str, Any]:
             """Format citation as dictionary for LM consumption.
 
@@ -131,6 +133,7 @@ class Citations(Type):
         return cls(citations=citations)
 
     @classmethod
+    @override
     def description(cls) -> str:
         """Description of the citations type for use in prompts."""
         return (
@@ -138,6 +141,7 @@ class Citations(Type):
             "Include the exact text being cited and information about its source."
         )
 
+    @override
     def format(self) -> list[dict[str, Any]]:
         """Format citations as a list of dictionaries."""
         return [citation.format() for citation in self.citations]
@@ -171,6 +175,7 @@ class Citations(Type):
 
         raise ValueError(f"Received invalid value for `Citations`: {data}")
 
+    @override
     def __iter__(self) -> Iterator[Citation]:  # ty: ignore[invalid-method-override]
         """Allow iteration over citations."""
         return iter(self.citations)
@@ -184,6 +189,7 @@ class Citations(Type):
         return self.citations[index]
 
     @classmethod
+    @override
     def adapt_to_native_lm_feature(
         cls,
         signature: type[Signature],
@@ -197,11 +203,13 @@ class Citations(Type):
         return signature
 
     @classmethod
+    @override
     def is_streamable(cls) -> bool:
         """Whether the Citations type is streamable."""
         return True
 
     @classmethod
+    @override
     def parse_stream_chunk(cls, chunk: ModelResponseStream) -> Type | str | None:
         """
         Parse a stream chunk into Citations.
@@ -225,6 +233,7 @@ class Citations(Type):
         return None
 
     @classmethod
+    @override
     def parse_lm_output(cls, output: object) -> Type | None:
         """Parse a typed LM output into Citations."""
         citations = getattr(output, "citations", None)
@@ -244,6 +253,7 @@ class Citations(Type):
         return data
 
     @classmethod
+    @override
     def parse_lm_response(cls, response: str | dict[str, Any]) -> Type | None:
         """Parse a LM response into Citations."""
         if isinstance(response, dict) and "citations" in response:

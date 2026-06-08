@@ -4,6 +4,8 @@ import random
 from collections import defaultdict
 from typing import Any, NoReturn, cast
 
+from typing_extensions import override
+
 from dspy.adapters.chat_adapter import FieldInfoWithName, field_header_pattern
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import provider_tool_call_to_part
@@ -135,6 +137,7 @@ class DummyLM(BaseLM):
             # Fallback for adapters that don't support role parameter (like ChatAdapter)
             return adapter.format_field_with_value(fields_with_values)
 
+    @override
     def forward(self, request: LMRequest) -> LMResponse:
         messages = request.messages
         kwargs = {**self.kwargs, **request.config.model_dump(exclude_none=True)}
@@ -165,6 +168,7 @@ class DummyLM(BaseLM):
             usage=dotdict(prompt_tokens=0, completion_tokens=0, total_tokens=0),
         )
 
+    @override
     async def aforward(self, request: LMRequest) -> LMResponse:
         return self.forward(request)
 

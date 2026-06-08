@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import pydantic
+from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
 
@@ -62,6 +63,7 @@ class File(Type):
 
         return encode_file_to_dict(values)
 
+    @override
     def format(self) -> list[dict[str, Any]]:
         file_dict = {}
         if self.file_data:
@@ -73,9 +75,11 @@ class File(Type):
 
         return [{"type": "file", "file": file_dict}]
 
+    @override
     def __str__(self) -> str:
         return str(self.serialize_model())
 
+    @override
     def __repr__(self) -> str:
         parts = []
         if self.file_data is not None:

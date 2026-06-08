@@ -1,13 +1,17 @@
 import enum
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from unittest import mock
 
 import pydantic
 import pytest
+from typing_extensions import override
 
 from dspy.adapters.types.document import Document
 from dspy.utils.dummies import DummyLM
 from dspy.utils.exceptions import AdapterParseError
+
+if TYPE_CHECKING:
+    from litellm.utils import ModelResponse
 
 try:
     from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
@@ -653,6 +657,7 @@ def test_json_adapter_format_exact_messages_with_incomplete_demo():
 def test_json_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calling():
     class FunctionCallingLM(DummyLM):
         @property
+        @override
         def supports_function_calling(self):
             return True
 
