@@ -181,6 +181,8 @@ def test_react_v2_forced_submit_on_empty_tool_calls():
         ]
     )
 
+    lm.kwargs["reasoning_effort"] = "low"
+
     with settings.context(lm=lm, adapter=ChatAdapter()):
         pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(question="cats"))
 

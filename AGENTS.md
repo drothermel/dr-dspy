@@ -66,6 +66,34 @@ tool = Tool(my_func, description="Describe what the tool does.")
 
 See `docs/migration/taskspec.md` for the full Signature → TaskSpec translation table.
 
+Field descriptions must be explicit under strict transparency (placeholder `${field}` descs are rejected).
+
+## Strict transparency and audit logging
+
+`transparency` defaults to `"strict"`. Configure explicit LM and adapter settings before running modules:
+
+```python
+from dspy.adapters.json_adapter import JSONAdapter
+from dspy.clients.lm import LM
+from dspy.dsp.utils.settings import settings
+
+settings.configure(
+    lm=LM("openai/gpt-4o-mini", temperature=0.0, max_tokens=4000, cache=False),
+    adapter=JSONAdapter(),
+)
+```
+
+Opt down for legacy behavior: `settings.configure(transparency="off")`.
+
+Environment variables:
+
+- `DSPY_LOG_DIR` — root directory for run logs (default: `logs/` relative to cwd)
+- `DSPY_RUN_ID` — experiment bucket name (default: `default_run`)
+
+Each `settings.configure(...)` creates `{DSPY_LOG_DIR}/{DSPY_RUN_ID}/{timestamp}/` with `run.json` and append-only `calls.jsonl` for every LM call.
+
+Optimizer/bootstrap teacher contexts must include a configured `adapter` (use `optimizer_lm_context` from `dspy.teleprompt.utils`).
+
 ## Internal call-site conventions
 
 - Use keyword arguments for multi-arg calls to DSPy-internal functions when meaning is not obvious from position.

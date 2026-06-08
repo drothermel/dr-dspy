@@ -13,8 +13,11 @@ from contextlib import contextmanager
 import pytest
 from typing_extensions import override
 
+from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool
+from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm import LM
+from dspy.core.types import LMRequest, LMResponse
 from dspy.dsp.utils.settings import settings
 from dspy.predict.rlm import RLM, _strip_code_fences
 from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
@@ -24,12 +27,25 @@ from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
 from dspy.primitives.sandbox_serializable import SandboxSerializable
 from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
+from dspy.utils.dummies import DummyLM
 from tests.mock_interpreter import MockInterpreter
 from tests.task_spec.helpers import ts
 
 # ============================================================================
 # Test Helpers and Factories
 # ============================================================================
+
+
+class FailingSubLM(BaseLM):
+    def __init__(self) -> None:
+        super().__init__("fail-lm", "chat", temperature=0.0, max_tokens=1000, cache=False)
+        self.cache = False
+
+    @override
+    async def aforward(self, request: LMRequest) -> LMResponse:
+        raise RuntimeError("LM failed")
+
+
 
 
 def make_mock_predictor(responses: list[dict]):
@@ -228,12 +244,8 @@ class TestRLMInitialization:
 
     def test_batched_query_errors_have_clear_markers(self):
         """Test that errors in llm_query_batched are prefixed with [ERROR]."""
-        from unittest.mock import MagicMock
-
-        mock_lm = MagicMock()
-        mock_lm.side_effect = RuntimeError("LM failed")
-
-        rlm = RLM(ts("context -> answer"), max_llm_calls=10, sub_lm=mock_lm)
+        settings.configure(adapter=ChatAdapter())
+        rlm = RLM(ts("context -> answer"), max_llm_calls=10, sub_lm=FailingSubLM())
         tools = rlm._make_llm_tools()
 
         results = tools["llm_query_batched"](prompts=["test prompt"])
@@ -248,12 +260,10 @@ class TestRLMInitialization:
         ThreadPoolExecutor for concurrent execution.
         """
         from concurrent.futures import ThreadPoolExecutor
-        from unittest.mock import MagicMock
 
-        mock_lm = MagicMock()
-        mock_lm.return_value = ["response"]
-
-        rlm = RLM(ts("context -> answer"), max_llm_calls=10, sub_lm=mock_lm)
+        sub_lm = DummyLM([{"response": "response"} for _ in range(11)], adapter=ChatAdapter())
+        settings.configure(lm=sub_lm, adapter=ChatAdapter())
+        rlm = RLM(ts("context -> answer"), max_llm_calls=10, sub_lm=sub_lm)
         tools = rlm._make_llm_tools()
 
         call_count = [0]

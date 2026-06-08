@@ -87,7 +87,8 @@ class DummyLM(BaseLM):
         reasoning: bool = False,
         adapter=None,
     ) -> None:
-        super().__init__("dummy", "chat", temperature=0.0, max_tokens=1000)
+        super().__init__("dummy", "chat", temperature=0.0, max_tokens=1000, cache=False)
+        self.cache = False
         self.answers = answers
         if isinstance(answers, list):
             self.answers = iter(answers)

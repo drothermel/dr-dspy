@@ -10,16 +10,27 @@ from tests.test_utils.server import litellm_test_server, read_litellm_test_serve
 SKIP_DEFAULT_FLAGS = ["reliability", "extra", "llm_call", "deno"]
 
 
+def _test_settings_config() -> dict:
+    from dspy.dsp.utils.settings import DEFAULT_CONFIG
+
+    test_config = copy.deepcopy(DEFAULT_CONFIG)
+    test_config["run_log_enabled"] = False
+    test_config["transparency"] = "off"
+    return test_config
+
+
 @pytest.fixture(autouse=True)
 def clear_settings() -> Iterator[None]:
-    """Ensure each test gets fresh DSPy settings."""
+    """Ensure each test gets fresh DSPy settings with transparency disabled."""
 
+    import dspy.dsp.utils.settings as settings_module
+
+    settings.configure(**_test_settings_config())
     try:
         yield
     finally:
-        from dspy.dsp.utils.settings import DEFAULT_CONFIG
-
-        settings.configure(**copy.deepcopy(DEFAULT_CONFIG), inherit_config=False)
+        settings.configure(**_test_settings_config())
+        settings_module.config_owner_async_task = None
 
 
 @pytest.fixture

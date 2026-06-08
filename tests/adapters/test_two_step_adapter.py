@@ -3,6 +3,7 @@ import asyncio
 import pytest
 from typing_extensions import override
 
+from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.two_step_adapter import TwoStepAdapter
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import message_to_openai_chat
@@ -31,7 +32,7 @@ class RecordingTextLM(BaseLM):
 
 def test_two_step_adapter_format_exact_messages_for_simple_signature_with_demo():
     QA = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
-    adapter = TwoStepAdapter(DummyLM([{"answer": "x"}]))
+    adapter = TwoStepAdapter(DummyLM([{"answer": "x"}]), extraction_adapter=ChatAdapter())
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=adapter,
         task_spec=QA,
@@ -69,7 +70,7 @@ def test_two_step_adapter_format_exact_messages_with_typed_outputs():
         },
         instructions="Given the fields `question`, produce the fields `count`, `answer`.",
     )
-    adapter = TwoStepAdapter(DummyLM([{"count": 1, "answer": "x"}]))
+    adapter = TwoStepAdapter(DummyLM([{"count": 1, "answer": "x"}]), extraction_adapter=ChatAdapter())
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=adapter, task_spec=TypedSignature, demos=[], inputs={"question": "Q"}
     )
@@ -109,7 +110,10 @@ def test_two_step_adapter_call():
     main_lm = RecordingTextLM(["text from main LM"])
     extraction_lm = DummyLM([{"solution": "result", "answer": 12}])
 
-    settings.configure(lm=main_lm, adapter=TwoStepAdapter(extraction_model=extraction_lm))
+    settings.configure(
+        lm=main_lm,
+        adapter=TwoStepAdapter(extraction_model=extraction_lm, extraction_adapter=ChatAdapter()),
+    )
 
     result = asyncio.run(program.acall(question="What is 5 + 7?"))
 
@@ -154,7 +158,10 @@ async def test_two_step_adapter_async_call():
     main_lm = RecordingTextLM(["text from main LM"])
     extraction_lm = DummyLM([{"solution": "result", "answer": 12}])
 
-    with settings.context(lm=main_lm, adapter=TwoStepAdapter(extraction_model=extraction_lm)):
+    with settings.context(
+        lm=main_lm,
+        adapter=TwoStepAdapter(extraction_model=extraction_lm, extraction_adapter=ChatAdapter()),
+    ):
         result = await program.acall(question="What is 5 + 7?")
 
     assert result.answer == 12
@@ -183,10 +190,11 @@ async def test_two_step_adapter_async_call():
     assert "text from main LM" in content
 
 
-def test_two_step_adapter_parse():
+@pytest.mark.asyncio
+async def test_two_step_adapter_extraction():
     ComplexSignature = make_task_spec(
         {
-            "input_text": FieldSpec.input("input_text"),
+            "input_text": FieldSpec.input("input_text", desc="Source text to tag"),
             "tags": FieldSpec.output("tags", type_=list[str], desc="List of relevant tags"),
             "confidence": FieldSpec.output("confidence", type_=float, desc="Confidence score"),
         },
@@ -195,21 +203,28 @@ def test_two_step_adapter_parse():
     first_response = "main LM response"
 
     extraction_lm = DummyLM([{"tags": ["AI", "deep learning", "neural networks"], "confidence": 0.87}])
-    adapter = TwoStepAdapter(extraction_lm)
+    adapter = TwoStepAdapter(extraction_lm, extraction_adapter=ChatAdapter())
     settings.configure(adapter=adapter, lm=extraction_lm)
 
-    result = adapter.parse(task_spec=ComplexSignature, completion=first_response)
+    result = await adapter._run_extraction(original_task_spec=ComplexSignature, text=first_response)
 
     assert result["tags"] == ["AI", "deep learning", "neural networks"]
     assert result["confidence"] == 0.87
 
 
-def test_two_step_adapter_parse_errors():
-    TestSignature = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
+@pytest.mark.asyncio
+async def test_two_step_adapter_extraction_errors():
+    TestSignature = make_task_spec(
+        {
+            "question": FieldSpec.input("question", desc="The question to answer"),
+            "answer": FieldSpec.output("answer", desc="The answer to the question"),
+        },
+        instructions="Given the fields `question`, produce the fields `answer`.",
+    )
     first_response = "main LM response"
 
     extraction_lm = RecordingTextLM(["not parseable extraction output"])
-    adapter = TwoStepAdapter(extraction_lm)
+    adapter = TwoStepAdapter(extraction_lm, extraction_adapter=ChatAdapter())
 
-    with pytest.raises(AdapterParseError, match="Failed to parse response"):
-        adapter.parse(task_spec=TestSignature, completion=first_response)
+    with pytest.raises(AdapterParseError):
+        await adapter._run_extraction(original_task_spec=TestSignature, text=first_response)
