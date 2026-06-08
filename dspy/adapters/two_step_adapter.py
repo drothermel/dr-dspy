@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import Mapping
 from typing import Any
 
@@ -6,69 +5,63 @@ import json_repair
 from typing_extensions import override
 
 from dspy.adapters.base import Adapter
-from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import build_lm_message
 from dspy.clients.base_lm import BaseLM
-from dspy.core.types import LMConfig, LMMessage, LMRequest, LMToolCallPart, merge_lm_request_config
-from dspy.task_spec import TaskSpec, input_field, make_task_spec
+from dspy.compile.resolve import resolve_adapter, resolve_call, resolve_lm_config
+from dspy.core.types import LMConfig, LMMessage, LMRequest, LMToolCallPart, coerce_lm_config, merge_lm_request_config
+from dspy.core.types.history import _history_request_messages_as_openai
+from dspy.dsp.utils.settings import settings
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec
 from dspy.task_spec.formatting import get_field_spec_description_string
 from dspy.utils.exceptions import AdapterParseError, LMError
+from dspy.utils.transparency import (
+    ACTIVE_COMPILED_CALL,
+    reset_active_call_metadata,
+    set_active_call_metadata,
+    validate_compiled_call,
+)
 
-"""
-NOTE/TODO/FIXME:
 
-The main issue below is that the second step's task spec is entirely created on the fly and is invoked with a chat
-adapter explicitly constructed with no demonstrations. This means that it cannot "learn" or get optimized.
-"""
+class FrameworkTwoStepExtractorTaskSpec(TaskSpec):
+    """Framework task spec for TwoStepAdapter extraction (outputs filled dynamically)."""
+
+    name: str = "framework.two_step.extractor"
+    instructions: str = (
+        "The input is text that should contain all information needed to produce the requested output fields. "
+        "Extract each output field verbatim from the text."
+    )
+    inputs: tuple[FieldSpec, ...] = (
+        input_field(
+            "text",
+            str,
+            desc="Raw completion text from the main language model to extract structured fields from.",
+        ),
+    )
+    outputs: tuple[FieldSpec, ...] = ()
 
 
 class TwoStepAdapter(Adapter):
     """
     A two-stage adapter that:
         1. Uses a simpler, more natural prompt for the main LM
-        2. Uses a smaller LM with chat adapter to extract structured data from the response of main LM
-    This adapter uses a common __call__ logic defined in base Adapter class.
-    This class is particularly useful when interacting with reasoning models as the main LM since reasoning models
-    are known to struggle with structured outputs.
-
-    Examples:
-    ```
-    from dspy.adapters.two_step_adapter import TwoStepAdapter
-    from dspy.clients.lm import LM
-    from dspy.dsp.utils.settings import settings
-    from dspy.predict.chain_of_thought import ChainOfThought
-
-    lm = LM(model="openai/o3-mini", max_tokens=16000, temperature = 1.0)
-    adapter = TwoStepAdapter(LM("openai/gpt-4o-mini"))
-    settings.configure(lm=lm, adapter=adapter)
-    program = ChainOfThought("question->answer")
-    result = program("What is the capital of France?")
-    print(result)
-    ```
+        2. Uses a smaller LM with the configured adapter to extract structured data from the response of main LM
     """
 
-    def __init__(self, extraction_model: BaseLM, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        extraction_model: BaseLM,
+        extraction_adapter: Adapter | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         if not isinstance(extraction_model, BaseLM):
             raise ValueError("extraction_model must be an instance of dspy.clients.base_lm.BaseLM")
         self.extraction_model = extraction_model
+        self.extraction_adapter = extraction_adapter
 
     @override
     def format(self, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any]) -> list[LMMessage]:
-        """
-        Format a prompt for the first stage with the main LM.
-        This no specific structure is required for the main LM, we customize the format method
-        instead of format_field_description or format_field_structure.
-
-        Args:
-            task_spec: The task spec of the original task
-            demos: A list of demo examples
-            inputs: The current input
-
-        Returns:
-            A list of messages to be passed to the main LM.
-        """
         messages: list[LMMessage] = []
 
         task_description = self.format_task_description(task_spec)
@@ -87,40 +80,40 @@ class TwoStepAdapter(Adapter):
 
     @override
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
-        """
-        Use a smaller LM (extraction_model) with chat adapter to extract structured data
-        from the raw completion text of the main LM.
+        raise NotImplementedError(
+            "TwoStepAdapter.parse is not supported. Structured extraction runs in TwoStepAdapter.acall."
+        )
 
-        Args:
-            task_spec: The task spec of the original task
-            completion: The completion from the main LM
+    async def _run_extraction(
+        self,
+        *,
+        original_task_spec: TaskSpec,
+        text: str,
+    ) -> dict[str, Any]:
+        transparency = settings.get("transparency", "strict")
+        extraction_adapter, _adapter_notes = resolve_adapter(
+            self.extraction_adapter or settings.adapter,
+            transparency=transparency,
+        )
+        extractor_task_spec = self._create_extractor_task_spec(original_task_spec)
+        config, _provenance = resolve_lm_config(self.extraction_model, LMConfig())
 
-        Returns:
-            A dictionary containing the extracted structured data.
-        """
-        extractor_task_spec = self._create_extractor_task_spec(task_spec)
-
+        metadata_token = set_active_call_metadata(
+            module="TwoStepAdapter",
+            phase="two_step.extraction",
+            lm_role="extraction_model",
+        )
         try:
-            parsed_result = asyncio.run(
-                ChatAdapter().acall(
-                    lm=self.extraction_model,
-                    config=LMConfig(),
-                    task_spec=extractor_task_spec,
-                    demos=[],
-                    inputs={"text": completion},
-                )
+            results = await extraction_adapter.acall(
+                lm=self.extraction_model,
+                config=config,
+                task_spec=extractor_task_spec,
+                demos=[],
+                inputs={"text": text},
             )
-            return parsed_result[0]
-
-        except LMError:
-            raise
-        except Exception as e:
-            raise AdapterParseError(
-                adapter_name="TwoStepAdapter",
-                task_spec=task_spec,
-                lm_response=completion,
-                message=f"Failed to parse response from the original completion: {e}",
-            ) from e
+        finally:
+            reset_active_call_metadata(metadata_token)
+        return results[0]
 
     @override
     async def acall(
@@ -131,19 +124,43 @@ class TwoStepAdapter(Adapter):
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        from dspy.core.types import coerce_lm_config
-
+        resolved_config = coerce_lm_config(config)
         messages = self.format(task_spec=task_spec, demos=demos, inputs=inputs)
+        merged_config, provenance = resolve_lm_config(lm, resolved_config)
         request = LMRequest(
             model=lm.model,
             messages=messages,
-            config=merge_lm_request_config(lm=lm, config=coerce_lm_config(config)),
+            config=merge_lm_request_config(lm=lm, config=merged_config),
         )
-        response = await lm.acall(request)
+
+        transparency = settings.get("transparency", "strict")
+        main_compiled = resolve_call(
+            lm=lm,
+            adapter=self,
+            task_spec=task_spec,
+            config=merged_config,
+            config_provenance=provenance,
+            messages=_history_request_messages_as_openai(request),
+            module="TwoStepAdapter",
+            phase="two_step.main",
+            lm_role="default",
+        )
+        validate_compiled_call(main_compiled, transparency)
+
+        main_token = ACTIVE_COMPILED_CALL.set(main_compiled)
+        metadata_token = set_active_call_metadata(
+            module="TwoStepAdapter",
+            phase="two_step.main",
+            lm_role="default",
+        )
+        try:
+            response = await lm.acall(request)
+        finally:
+            ACTIVE_COMPILED_CALL.reset(main_token)
+            reset_active_call_metadata(metadata_token)
+
         extractor_task_spec = self._create_extractor_task_spec(task_spec)
-
         values = []
-
         tool_call_output_field_name = self._get_tool_call_output_field_name(task_spec)
         for output in response.outputs:
             output_logprobs = output.logprobs
@@ -151,21 +168,13 @@ class TwoStepAdapter(Adapter):
             text = output.text
 
             try:
-                value = await ChatAdapter().acall(
-                    lm=self.extraction_model,
-                    config=LMConfig(),
-                    task_spec=extractor_task_spec,
-                    demos=[],
-                    inputs={"text": text or ""},
-                )
-                value = value[0]
-
+                value = await self._run_extraction(original_task_spec=task_spec, text=text or "")
             except LMError:
                 raise
             except Exception as e:
                 raise AdapterParseError(
                     adapter_name="TwoStepAdapter",
-                    task_spec=task_spec,
+                    task_spec=extractor_task_spec,
                     lm_response=str(output),
                     message=f"Failed to parse response from the original completion: {e}",
                 ) from e
@@ -194,7 +203,6 @@ class TwoStepAdapter(Adapter):
 
     @override
     def format_task_description(self, task_spec: TaskSpec) -> str:
-        """Create a description of the task based on the task spec"""
         parts = []
 
         parts.append("You are a helpful assistant that can solve tasks based on user input.")
@@ -239,25 +247,21 @@ class TwoStepAdapter(Adapter):
 
         return "\n\n".join(parts).strip()
 
-    def _create_extractor_task_spec(
-        self,
-        original_task_spec: TaskSpec,
-    ) -> TaskSpec:
-        """Create a new task spec containing a new 'text' input field and all output fields.
-
-        Args:
-            original_task_spec: The original task spec to extract output fields from
-
-        Returns:
-            A new TaskSpec with a text input field and all output fields
-        """
+    def _create_extractor_task_spec(self, original_task_spec: TaskSpec) -> TaskSpec:
         new_fields = {
-            "text": input_field("text"),
+            "text": input_field(
+                "text",
+                str,
+                desc="Raw completion text from the main language model to extract structured fields from.",
+            ),
             **dict(original_task_spec.output_fields),
         }
 
-        outputs_str = ", ".join([f"`{field}`" for field in original_task_spec.output_fields])
-        instructions = f"The input is a text that should contain all the necessary information to produce the fields {outputs_str}. \
-            Your job is to extract the fields from the text verbatim. Extract precisely the appropriate value (content) for each field."
+        outputs_str = ", ".join(f"`{field}`" for field in original_task_spec.output_fields)
+        instructions = (
+            f"The input is a text that should contain all the necessary information to produce the fields {outputs_str}. "
+            "Your job is to extract the fields from the text verbatim. Extract precisely the appropriate value "
+            "(content) for each field."
+        )
 
-        return make_task_spec(new_fields, instructions=instructions, name="Extractor")
+        return make_task_spec(new_fields, instructions=instructions, name="framework.two_step.extractor")

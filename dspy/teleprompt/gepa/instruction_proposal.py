@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class GenerateEnhancedMultimodalInstructionTaskSpec(TaskSpec):
-    name: str = "GenerateEnhancedMultimodalInstructionFromFeedback"
+    name: str = "framework.gepa.multimodal_instruction"
     instructions: str = (
         "I provided an assistant with instructions to perform a task involving visual content, but the assistant's "
         "performance needs improvement based on the examples and feedback below.\n\n"

@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, cast
 import pydantic
 
 from dspy.adapters.types.tool import Tool, tool_from_callable
+from dspy.clients.base_lm import BaseLM
 from dspy.adapters.utils import parse_value, translate_field_type
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
@@ -32,13 +33,42 @@ from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl
 from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
 from dspy.utils.annotation import experimental
+from dspy.utils.transparency import reset_active_call_metadata, set_active_call_metadata
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
-    from dspy.clients.lm import LM
+    from dspy.clients.base_lm import BaseLM as BaseLMType
 
 logger = logging.getLogger(__name__)
+
+
+class FrameworkRlmSubQueryTaskSpec(TaskSpec):
+    name: str = "framework.rlm.sub_query"
+    instructions: str = "Answer the prompt concisely and directly."
+    inputs: tuple = (
+        input_field("prompt", str, desc="The sub-LLM query prompt to answer."),
+    )
+    outputs: tuple = (
+        output_field("response", str, desc="The sub-LLM response text."),
+    )
+
+
+def _run_sub_lm_async(coro):
+    import asyncio
+    import contextvars
+
+    ctx = contextvars.copy_context()
+
+    def _run_in_context() -> Any:
+        return ctx.run(asyncio.run, coro)
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return _run_in_context()
+    raise RuntimeError("RLM sub-LM queries cannot run inside an active asyncio loop from sync REPL tools.")
+
 
 # TODO: Optimize this prompt across a diverse benchmark
 
@@ -135,7 +165,7 @@ class RLM(Module):
         max_output_chars: int = 10_000,
         verbose: bool = False,
         tools: list[Callable] | None = None,
-        sub_lm: LM | None = None,
+        sub_lm: BaseLM | None = None,
         interpreter: CodeInterpreter | None = None,
     ) -> None:
         """
@@ -168,6 +198,7 @@ class RLM(Module):
         action_sig, extract_sig = self._build_task_specs()
         self.generate_action = Predict(action_sig)
         self.extract = Predict(extract_sig)
+        self._sub_query_predict = Predict(FrameworkRlmSubQueryTaskSpec())
 
     # =========================================================================
     # Tool Creation and Validation
@@ -248,20 +279,26 @@ class RLM(Module):
                     )
                 state["call_count"] += n
 
-        def _query_lm(prompt: str) -> str:
+        async def _aquery_lm(prompt: str) -> str:
             target_lm = lm if lm is not None else settings.lm
             if target_lm is None:
                 raise RuntimeError(
                     "No LM configured. Use `from dspy.dsp.utils.settings import settings; "
                     "settings.configure(lm=...)` or pass sub_lm to RLM."
                 )
-            response = target_lm(prompt)
-            if isinstance(response, list) and response:
-                item = response[0]
-                if isinstance(item, dict) and "text" in item:
-                    return item["text"]
-                return item
-            return str(response)
+            metadata_token = set_active_call_metadata(
+                module="RLM",
+                phase="rlm.sub_lm",
+                lm_role="sub_lm",
+            )
+            try:
+                prediction = await self._sub_query_predict(prompt=prompt, lm=target_lm)
+            finally:
+                reset_active_call_metadata(metadata_token)
+            return prediction.response
+
+        def _query_lm(prompt: str) -> str:
+            return _run_sub_lm_async(_aquery_lm(prompt))
 
         def llm_query(prompt: str) -> str:
             """Query the LLM with a prompt string."""

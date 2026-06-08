@@ -1,22 +1,24 @@
 import asyncio
+import contextvars
+import json
 import logging
 import random
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Callable, Protocol, TypedDict, cast
 
 from gepa import EvaluationBatch, GEPAAdapter
-from gepa.strategies.instruction_proposal import InstructionProposalSignature
 from typing_extensions import override
 
-from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.history import History
 from dspy.dsp.utils.settings import settings
 from dspy.evaluate.evaluate import Evaluate
+from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, TraceData
-from dspy.teleprompt.utils import get_task_spec, set_task_spec
+from dspy.teleprompt.gepa.task_specs import FrameworkGepaInstructionProposalTaskSpec
+from dspy.teleprompt.utils import get_task_spec, optimizer_lm_context, set_task_spec
 
 if TYPE_CHECKING:
     from gepa.core.adapter import ProposalFn
@@ -27,11 +29,16 @@ _gepa_eval_executor = ThreadPoolExecutor(max_workers=1)
 
 
 def _run_async_from_sync(coro):
+    ctx = contextvars.copy_context()
+
+    def _run_in_context() -> Any:
+        return ctx.run(asyncio.run, coro)
+
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        return asyncio.run(coro)
-    return _gepa_eval_executor.submit(asyncio.run, coro).result()
+        return _run_in_context()
+    return _gepa_eval_executor.submit(_run_in_context).result()
 
 
 class LoggerAdapter:
@@ -128,7 +135,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         reflection_lm = self.reflection_lm or settings.lm
         # If custom proposer provided, override everything with custom proposer
         if self.custom_instruction_proposer:
-            with settings.context(lm=reflection_lm):
+            with optimizer_lm_context(lm=reflection_lm, phase="gepa.reflection", lm_role="reflection_lm"):
                 return self.custom_instruction_proposer(
                     candidate=candidate,
                     reflective_dataset=reflective_dataset,
@@ -136,18 +143,19 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 )
 
         results: dict[str, str] = {}
+        proposer = Predict(FrameworkGepaInstructionProposalTaskSpec())
 
-        with settings.context(lm=reflection_lm):
+        with optimizer_lm_context(lm=reflection_lm, phase="gepa.reflection", lm_role="reflection_lm"):
             for name in components_to_update:
                 base_instruction = candidate[name]
                 dataset_with_feedback = reflective_dataset[name]
-                results[name] = InstructionProposalSignature.run(
-                    lm=cast("Any", lambda x: self.stripped_lm_call(x)[0]),
-                    input_dict={
-                        "current_instruction_doc": base_instruction,
-                        "dataset_with_feedback": dataset_with_feedback,
-                    },
-                )["new_instruction"]
+                prediction = _run_async_from_sync(
+                    proposer(
+                        current_instruction_doc=base_instruction,
+                        dataset_with_feedback=json.dumps(dataset_with_feedback, indent=2, default=str),
+                    )
+                )
+                results[name] = prediction.new_instruction
 
         return results
 
@@ -306,7 +314,9 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
 
                 d = {"Inputs": new_inputs, "Generated Outputs": new_outputs}
                 if isinstance(outputs, FailedPrediction):
-                    adapter = ChatAdapter()
+                    from dspy.compile.resolve import resolve_adapter
+
+                    adapter, _ = resolve_adapter(settings.adapter, transparency=settings.get("transparency", "strict"))
                     structure_instruction = ""
                     for message in adapter.format(task_spec=get_task_spec(module), demos=[], inputs={}):
                         structure_instruction += message.role + ": " + (message.text or "") + "\n"
@@ -343,20 +353,3 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
 
         return ret_d
 
-    # Always return strings from the LM outputs
-    # Even when it returns a dict with e.g., "text" and "reasoning" fields
-    def stripped_lm_call(self, x: str) -> list[str]:
-        assert self.reflection_lm is not None
-        raw_outputs = self.reflection_lm(x)
-        outputs = []
-        for raw_output in raw_outputs:
-            if type(raw_output) == str:
-                outputs.append(raw_output)
-            elif type(raw_output) == dict:
-                if "text" not in raw_output:
-                    raise KeyError("Missing 'text' field in the output from the base LM!")
-                outputs.append(raw_output["text"])
-            else:
-                raise TypeError("Unexpected output type from the base LM! Expected str or dict")
-
-        return outputs
