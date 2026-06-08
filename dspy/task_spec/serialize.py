@@ -2,7 +2,7 @@
 
 from typing import Any, get_args, get_origin
 
-from dspy.task_spec.field_spec import _UNSET, FieldSpec
+from dspy.task_spec.field_spec import _UNSET, FieldSpec, input_field, output_field
 
 TASK_SPEC_VERSION = 2
 
@@ -31,14 +31,14 @@ def field_spec_from_dict(data: dict[str, Any], *, custom_types: dict[str, type] 
         "constraints": data.get("constraints"),
     }
     if data["role"] == "input":
-        return FieldSpec.input(
+        return input_field(
             data["name"],
             type_,
             is_type_undefined=data.get("is_type_undefined", False),
             default=data["default"] if data.get("has_default") else _UNSET,
             **common,
         )
-    return FieldSpec.output(data["name"], type_, **common)
+    return output_field(data["name"], type_, **common)
 
 
 def _type_to_str(type_annotation: Any) -> str:

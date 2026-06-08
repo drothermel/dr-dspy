@@ -1,6 +1,15 @@
 import pytest
 
-from dspy.task_spec import FieldSpec, TaskSpec, default_task_instructions, infer_prefix, make_task_spec
+from dspy.task_spec import (
+    FieldRole,
+    FieldSpec,
+    TaskSpec,
+    default_task_instructions,
+    infer_prefix,
+    input_field,
+    make_task_spec,
+    output_field,
+)
 from tests.task_spec.helpers import ts
 
 
@@ -107,6 +116,44 @@ def test_field_spec_default_desc():
     field = FieldSpec.input("my_field")
     assert field.desc == "${my_field}"
     assert field.prefix == "My Field:"
+
+
+def test_input_field_and_output_field():
+    inp = input_field("question", desc="The question")
+    out = output_field("answer", type_=int, desc="The answer")
+    assert inp.role == FieldRole.INPUT
+    assert out.role == FieldRole.OUTPUT
+    assert inp.type_ is str
+    assert out.type_ is int
+
+
+def test_make_task_spec_from_field_lists():
+    spec = make_task_spec(
+        inputs=[input_field("question", desc="The question")],
+        outputs=[output_field("answer", desc="The answer")],
+        instructions="Answer briefly.",
+        name="QA",
+    )
+    assert spec.name == "QA"
+    assert list(spec.input_fields) == ["question"]
+    assert list(spec.output_fields) == ["answer"]
+
+
+def test_make_task_spec_rejects_mismatched_field_role():
+    with pytest.raises(ValueError, match="expected.*output"):
+        make_task_spec(
+            outputs=[input_field("answer")],
+            instructions="Test.",
+        )
+
+
+def test_make_task_spec_rejects_spec_and_lists():
+    with pytest.raises(TypeError, match="not both"):
+        make_task_spec(
+            "q -> a",
+            inputs=[input_field("q")],
+            instructions="Test.",
+        )
 
 
 def test_custom_types_in_string_spec():

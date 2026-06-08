@@ -8,7 +8,7 @@ from typing import Any, cast
 
 from pydantic import Field
 
-from dspy.task_spec.field_spec import FieldSpec
+from dspy.task_spec.field_spec import FieldSpec, input_field, output_field
 
 
 def parse_task_spec_string(
@@ -33,10 +33,10 @@ def parse_task_spec_string(
         )
 
     inputs = tuple(
-        FieldSpec.input(name, type_, is_type_undefined=is_type_undefined)
+        input_field(name, type_, is_type_undefined=is_type_undefined)
         for name, type_, is_type_undefined in input_fields
     )
-    outputs = tuple(FieldSpec.output(name, type_) for name, type_, _ in output_fields)
+    outputs = tuple(output_field(name, type_) for name, type_, _ in output_fields)
     return inputs, outputs
 
 

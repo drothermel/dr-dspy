@@ -1,9 +1,15 @@
 import re
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 _UNSET = object()
+
+
+class FieldRole(StrEnum):
+    INPUT = "input"
+    OUTPUT = "output"
 
 
 def infer_prefix(attribute_name: str) -> str:
@@ -19,6 +25,48 @@ def infer_prefix(attribute_name: str) -> str:
     words = with_underscores_around_numbers.split("_")
     title_cased_words = [word if word.isupper() else word.capitalize() for word in words]
     return " ".join(title_cased_words)
+
+
+def input_field(
+    name: str,
+    type_: Any = str,
+    *,
+    desc: str | None = None,
+    prefix: str | None = None,
+    is_type_undefined: bool = False,
+    constraints: str | None = None,
+    default: Any = _UNSET,
+) -> "FieldSpec":
+    has_default = default is not _UNSET
+    return FieldSpec(
+        name=name,
+        type=type_,
+        desc=desc if desc is not None else f"${{{name}}}",
+        role=FieldRole.INPUT,
+        prefix=prefix if prefix is not None else infer_prefix(name) + ":",
+        is_type_undefined=is_type_undefined,
+        constraints=constraints,
+        has_default=has_default,
+        default=None if default is _UNSET else default,
+    )
+
+
+def output_field(
+    name: str,
+    type_: Any = str,
+    *,
+    desc: str | None = None,
+    prefix: str | None = None,
+    constraints: str | None = None,
+) -> "FieldSpec":
+    return FieldSpec(
+        name=name,
+        type=type_,
+        desc=desc if desc is not None else f"${{{name}}}",
+        role=FieldRole.OUTPUT,
+        prefix=prefix if prefix is not None else infer_prefix(name) + ":",
+        constraints=constraints,
+    )
 
 
 class FieldSpec(BaseModel):
@@ -48,17 +96,14 @@ class FieldSpec(BaseModel):
         constraints: str | None = None,
         default: Any = _UNSET,
     ) -> "FieldSpec":
-        has_default = default is not _UNSET
-        return cls(
-            name=name,
-            type=type_,
-            desc=desc if desc is not None else f"${{{name}}}",
-            role="input",
-            prefix=prefix if prefix is not None else infer_prefix(name) + ":",
+        return input_field(
+            name,
+            type_,
+            desc=desc,
+            prefix=prefix,
             is_type_undefined=is_type_undefined,
             constraints=constraints,
-            has_default=has_default,
-            default=None if default is _UNSET else default,
+            default=default,
         )
 
     @classmethod
@@ -71,12 +116,11 @@ class FieldSpec(BaseModel):
         prefix: str | None = None,
         constraints: str | None = None,
     ) -> "FieldSpec":
-        return cls(
-            name=name,
-            type=type_,
-            desc=desc if desc is not None else f"${{{name}}}",
-            role="output",
-            prefix=prefix if prefix is not None else infer_prefix(name) + ":",
+        return output_field(
+            name,
+            type_,
+            desc=desc,
+            prefix=prefix,
             constraints=constraints,
         )
 
