@@ -35,7 +35,12 @@ from dspy.primitives.example import Example
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature, make_signature
 from dspy.utils.exceptions import AdapterParseError
-from tests.adapters.conftest import default_model_response, format_messages_and_lm_kwargs, legacy_outputs_to_lm_response
+from tests.adapters.conftest import (
+    adapter_format_as_openai,
+    default_model_response,
+    format_messages_and_lm_kwargs,
+    legacy_outputs_to_lm_response,
+)
 
 
 @pytest.mark.parametrize(
@@ -97,7 +102,7 @@ def test_chat_adapter_quotes_literals_as_expected(
         output_text: output_literal = OutputField()
 
     adapter = ChatAdapter()
-    messages = adapter.format(TestSignature, [], {"input_text": input_value})
+    messages = adapter_format_as_openai(adapter, TestSignature, [], {"input_text": input_value})
     content = messages[0]["content"]
 
     assert expected_input_str in content
@@ -1750,7 +1755,8 @@ def test_non_native_tool_history_remains_text_based(adapter):
 
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
-    messages = adapter.format(
+    messages = adapter_format_as_openai(
+        adapter,
         ToolHistorySignature,
         [],
         {
@@ -1781,18 +1787,21 @@ def test_non_native_tool_history_remains_text_based(adapter):
 
 
 def test_chat_adapter_format_accepts_custom_history_formatter_returning_messages_only():
+    from dspy.adapters.utils import build_lm_message
+
     class CustomHistoryAdapter(ChatAdapter):
         @override
         def format_conversation_history(self, signature, history_field_name, inputs):
             del inputs[history_field_name]
-            return [{"role": "user", "content": "custom history"}]
+            return [build_lm_message("user", "custom history")]
 
     class HistorySignature(Signature):
         question: str = InputField()
         history: History = InputField()
         answer: str = OutputField()
 
-    messages = CustomHistoryAdapter().format(
+    messages = adapter_format_as_openai(
+        CustomHistoryAdapter(),
         HistorySignature,
         [],
         {
@@ -2226,7 +2235,8 @@ def test_chat_adapter_with_pydantic_models():
         output: Answer = OutputField()
 
     adapter = ChatAdapter()
-    messages = adapter.format(
+    messages = adapter_format_as_openai(
+        adapter,
         TestSignature,
         [],
         {
@@ -2312,7 +2322,7 @@ def test_chat_adapter_formats_image():
         text: str = OutputField()
 
     adapter = ChatAdapter()
-    messages = adapter.format(MySignature, [], {"image": image})
+    messages = adapter_format_as_openai(adapter, MySignature, [], {"image": image})
 
     assert len(messages) == 2
     user_message_content = messages[1]["content"]
@@ -2345,7 +2355,9 @@ def test_chat_adapter_formats_image_with_few_shot_examples():
             text="This is another test image",
         ),
     ]
-    messages = adapter.format(MySignature, demos, {"image": Image(url="https://example.com/image3.jpg")})  # ty:ignore[invalid-argument-type]
+    messages = adapter_format_as_openai(
+        adapter, MySignature, demos, {"image": Image(url="https://example.com/image3.jpg")}
+    )  # ty:ignore[invalid-argument-type]
 
     # 1 system message, 2 few shot examples (1 user and assistant message for each example), 1 user message
     assert len(messages) == 6
@@ -2374,7 +2386,7 @@ def test_chat_adapter_formats_image_with_nested_images():
     image_wrapper = ImageWrapper(images=[image1, image2, image3], tag=["test", "example"])
 
     adapter = ChatAdapter()
-    messages = adapter.format(MySignature, [], {"image": image_wrapper})
+    messages = adapter_format_as_openai(adapter, MySignature, [], {"image": image_wrapper})
 
     expected_image1_content = {"type": "image_url", "image_url": {"url": "https://example.com/image1.jpg"}}
     expected_image2_content = {"type": "image_url", "image_url": {"url": "https://example.com/image2.jpg"}}
@@ -2408,7 +2420,7 @@ def test_chat_adapter_formats_image_with_few_shot_examples_with_nested_images():
 
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = ChatAdapter()
-    messages = adapter.format(MySignature, demos, {"image": image_wrapper_2})  # ty:ignore[invalid-argument-type]
+    messages = adapter_format_as_openai(adapter, MySignature, demos, {"image": image_wrapper_2})  # ty:ignore[invalid-argument-type]
 
     assert len(messages) == 4
 
@@ -2444,7 +2456,9 @@ def test_chat_adapter_with_tool():
     tools = [Tool(get_weather), Tool(get_population)]
 
     adapter = ChatAdapter()
-    messages = adapter.format(MySignature, [], {"question": "What is the weather in Tokyo?", "tools": tools})
+    messages = adapter_format_as_openai(
+        adapter, MySignature, [], {"question": "What is the weather in Tokyo?", "tools": tools}
+    )
 
     assert len(messages) == 2
 
@@ -2470,7 +2484,7 @@ def test_chat_adapter_with_code():
         result: str = OutputField()
 
     adapter = ChatAdapter()
-    messages = adapter.format(CodeAnalysis, [], {"code": "print('Hello, world!')"})
+    messages = adapter_format_as_openai(adapter, CodeAnalysis, [], {"code": "print('Hello, world!')"})
 
     assert len(messages) == 2
 
@@ -2513,7 +2527,7 @@ def test_code_output_field_omits_json_schema_in_prompt():
         code: Code = OutputField()
 
     adapter = ChatAdapter()
-    messages = adapter.format(CodeGeneration, [], {"question": "Hello"})
+    messages = adapter_format_as_openai(adapter, CodeGeneration, [], {"question": "Hello"})
     system_content = messages[0]["content"]
 
     assert Code.description() in system_content
@@ -2530,7 +2544,7 @@ def test_citations_output_field_keeps_json_schema_in_prompt():
         citations: Citations = OutputField()
 
     adapter = ChatAdapter()
-    messages = adapter.format(CitationGeneration, [], {"question": "Hello"})
+    messages = adapter_format_as_openai(adapter, CitationGeneration, [], {"question": "Hello"})
     system_content = messages[0]["content"]
 
     assert "must adhere to the JSON schema" in system_content
@@ -2551,7 +2565,9 @@ def test_chat_adapter_formats_conversation_history():
     )
 
     adapter = ChatAdapter()
-    messages = adapter.format(MySignature, [], {"question": "What is the capital of France?", "history": history})
+    messages = adapter_format_as_openai(
+        adapter, MySignature, [], {"question": "What is the capital of France?", "history": history}
+    )
 
     assert len(messages) == 6
     assert messages[1]["content"] == "[[ ## question ## ]]\nWhat is the capital of France?"

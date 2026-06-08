@@ -540,11 +540,16 @@ class GRPO(FinetuneTeleprompter):
                             # TODO(Lakshya): Currently we exclude demos from the training data
                             # TODO(GRPO Team): Use build_call_data_from_trace (from bootstrap_finetune) instead of
                             # dealing with the message formatting ourselves.
-                            inp_messages = adapter.format(
-                                signature=trace_instance[0].signature,
-                                inputs=trace_instance[1],
-                                demos=[],  # TODO: Add support for demos
-                            )
+                            from dspy.clients.openai_format import message_to_openai_chat
+
+                            inp_messages = [
+                                message_to_openai_chat(message)
+                                for message in adapter.format(
+                                    signature=trace_instance[0].signature,
+                                    inputs=trace_instance[1],
+                                    demos=[],  # TODO: Add support for demos
+                                )
+                            ]
 
                             if isinstance(trace_instance[2], FailedPrediction):
                                 score = trace_instance[2].format_reward or self.format_failure_score

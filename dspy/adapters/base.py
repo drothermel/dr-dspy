@@ -11,7 +11,7 @@ from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.history import History
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
-from dspy.adapters.utils import serialize_for_json
+from dspy.adapters.utils import build_lm_message, serialize_for_json
 from dspy.core.types import (
     LMConfig,
     LMMessage,
@@ -223,17 +223,12 @@ class Adapter:
         lm: BaseLM,
         config: LMConfig,
         tools: list[LMToolSpec],
-        messages: Sequence[LMMessage | dict[str, Any]],
+        messages: Sequence[LMMessage],
     ) -> LMRequest:
-        """Build the normalized LM request for the current adapter call path.
-
-        TODO(adapters-plan): This currently receives already-rendered messages.
-        Once planning lands, this should render from `_AdapterPlan` and apply
-        planned message/part insertions before creating `LMRequest`.
-        """
+        """Build the normalized LM request for the current adapter call path."""
         return LMRequest(
             model=lm.model,
-            messages=self._coerce_lm_messages(messages),
+            messages=list(messages),
             tools=tools,
             config=merge_lm_request_config(lm, config),
         )
@@ -243,43 +238,6 @@ class Adapter:
 
     async def _acall_lm(self, lm: BaseLM, request: LMRequest) -> LMResponse:
         return await lm.acall(request)
-
-    def _coerce_lm_messages(self, messages: Sequence[LMMessage | dict[str, Any]]) -> list[LMMessage]:
-        """Normalize subclass `format()` output before the LM boundary.
-
-        TODO(adapters-normalized-rendering): Adapter `format()` methods still
-        return OpenAI-chat-shaped dictionaries. This coercion is the bridge until
-        adapters render `LMMessage` / `LMPart` directly.
-        """
-        return [
-            message if isinstance(message, LMMessage) else self._chat_dict_to_lm_message(message)
-            for message in messages
-        ]
-
-    def _chat_dict_to_lm_message(self, message: dict[str, Any]) -> LMMessage:
-        try:
-            return LMMessage(**message)
-        except Exception:
-            # TODO(legacy-custom-types): Unknown OpenAI content blocks are
-            # temporarily preserved as `legacy_content_block` metadata on an
-            # empty text part so `openai_format` can round-trip them back to
-            # current BaseLM calls. Replace this with either explicit opaque
-            # provider parts or remove it when marker-based custom type
-            # serialization is retired.
-            message = dict(message)
-            content = message.get("content")
-            if isinstance(content, list):
-                sanitized = []
-                supported = {"text", "image_url", "input_audio", "file", "document", "video"}
-                for block in content:
-                    if isinstance(block, dict) and block.get("type") in supported:
-                        sanitized.append(block)
-                    elif isinstance(block, dict):
-                        sanitized.append({"type": "text", "text": "", "metadata": {"legacy_content_block": block}})
-                    else:
-                        sanitized.append({"type": "text", "text": json.dumps(block, ensure_ascii=False)})
-                message["content"] = sanitized
-            return LMMessage(**message)
 
     def __call__(
         self,
@@ -338,7 +296,7 @@ class Adapter:
         signature: type[Signature],
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
-    ) -> list[dict[str, Any]]:
+    ) -> list[LMMessage]:
         """Format the input messages for the LM call.
 
         This method converts the DSPy structured input along with few-shot examples and conversation history into
@@ -383,7 +341,7 @@ class Adapter:
         # Render conversation history as prior messages; omit the History field from history/current user content while keeping the original signature for system instructions.
         history_field_name = self._get_history_field_name(signature)
         signature_without_history = signature
-        conversation_history: list[dict[str, Any]] = []
+        conversation_history: list[LMMessage] = []
         if history_field_name:
             signature_without_history = signature.delete(history_field_name)
             conversation_history = self.format_conversation_history(
@@ -392,19 +350,19 @@ class Adapter:
                 inputs_copy,
             )
 
-        messages: list[dict[str, Any]] = []
+        messages: list[LMMessage] = []
         system_message = self.format_system_message(signature)
-        messages.append({"role": "system", "content": system_message})
+        messages.append(build_lm_message("system", system_message))
         messages.extend(self.format_demos(signature, demos))
         if history_field_name:
             content = self.format_user_message_content(signature_without_history, inputs_copy, main_request=True)
             messages.extend(conversation_history)
             if content:
-                messages.append({"role": "user", "content": content})
+                messages.append(build_lm_message("user", content))
         else:
             content = self.format_user_message_content(signature, inputs_copy, main_request=True)
             if content:
-                messages.append({"role": "user", "content": content})
+                messages.append(build_lm_message("user", content))
 
         return messages
 
@@ -506,7 +464,7 @@ class Adapter:
         """
         raise NotImplementedError
 
-    def format_demos(self, signature: type[Signature], demos: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def format_demos(self, signature: type[Signature], demos: list[dict[str, Any]]) -> list[LMMessage]:
         """Format the few-shot examples.
 
         This method formats the few-shot examples as multiturn messages.
@@ -539,29 +497,29 @@ class Adapter:
         incomplete_demo_prefix = "This is an example of the task, though some input or output fields are not supplied."
         for demo in incomplete_demos:
             messages.append(
-                {
-                    "role": "user",
-                    "content": self.format_user_message_content(signature, demo, prefix=incomplete_demo_prefix),
-                }
+                build_lm_message(
+                    "user",
+                    self.format_user_message_content(signature, demo, prefix=incomplete_demo_prefix),
+                )
             )
             messages.append(
-                {
-                    "role": "assistant",
-                    "content": self.format_assistant_message_content(
+                build_lm_message(
+                    "assistant",
+                    self.format_assistant_message_content(
                         signature, demo, missing_field_message="Not supplied for this particular example. "
                     ),
-                }
+                )
             )
 
         for demo in complete_demos:
-            messages.append({"role": "user", "content": self.format_user_message_content(signature, demo)})
+            messages.append(build_lm_message("user", self.format_user_message_content(signature, demo)))
             messages.append(
-                {
-                    "role": "assistant",
-                    "content": self.format_assistant_message_content(
+                build_lm_message(
+                    "assistant",
+                    self.format_assistant_message_content(
                         signature, demo, missing_field_message="Not supplied for this conversation history message. "
                     ),
-                }
+                )
             )
 
         return messages
@@ -592,7 +550,7 @@ class Adapter:
         signature: type[Signature],
         history_field_name: str,
         inputs: dict[str, Any],
-    ) -> list[dict[str, Any]]:
+    ) -> list[LMMessage]:
         """Format the conversation history.
 
         This method formats the conversation history and the current input as multiturn messages.
@@ -621,7 +579,7 @@ class Adapter:
 
             user_content = self.format_user_message_content(signature, message)
             if user_content:
-                messages.append({"role": "user", "content": user_content})
+                messages.append(build_lm_message("user", user_content))
 
             if self.use_native_function_calling and tool_calls is not None:
                 content_signature = signature
@@ -642,18 +600,23 @@ class Adapter:
                         tool_call_results = None
 
                 if content or tool_call_results is not None:
-                    assistant_message: dict[str, Any] = {"role": "assistant", "content": content or None}
+                    assistant_kwargs: dict[str, Any] = {"content": content or None}
                     if tool_call_results is not None:
-                        assistant_message["tool_calls"] = [
+                        assistant_kwargs["tool_calls"] = [
                             _tool_call_as_openai_message_tool_call(tool_call) for tool_call in tool_calls.tool_calls
                         ]
-                    messages.append(assistant_message)
+                    messages.append(build_lm_message("assistant", **assistant_kwargs))
 
                 if tool_call_results is not None:
                     for result in tool_call_results.tool_call_results:
                         content = _tool_result_content(result.value)
                         messages.append(
-                            {"role": "tool", "tool_call_id": result.call_id, "name": result.name, "content": content}
+                            build_lm_message(
+                                "tool",
+                                content,
+                                tool_call_id=result.call_id,
+                                name=result.name,
+                            )
                         )
                 continue
 
@@ -664,11 +627,11 @@ class Adapter:
 
             assistant_content = self.format_assistant_message_content(signature, assistant_values)
             if assistant_content:
-                messages.append({"role": "assistant", "content": assistant_content})
+                messages.append(build_lm_message("assistant", assistant_content))
             if tool_call_results is not None:
                 result_input = {"tool_call_results": tool_call_results}
                 content = self.format_user_message_content(_TOOL_CALL_RESULTS_SIGNATURE, result_input)
-                messages.append({"role": "user", "content": content})
+                messages.append(build_lm_message("user", content))
 
         del inputs[history_field_name]
 

@@ -1712,6 +1712,8 @@ def _parts_from_openai_content(content: Any) -> list[LMPart]:
         elif item_type == "video":
             video = item.get("video", {})
             parts.append(_media_dict_to_video_part(video))
+        elif isinstance(item, dict):
+            parts.append(LMTextPart(text="", metadata={"legacy_content_block": item}))
         else:
             parts.append(_coerce_part(item))
     return parts

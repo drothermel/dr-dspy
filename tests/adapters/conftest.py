@@ -103,6 +103,11 @@ class CapturingLM(BaseLM):
         raise StopAdapterCallCapture
 
 
+def adapter_format_as_openai(adapter, signature, demos, inputs):
+    """Return OpenAI-chat-shaped messages from adapter.format()."""
+    return [message_to_openai_chat(message) for message in adapter.format(signature, demos, inputs)]
+
+
 def format_messages_and_lm_kwargs(adapter, signature, demos, inputs, config=None, lm=None, lm_kwargs=None):
     if lm_kwargs is not None:
         if config is not None:

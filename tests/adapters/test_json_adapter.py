@@ -33,7 +33,7 @@ from dspy.primitives.example import Example
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature, make_signature
 from dspy.utils.exceptions import LMUnexpectedError
-from tests.adapters.conftest import format_messages_and_lm_kwargs
+from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs
 
 
 def _structured_output_model_response() -> ModelResponse:
@@ -1071,7 +1071,7 @@ def test_json_adapter_formats_image():
         text: str = OutputField()
 
     adapter = JSONAdapter()
-    messages = adapter.format(MySignature, [], {"image": image})
+    messages = adapter_format_as_openai(adapter, MySignature, [], {"image": image})
 
     assert len(messages) == 2
     user_message_content = messages[1]["content"]
@@ -1104,7 +1104,9 @@ def test_json_adapter_formats_image_with_few_shot_examples():
             text="This is another test image",
         ),
     ]
-    messages = adapter.format(MySignature, demos, {"image": Image(url="https://example.com/image3.jpg")})  # ty:ignore[invalid-argument-type]
+    messages = adapter_format_as_openai(
+        adapter, MySignature, demos, {"image": Image(url="https://example.com/image3.jpg")}
+    )  # ty:ignore[invalid-argument-type]
 
     # 1 system message, 2 few shot examples (1 user and assistant message for each example), 1 user message
     assert len(messages) == 6
@@ -1130,7 +1132,7 @@ def test_json_adapter_formats_image_with_nested_images():
     image_wrapper = ImageWrapper(images=[image1, image2, image3], tag=["test", "example"])
 
     adapter = JSONAdapter()
-    messages = adapter.format(MySignature, [], {"image": image_wrapper})
+    messages = adapter_format_as_openai(adapter, MySignature, [], {"image": image_wrapper})
 
     expected_image1_content = {"type": "image_url", "image_url": {"url": "https://example.com/image1.jpg"}}
     expected_image2_content = {"type": "image_url", "image_url": {"url": "https://example.com/image2.jpg"}}
@@ -1155,7 +1157,7 @@ def test_json_adapter_formats_with_nested_documents():
     document_wrapper = DocumentWrapper(documents=[doc1, doc2])
 
     adapter = JSONAdapter()
-    messages = adapter.format(MySignature, [], {"document": document_wrapper})
+    messages = adapter_format_as_openai(adapter, MySignature, [], {"document": document_wrapper})
 
     expected_doc1_content = {
         "type": "document",
@@ -1195,7 +1197,7 @@ def test_json_adapter_formats_image_with_few_shot_examples_with_nested_images():
 
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = JSONAdapter()
-    messages = adapter.format(MySignature, demos, {"image": image_wrapper_2})  # ty:ignore[invalid-argument-type]
+    messages = adapter_format_as_openai(adapter, MySignature, demos, {"image": image_wrapper_2})  # ty:ignore[invalid-argument-type]
 
     assert len(messages) == 4
 
@@ -1231,7 +1233,9 @@ def test_json_adapter_with_tool():
     tools = [Tool(get_weather), Tool(get_population)]
 
     adapter = JSONAdapter()
-    messages = adapter.format(MySignature, [], {"question": "What is the weather in Tokyo?", "tools": tools})
+    messages = adapter_format_as_openai(
+        adapter, MySignature, [], {"question": "What is the weather in Tokyo?", "tools": tools}
+    )
 
     assert len(messages) == 2
 
@@ -1312,7 +1316,7 @@ def test_json_adapter_with_code():
         result: str = OutputField()
 
     adapter = JSONAdapter()
-    messages = adapter.format(CodeAnalysis, [], {"code": "print('Hello, world!')"})
+    messages = adapter_format_as_openai(adapter, CodeAnalysis, [], {"code": "print('Hello, world!')"})
 
     assert len(messages) == 2
 
@@ -1359,7 +1363,9 @@ def test_json_adapter_formats_conversation_history():
     )
 
     adapter = JSONAdapter()
-    messages = adapter.format(MySignature, [], {"question": "What is the capital of France?", "history": history})
+    messages = adapter_format_as_openai(
+        adapter, MySignature, [], {"question": "What is the capital of France?", "history": history}
+    )
 
     assert len(messages) == 6
     assert messages[1]["content"] == "[[ ## question ## ]]\nWhat is the capital of France?"

@@ -14,8 +14,21 @@ from pydantic.fields import FieldInfo
 from dspy.adapters.types.base_type import Type as DspyType
 from dspy.adapters.types.code import Code
 from dspy.adapters.types.reasoning import Reasoning
+from dspy.core.types import LMMessage
 from dspy.signatures.signature import Signature
 from dspy.signatures.utils import get_dspy_field_type
+
+
+def build_lm_message(
+    role: str,
+    content: str | list[dict[str, Any]] | None = None,
+    **extra: Any,
+) -> LMMessage:
+    payload: dict[str, Any] = {"role": role}
+    if content is not None:
+        payload["content"] = content
+    payload.update(extra)
+    return LMMessage(**payload)
 
 
 def _annotation_is_subclass(annotation: object, expected_base: type) -> bool:

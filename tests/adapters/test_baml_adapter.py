@@ -21,7 +21,7 @@ from dspy.adapters.types.tool import Tool
 from dspy.clients.lm import LM
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
-from tests.adapters.conftest import format_messages_and_lm_kwargs
+from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs
 
 
 # Test fixtures - Pydantic models for testing
@@ -286,7 +286,9 @@ def test_baml_adapter_formats_pydantic_inputs_as_clean_json():
         name="John Doe", age=45, address=PatientAddress(street="123 Main St", city="Anytown", country="US")
     )
 
-    messages = adapter.format(TestSignature, [], {"patient": patient, "question": "What is the diagnosis?"})
+    messages = adapter_format_as_openai(
+        adapter, TestSignature, [], {"patient": patient, "question": "What is the diagnosis?"}
+    )
 
     user_message = messages[-1]["content"]
     assert '"name": "John Doe"' in user_message
@@ -307,7 +309,9 @@ def test_baml_adapter_handles_mixed_input_types():
     adapter = BAMLAdapter()
     patient = PatientDetails(name="Jane Doe", age=30)
 
-    messages = adapter.format(TestSignature, [], {"patient": patient, "priority": 1, "notes": "Urgent case"})
+    messages = adapter_format_as_openai(
+        adapter, TestSignature, [], {"patient": patient, "priority": 1, "notes": "Urgent case"}
+    )
 
     user_message = messages[-1]["content"]
     assert '"name": "Jane Doe"' in user_message
@@ -385,7 +389,7 @@ def test_baml_adapter_with_images():
         tag=["test", "medical"],
     )
 
-    messages = adapter.format(TestSignature, [], {"image_data": image_wrapper})
+    messages = adapter_format_as_openai(adapter, TestSignature, [], {"image_data": image_wrapper})
 
     user_message = messages[-1]["content"]
     image_contents = [
@@ -416,7 +420,9 @@ def test_baml_adapter_with_tools():
     tools = [Tool(get_patient_info), Tool(schedule_appointment)]
 
     adapter = BAMLAdapter()
-    messages = adapter.format(TestSignature, [], {"question": "Schedule an appointment for John", "tools": tools})
+    messages = adapter_format_as_openai(
+        adapter, TestSignature, [], {"question": "Schedule an appointment for John", "tools": tools}
+    )
 
     user_message = messages[-1]["content"]
     assert "get_patient_info" in user_message
@@ -434,7 +440,9 @@ def test_baml_adapter_with_code():
         analysis: str = OutputField()
 
     adapter = BAMLAdapter()
-    messages = adapter.format(CodeAnalysisSignature, [], {"code": "def hello():\n    print('Hello, world!')"})
+    messages = adapter_format_as_openai(
+        adapter, CodeAnalysisSignature, [], {"code": "def hello():\n    print('Hello, world!')"}
+    )
 
     user_message = messages[-1]["content"]
     assert "def hello():" in user_message
@@ -478,7 +486,9 @@ def test_baml_adapter_with_conversation_history():
     )
 
     adapter = BAMLAdapter()
-    messages = adapter.format(TestSignature, [], {"history": history, "question": "What medications should we avoid?"})
+    messages = adapter_format_as_openai(
+        adapter, TestSignature, [], {"history": history, "question": "What medications should we avoid?"}
+    )
 
     assert len(messages) == 6  # system + 2 history pairs + user
     assert "What is the patient's age?" in messages[1]["content"]
@@ -633,7 +643,7 @@ def test_baml_adapter_multiple_pydantic_input_fields():
     user_profile = UserProfile(name="John Doe", email="john@example.com", age=30)
     system_config = SystemConfig(timeout=300, debug=True, endpoints=["api1", "api2"])
 
-    messages = adapter.format(TestSignature, [], {"input_1": user_profile, "input_2": system_config})
+    messages = adapter_format_as_openai(adapter, TestSignature, [], {"input_1": user_profile, "input_2": system_config})
 
     user_message = messages[-1]["content"]
 

@@ -21,7 +21,7 @@ from dspy.clients.lm import LM
 from dspy.primitives.example import Example
 from dspy.signatures.field import InputField, OutputField
 from dspy.signatures.signature import Signature
-from tests.adapters.conftest import format_messages_and_lm_kwargs
+from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs
 
 
 def test_xml_adapter_format_and_parse_basic():
@@ -220,7 +220,7 @@ def test_xml_adapter_formats_nested_images():
 
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = XMLAdapter()
-    messages = adapter.format(MySignature, demos, {"image": image_wrapper_2})  # ty:ignore[invalid-argument-type]
+    messages = adapter_format_as_openai(adapter, MySignature, demos, {"image": image_wrapper_2})  # ty:ignore[invalid-argument-type]
 
     assert len(messages) == 4
 
@@ -245,7 +245,7 @@ def test_xml_adapter_with_code():
         result: str = OutputField()
 
     adapter = XMLAdapter()
-    messages = adapter.format(CodeAnalysis, [], {"code": "print('Hello, world!')"})
+    messages = adapter_format_as_openai(adapter, CodeAnalysis, [], {"code": "print('Hello, world!')"})
 
     assert len(messages) == 2
 
@@ -285,7 +285,7 @@ def test_xml_adapter_full_prompt():
         answer: str = OutputField()
 
     adapter = XMLAdapter()
-    messages = adapter.format(QA, [], {"query": "when was Marie Curie born"})
+    messages = adapter_format_as_openai(adapter, QA, [], {"query": "when was Marie Curie born"})
 
     assert len(messages) == 2
     assert messages[0]["role"] == "system"

@@ -7,9 +7,9 @@ from typing_extensions import override
 from dspy.adapters.base import Adapter
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import ToolCalls
-from dspy.adapters.utils import get_field_description_string
+from dspy.adapters.utils import build_lm_message, get_field_description_string
 from dspy.clients.base_lm import BaseLM
-from dspy.core.types import LMConfig, LMRequest, LMToolCallPart, merge_lm_request_config
+from dspy.core.types import LMConfig, LMMessage, LMRequest, LMToolCallPart, merge_lm_request_config
 from dspy.signatures.field import InputField
 from dspy.signatures.signature import Signature, make_signature
 from dspy.utils.exceptions import AdapterParseError, LMError
@@ -56,7 +56,7 @@ class TwoStepAdapter(Adapter):
     @override
     def format(
         self, signature: type[Signature], demos: list[dict[str, Any]], inputs: dict[str, Any]
-    ) -> list[dict[str, Any]]:
+    ) -> list[LMMessage]:
         """
         Format a prompt for the first stage with the main LM.
         This no specific structure is required for the main LM, we customize the format method
@@ -70,14 +70,14 @@ class TwoStepAdapter(Adapter):
         Returns:
             A list of messages to be passed to the main LM.
         """
-        messages = []
+        messages: list[LMMessage] = []
 
         task_description = self.format_task_description(signature)
-        messages.append({"role": "system", "content": task_description})
+        messages.append(build_lm_message("system", task_description))
 
         messages.extend(self.format_demos(signature, demos))
 
-        messages.append({"role": "user", "content": self.format_user_message_content(signature, inputs)})
+        messages.append(build_lm_message("user", self.format_user_message_content(signature, inputs)))
 
         return messages
 
@@ -130,7 +130,7 @@ class TwoStepAdapter(Adapter):
         messages = self.format(signature, demos, inputs)
         request = LMRequest(
             model=lm.model,
-            messages=self._coerce_lm_messages(messages),
+            messages=messages,
             config=merge_lm_request_config(lm, coerce_lm_config(config)),
         )
         response = await lm.acall(request)

@@ -289,8 +289,8 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 if isinstance(outputs, FailedPrediction):
                     adapter = ChatAdapter()
                     structure_instruction = ""
-                    for dd in adapter.format(module.signature, [], {}):
-                        structure_instruction += dd["role"] + ": " + dd["content"] + "\n"
+                    for message in adapter.format(module.signature, [], {}):
+                        structure_instruction += message.role + ": " + (message.text or "") + "\n"
                     d["Feedback"] = "Your output failed to parse. Follow this structure:\n" + structure_instruction
                     # d['score'] = self.failure_score
                 else:
