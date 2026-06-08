@@ -53,7 +53,7 @@ def test_message_content_and_tool_calls_normalize_for_dspy_history_surface():
     assert [part for part in message.parts if isinstance(part, LMToolCallPart)] == [
         LMToolCallPart(id="call_1", name="search", args={"query": "dspy"})
     ]
-    assert _history_entry(message).messages == [
+    assert _history_entry(message).messages_as_openai == [
         {
             "role": "assistant",
             "content": "Use search.",
@@ -78,7 +78,7 @@ def test_tool_result_content_none_normalizes_to_empty_parts():
     assert result.call_id == "call_1"
     assert result.name == "search"
     assert result.content == []
-    assert _history_entry(message).messages == [
+    assert _history_entry(message).messages_as_openai == [
         {"role": "tool", "content": "", "tool_call_id": "call_1", "name": "search"}
     ]
 
@@ -97,7 +97,7 @@ def test_audio_content_accepts_url_and_history_preserves_url():
     audio = message.parts[0]
     assert isinstance(audio, LMAudioPart)
     assert audio.url == "https://example.com/audio.wav"
-    assert _history_entry(message).messages[0]["content"][0]["input_audio"] == {  # ty:ignore[not-subscriptable]
+    assert _history_entry(message).messages_as_openai[0]["content"][0]["input_audio"] == {
         "format": "wav",
         "url": "https://example.com/audio.wav",
     }
@@ -130,7 +130,7 @@ def test_image_content_requires_mapping_with_url():
 
 def test_video_data_round_trips_through_history_messages():
     message = User(LMVideoPart(data="YWJj", media_type="video/mp4"))
-    content = _history_entry(message).messages[0]["content"][0]  # ty:ignore[not-subscriptable]
+    content = _history_entry(message).messages_as_openai[0]["content"][0]
     round_tripped = LMMessage(role="user", content=[content]).parts[0]  # ty:ignore[missing-argument, unknown-argument]
 
     assert content == {
@@ -154,7 +154,7 @@ def test_document_source_url_stays_url_and_round_trips_through_history_messages(
         ],  # ty:ignore[unknown-argument]
     )  # ty:ignore[missing-argument]
     document = message.parts[0]
-    content = _history_entry(message).messages[0]["content"][0]  # ty:ignore[not-subscriptable]
+    content = _history_entry(message).messages_as_openai[0]["content"][0]
     round_tripped = LMMessage(role="user", content=[content]).parts[0]  # ty:ignore[missing-argument, unknown-argument]
 
     assert isinstance(document, LMDocumentPart)
@@ -240,7 +240,7 @@ def test_default_config_does_not_serialize_empty_stop_sequences():
     assert entry.kwargs == {}
 
 
-def test_history_entry_exposes_existing_dict_style_properties():
+def test_history_entry_exposes_typed_derived_properties():
     message = User("hi")
     request = LMRequest.from_call(model="model", messages=[message], temperature=0.2)
     response = LMResponse.from_text("ok", model="response-model", usage={"input_tokens": 1}, cost=0.5)
@@ -248,14 +248,13 @@ def test_history_entry_exposes_existing_dict_style_properties():
 
     assert entry.model == "model"
     assert entry.prompt == "hi"
-    assert entry.messages == [{"role": "user", "content": "hi"}]
+    assert entry.messages == [message]
+    assert entry.messages_as_openai == [{"role": "user", "content": "hi"}]
     assert entry.outputs == ["ok"]
     assert entry.usage["input_tokens"] == 1
     assert entry.cost == 0.5
     assert entry.kwargs == {"temperature": 0.2}
     assert entry.response_model == "response-model"
-    assert entry["messages"] == [{"role": "user", "content": "hi"}]
-    assert entry["kwargs"] == {"temperature": 0.2}
 
 
 def test_response_rejects_empty_outputs():

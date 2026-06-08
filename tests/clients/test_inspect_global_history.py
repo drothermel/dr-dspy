@@ -3,7 +3,19 @@ from io import StringIO
 import pytest
 
 from dspy.clients.base_lm import GLOBAL_HISTORY, inspect_history
-from dspy.core.types import LMHistoryEntry
+from dspy.core.types import (
+    Assistant,
+    LMHistoryEntry,
+    LMMessage,
+    LMOutput,
+    LMRequest,
+    LMResponse,
+    LMTextPart,
+    LMToolCallPart,
+    LMToolResultPart,
+    ToolCall,
+    User,
+)
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.utils.dummies import DummyLM
@@ -17,44 +29,40 @@ def clear_history():
 
 
 def test_inspect_history_basic(capsys):
-    # Configure a DummyLM with some predefined responses
     lm = DummyLM([{"response": "Hello"}, {"response": "How are you?"}])
     settings.configure(lm=lm)
 
-    # Make some calls to generate history
     predictor = Predict("query: str -> response: str")
     predictor(query="Hi")
     predictor(query="What's up?")
 
-    # Test inspecting all history
     history = GLOBAL_HISTORY
     assert len(history) > 0
     assert isinstance(history, list)
     assert all(isinstance(entry, LMHistoryEntry) for entry in history)
-    assert all("messages" in entry for entry in history)
+    assert all(entry.messages for entry in history)
 
 
 def test_inspect_history_renders_message_tool_calls():
     out = StringIO()
     history = [
-        {
-            "messages": [
-                {
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [
-                        {
-                            "id": "call_1",
-                            "type": "function",
-                            "function": {"name": "search", "arguments": '{"query":"cats"}'},
-                        }
-                    ],
-                },
-                {"role": "tool", "content": "cat result", "tool_call_id": "call_1", "name": "search"},
-            ],
-            "outputs": [{"text": "done"}],
-            "timestamp": "now",
-        }
+        LMHistoryEntry(
+            request=LMRequest(
+                model="test",
+                messages=[
+                    Assistant(ToolCall(id="call_1", name="search", args={"query": "cats"})),
+                    LMMessage(
+                        role="tool",
+                        parts=[
+                            LMToolResultPart(call_id="call_1", name="search", content=[LMTextPart(text="cat result")])
+                        ],
+                    ),
+                ],
+            ),
+            response=LMResponse.from_text("done"),
+            timestamp="now",
+            uuid="1",
+        )
     ]
 
     pretty_print_history(history, n=1, file=out)
@@ -70,18 +78,28 @@ def test_inspect_history_renders_message_tool_calls():
 def test_inspect_history_renders_output_tool_calls_without_text():
     out = StringIO()
     history = [
-        {
-            "messages": [{"role": "user", "content": "Find cats"}],
-            "outputs": [
-                {
-                    "tool_calls": [
-                        {"name": "lookup", "arguments": {"query": "cats"}},
-                        {"name": "search", "args": {"query": "dogs"}},
-                    ]
-                }
-            ],
-            "timestamp": "now",
-        }
+        LMHistoryEntry(
+            request=LMRequest(model="test", messages=[User("Find cats")]),
+            response=LMResponse(
+                model="test",
+                outputs=[
+                    LMOutput(
+                        parts=[
+                            LMToolCallPart(id="call_1", name="lookup", args={"query": "cats"}),
+                            LMToolCallPart(id="call_2", name="search", args={"query": "dogs"}),
+                        ],
+                        provider_output={
+                            "tool_calls": [
+                                {"name": "lookup", "arguments": {"query": "cats"}},
+                                {"name": "search", "args": {"query": "dogs"}},
+                            ]
+                        },
+                    )
+                ],
+            ),
+            timestamp="now",
+            uuid="1",
+        )
     ]
 
     pretty_print_history(history, n=1, file=out)
@@ -94,20 +112,15 @@ def test_inspect_history_renders_output_tool_calls_without_text():
 
 
 def test_inspect_history_with_n(capsys):
-    """Test that inspect_history works with n
-    Random failures in this test most likely mean you are printing messages somewhere
-    """
     lm = DummyLM([{"response": "One"}, {"response": "Two"}, {"response": "Three"}])
     settings.configure(lm=lm)
 
-    # Generate some history
     predictor = Predict("query: str -> response: str")
     predictor(query="First")
     predictor(query="Second")
     predictor(query="Third")
 
     inspect_history(n=2)
-    # Test getting last 2 entries
     out, _err = capsys.readouterr()
     assert "First" not in out
     assert "Second" in out
@@ -115,11 +128,9 @@ def test_inspect_history_with_n(capsys):
 
 
 def test_inspect_empty_history(capsys):
-    # Configure fresh DummyLM
     lm = DummyLM([])
     settings.configure(lm=lm)
 
-    # Test inspecting empty history
     inspect_history()
     history = GLOBAL_HISTORY
     assert len(history) == 0
@@ -134,7 +145,6 @@ def test_inspect_history_n_larger_than_history(capsys):
     predictor(query="Query 1")
     predictor(query="Query 2")
 
-    # Request more entries than exist
     inspect_history(n=5)
     history = GLOBAL_HISTORY
-    assert len(history) == 2  # Should return all available entries
+    assert len(history) == 2

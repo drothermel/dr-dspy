@@ -258,9 +258,9 @@ def get_token_usage(model) -> tuple[int, int]:
     input_tokens = []
     output_tokens = []
     for interaction in model.history:
-        usage = interaction.get("usage", {})
-        _input_tokens = usage.get("prompt_tokens", 0)
-        _output_tokens = usage.get("completion_tokens", 0)
+        usage = interaction.usage
+        _input_tokens = usage.get("prompt_tokens", usage.get("input_tokens", 0))
+        _output_tokens = usage.get("completion_tokens", usage.get("output_tokens", 0))
         input_tokens.append(_input_tokens)
         output_tokens.append(_output_tokens)
 

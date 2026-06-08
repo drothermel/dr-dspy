@@ -77,7 +77,7 @@ def test_react_v2_continuation_omits_missing_original_inputs():
         pred = ReActV2("question -> answer", tools=[lookup])(question="cats")
 
     assert pred.answer == "found cats"
-    second_call_messages = lm.history[1]["messages"]
+    second_call_messages = lm.history[1].messages_as_openai
     second_current_user_message = second_call_messages[-1]["content"]
     assert "[[ ## question ## ]]\nNone" not in second_current_user_message
     assert "[[ ## question ## ]]" not in second_current_user_message

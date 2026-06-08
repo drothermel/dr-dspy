@@ -196,7 +196,8 @@ class DummyLM(BaseLM):
 
     def get_convo(self, index):
         """Get the prompt + answer from the ith message."""
-        return self.history[index]["messages"], self.history[index]["outputs"]
+        entry = self.history[index]
+        return entry.messages_as_openai, entry.outputs
 
 
 def dummy_rm(passages=()) -> callable:  # ty:ignore[invalid-type-form]

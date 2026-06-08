@@ -188,7 +188,7 @@ def test_file_in_signature(sample_text_file):
     result = predictor(document=file_obj)
 
     assert result.summary == "This is a summary"
-    assert count_messages_with_file_pattern(lm.history[-1]["messages"]) == 1
+    assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 1
 
 
 def test_file_list_in_signature(sample_text_file):
@@ -206,7 +206,7 @@ def test_file_list_in_signature(sample_text_file):
     result = predictor(documents=files)
 
     assert result.summary == "Multiple files"
-    assert count_messages_with_file_pattern(lm.history[-1]["messages"]) == 2
+    assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 2
 
 
 def test_optional_file_field():
@@ -217,7 +217,7 @@ def test_optional_file_field():
     predictor, lm = setup_predictor(OptionalFileSignature, {"output": "Hello"})
     result = predictor(document=None)
     assert result.output == "Hello"
-    assert count_messages_with_file_pattern(lm.history[-1]["messages"]) == 0
+    assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 0
 
 
 def test_save_load_file_signature(sample_text_file):
@@ -235,7 +235,7 @@ def test_save_load_file_signature(sample_text_file):
         loaded_predictor.load(temp_file.name)
 
     loaded_predictor(document=File.from_file_id("file-test"))
-    assert count_messages_with_file_pattern(lm.history[-1]["messages"]) == 2
+    assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 2
 
 
 def test_file_frozen():

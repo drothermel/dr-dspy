@@ -927,15 +927,8 @@ class LMResponse(BaseModel):
         return dict(self.usage)
 
 
-class LMHistoryEntry(BaseModel, Mapping[str, Any]):
-    """A typed history record that can be read like a dictionary.
-
-    Store the canonical request and response, then derive legacy convenience
-    fields such as `outputs`, `usage`, `messages`, and `kwargs` on demand.
-    Because this class implements `Mapping`, existing history code can keep
-    using `entry["messages"]`, `entry.get("prompt")`, `entry.items()`, and
-    `dict(entry)`.
-    """
+class LMHistoryEntry(BaseModel):
+    """A typed record of one LM request and response."""
 
     request: LMRequest
     response: LMResponse
@@ -944,15 +937,6 @@ class LMHistoryEntry(BaseModel, Mapping[str, Any]):
     model_type: str | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
-
-    @model_validator(mode="before")
-    @classmethod
-    def drop_derived_fields(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            data = dict(data)
-            for key in _HISTORY_DERIVED_KEYS:
-                data.pop(key, None)
-        return data
 
     @property
     def outputs(self) -> list[Any]:
@@ -975,7 +959,11 @@ class LMHistoryEntry(BaseModel, Mapping[str, Any]):
         return _history_request_prompt(self.request)
 
     @property
-    def messages(self) -> list[dict[str, Any]] | None:
+    def messages(self) -> list[LMMessage]:
+        return self.request.messages
+
+    @property
+    def messages_as_openai(self) -> list[dict[str, Any]]:
         return _history_request_messages_as_openai(self.request)
 
     @property
@@ -987,20 +975,8 @@ class LMHistoryEntry(BaseModel, Mapping[str, Any]):
         return self.response.model
 
     @override
-    def __getitem__(self, key: str) -> Any:
-        return self._mapping()[key]
-
-    @override
-    def __iter__(self) -> Iterator[str]:  # ty:ignore[invalid-method-override]
-        return iter(self._mapping())
-
-    @override
-    def __len__(self) -> int:
-        return len(self._mapping())
-
-    @override
     def __repr__(self) -> str:
-        formatted = pformat(self._essential_mapping(), width=100, sort_dicts=False)
+        formatted = pformat(self.model_dump(mode="python", exclude_none=True), width=100, sort_dicts=False)
         return f"LMHistoryEntry(\n{formatted}\n)"
 
     @override
@@ -1011,34 +987,22 @@ class LMHistoryEntry(BaseModel, Mapping[str, Any]):
         """Return this history entry as a plain dictionary."""
         if kwargs:
             return self.model_dump(mode=mode, exclude_none=exclude_none, **kwargs)
-        data = self._mapping()
+        data = {
+            **self.model_dump(mode="python", exclude_none=True),
+            "outputs": self.outputs,
+            "usage": self.usage,
+            "cost": self.cost,
+            "model": self.model,
+            "prompt": self.prompt,
+            "messages": self.messages_as_openai,
+            "kwargs": self.kwargs,
+            "response_model": self.response_model,
+        }
         if mode != "python":
             data = json.loads(json.dumps(data, default=_json_default))
         if exclude_none:
             data = {key: value for key, value in data.items() if value is not None}
         return data
-
-    def _essential_mapping(self) -> dict[str, Any]:
-        data = self.model_dump(mode="python", exclude_none=True)
-        data.update(self.model_extra or {})
-        return data
-
-    def _mapping(self) -> dict[str, Any]:
-        data = self._essential_mapping()
-        data.update({key: getattr(self, key) for key in _HISTORY_DERIVED_KEYS})
-        return {key: value for key, value in data.items() if value is not None}
-
-
-_HISTORY_DERIVED_KEYS = (
-    "outputs",
-    "usage",
-    "cost",
-    "model",
-    "prompt",
-    "messages",
-    "kwargs",
-    "response_model",
-)
 
 
 def _json_default(value: Any) -> Any:

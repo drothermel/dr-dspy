@@ -3,7 +3,7 @@ import tempfile
 import time
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 from unittest import mock
 from unittest.mock import patch
 
@@ -718,7 +718,14 @@ def test_base_lm_copy_is_shallow_runtime_copy_with_isolated_dspy_state():
     lm = CustomLM(model="custom-model", callbacks=[callback], temperature=0.1)  # ty:ignore[invalid-argument-type]
     lm.client = client  # ty:ignore[unresolved-attribute]
     lm.extra_state = {"mutable": []}  # ty:ignore[unresolved-attribute]
-    lm.history = cast("list[LMHistoryEntry]", [{"prompt": "original"}])
+    lm.history = [
+        LMHistoryEntry(
+            request=LMRequest.from_call(model="custom-model", prompt="original"),
+            response=LMResponse.from_text("ok"),
+            timestamp="timestamp",
+            uuid="uuid",
+        )
+    ]
 
     copied_lm = lm.copy(temperature=0.2, rollout_id=1)
 
@@ -1508,7 +1515,7 @@ def test_responses_api_with_none_usage():
             result = lm(_request(lm, prompt="test query"))
 
         assert result.text == "Partial response that was truncated"
-        assert lm.history[-1]["usage"] == {}
+        assert lm.history[-1].usage == {}
         assert tracker.get_total_tokens() == {}
 
 
@@ -1561,7 +1568,7 @@ async def test_responses_api_with_none_usage_async():
             result = await lm.acall(_request(lm, prompt="test query"))
 
         assert result.text == "Partial async response"
-        assert lm.history[-1]["usage"] == {}
+        assert lm.history[-1].usage == {}
         assert tracker.get_total_tokens() == {}
 
 

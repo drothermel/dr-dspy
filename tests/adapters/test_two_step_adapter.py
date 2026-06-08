@@ -121,7 +121,7 @@ def test_two_step_adapter_call():
     assert "question:" in content.lower()
     assert "What is 5 + 7?" in content
 
-    extraction_messages = extraction_lm.history[0]["messages"]
+    extraction_messages = extraction_lm.history[0].messages_as_openai
     assert len(extraction_messages) == 2
     assert extraction_messages[0]["role"] == "system"
     content = extraction_messages[0]["content"]
@@ -162,7 +162,7 @@ async def test_two_step_adapter_async_call():
     assert "question:" in content.lower()
     assert "What is 5 + 7?" in content
 
-    extraction_messages = extraction_lm.history[0]["messages"]
+    extraction_messages = extraction_lm.history[0].messages_as_openai
     assert len(extraction_messages) == 2
     assert extraction_messages[0]["role"] == "system"
     content = extraction_messages[0]["content"]

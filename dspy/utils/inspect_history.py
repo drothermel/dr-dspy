@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import sys
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any, TextIO
+from typing import TYPE_CHECKING, TextIO
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
+
+    from dspy.core.types import LMHistoryEntry
 
 
 def _green(text: str, end: str = "\n", *, use_colors: bool = True) -> str:
@@ -27,7 +29,7 @@ def _blue(text: str, end: str = "\n", *, use_colors: bool = True) -> str:
     return str(text) + end
 
 
-def pretty_print_history(history: Sequence[Mapping[str, Any]], n: int = 1, file: TextIO | None = None) -> None:
+def pretty_print_history(history: Sequence[LMHistoryEntry], n: int = 1, file: TextIO | None = None) -> None:
     """Print the last n prompts and their completions.
 
     Args:
@@ -58,15 +60,15 @@ def pretty_print_history(history: Sequence[Mapping[str, Any]], n: int = 1, file:
             )
 
     for item in history[-n:]:
-        messages = item["messages"] or [{"role": "user", "content": item["prompt"]}]
-        outputs = item["outputs"]
-        timestamp = item.get("timestamp", "Unknown time")
+        messages = item.messages_as_openai or [{"role": "user", "content": item.prompt}]
+        outputs = item.outputs
+        timestamp = item.timestamp
 
         print("\n\n\n", file=out)
         print(_blue(f"[{timestamp}]", use_colors=use_colors), file=out)
 
         for msg in messages:
-            print(_red(f"{msg['role'].capitalize()} message:", use_colors=use_colors), file=out)
+            print(_red(f"{str(msg['role']).capitalize()} message:", use_colors=use_colors), file=out)
             if isinstance(msg["content"], str):
                 print(msg["content"].strip(), file=out)
             else:

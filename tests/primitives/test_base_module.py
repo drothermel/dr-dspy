@@ -434,7 +434,7 @@ def test_module_history():
         # The same history entity is shared across all the ancestor callers to reduce memory usage.
         assert id(program.history[0]) == id(program.cot.history[0])
 
-        assert program.history[0]["outputs"] == ["{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"]
+        assert program.history[0].outputs == ["{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"]
 
         settings.configure(disable_history=True)
 
@@ -515,7 +515,7 @@ async def test_module_history_async():
         # The same history entity is shared across all the ancestor callers to reduce memory usage.
         assert id(program.history[0]) == id(program.cot.history[0])
 
-        assert program.history[0]["outputs"] == ["{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"]
+        assert program.history[0].outputs == ["{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"]
 
         with settings.context(disable_history=True, lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter()):
             await program.acall(question="What is the capital of France?")
