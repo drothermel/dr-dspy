@@ -1,4 +1,3 @@
-import asyncio
 import inspect
 import logging
 from collections.abc import Callable
@@ -120,14 +119,14 @@ class CodeAct(ReAct, ProgramOfThought):
         return instructions
 
     @override
-    def forward(self, **kwargs):
+    async def aforward(self, **kwargs):
         for tool in self.tools.values():
             self.interpreter(inspect.getsource(tool.func))
 
         trajectory = {}
         max_iters = kwargs.pop("max_iters", self.max_iters)
         for idx in range(max_iters):
-            code_data = asyncio.run(self.codeact(trajectory=trajectory, **kwargs))
+            code_data = await self.codeact(trajectory=trajectory, **kwargs)
             output = None
             code, error = self._parse_code(code_data)
 
@@ -146,6 +145,6 @@ class CodeAct(ReAct, ProgramOfThought):
             if code_data.finished:
                 break
 
-        extract = asyncio.run(self._call_with_potential_trajectory_truncation(self.extractor, trajectory, **kwargs))
+        extract = await self._call_with_potential_trajectory_truncation(self.extractor, trajectory, **kwargs)
         self.interpreter.shutdown()
         return Prediction(trajectory=trajectory, **extract)

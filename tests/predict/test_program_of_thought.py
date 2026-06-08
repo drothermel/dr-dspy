@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import patch
 
 import pytest
@@ -27,7 +28,7 @@ def test_pot_code_generation():
     )
     settings.configure(lm=lm)
     pot = ProgramOfThought(BasicQA)
-    res = pot(question="What is 1+1?")
+    res = asyncio.run(pot(question="What is 1+1?"))
     assert res.answer == "2"
     assert pot.interpreter.deno_process is None
 
@@ -43,7 +44,7 @@ def test_old_style_pot():
     )
     settings.configure(lm=lm)
     pot = ProgramOfThought(BasicQA)
-    res = pot(question="What is 1+1?")
+    res = asyncio.run(pot(question="What is 1+1?"))
     assert res.answer == "2"
     assert pot.interpreter.deno_process is None
 
@@ -67,7 +68,7 @@ def test_pot_support_multiple_fields():
     )
     settings.configure(lm=lm)
     pot = ProgramOfThought(ExtremumFinder)
-    res = pot(input_list="2, 3, 5, 6")
+    res = asyncio.run(pot(input_list="2, 3, 5, 6"))
     assert res.maximum == "6"
     assert res.minimum == "2"
     assert pot.interpreter.deno_process is None
@@ -90,7 +91,7 @@ def test_pot_code_generation_with_one_error():
     )
     settings.configure(lm=lm)
     pot = ProgramOfThought(BasicQA)
-    res = pot(question="What is 1+1?")
+    res = asyncio.run(pot(question="What is 1+1?"))
     assert res.answer == "2"
     assert pot.interpreter.deno_process is None
 
@@ -111,7 +112,7 @@ def test_pot_code_generation_persistent_errors():
 
     pot = ProgramOfThought(BasicQA, max_iters=max_iters)
     with pytest.raises(RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: ZeroDivisionError:"):  # noqa: RUF043
-        pot(question="What is 1+1?")
+        asyncio.run(pot(question="What is 1+1?"))
 
 
 def test_pot_code_parse_error():
@@ -131,5 +132,5 @@ def test_pot_code_parse_error():
             match="Max hops reached. Failed to run ProgramOfThought: Error: Code format is not correct.",  # noqa: RUF043
         ),
     ):
-        pot(question="What is 1+1?")
+        asyncio.run(pot(question="What is 1+1?"))
     mock_execute_code.assert_not_called()

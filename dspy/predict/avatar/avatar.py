@@ -110,7 +110,7 @@ class Avatar(Module):
                 return tool.tool.run(tool_input_query)
         return None
 
-    def forward(self, **kwargs):
+    async def aforward(self, **kwargs):
         if self.verbose:
             pass
 
@@ -129,7 +129,7 @@ class Avatar(Module):
         max_iters = kwargs.get("max_iters")
 
         while tool_name != "Finish" and (max_iters > 0 if max_iters else True):
-            actor_output = self.actor(**args)
+            actor_output = await self.actor(**args)
             action = getattr(actor_output, f"action_{idx}")
 
             tool_name = action.tool_name
@@ -160,7 +160,7 @@ class Avatar(Module):
             if max_iters:
                 max_iters -= 1
 
-        final_answer = self.actor(**args)
+        final_answer = await self.actor(**args)
         self.actor = deepcopy(self.actor_clone)
 
         return Prediction(

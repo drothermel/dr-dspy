@@ -1,3 +1,4 @@
+import asyncio
 import threading
 from typing import Any
 
@@ -92,7 +93,6 @@ class Parallel:
         )
 
         def process_pair(pair):
-            result = None
             module, example = pair
 
             if isinstance(example, Example):
@@ -107,6 +107,9 @@ class Parallel:
                 raise ValueError(
                     f"Invalid example type: {type(example)}, only supported types are Example, dict, list and tuple"
                 )
+
+            if asyncio.iscoroutine(result):
+                return asyncio.run(result)
             return result
 
         results = executor.execute(process_pair, exec_pairs)

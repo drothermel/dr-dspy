@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from dspy.dsp.utils.settings import settings
@@ -32,7 +34,7 @@ def test_codeact_code_generation():
     )
     settings.configure(lm=lm)
     program = CodeAct(BasicQA, tools=[add])
-    res = program(question="What is 1+1?")
+    res = asyncio.run(program(question="What is 1+1?"))
     assert res.answer == "2"
     assert res.trajectory == {
         "code_output_0": '"2\\n"',
@@ -65,7 +67,7 @@ def test_codeact_support_multiple_fields():
     )
     settings.configure(lm=lm)
     program = CodeAct(ExtremumFinder, tools=[extract_maximum_minimum])
-    res = program(input_list="2, 3, 5, 6")
+    res = asyncio.run(program(input_list="2, 3, 5, 6"))
     assert res.maximum == "6"
     assert res.minimum == "2"
     assert res.trajectory == {
@@ -93,7 +95,7 @@ def test_codeact_code_parse_failure():
     )
     settings.configure(lm=lm)
     program = CodeAct(BasicQA, tools=[add])
-    res = program(question="What is 1+1?")
+    res = asyncio.run(program(question="What is 1+1?"))
     assert res.answer == "2"
     assert res.trajectory == {
         "generated_code_0": "parse(error",
@@ -122,7 +124,7 @@ def test_codeact_code_execution_failure():
     )
     settings.configure(lm=lm)
     program = CodeAct(BasicQA, tools=[add])
-    res = program(question="What is 1+1?")
+    res = asyncio.run(program(question="What is 1+1?"))
     assert res.answer == "2"
     assert res.trajectory == {
         "generated_code_0": "unknown+1",

@@ -1,3 +1,5 @@
+import asyncio
+
 from dspy.dsp.utils.settings import settings
 from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
@@ -26,7 +28,7 @@ def test_parallel_module():
 
             self.parallel = Parallel(num_threads=2)
 
-        def forward(self, input):
+        async def aforward(self, input):
             return self.parallel(
                 [
                     (self.predictor, input),
@@ -37,7 +39,7 @@ def test_parallel_module():
                 ]
             )
 
-    output = MyModule()(Example(input="test input").with_inputs("input"))
+    output = asyncio.run(MyModule()(Example(input="test input").with_inputs("input")))
 
     expected_outputs = {f"test output {i}" for i in range(1, 6)}
     assert {r.output for r in output} == expected_outputs
@@ -71,7 +73,7 @@ def test_batch_module():
 
             self.parallel = Parallel(num_threads=2)
 
-        def forward(self, input):
+        async def aforward(self, input):
             with settings.context(lm=lm):
                 res1 = self.predictor.batch([input] * 5)
 
@@ -80,7 +82,7 @@ def test_batch_module():
 
             return (res1, res2)
 
-    result, reason_result = MyModule()(Example(input="test input").with_inputs("input"))
+    result, reason_result = asyncio.run(MyModule()(Example(input="test input").with_inputs("input")))
 
     # Check that we got all expected outputs without caring about order
     expected_outputs = {f"test output {i}" for i in range(1, 6)}
@@ -113,7 +115,7 @@ def test_nested_parallel_module():
 
             self.parallel = Parallel(num_threads=2)
 
-        def forward(self, input):
+        async def aforward(self, input):
             return self.parallel(
                 [
                     (self.predictor, input),
@@ -128,7 +130,7 @@ def test_nested_parallel_module():
                 ]
             )
 
-    output = MyModule()(Example(input="test input").with_inputs("input"))
+    output = asyncio.run(MyModule()(Example(input="test input").with_inputs("input")))
 
     # For nested structure, check first two outputs and nested outputs separately
     assert {output[0].output, output[1].output} <= {f"test output {i}" for i in range(1, 5)}
@@ -154,7 +156,7 @@ def test_nested_batch_method():
             super().__init__()
             self.predictor = Predict("input -> output")
 
-        def forward(self, input):
+        async def aforward(self, input):
             return self.predictor.batch([Example(input=input).with_inputs("input")] * 2)
 
     result = MyModule().batch([Example(input="test input").with_inputs("input")] * 2)
@@ -169,7 +171,7 @@ def test_nested_batch_method():
 
 def test_batch_with_failed_examples():
     class FailingModule(Module):
-        def forward(self, value: int) -> str:
+        async def aforward(self, value: int) -> str:
             if value == 42:
                 raise ValueError("test error")
             return f"success-{value}"
@@ -210,7 +212,7 @@ def test_parallel_timeout_and_straggler_limit_params():
 
 def test_batch_timeout_and_straggler_limit_params():
     class SimpleModule(Module):
-        def forward(self, value: int) -> int:
+        async def aforward(self, value: int) -> int:
             return value * 2
 
     module = SimpleModule()

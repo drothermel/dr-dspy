@@ -1,3 +1,5 @@
+import asyncio
+
 from dspy.dsp.utils.settings import settings
 from dspy.predict.multi_chain_comparison import MultiChainComparison
 from dspy.primitives.prediction import Prediction
@@ -38,7 +40,7 @@ def test_basic_example():
     question = "What is the color of the sky?"
     lm = DummyLM([{"rationale": "my rationale", "answer": "blue"}])
     settings.configure(lm=lm)
-    final_pred = compare_answers(completions, question=question)
+    final_pred = asyncio.run(compare_answers(completions, question=question))
 
     assert final_pred.rationale == "my rationale"
     assert final_pred.answer == "blue"

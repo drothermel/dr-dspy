@@ -101,7 +101,7 @@ class Refine(Module):
         except TypeError:
             self.reward_fn_code = inspect.getsource(reward_fn.__class__)
 
-    def forward(self, **kwargs):
+    async def aforward(self, **kwargs):
         lm = self.module.get_lm() or settings.lm
         start = lm.kwargs.get("rollout_id", 0)
         rollout_ids = [start + i for i in range(self.N)]
@@ -121,7 +121,7 @@ class Refine(Module):
             try:
                 with settings.context(trace=[]):
                     if not advice:
-                        outputs = mod(**kwargs)
+                        outputs = await mod(**kwargs)
                     else:
 
                         class WrapperAdapter(cast("Any", adapter.__class__)):
@@ -135,7 +135,7 @@ class Refine(Module):
                                 )
 
                         with settings.context(adapter=WrapperAdapter()):
-                            outputs = mod(**kwargs)
+                            outputs = await mod(**kwargs)
 
                     trace = settings.trace.copy()
 
@@ -172,7 +172,7 @@ class Refine(Module):
                     k: v if isinstance(v, str) else orjson.dumps(recursive_mask(v), option=orjson.OPT_INDENT_2).decode()
                     for k, v in advise_kwargs.items()
                 }
-                advice = Predict(OfferFeedback)(**advise_kwargs).advice
+                advice = (await Predict(OfferFeedback)(**advise_kwargs)).advice
                 # print(f"Advice for each module: {advice}")
 
             except Exception:

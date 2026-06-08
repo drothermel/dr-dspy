@@ -55,7 +55,7 @@ class BestOfN(Module):
         self.N = N
         self.fail_count = fail_count or N  # Defaults to N when fail_count is falsy.
 
-    def forward(self, **kwargs):
+    async def aforward(self, **kwargs):
         lm = self.module.get_lm() or settings.lm
         start = lm.kwargs.get("rollout_id", 0)
         rollout_ids = [start + i for i in range(self.N)]
@@ -68,7 +68,7 @@ class BestOfN(Module):
 
             try:
                 with settings.context(trace=[]):
-                    pred = mod(**kwargs)
+                    pred = await mod(**kwargs)
                     trace = settings.trace.copy()
 
                     # NOTE: Not including the trace of reward_fn.

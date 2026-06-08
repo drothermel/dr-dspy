@@ -32,7 +32,7 @@ class MultiChainComparison(Module):
 
         self.predict = Predict(signature, temperature=temperature, **config)
 
-    def forward(self, completions, **kwargs):
+    async def aforward(self, completions, **kwargs):
         attempts = []
 
         for c in completions:
@@ -50,4 +50,4 @@ class MultiChainComparison(Module):
             **{f"reasoning_attempt_{idx + 1}": attempt for idx, attempt in enumerate(attempts)},
             **kwargs,
         }
-        return self.predict(**kwargs)
+        return await self.predict(**kwargs)
