@@ -128,7 +128,8 @@ class Refine(Module):
                             async def acall(self, *, lm, config, signature, demos, inputs):
                                 inputs["hint_"] = advice.get(signature2name[signature], "N/A")  # noqa: B023
                                 signature = signature.append(
-                                    "hint_", InputField(desc="A hint to the module from an earlier run")
+                                    name="hint_",
+                                    field=InputField(desc="A hint to the module from an earlier run"),
                                 )
                                 return await adapter.acall(
                                     lm=lm, config=config, signature=signature, demos=demos, inputs=inputs

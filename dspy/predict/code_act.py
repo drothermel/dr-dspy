@@ -74,24 +74,30 @@ class CodeAct(ReAct, ProgramOfThought):
 
         codeact_signature = (
             make_signature(
-                cast("Any", _field_infos_to_signature_fields(self.signature.input_fields)),
-                "\n".join(instructions),
+                signature=cast("Any", _field_infos_to_signature_fields(self.signature.input_fields)),
+                instructions="\n".join(instructions),
             )
-            .append("trajectory", InputField(), type_=str)
+            .append(name="trajectory", field=InputField(), type_=str)
             .append(
-                "generated_code",
-                OutputField(desc="Python code that when executed, produces output relevant to answering the question"),
+                name="generated_code",
+                field=OutputField(
+                    desc="Python code that when executed, produces output relevant to answering the question"
+                ),
                 type_=str,
             )
-            .append("finished", OutputField(desc="a boolean flag to determine if the process is done"), type_=bool)
+            .append(
+                name="finished",
+                field=OutputField(desc="a boolean flag to determine if the process is done"),
+                type_=bool,
+            )
         )
 
         extract_signature = make_signature(
-            cast(
+            signature=cast(
                 "Any", _field_infos_to_signature_fields({**self.signature.input_fields, **self.signature.output_fields})
             ),
-            self.signature.instructions,
-        ).append("trajectory", InputField(), type_=str)
+            instructions=self.signature.instructions,
+        ).append(name="trajectory", field=InputField(), type_=str)
 
         self.tools: dict[str, Tool] = tools_by_name
         self.codeact = Predict(codeact_signature)

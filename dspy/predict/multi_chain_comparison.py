@@ -18,8 +18,8 @@ class MultiChainComparison(Module):
         for idx in range(M):
             field_name = f"reasoning_attempt_{idx + 1}"
             signature = signature.append(
-                field_name,
-                InputField(desc="${reasoning attempt}"),
+                name=field_name,
+                field=InputField(desc="${reasoning attempt}"),
             ).with_updated_fields(field_name, prefix=f"Student Attempt #{idx + 1}:")
 
         signature = signature.prepend(

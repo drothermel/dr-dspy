@@ -91,7 +91,7 @@ class ReActV2(Module):
             ]
         ).strip()
 
-        return make_signature(fields, instructions)
+        return make_signature(signature=fields, instructions=instructions)
 
     async def aforward(self, **input_args):
         max_iters = input_args.pop("max_iters", self.max_iters)

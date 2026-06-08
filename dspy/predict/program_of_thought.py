@@ -52,20 +52,20 @@ class ProgramOfThought(Module):
 
         self.code_generate = ChainOfThought(
             make_signature(
-                cast("Any", _field_infos_to_signature_fields(self._generate_signature("generate").fields)),
-                self._generate_instruction("generate"),
+                signature=cast("Any", _field_infos_to_signature_fields(self._generate_signature("generate").fields)),
+                instructions=self._generate_instruction("generate"),
             ),
         )
         self.code_regenerate = ChainOfThought(
             make_signature(
-                cast("Any", _field_infos_to_signature_fields(self._generate_signature("regenerate").fields)),
-                self._generate_instruction("regenerate"),
+                signature=cast("Any", _field_infos_to_signature_fields(self._generate_signature("regenerate").fields)),
+                instructions=self._generate_instruction("regenerate"),
             ),
         )
         self.generate_output = ChainOfThought(
             make_signature(
-                cast("Any", _field_infos_to_signature_fields(self._generate_signature("answer").fields)),
-                self._generate_instruction("answer"),
+                signature=cast("Any", _field_infos_to_signature_fields(self._generate_signature("answer").fields)),
+                instructions=self._generate_instruction("answer"),
             ),
         )
         # PythonInterpreter may raise if the Deno-backed sandbox is unavailable; construct it here so failures surface during module initialization.

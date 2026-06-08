@@ -316,8 +316,8 @@ class RLM(Module):
 
         action_sig = (
             make_signature(
-                {},
-                task_instructions
+                signature={},
+                instructions=task_instructions
                 + ACTION_INSTRUCTIONS_TEMPLATE.format(
                     inputs=inputs_str,
                     final_output_names=final_output_names,
@@ -326,21 +326,31 @@ class RLM(Module):
                 )
                 + tool_docs,
             )
-            .append("variables_info", InputField(desc="Metadata about the variables available in the REPL"), type_=str)
             .append(
-                "repl_history", InputField(desc="Previous REPL code executions and their outputs"), type_=REPLHistory
-            )
-            .append(
-                "iteration", InputField(desc="Current iteration number (1-indexed) out of max_iterations"), type_=str
-            )
-            .append(
-                "reasoning",
-                OutputField(desc="Think step-by-step: what do you know? What remains? Plan your next action."),
+                name="variables_info",
+                field=InputField(desc="Metadata about the variables available in the REPL"),
                 type_=str,
             )
             .append(
-                "code",
-                OutputField(desc="Python code to execute. Use markdown code block format: ```python\\n<code>\\n```"),
+                name="repl_history",
+                field=InputField(desc="Previous REPL code executions and their outputs"),
+                type_=REPLHistory,
+            )
+            .append(
+                name="iteration",
+                field=InputField(desc="Current iteration number (1-indexed) out of max_iterations"),
+                type_=str,
+            )
+            .append(
+                name="reasoning",
+                field=OutputField(desc="Think step-by-step: what do you know? What remains? Plan your next action."),
+                type_=str,
+            )
+            .append(
+                name="code",
+                field=OutputField(
+                    desc="Python code to execute. Use markdown code block format: ```python\\n<code>\\n```"
+                ),
                 type_=str,
             )
         )
@@ -359,8 +369,8 @@ class RLM(Module):
         full_extract_instructions = extended_task_instructions + extract_instructions
 
         extract_sig = make_signature(
-            {**self.signature.output_fields},
-            full_extract_instructions,
+            signature={**self.signature.output_fields},
+            instructions=full_extract_instructions,
         )
         extract_sig = extract_sig.prepend(
             "repl_history", InputField(desc="Your REPL interactions so far"), type_=REPLHistory

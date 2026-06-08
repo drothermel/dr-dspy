@@ -89,19 +89,21 @@ class ReAct(Module):
 
         react_signature = (
             make_signature(
-                cast("Any", _field_infos_to_signature_fields(signature.input_fields)),
-                "\n".join(instr),
+                signature=cast("Any", _field_infos_to_signature_fields(signature.input_fields)),
+                instructions="\n".join(instr),
             )
-            .append("trajectory", InputField(), type_=str)
-            .append("next_thought", OutputField(), type_=str)
-            .append("next_tool_name", OutputField(), type_=str)
-            .append("next_tool_args", OutputField(), type_=dict[str, Any])
+            .append(name="trajectory", field=InputField(), type_=str)
+            .append(name="next_thought", field=OutputField(), type_=str)
+            .append(name="next_tool_name", field=OutputField(), type_=str)
+            .append(name="next_tool_args", field=OutputField(), type_=dict[str, Any])
         )
 
         fallback_signature = make_signature(
-            cast("Any", _field_infos_to_signature_fields({**signature.input_fields, **signature.output_fields})),
-            signature.instructions,
-        ).append("trajectory", InputField(), type_=str)
+            signature=cast(
+                "Any", _field_infos_to_signature_fields({**signature.input_fields, **signature.output_fields})
+            ),
+            instructions=signature.instructions,
+        ).append(name="trajectory", field=InputField(), type_=str)
 
         self.tools = tools_by_name
         self.react = Predict(react_signature)
