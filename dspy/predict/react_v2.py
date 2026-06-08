@@ -93,7 +93,7 @@ class ReActV2(Module):
 
         return make_signature(fields, instructions)
 
-    def forward(self, **input_args):
+    async def aforward(self, **input_args):
         max_iters = input_args.pop("max_iters", self.max_iters)
         history = _coerce_history(input_args.pop("history", None))
         pending_inputs = {name: input_args[name] for name in self.signature.input_fields if name in input_args}
@@ -101,7 +101,7 @@ class ReActV2(Module):
         break_reason = "max_iters"
         for turn_index in range(max_iters):
             try:
-                pred = self.react(
+                pred = await self.react(
                     history=history,
                     tools=list(self.tools.values()),
                     **pending_inputs,
@@ -131,7 +131,7 @@ class ReActV2(Module):
             if final_outputs is not None:
                 return Prediction(**final_outputs, history=history, termination_reason="submit")
 
-        return self._forced_submit(history, pending_inputs, break_reason, max_iters)
+        return await self._forced_submit(history, pending_inputs, break_reason, max_iters)
 
     def _execute_tool_calls(self, tool_calls: ToolCalls) -> tuple[ToolCallResults, dict[str, Any] | None]:
         values = []
@@ -172,7 +172,7 @@ class ReActV2(Module):
             event["tool_calls"] = tool_calls
         return event
 
-    def _forced_submit(
+    async def _forced_submit(
         self,
         history: History,
         pending_inputs: dict[str, Any],
@@ -180,7 +180,7 @@ class ReActV2(Module):
         turn_index: int,
     ) -> Prediction:
         try:
-            pred = self.react(
+            pred = await self.react(
                 history=history,
                 tools=list(self.tools.values()),
                 config={

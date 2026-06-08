@@ -35,8 +35,5 @@ class ChainOfThought(Module):
         callbacks = cast("list[BaseCallback] | None", config.pop("callbacks", None))
         self.predict = Predict(extended_signature, callbacks=callbacks, **config)
 
-    def forward(self, **kwargs):
-        return self.predict(**kwargs)
-
     async def aforward(self, **kwargs):
-        return await self.predict.acall(**kwargs)
+        return await self.predict(**kwargs)

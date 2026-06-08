@@ -5,7 +5,7 @@ import logging
 import time
 import types
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import orjson
 import pydantic
@@ -159,7 +159,7 @@ def test_call_method():
     predict_instance = Predict("input -> output")
     lm = DummyLM([{"output": "test output"}])
     settings.configure(lm=lm)
-    result = predict_instance(input="test input")
+    result = asyncio.run(predict_instance(input="test input"))
     assert result.output == "test output"
 
 
@@ -436,13 +436,15 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
         def __init__(self):
             super().__init__({"choices": []})
 
-    with patch("litellm.completion", return_value=FakeResp()) as completion_mock:
+    with patch(
+        "dspy.clients.lm.alitellm_completion", new_callable=AsyncMock, return_value=FakeResp()
+    ) as completion_mock:
         lm = loaded_predict.lm
         assert lm is not None
         asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
 
     assert completion_mock.call_count == 1
-    assert completion_mock.call_args.kwargs.get(endpoint_override_key) != override_url
+    assert completion_mock.call_args.kwargs["request"].get(endpoint_override_key) != override_url
 
 
 def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
@@ -476,7 +478,9 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
     safe_loaded_predict = Predict("q->a")
     safe_loaded_predict.load(file_path)
     with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:  # noqa: SIM117
-        with patch("litellm.completion", return_value=FakeResp()) as completion_mock:
+        with patch(
+            "dspy.clients.lm.alitellm_completion", new_callable=AsyncMock, return_value=FakeResp()
+        ) as completion_mock:
             lm = safe_loaded_predict.lm
             assert lm is not None
             asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
@@ -486,7 +490,9 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path):
 
     opt_in_loaded_predict = Predict("q->a")
     opt_in_loaded_predict.load(file_path, allow_unsafe_lm_state=True)
-    with patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock:
+    with patch(
+        "litellm.batch_completion_models", new_callable=AsyncMock, return_value=FakeResp()
+    ) as batch_completion_mock:
         lm = opt_in_loaded_predict.lm
         assert lm is not None
         asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
@@ -523,7 +529,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     # Simulates legacy behavior by allowing serialized endpoint overrides.
     opt_in_loaded_predict = Predict("q->a")
     opt_in_loaded_predict.load(file_path, allow_unsafe_lm_state=True)
-    with patch("litellm.text_completion", return_value=FakeResp()) as text_completion_mock:
+    with patch("litellm.atext_completion", new_callable=AsyncMock, return_value=FakeResp()) as text_completion_mock:
         lm = opt_in_loaded_predict.lm
         assert lm is not None
         asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
@@ -533,7 +539,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
 
     safe_loaded_predict = Predict("q->a")
     safe_loaded_predict.load(file_path)
-    with patch("litellm.text_completion", return_value=FakeResp()) as text_completion_mock:
+    with patch("litellm.atext_completion", new_callable=AsyncMock, return_value=FakeResp()) as text_completion_mock:
         lm = safe_loaded_predict.lm
         assert lm is not None
         asyncio.run(lm(LMRequest.from_call(model=lm.model, prompt="hello", cache=False)))
@@ -546,14 +552,14 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
 def test_forward_method():
     program = Predict("question -> answer")
     settings.configure(lm=DummyLM([{"answer": "No more responses"}]))
-    result = program(question="What is 1+1?").answer
+    result = asyncio.run(program(question="What is 1+1?")).answer
     assert result == "No more responses"
 
 
 def test_forward_method2():
     program = Predict("question -> answer1, answer2")
     settings.configure(lm=DummyLM([{"answer1": "my first answer", "answer2": "my second answer"}]))
-    result = program(question="What is 1+1?")
+    result = asyncio.run(program(question="What is 1+1?"))
     assert result.answer1 == "my first answer"
     assert result.answer2 == "my second answer"
 
@@ -569,7 +575,7 @@ def test_config_management():
 def test_multi_output():
     program = Predict("question -> answer", n=2)
     settings.configure(lm=DummyLM([{"answer": "my first answer"}, {"answer": "my second answer"}]))
-    results = program(question="What is 1+1?")
+    results = asyncio.run(program(question="What is 1+1?"))
     assert results.completions.answer[0] == "my first answer"
     assert results.completions.answer[1] == "my second answer"
 
@@ -584,7 +590,7 @@ def test_multi_output2():
             ],
         )
     )
-    results = program(question="What is 1+1?")
+    results = asyncio.run(program(question="What is 1+1?"))
     assert results.completions.answer1[0] == "my 0 answer"
     assert results.completions.answer1[1] == "my 1 answer"
     assert results.completions.answer2[0] == "my 2 answer"
@@ -615,11 +621,13 @@ def test_datetime_inputs_and_outputs():
     )
     settings.configure(lm=lm)
 
-    output = program(
-        events=[
-            TimedEvent(event_name="Event 1", event_time=datetime(2024, 11, 25, 10, 0, 0)),
-            TimedEvent(event_name="Event 2", event_time=datetime(2024, 11, 25, 15, 30, 0)),
-        ]
+    output = asyncio.run(
+        program(
+            events=[
+                TimedEvent(event_name="Event 1", event_time=datetime(2024, 11, 25, 10, 0, 0)),
+                TimedEvent(event_name="Event 2", event_time=datetime(2024, 11, 25, 15, 30, 0)),
+            ]
+        )
     )
     assert output.summary == "All events are processed"
     assert output.next_event_time == datetime(2024, 11, 27, 14, 0, 0)
@@ -647,7 +655,7 @@ def test_explicitly_valued_enum_inputs_and_outputs():
     )
     settings.configure(lm=lm)
 
-    output = program(current_status=Status.PENDING)
+    output = asyncio.run(program(current_status=Status.PENDING))
     assert output.next_status == Status.IN_PROGRESS
 
 
@@ -674,7 +682,7 @@ def test_enum_inputs_and_outputs_with_shared_names_and_values():
     )
     settings.configure(lm=lm)
 
-    output = program(current_status=TicketStatus.OPEN)
+    output = asyncio.run(program(current_status=TicketStatus.OPEN))
     assert output.next_status == TicketStatus.CLOSED  # By value
 
 
@@ -697,7 +705,7 @@ def test_auto_valued_enum_inputs_and_outputs():
     )
     settings.configure(lm=lm)
 
-    output = program(current_status=Status.PENDING)
+    output = asyncio.run(program(current_status=Status.PENDING))
     assert output.next_status == Status.IN_PROGRESS
 
 
@@ -723,7 +731,7 @@ def test_output_only():
 
     lm = DummyLM([{"output": "short answer"}])
     settings.configure(lm=lm)
-    assert predictor().output == "short answer"
+    assert asyncio.run(predictor()).output == "short answer"
 
 
 def test_load_state_chaining():
@@ -753,9 +761,11 @@ def test_call_predict_with_chat_history(adapter_type):
         lm = SpyLM("dummy_model", return_json=True)
         settings.configure(adapter=JSONAdapter(), lm=lm)
 
-    program(
-        question="are you sure that's correct?",
-        history=History(messages=[{"question": "what's the capital of france?", "answer": "paris"}]),
+    asyncio.run(
+        program(
+            question="are you sure that's correct?",
+            history=History(messages=[{"question": "what's the capital of france?", "answer": "paris"}]),
+        )
     )
 
     # Verify the LM was called with correct messages
@@ -773,13 +783,13 @@ def test_lm_usage():
     program = Predict("question -> answer")
     settings.configure(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True)
     with patch(
-        "dspy.clients.lm.litellm_completion",
+        "dspy.clients.lm.alitellm_completion",
         return_value=ModelResponse(
             choices=[{"message": {"content": "[[ ## answer ## ]]\nParis"}}],
             usage={"total_tokens": 10},
         ),
     ):
-        result = program(question="What is the capital of France?")
+        result = asyncio.run(program(question="What is the capital of France?"))
         assert result.answer == "Paris"
         assert result.get_lm_usage()["openai/gpt-4o-mini"]["total_tokens"] == 10
 
@@ -790,11 +800,11 @@ def test_lm_usage_with_parallel():
     def program_wrapper(question):
         # Sleep to make it possible to cause a race condition
         time.sleep(0.5)
-        return program(question=question)
+        return asyncio.run(program(question=question))
 
     settings.configure(lm=LM("openai/gpt-4o-mini", cache=False), track_usage=True)
     with patch(
-        "dspy.clients.lm.litellm_completion",
+        "dspy.clients.lm.alitellm_completion",
         return_value=ModelResponse(
             choices=[{"message": {"content": "[[ ## answer ## ]]\nParis"}}],
             usage={"total_tokens": 10},
@@ -852,7 +862,7 @@ async def test_lm_usage_with_async():
 def test_positional_arguments():
     program = Predict("question -> answer")
     with pytest.raises(ValueError) as e:  # noqa: PT011
-        program("What is the capital of France?")
+        asyncio.run(program("What is the capital of France?"))
     assert str(e.value) == (
         "Positional arguments are not allowed when calling `dspy.predict.predict.Predict`, must use keyword arguments "
         "that match "
@@ -863,12 +873,12 @@ def test_positional_arguments():
 def test_error_message_on_invalid_lm_setup():
     # No LM is loaded.
     with pytest.raises(ValueError, match="No LM is loaded"):
-        Predict("question -> answer")(question="Why did a chicken cross the kitchen?")
+        asyncio.run(Predict("question -> answer")(question="Why did a chicken cross the kitchen?"))
 
     # LM is a string.
     settings.configure(lm="openai/gpt-4o-mini")
     with pytest.raises(ValueError) as e:  # noqa: PT011
-        Predict("question -> answer")(question="Why did a chicken cross the kitchen?")
+        asyncio.run(Predict("question -> answer")(question="Why did a chicken cross the kitchen?"))
 
     assert "LM must be an instance of `dspy.clients.base_lm.BaseLM`, not a string." in str(e.value)
 
@@ -878,7 +888,7 @@ def test_error_message_on_invalid_lm_setup():
     # LM is not an instance of BaseLM.
     settings.configure(lm=dummy_lm)
     with pytest.raises(ValueError) as e:  # noqa: PT011
-        Predict("question -> answer")(question="Why did a chicken cross the kitchen?")
+        asyncio.run(Predict("question -> answer")(question="Why did a chicken cross the kitchen?"))
     assert "LM must be an instance of `dspy.clients.base_lm.BaseLM`, not <class 'function'>." in str(e.value)
 
 
@@ -907,7 +917,7 @@ def test_field_constraints(adapter_type):
         settings.configure(adapter=JSONAdapter(), lm=lm)
 
     # Call the predictor to trigger instruction generation
-    program(text="hello world", number=5)
+    asyncio.run(program(text="hello world", number=5))
 
     # Get the system message containing the instructions
     system_message = lm.calls[0]["messages"][0]["content"]
@@ -935,10 +945,12 @@ def test_predicted_outputs_piped_from_predict_to_lm_call():
     settings.configure(lm=LM("openai/gpt-4o-mini", cache=False))
     mock_response = ModelResponse(choices=[{"message": {"content": "[[ ## answer ## ]]\nParis"}}])
 
-    with patch("litellm.completion", return_value=mock_response) as mock_completion:
-        program(
-            question="Why did a chicken cross the kitchen?",
-            prediction={"type": "content", "content": "A chicken crossing the kitchen"},
+    with patch("litellm.acompletion", return_value=mock_response) as mock_completion:
+        asyncio.run(
+            program(
+                question="Why did a chicken cross the kitchen?",
+                prediction={"type": "content", "content": "A chicken crossing the kitchen"},
+            )
         )
 
         assert mock_completion.call_args[1]["prediction"] == {
@@ -950,8 +962,8 @@ def test_predicted_outputs_piped_from_predict_to_lm_call():
     # format, it should not be passed to the LM.
     program = Predict("question, prediction -> judgement")
     judgement_response = ModelResponse(choices=[{"message": {"content": "[[ ## judgement ## ]]\nFair"}}])
-    with patch("litellm.completion", return_value=judgement_response) as mock_completion:
-        program(question="Why did a chicken cross the kitchen?", prediction="To get to the other side!")
+    with patch("litellm.acompletion", return_value=judgement_response) as mock_completion:
+        asyncio.run(program(question="Why did a chicken cross the kitchen?", prediction="To get to the other side!"))
 
     assert "prediction" not in mock_completion.call_args[1]
 
@@ -1001,7 +1013,7 @@ def test_trace_size_limit():
     settings.configure(lm=DummyLM([{"answer": "Paris"}]), max_trace_size=3)
 
     for _ in range(10):
-        program(question="What is the capital of France?")
+        asyncio.run(program(question="What is the capital of France?"))
 
     assert len(settings.trace) == 3
 
@@ -1011,7 +1023,7 @@ def test_disable_trace():
     settings.configure(lm=DummyLM([{"answer": "Paris"}]), trace=None)
 
     for _ in range(10):
-        program(question="What is the capital of France?")
+        asyncio.run(program(question="What is the capital of France?"))
 
     assert settings.trace is None
 
@@ -1021,7 +1033,7 @@ def test_per_module_history_size_limit():
     settings.configure(lm=DummyLM([{"answer": "Paris"}]), max_history_size=5)
 
     for _ in range(10):
-        program(question="What is the capital of France?")
+        asyncio.run(program(question="What is the capital of France?"))
     assert len(program.history) == 5
 
 
@@ -1030,7 +1042,7 @@ def test_per_module_history_disabled():
     settings.configure(lm=DummyLM([{"answer": "Paris"}]), disable_history=True)
 
     for _ in range(10):
-        program(question="What is the capital of France?")
+        asyncio.run(program(question="What is the capital of France?"))
     assert len(program.history) == 0
 
 
@@ -1043,7 +1055,7 @@ def test_input_field_default_value():
     lm = SpyLM("dummy_model", response_text="[[ ## answer ## ]]\ntest")
     settings.configure(lm=lm)
     predictor = Predict(SignatureWithDefault)
-    predictor(question="test")
+    asyncio.run(predictor(question="test"))
 
     user_message = lm.calls[0]["messages"][-1]["content"]
     assert "DEFAULT_CONTEXT" in user_message
@@ -1063,7 +1075,7 @@ def test_extra_fields_warning(caplog):
     predict_instance = Predict("question -> answer")
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(question="test", extra_field="should warn", another="also warn")
+        asyncio.run(predict_instance(question="test", extra_field="should warn", another="also warn"))
 
     # Check that warning was logged about extra fields
     assert "not in signature" in caplog.text
@@ -1081,7 +1093,7 @@ def test_missing_optional_input_field_no_warning(caplog):
     predict_instance = Predict(OptionalInputSignature)
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(question="test")
+        asyncio.run(predict_instance(question="test"))
 
     assert "Not all input fields were provided" not in caplog.text
 
@@ -1097,7 +1109,7 @@ def test_missing_required_input_field_still_warns(caplog):
     predict_instance = Predict(OptionalInputSignature)
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance()
+        asyncio.run(predict_instance())
 
     assert "Not all input fields were provided" in caplog.text
     assert "Missing: ['question']" in caplog.text
@@ -1110,14 +1122,14 @@ def test_warning_images(caplog):
     predict_instance = Predict("question:Image -> answer")
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(question=Image("https://example.com/image1.jpg"))
+        asyncio.run(predict_instance(question=Image("https://example.com/image1.jpg")))
 
     assert "Type mismatch" not in caplog.text
 
     caplog.clear()
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(question="dog_image")
+        asyncio.run(predict_instance(question="dog_image"))
 
     assert "Type mismatch for field 'question': expected Image" in caplog.text
 
@@ -1137,7 +1149,7 @@ def test_type_mismatch_warning(caplog):
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Pass a string where int is expected
-        predict_instance(count="not an int", name="test")
+        asyncio.run(predict_instance(count="not an int", name="test"))
 
     assert "Type mismatch for field 'count': expected int" in caplog.text
 
@@ -1158,7 +1170,7 @@ def test_correct_types_no_warning(caplog):
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Pass correct types
-        predict_instance(count=42, name="test")
+        asyncio.run(predict_instance(count=42, name="test"))
 
     assert "not in signature" not in caplog.text
     assert "Type mismatch" not in caplog.text
@@ -1179,14 +1191,14 @@ def test_list_type_validation(caplog):
     # Test with wrong type
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(items="not a list")
+        asyncio.run(predict_instance(items="not a list"))
 
     assert "Type mismatch for field 'items': expected list" in caplog.text
 
     # Test with correct type
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(items=["a", "b", "c"])
+        asyncio.run(predict_instance(items=["a", "b", "c"]))
 
     assert "Type mismatch for field 'items'" not in caplog.text
 
@@ -1209,7 +1221,7 @@ def test_literal_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(status="approved", priority=2)
+        asyncio.run(predict_instance(status="approved", priority=2))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1218,7 +1230,7 @@ def test_literal_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(status="invalid", priority=2)
+        asyncio.run(predict_instance(status="invalid", priority=2))
 
     assert "Type mismatch for field 'status': expected Literal['pending', 'approved', 'rejected']" in caplog.text
 
@@ -1227,7 +1239,7 @@ def test_literal_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(status="approved", priority=5)
+        asyncio.run(predict_instance(status="approved", priority=5))
 
     assert "Type mismatch for field 'priority': expected Literal[1, 2, 3]" in caplog.text
 
@@ -1249,7 +1261,7 @@ def test_literal_union_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(mode="auto")
+        asyncio.run(predict_instance(mode="auto"))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1258,7 +1270,7 @@ def test_literal_union_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(mode=None)
+        asyncio.run(predict_instance(mode=None))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1267,7 +1279,7 @@ def test_literal_union_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(mode="invalid")
+        asyncio.run(predict_instance(mode="invalid"))
 
     assert "Type mismatch for field 'mode'" in caplog.text
 
@@ -1286,7 +1298,7 @@ def test_list_string(caplog):
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Pass list of strings
-        predict_instance(nameList=["Alice", "Bob", "Charlie"])
+        asyncio.run(predict_instance(nameList=["Alice", "Bob", "Charlie"]))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1296,7 +1308,7 @@ def test_list_string(caplog):
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Pass list of non strings
-        predict_instance(nameList=[1, 2, 3, None])
+        asyncio.run(predict_instance(nameList=[1, 2, 3, None]))
 
     assert "Type mismatch for field 'nameList': expected list[str]" in caplog.text
 
@@ -1317,7 +1329,7 @@ def test_nested_list_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(numbers=[1, 2, 3], names=["alice", "bob"])
+        asyncio.run(predict_instance(numbers=[1, 2, 3], names=["alice", "bob"]))
 
     # Should not have type warnings for correct element types
     assert "Type mismatch" not in caplog.text
@@ -1327,7 +1339,7 @@ def test_nested_list_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(numbers=["1", "2", "3"], names=["alice", "bob"])
+        asyncio.run(predict_instance(numbers=["1", "2", "3"], names=["alice", "bob"]))
 
     assert "Type mismatch for field 'numbers': expected list[int]" in caplog.text
 
@@ -1336,7 +1348,7 @@ def test_nested_list_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(numbers=[1, 2, 3], names=[1, 2, 3])
+        asyncio.run(predict_instance(numbers=[1, 2, 3], names=[1, 2, 3]))
 
     assert "Type mismatch for field 'names': expected list[str]" in caplog.text
 
@@ -1345,7 +1357,7 @@ def test_nested_list_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(numbers=[], names=[])
+        asyncio.run(predict_instance(numbers=[], names=[]))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1365,7 +1377,7 @@ def test_nested_dict_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(mapping={"a": 1, "b": 2, "c": 3})
+        asyncio.run(predict_instance(mapping={"a": 1, "b": 2, "c": 3}))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1374,7 +1386,7 @@ def test_nested_dict_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(mapping={"a": "1", "b": "2", "c": "3"})
+        asyncio.run(predict_instance(mapping={"a": "1", "b": "2", "c": "3"}))
 
     assert "Type mismatch for field 'mapping': expected dict[str, int]" in caplog.text
 
@@ -1383,7 +1395,7 @@ def test_nested_dict_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(mapping={1: 1, 2: 2, 3: 3})
+        asyncio.run(predict_instance(mapping={1: 1, 2: 2, 3: 3}))
 
     assert "Type mismatch for field 'mapping': expected dict[str, int]" in caplog.text
 
@@ -1404,7 +1416,7 @@ def test_nested_tuple_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(fixed_tuple=("hello", 42, True), var_tuple=(1, 2, 3, 4))
+        asyncio.run(predict_instance(fixed_tuple=("hello", 42, True), var_tuple=(1, 2, 3, 4)))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1413,7 +1425,7 @@ def test_nested_tuple_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(fixed_tuple=(123, 42, True), var_tuple=(1, 2, 3))
+        asyncio.run(predict_instance(fixed_tuple=(123, 42, True), var_tuple=(1, 2, 3)))
 
     assert "Type mismatch for field 'fixed_tuple': expected tuple[str, int, bool]" in caplog.text
 
@@ -1422,7 +1434,7 @@ def test_nested_tuple_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(fixed_tuple=("hello", 42), var_tuple=(1, 2, 3))
+        asyncio.run(predict_instance(fixed_tuple=("hello", 42), var_tuple=(1, 2, 3)))
 
     assert "Type mismatch for field 'fixed_tuple': expected tuple[str, int, bool]" in caplog.text
 
@@ -1431,7 +1443,7 @@ def test_nested_tuple_type_validation(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(fixed_tuple=("hello", 42, True), var_tuple=("a", "b", "c"))
+        asyncio.run(predict_instance(fixed_tuple=("hello", 42, True), var_tuple=("a", "b", "c")))
 
     assert "Type mismatch for field 'var_tuple': expected tuple[int, ...]" in caplog.text
 
@@ -1448,7 +1460,7 @@ def test_literal_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(status="approved", priority=2)
+        asyncio.run(predict_instance(status="approved", priority=2))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1457,7 +1469,7 @@ def test_literal_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(status="invalid", priority=2)
+        asyncio.run(predict_instance(status="invalid", priority=2))
 
     assert "Type mismatch for field 'status': expected Literal['pending', 'approved', 'rejected']" in caplog.text
 
@@ -1466,7 +1478,7 @@ def test_literal_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(status="approved", priority=5)
+        asyncio.run(predict_instance(status="approved", priority=5))
 
     assert "Type mismatch for field 'priority': expected Literal[1, 2, 3]" in caplog.text
 
@@ -1483,7 +1495,7 @@ def test_list_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(numbers=[1, 2, 3], names=["alice", "bob"])
+        asyncio.run(predict_instance(numbers=[1, 2, 3], names=["alice", "bob"]))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1492,7 +1504,7 @@ def test_list_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(numbers=["1", "2", "3"], names=["alice", "bob"])
+        asyncio.run(predict_instance(numbers=["1", "2", "3"], names=["alice", "bob"]))
 
     assert "Type mismatch for field 'numbers': expected list[int]" in caplog.text
 
@@ -1501,7 +1513,7 @@ def test_list_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(numbers=[1, 2, 3], names=[1, 2, 3])
+        asyncio.run(predict_instance(numbers=[1, 2, 3], names=[1, 2, 3]))
 
     assert "Type mismatch for field 'names': expected list[str]" in caplog.text
 
@@ -1510,7 +1522,7 @@ def test_list_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(numbers=[], names=[])
+        asyncio.run(predict_instance(numbers=[], names=[]))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1527,7 +1539,7 @@ def test_dict_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(mapping={"a": 1, "b": 2, "c": 3})
+        asyncio.run(predict_instance(mapping={"a": 1, "b": 2, "c": 3}))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1536,7 +1548,7 @@ def test_dict_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(mapping={"a": "1", "b": "2", "c": "3"})
+        asyncio.run(predict_instance(mapping={"a": "1", "b": "2", "c": "3"}))
 
     assert "Type mismatch for field 'mapping': expected dict[str, int]" in caplog.text
 
@@ -1545,7 +1557,7 @@ def test_dict_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(mapping={1: 1, 2: 2, 3: 3})
+        asyncio.run(predict_instance(mapping={1: 1, 2: 2, 3: 3}))
 
     assert "Type mismatch for field 'mapping': expected dict[str, int]" in caplog.text
 
@@ -1562,7 +1574,7 @@ def test_tuple_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(fixed_tuple=("hello", 42, True), var_tuple=(1, 2, 3, 4))
+        asyncio.run(predict_instance(fixed_tuple=("hello", 42, True), var_tuple=(1, 2, 3, 4)))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1571,7 +1583,7 @@ def test_tuple_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(fixed_tuple=(123, 42, True), var_tuple=(1, 2, 3))
+        asyncio.run(predict_instance(fixed_tuple=(123, 42, True), var_tuple=(1, 2, 3)))
 
     assert "Type mismatch for field 'fixed_tuple': expected tuple[str, int, bool]" in caplog.text
 
@@ -1580,7 +1592,7 @@ def test_tuple_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(fixed_tuple=("hello", 42), var_tuple=(1, 2, 3))
+        asyncio.run(predict_instance(fixed_tuple=("hello", 42), var_tuple=(1, 2, 3)))
 
     assert "Type mismatch for field 'fixed_tuple': expected tuple[str, int, bool]" in caplog.text
 
@@ -1589,7 +1601,7 @@ def test_tuple_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(fixed_tuple=("hello", 42, True), var_tuple=("a", "b", "c"))
+        asyncio.run(predict_instance(fixed_tuple=("hello", 42, True), var_tuple=("a", "b", "c")))
 
     assert "Type mismatch for field 'var_tuple': expected tuple[int, ...]" in caplog.text
 
@@ -1606,7 +1618,7 @@ def test_union_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(mode="auto")
+        asyncio.run(predict_instance(mode="auto"))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1615,7 +1627,7 @@ def test_union_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(mode=None)
+        asyncio.run(predict_instance(mode=None))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1624,7 +1636,7 @@ def test_union_type_validation_string_signature(caplog):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(mode="invalid")
+        asyncio.run(predict_instance(mode="invalid"))
 
     assert "Type mismatch for field 'mode'" in caplog.text
 
@@ -1642,7 +1654,7 @@ def test_basic_types_string_signature(caplog, enable_type_warnings):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(count=42, name="test")
+        asyncio.run(predict_instance(count=42, name="test"))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1651,7 +1663,7 @@ def test_basic_types_string_signature(caplog, enable_type_warnings):
     lm = DummyLM([{"result": "test output"}])
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(count="not an int", name="test")
+        asyncio.run(predict_instance(count="not an int", name="test"))
 
     if enable_type_warnings:
         assert "Type mismatch for field 'count': expected int" in caplog.text
@@ -1671,7 +1683,7 @@ def test_untyped_string_signature(caplog):
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Test with incorrect type for count and name
-        predict_instance(count="abc", name=123)
+        asyncio.run(predict_instance(count="abc", name=123))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1694,7 +1706,7 @@ def test_untyped_class_signature(caplog):
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Test with "unexpected" type for count and name
-        predict_instance(count="abc", name=123)
+        asyncio.run(predict_instance(count="abc", name=123))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1716,7 +1728,7 @@ def test_string_to_list_signature(caplog):
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Test with a list of strings
-        predict_instance(name=["abc", "def", "geh"], count=123)
+        asyncio.run(predict_instance(name=["abc", "def", "geh"], count=123))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1738,7 +1750,7 @@ def test_custom_signature_types(caplog, enable_type_warnings):
     query_instance = MyContainer.Query(text="What is the capital of France?")
 
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
-        predict_instance(query=query_instance)
+        asyncio.run(predict_instance(query=query_instance))
 
     assert "Type mismatch" not in caplog.text
 
@@ -1747,7 +1759,7 @@ def test_custom_signature_types(caplog, enable_type_warnings):
     settings.configure(lm=lm)
     with caplog.at_level(logging.WARNING, logger="dspy.predict.predict"):
         # Test with an incorrect type
-        predict_instance(query="What is the capital of France?")
+        asyncio.run(predict_instance(query="What is the capital of France?"))
 
     if enable_type_warnings:
         assert "Type mismatch for field 'query': expected Query" in caplog.text

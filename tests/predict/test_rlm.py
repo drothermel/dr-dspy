@@ -6,6 +6,7 @@ Test organization:
 - Integration tests (@pytest.mark.deno): PythonInterpreter with Deno
 """
 
+import asyncio
 import base64
 from contextlib import contextmanager
 
@@ -30,12 +31,11 @@ from tests.mock_interpreter import MockInterpreter
 # ============================================================================
 
 
-def make_mock_predictor(responses: list[dict], async_mode: bool = False):
+def make_mock_predictor(responses: list[dict]):
     """Factory for mock predictors with scripted responses.
 
     Args:
         responses: List of dicts with keys like 'reasoning', 'code'.
-        async_mode: If True, returns a predictor with acall() instead of __call__().
     """
 
     class MockPredictor:
@@ -47,11 +47,10 @@ def make_mock_predictor(responses: list[dict], async_mode: bool = False):
             self.idx += 1
             return Prediction(**result)
 
-        def __call__(self, **kwargs: object):
+        async def __call__(self, **kwargs: object):
             return self._next_response()
 
-        async def acall(self, **kwargs: object):
-            return self._next_response()
+        acall = __call__
 
     return MockPredictor()
 
@@ -210,19 +209,19 @@ class TestRLMInitialization:
         assert rlm.sub_lm is mock_lm
         assert rlm._interpreter is mock
 
-    def test_forward_validates_required_inputs(self):
-        """Test that forward() raises ValueError for missing required inputs."""
+    def test_validates_required_inputs(self):
+        """Test that aforward() raises ValueError for missing required inputs."""
         mock = MockInterpreter(responses=["result"])
 
         # Single missing input
         rlm = RLM("context, query -> answer", max_iterations=3, interpreter=mock)
         with pytest.raises(ValueError, match="Missing required input"):
-            rlm.forward(context="some context")  # Missing 'query'
+            asyncio.run(rlm(context="some context"))  # Missing 'query'
 
         # Multiple missing inputs - all should be reported
         rlm = RLM("a, b, c -> answer", max_iterations=3, interpreter=mock)
         with pytest.raises(ValueError) as exc_info:  # noqa: PT011
-            rlm.forward(a="only a")  # Missing 'b' and 'c'
+            asyncio.run(rlm(a="only a"))  # Missing 'b' and 'c'
         assert "b" in str(exc_info.value)
         assert "c" in str(exc_info.value)
 
@@ -513,8 +512,8 @@ class TestREPLTypes:
 class TestRLMCallMethod:
     """Tests for RLM __call__ method."""
 
-    def test_call_is_alias_for_forward(self):
-        """Test that __call__ is an alias for forward()."""
+    def test_call_executes_rlm(self):
+        """Test that __call__ executes RLM and returns a Prediction."""
         mock = MockInterpreter(responses=[FinalOutput({"answer": "42"})])
         rlm = RLM("query -> answer", max_iterations=3, interpreter=mock)
         rlm.generate_action = make_mock_predictor(
@@ -523,7 +522,7 @@ class TestRLMCallMethod:
             ]
         )
 
-        result = rlm(query="What is the answer?")
+        result = asyncio.run(rlm(query="What is the answer?"))
         assert result.answer == "42"
 
 
@@ -554,7 +553,7 @@ class TestRLMMaxIterationsFallback:
             ]
         )
 
-        result = rlm.forward(query="test")
+        result = asyncio.run(rlm(query="test"))
         assert result.answer == "extracted_answer"
         assert result.final_reasoning == "Extract forced final output"
 
@@ -582,7 +581,7 @@ class TestRLMToolExceptions:
             ]
         )
 
-        result = rlm.forward(query="test")
+        result = asyncio.run(rlm(query="test"))
         assert result.answer == "recovered"
 
     def test_runtime_error_history_uses_stripped_code(self):
@@ -601,7 +600,7 @@ class TestRLMToolExceptions:
             ]
         )
 
-        result = rlm.forward(query="test")
+        result = asyncio.run(rlm(query="test"))
         assert result.answer == "recovered"
         first_step = result.trajectory[0]
         assert first_step["code"] == "print(x)"
@@ -622,7 +621,7 @@ class TestRLMToolExceptions:
             ]
         )
 
-        result = rlm.forward(query="test")
+        result = asyncio.run(rlm(query="test"))
         assert result.answer == "recovered"
         assert result.trajectory[0]["output"].startswith("[Error] invalid syntax")
 
@@ -641,7 +640,7 @@ class TestRLMToolExceptions:
             ]
         )
 
-        result = rlm.forward(query="test")
+        result = asyncio.run(rlm(query="test"))
         assert result.answer == "recovered"
         assert result.trajectory[0]["output"].startswith("[Error]")
 
@@ -947,7 +946,7 @@ class TestRLMTypeCoercionMock:
             ]
         )
 
-        result = rlm.forward(query="test")
+        result = asyncio.run(rlm(query="test"))
         assert getattr(result, output_field) == expected
 
     def test_type_error_retries(self):
@@ -966,7 +965,7 @@ class TestRLMTypeCoercionMock:
             ]
         )
 
-        result = rlm.forward(query="is it yes?")
+        result = asyncio.run(rlm(query="is it yes?"))
         assert result.answer == "yes"
 
 
@@ -1003,7 +1002,7 @@ class TestRLMTypeCoercion:
             ]
         )
 
-        result = rlm.forward(query="test")
+        result = asyncio.run(rlm(query="test"))
         assert getattr(result, output_field) == expected
         assert isinstance(getattr(result, output_field), expected_type)
 
@@ -1016,7 +1015,7 @@ class TestRLMTypeCoercion:
             ]
         )
 
-        result = rlm.forward(query="count items")
+        result = asyncio.run(rlm(query="count items"))
         assert result.count == 42
         assert isinstance(result.count, int)
 
@@ -1042,7 +1041,7 @@ class TestRLMMultipleOutputs:
             ]
         )
 
-        result = rlm.forward(query="test")
+        result = asyncio.run(rlm(query="test"))
         assert result.name == "alice"
         assert result.count == 5
         assert isinstance(result.count, int)
@@ -1056,7 +1055,7 @@ class TestRLMMultipleOutputs:
             ]
         )
 
-        result = rlm.forward(query="test")
+        result = asyncio.run(rlm(query="test"))
         assert result.name == "bob"
         assert result.count == 10
 
@@ -1069,7 +1068,7 @@ class TestRLMMultipleOutputs:
             ]
         )
 
-        result = rlm.forward(query="test")
+        result = asyncio.run(rlm(query="test"))
         assert result.name == "carol"
         assert result.age == 30
         assert result.active is True
@@ -1085,7 +1084,7 @@ class TestRLMMultipleOutputs:
         )
 
         # RLM should retry after getting error for missing field
-        result = rlm.forward(query="test")
+        result = asyncio.run(rlm(query="test"))
         assert result.name == "alice"
         assert result.count == 5
 
@@ -1098,7 +1097,7 @@ class TestRLMMultipleOutputs:
             ]
         )
 
-        result = rlm.forward(query="test")
+        result = asyncio.run(rlm(query="test"))
         assert result.name == "dave"
         assert result.count == 15
 
@@ -1111,7 +1110,7 @@ class TestRLMMultipleOutputs:
             ]
         )
 
-        result = rlm.forward(query="test")
+        result = asyncio.run(rlm(query="test"))
         assert result.count == 42
         assert isinstance(result.count, int)
         assert result.ratio == 3.14
@@ -1141,7 +1140,7 @@ class TestRLMWithDummyLM:
             ]
         ):
             rlm = RLM("query -> answer: int", max_iterations=3)
-            result = rlm.forward(query="What is 2 + 3?")
+            result = asyncio.run(rlm(query="What is 2 + 3?"))
 
             assert result.answer == 5
             assert isinstance(result.answer, int)
@@ -1155,7 +1154,7 @@ class TestRLMWithDummyLM:
             ]
         ):
             rlm = RLM("query -> answer: int", max_iterations=5)
-            result = rlm.forward(query="Double ten")
+            result = asyncio.run(rlm(query="Double ten"))
 
             assert result.answer == 20
             assert len(result.trajectory) == 2
@@ -1168,7 +1167,7 @@ class TestRLMWithDummyLM:
             ]
         ):
             rlm = RLM("numbers: list[int] -> total: int", max_iterations=3)
-            result = rlm.forward(numbers=[1, 2, 3, 4, 5])
+            result = asyncio.run(rlm(numbers=[1, 2, 3, 4, 5]))
 
             assert result.total == 15
 
@@ -1184,7 +1183,7 @@ class TestRLMWithDummyLM:
             ]
         ):
             rlm = RLM("fruit -> color: str", max_iterations=3, tools=[lookup])
-            result = rlm.forward(fruit="apple")
+            result = asyncio.run(rlm(fruit="apple"))
 
             assert result.color == "red"
 
@@ -1245,7 +1244,7 @@ class TestRLMIntegration:
         settings.configure(lm=LM("openai/gpt-4o-mini"))
 
         rlm = RLM("context, query -> answer", max_iterations=5)
-        result = rlm(context={"numbers": [1, 2, 3, 4, 5]}, query="What is the sum of the numbers?")
+        result = asyncio.run(rlm(context={"numbers": [1, 2, 3, 4, 5]}, query="What is the sum of the numbers?"))
         assert "15" in result.answer
 
     def test_with_llm_query(self):
@@ -1253,9 +1252,11 @@ class TestRLMIntegration:
         settings.configure(lm=LM("openai/gpt-4o-mini"))
 
         rlm = RLM("context, query -> answer", max_iterations=5)
-        result = rlm(
-            context="The quick brown fox jumps over the lazy dog.",
-            query="Use llm_query to describe what animal is mentioned as lazy.",
+        result = asyncio.run(
+            rlm(
+                context="The quick brown fox jumps over the lazy dog.",
+                query="Use llm_query to describe what animal is mentioned as lazy.",
+            )
         )
         assert "dog" in result.answer.lower()
 
@@ -1425,7 +1426,7 @@ class TestPrepareSerializableVars:
         assert len(code) < 1000
 
     def test_forward_with_serializable(self):
-        """Full forward() pass with a SandboxSerializable input."""
+        """Full async call with a SandboxSerializable input."""
         mock = MockInterpreter(
             responses=[
                 "",  # setup execution for _prepare_serializable_vars
@@ -1440,7 +1441,7 @@ class TestPrepareSerializableVars:
         )
 
         stub = _StubSerializable("test_payload")
-        result = rlm.forward(data=stub, query="test")
+        result = asyncio.run(rlm(data=stub, query="test"))
         assert result.answer == "done"
 
         # First call should be the serializable setup, second should be the iteration

@@ -40,7 +40,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
     sub-modules, and custom logic. Modules can be composed together to create
     complex pipelines and can be optimized using DSPy's teleprompters.
 
-    All DSPy programs should inherit from this class and implement a ``forward``
+    All DSPy programs should inherit from this class and implement an ``aforward``
     method that defines the program's logic.
 
     Args:
@@ -59,8 +59,8 @@ class Module(BaseModule, metaclass=ProgramMeta):
         ...         super().__init__()
         ...         self.predictor = Predict("question -> answer")
         ...
-        ...     def forward(self, question):
-        ...         return self.predictor(question=question)
+        ...     async def aforward(self, question):
+        ...         return await self.predictor(question=question)
     """
 
     @staticmethod
@@ -89,26 +89,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
             self.callbacks = []
 
     @with_callbacks
-    def __call__(self, *args, **kwargs) -> Prediction:
-        from dspy.dsp.utils.settings import thread_local_overrides
-
-        caller_modules = settings.caller_modules or []
-        caller_modules = list(caller_modules)
-        caller_modules.append(self)
-
-        with settings.context(caller_modules=caller_modules):
-            if settings.track_usage and thread_local_overrides.get().get("usage_tracker") is None:
-                with track_usage() as usage_tracker:
-                    output = self.forward(*args, **kwargs)
-                tokens = usage_tracker.get_total_tokens()
-                self._set_lm_usage(tokens, output)
-
-                return output
-
-            return self.forward(*args, **kwargs)
-
-    @with_callbacks
-    async def acall(self, *args, **kwargs) -> Prediction:
+    async def __call__(self, *args, **kwargs) -> Prediction:
         from dspy.dsp.utils.settings import thread_local_overrides
 
         caller_modules = settings.caller_modules or []
@@ -119,12 +100,14 @@ class Module(BaseModule, metaclass=ProgramMeta):
             if settings.track_usage and thread_local_overrides.get().get("usage_tracker") is None:
                 with track_usage() as usage_tracker:
                     output = await self.aforward(*args, **kwargs)
-                    tokens = usage_tracker.get_total_tokens()
-                    self._set_lm_usage(tokens, output)
+                tokens = usage_tracker.get_total_tokens()
+                self._set_lm_usage(tokens, output)
 
-                    return output
+                return output
 
             return await self.aforward(*args, **kwargs)
+
+    acall = __call__
 
     def named_predictors(self):
         """Return all named Predict modules in this module.
@@ -316,7 +299,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
 
     def _set_lm_usage(self, tokens: dict[str, Any], output: Any) -> None:
         # Some optimizers (e.g., GEPA bootstrap tracing) temporarily patch
-        # module.forward to return a tuple: (prediction, trace).
+        # module.aforward to return a tuple: (prediction, trace).
         # When usage tracking is enabled, ensure we attach usage to the
         # prediction object if present.
         prediction_in_output = None
@@ -336,15 +319,14 @@ class Module(BaseModule, metaclass=ProgramMeta):
     def __getattribute__(self, name):
         attr = super().__getattribute__(name)
 
-        if name == "forward" and callable(attr):
-            # Check if forward is called through __call__ or directly
+        if name == "aforward" and callable(attr):
             stack = inspect.stack()
-            forward_called_directly = len(stack) <= 1 or stack[1].function != "__call__"
+            aforward_called_directly = len(stack) <= 1 or stack[1].function not in {"__call__", "acall"}
 
-            if forward_called_directly:
+            if aforward_called_directly:
                 logger.warning(
-                    f"Calling module.forward(...) on {self.__class__.__name__} directly is discouraged. "
-                    f"Please use module(...) instead."
+                    f"Calling module.aforward(...) on {self.__class__.__name__} directly is discouraged. "
+                    f"Please use await module(...) instead."
                 )
 
         return attr

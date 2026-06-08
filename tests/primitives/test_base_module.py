@@ -126,7 +126,7 @@ def test_save_and_load_with_pkl(tmp_path):
     )
 
     cot = ChainOfThought(MySignature)
-    cot(current_date=datetime.date(2024, 1, 1), target_date=datetime.date(2024, 1, 2))
+    asyncio.run(cot(current_date=datetime.date(2024, 1, 1), target_date=datetime.date(2024, 1, 2)))
 
     def dummy_metric(example, pred, trace=None):
         return True
@@ -160,8 +160,8 @@ class MyModule(Module):
     def __init__(self):
         self.cot = ChainOfThought(Signature("q -> a"))
 
-    def forward(self, q):
-        return self.cot(q=q)
+    async def aforward(self, q):
+        return await self.cot(q=q)
 """)
 
     # Add the tmp_path to Python path so we can import the module
@@ -394,12 +394,12 @@ def test_usage_tracker_no_side_effect():
         def __init__(self):
             self.predict = Predict("question -> answer")
 
-        def forward(self, question: str, **kwargs: object) -> str:
-            return self.predict(question=question).answer
+        async def aforward(self, question: str, **kwargs: object) -> str:
+            return (await self.predict(question=question)).answer
 
     program = MyProgram()
     with settings.context(lm=DummyLM([{"answer": "Paris"}]), track_usage=True):
-        result = program(question="What is the capital of France?")
+        result = asyncio.run(program(question="What is the capital of France?"))
     assert result == "Paris"
 
 
@@ -409,10 +409,10 @@ def test_module_history():
             super().__init__(**kwargs)
             self.cot = ChainOfThought("question -> answer")
 
-        def forward(self, question: str, **kwargs: object) -> Prediction:
-            return self.cot(question=question)
+        async def aforward(self, question: str, **kwargs: object) -> Prediction:
+            return await self.cot(question=question)
 
-    with patch("litellm.completion") as mock_completion:
+    with patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
                 Choices(message=Message(content="{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"))
@@ -421,10 +421,10 @@ def test_module_history():
         )
         settings.configure(lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter())
         program = MyProgram()
-        program(question="What is the capital of France?")
+        asyncio.run(program(question="What is the capital of France?"))
 
         # Second call only call the submodule.
-        program.cot(question="What is the capital of France?")
+        asyncio.run(program.cot(question="What is the capital of France?"))
 
         # The LM history entity exists in all the ancestor callers.
         assert len(program.history) == 1
@@ -438,7 +438,7 @@ def test_module_history():
 
         settings.configure(disable_history=True)
 
-        program(question="What is the capital of France?")
+        asyncio.run(program(question="What is the capital of France?"))
         # No history is recorded when history is disabled.
         assert len(program.history) == 1
         assert len(program.cot.history) == 2
@@ -446,7 +446,7 @@ def test_module_history():
 
         settings.configure(disable_history=False)
 
-        program(question="What is the capital of France?")
+        asyncio.run(program(question="What is the capital of France?"))
         # History is recorded again when history is enabled.
         assert len(program.history) == 2
         assert len(program.cot.history) == 3
@@ -459,10 +459,10 @@ def test_module_history_with_concurrency():
             super().__init__()
             self.cot = ChainOfThought("question -> answer")
 
-        def forward(self, question: str, **kwargs: object) -> Prediction:
-            return self.cot(question=question)
+        async def aforward(self, question: str, **kwargs: object) -> Prediction:
+            return await self.cot(question=question)
 
-    with patch("litellm.completion") as mock_completion:
+    with patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="{'reasoning': 'N/A', 'answer': 'Holy crab!'}"))],
             model="openai/gpt-4o-mini",
@@ -470,14 +470,13 @@ def test_module_history_with_concurrency():
         settings.configure(lm=LM("openai/gpt-4o-mini", cache=False), adapter=JSONAdapter())
         program = MyProgram()
 
-        parallelizer = Parallel()
+        async def run_concurrent():
+            await asyncio.gather(
+                program(question="What is the meaning of life?"),
+                program(question="why did a chicken cross the kitchen?"),
+            )
 
-        parallelizer(
-            [
-                (program, {"question": "What is the meaning of life?"}),
-                (program, {"question": "why did a chicken cross the kitchen?"}),
-            ]
-        )
+        asyncio.run(run_concurrent())
         assert len(program.history) == 2
         assert len(program.cot.history) == 2
         assert len(program.cot.predict.history) == 2
@@ -535,21 +534,21 @@ async def test_module_history_async():
 
 def test_forward_direct_call_warning(caplog):
     class TestModule(Module):
-        def forward(self, x):
+        async def aforward(self, x):
             return x
 
     module = TestModule()
     with caplog.at_level(logging.WARNING, logger="dspy.primitives.module"):
-        module.forward("test")
+        asyncio.run(module.aforward("test"))
     assert "directly is discouraged" in caplog.text
 
 
 def test_forward_through_call_no_warning(capsys):
     class TestModule(Module):
-        def forward(self, x):
+        async def aforward(self, x):
             return x
 
     module = TestModule()
-    module(x="test")
+    asyncio.run(module(x="test"))
     captured = capsys.readouterr()
     assert "directly is discouraged" not in captured.err

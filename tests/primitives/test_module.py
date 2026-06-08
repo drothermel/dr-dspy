@@ -1,3 +1,4 @@
+import asyncio
 import json
 import tempfile
 from pathlib import Path
@@ -20,9 +21,9 @@ class HopModule(Module):
         self.predict1 = Predict("question -> query")
         self.predict2 = Predict("query -> answer")
 
-    def forward(self, question):
-        query = self.predict1(question=question).query
-        return self.predict2(query=query)
+    async def aforward(self, question):
+        query = (await self.predict1(question=question)).query
+        return await self.predict2(query=query)
 
 
 def test_module_initialization():
@@ -57,7 +58,7 @@ def test_forward():
             }
         )
     )
-    result = program(question="What is 1+1?").answer
+    result = asyncio.run(program(question="What is 1+1?")).answer
     assert result == "2"
 
 

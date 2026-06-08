@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 import logging
 from collections.abc import Callable
@@ -126,7 +127,7 @@ class CodeAct(ReAct, ProgramOfThought):
         trajectory = {}
         max_iters = kwargs.pop("max_iters", self.max_iters)
         for idx in range(max_iters):
-            code_data = self.codeact(trajectory=trajectory, **kwargs)
+            code_data = asyncio.run(self.codeact(trajectory=trajectory, **kwargs))
             output = None
             code, error = self._parse_code(code_data)
 
@@ -145,6 +146,6 @@ class CodeAct(ReAct, ProgramOfThought):
             if code_data.finished:
                 break
 
-        extract = self._call_with_potential_trajectory_truncation(self.extractor, trajectory, **kwargs)
+        extract = asyncio.run(self._call_with_potential_trajectory_truncation(self.extractor, trajectory, **kwargs))
         self.interpreter.shutdown()
         return Prediction(trajectory=trajectory, **extract)

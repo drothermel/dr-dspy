@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import random
 import types
@@ -258,13 +257,6 @@ class Predict(Module, Parameter):
                 trace.pop(0)
             trace.append((self, {**kwargs}, pred))
         return pred
-
-    def forward(self, **kwargs):
-        lm, config, signature, demos, kwargs = self._forward_preprocess(**kwargs)
-
-        adapter = settings.adapter or ChatAdapter()
-        completions = asyncio.run(adapter.acall(lm=lm, config=config, signature=signature, demos=demos, inputs=kwargs))
-        return self._forward_postprocess(completions, signature, **kwargs)
 
     async def aforward(self, **kwargs):
         lm, config, signature, demos, kwargs = self._forward_preprocess(**kwargs)

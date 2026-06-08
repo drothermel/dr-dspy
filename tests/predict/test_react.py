@@ -1,3 +1,4 @@
+import asyncio
 import re
 
 import pytest
@@ -52,7 +53,7 @@ def test_tool_observation_preserves_custom_type():
     settings.configure(lm=lm, adapter=adapter)
 
     react = ReAct("question -> answer", tools=[make_images])
-    react(question="Draw me something red")
+    asyncio.run(react(question="Draw me something red"))
 
     sigs_with_obs = [sig for sig, inputs in captured_calls if "observation_0" in inputs]
     assert sigs_with_obs, "Expected ReAct to format a trajectory containing observation_0"
@@ -109,13 +110,15 @@ def test_tool_calling_with_pydantic_args():
     )
     settings.configure(lm=lm)
 
-    outputs = react(
-        participant_name="Alice",
-        event_info=CalendarEvent(
-            name="Science Fair",
-            date="Friday",
-            participants={"Alice": "female", "Bob": "male"},
-        ),
+    outputs = asyncio.run(
+        react(
+            participant_name="Alice",
+            event_info=CalendarEvent(
+                name="Science Fair",
+                date="Friday",
+                participants={"Alice": "female", "Bob": "male"},
+            ),
+        )
     )
     assert outputs.invitation_letter == "It's my honor to invite Alice to the Science Fair event on Friday."
 
@@ -178,7 +181,7 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
     )
 
     with settings.context(lm=lm):
-        result = react(user_request="Help me, my name is Adam")
+        result = asyncio.run(react(user_request="Help me, my name is Adam"))
 
     assert result.process_result == "Resolved Adam's request."
     assert result.trajectory["tool_name_0"] == "get_user_info"
@@ -199,7 +202,7 @@ def test_tool_calling_without_typehint():
         ]
     )
     settings.configure(lm=lm)
-    outputs = react(a=1, b=2)
+    outputs = asyncio.run(react(a=1, b=2))
 
     expected_trajectory = {
         "thought_0": "I need to add two numbers.",
@@ -228,7 +231,7 @@ def test_trajectory_truncation():
     # Mock react.react to simulate multiple tool calls
     call_count = 0
 
-    def mock_react(**kwargs: object):
+    async def mock_react(**kwargs: object):
         nonlocal call_count
         call_count += 1
 
@@ -246,10 +249,14 @@ def test_trajectory_truncation():
         return Prediction(next_thought="Final thought", next_tool_name="finish", next_tool_args={})
 
     react.react = mock_react  # ty:ignore[invalid-assignment]
-    react.extract = lambda **kwargs: Prediction(output_text="Final output")  # noqa: ARG005  # ty:ignore[invalid-assignment]
+
+    async def mock_extract(**kwargs: object):
+        return Prediction(output_text="Final output")
+
+    react.extract = mock_extract  # ty:ignore[invalid-assignment]
 
     # Call forward and get the result
-    result = react(input_text="test input")
+    result = asyncio.run(react(input_text="test input"))
 
     # Verify that older entries in the trajectory were truncated
     assert "thought_0" not in result.trajectory
@@ -264,45 +271,25 @@ async def test_context_window_exceeded_after_retries():
 
     react = ReAct("input_text -> output_text", tools=[echo])
 
-    def mock_react(**kwargs: object):
+    async def mock_react(**kwargs: object):
         raise ContextWindowExceededError
 
     # Test sync version
     extract_calls = []
 
-    def mock_extract(**kwargs: object):
+    async def mock_extract(**kwargs: object):
         extract_calls.append(kwargs)
         return Prediction(output_text="Fallback output")
 
     react.react = mock_react  # ty:ignore[invalid-assignment]
     react.extract = mock_extract  # ty:ignore[invalid-assignment]
 
-    result = react(input_text="test input")
+    result = await react(input_text="test input")
     assert result.trajectory == {}
     assert result.output_text == "Fallback output"
     assert len(extract_calls) == 1
     assert extract_calls[0]["input_text"] == "test input"
     assert "trajectory" in extract_calls[0]
-
-    # Test async version
-    async_extract_calls = []
-
-    async def mock_react_async(**kwargs: object):
-        raise ContextWindowExceededError
-
-    async def mock_extract_async(**kwargs: object):
-        async_extract_calls.append(kwargs)
-        return Prediction(output_text="Fallback output")
-
-    react.react.acall = mock_react_async  # ty:ignore[invalid-assignment]
-    react.extract.acall = mock_extract_async
-
-    result = await react.acall(input_text="test input")
-    assert result.trajectory == {}
-    assert result.output_text == "Fallback output"
-    assert len(async_extract_calls) == 1
-    assert async_extract_calls[0]["input_text"] == "test input"
-    assert "trajectory" in async_extract_calls[0]
 
 
 def test_error_retry():
@@ -330,7 +317,7 @@ def test_error_retry():
     )
     settings.configure(lm=lm)
 
-    outputs = react(a=1, b=2, max_iters=2)
+    outputs = asyncio.run(react(a=1, b=2, max_iters=2))
     traj = outputs.trajectory
 
     # --- exact-match checks (thoughts + tool calls) -------------------------

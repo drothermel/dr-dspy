@@ -1,3 +1,4 @@
+import asyncio
 from unittest import mock
 
 import pytest
@@ -21,7 +22,7 @@ def test_initialization_with_string_signature():
         "reasoning",
         "answer",
     ]
-    assert predict(question="What is 1+1?").answer == "2"
+    assert asyncio.run(predict(question="What is 1+1?")).answer == "2"
 
 
 @pytest.mark.asyncio
@@ -39,7 +40,7 @@ def test_chain_of_thought_with_native_reasoning():
     lm = LM(model="anthropic/claude-3-7-sonnet-20250219", cache=False)
     settings.configure(lm=lm)
 
-    with mock.patch("litellm.completion") as mock_completion:
+    with mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
                 Choices(
@@ -53,7 +54,7 @@ def test_chain_of_thought_with_native_reasoning():
         )
 
         cot = ChainOfThought("question -> answer")
-        result = cot(question="What is the capital of France?")
+        result = asyncio.run(cot(question="What is the capital of France?"))
         assert result.answer == "Paris"
         assert result.reasoning == "Step-by-step thinking about the capital of France"
 
@@ -65,7 +66,7 @@ def test_chain_of_thought_with_manual_reasoning():
     lm = LM(model="openai/gpt-4o-mini")
     settings.configure(lm=lm)
 
-    with mock.patch("litellm.completion") as mock_completion:
+    with mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
                 Choices(
@@ -82,6 +83,6 @@ def test_chain_of_thought_with_manual_reasoning():
         )
 
         cot = ChainOfThought("question -> answer")
-        result = cot(question="What is the capital of France?")
+        result = asyncio.run(cot(question="What is the capital of France?"))
         assert result.answer == "Paris"
         assert result.reasoning == "Step-by-step thinking about the capital of France"

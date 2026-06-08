@@ -325,7 +325,7 @@ Prefer `await self.predict(...)` once `Predict.__call__` is async.
 uv run pytest tests/predict/test_predict.py tests/predict/test_chain_of_thought.py tests/predict/test_react.py tests/primitives/ -q
 ```
 
-- [ ] **Commit Phase 3**
+- [x] **Commit Phase 3** (pending hash below)
 
 ```bash
 git commit -m "$(cat <<'EOF'

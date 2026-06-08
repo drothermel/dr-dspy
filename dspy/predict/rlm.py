@@ -661,50 +661,17 @@ class RLM(Module):
     # Public Interface
     # =========================================================================
 
-    def forward(self, **input_args) -> Prediction:
-        """Execute RLM to produce outputs from the given inputs.
-
-        Args:
-            **input_args: Input values matching the signature's input fields
-
-        Returns:
-            Prediction with output field(s) from the signature and 'trajectory' for debugging
-
-        Raises:
-            ValueError: If required input fields are missing
-        """
-        self._validate_inputs(input_args)
-
-        output_field_names = list(self.signature.output_fields.keys())
-        execution_tools = self._prepare_execution_tools()
-        variables = self._build_variables(**input_args)
-
-        with self._interpreter_context(execution_tools) as repl:
-            regular_args = self._prepare_serializable_vars(input_args, repl)
-            history: REPLHistory = REPLHistory(max_output_chars=self.max_output_chars)
-
-            for iteration in range(self.max_iterations):
-                result: Prediction | REPLHistory = self._execute_iteration(
-                    repl, variables, history, iteration, regular_args, output_field_names
-                )
-                if isinstance(result, Prediction):
-                    return result
-                history = result
-
-            # Max iterations reached - use extract fallback
-            return self._extract_fallback(variables, history, output_field_names)
-
     async def _aextract_fallback(
         self,
         variables: list[REPLVariable],
         history: REPLHistory,
         output_field_names: list[str],
     ) -> Prediction:
-        """Async version: Use extract module when max iterations reached."""
+        """Use extract module when max iterations reached."""
         logger.warning("RLM reached max iterations, using extract to get final output")
 
         variables_info = [variable.format() for variable in variables]
-        extract_pred = await self.extract.acall(
+        extract_pred = await self.extract(
             variables_info=variables_info,
             repl_history=history,
         )
@@ -724,9 +691,9 @@ class RLM(Module):
         input_args: dict[str, Any],
         output_field_names: list[str],
     ) -> Prediction | REPLHistory:
-        """Async version: Execute one iteration."""
+        """Execute one iteration."""
         variables_info = [variable.format() for variable in variables]
-        pred = await self.generate_action.acall(
+        pred = await self.generate_action(
             variables_info=variables_info,
             repl_history=history,
             iteration=f"{iteration + 1}/{self.max_iterations}",
@@ -746,7 +713,7 @@ class RLM(Module):
         return self._process_execution_result(pred, code, result, history, output_field_names)
 
     async def aforward(self, **input_args) -> Prediction:
-        """Async version of forward(). Execute RLM to produce outputs.
+        """Execute RLM to produce outputs from the given inputs.
 
         Args:
             **input_args: Input values matching the signature's input fields
