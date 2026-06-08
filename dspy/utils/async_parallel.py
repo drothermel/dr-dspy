@@ -102,7 +102,7 @@ async def run_bounded(
             async with sem:
                 if cancel.is_set():
                     return
-                await run_indexed(index, item)
+                await run_indexed(index=index, item=item)
 
         await asyncio.gather(*(run_one(index, item) for index, item in enumerate(items)))
     finally:

@@ -335,7 +335,7 @@ def video_to_openai(video: LMVideoPart) -> dict[str, Any]:
 def binary_to_openai(binary: LMBinaryPart) -> dict[str, Any]:
     file_data: dict[str, Any] = {}
     if binary.data is not None:
-        file_data["file_data"] = data_uri(binary.media_type, binary.data)
+        file_data["file_data"] = data_uri(media_type=binary.media_type, data=binary.data)
     elif binary.path is not None:
         file_data["file_data"] = data_uri_from_path(binary.path, fallback_media_type=binary.media_type)
         file_data["filename"] = binary.filename or os.path.basename(binary.path)
@@ -838,7 +838,7 @@ def usage_from_response(response: Any) -> LMUsage | None:
 
 def media_source(part: LMImagePart | LMAudioPart | LMDocumentPart | LMBinaryPart) -> str:
     if part.data is not None:
-        return data_uri(part.media_type, part.data)
+        return data_uri(media_type=part.media_type, data=part.data)
     if part.url is not None:
         return part.url
     if part.file_id is not None:
@@ -858,7 +858,10 @@ def media_type_for_path(path: str, *, fallback: str) -> str:
 
 
 def data_uri_from_path(path: str, *, fallback_media_type: str) -> str:
-    return data_uri(media_type_for_path(path, fallback=fallback_media_type), read_path_base64(path))
+    return data_uri(
+        media_type=media_type_for_path(path, fallback=fallback_media_type),
+        data=read_path_base64(path),
+    )
 
 
 def data_uri(media_type: str, data: str) -> str:

@@ -126,7 +126,7 @@ def validate_data_format(
         finetune_dir = get_finetune_directory()
         log_path = os.path.join(finetune_dir, "data_format_errors.log")
         log_path = os.path.abspath(log_path)
-        write_lines(log_path, data_dict_errors)
+        write_lines(file_path=log_path, data=data_dict_errors)
 
         err = f"Data format errors found.  For more details, see the log file: {log_path}"
         raise ValueError(err)

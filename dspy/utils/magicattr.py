@@ -22,7 +22,7 @@ def get(obj, attr, **kwargs):
     """
     for chunk in _parse(attr):
         try:
-            obj = _lookup(obj, chunk)
+            obj = _lookup(obj=obj, node=chunk)
         except Exception:
             if "default" in kwargs:
                 return kwargs["default"]
@@ -34,7 +34,7 @@ def set(obj, attr, val) -> None:
     """A setattr that supports nested lookups on objects, dicts, lists, and
     any combination in between.
     """
-    obj, attr_or_key, is_subscript = lookup(obj, attr)
+    obj, attr_or_key, is_subscript = lookup(obj=obj, attr=attr)
     if is_subscript:
         obj[attr_or_key] = val
     else:
@@ -45,7 +45,7 @@ def delete(obj, attr) -> None:
     """A delattr that supports deletion of a nested lookups on objects,
     dicts, lists, and any combination in between.
     """
-    obj, attr_or_key, is_subscript = lookup(obj, attr)
+    obj, attr_or_key, is_subscript = lookup(obj=obj, attr=attr)
     if is_subscript:
         del obj[attr_or_key]
     else:

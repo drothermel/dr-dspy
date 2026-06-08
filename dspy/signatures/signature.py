@@ -311,7 +311,7 @@ class Signature(BaseModel, metaclass=SignatureMeta):
             assert NewSig.instructions == "Translate to French."
             ```
         """
-        return make_signature(_field_infos_to_signature_fields(cls.fields), instructions)
+        return make_signature(signature=_field_infos_to_signature_fields(cls.fields), instructions=instructions)
 
     @classmethod
     def with_updated_fields(cls, name: str, type_: type | None = None, **kwargs: Any) -> type["Signature"]:
@@ -337,7 +337,10 @@ class Signature(BaseModel, metaclass=SignatureMeta):
         }
         if type_ is not None:
             fields_copy[name].annotation = type_
-        return make_signature(_field_infos_to_signature_fields(fields_copy), cls.instructions)
+        return make_signature(
+            signature=_field_infos_to_signature_fields(fields_copy),
+            instructions=cls.instructions,
+        )
 
     @classmethod
     def prepend(cls, name, field, type_=None) -> type["Signature"]:
@@ -365,7 +368,7 @@ class Signature(BaseModel, metaclass=SignatureMeta):
             print(list(NewSig.fields.keys()))
             ```
         """
-        return cls.insert(0, name, field, type_)
+        return cls.insert(index=0, name=name, field=field, type_=type_)
 
     @classmethod
     def append(cls, name, field, type_=None) -> type["Signature"]:
@@ -393,7 +396,7 @@ class Signature(BaseModel, metaclass=SignatureMeta):
             print(list(NewSig.fields.keys()))
             ```
         """
-        return cls.insert(-1, name, field, type_)
+        return cls.insert(index=-1, name=name, field=field, type_=type_)
 
     @classmethod
     def delete(cls, name) -> type["Signature"]:
@@ -429,7 +432,10 @@ class Signature(BaseModel, metaclass=SignatureMeta):
 
         fields.pop(name, None)
 
-        return make_signature(_field_infos_to_signature_fields(fields), cls.instructions)
+        return make_signature(
+            signature=_field_infos_to_signature_fields(fields),
+            instructions=cls.instructions,
+        )
 
     @classmethod
     def insert(cls, index: int, name: str, field, type_: type | None = None) -> type["Signature"]:
@@ -490,7 +496,7 @@ class Signature(BaseModel, metaclass=SignatureMeta):
         lst.insert(index, (name, (type_, field)))
 
         new_fields = dict(input_fields + output_fields)
-        return make_signature(cast("Any", new_fields), cls.instructions)
+        return make_signature(signature=cast("Any", new_fields), instructions=cls.instructions)
 
     @classmethod
     def equals(cls, other) -> bool:
@@ -521,7 +527,10 @@ class Signature(BaseModel, metaclass=SignatureMeta):
 
     @classmethod
     def load_state(cls, state) -> type["Signature"]:
-        signature_copy = make_signature(_field_infos_to_signature_fields(deepcopy(cls.fields)), cls.instructions)
+        signature_copy = make_signature(
+            signature=_field_infos_to_signature_fields(deepcopy(cls.fields)),
+            instructions=cls.instructions,
+        )
 
         signature_copy.instructions = state["instructions"]
         for field, saved_field in zip(signature_copy.fields.values(), state["fields"], strict=False):

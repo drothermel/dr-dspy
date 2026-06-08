@@ -282,7 +282,9 @@ def with_callbacks(fn):
             inputs.pop("instance")
         for callback in callbacks:
             try:
-                _get_on_start_handler(callback, instance, fn)(call_id=call_id, instance=instance, inputs=inputs)
+                _get_on_start_handler(callback=callback, instance=instance, fn=fn)(
+                    call_id=call_id, instance=instance, inputs=inputs
+                )
             except Exception as e:
                 logger.warning(f"Error when calling callback {callback}: {e}")
 
@@ -290,7 +292,7 @@ def with_callbacks(fn):
         """Execute all end callbacks for a function call."""
         for callback in callbacks:
             try:
-                _get_on_end_handler(callback, instance, fn)(
+                _get_on_end_handler(callback=callback, instance=instance, fn=fn)(
                     call_id=call_id,
                     outputs=results,
                     exception=exception,
@@ -312,7 +314,14 @@ def with_callbacks(fn):
 
             call_id = uuid.uuid4().hex
 
-            _execute_start_callbacks(instance, fn, call_id, callbacks, args, kwargs)
+            _execute_start_callbacks(
+                instance=instance,
+                fn=fn,
+                call_id=call_id,
+                callbacks=callbacks,
+                args=args,
+                kwargs=kwargs,
+            )
 
             # Active ID must be set right before the function is called, not before calling the callbacks.
             parent_call_id = ACTIVE_CALL_ID.get()
@@ -329,7 +338,14 @@ def with_callbacks(fn):
                 return results
             finally:
                 ACTIVE_CALL_ID.set(parent_call_id)
-                _execute_end_callbacks(instance, fn, call_id, results, exception, callbacks)
+                _execute_end_callbacks(
+                    instance=instance,
+                    fn=fn,
+                    call_id=call_id,
+                    results=results,
+                    exception=exception,
+                    callbacks=callbacks,
+                )
 
         return async_wrapper
 
@@ -341,7 +357,14 @@ def with_callbacks(fn):
 
         call_id = uuid.uuid4().hex
 
-        _execute_start_callbacks(instance, fn, call_id, callbacks, args, kwargs)
+        _execute_start_callbacks(
+            instance=instance,
+            fn=fn,
+            call_id=call_id,
+            callbacks=callbacks,
+            args=args,
+            kwargs=kwargs,
+        )
 
         # Active ID must be set right before the function is called, not before calling the callbacks.
         parent_call_id = ACTIVE_CALL_ID.get()
@@ -358,7 +381,14 @@ def with_callbacks(fn):
             return results
         finally:
             ACTIVE_CALL_ID.set(parent_call_id)
-            _execute_end_callbacks(instance, fn, call_id, results, exception, callbacks)
+            _execute_end_callbacks(
+                instance=instance,
+                fn=fn,
+                call_id=call_id,
+                results=results,
+                exception=exception,
+                callbacks=callbacks,
+            )
 
     return sync_wrapper
 

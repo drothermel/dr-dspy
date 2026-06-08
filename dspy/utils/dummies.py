@@ -132,10 +132,10 @@ class DummyLM(BaseLM):
 
         # Try to use role="assistant" if the adapter supports it (like JSONAdapter)
         try:
-            return adapter.format_field_with_value(fields_with_values, role="assistant")  # ty:ignore[unknown-argument]
+            return adapter.format_field_with_value(fields_with_values=fields_with_values, role="assistant")  # ty:ignore[unknown-argument]
         except TypeError:
             # Fallback for adapters that don't support role parameter (like ChatAdapter)
-            return adapter.format_field_with_value(fields_with_values)
+            return adapter.format_field_with_value(fields_with_values=fields_with_values)
 
     @override
     async def aforward(self, request: LMRequest) -> LMResponse:

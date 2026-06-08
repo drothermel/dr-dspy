@@ -117,7 +117,7 @@ class Cache:
             return None
 
         try:
-            key = self.cache_key(request, ignored_args_for_cache_key)
+            key = self.cache_key(request=request, ignored_args_for_cache_key=ignored_args_for_cache_key)
         except Exception:
             logger.debug("Failed to generate cache key for request: %s", request)
             return None
@@ -168,7 +168,7 @@ class Cache:
             return
 
         try:
-            key = self.cache_key(request, ignored_args_for_cache_key)
+            key = self.cache_key(request=request, ignored_args_for_cache_key=ignored_args_for_cache_key)
         except Exception:
             logger.debug("Failed to generate cache key for request: %s", request)
             return
@@ -252,7 +252,7 @@ def request_cache(
             cache = dspy_clients.DSPY_CACHE
             modified_request = process_request(args, kwargs)
 
-            cached_result = cache.get(modified_request, ignored_args_for_cache_key)
+            cached_result = cache.get(request=modified_request, ignored_args_for_cache_key=ignored_args_for_cache_key)
 
             if cached_result is not None:
                 return cached_result
@@ -260,7 +260,12 @@ def request_cache(
             original_request = copy.deepcopy(modified_request)
             result = fn(*args, **kwargs)
             # `enable_memory_cache` can be provided at call time to avoid indefinite growth.
-            cache.put(original_request, result, ignored_args_for_cache_key, enable_memory_cache)
+            cache.put(
+                request=original_request,
+                value=result,
+                ignored_args_for_cache_key=ignored_args_for_cache_key,
+                enable_memory_cache=enable_memory_cache,
+            )
 
             return result
 
@@ -271,13 +276,18 @@ def request_cache(
             cache = dspy_clients.DSPY_CACHE
             modified_request = process_request(args, kwargs)
 
-            cached_result = cache.get(modified_request, ignored_args_for_cache_key)
+            cached_result = cache.get(request=modified_request, ignored_args_for_cache_key=ignored_args_for_cache_key)
             if cached_result is not None:
                 return cached_result
 
             original_request = copy.deepcopy(modified_request)
             result = await fn(*args, **kwargs)
-            cache.put(original_request, result, ignored_args_for_cache_key, enable_memory_cache)
+            cache.put(
+                request=original_request,
+                value=result,
+                ignored_args_for_cache_key=ignored_args_for_cache_key,
+                enable_memory_cache=enable_memory_cache,
+            )
 
             return result
 

@@ -249,10 +249,13 @@ class DatabricksProvider(Provider):
     @staticmethod
     def upload_data(train_data: list[dict[str, Any]], databricks_unity_catalog_path: str, data_format: TrainDataFormat):
         logger.info("Uploading finetuning data to Databricks Unity Catalog...")
-        file_path = _save_data_to_local_file(train_data, data_format)
+        file_path = _save_data_to_local_file(train_data=train_data, data_format=data_format)
 
         w = _get_workspace_client()
-        _create_directory_in_databricks_unity_catalog(w, databricks_unity_catalog_path)
+        _create_directory_in_databricks_unity_catalog(
+            w=w,
+            databricks_unity_catalog_path=databricks_unity_catalog_path,
+        )
 
         try:
             with open(file_path, "rb") as f:

@@ -50,17 +50,24 @@ class DataLoader(Dataset):
             split_names = cast("list[str]", kwargs["split"])
             return {
                 split_name: _rows_to_examples(
-                    cast("Iterable[Mapping[str, object]]", split_rows),
-                    fields,
-                    input_keys,
+                    rows=cast("Iterable[Mapping[str, object]]", split_rows),
+                    fields=fields,
+                    input_keys=input_keys,
                 )
                 for split_name, split_rows in zip(split_names, dataset, strict=False)
             }
 
         if isinstance(dataset, DatasetDict):
-            return {split_name: _rows_to_examples(rows, fields, input_keys) for split_name, rows in dataset.items()}
+            return {
+                split_name: _rows_to_examples(rows=rows, fields=fields, input_keys=input_keys)
+                for split_name, rows in dataset.items()
+            }
 
-        return _rows_to_examples(cast("Iterable[Mapping[str, object]]", dataset), fields, input_keys)
+        return _rows_to_examples(
+            rows=cast("Iterable[Mapping[str, object]]", dataset),
+            fields=fields,
+            input_keys=input_keys,
+        )
 
     def from_csv(
         self,
@@ -72,7 +79,11 @@ class DataLoader(Dataset):
 
         loaded_dataset: Any = load_dataset("csv", data_files=file_path)
         dataset = loaded_dataset["train"]
-        return _rows_to_examples(cast("Iterable[Mapping[str, object]]", dataset), fields, input_keys)
+        return _rows_to_examples(
+            rows=cast("Iterable[Mapping[str, object]]", dataset),
+            fields=fields,
+            input_keys=input_keys,
+        )
 
     def from_pandas(
         self,
@@ -95,7 +106,11 @@ class DataLoader(Dataset):
 
         loaded_dataset: Any = load_dataset("json", data_files=file_path)
         dataset = loaded_dataset["train"]
-        return _rows_to_examples(cast("Iterable[Mapping[str, object]]", dataset), fields, input_keys)
+        return _rows_to_examples(
+            rows=cast("Iterable[Mapping[str, object]]", dataset),
+            fields=fields,
+            input_keys=input_keys,
+        )
 
     def from_parquet(
         self,
@@ -107,16 +122,20 @@ class DataLoader(Dataset):
 
         loaded_dataset: Any = load_dataset("parquet", data_files=file_path)
         dataset = loaded_dataset["train"]
-        return _rows_to_examples(cast("Iterable[Mapping[str, object]]", dataset), fields, input_keys)
+        return _rows_to_examples(
+            rows=cast("Iterable[Mapping[str, object]]", dataset),
+            fields=fields,
+            input_keys=input_keys,
+        )
 
     def from_rm(self, num_samples: int, fields: list[str], input_keys: list[str]) -> list[Example]:
         try:
             rm = settings.rm
             try:
                 return _rows_to_examples(
-                    cast("Iterable[Mapping[str, object]]", rm.get_objects(num_samples=num_samples, fields=fields)),
-                    fields,
-                    tuple(input_keys),
+                    rows=cast("Iterable[Mapping[str, object]]", rm.get_objects(num_samples=num_samples, fields=fields)),
+                    fields=fields,
+                    input_keys=tuple(input_keys),
                 )
             except AttributeError:
                 raise ValueError(

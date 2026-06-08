@@ -28,9 +28,9 @@ class ColBERTv2:
         simplify: bool = False,
     ) -> list[str] | list[dotdict]:
         if self.post_requests:
-            topk: list[dict[str, Any]] = colbertv2_post_request(self.url, query, k)
+            topk: list[dict[str, Any]] = colbertv2_post_request(url=self.url, query=query, k=k)
         else:
-            topk: list[dict[str, Any]] = colbertv2_get_request(self.url, query, k)
+            topk: list[dict[str, Any]] = colbertv2_get_request(url=self.url, query=query, k=k)
 
         if simplify:
             return [psg["long_text"] for psg in topk]

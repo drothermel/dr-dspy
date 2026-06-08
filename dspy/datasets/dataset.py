@@ -64,10 +64,10 @@ class Dataset:
             if self._train is None:
                 raise ValueError("Train split has not been initialized.")
             self._train_cache = self._shuffle_and_sample(
-                "train",
-                cast("Iterable[dict[str, object]]", self._train),
-                self.train_size,
-                self.train_seed,
+                split="train",
+                data=cast("Iterable[dict[str, object]]", self._train),
+                size=self.train_size,
+                seed=self.train_seed,
             )
 
         return self._train_cache
@@ -78,10 +78,10 @@ class Dataset:
             if self._dev is None:
                 raise ValueError("Dev split has not been initialized.")
             self._dev_cache = self._shuffle_and_sample(
-                "dev",
-                cast("Iterable[dict[str, object]]", self._dev),
-                self.dev_size,
-                self.dev_seed,
+                split="dev",
+                data=cast("Iterable[dict[str, object]]", self._dev),
+                size=self.dev_size,
+                seed=self.dev_seed,
             )
 
         return self._dev_cache
@@ -92,10 +92,10 @@ class Dataset:
             if self._test is None:
                 raise ValueError("Test split has not been initialized.")
             self._test_cache = self._shuffle_and_sample(
-                "test",
-                cast("Iterable[dict[str, object]]", self._test),
-                self.test_size,
-                self.test_seed,
+                split="test",
+                data=cast("Iterable[dict[str, object]]", self._test),
+                size=self.test_size,
+                seed=self.test_seed,
             )
 
         return self._test_cache

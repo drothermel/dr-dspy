@@ -233,7 +233,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
             >>> program.map_named_predictors(lambda p: p)
         """
         for name, predictor in self.named_predictors():
-            set_attribute_by_name(self, name, func(predictor))
+            set_attribute_by_name(obj=self, name=name, value=func(predictor))
         return self
 
     def inspect_history(self, n: int = 1, file: "TextIO | None" = None) -> None:
@@ -250,7 +250,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
                 provided, ANSI color codes are automatically disabled.
                 Defaults to `None` (prints to stdout).
         """
-        pretty_print_history(self.history, n, file=file)
+        pretty_print_history(history=self.history, n=n, file=file)
 
     async def batch(
         self,
@@ -339,4 +339,4 @@ class Module(BaseModule, metaclass=ProgramMeta):
 
 
 def set_attribute_by_name(obj, name, value) -> None:
-    magicattr.set(obj, name, value)
+    magicattr.set(obj=obj, attr=name, val=value)

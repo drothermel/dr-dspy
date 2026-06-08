@@ -75,10 +75,10 @@ class Embeddings:
         q_embeds = self.embedder(queries)
         q_embeds = self._normalize(q_embeds) if self.normalize else q_embeds
 
-        pids = self._faiss_search(q_embeds, self.k * 10) if self.index else None
+        pids = self._faiss_search(query_embeddings=q_embeds, num_candidates=self.k * 10) if self.index else None
         pids = np.tile(np.arange(len(self.corpus)), (len(queries), 1)) if pids is None else pids
 
-        return self._rerank_and_predict(q_embeds, pids)
+        return self._rerank_and_predict(q_embeds=q_embeds, candidate_indices=pids)
 
     def _build_faiss(self) -> FaissIndex:
         nbytes = 32
@@ -238,7 +238,7 @@ class Embeddings:
         """
         instance = cls.__new__(cls)
         instance.search_fn = Unbatchify(instance._batch_forward)
-        instance.load(path, embedder)
+        instance.load(path=path, embedder=embedder)
         return instance
 
 

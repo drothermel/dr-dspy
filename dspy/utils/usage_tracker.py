@@ -44,7 +44,7 @@ class UsageTracker:
         for k, v in usage_entry1.items():
             current_v = result.get(k)
             if isinstance(v, dict) or isinstance(current_v, dict):
-                result[k] = self._merge_usage_entries(current_v, v)
+                result[k] = self._merge_usage_entries(usage_entry1=current_v, usage_entry2=v)
             elif current_v is not None or v is not None:
                 result[k] = (current_v or 0) + (v or 0)
         return result
@@ -60,7 +60,7 @@ class UsageTracker:
         for lm, usage_entries in self.usage_data.items():
             total_usage = {}
             for usage_entry in usage_entries:
-                total_usage = self._merge_usage_entries(total_usage, usage_entry)
+                total_usage = self._merge_usage_entries(usage_entry1=total_usage, usage_entry2=usage_entry)
             total_usage_by_lm[lm] = total_usage
         return total_usage_by_lm
 

@@ -140,14 +140,21 @@ class Embedder:
             numpy.ndarray: If the input is a single string, returns a 1D numpy array representing the embedding.
             If the input is a list of strings, returns a 2D numpy array of embeddings, one embedding per row.
         """
-        input_batches, caching, kwargs, is_single_input = self._preprocess(inputs, batch_size, caching, **kwargs)
+        input_batches, caching, kwargs, is_single_input = self._preprocess(
+            inputs=inputs,
+            batch_size=batch_size,
+            caching=caching,
+            **kwargs,
+        )
 
         embeddings_list = []
         acompute_embeddings = _cached_acompute_embeddings if caching else _acompute_embeddings
 
         for batch in input_batches:
-            embeddings_list.extend(await acompute_embeddings(self.model, batch, caching=caching, **kwargs))
-        return self._postprocess(embeddings_list, is_single_input)
+            embeddings_list.extend(
+                await acompute_embeddings(model=self.model, batch_inputs=batch, caching=caching, **kwargs)
+            )
+        return self._postprocess(embeddings_list=embeddings_list, is_single_input=is_single_input)
 
     async def acall(self, inputs, batch_size=None, caching=None, **kwargs):
         return await self.__call__(inputs, batch_size=batch_size, caching=caching, **kwargs)
@@ -167,7 +174,7 @@ def _compute_embeddings(model, batch_inputs, caching=False, **kwargs):
 
 @request_cache(ignored_args_for_cache_key=["api_key", "api_base", "base_url"])
 def _cached_compute_embeddings(model, batch_inputs, caching=True, **kwargs):
-    return _compute_embeddings(model, batch_inputs, caching=caching, **kwargs)
+    return _compute_embeddings(model=model, batch_inputs=batch_inputs, caching=caching, **kwargs)
 
 
 async def _acompute_embeddings(model, batch_inputs, caching=False, **kwargs):
@@ -184,4 +191,4 @@ async def _acompute_embeddings(model, batch_inputs, caching=False, **kwargs):
 
 @request_cache(ignored_args_for_cache_key=["api_key", "api_base", "base_url"])
 async def _cached_acompute_embeddings(model, batch_inputs, caching=True, **kwargs):
-    return await _acompute_embeddings(model, batch_inputs, caching=caching, **kwargs)
+    return await _acompute_embeddings(model=model, batch_inputs=batch_inputs, caching=caching, **kwargs)

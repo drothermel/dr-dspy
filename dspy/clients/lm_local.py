@@ -155,7 +155,7 @@ class LocalProvider(Provider):
 
         data_path = save_data(train_data)
         logger.info(f"Train data saved to {data_path}")
-        output_dir = create_output_dir(model, data_path)
+        output_dir = create_output_dir(model_name=model, data_path=data_path)
 
         default_train_kwargs = {
             "device": None,
@@ -230,7 +230,11 @@ def train_sft_locally(model_name, train_data, train_kwargs):
     hf_dataset = Dataset.from_list(train_data)
 
     def tokenize_function(example):
-        return encode_sft_example(example, tokenizer, train_kwargs["max_seq_length"])  # noqa: F821
+        return encode_sft_example(
+            example=example,
+            tokenizer=tokenizer,  # noqa: F821
+            max_seq_length=train_kwargs["max_seq_length"],
+        )
 
     tokenized_dataset = hf_dataset.map(tokenize_function, batched=False)
     tokenized_dataset.set_format(type="torch")

@@ -89,7 +89,7 @@ class BaseLM:
                 f"{type(self).__name__}.aforward(request) must return dspy.core.types.LMResponse, "
                 f"but got {type(response).__name__}."
             )
-        return self._finalize_lm_response(request, response)
+        return self._finalize_lm_response(request=request, response=response)
 
     async def acall(self, request: LMRequest) -> LMResponse:
         """Compatibility alias for ``__call__``; prefer ``await lm(request)``."""
@@ -115,7 +115,7 @@ class BaseLM:
         if not getattr(response, "cache_hit", False) and settings.usage_tracker:
             usage = response.usage_as_dict()
             if usage:
-                settings.usage_tracker.add_usage(self.model, usage)
+                settings.usage_tracker.add_usage(lm=self.model, usage_entry=usage)
 
         if not settings.disable_history:
             entry = LMHistoryEntry(
@@ -189,7 +189,7 @@ class BaseLM:
         return new_instance
 
     def inspect_history(self, n: int = 1, file: "TextIO | None" = None) -> None:
-        pretty_print_history(self.history, n, file=file)
+        pretty_print_history(history=self.history, n=n, file=file)
 
     def update_history(self, entry: LMHistoryEntry) -> None:
         if settings.disable_history:
@@ -215,4 +215,4 @@ class BaseLM:
 
 def inspect_history(n: int = 1, file: "TextIO | None" = None) -> None:
     """Print the global history shared across all LMs."""
-    pretty_print_history(GLOBAL_HISTORY, n, file=file)
+    pretty_print_history(history=GLOBAL_HISTORY, n=n, file=file)

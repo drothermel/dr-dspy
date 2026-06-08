@@ -253,7 +253,11 @@ class PythonInterpreter:
             # permission check matches the canonical entries in --allow-read.
             virtual_path = f"/sandbox/{path_obj.name}"
             host_path = _canonicalize_path(path)
-            self._send_request("mount_file", {"host_path": host_path, "virtual_path": virtual_path}, f"mounting {path}")
+            self._send_request(
+                method="mount_file",
+                params={"host_path": host_path, "virtual_path": virtual_path},
+                context=f"mounting {path}",
+            )
         self._mounted_files = True
 
     def _sync_files(self) -> None:
@@ -304,7 +308,7 @@ class PythonInterpreter:
             self._tools_registered = True
             return
 
-        self._send_request("register", params, "registering tools/outputs")
+        self._send_request(method="register", params=params, context="registering tools/outputs")
         self._tools_registered = True
 
     def _handle_tool_call(self, request: dict) -> None:
@@ -322,16 +326,21 @@ class PythonInterpreter:
                 result = _await_in_sync(result)
             is_json = isinstance(result, (list, dict))
             response = _jsonrpc_result(
-                {
+                result={
                     "value": json.dumps(result) if is_json else (str(result) if result is not None else ""),
                     "type": "json" if is_json else "string",
                 },
-                request_id,
+                id=request_id,
             )
         except Exception as e:
             error_type = type(e).__name__
             error_code = JSONRPC_APP_ERRORS.get(error_type, JSONRPC_APP_ERRORS["Unknown"])
-            response = _jsonrpc_error(error_code, str(e), request_id, {"type": error_type})
+            response = _jsonrpc_error(
+                code=error_code,
+                message=str(e),
+                id=request_id,
+                data={"type": error_type},
+            )
 
         stdin = self._deno_stdin()
         stdin.write(response + "\n")
@@ -418,7 +427,7 @@ class PythonInterpreter:
         """
         self._request_id += 1
         request_id = self._request_id
-        msg = _jsonrpc_request(method, params, request_id)
+        msg = _jsonrpc_request(method=method, params=params, id=request_id)
         stdin = self._deno_stdin()
         stdin.write(msg + "\n")
         stdin.flush()
@@ -426,7 +435,7 @@ class PythonInterpreter:
         skipped = 0
         while skipped <= self._MAX_SKIP_LINES:
             response_line = self._read_response_line(context)
-            response = self._parse_response_line(response_line, context)
+            response = self._parse_response_line(response_line=response_line, context=context)
             if response is None:
                 skipped += 1
                 continue
@@ -443,7 +452,11 @@ class PythonInterpreter:
 
     def _health_check(self) -> None:
         """Verify the subprocess is alive by executing a simple expression."""
-        response = self._send_request("execute", {"code": "print(1+1)"}, "during health check")
+        response = self._send_request(
+            method="execute",
+            params={"code": "print(1+1)"},
+            context="during health check",
+        )
         if response.get("result", {}).get("output", "").strip() != "2":
             raise CodeInterpreterError(f"Unexpected ping response: {response}")
 
@@ -522,7 +535,11 @@ class PythonInterpreter:
 
     def _inject_large_var(self, name: str, value: str) -> None:
         """Inject a large variable via the virtual filesystem."""
-        self._send_request("inject_var", {"name": name, "value": value}, f"injecting variable '{name}'")
+        self._send_request(
+            method="inject_var",
+            params={"name": name, "value": value},
+            context=f"injecting variable '{name}'",
+        )
 
     def execute(
         self,
@@ -531,18 +548,18 @@ class PythonInterpreter:
     ) -> Any:
         self._check_thread_ownership()
         variables = variables or {}
-        code = self._inject_variables(code, variables)
+        code = self._inject_variables(code=code, variables=variables)
         self._ensure_deno_process()
         self._mount_files()
         self._register_tools()
 
         for name, value in self._pending_large_vars.items():
-            self._inject_large_var(name, value)
+            self._inject_large_var(name=name, value=value)
 
         # Send the code as JSON-RPC request
         self._request_id += 1
         execute_request_id = self._request_id
-        input_data = _jsonrpc_request("execute", {"code": code}, execute_request_id)
+        input_data = _jsonrpc_request(method="execute", params={"code": code}, id=execute_request_id)
         stdin = self._deno_stdin()
         try:
             stdin.write(input_data + "\n")
@@ -553,7 +570,7 @@ class PythonInterpreter:
             self._mount_files()
             self._register_tools()
             for name, value in self._pending_large_vars.items():
-                self._inject_large_var(name, value)
+                self._inject_large_var(name=name, value=value)
             stdin = self._deno_stdin()
             stdin.write(input_data + "\n")
             stdin.flush()
@@ -563,7 +580,7 @@ class PythonInterpreter:
         skipped = 0
         while skipped <= self._MAX_SKIP_LINES:
             output_line = self._read_response_line("during execution")
-            msg = self._parse_response_line(output_line, "during execution")
+            msg = self._parse_response_line(response_line=output_line, context="during execution")
             if msg is None:
                 skipped += 1
                 continue
@@ -631,7 +648,7 @@ class PythonInterpreter:
         code: str,
         variables: dict[str, Any] | None = None,
     ) -> Any:
-        return self.execute(code, variables)
+        return self.execute(code=code, variables=variables)
 
     def shutdown(self) -> None:
         if self.deno_process and self.deno_process.poll() is None:

@@ -43,17 +43,17 @@ class BaseModule:
             if isinstance(item, BaseModule):
                 if name == "self" or not getattr(item, "_compiled", False):
                     for sub_name, sub_item in item.__dict__.items():
-                        enqueue(f"{name}.{sub_name}", sub_item)
+                        enqueue(name=f"{name}.{sub_name}", item=sub_item)
                 continue
 
             if isinstance(item, (list, tuple)):
                 for idx, sub_item in enumerate(item):
-                    enqueue(f"{name}[{idx}]", sub_item)
+                    enqueue(name=f"{name}[{idx}]", item=sub_item)
                 continue
 
             if isinstance(item, dict):
                 for key, sub_item in item.items():
-                    enqueue(f"{name}[{key}]", sub_item)
+                    enqueue(name=f"{name}[{key}]", item=sub_item)
 
         return named_parameters
 
@@ -85,15 +85,15 @@ class BaseModule:
                 if skip_compiled and getattr(item, "_compiled", False):
                     continue
                 for sub_name, sub_item in item.__dict__.items():
-                    add_to_queue(f"{name}.{sub_name}", sub_item)
+                    add_to_queue(name=f"{name}.{sub_name}", item=sub_item)
 
             elif isinstance(item, (list, tuple)):
                 for i, sub_item in enumerate(item):
-                    add_to_queue(f"{name}[{i}]", sub_item)
+                    add_to_queue(name=f"{name}[{i}]", item=sub_item)
 
             elif isinstance(item, dict):
                 for key, sub_item in item.items():
-                    add_to_queue(f"{name}[{key}]", sub_item)
+                    add_to_queue(name=f"{name}[{key}]", item=sub_item)
 
     def parameters(self):
         return [param for _, param in self.named_parameters()]
