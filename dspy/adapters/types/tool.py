@@ -4,18 +4,28 @@ from typing import TYPE_CHECKING, Any, Callable, get_origin, get_type_hints
 
 import json_repair
 import pydantic
-from jsonschema import ValidationError, validate
 from pydantic import BaseModel, TypeAdapter, create_model
 
 from dspy.adapters.types.base_type import Type
 from dspy.dsp.utils.settings import settings
 from dspy.utils.callback import with_callbacks
+from dspy.utils.lazy_import import require
 
 if TYPE_CHECKING:
     import mcp
     from langchain.tools import BaseTool
 
 _TYPE_MAPPING = {"string": str, "integer": int, "number": float, "boolean": bool, "array": list, "object": dict}
+jsonschema = require("jsonschema", extra="tools", feature="dspy.Tool argument validation")
+
+
+def _validate_json_schema(instance: Any, schema: dict[str, Any], arg_name: str) -> None:
+    validation_error_cls = jsonschema.ValidationError
+    validate = jsonschema.validate
+    try:
+        validate(instance=instance, schema=schema)
+    except validation_error_cls as e:
+        raise ValueError(f"Arg {arg_name} is invalid: {e.message}")
 
 
 class Tool(Type):
@@ -125,13 +135,10 @@ class Tool(Type):
                     continue
                 else:
                     raise ValueError(f"Arg {k} is not in the tool's args.")
-            try:
-                instance = v.model_dump() if hasattr(v, "model_dump") else v
-                type_str = self.args[k].get("type")
-                if type_str is not None and type_str != "Any":
-                    validate(instance=instance, schema=self.args[k])
-            except ValidationError as e:
-                raise ValueError(f"Arg {k} is invalid: {e.message}")
+            instance = v.model_dump() if hasattr(v, "model_dump") else v
+            type_str = self.args[k].get("type")
+            if type_str is not None and type_str != "Any":
+                _validate_json_schema(instance=instance, schema=self.args[k], arg_name=k)
 
         # Parse the args to the correct type.
         parsed_kwargs = {}
@@ -509,7 +516,7 @@ def _resolve_json_schema_reference(schema: dict) -> dict:
         return schema
 
     def resolve_refs(obj: Any) -> Any:
-        if not isinstance(obj, (dict, list)):
+        if not isinstance(obj, dict | list):
             return obj
         if isinstance(obj, dict):
             if "$ref" in obj:

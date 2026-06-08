@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from importlib.util import find_spec
 from typing import Any
 
-import requests
-
 import dspy
 from dspy.primitives.prediction import Prediction
 
@@ -423,6 +421,8 @@ class DatabricksRM(dspy.Retrieve):
         Returns:
             dict[str, Any]: Parsed JSON response from the Databricks Vector Search Index query.
         """
+        import requests
+
         if (query_text, query_vector).count(None) != 1:
             raise ValueError("Exactly one of query_text or query_vector must be specified.")
 

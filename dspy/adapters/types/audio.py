@@ -5,7 +5,6 @@ import os
 from typing import Any, Union
 
 import pydantic
-import requests
 
 from dspy.adapters.types.base_type import Type
 
@@ -60,6 +59,8 @@ class Audio(Type):
         """
         Download an audio file from URL and encode it as base64.
         """
+        import requests
+
         response = requests.get(url)
         response.raise_for_status()
         mime_type = response.headers.get("Content-Type", "audio/wav")
@@ -125,7 +126,7 @@ class Audio(Type):
 def encode_audio(audio: Union[str, bytes, dict, "Audio", Any], sampling_rate: int = 16000, format: str = "wav") -> dict:
     """
     Encode audio to a dict with 'data' and 'audio_format'.
-    
+
     Accepts: local file path, URL, data URI, dict, Audio instance, numpy array, or bytes (with known format).
     """
     if isinstance(audio, dict) and "data" in audio and "audio_format" in audio:

@@ -1,7 +1,5 @@
 from typing import Any
 
-import requests
-
 from dspy.clients.cache import request_cache
 from dspy.dsp.utils import dotdict
 
@@ -39,6 +37,8 @@ class ColBERTv2:
 
 @request_cache()
 def colbertv2_get_request_v2(url: str, query: str, k: int):
+    import requests
+
     assert k <= 100, "Only k <= 100 is supported for the hosted ColBERTv2 server at the moment."
 
     payload = {"query": query, "k": k}
@@ -67,6 +67,8 @@ colbertv2_get_request = colbertv2_get_request_v2_wrapped
 
 @request_cache()
 def colbertv2_post_request_v2(url: str, query: str, k: int):
+    import requests
+
     headers = {"Content-Type": "application/json; charset=utf-8"}
     payload = {"query": query, "k": k}
     res = requests.post(url, json=payload, headers=headers, timeout=10)

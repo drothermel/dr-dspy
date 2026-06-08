@@ -5,7 +5,6 @@ import time
 from typing import TYPE_CHECKING, Any
 
 import orjson
-import requests
 
 from dspy.clients.provider import Provider, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat, get_finetune_directory
@@ -55,6 +54,8 @@ class DatabricksProvider(Provider):
         databricks_token: str | None = None,
         deploy_timeout: int = 900,
     ):
+        import requests
+
         workspace_client = _get_workspace_client()
         model_version = next(workspace_client.model_versions.list(model)).version
 

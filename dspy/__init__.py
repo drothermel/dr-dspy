@@ -62,3 +62,13 @@ context = settings.context
 BootstrapRS = BootstrapFewShotWithRandomSearch
 
 cache = DSPY_CACHE
+
+
+def __getattr__(name: str) -> object:
+    if name != "GEPA":
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    from dspy.teleprompt import GEPA as _GEPA
+
+    globals()["GEPA"] = _GEPA
+    return _GEPA

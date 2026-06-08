@@ -768,7 +768,6 @@ dependencies = [
     { name = "cachetools" },
     { name = "cloudpickle" },
     { name = "diskcache" },
-    { name = "gepa" },
     { name = "json-repair" },
     { name = "litellm", version = "1.68.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
     { name = "litellm", version = "1.72.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14' or sys_platform == 'win32'" },
@@ -800,6 +799,9 @@ dev = [
     { name = "pytest-mock" },
     { name = "ruff" },
 ]
+gepa = [
+    { name = "gepa" },
+]
 langchain = [
     { name = "langchain-core" },
 ]
@@ -818,6 +820,9 @@ numpy = [
 optuna = [
     { name = "optuna" },
 ]
+streaming = [
+    { name = "jiter" },
+]
 test-extras = [
     { name = "datasets" },
     { name = "langchain-core" },
@@ -827,6 +832,9 @@ test-extras = [
     { name = "numpy", version = "2.3.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "optuna" },
     { name = "pandas" },
+]
+tools = [
+    { name = "jsonschema" },
 ]
 weaviate = [
     { name = "weaviate-client" },
@@ -842,8 +850,10 @@ requires-dist = [
     { name = "datamodel-code-generator", marker = "extra == 'dev'", specifier = ">=0.26.3" },
     { name = "datasets", marker = "extra == 'test-extras'", specifier = ">=2.14.6" },
     { name = "diskcache", specifier = ">=5.6.0" },
-    { name = "gepa", extras = ["dspy"], specifier = "==0.1.1" },
+    { name = "gepa", extras = ["dspy"], marker = "extra == 'gepa'", specifier = "==0.1.1" },
+    { name = "jiter", marker = "extra == 'streaming'", specifier = ">=0.10.0" },
     { name = "json-repair", specifier = ">=0.54.2" },
+    { name = "jsonschema", marker = "extra == 'tools'", specifier = ">=4.24.0" },
     { name = "langchain-core", marker = "extra == 'langchain'" },
     { name = "langchain-core", marker = "extra == 'test-extras'" },
     { name = "litellm", specifier = ">=1.64.0" },
@@ -873,7 +883,7 @@ requires-dist = [
     { name = "tqdm", specifier = ">=4.66.1" },
     { name = "weaviate-client", marker = "extra == 'weaviate'", specifier = ">=4.5.4,<4.22.0" },
 ]
-provides-extras = ["anthropic", "weaviate", "mcp", "langchain", "optuna", "numpy", "litellm", "dev", "test-extras"]
+provides-extras = ["anthropic", "gepa", "weaviate", "mcp", "langchain", "optuna", "numpy", "litellm", "streaming", "tools", "dev", "test-extras"]
 
 [[package]]
 name = "email-validator"

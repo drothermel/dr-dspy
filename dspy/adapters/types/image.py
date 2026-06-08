@@ -8,7 +8,6 @@ from typing import Any, Union
 from urllib.parse import urlparse
 
 import pydantic
-import requests
 
 from dspy.adapters.types.base_type import Type
 
@@ -192,11 +191,13 @@ def _encode_image_from_file(file_path: str) -> str:
 
 def _encode_image_from_url(image_url: str, verify: bool = True) -> str:
     """Encode a file from a URL to a base64 data URI.
-    
+
     Args:
         image_url: The URL of the image to download.
         verify: Whether to verify SSL certificates. Set to False for self-signed certs.
     """
+    import requests
+
     response = requests.get(image_url, verify=verify)
     response.raise_for_status()
     content_type = response.headers.get("Content-Type", "")

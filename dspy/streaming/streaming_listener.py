@@ -6,14 +6,13 @@ from collections import defaultdict
 from queue import Queue
 from typing import TYPE_CHECKING, Any
 
-import jiter
-
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types import Type
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.dsp.utils.settings import settings
 from dspy.streaming.messages import StreamResponse
+from dspy.utils.lazy_import import require
 
 if TYPE_CHECKING:
     from litellm import ModelResponseStream
@@ -21,6 +20,7 @@ if TYPE_CHECKING:
     from dspy.primitives.module import Module
 
 ADAPTER_SUPPORT_STREAMING = [ChatAdapter, XMLAdapter, JSONAdapter]
+jiter = require("jiter", extra="streaming", feature="JSONAdapter streaming")
 
 
 class StreamListener:

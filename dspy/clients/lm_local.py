@@ -8,8 +8,6 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any
 
-import requests
-
 from dspy.clients.provider import Provider, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat, save_data
 
@@ -340,6 +338,8 @@ def wait_for_server(base_url: str, timeout: int | None = None) -> None:
         base_url: The base URL of the server (e.g. http://localhost:1234)
         timeout: Maximum time to wait in seconds. None means wait forever.
     """
+    import requests
+
     start_time = time.time()
     while True:
         try:

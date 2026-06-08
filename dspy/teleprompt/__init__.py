@@ -14,8 +14,6 @@ from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.teleprompt_optuna import BootstrapFewShotWithOptuna
 from dspy.teleprompt.vanilla import LabeledFewShot
 
-from .gepa.gepa import GEPA
-
 __all__ = [
     "AvatarOptimizer",
     "BetterTogether",
@@ -23,7 +21,6 @@ __all__ = [
     "BootstrapFinetune",
     "COPRO",
     "Ensemble",
-    "GEPA",
     "KNNFewShot",
     "MIPROv2",
     "BootstrapFewShotWithRandomSearch",
@@ -33,3 +30,13 @@ __all__ = [
     "SIMBA",
     "bootstrap_trace_data",
 ]
+
+
+def __getattr__(name: str) -> object:
+    if name != "GEPA":
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    from dspy.teleprompt.gepa import GEPA as _GEPA
+
+    globals()["GEPA"] = _GEPA
+    return _GEPA

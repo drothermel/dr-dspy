@@ -43,6 +43,7 @@ _INSTALL_HINTS: dict[str, str] = {
     "langchain_core": "langchain",
     "weaviate": "weaviate",
     "anthropic": "anthropic",
+    "gepa": "gepa",
     "numpy": "numpy",
     "litellm": "litellm",
 }
