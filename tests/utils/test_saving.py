@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from unittest.mock import patch
 
@@ -83,7 +84,7 @@ def test_save_compiled_model(tmp_path):
         return True
 
     optimizer = BootstrapFewShot(max_bootstrapped_demos=4, max_labeled_demos=4, max_rounds=5, metric=dummy_metric)
-    compiled_predict = optimizer.compile(predict, trainset=trainset)
+    compiled_predict = asyncio.run(optimizer.compile(predict, trainset=trainset))
     compiled_predict.save(tmp_path, save_program=True)
 
     loaded_predict = load(tmp_path, allow_pickle=True)

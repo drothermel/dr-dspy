@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import os
 import tempfile
@@ -185,7 +186,7 @@ def test_file_in_signature(sample_text_file):
     predictor, lm = setup_predictor(signature, expected)
 
     file_obj = File.from_path(sample_text_file)
-    result = predictor(document=file_obj)
+    result = asyncio.run(predictor(document=file_obj))
 
     assert result.summary == "This is a summary"
     assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 1
@@ -203,7 +204,7 @@ def test_file_list_in_signature(sample_text_file):
         File.from_path(sample_text_file),
         File.from_file_id("file-123"),
     ]
-    result = predictor(documents=files)
+    result = asyncio.run(predictor(documents=files))
 
     assert result.summary == "Multiple files"
     assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 2
@@ -215,7 +216,7 @@ def test_optional_file_field():
         output: str = OutputField()
 
     predictor, lm = setup_predictor(OptionalFileSignature, {"output": "Hello"})
-    result = predictor(document=None)
+    result = asyncio.run(predictor(document=None))
     assert result.output == "Hello"
     assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 0
 
@@ -227,14 +228,14 @@ def test_save_load_file_signature(sample_text_file):
 
     predictor, lm = setup_predictor(signature, {"summary": "A summary"})
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = optimizer.compile(student=predictor, trainset=examples, sample=False)
+    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
 
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(signature)
         loaded_predictor.load(temp_file.name)
 
-    loaded_predictor(document=File.from_file_id("file-test"))
+    asyncio.run(loaded_predictor(document=File.from_file_id("file-test")))
     assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 2
 
 

@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import os
 import tempfile
@@ -123,7 +124,7 @@ def test_basic_image_operations(test_case):
         k: Image(v) if isinstance(v, str) and k in ["image", "ui_image"] else v for k, v in test_case["inputs"].items()
     }
 
-    result = predictor(**inputs)
+    result = asyncio.run(predictor(**inputs))
 
     # Check result based on output field name
     output_field = next(f for f in ["probabilities", "generated_code", "bboxes", "captions"] if hasattr(result, f))
@@ -160,7 +161,7 @@ def test_image_input_formats(
     if image_input in ["pil_image", "encoded_pil_image"]:
         pytest.xfail(f"{description} not fully supported without Image coercion")  # ty:ignore[too-many-positional-arguments]
 
-    result = predictor(image=actual_input, class_labels=["dog", "cat", "bird"])
+    result = asyncio.run(predictor(image=actual_input, class_labels=["dog", "cat", "bird"]))
     assert result.probabilities == expected["probabilities"]
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
 
@@ -175,14 +176,14 @@ def test_predictor_save_load(sample_url, sample_pil_image):
 
     predictor, lm = setup_predictor(signature, {"caption": "A golden retriever"})
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = optimizer.compile(student=predictor, trainset=examples, sample=False)
+    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
 
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(signature)
         loaded_predictor.load(temp_file.name)
 
-    loaded_predictor(image=Image("https://example.com/dog.jpg"))
+    asyncio.run(loaded_predictor(image=Image("https://example.com/dog.jpg")))
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 2
     assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
 
@@ -205,14 +206,14 @@ def test_save_load_complex_default_types():
 
     predictor, lm = setup_predictor(ComplexTypeSignature, {"caption": "A list of images"})
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = optimizer.compile(student=predictor, trainset=examples, sample=False)
+    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
 
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(ComplexTypeSignature)
         loaded_predictor.load(temp_file.name)
 
-    result = loaded_predictor(**examples[0].inputs())
+    result = asyncio.run(loaded_predictor(**examples[0].inputs()))
     assert result.caption == "A list of images"
     assert str(lm.history[-1].messages_as_openai).count("'url'") == 4
     assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
@@ -270,7 +271,7 @@ def test_save_load_complex_types(test_case):
 
     predictor, lm = setup_predictor(signature_cls, test_case["expected"])
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = optimizer.compile(student=predictor, trainset=examples, sample=False)
+    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
 
     # Test save and load
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
@@ -279,7 +280,7 @@ def test_save_load_complex_types(test_case):
         loaded_predictor.load(temp_file.name)
 
     # Run prediction
-    result = loaded_predictor(**processed_input)
+    result = asyncio.run(loaded_predictor(**processed_input))
 
     # Verify output matches expected
     for key, value in test_case["expected"].items():
@@ -314,7 +315,7 @@ def test_save_load_pydantic_model():
 
     predictor, lm = setup_predictor(PydanticSignature, {"output": "Multiple photos"})
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = optimizer.compile(student=predictor, trainset=examples, sample=False)
+    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
 
     # Test save and load
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
@@ -323,7 +324,7 @@ def test_save_load_pydantic_model():
         loaded_predictor.load(temp_file.name)
 
     # Run prediction
-    result = loaded_predictor(model_input=model_input)
+    result = asyncio.run(loaded_predictor(model_input=model_input))
 
     # Verify output matches expected
     assert result.output == "Multiple photos"
@@ -339,7 +340,7 @@ def test_optional_image_field():
         output: str = OutputField()
 
     predictor, lm = setup_predictor(OptionalImageSignature, {"output": "Hello"})
-    result = predictor(image=None)
+    result = asyncio.run(predictor(image=None))
     assert result.output == "Hello"
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 0
 
@@ -361,7 +362,7 @@ def test_pdf_url_support():
         summary: str = OutputField(desc="A summary of the PDF")
 
     predictor, lm = setup_predictor(PDFSignature, {"summary": "This is a dummy PDF"})
-    result = predictor(document=pdf_image)
+    result = asyncio.run(predictor(document=pdf_image))
 
     assert result.summary == "This is a dummy PDF"
     assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
@@ -439,7 +440,7 @@ def test_pdf_from_file():
             summary: str = OutputField(desc="A summary of the PDF")
 
         predictor, lm = setup_predictor(FilePDFSignature, {"summary": "This is a PDF from file"})
-        result = predictor(document=pdf_image)
+        result = asyncio.run(predictor(document=pdf_image))
 
         assert result.summary == "This is a PDF from file"
         assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1

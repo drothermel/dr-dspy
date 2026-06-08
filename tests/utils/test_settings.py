@@ -2,6 +2,7 @@ import asyncio
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from unittest import mock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -77,12 +78,14 @@ def test_dspy_context_with_dspy_parallel():
                 assert settings.lm.model == lm.model
                 return await self.predict(question=question)
 
-    with mock.patch("litellm.completion") as mock_completion:
-        mock_completion.return_value = ModelResponse(
+    with mock.patch(
+        "dspy.clients.lm.alitellm_completion",
+        new_callable=AsyncMock,
+        return_value=ModelResponse(
             choices=[Choices(message=Message(content="[[ ## answer ## ]]\nParis"))],
             model="openai/gpt-4o-mini",
-        )
-
+        ),
+    ) as mock_completion:
         module = MyModule()
         parallelizer = Parallel()
         input_pairs = [
@@ -94,12 +97,13 @@ def test_dspy_context_with_dspy_parallel():
         # Verify mock was called correctly
         assert mock_completion.call_count == 2
         for call_args in mock_completion.call_args_list:
-            if "France" in call_args.kwargs["messages"][-1]["content"]:
+            request = call_args.kwargs["request"]
+            if "France" in request["messages"][-1]["content"]:
                 # France question uses gpt-4o-mini
-                assert call_args.kwargs["model"] == "openai/gpt-4o-mini"
+                assert request["model"] == "openai/gpt-4o-mini"
             else:
                 # Germany question uses gpt-4o
-                assert call_args.kwargs["model"] == "openai/gpt-4o"
+                assert request["model"] == "openai/gpt-4o"
 
         # The main thread is not affected by the context
         assert settings.lm.model == "openai/gpt-4o"

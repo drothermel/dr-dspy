@@ -1,3 +1,4 @@
+import asyncio
 import pickle
 from types import UnionType
 from typing import Any, Union, get_args, get_origin
@@ -198,7 +199,7 @@ def test_multiline_instructions():
         output = OutputField()
 
     predictor = Predict(MySignature)
-    assert predictor().output == "short answer"
+    assert asyncio.run(predictor()).output == "short answer"
 
 
 def test_dump_and_load_state():
@@ -405,7 +406,7 @@ def test_basic_custom_type():
     settings.configure(lm=lm)
 
     custom_obj = CustomType(value="test")
-    pred = Predict(test_signature)(input=custom_obj)  # ty:ignore[invalid-argument-type]
+    pred = asyncio.run(Predict(test_signature)(input=custom_obj))  # ty:ignore[invalid-argument-type]
     assert pred.output == "processed"
 
 
@@ -419,7 +420,7 @@ def test_custom_type_from_different_module():
     settings.configure(lm=lm)
 
     path_obj = Path("/test/path")
-    pred = Predict(test_signature)(input=path_obj)  # ty:ignore[invalid-argument-type]
+    pred = asyncio.run(Predict(test_signature)(input=path_obj))  # ty:ignore[invalid-argument-type]
     assert pred.output == "/test/path"
 
 
@@ -536,7 +537,7 @@ def test_pep604_union_type_with_custom_types():
     settings.configure(lm=lm)
 
     custom_obj = CustomType(value="test")
-    pred = Predict(sig)(input=custom_obj)  # ty:ignore[invalid-argument-type]
+    pred = asyncio.run(Predict(sig)(input=custom_obj))  # ty:ignore[invalid-argument-type]
     assert pred.output == "processed"
 
 

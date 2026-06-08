@@ -132,7 +132,7 @@ def test_save_and_load_with_pkl(tmp_path):
         return True
 
     optimizer = BootstrapFewShot(max_bootstrapped_demos=4, max_labeled_demos=4, max_rounds=5, metric=dummy_metric)
-    compiled_cot = optimizer.compile(cot, trainset=trainset)
+    compiled_cot = asyncio.run(optimizer.compile(cot, trainset=trainset))
     compiled_cot.predict.signature = compiled_cot.predict.signature.with_instructions("You are a helpful assistant.")
 
     save_path = tmp_path / "program.pkl"
@@ -319,11 +319,10 @@ def test_usage_tracker_in_parallel():
             self.predict1 = ChainOfThought("question -> answer")
             self.predict2 = ChainOfThought("question, answer -> score")
 
-        @override
-        def __call__(self, question: str) -> Prediction:
+        async def aforward(self, question: str) -> Prediction:
             with settings.context(lm=self.lm):
-                answer = self.predict1(question=question)
-                return self.predict2(question=question, answer=answer)
+                answer = await self.predict1(question=question)
+                return await self.predict2(question=question, answer=answer)
 
     settings.configure(track_usage=True)
     program1 = MyProgram(lm=LM("openai/gpt-4o-mini", cache=False))
@@ -331,11 +330,13 @@ def test_usage_tracker_in_parallel():
 
     parallelizer = Parallel()
 
-    results = parallelizer(
-        [
-            (program1, {"question": "What is the meaning of life?"}),
-            (program2, {"question": "why did a chicken cross the kitchen?"}),
-        ]
+    results = asyncio.run(
+        parallelizer(
+            [
+                (program1, {"question": "What is the meaning of life?"}),
+                (program2, {"question": "why did a chicken cross the kitchen?"}),
+            ]
+        )
     )
 
     assert results[0].get_lm_usage() is not None
