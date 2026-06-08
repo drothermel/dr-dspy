@@ -203,8 +203,6 @@ class Settings:
             [`dspy.LM`][dspy.LM]: create the language model you pass as `lm`.
             `dspy.context`: temporary overrides inside one block.
         """
-        # `dspy.configure` is documented manually in docs/docs/api/utils/context.md
-        # changes here should be reflected there as well.
         # If no exception is raised, the `configure` call is allowed.
         self._ensure_configure_allowed()
 
@@ -245,8 +243,6 @@ class Settings:
         See Also:
             `dspy.configure`: set process-wide defaults.
         """
-        # `dspy.context` is documented manually in docs/docs/api/utils/context.md
-        # changes here should be reflected there as well.
         original_overrides = thread_local_overrides.get().copy()
         new_overrides = dotdict({**main_thread_config, **original_overrides, **kwargs})
         token = thread_local_overrides.set(new_overrides)

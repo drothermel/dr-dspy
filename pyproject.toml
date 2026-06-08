@@ -3,8 +3,6 @@ requires = ["setuptools>=77.0.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
-# Do not add spaces around the '=' sign for any of the fields
-# preceded by a marker comment as it affects the publish workflow.
 #replace_package_name_marker
 name="dspy"
 #replace_package_version_marker
