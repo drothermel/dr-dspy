@@ -578,7 +578,7 @@ Retrievers may stay sync if they only hit local/vector DB — **only async-ify t
 uv run pytest tests/teleprompt/ tests/propose/ tests/evaluate/ -q
 ```
 
-- [x] **Commit Phase 6** (`pending`)
+- [x] **Commit Phase 6** (`d10d51f3`)
 
 ```bash
 git commit -m "$(cat <<'EOF'
