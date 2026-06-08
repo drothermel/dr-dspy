@@ -258,39 +258,18 @@ class Predict(Module, Parameter):
             trace.append((self, {**kwargs}, pred))
         return pred
 
-    def _should_stream(self):
-        stream_listeners = settings.stream_listeners or []
-        should_stream = settings.send_stream is not None
-        if should_stream and len(stream_listeners) > 0:
-            should_stream = any(stream_listener.predict == self for stream_listener in stream_listeners)
-
-        return should_stream
-
     def forward(self, **kwargs):
         lm, config, signature, demos, kwargs = self._forward_preprocess(**kwargs)
 
         adapter = settings.adapter or ChatAdapter()
-
-        if self._should_stream():
-            with settings.context(caller_predict=self):
-                completions = adapter(lm, config, signature, demos, kwargs)
-        else:
-            with settings.context(send_stream=None):
-                completions = adapter(lm, config, signature, demos, kwargs)
-
+        completions = adapter(lm, config, signature, demos, kwargs)
         return self._forward_postprocess(completions, signature, **kwargs)
 
     async def aforward(self, **kwargs):
         lm, config, signature, demos, kwargs = self._forward_preprocess(**kwargs)
 
         adapter = settings.adapter or ChatAdapter()
-        if self._should_stream():
-            with settings.context(caller_predict=self):
-                completions = await adapter.acall(lm, config, signature, demos, kwargs)
-        else:
-            with settings.context(send_stream=None):
-                completions = await adapter.acall(lm, config, signature, demos, kwargs)
-
+        completions = await adapter.acall(lm, config, signature, demos, kwargs)
         return self._forward_postprocess(completions, signature, **kwargs)
 
     def update_config(self, **kwargs) -> None:

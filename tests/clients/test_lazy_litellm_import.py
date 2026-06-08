@@ -7,7 +7,6 @@ import pytest
 
 from dspy.clients.embedding import Embedder
 from dspy.clients.lm import LM
-from dspy.streaming.streamify import streamify
 
 
 def _hide_litellm(monkeypatch):
@@ -31,7 +30,6 @@ def test_import_dspy_does_not_import_litellm(monkeypatch):
 
     _ = LM
     _ = Embedder
-    _ = streamify
 
     assert "litellm" not in sys.modules
 

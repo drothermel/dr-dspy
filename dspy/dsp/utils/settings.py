@@ -22,13 +22,10 @@ DEFAULT_CONFIG = dotdict(
     trace=[],
     callbacks=[],
     async_max_workers=8,
-    send_stream=None,
     disable_history=False,
     track_usage=False,
     usage_tracker=None,
-    caller_predict=None,
     caller_modules=None,
-    stream_listeners=[],
     provide_traceback=False,  # Whether to include traceback information in error logs.
     num_threads=8,  # Number of threads to use for parallel processing.
     max_errors=10,  # Maximum errors before halting operations.
@@ -61,8 +58,7 @@ class Settings:
       2. It affects a global state, visible to all. As a result, user threads work, but they shouldn't be
          mixed with concurrent changes to settings.configure from the "main" thread.
          (TODO: In the future, add warnings: if there are near-in-time user-thread reads followed by .configure calls.)
-      3. Any thread can use settings.context. It propagates to child threads created with DSPy primitives: Parallel,
-         asyncify, etc.
+      3. Any thread can use settings.context. It propagates to child threads created with DSPy primitives: Parallel, etc.
     """
 
     _instance = None

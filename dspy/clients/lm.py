@@ -1,12 +1,10 @@
-import functools
 import logging
 import os
 import re
 import threading
 import warnings
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import Any, Literal
 
-import anyio.from_thread
 import pydantic
 from typing_extensions import override
 
@@ -26,7 +24,6 @@ from dspy.clients.openai_format import (
 from dspy.clients.provider import Provider, ReinforceJob, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat
 from dspy.core.types import LMRequest, LMResponse
-from dspy.dsp.utils.settings import settings
 from dspy.utils.callback import BaseCallback
 from dspy.utils.exceptions import (
     ContextWindowExceededError,
@@ -47,9 +44,6 @@ from dspy.utils.exceptions import (
 )
 
 from .base_lm import BaseLM
-
-if TYPE_CHECKING:
-    from anyio.streams.memory import MemoryObjectSendStream
 
 logger = logging.getLogger(__name__)
 
@@ -487,68 +481,18 @@ class LM(BaseLM):
             )
 
 
-def _get_stream_completion_fn(
-    request: dict[str, Any],
-    cache_kwargs: dict[str, Any],
-    sync=True,
-    headers: dict[str, Any] | None = None,
-):
-    stream = settings.send_stream
-    caller_predict = settings.caller_predict
-
-    if stream is None:
-        return None
-
-    # The stream is already opened, and will be closed by the caller.
-    stream = cast("MemoryObjectSendStream", stream)
-    caller_predict_id = id(caller_predict) if caller_predict else None
-
-    if settings.track_usage:
-        request["stream_options"] = {"include_usage": True}
-
-    async def stream_completion(request: dict[str, Any], cache_kwargs: dict[str, Any]):
-        response = await _get_litellm().acompletion(
-            cache=cache_kwargs,
-            stream=True,
-            headers=headers,
-            **request,
-        )
-        chunks = []
-        async for chunk in response:
-            if caller_predict_id:
-                # Add the predict id to the chunk so that the stream listener can identify which predict produces it.
-                chunk.predict_id = caller_predict_id
-            chunks.append(chunk)
-            await stream.send(chunk)
-        return _get_litellm().stream_chunk_builder(chunks)
-
-    def sync_stream_completion():
-        return anyio.from_thread.run(functools.partial(stream_completion, request, cache_kwargs))
-
-    async def async_stream_completion():
-        return await stream_completion(request, cache_kwargs)
-
-    if sync:
-        return sync_stream_completion
-    return async_stream_completion
-
-
 def litellm_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
     cache = cache or {"no-cache": True, "no-store": True}
     request = dict(request)
     request.pop("rollout_id", None)
     headers = _add_dspy_identifier_to_headers(request.pop("headers", None))
-    stream_completion = _get_stream_completion_fn(request, cache, sync=True, headers=headers)
-    if stream_completion is None:
-        return _get_litellm().completion(
-            cache=cache,
-            num_retries=num_retries,
-            retry_strategy="exponential_backoff_retry",
-            headers=headers,
-            **request,
-        )
-
-    return stream_completion()
+    return _get_litellm().completion(
+        cache=cache,
+        num_retries=num_retries,
+        retry_strategy="exponential_backoff_retry",
+        headers=headers,
+        **request,
+    )
 
 
 def litellm_text_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
@@ -582,17 +526,13 @@ async def alitellm_completion(request: dict[str, Any], num_retries: int, cache: 
     request = dict(request)
     request.pop("rollout_id", None)
     headers = _add_dspy_identifier_to_headers(request.pop("headers", None))
-    stream_completion = _get_stream_completion_fn(request, cache, sync=False, headers=headers)
-    if stream_completion is None:
-        return await _get_litellm().acompletion(
-            cache=cache,
-            num_retries=num_retries,
-            retry_strategy="exponential_backoff_retry",
-            headers=headers,
-            **request,
-        )
-
-    return await stream_completion()
+    return await _get_litellm().acompletion(
+        cache=cache,
+        num_retries=num_retries,
+        retry_strategy="exponential_backoff_retry",
+        headers=headers,
+        **request,
+    )
 
 
 async def alitellm_text_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
