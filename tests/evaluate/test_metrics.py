@@ -1,6 +1,7 @@
 from dspy.evaluate.metrics import answer_exact_match
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
+from tests.task_spec.helpers import ts
 
 
 def test_answer_exact_match_string():
@@ -8,7 +9,7 @@ def test_answer_exact_match_string():
         question="What is 1+1?",
         answer="2",
     ).with_inputs("question")
-    pred = Predict("question -> answer")
+    pred = Predict(ts("question -> answer"))
     pred.answer = "2"  # ty:ignore[unresolved-attribute]
     assert answer_exact_match(example, pred)
 
@@ -18,7 +19,7 @@ def test_answer_exact_match_list():
         question="What is 1+1?",
         answer=["2", "two"],
     ).with_inputs("question")
-    pred = Predict("question -> answer")
+    pred = Predict(ts("question -> answer"))
     pred.answer = "2"  # ty:ignore[unresolved-attribute]
     assert answer_exact_match(example, pred)
 
@@ -28,6 +29,6 @@ def test_answer_exact_match_no_match():
         question="What is 1+1?",
         answer="2",
     ).with_inputs("question")
-    pred = Predict("question -> answer")
+    pred = Predict(ts("question -> answer"))
     pred.answer = "3"  # ty:ignore[unresolved-attribute]
     assert not answer_exact_match(example, pred)

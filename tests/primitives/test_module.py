@@ -10,8 +10,6 @@ from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module, set_attribute_by_name
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
 from dspy.task_spec import default_task_instructions
 from dspy.utils.dummies import DummyLM
 from tests.task_spec.helpers import ts
@@ -218,9 +216,7 @@ def test_load_state_is_transactional():
     or malformed value), the module must be completely unchanged.
     """
 
-    class Sig(Signature):
-        question: str = InputField()
-        answer: str = OutputField()
+    Sig = ts("question -> answer")
 
     class Prog(Module):
         def __init__(self):

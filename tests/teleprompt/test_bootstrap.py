@@ -8,6 +8,7 @@ from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.utils.dummies import DummyLM
+from tests.task_spec.helpers import ts
 
 
 # Define a simple metric function for testing
@@ -42,8 +43,8 @@ class SimpleModule(Module):
 def test_compile_with_predict_instances():
     # Create Predict instances for student and teacher
     # Note that Predict is not itself a module, so we can't use it directly here
-    student = SimpleModule("input -> output")
-    teacher = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
+    teacher = SimpleModule(ts("input -> output"))
 
     lm = DummyLM(["Initial thoughts", "Finish[blue]"])  # ty:ignore[invalid-argument-type]
     settings.configure(lm=lm)
@@ -58,8 +59,8 @@ def test_compile_with_predict_instances():
 
 def test_bootstrap_effectiveness():
     # This test verifies if the bootstrapping process improves the student's predictions
-    student = SimpleModule("input -> output")
-    teacher = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
+    teacher = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "blue"}, {"output": "Ring-ding-ding-ding-dingeringeding!"}], follow_examples=True)
     settings.configure(lm=lm, trace=[])
 
@@ -93,8 +94,8 @@ def test_error_handling_during_bootstrap():
         async def aforward(self, **kwargs: object):
             raise RuntimeError("Simulated error")
 
-    student = SimpleModule("input -> output")
-    teacher = BuggyModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
+    teacher = BuggyModule(ts("input -> output"))
 
     # Setup DummyLM to simulate an error scenario
     lm = DummyLM(
@@ -119,8 +120,8 @@ def test_validation_set_usage():
     """
     Test to ensure the validation set is correctly used during bootstrapping
     """
-    student = SimpleModule("input -> output")
-    teacher = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
+    teacher = SimpleModule(ts("input -> output"))
 
     lm = DummyLM(
         [

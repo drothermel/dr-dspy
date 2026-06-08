@@ -39,6 +39,7 @@ from dspy.utils.exceptions import (
     LMUnexpectedError,
 )
 from dspy.utils.usage_tracker import track_usage
+from tests.task_spec.helpers import ts
 
 
 def make_response(output_blocks):
@@ -1172,7 +1173,7 @@ def test_api_key_not_saved_in_json():
         api_key="sk-test-api-key-12345",
     )
 
-    predict = Predict("question -> answer")
+    predict = Predict(ts("question -> answer"))
     predict.lm = lm
 
     with tempfile.TemporaryDirectory() as tmpdir:

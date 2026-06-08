@@ -30,8 +30,43 @@ compiled = await teleprompter.compile(student, trainset=trainset)
 
 `Module.acall` and `BaseLM.acall` are compatibility aliases for `__call__`.
 
+## TaskSpec (not Signature)
+
+Define tasks with `make_task_spec` and pass the resulting `TaskSpec` to predictors. Do not pass strings or legacy `Signature` classes to `Predict`.
+
+```python
+import asyncio
+
+from dspy.predict import ChainOfThought, Predict
+from dspy.task_spec import FieldSpec, make_task_spec
+
+qa = make_task_spec(
+    {
+        "question": FieldSpec.input("question"),
+        "answer": FieldSpec.output("answer"),
+    },
+    instructions="Answer the question.",
+)
+
+predict = Predict(qa)
+result = asyncio.run(predict(question="What is DSPy?"))
+
+cot = ChainOfThought(qa)
+result = asyncio.run(cot(question="What is DSPy?"))
+```
+
+Tools require an explicit description:
+
+```python
+from dspy.adapters.types.tool import Tool
+
+tool = Tool(my_func, description="Describe what the tool does.")
+```
+
+See `docs/migration/taskspec.md` for the full Signature → TaskSpec translation table.
+
 ## Internal call-site conventions
 
 - Use keyword arguments for multi-arg calls to DSPy-internal functions when meaning is not obvious from position.
 - Do not add keyword-only `*` to public constructors or documented callback protocols (e.g. `metric(example, prediction, trace)`).
-- Spine APIs require keywords at call sites: `run_bounded(items=..., fn=...)`, `adapter.acall(lm=..., config=..., signature=..., demos=..., inputs=...)`.
+- Spine APIs require keywords at call sites: `run_bounded(items=..., fn=...)`, `adapter.acall(lm=..., config=..., task_spec=..., demos=..., inputs=...)`.

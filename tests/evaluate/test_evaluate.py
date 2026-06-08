@@ -15,6 +15,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.utils.callback import BaseCallback
 from dspy.utils.dummies import DummyLM
+from tests.task_spec.helpers import ts
 
 
 def new_example(question, answer):
@@ -48,7 +49,7 @@ def test_evaluate_call():
         )
     )
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
-    program = Predict("question -> answer")
+    program = Predict(ts("question -> answer"))
     assert asyncio.run(program(question="What is 1+1?")).answer == "2"
     ev = Evaluate(
         devset=devset,
@@ -72,7 +73,7 @@ def test_evaluate_single_thread_runs_in_main_thread():
         execution_threads.append(threading.current_thread())
         return original_metric(example, prediction, trace)
 
-    program = Predict("question -> answer")
+    program = Predict(ts("question -> answer"))
     ev = Evaluate(
         devset=devset,
         metric=tracking_metric,
@@ -119,7 +120,7 @@ def test_construct_result_df():
 def test_multithread_evaluate_call():
     settings.configure(lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
-    program = Predict("question -> answer")
+    program = Predict(ts("question -> answer"))
     assert asyncio.run(program(question="What is 1+1?")).answer == "2"
     ev = Evaluate(
         devset=devset,
@@ -144,7 +145,7 @@ def test_multi_thread_evaluate_call_cancelled(monkeypatch):
     settings.configure(lm=SlowLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
 
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
-    program = Predict("question -> answer")
+    program = Predict(ts("question -> answer"))
     assert asyncio.run(program(question="What is 1+1?")).answer == "2"
 
     # spawn a thread that will sleep for .1 seconds then send a KeyboardInterrupt
@@ -172,7 +173,7 @@ def test_multi_thread_evaluate_call_cancelled(monkeypatch):
 def test_evaluate_call_wrong_answer():
     settings.configure(lm=DummyLM({"What is 1+1?": {"answer": "0"}, "What is 2+2?": {"answer": "0"}}))
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
-    program = Predict("question -> answer")
+    program = Predict(ts("question -> answer"))
     ev = Evaluate(
         devset=devset,
         metric=answer_exact_match,
@@ -186,19 +187,19 @@ def test_evaluate_call_wrong_answer():
 @pytest.mark.parametrize(
     "program_with_example",
     [
-        (Predict("question -> answer"), new_example("What is 1+1?", "2")),
+        (Predict(ts("question -> answer")), new_example("What is 1+1?", "2")),
         # Create programs that do not return dictionary-like objects because Evaluate()
         # has failed for such cases in the past
         (
-            lambda text: asyncio.run(Predict("text: str -> entities: list[str]")(text=text)).entities,
+            lambda text: asyncio.run(Predict(ts("text: str -> entities: list[str]"))(text=text)).entities,
             Example(text="United States", entities=["United States"]).with_inputs("text"),
         ),
         (
-            lambda text: asyncio.run(Predict("text: str -> entities: list[dict[str, str]]")(text=text)).entities,
+            lambda text: asyncio.run(Predict(ts("text: str -> entities: list[dict[str, str]]"))(text=text)).entities,
             Example(text="United States", entities=[{"name": "United States", "type": "location"}]).with_inputs("text"),
         ),
         (
-            lambda text: asyncio.run(Predict("text: str -> first_word: Tuple[str, int]")(text=text)).words,
+            lambda text: asyncio.run(Predict(ts("text: str -> first_word: Tuple[str, int]"))(text=text)).words,
             Example(text="United States", first_word=("United", 6)).with_inputs("text"),
         ),
     ],
@@ -270,7 +271,7 @@ def test_evaluate_callback():
         callbacks=[callback],
     )
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
-    program = Predict("question -> answer")
+    program = Predict(ts("question -> answer"))
     assert asyncio.run(program(question="What is 1+1?")).answer == "2"
     ev = Evaluate(
         devset=devset,
@@ -321,7 +322,7 @@ def test_evaluate_save_as_json_with_history():
         Example(question="What is 2+2?", answer="4", history=history2).with_inputs("question"),
     ]
 
-    program = Predict("question -> answer")
+    program = Predict(ts("question -> answer"))
 
     # Create evaluator with save_as_json
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -389,7 +390,7 @@ def test_evaluate_save_as_csv_with_history():
         Example(question="What is 1+1?", answer="2", history=history).with_inputs("question"),
     ]
 
-    program = Predict("question -> answer")
+    program = Predict(ts("question -> answer"))
 
     # Create evaluator with save_as_csv
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:

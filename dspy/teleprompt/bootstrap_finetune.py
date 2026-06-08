@@ -204,7 +204,7 @@ def build_call_data_from_trace(
     if not hasattr(adapter, "format_finetune_data"):
         raise TypeError(f"Adapter {type(adapter).__name__} does not support format_finetune_data")
     return cast("Any", adapter).format_finetune_data(
-        signature=pred.signature,
+        task_spec=pred.task_spec,
         demos=demos,
         inputs=inputs,
         outputs=outputs,

@@ -26,6 +26,23 @@ class PydanticJsonSchemaHandler(Protocol):
     def resolve_ref_schema(self, schema: dict[str, Any]) -> dict[str, Any]: ...
 
 
+def tool_from_callable(func: Callable[..., object], *, description: str | None = None) -> "Tool":
+    """Wrap a callable as a :class:`Tool`, using ``description`` or the callable docstring."""
+    if isinstance(func, Tool):
+        return func
+    if not callable(func):
+        raise TypeError(f"Expected callable or Tool, got {type(func).__name__}.")
+    if description is None:
+        annotations_func = func if inspect.isfunction(func) or inspect.ismethod(func) else func.__call__
+        doc = getattr(func, "__doc__", None) or getattr(annotations_func, "__doc__", None)
+        if doc and doc.strip():
+            description = doc.strip()
+        else:
+            name = getattr(func, "__name__", type(func).__name__)
+            description = f"Invoke {name}."
+    return Tool(func, description=description)
+
+
 def _with_callbacks(fn: Callable[..., object]) -> Callable[..., object]:
     if inspect.iscoroutinefunction(fn):
 
@@ -73,22 +90,23 @@ class Tool(Type):
     def __init__(
         self,
         func: Callable[..., object],
+        *,
+        description: str,
         name: str | None = None,
-        desc: str | None = None,
         args: dict[str, Any] | None = None,
         arg_types: dict[str, Any] | None = None,
         arg_desc: dict[str, str] | None = None,
     ) -> None:
         """Initialize the Tool class.
 
-        Users can choose to specify the `name`, `desc`, `args`, and `arg_types`, or let the `Tool`
-        automatically infer the values from the function. For values that are specified by the user, automatic inference
+        Users can choose to specify the `name`, `args`, and `arg_types`, or let the `Tool`
+        automatically infer them from the function. For values that are specified by the user, automatic inference
         will not be performed on them.
 
         Args:
             func (Callable): The actual function that is being wrapped by the tool.
+            description (str): Required description of the tool sent to the language model.
             name (str | None, optional): The name of the tool. Defaults to None.
-            desc (str | None, optional): The description of the tool. Defaults to None.
             args (dict[str, Any] | None, optional): The args and their schema of the tool, represented as a
                 dictionary from arg name to arg's json schema. Defaults to None.
             arg_types (dict[str, Any] | None, optional): The argument types of the tool, represented as a dictionary
@@ -102,12 +120,14 @@ class Tool(Type):
         def foo(x: int, y: str = "hello"):
             return str(x) + y
 
-        tool = Tool(foo)
+        tool = Tool(foo, description="Concatenate an integer and a string.")
         print(tool.args)
         # Expected output: {'x': {'type': 'integer'}, 'y': {'type': 'string', 'default': 'hello'}}
         ```
         """
-        super().__init__(func=func, name=name, desc=desc, args=args, arg_types=arg_types, arg_desc=arg_desc)  # ty: ignore[unknown-argument]
+        if not description:
+            raise ValueError("Tool description is required and must be non-empty.")
+        super().__init__(func=func, name=name, desc=description, args=args, arg_types=arg_types, arg_desc=arg_desc)  # ty: ignore[unknown-argument]
         self._parse_function(func=func, arg_desc=arg_desc)
 
     def _parse_function(self, func: Callable, arg_desc: dict[str, str] | None = None) -> None:
@@ -118,7 +138,6 @@ class Tool(Type):
         """
         annotations_func = func if inspect.isfunction(func) or inspect.ismethod(func) else func.__call__
         name = getattr(func, "__name__", type(func).__name__)
-        desc = getattr(func, "__doc__", None) or getattr(annotations_func, "__doc__", "")
         args = {}
         arg_types = {}
 
@@ -143,7 +162,6 @@ class Tool(Type):
                 args[k]["description"] = arg_desc[k]
 
         self.name = self.name or name
-        self.desc = self.desc or desc
         self.args = self.args if self.args is not None else args
         self.arg_types = self.arg_types if self.arg_types is not None else arg_types
         self.has_kwargs = any(param.kind == param.VAR_KEYWORD for param in sig.parameters.values())
@@ -281,7 +299,7 @@ class Tool(Type):
 
     @override
     def __repr__(self) -> str:
-        return f"Tool(name={self.name}, desc={self.desc}, args={self.args})"
+        return f"Tool(name={self.name}, description={self.desc}, args={self.args})"
 
     @override
     def __str__(self) -> str:

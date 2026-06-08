@@ -10,9 +10,7 @@ from dspy.adapters.types.file import File, encode_file_to_dict
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
-from dspy.task_spec.bridge import task_spec_from_signature
+from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
 from dspy.teleprompt.vanilla import LabeledFewShot
 from dspy.utils.dummies import DummyLM
 from tests.task_spec.helpers import ts
@@ -58,10 +56,10 @@ def setup_predictor(spec, expected_output):
     settings.configure(lm=lm)
     if isinstance(spec, str):
         task_spec = ts(spec)
-    elif isinstance(spec, type):
-        task_spec = task_spec_from_signature(spec)
-    else:
+    elif isinstance(spec, TaskSpec):
         task_spec = spec
+    else:
+        raise TypeError(f"Expected str or TaskSpec, got {type(spec).__name__}")
     return Predict(task_spec), lm
 
 
@@ -201,9 +199,14 @@ def test_file_in_signature(sample_text_file):
 
 
 def test_file_list_in_signature(sample_text_file):
-    class FileListSignature(Signature):
-        documents: list[File] = InputField()
-        summary: str = OutputField()
+    FileListSignature = make_task_spec(
+        {
+            "documents": FieldSpec.input("documents", type_=list[File]),
+            "summary": FieldSpec.output("summary"),
+        },
+        instructions="Summarize documents.",
+        name="FileListSignature",
+    )
 
     expected = {"summary": "Multiple files"}
     predictor, lm = setup_predictor(FileListSignature, expected)
@@ -219,9 +222,14 @@ def test_file_list_in_signature(sample_text_file):
 
 
 def test_optional_file_field():
-    class OptionalFileSignature(Signature):
-        document: File | None = InputField()
-        output: str = OutputField()
+    OptionalFileSignature = make_task_spec(
+        {
+            "document": FieldSpec.input("document", type_=File | None),
+            "output": FieldSpec.output("output"),
+        },
+        instructions="Process optional file.",
+        name="OptionalFileSignature",
+    )
 
     predictor, lm = setup_predictor(OptionalFileSignature, {"output": "Hello"})
     result = asyncio.run(predictor(document=None))

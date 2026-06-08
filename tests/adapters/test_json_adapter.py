@@ -242,7 +242,7 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
         },
         instructions="Answer using all supplied context.",
     )
-    tool = Tool(search)
+    tool = Tool(search, description="Search for documents.")
     demo_profile = Profile(
         name="Ada",
         location=Location(city="London", country="UK"),
@@ -702,7 +702,7 @@ def test_json_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
         adapter=JSONAdapter(use_native_function_calling=True),
         task_spec=NativeToolSignature,
         demos=[],
-        inputs={"question": "Q?", "tools": [Tool(search)]},
+        inputs={"question": "Q?", "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -864,7 +864,7 @@ def test_json_adapter_format_exact_non_native_tool_result_history_field():
                     }
                 ]
             ),
-            "tools": [Tool(search)],
+            "tools": [Tool(search, description="Search for documents.")],
         },
     )
 
@@ -877,7 +877,7 @@ def test_json_adapter_format_exact_non_native_tool_result_history_field():
         "Q2\n"
         "\n"
         "[[ ## tools ## ]]\n"
-        "[\"search. It takes arguments {'query': {'type': 'string'}}.\"]\n"
+        "[\"search, whose description is <desc>Search for documents.</desc>. It takes arguments {'query': {'type': 'string'}}.\"]\n"
         "\n"
         "Respond with a JSON object in the following order of fields: `next_thought`, then "
         '`tool_calls` (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]}).'
@@ -972,9 +972,7 @@ def test_json_adapter_with_structured_outputs_does_not_mutate_original_signature
         mock_completion.return_value = _structured_output_model_response()
         asyncio.run(program.acall(input1="Test input"))
 
-    from dspy.task_spec.bridge import task_spec_from_signature
-
-    assert task_spec_from_signature(program.signature).equals(TestSignature)
+    assert program.task_spec.equals(TestSignature)
 
 
 def test_json_adapter_sync_call():
@@ -1324,7 +1322,10 @@ def test_json_adapter_with_tool():
         """Get the population for a country"""
         return f"The population of {country} in {year} is 1000000"
 
-    tools = [Tool(get_weather), Tool(get_population)]
+    tools = [
+        Tool(get_weather, description="Get the weather for a city"),
+        Tool(get_population, description="Get the population for a country"),
+    ]
 
     adapter = JSONAdapter()
     messages = adapter_format_as_openai(
@@ -1759,7 +1760,7 @@ def test_json_adapter_toolcalls_native_function_calling():
     def get_weather(city: str) -> str:
         return f"The weather in {city} is sunny"
 
-    tools = [Tool(get_weather)]
+    tools = [Tool(get_weather, description="Get the weather for a city")]
 
     adapter = JSONAdapter(use_native_function_calling=True)
 
@@ -1840,7 +1841,7 @@ def test_json_adapter_toolcalls_no_native_function_calling():
     def get_weather(city: str) -> str:
         return f"The weather in {city} is sunny"
 
-    tools = [Tool(get_weather)]
+    tools = [Tool(get_weather, description="Get the weather for a city")]
 
     # Patch _get_structured_outputs_response_format to track calls
     with mock.patch("dspy.adapters.json_adapter._get_structured_outputs_response_format") as mock_structured:

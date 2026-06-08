@@ -134,7 +134,7 @@ async def async_complex_dummy_function(
 
 
 def test_basic_initialization():
-    tool = Tool(name="test_tool", desc="A test tool", args={"param1": {"type": "string"}}, func=lambda x: x)
+    tool = Tool(lambda x: x, description="A test tool", name="test_tool", args={"param1": {"type": "string"}})
     assert tool.name == "test_tool"
     assert tool.desc == "A test tool"
     assert tool.args == {"param1": {"type": "string"}}
@@ -142,7 +142,7 @@ def test_basic_initialization():
 
 
 def test_tool_from_function():
-    tool = Tool(dummy_function)
+    tool = Tool(dummy_function, description="A dummy function for testing.")
 
     assert tool.name == "dummy_function"
     assert "A dummy function for testing" in tool.desc  # ty:ignore[unsupported-operator]
@@ -162,14 +162,14 @@ def test_tool_from_class():
             """Add two numbers."""
             return a + b
 
-    tool = Tool(Foo("123"))
+    tool = Tool(Foo("123"), description="Add two numbers.")
     assert tool.name == "Foo"
     assert tool.desc == "Add two numbers."
     assert tool.args == {"a": {"type": "integer"}, "b": {"type": "integer"}}
 
 
 def test_tool_from_function_with_pydantic():
-    tool = Tool(dummy_with_pydantic)
+    tool = Tool(dummy_with_pydantic, description="A dummy function that accepts a Pydantic model.")
 
     assert tool.name == "dummy_with_pydantic"
     assert "model" in tool.args  # ty:ignore[unsupported-operator]
@@ -180,7 +180,7 @@ def test_tool_from_function_with_pydantic():
 
 
 def test_tool_from_function_with_pydantic_nesting():
-    tool = Tool(complex_dummy_function)
+    tool = Tool(complex_dummy_function, description="Process user profile with complex nested structure.")
 
     assert tool.name == "complex_dummy_function"
 
@@ -204,14 +204,14 @@ def test_tool_from_function_with_pydantic_nesting():
 
 @requires_jsonschema
 def test_tool_callable():
-    tool = Tool(dummy_function)
+    tool = Tool(dummy_function, description="A dummy function for testing.")
     result = tool(x=42, y="hello")
     assert result == "hello 42"
 
 
 @requires_jsonschema
 def test_tool_with_pydantic_callable():
-    tool = Tool(dummy_with_pydantic)
+    tool = Tool(dummy_with_pydantic, description="A dummy function that accepts a Pydantic model.")
     model = DummyModel(field1="test", field2=123)
     result = tool(model=model)
     assert result == "test 123"
@@ -219,13 +219,13 @@ def test_tool_with_pydantic_callable():
 
 @requires_jsonschema
 def test_invalid_function_call():
-    tool = Tool(dummy_function)
+    tool = Tool(dummy_function, description="A dummy function for testing.")
     with pytest.raises(ValueError):  # noqa: PT011
         tool(x="not an integer", y="hello")
 
 
 def test_parameter_desc():
-    tool = Tool(dummy_function, arg_desc={"x": "The x parameter"})
+    tool = Tool(dummy_function, description="A dummy function for testing.", arg_desc={"x": "The x parameter"})
     assert tool.args["x"]["description"] == "The x parameter"  # ty:ignore[not-subscriptable]
 
 
@@ -233,14 +233,14 @@ def test_tool_with_default_args_without_type_hints():
     def foo(x=100):
         return x
 
-    tool = Tool(foo)
+    tool = Tool(foo, description="Return x.")
     assert tool.args["x"]["default"] == 100  # ty:ignore[not-subscriptable]
     assert not hasattr(tool.args["x"], "type")  # ty:ignore[not-subscriptable]
 
 
 @requires_jsonschema
 def test_tool_call_parses_args():
-    tool = Tool(dummy_with_pydantic)
+    tool = Tool(dummy_with_pydantic, description="A dummy function that accepts a Pydantic model.")
 
     args = {
         "model": {
@@ -258,7 +258,7 @@ def test_tool_call_parses_nested_list_of_pydantic_model():
     def dummy_function(x: list[list[DummyModel]]):
         return x
 
-    tool = Tool(dummy_function)
+    tool = Tool(dummy_function, description="A dummy function for testing.")
     args = {
         "x": [
             [
@@ -279,7 +279,7 @@ def test_tool_call_kwarg():
     def fn(x: int, **kwargs: object):
         return kwargs
 
-    tool = Tool(fn)
+    tool = Tool(fn, description="Accept kwargs.")
 
     assert tool(x=1, y=2, z=3) == {"y": 2, "z": 3}
 
@@ -289,7 +289,7 @@ def test_tool_str():
         """Add two integers."""
         return x + y
 
-    tool = Tool(add)
+    tool = Tool(add, description="Add two integers.")
     assert (
         str(tool)
         == "add, whose description is <desc>Add two integers.</desc>. It takes arguments {'x': {'type': 'integer'}, 'y': {'type': 'integer', 'default': 0}}."
@@ -299,7 +299,7 @@ def test_tool_str():
 @requires_jsonschema
 @pytest.mark.asyncio
 async def test_async_tool_from_function():
-    tool = Tool(async_dummy_function)
+    tool = Tool(async_dummy_function, description="An async dummy function for testing.")
 
     assert tool.name == "async_dummy_function"
     assert "An async dummy function for testing" in tool.desc  # ty:ignore[unsupported-operator]
@@ -317,7 +317,7 @@ async def test_async_tool_from_function():
 @requires_jsonschema
 @pytest.mark.asyncio
 async def test_async_tool_with_pydantic():
-    tool = Tool(async_dummy_with_pydantic)
+    tool = Tool(async_dummy_with_pydantic, description="An async dummy function that accepts a Pydantic model.")
 
     assert tool.name == "async_dummy_with_pydantic"
     assert "model" in tool.args  # ty:ignore[unsupported-operator]
@@ -338,7 +338,9 @@ async def test_async_tool_with_pydantic():
 @requires_jsonschema
 @pytest.mark.asyncio
 async def test_async_tool_with_complex_pydantic():
-    tool = Tool(async_complex_dummy_function)
+    tool = Tool(
+        async_complex_dummy_function, description="Process user profile with complex nested structure asynchronously."
+    )
 
     profile = UserProfile(
         user_id=1,
@@ -363,7 +365,7 @@ async def test_async_tool_with_complex_pydantic():
 @requires_jsonschema
 @pytest.mark.asyncio
 async def test_async_tool_invalid_call():
-    tool = Tool(async_dummy_function)
+    tool = Tool(async_dummy_function, description="An async dummy function for testing.")
     with pytest.raises(ValueError):  # noqa: PT011
         await tool.acall(x="not an integer", y="hello")  # ty:ignore[invalid-await]
 
@@ -374,7 +376,7 @@ async def test_async_tool_with_kwargs():
     async def fn(x: int, **kwargs: object):
         return kwargs
 
-    tool = Tool(fn)
+    tool = Tool(fn, description="Accept kwargs.")
 
     result = await tool.acall(x=1, y=2, z=3)  # ty:ignore[invalid-await]
     assert result == {"y": 2, "z": 3}
@@ -384,7 +386,7 @@ async def test_async_tool_with_kwargs():
 @pytest.mark.asyncio
 async def test_async_concurrent_calls():
     """Test that multiple async tools can run concurrently."""
-    tool = Tool(async_dummy_function)
+    tool = Tool(async_dummy_function, description="An async dummy function for testing.")
 
     # Create multiple concurrent calls
     tasks = [tool.acall(x=i, y=f"hello{i}") for i in range(5)]
@@ -405,7 +407,7 @@ async def test_async_concurrent_calls():
 @requires_jsonschema
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_async_tool_call_in_sync_mode():
-    tool = Tool(async_dummy_function)
+    tool = Tool(async_dummy_function, description="An async dummy function for testing.")
     with settings.context(allow_tool_async_sync_conversion=False):  # noqa: SIM117
         with pytest.raises(ValueError, match=r".*acall.*allow_tool_async_sync_conversion.*"):
             result = tool(x=1, y="hello")
@@ -709,7 +711,10 @@ def test_tool_call_execute():
     def add_numbers(a: int, b: int) -> int:
         return a + b
 
-    tools = [Tool(get_weather), Tool(add_numbers)]
+    tools = [
+        Tool(get_weather, description="Get the weather for a city"),
+        Tool(add_numbers, description="Add two numbers."),
+    ]
 
     tool_call = ToolCalls.ToolCall(name="get_weather", args={"city": "Berlin"})
     result = tool_call.execute(functions=tools)

@@ -461,7 +461,10 @@ def test_baml_adapter_with_tools():
         """Schedule an appointment for a patient"""
         return f"Scheduled appointment for {patient_name} on {date}"
 
-    tools = [Tool(get_patient_info), Tool(schedule_appointment)]
+    tools = [
+        Tool(get_patient_info, description="Get patient information by ID"),
+        Tool(schedule_appointment, description="Schedule an appointment for a patient"),
+    ]
 
     adapter = BAMLAdapter()
     messages = adapter_format_as_openai(

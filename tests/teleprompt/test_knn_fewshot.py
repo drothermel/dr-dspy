@@ -8,6 +8,7 @@ from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.teleprompt.knn_fewshot import KNNFewShot
 from dspy.utils.dummies import DummyLM, DummyVectorizer
+from tests.task_spec.helpers import ts
 
 
 def mock_example(question: str, answer: str) -> Example:
@@ -44,14 +45,14 @@ class SimpleModule(Module):
     @override
     def reset_copy(self):
         # Creates a new instance of SimpleModule with the same predictor
-        return SimpleModule(self.predictor.signature)
+        return SimpleModule(self.predictor.task_spec)
 
 
 # Disabled from pytest collection by leading underscore; restore once KNNFewShot compile behavior is fixed.
 def _test_knn_few_shot_compile(setup_knn_few_shot):
     """Tests the compile method of KNNFewShot with SimpleModule as student."""
-    student = SimpleModule("input -> output")
-    teacher = SimpleModule("input -> output")  # Assuming teacher uses the same module type
+    student = SimpleModule(ts("input -> output"))
+    teacher = SimpleModule(ts("input -> output"))  # Assuming teacher uses the same module type
 
     # Setup DummyLM with a response for a query similar to one of the training examples
     lm = DummyLM(["Madrid", "10"])  # ty:ignore[invalid-argument-type]

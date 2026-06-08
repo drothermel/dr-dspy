@@ -7,7 +7,7 @@ import pydantic
 
 from dspy.adapters.types.history import History
 from dspy.adapters.types.reasoning import Reasoning
-from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
+from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls, tool_from_callable
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
@@ -30,7 +30,7 @@ class ReActV2(Module):
         self.task_spec = task_spec
         self.max_iters = max_iters
 
-        user_tools = [tool if isinstance(tool, Tool) else Tool(tool) for tool in tools]
+        user_tools = [tool_from_callable(tool) for tool in tools]
         self.tools = {}
         for tool in user_tools:
             if tool.name is None:
@@ -56,8 +56,8 @@ class ReActV2(Module):
         arg_types = {name: field.type_ for name, field in output_fields.items()}
         return Tool(
             submit,
+            description="Submit the final outputs for the task.",
             name="submit",
-            desc="Submit the final outputs for the task.",
             args=args,
             arg_types=arg_types,
         )

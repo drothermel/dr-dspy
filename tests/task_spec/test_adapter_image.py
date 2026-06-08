@@ -13,9 +13,7 @@ from dspy.adapters.types.image import Image, encode_image
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
-from dspy.task_spec.bridge import task_spec_from_signature
+from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
 from dspy.teleprompt.vanilla import LabeledFewShot
 from dspy.utils.dummies import DummyLM
 from tests.task_spec.helpers import ts
@@ -81,10 +79,10 @@ def setup_predictor(spec, expected_output):
     settings.configure(lm=lm)
     if isinstance(spec, str):
         task_spec = ts(spec)
-    elif isinstance(spec, type):
-        task_spec = task_spec_from_signature(spec)
-    else:
+    elif isinstance(spec, TaskSpec):
         task_spec = spec
+    else:
+        raise TypeError(f"Expected str or TaskSpec, got {type(spec).__name__}")
     return Predict(task_spec), lm
 
 
@@ -208,9 +206,14 @@ def test_save_load_complex_default_types():
         ).with_inputs("image_list"),
     ]
 
-    class ComplexTypeSignature(Signature):
-        image_list: list[Image] = InputField(desc="A list of images")
-        caption: str = OutputField(desc="A caption for the image list")
+    ComplexTypeSignature = make_task_spec(
+        {
+            "image_list": FieldSpec.input("image_list", type_=list[Image], desc="A list of images"),
+            "caption": FieldSpec.output("caption", desc="A caption for the image list"),
+        },
+        instructions="Caption image lists.",
+        name="ComplexTypeSignature",
+    )
 
     predictor, lm = setup_predictor(ComplexTypeSignature, {"caption": "A list of images"})
     optimizer = LabeledFewShot(k=1)
@@ -218,7 +221,7 @@ def test_save_load_complex_default_types():
 
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
-        loaded_predictor = Predict(task_spec_from_signature(ComplexTypeSignature))
+        loaded_predictor = Predict(ComplexTypeSignature)
         loaded_predictor.load(temp_file.name)
 
     result = asyncio.run(loaded_predictor(**examples[0].inputs()))
@@ -227,18 +230,20 @@ def test_save_load_complex_default_types():
     assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
 
 
-class BasicImageSignature(Signature):
-    """Basic signature with a single image input"""
+BasicImageSignature = make_task_spec(
+    {"image": FieldSpec.input("image", type_=Image), "output": FieldSpec.output("output")},
+    instructions="Basic signature with a single image input.",
+    name="BasicImageSignature",
+)
 
-    image: Image = InputField()
-    output: str = OutputField()
-
-
-class ImageListSignature(Signature):
-    """Signature with a list of images input"""
-
-    image_list: list[Image] = InputField()
-    output: str = OutputField()
+ImageListSignature = make_task_spec(
+    {
+        "image_list": FieldSpec.input("image_list", type_=list[Image]),
+        "output": FieldSpec.output("output"),
+    },
+    instructions="Signature with a list of images input.",
+    name="ImageListSignature",
+)
 
 
 @pytest.mark.parametrize(
@@ -246,14 +251,14 @@ class ImageListSignature(Signature):
     [
         {
             "name": "basic_dspy_signature",
-            "signature_class": BasicImageSignature,
+            "task_spec": BasicImageSignature,
             "inputs": {"image": "https://example.com/dog.jpg"},
             "expected": {"output": "A dog photo"},
             "expected_image_urls": 2,
         },
         {
             "name": "list_dspy_signature",
-            "signature_class": ImageListSignature,
+            "task_spec": ImageListSignature,
             "inputs": {"image_list": ["https://example.com/dog.jpg", "https://example.com/cat.jpg"]},
             "expected": {"output": "Multiple photos"},
             "expected_image_urls": 4,
@@ -262,7 +267,7 @@ class ImageListSignature(Signature):
 )
 def test_save_load_complex_types(test_case):
     """Test saving and loading predictors with complex types"""
-    signature_cls = test_case["signature_class"]
+    task_spec = test_case["task_spec"]
 
     # Convert string URLs to Image objects in input
     processed_input = {}
@@ -277,14 +282,14 @@ def test_save_load_complex_types(test_case):
     # Create example and predictor
     examples = [Example(**processed_input, **test_case["expected"]).with_inputs(*processed_input.keys())]
 
-    predictor, lm = setup_predictor(signature_cls, test_case["expected"])
+    predictor, lm = setup_predictor(task_spec, test_case["expected"])
     optimizer = LabeledFewShot(k=1)
     compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False))
 
     # Test save and load
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
-        loaded_predictor = Predict(task_spec_from_signature(signature_cls))
+        loaded_predictor = Predict(task_spec)
         loaded_predictor.load(temp_file.name)
 
     # Run prediction
@@ -307,9 +312,14 @@ def test_save_load_pydantic_model():
         image_list: list[Image] | None = None
         output: str
 
-    class PydanticSignature(Signature):
-        model_input: ImageModel = InputField()
-        output: str = OutputField()
+    PydanticSignature = make_task_spec(
+        {
+            "model_input": FieldSpec.input("model_input", type_=ImageModel),
+            "output": FieldSpec.output("output"),
+        },
+        instructions="Process pydantic image model.",
+        name="PydanticSignature",
+    )
 
     # Create model instance
     model_input = ImageModel(
@@ -328,7 +338,7 @@ def test_save_load_pydantic_model():
     # Test save and load
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
-        loaded_predictor = Predict(task_spec_from_signature(PydanticSignature))
+        loaded_predictor = Predict(PydanticSignature)
         import json
 
         with open(temp_file.name, encoding="utf-8") as saved_file:
@@ -348,9 +358,14 @@ def test_save_load_pydantic_model():
 def test_optional_image_field():
     """Test that optional image fields are not required"""
 
-    class OptionalImageSignature(Signature):
-        image: Image | None = InputField()
-        output: str = OutputField()
+    OptionalImageSignature = make_task_spec(
+        {
+            "image": FieldSpec.input("image", type_=Image | None),
+            "output": FieldSpec.output("output"),
+        },
+        instructions="Process optional image.",
+        name="OptionalImageSignature",
+    )
 
     predictor, lm = setup_predictor(OptionalImageSignature, {"output": "Hello"})
     result = asyncio.run(predictor(image=None))
@@ -370,9 +385,14 @@ def test_pdf_url_support():
     assert ";base64," in pdf_image.url
 
     # Test using it in a predictor
-    class PDFSignature(Signature):
-        document: Image = InputField(desc="A PDF document")
-        summary: str = OutputField(desc="A summary of the PDF")
+    PDFSignature = make_task_spec(
+        {
+            "document": FieldSpec.input("document", type_=Image, desc="A PDF document"),
+            "summary": FieldSpec.output("summary", desc="A summary of the PDF"),
+        },
+        instructions="Summarize PDF documents.",
+        name="PDFSignature",
+    )
 
     predictor, lm = setup_predictor(PDFSignature, {"summary": "This is a dummy PDF"})
     result = asyncio.run(predictor(document=pdf_image))
@@ -448,9 +468,14 @@ def test_pdf_from_file():
         assert ";base64," in pdf_image.url
 
         # Test the image in a predictor
-        class FilePDFSignature(Signature):
-            document: Image = InputField(desc="A PDF document from file")
-            summary: str = OutputField(desc="A summary of the PDF")
+        FilePDFSignature = make_task_spec(
+            {
+                "document": FieldSpec.input("document", type_=Image, desc="A PDF document from file"),
+                "summary": FieldSpec.output("summary", desc="A summary of the PDF"),
+            },
+            instructions="Summarize PDF from file.",
+            name="FilePDFSignature",
+        )
 
         predictor, lm = setup_predictor(FilePDFSignature, {"summary": "This is a PDF from file"})
         result = asyncio.run(predictor(document=pdf_image))

@@ -22,9 +22,8 @@ from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
 from dspy.primitives.sandbox_serializable import SandboxSerializable
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
-from dspy.task_spec.bridge import task_spec_from_signature
+from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
 from tests.mock_interpreter import MockInterpreter
 from tests.task_spec.helpers import ts
 
@@ -164,7 +163,7 @@ class TestRLMInitialization:
         def my_tool() -> str:
             return "result"
 
-        tool = Tool(my_tool, name=tool_name)
+        tool = Tool(my_tool, description="My tool.", name=tool_name)
         with pytest.raises(ValueError, match="must be a valid Python identifier"):
             RLM(ts("context -> answer"), tools=[tool])
 
@@ -175,7 +174,7 @@ class TestRLMInitialization:
         def my_tool() -> str:
             return "result"
 
-        tool = Tool(my_tool, name=tool_name)
+        tool = Tool(my_tool, description="My tool.", name=tool_name)
         with pytest.raises(ValueError, match="conflicts with built-in"):
             RLM(ts("context -> answer"), tools=[tool])
 
@@ -467,8 +466,17 @@ class TestREPLTypes:
     def test_repl_variable_with_field_info(self):
         """Test REPLVariable includes desc and constraints from field_info."""
 
-        # Create a field with description and constraints
-        field = InputField(desc="The user's question", ge=0, le=100)
+        spec = make_task_spec(
+            {
+                "query": FieldSpec.input(
+                    "query",
+                    desc="The user's question",
+                    constraints="greater than or equal to: 0.0, less than or equal to: 100.0",
+                ),
+            },
+            instructions="Query field.",
+        )
+        field = task_spec_input_field_infos(spec)["query"]
 
         var = REPLVariable.from_value("query", "What is 2+2?", field_info=field)
         assert var.desc == "The user's question"
@@ -493,14 +501,17 @@ class TestREPLTypes:
     def test_build_variables_includes_field_metadata(self):
         """Test _build_variables passes field_info to REPLVariable."""
 
-        class QASig(Signature):
-            """Answer questions."""
+        QASig = make_task_spec(
+            {
+                "context": FieldSpec.input("context", desc="Background information"),
+                "question": FieldSpec.input("question", desc="The question to answer"),
+                "answer": FieldSpec.output("answer"),
+            },
+            instructions="Answer questions.",
+            name="QASig",
+        )
 
-            context: str = InputField(desc="Background information")
-            question: str = InputField(desc="The question to answer")
-            answer: str = OutputField()
-
-        rlm = RLM(task_spec_from_signature(QASig), max_iterations=3)
+        rlm = RLM(QASig, max_iterations=3)
         variables = rlm._build_variables(context="Some text", question="What?")
 
         # Find the context variable

@@ -15,8 +15,8 @@ from dspy.adapters.types.base_type import Type as DspyType
 from dspy.adapters.types.code import Code
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.core.types import LMMessage
-from dspy.signatures.utils import get_dspy_field_type
 from dspy.task_spec import TaskSpec
+from dspy.task_spec.pydantic_bridge import get_dspy_field_type
 
 
 def build_lm_message(

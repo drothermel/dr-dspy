@@ -16,51 +16,52 @@ class Code(Type):
     Example 1: `Code` as output type in code generation:
 
     ```python
+    import asyncio
+
     from dspy.adapters.types.code import Code
     from dspy.clients.lm import LM
     from dspy.dsp.utils.settings import settings
     from dspy.predict.predict import Predict
-    from dspy.signatures.field import InputField, OutputField
-    from dspy.signatures.signature import Signature
+    from dspy.task_spec import FieldSpec, make_task_spec
 
     settings.configure(lm=LM("openai/gpt-4o-mini"))
 
+    task_spec = make_task_spec(
+        {
+            "question": FieldSpec.input("question", desc="The question to answer"),
+            "code": FieldSpec.output("code", type_=Code["java"], desc="The code to execute"),
+        },
+        instructions="Generate python code to answer the question.",
+    )
 
-    class CodeGeneration(Signature):
-        '''Generate python code to answer the question.'''
-
-        question: str = InputField(description="The question to answer")
-        code: Code["java"] = OutputField(description="The code to execute")
-
-
-    predict = Predict(CodeGeneration)
-
-    result = predict(question="Given an array, find if any of the two numbers sum up to 10")
+    predict = Predict(task_spec)
+    result = asyncio.run(predict(question="Given an array, find if any of the two numbers sum up to 10"))
     print(result.code)
     ```
 
     Example 2: `Code` as input type in code analysis:
 
     ```python
+    import asyncio
     import inspect
+
     from dspy.adapters.types.code import Code
     from dspy.clients.lm import LM
     from dspy.dsp.utils.settings import settings
     from dspy.predict.predict import Predict
-    from dspy.signatures.field import InputField, OutputField
-    from dspy.signatures.signature import Signature
+    from dspy.task_spec import FieldSpec, make_task_spec
 
     settings.configure(lm=LM("openai/gpt-4o-mini"))
 
-    class CodeAnalysis(Signature):
-        '''Analyze the time complexity of the function.'''
+    task_spec = make_task_spec(
+        {
+            "code": FieldSpec.input("code", type_=Code["python"], desc="The function to analyze"),
+            "result": FieldSpec.output("result", desc="The time complexity of the function"),
+        },
+        instructions="Analyze the time complexity of the function.",
+    )
 
-        code: Code["python"] = InputField(description="The function to analyze")
-        result: str = OutputField(description="The time complexity of the function")
-
-
-    predict = Predict(CodeAnalysis)
-
+    predict = Predict(task_spec)
 
     def sleepsort(x):
         import time
@@ -69,7 +70,7 @@ class Code(Type):
             time.sleep(i)
             print(i)
 
-    result = predict(code=inspect.getsource(sleepsort))
+    result = asyncio.run(predict(code=inspect.getsource(sleepsort)))
     print(result.result)
     ```
     """

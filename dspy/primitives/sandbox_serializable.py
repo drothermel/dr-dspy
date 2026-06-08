@@ -6,7 +6,7 @@ abstract methods describing how a value enters and appears inside the
 sandbox, and inherit:
 
 - ``__get_pydantic_core_schema__`` so the type can be used directly as a
-  :class:`dspy.signatures.signature.Signature` field annotation (see "The pydantic hook" below).
+  TaskSpec field annotation (see "The pydantic hook" below).
 - ``to_repl_variable()`` as a default helper that delegates to the free
   :func:`build_repl_variable` function.
 
@@ -17,7 +17,7 @@ The pydantic hook
 -----------------
 
 ``__get_pydantic_core_schema__`` lets subclasses be used as
-``dspy.signatures.signature.Signature`` field annotations. It is a pass-through (no validation,
+``TaskSpec`` field annotations. It is a pass-through (no validation,
 ``str()`` serialization) — RLM owns real serialization via ``to_sandbox()``
 and ``sandbox_assignment()``.
 """
@@ -70,7 +70,7 @@ class SandboxSerializable(ABC):
             def rlm_preview(self, max_chars: int = 500) -> str:
                 return f"DataFrame: {self.data.shape[0]} rows x {self.data.shape[1]} columns"
 
-    Subclasses can be used directly as :class:`dspy.signatures.signature.Signature` field
+    Subclasses can be used directly as TaskSpec field
     annotations because of the inherited ``__get_pydantic_core_schema__``
     hook (see the module docstring for what that hook does and why it is
     needed).
@@ -90,7 +90,7 @@ class SandboxSerializable(ABC):
 
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type: Any, handler: GetCoreSchemaHandler) -> core_schema.CoreSchema:
-        """Pass-through schema so subclasses work as ``dspy.signatures.signature.Signature`` annotations."""
+        """Pass-through schema so subclasses work as TaskSpec field annotations."""
         return core_schema.no_info_plain_validator_function(
             lambda v: v,
             serialization=core_schema.plain_serializer_function_ser_schema(lambda v: str(v)),

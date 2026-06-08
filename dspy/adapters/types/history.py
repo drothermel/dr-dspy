@@ -6,37 +6,45 @@ import pydantic
 class History(pydantic.BaseModel):
     """Class representing the conversation history.
 
-    The conversation history is a list of messages, each message entity should have keys from the associated signature.
-    For example, if you have the following signature:
+    The conversation history is a list of messages, each message entity should have keys from the associated task spec.
+    For example, if you have the following task spec:
 
     ```
     from dspy.adapters.types.history import History
-    from dspy.signatures.field import InputField, OutputField
-    from dspy.signatures.signature import Signature
+    from dspy.task_spec import FieldSpec, make_task_spec
 
-    class MySignature(Signature):
-        question: str = InputField()
-        history: History = InputField()
-        answer: str = OutputField()
+    task_spec = make_task_spec(
+        {
+            "question": FieldSpec.input("question"),
+            "history": FieldSpec.input("history", type_=History),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Answer using conversation history.",
+    )
     ```
 
     Then the history should be a list of dictionaries with keys "question" and "answer".
 
     Examples:
         ```
+        import asyncio
+
         from dspy.adapters.types.history import History
         from dspy.clients.lm import LM
         from dspy.dsp.utils.settings import settings
         from dspy.predict.predict import Predict
-        from dspy.signatures.field import InputField, OutputField
-        from dspy.signatures.signature import Signature
+        from dspy.task_spec import FieldSpec, make_task_spec
 
         settings.configure(lm=LM("openai/gpt-4o-mini"))
 
-        class MySignature(Signature):
-            question: str = InputField()
-            history: History = InputField()
-            answer: str = OutputField()
+        task_spec = make_task_spec(
+            {
+                "question": FieldSpec.input("question"),
+                "history": FieldSpec.input("history", type_=History),
+                "answer": FieldSpec.output("answer"),
+            },
+            instructions="Answer using conversation history.",
+        )
 
         history = History(
             messages=[
@@ -45,30 +53,35 @@ class History(pydantic.BaseModel):
             ]
         )
 
-        predict = Predict(MySignature)
-        outputs = predict(question="What is the capital of France?", history=history)
+        predict = Predict(task_spec)
+        outputs = asyncio.run(predict(question="What is the capital of France?", history=history))
         ```
 
     Example of capturing the conversation history:
         ```
+        import asyncio
+
         from dspy.adapters.types.history import History
         from dspy.clients.lm import LM
         from dspy.dsp.utils.settings import settings
         from dspy.predict.predict import Predict
-        from dspy.signatures.field import InputField, OutputField
-        from dspy.signatures.signature import Signature
+        from dspy.task_spec import FieldSpec, make_task_spec
 
         settings.configure(lm=LM("openai/gpt-4o-mini"))
 
-        class MySignature(Signature):
-            question: str = InputField()
-            history: History = InputField()
-            answer: str = OutputField()
+        task_spec = make_task_spec(
+            {
+                "question": FieldSpec.input("question"),
+                "history": FieldSpec.input("history", type_=History),
+                "answer": FieldSpec.output("answer"),
+            },
+            instructions="Answer using conversation history.",
+        )
 
-        predict = Predict(MySignature)
-        outputs = predict(question="What is the capital of France?")
+        predict = Predict(task_spec)
+        outputs = asyncio.run(predict(question="What is the capital of France?"))
         history = History(messages=[{"question": "What is the capital of France?", **outputs}])
-        outputs_with_history = predict(question="Are you sure?", history=history)
+        outputs_with_history = asyncio.run(predict(question="Are you sure?", history=history))
         ```
     """
 

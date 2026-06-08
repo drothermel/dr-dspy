@@ -7,6 +7,7 @@ from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.teleprompt.bootstrap_finetune import BootstrapFinetune
 from dspy.utils.dummies import DummyLM
+from tests.task_spec.helpers import ts
 
 
 # Define a simple metric function for testing
@@ -40,8 +41,8 @@ class SimpleModule(Module):
 def test_compile_with_predict_instances():
     """Test BootstrapFinetune compilation with Predict instances."""
     # Create SimpleModule instances for student and teacher
-    student = SimpleModule("input -> output")
-    teacher = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
+    teacher = SimpleModule(ts("input -> output"))
 
     lm = DummyLM([{"output": "blue"}, {"output": "Ring-ding-ding-ding-dingeringeding!"}])
     settings.configure(lm=lm)
@@ -69,7 +70,7 @@ def test_error_handling_missing_lm():
     lm = DummyLM([{"output": "test"}])
     settings.configure(lm=lm)
 
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
     # Intentionally NOT setting LM for the student module
 
     bootstrap = BootstrapFinetune(metric=simple_metric)

@@ -18,17 +18,22 @@ class File(Type):
 
     Examples:
         ```python
+        import asyncio
+
         from dspy.adapters.types.file import File
         from dspy.predict.predict import Predict
-        from dspy.signatures.field import InputField, OutputField
-        from dspy.signatures.signature import Signature
+        from dspy.task_spec import FieldSpec, make_task_spec
 
-        class QA(Signature):
-            file: File = InputField()
-            summary = OutputField()
+        task_spec = make_task_spec(
+            {
+                "file": FieldSpec.input("file", type_=File),
+                "summary": FieldSpec.output("summary"),
+            },
+            instructions="Summarize the file.",
+        )
 
-        program = Predict(QA)
-        result = program(file=File.from_path("./research.pdf"))
+        program = Predict(task_spec)
+        result = asyncio.run(program(file=File.from_path("./research.pdf")))
         print(result.summary)
         ```
     """

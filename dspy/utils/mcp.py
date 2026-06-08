@@ -43,4 +43,4 @@ def convert_mcp_tool(session: "mcp.ClientSession", tool: "mcp.types.Tool") -> To
         result = await session.call_tool(tool.name, arguments=kwargs)
         return _convert_mcp_tool_result(result)
 
-    return Tool(func=func, name=tool.name, desc=tool.description, args=args, arg_types=arg_types, arg_desc=arg_desc)
+    return Tool(func, description=tool.description, name=tool.name, args=args, arg_types=arg_types, arg_desc=arg_desc)

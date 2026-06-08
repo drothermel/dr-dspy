@@ -5,15 +5,27 @@ import pytest
 
 from dspy.dsp.utils.settings import settings
 from dspy.predict.program_of_thought import ProgramOfThought
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
-from dspy.task_spec.bridge import task_spec_from_signature
+from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.utils.dummies import DummyLM
 
+BasicQA = make_task_spec(
+    {
+        "question": FieldSpec.input("question"),
+        "answer": FieldSpec.output("answer", desc="often between 1 and 5 words"),
+    },
+    instructions="Answer the question.",
+    name="BasicQA",
+)
 
-class BasicQA(Signature):
-    question = InputField()
-    answer = OutputField(desc="often between 1 and 5 words")
+ExtremumFinder = make_task_spec(
+    {
+        "input_list": FieldSpec.input("input_list"),
+        "maximum": FieldSpec.output("maximum", desc="The maximum of the given numbers"),
+        "minimum": FieldSpec.output("minimum", desc="The minimum of the given numbers"),
+    },
+    instructions="Find the maximum and minimum values.",
+    name="ExtremumFinder",
+)
 
 
 @pytest.mark.deno
@@ -28,7 +40,7 @@ def test_pot_code_generation():
         ]
     )
     settings.configure(lm=lm)
-    pot = ProgramOfThought(task_spec_from_signature(BasicQA))
+    pot = ProgramOfThought(BasicQA)
     res = asyncio.run(pot(question="What is 1+1?"))
     assert res.answer == "2"
     assert pot.interpreter.deno_process is None
@@ -44,16 +56,10 @@ def test_old_style_pot():
         ]
     )
     settings.configure(lm=lm)
-    pot = ProgramOfThought(task_spec_from_signature(BasicQA))
+    pot = ProgramOfThought(BasicQA)
     res = asyncio.run(pot(question="What is 1+1?"))
     assert res.answer == "2"
     assert pot.interpreter.deno_process is None
-
-
-class ExtremumFinder(Signature):
-    input_list = InputField()
-    maximum = OutputField(desc="The maximum of the given numbers")
-    minimum = OutputField(desc="The minimum of the given numbers")
 
 
 @pytest.mark.deno
@@ -68,7 +74,7 @@ def test_pot_support_multiple_fields():
         ]
     )
     settings.configure(lm=lm)
-    pot = ProgramOfThought(task_spec_from_signature(ExtremumFinder))
+    pot = ProgramOfThought(ExtremumFinder)
     res = asyncio.run(pot(input_list="2, 3, 5, 6"))
     assert res.maximum == "6"
     assert res.minimum == "2"
@@ -91,7 +97,7 @@ def test_pot_code_generation_with_one_error():
         ]
     )
     settings.configure(lm=lm)
-    pot = ProgramOfThought(task_spec_from_signature(BasicQA))
+    pot = ProgramOfThought(BasicQA)
     res = asyncio.run(pot(question="What is 1+1?"))
     assert res.answer == "2"
     assert pot.interpreter.deno_process is None
@@ -111,7 +117,7 @@ def test_pot_code_generation_persistent_errors():
     )
     settings.configure(lm=lm)
 
-    pot = ProgramOfThought(task_spec_from_signature(BasicQA), max_iters=max_iters)
+    pot = ProgramOfThought(BasicQA, max_iters=max_iters)
     with pytest.raises(RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: ZeroDivisionError:"):  # noqa: RUF043
         asyncio.run(pot(question="What is 1+1?"))
 
@@ -125,7 +131,7 @@ def test_pot_code_parse_error():
         * max_iters
     )
     settings.configure(lm=lm)
-    pot = ProgramOfThought(task_spec_from_signature(BasicQA), max_iters=max_iters)
+    pot = ProgramOfThought(BasicQA, max_iters=max_iters)
     with (
         patch("dspy.predict.program_of_thought.ProgramOfThought._execute_code") as mock_execute_code,
         pytest.raises(

@@ -22,10 +22,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
-from dspy.task_spec import default_task_instructions
-from dspy.task_spec.bridge import task_spec_from_signature
+from dspy.task_spec import FieldSpec, default_task_instructions, make_task_spec
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.utils.dummies import DummyLM
 from dspy.utils.saving import load
@@ -39,7 +36,7 @@ QUESTION_ANSWER_TASK_SPEC = ts(
 
 
 def test_deepcopy_basic():
-    cot = ChainOfThought(ts("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
+    cot = ChainOfThought(ts("q -> a"))
     cot_copy = cot.deepcopy()
     assert len(cot.parameters()) == len(cot_copy.parameters())
     # Parameters should be different objects with the same values.
@@ -51,7 +48,7 @@ def test_deepcopy_with_uncopyable_modules():
     class CustomClass(Module):
         def __init__(self):
             self.lock = threading.Lock()  # Non-copyable object.
-            self.cot = ChainOfThought(ts("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
+            self.cot = ChainOfThought(ts("q -> a"))
 
     model = CustomClass()
     model_copy = model.deepcopy()
@@ -67,7 +64,7 @@ def test_deepcopy_with_nested_modules():
     class CustomClass1(Module):
         def __init__(self):
             self.lock = threading.Lock()  # Non-copyable object.
-            self.cot = ChainOfThought(ts("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
+            self.cot = ChainOfThought(ts("q -> a"))
 
     class CustomClass2(Module):
         def __init__(self):
@@ -84,7 +81,7 @@ def test_deepcopy_with_nested_modules():
 
 
 def test_save_and_load_with_json(tmp_path):
-    model = ChainOfThought(ts("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
+    model = ChainOfThought(ts("q -> a"))
     model.predict.task_spec = model.predict.task_spec.with_instructions("You are a helpful assistant.")
     model.predict.demos = [
         Example(q="What is the capital of France?", a="Paris", reasoning="n/a").with_inputs("q"),
@@ -100,7 +97,7 @@ def test_save_and_load_with_json(tmp_path):
     ]
     save_path = tmp_path / "model.json"
     model.save(save_path)
-    new_model = ChainOfThought(ts("q -> a"))  # ty:ignore[invalid-argument-type, too-many-positional-arguments]
+    new_model = ChainOfThought(ts("q -> a"))
     new_model.load(save_path)
 
     assert new_model.predict.task_spec.equals(model.predict.task_spec)
@@ -113,12 +110,19 @@ def test_save_and_load_with_pkl(tmp_path):
     import datetime
 
     # `datetime.date` is not json serializable, so we need to save with pickle.
-    class MySignature(Signature):
-        """Just a custom signature."""
-
-        current_date: datetime.date = InputField()
-        target_date: datetime.date = InputField()
-        date_diff: int = OutputField(desc="The difference in days between the current_date and the target_date")
+    MySignature = make_task_spec(
+        {
+            "current_date": FieldSpec.input("current_date", type_=datetime.date),
+            "target_date": FieldSpec.input("target_date", type_=datetime.date),
+            "date_diff": FieldSpec.output(
+                "date_diff",
+                type_=int,
+                desc="The difference in days between the current_date and the target_date",
+            ),
+        },
+        instructions="Just a custom task spec.",
+        name="MySignature",
+    )
 
     trainset = [
         {"current_date": datetime.date(2024, 1, 1), "target_date": datetime.date(2024, 1, 2), "date_diff": 1},
@@ -133,7 +137,7 @@ def test_save_and_load_with_pkl(tmp_path):
         lm=DummyLM([{"date_diff": "1", "reasoning": "n/a"}, {"date_diff": "2", "reasoning": "n/a"}] * 10)
     )
 
-    cot = ChainOfThought(task_spec_from_signature(MySignature))
+    cot = ChainOfThought(MySignature)
     asyncio.run(cot(current_date=datetime.date(2024, 1, 1), target_date=datetime.date(2024, 1, 2)))
 
     def dummy_metric(example, pred, trace=None):
@@ -146,7 +150,7 @@ def test_save_and_load_with_pkl(tmp_path):
     save_path = tmp_path / "program.pkl"
     compiled_cot.save(save_path)
 
-    new_cot = ChainOfThought(task_spec_from_signature(MySignature))
+    new_cot = ChainOfThought(MySignature)
     new_cot.load(save_path, allow_pickle=True)
 
     assert str(new_cot.predict.task_spec) == str(compiled_cot.predict.task_spec)
@@ -162,11 +166,11 @@ def test_save_with_extra_modules(tmp_path):
         f.write("""
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.module import Module
-from dspy.signatures.signature import Signature
+from dspy.task_spec import make_task_spec
 
 class MyModule(Module):
     def __init__(self):
-        self.cot = ChainOfThought(ts("q -> a"))
+        self.cot = ChainOfThought(make_task_spec("q -> a", instructions="Answer the question."))
 
     async def aforward(self, q):
         return await self.cot(q=q)

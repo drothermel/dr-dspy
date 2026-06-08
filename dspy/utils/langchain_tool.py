@@ -36,4 +36,4 @@ def convert_langchain_tool(tool: "BaseTool") -> Tool:
         for key, field in args_schema.model_fields.items()
     }
 
-    return Tool(func=func, name=tool.name, desc=tool.description, args=args, arg_types=arg_types, arg_desc=arg_desc)
+    return Tool(func, description=tool.description, name=tool.name, args=args, arg_types=arg_types, arg_desc=arg_desc)

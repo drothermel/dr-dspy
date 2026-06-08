@@ -9,6 +9,7 @@ from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.parallel import Parallel
 from dspy.utils.usage_tracker import UsageTracker, track_usage
+from tests.task_spec.helpers import ts
 
 
 def test_add_usage_entry():
@@ -146,7 +147,7 @@ def test_track_usage_context_manager(lm_for_test):
     lm = LM(lm_for_test, cache=False, temperature=0.0)
     settings.configure(lm=lm)
 
-    predict = ChainOfThought("question -> answer")
+    predict = ChainOfThought(ts("question -> answer"))
     with track_usage() as tracker:
         predict(question="What is the capital of France?")
         predict(question="What is the capital of Italy?")

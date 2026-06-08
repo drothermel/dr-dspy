@@ -30,9 +30,7 @@ class ProgramOfThought(Module):
     ```
     """
 
-    def __init__(
-        self, task_spec: TaskSpec, max_iters: int = 3, interpreter: PythonInterpreter | None = None
-    ) -> None:
+    def __init__(self, task_spec: TaskSpec, max_iters: int = 3, interpreter: PythonInterpreter | None = None) -> None:
         """
         Args:
             task_spec: The task spec of the module.

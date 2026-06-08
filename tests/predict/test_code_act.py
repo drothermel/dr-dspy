@@ -4,17 +4,29 @@ import pytest
 
 from dspy.dsp.utils.settings import settings
 from dspy.predict.code_act import CodeAct
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
-from dspy.task_spec.bridge import task_spec_from_signature
+from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.utils.dummies import DummyLM
 
 pytestmark = pytest.mark.deno
 
+BasicQA = make_task_spec(
+    {
+        "question": FieldSpec.input("question"),
+        "answer": FieldSpec.output("answer", desc="often between 1 and 5 words"),
+    },
+    instructions="Answer the question.",
+    name="BasicQA",
+)
 
-class BasicQA(Signature):
-    question = InputField()
-    answer = OutputField(desc="often between 1 and 5 words")
+ExtremumFinder = make_task_spec(
+    {
+        "input_list": FieldSpec.input("input_list"),
+        "maximum": FieldSpec.output("maximum", desc="The maximum of the given numbers"),
+        "minimum": FieldSpec.output("minimum", desc="The minimum of the given numbers"),
+    },
+    instructions="Find the maximum and minimum values.",
+    name="ExtremumFinder",
+)
 
 
 def add(a: float, b: float) -> float:
@@ -34,7 +46,7 @@ def test_codeact_code_generation():
         ]
     )
     settings.configure(lm=lm)
-    program = CodeAct(task_spec_from_signature(BasicQA), tools=[add])
+    program = CodeAct(BasicQA, tools=[add])
     res = asyncio.run(program(question="What is 1+1?"))
     assert res.answer == "2"
     assert res.trajectory == {
@@ -42,12 +54,6 @@ def test_codeact_code_generation():
         "generated_code_0": "result = add(1,1)\nprint(result)",
     }
     assert program.interpreter.deno_process is None
-
-
-class ExtremumFinder(Signature):
-    input_list = InputField()
-    maximum = OutputField(desc="The maximum of the given numbers")
-    minimum = OutputField(desc="The minimum of the given numbers")
 
 
 def extract_maximum_minimum(input_list: str) -> dict[str, float]:
@@ -67,7 +73,7 @@ def test_codeact_support_multiple_fields():
         ]
     )
     settings.configure(lm=lm)
-    program = CodeAct(task_spec_from_signature(ExtremumFinder), tools=[extract_maximum_minimum])
+    program = CodeAct(ExtremumFinder, tools=[extract_maximum_minimum])
     res = asyncio.run(program(input_list="2, 3, 5, 6"))
     assert res.maximum == "6"
     assert res.minimum == "2"
@@ -95,7 +101,7 @@ def test_codeact_code_parse_failure():
         ]
     )
     settings.configure(lm=lm)
-    program = CodeAct(task_spec_from_signature(BasicQA), tools=[add])
+    program = CodeAct(BasicQA, tools=[add])
     res = asyncio.run(program(question="What is 1+1?"))
     assert res.answer == "2"
     assert res.trajectory == {
@@ -124,7 +130,7 @@ def test_codeact_code_execution_failure():
         ]
     )
     settings.configure(lm=lm)
-    program = CodeAct(task_spec_from_signature(BasicQA), tools=[add])
+    program = CodeAct(BasicQA, tools=[add])
     res = asyncio.run(program(question="What is 1+1?"))
     assert res.answer == "2"
     assert res.trajectory == {
@@ -143,4 +149,4 @@ class CustomTool:
 
 def test_codeact_tool_validation():
     with pytest.raises(ValueError, match="CodeAct only accepts functions and not callable objects."):  # noqa: RUF043
-        CodeAct(task_spec_from_signature(BasicQA), tools=[CustomTool()])
+        CodeAct(BasicQA, tools=[CustomTool()])

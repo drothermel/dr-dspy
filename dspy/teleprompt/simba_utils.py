@@ -187,7 +187,9 @@ OFFER_FEEDBACK_TASK_SPEC = make_task_spec(
             str,
             desc="The definition of each module in the program, including its I/O",
         ),
-        "program_inputs": FieldSpec.input("program_inputs", str, desc="The inputs to the program that we are analyzing"),
+        "program_inputs": FieldSpec.input(
+            "program_inputs", str, desc="The inputs to the program that we are analyzing"
+        ),
         "oracle_metadata": FieldSpec.input(
             "oracle_metadata",
             str,

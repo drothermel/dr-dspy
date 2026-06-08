@@ -42,7 +42,9 @@ DATASET_DESCRIPTOR_TASK_SPEC = make_task_spec(
 DATASET_DESCRIPTOR_WITH_PRIOR_OBSERVATIONS_TASK_SPEC = make_task_spec(
     {
         "examples": FieldSpec.input("examples", str, desc="Sample data points from the dataset"),
-        "prior_observations": FieldSpec.input("prior_observations", str, desc="Some prior observations I made about the data"),
+        "prior_observations": FieldSpec.input(
+            "prior_observations", str, desc="Some prior observations I made about the data"
+        ),
         "observations": FieldSpec.output(
             "observations",
             str,

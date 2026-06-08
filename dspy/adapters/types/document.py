@@ -23,37 +23,40 @@ class Document(Type):
 
     Examples:
         ```python
+        import asyncio
+
         from dspy.adapters.types.citation import Citations
         from dspy.adapters.types.document import Document
         from dspy.clients.lm import LM
         from dspy.predict.predict import Predict
-        from dspy.signatures.field import InputField, OutputField
-        from dspy.signatures.signature import Signature
+        from dspy.task_spec import FieldSpec, make_task_spec
 
-        class AnswerWithSources(Signature):
-            '''Answer questions using provided documents with citations.'''
-            documents: list[Document] = InputField()
-            question: str = InputField()
-            answer: str = OutputField()
-            citations: Citations = OutputField()
+        task_spec = make_task_spec(
+            {
+                "documents": FieldSpec.input("documents", type_=list[Document]),
+                "question": FieldSpec.input("question"),
+                "answer": FieldSpec.output("answer"),
+                "citations": FieldSpec.output("citations", type_=Citations),
+            },
+            instructions="Answer questions using provided documents with citations.",
+        )
 
-        # Create documents
         docs = [
             Document(
                 data="The Earth orbits the Sun in an elliptical path.",
-                title="Basic Astronomy Facts"
+                title="Basic Astronomy Facts",
             ),
             Document(
                 data="Water boils at 100°C at standard atmospheric pressure.",
                 title="Physics Fundamentals",
-            )
+            ),
         ]
 
-        # Use with a citation-supporting model
         lm = LM("anthropic/claude-opus-4-1-20250805")
-        predictor = Predict(AnswerWithSources)
-        result = predictor(documents=docs, question="What temperature does water boil?", lm=lm)
+        predictor = Predict(task_spec)
+        result = asyncio.run(predictor(documents=docs, question="What temperature does water boil?", lm=lm))
         print(result.citations)
+        ```
         ```
     """
 

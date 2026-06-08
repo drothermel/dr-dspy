@@ -1,12 +1,19 @@
 """Synthesize Pydantic models from TaskSpec instances for JSON-schema tooling."""
 
-from typing import Any
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field, create_model
 from pydantic.fields import FieldInfo
 
 from dspy.task_spec.task_spec import TaskSpec
 from dspy.utils.constants import IS_TYPE_UNDEFINED
+
+
+def get_dspy_field_type(field: FieldInfo) -> Literal["input", "output"]:
+    field_type = cast("dict[str, Any]", field.json_schema_extra or {}).get("__dspy_field_type")
+    if field_type is None:
+        raise ValueError(f"Field {field} does not have a __dspy_field_type")
+    return field_type
 
 
 def task_spec_input_field_infos(spec: TaskSpec) -> dict[str, FieldInfo]:

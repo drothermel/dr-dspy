@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from typing_extensions import override
 
-from dspy.adapters.types.tool import Tool
+from dspy.adapters.types.tool import Tool, tool_from_callable
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.predict.program_of_thought import ProgramOfThought
@@ -55,7 +55,7 @@ class CodeAct(ReAct, ProgramOfThought):
         self.max_iters = max_iters
         self.history = []
 
-        normalized_tools: list[Tool] = [t if isinstance(t, Tool) else Tool(t) for t in tools]
+        normalized_tools: list[Tool] = [tool_from_callable(t) for t in tools]
         if any(not inspect.isfunction(tool.func) for tool in normalized_tools):
             raise ValueError("CodeAct only accepts functions and not callable objects.")
         tools_by_name: dict[str, Tool] = {}

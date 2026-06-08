@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pydantic
 
-from dspy.adapters.types.tool import Tool
+from dspy.adapters.types.tool import Tool, tool_from_callable
 from dspy.adapters.utils import parse_value, translate_field_type
 from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
@@ -193,7 +193,7 @@ class RLM(Module):
                 return func
             if not callable(func):
                 raise TypeError(f"Tool {func!r} must be callable, got {type(func).__name__}")
-            return Tool(func)
+            return tool_from_callable(func)
 
         # List of callables/Tools -> normalize to Tool objects
         tool_list = [to_tool(t) for t in tools]
@@ -306,9 +306,7 @@ class RLM(Module):
         final_output_names = ", ".join(self.task_spec.output_fields.keys())
 
         output_field_infos = task_spec_output_field_infos(self.task_spec)
-        output_fields = "\n".join(
-            f"- {translate_field_type(n, f)}" for n, f in output_field_infos.items()
-        )
+        output_fields = "\n".join(f"- {translate_field_type(n, f)}" for n, f in output_field_infos.items())
 
         # Include original task instructions if present
         task_instructions = f"{self.task_spec.instructions}\n\n" if self.task_spec.instructions else ""

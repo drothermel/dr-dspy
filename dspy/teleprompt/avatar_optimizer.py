@@ -232,9 +232,7 @@ class AvatarOptimizer(Teleprompter):
             ).feedback
 
             new_instruction = (
-                await self.feedback_instruction(
-                    previous_instruction=actor_task_spec.instructions, feedback=feedback
-                )
+                await self.feedback_instruction(previous_instruction=actor_task_spec.instructions, feedback=feedback)
             ).new_instruction
 
             if (self.optimize_for == "max" and best_score < score) or (

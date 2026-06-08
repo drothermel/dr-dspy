@@ -426,7 +426,7 @@ def test_xml_adapter_format_exact_non_native_tool_result_history_field():
                     }
                 ]
             ),
-            "tools": [Tool(search)],
+            "tools": [Tool(search, description="Search for documents.")],
         },
     )
 
@@ -441,7 +441,7 @@ def test_xml_adapter_format_exact_non_native_tool_result_history_field():
         "</question>\n"
         "\n"
         "<tools>\n"
-        "[\"search. It takes arguments {'query': {'type': 'string'}}.\"]\n"
+        "[\"search, whose description is <desc>Search for documents.</desc>. It takes arguments {'query': {'type': 'string'}}.\"]\n"
         "</tools>\n"
         "\n"
         "Respond with the corresponding output fields wrapped in XML tags `<next_thought>`, then `<tool_calls>`."
@@ -601,7 +601,7 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
         },
         instructions="Answer using all supplied context.",
     )
-    tool = Tool(search)
+    tool = Tool(search, description="Search for documents.")
     demo_profile = Profile(
         name="Ada",
         location=Location(city="London", country="UK"),

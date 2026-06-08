@@ -18,6 +18,7 @@ from dspy.dsp.utils.settings import settings
 from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
+from tests.task_spec.helpers import ts
 
 
 def test_basic_dspy_settings():
@@ -69,7 +70,7 @@ def test_dspy_context_with_dspy_parallel():
 
     class MyModule(Module):
         def __init__(self):
-            self.predict = Predict("question -> answer")
+            self.predict = Predict(ts("question -> answer"))
 
         async def aforward(self, question: str) -> str:
             lm = LM("openai/gpt-4o-mini", cache=False) if "France" in question else settings.lm
@@ -113,7 +114,7 @@ def test_dspy_context_with_dspy_parallel():
 async def test_dspy_context_with_async_task_group():
     class MyModule(Module):
         def __init__(self):
-            self.predict = Predict("question -> answer")
+            self.predict = Predict(ts("question -> answer"))
 
         async def aforward(self, question: str) -> str:
             lm = LM("openai/gpt-4o-mini", cache=False) if "France" in question else LM("openai/gpt-4o", cache=False)

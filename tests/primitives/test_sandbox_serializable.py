@@ -5,8 +5,6 @@ from typing_extensions import override
 
 from dspy.primitives.repl_types import REPLVariable
 from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
 
 # -- Stub implementations --
 
@@ -128,7 +126,17 @@ class TestBuildReplVariable:
         assert "import json" in var.desc
 
     def test_passes_field_info_through(self):
-        field = InputField(desc="A data column")
+        from dspy.task_spec import FieldSpec, make_task_spec
+        from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
+
+        spec = make_task_spec(
+            {
+                "data": FieldSpec.input("data", type_=ExampleSerializable, desc="A data column"),
+                "answer": FieldSpec.output("answer"),
+            },
+            instructions="Process data.",
+        )
+        field = task_spec_input_field_infos(spec)["data"]
         var = build_repl_variable(ExampleSerializable(), "data", field_info=field)
         assert "A data column" in var.desc
         # Setup note still appended after user-provided desc
@@ -143,14 +151,3 @@ class TestToReplVariableMethod:
         var = obj.to_repl_variable("data")
         assert isinstance(var, REPLVariable)
         assert "ExampleData: payload" in var.preview
-
-
-class TestSignatureAnnotation:
-    """Subclasses should be usable as Signature field annotations."""
-
-    def test_subclass_supports_signature_annotation(self):
-        class ExampleSignature(Signature):
-            data: ExampleSerializable = InputField()
-            answer: str = OutputField()
-
-        assert ExampleSignature.input_fields["data"].annotation is ExampleSerializable

@@ -21,6 +21,7 @@ from dspy.dsp.utils.settings import settings
 from dspy.predict.predict import Predict
 from dspy.utils.dummies import DummyLM
 from dspy.utils.inspect_history import pretty_print_history
+from tests.task_spec.helpers import ts
 
 
 @pytest.fixture(autouse=True)
@@ -33,7 +34,7 @@ def test_inspect_history_basic(capsys):
     lm = DummyLM([{"response": "Hello"}, {"response": "How are you?"}])
     settings.configure(lm=lm)
 
-    predictor = Predict("query: str -> response: str")
+    predictor = Predict(ts("query: str -> response: str"))
     asyncio.run(predictor.acall(query="Hi"))
     asyncio.run(predictor.acall(query="What's up?"))
 
@@ -116,7 +117,7 @@ def test_inspect_history_with_n(capsys):
     lm = DummyLM([{"response": "One"}, {"response": "Two"}, {"response": "Three"}])
     settings.configure(lm=lm)
 
-    predictor = Predict("query: str -> response: str")
+    predictor = Predict(ts("query: str -> response: str"))
     asyncio.run(predictor.acall(query="First"))
     asyncio.run(predictor.acall(query="Second"))
     asyncio.run(predictor.acall(query="Third"))
@@ -142,7 +143,7 @@ def test_inspect_history_n_larger_than_history(capsys):
     lm = DummyLM([{"response": "First"}, {"response": "Second"}])
     settings.configure(lm=lm)
 
-    predictor = Predict("query: str -> response: str")
+    predictor = Predict(ts("query: str -> response: str"))
     asyncio.run(predictor.acall(query="Query 1"))
     asyncio.run(predictor.acall(query="Query 2"))
 

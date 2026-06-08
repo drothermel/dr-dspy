@@ -10,6 +10,7 @@ from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.module import Module
 from dspy.utils.callback import ACTIVE_CALL_ID, BaseCallback, with_callbacks
 from dspy.utils.dummies import DummyLM
+from tests.task_spec.helpers import ts
 
 
 @pytest.fixture(autouse=True)
@@ -177,7 +178,7 @@ def test_callback_complex_module():
         callbacks=[callback],
     )
 
-    cot = ChainOfThought("question -> answer", n=3)  # ty:ignore[invalid-argument-type]
+    cot = ChainOfThought(ts("question -> answer"), n=3)  # ty:ignore[invalid-argument-type]
     result = asyncio.run(cot(question="How are you?"))
     assert result["answer"] == "test output"
     assert result["reasoning"] == "No more responses"
@@ -209,7 +210,7 @@ async def test_callback_async_module():
         lm=DummyLM({"How are you?": {"answer": "test output", "reasoning": "No more responses"}}),
         callbacks=[callback],
     ):
-        cot = ChainOfThought("question -> answer", n=3)  # ty:ignore[invalid-argument-type]
+        cot = ChainOfThought(ts("question -> answer"), n=3)  # ty:ignore[invalid-argument-type]
         result = await cot.acall(question="How are you?")
     assert result["answer"] == "test output"
     assert result["reasoning"] == "No more responses"
@@ -248,7 +249,7 @@ def test_tool_calls():
 
     class MyModule(Module):
         def __init__(self):
-            self.tools = [Tool(tool_1), Tool(tool_2)]
+            self.tools = [Tool(tool_1, description="Tool one."), Tool(tool_2, description="Tool two.")]
 
         async def aforward(self, query: str) -> str:
             query = self.tools[0](query=query)  # ty:ignore[invalid-assignment]

@@ -7,6 +7,7 @@ from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.teleprompt.utils import create_n_fewshot_demo_sets, eval_candidate_program
 from dspy.utils.dummies import DummyLM
+from tests.task_spec.helpers import ts
 
 
 class DummyModule(Module):
@@ -87,7 +88,7 @@ def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled():
     Regression test for https://github.com/stanfordnlp/dspy/issues/9308
     """
     student = DummyModule()
-    student.predictor = Predict("input -> output")  # ty:ignore[unresolved-attribute]
+    student.predictor = Predict(ts("input -> output"))  # ty:ignore[unresolved-attribute]
     trainset = [Example(input="test", output="test").with_inputs("input")]
 
     lm = DummyLM([{"output": "test"}])

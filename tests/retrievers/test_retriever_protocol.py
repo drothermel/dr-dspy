@@ -123,7 +123,7 @@ def test_weaviate_rm_direct_call_preserves_long_text_shape() -> None:
             self.collections = FakeCollections(collection)
 
     collection = FakeCollection()
-    retriever = WeaviateRM("collection", weaviate_client=FakeClient(collection), k=1)  # ty:ignore[invalid-argument-type]
+    retriever = WeaviateRM("collection", weaviate_client=FakeClient(collection), k=1)
 
     result = retriever("question")
 

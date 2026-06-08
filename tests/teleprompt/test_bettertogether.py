@@ -18,6 +18,7 @@ from dspy.teleprompt.bootstrap_finetune import BootstrapFinetune
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.dummies import DummyLM
+from tests.task_spec.helpers import ts
 
 
 # Define a simple metric function for testing
@@ -69,7 +70,7 @@ class MarkedOptimizer(Teleprompter):
 
     @override
     async def compile(self, student, **kwargs: object):
-        prog = SimpleModule("input -> output")
+        prog = SimpleModule(ts("input -> output"))
         prog.marker = self.marker  # ty:ignore[unresolved-attribute]
         return prog
 
@@ -103,7 +104,7 @@ class CapturingOptimizer(Teleprompter):
 @pytest.fixture
 def student_with_lm():
     """Create a student module with a DummyLM."""
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     student.set_lm(lm)
     return student
@@ -187,7 +188,7 @@ def test_compile_basic():
     """Test basic compilation with mocked optimizers."""
     from dspy.teleprompt.teleprompt import Teleprompter
 
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
 
     lm = DummyLM([{"output": "blue"}, {"output": "4"}])
     student.set_lm(lm)
@@ -222,7 +223,7 @@ def test_compile_basic():
 def test_trainset_validation():
     """Test that empty trainset is rejected."""
     optimizer = BetterTogether(metric=simple_metric)
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
 
     lm = DummyLM([{"output": "test"}])
     student.set_lm(lm)
@@ -237,7 +238,7 @@ def test_trainset_validation():
 def test_valset_ratio_validation():
     """Test that invalid valset_ratio is rejected."""
     optimizer = BetterTogether(metric=simple_metric)
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
 
     lm = DummyLM([{"output": "test"}])
     student.set_lm(lm)
@@ -274,7 +275,9 @@ def test_student_in_optimizer_compile_args():
     optimizer = BetterTogether(metric=simple_metric)
 
     try:
-        optimizer._validate_compile_args(optimizer.optimizers["p"], "p", {"student": SimpleModule("input -> output")})
+        optimizer._validate_compile_args(
+            optimizer.optimizers["p"], "p", {"student": SimpleModule(ts("input -> output"))}
+        )
         raise AssertionError("Should have raised ValueError for 'student' in compile_args")
     except ValueError as e:
         assert "student" in str(e).lower()
@@ -310,7 +313,7 @@ def test_compile_args_multi_optimizer_strategy():
     """Test that different optimizers in a strategy receive their respective compile_args."""
     from dspy.teleprompt.teleprompt import Teleprompter
 
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     student.set_lm(lm)
 
@@ -371,7 +374,7 @@ def test_compile_args_override_global_params():
     """Test that optimizer_compile_args override global trainset/valset/teacher parameters."""
     from dspy.teleprompt.teleprompt import Teleprompter
 
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     student.set_lm(lm)
 
@@ -391,7 +394,7 @@ def test_compile_args_override_global_params():
     # Create override values
     override_trainset = [examples[2]]  # Different from global trainset
     override_valset = [examples[0]]  # Different from global valset
-    override_teacher = SimpleModule("input -> output")
+    override_teacher = SimpleModule(ts("input -> output"))
 
     # Pass global values to compile, but override them in optimizer_compile_args
     compile_args = {
@@ -437,7 +440,7 @@ def test_trainset_shuffling_between_steps():
     """Test that trainset is shuffled between steps when shuffle_trainset_between_steps=True."""
     from dspy.teleprompt.teleprompt import Teleprompter
 
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     student.set_lm(lm)
 
@@ -487,7 +490,7 @@ def test_strategy_execution_order():
     """Test that strategy steps are executed in order and programs are passed correctly."""
     from dspy.teleprompt.teleprompt import Teleprompter
 
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     student.set_lm(lm)
 
@@ -501,7 +504,7 @@ def test_strategy_execution_order():
         @override
         async def compile(self, student, **kwargs: object):
             # Create a new student with a marker to track the optimization path
-            optimized = SimpleModule("input -> output")
+            optimized = SimpleModule(ts("input -> output"))
             if not hasattr(student, "optimization_path"):
                 optimized.optimization_path = [self.name]  # ty:ignore[unresolved-attribute]
             else:
@@ -531,7 +534,7 @@ def test_lm_lifecycle_management():
     """Test that launch_lms and kill_lms are called appropriately between steps."""
     from dspy.teleprompt.teleprompt import Teleprompter
 
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     student.set_lm(lm)
 
@@ -561,7 +564,7 @@ def test_error_handling_returns_best_program():
     """Test that if a step fails, the best program found so far is still returned."""
     from dspy.teleprompt.teleprompt import Teleprompter
 
-    student = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     student.set_lm(lm)
 
@@ -569,7 +572,7 @@ def test_error_handling_returns_best_program():
     class SuccessfulOptimizer(Teleprompter):
         @override
         async def compile(self, student, **kwargs: object):
-            optimized = SimpleModule("input -> output")
+            optimized = SimpleModule(ts("input -> output"))
             optimized.step_name = "p_success"  # ty:ignore[unresolved-attribute]
             return optimized
 
@@ -694,7 +697,7 @@ def test_empty_valset_handling(student_with_lm):
     assert result.marker == "optimized", "Should return the latest program when valset is empty list"
     assert hasattr(result, "candidate_programs"), "Should have candidate_programs"
 
-    student2 = SimpleModule("input -> output")
+    student2 = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     student2.set_lm(lm)
 

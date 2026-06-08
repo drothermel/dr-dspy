@@ -232,9 +232,7 @@ class COPRO(Teleprompter):
                     # Set this new module with our instruction / prefix
                     *_, last_key = get_task_spec(p_new).fields.keys()
                     updated_task_spec = (
-                        get_task_spec(p_new)
-                        .with_instructions(instruction)
-                        .with_updated_field(last_key, prefix=prefix)
+                        get_task_spec(p_new).with_instructions(instruction).with_updated_field(last_key, prefix=prefix)
                     )
                     set_task_spec(predictor=p_new, task_spec=updated_task_spec)
 

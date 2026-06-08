@@ -14,7 +14,6 @@ from dspy.dsp.utils.settings import settings
 from dspy.predict.parameter import Parameter
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.signatures.signature import Signature
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
 from dspy.task_spec.task_spec import TaskSpec
 from dspy.utils.callback import BaseCallback
@@ -67,10 +66,6 @@ class Predict(Module, Parameter):
             raise TypeError(
                 "Predict requires a TaskSpec instance, not a string. "
                 "Use make_task_spec(...) to create one from a spec string."
-            )
-        if isinstance(task_spec, type) and issubclass(task_spec, Signature):
-            raise TypeError(
-                "Predict requires a TaskSpec instance, not a Signature class. Use make_task_spec(...) to create one."
             )
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"Predict requires a TaskSpec instance, got {type(task_spec).__name__}.")

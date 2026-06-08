@@ -5,6 +5,7 @@ import pytest
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
+from tests.task_spec.helpers import ts
 
 
 def test_reasoning_basic_operations():
@@ -80,7 +81,7 @@ def test_reasoning_with_chain_of_thought():
     lm = DummyLM([{"reasoning": "Let me think step by step", "answer": "42"}])
     settings.configure(lm=lm)
 
-    cot = ChainOfThought("question -> answer")
+    cot = ChainOfThought(ts("question -> answer"))
     result = asyncio.run(cot.acall(question="What is the answer?"))
 
     assert isinstance(result.reasoning, Reasoning)

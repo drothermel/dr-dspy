@@ -11,9 +11,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.dsp.utils.settings import settings
 from dspy.predict.react import ReAct
 from dspy.primitives.prediction import Prediction
-from dspy.signatures.field import InputField, OutputField
-from dspy.signatures.signature import Signature
-from dspy.task_spec.bridge import task_spec_from_signature
+from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.utils.dummies import DummyLM
 from dspy.utils.exceptions import ContextWindowExceededError
 from tests.task_spec.helpers import ts
@@ -75,12 +73,20 @@ def test_tool_calling_with_pydantic_args():
             return None
         return f"It's my honor to invite {participant_name} to event {event_info.name} on {event_info.date}"
 
-    class InvitationSignature(Signature):
-        participant_name: str = InputField(desc="The name of the participant to invite")
-        event_info: CalendarEvent = InputField(desc="The information about the event")
-        invitation_letter: str = OutputField(desc="The invitation letter to be sent to the participant")
+    InvitationSignature = make_task_spec(
+        {
+            "participant_name": FieldSpec.input("participant_name", desc="The name of the participant to invite"),
+            "event_info": FieldSpec.input("event_info", type_=CalendarEvent, desc="The information about the event"),
+            "invitation_letter": FieldSpec.output(
+                "invitation_letter",
+                desc="The invitation letter to be sent to the participant",
+            ),
+        },
+        instructions="Write invitation letters.",
+        name="InvitationSignature",
+    )
 
-    react = ReAct(task_spec_from_signature(InvitationSignature), tools=[write_invitation_letter])
+    react = ReAct(InvitationSignature, tools=[write_invitation_letter])
 
     lm = DummyLM(
         [
@@ -148,11 +154,16 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
     def get_user_info(name: str):
         return {"name": name}
 
-    class CustomerService(Signature):
-        user_request: str = InputField()
-        process_result: str = OutputField()
+    CustomerService = make_task_spec(
+        {
+            "user_request": FieldSpec.input("user_request"),
+            "process_result": FieldSpec.output("process_result"),
+        },
+        instructions="Handle customer service requests.",
+        name="CustomerService",
+    )
 
-    react = ReAct(task_spec_from_signature(CustomerService), tools=[get_user_info])
+    react = ReAct(CustomerService, tools=[get_user_info])
     problem_annotation = react.react.task_spec.output_fields["next_tool_args"].type_
 
     def guarded_issubclass(cls, class_or_tuple):
@@ -354,12 +365,20 @@ async def test_async_tool_calling_with_pydantic_args():
             return None
         return f"It's my honor to invite {participant_name} to event {event_info.name} on {event_info.date}"
 
-    class InvitationSignature(Signature):
-        participant_name: str = InputField(desc="The name of the participant to invite")
-        event_info: CalendarEvent = InputField(desc="The information about the event")
-        invitation_letter: str = OutputField(desc="The invitation letter to be sent to the participant")
+    InvitationSignature = make_task_spec(
+        {
+            "participant_name": FieldSpec.input("participant_name", desc="The name of the participant to invite"),
+            "event_info": FieldSpec.input("event_info", type_=CalendarEvent, desc="The information about the event"),
+            "invitation_letter": FieldSpec.output(
+                "invitation_letter",
+                desc="The invitation letter to be sent to the participant",
+            ),
+        },
+        instructions="Write invitation letters.",
+        name="InvitationSignature",
+    )
 
-    react = ReAct(task_spec_from_signature(InvitationSignature), tools=[write_invitation_letter])
+    react = ReAct(InvitationSignature, tools=[write_invitation_letter])
 
     lm = DummyLM(
         [

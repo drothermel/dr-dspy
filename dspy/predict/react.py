@@ -3,7 +3,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from dspy.adapters.chat_adapter import ChatAdapter
-from dspy.adapters.types.tool import Tool
+from dspy.adapters.types.tool import Tool, tool_from_callable
 from dspy.dsp.utils.settings import settings
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
@@ -52,7 +52,7 @@ class ReAct(Module):
         self.task_spec = task_spec
         self.max_iters = max_iters
 
-        normalized_tools: list[Tool] = [t if isinstance(t, Tool) else Tool(t) for t in tools]
+        normalized_tools: list[Tool] = [tool_from_callable(t) for t in tools]
         tools_by_name: dict[str, Tool] = {}
         for tool in normalized_tools:
             if tool.name is None:
@@ -76,8 +76,8 @@ class ReAct(Module):
 
         tools_by_name["finish"] = Tool(
             func=lambda: "Completed.",
+            description=f"Marks the task as complete. That is, signals that all information for producing the outputs, i.e. {outputs}, are now available to be extracted.",
             name="finish",
-            desc=f"Marks the task as complete. That is, signals that all information for producing the outputs, i.e. {outputs}, are now available to be extracted.",
             args={},
         )
 

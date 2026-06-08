@@ -188,8 +188,8 @@ async def get_task_model_history_for_full_example(
 
 def print_full_program(program) -> None:
     """Print out the program's instructions & prefixes for each module."""
-    for _i, predictor in enumerate(program.predictors()):
-        *_, _last_field = get_signature(predictor).fields.values()
+    for predictor in program.predictors():
+        _ = get_task_spec(predictor)
 
 
 def save_candidate_program(*, program, log_dir, trial_num, note=None):
@@ -303,25 +303,6 @@ def get_task_spec(predictor):
 def set_task_spec(*, predictor, task_spec) -> None:
     assert hasattr(predictor, "task_spec")
     predictor.task_spec = task_spec
-
-
-def get_signature(predictor):
-    if hasattr(predictor, "task_spec"):
-        from dspy.task_spec.bridge import signature_from_task_spec
-
-        return signature_from_task_spec(predictor.task_spec)
-    assert hasattr(predictor, "signature")
-    return predictor.signature
-
-
-def set_signature(*, predictor, updated_signature) -> None:
-    if hasattr(predictor, "task_spec"):
-        from dspy.task_spec.bridge import task_spec_from_signature
-
-        predictor.task_spec = task_spec_from_signature(updated_signature)
-        return
-    assert hasattr(predictor, "signature")
-    predictor.signature = updated_signature
 
 
 async def create_n_fewshot_demo_sets(

@@ -6,6 +6,7 @@ from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.utils.dummies import DummyLM
+from tests.task_spec.helpers import ts
 
 
 class SimpleModule(Module):
@@ -23,8 +24,8 @@ def simple_metric(example, prediction, trace=None):
 
 def test_basic_workflow():
     """Test to ensure the basic compile flow runs without errors."""
-    student = SimpleModule("input -> output")
-    teacher = SimpleModule("input -> output")
+    student = SimpleModule(ts("input -> output"))
+    teacher = SimpleModule(ts("input -> output"))
 
     lm = DummyLM(
         [

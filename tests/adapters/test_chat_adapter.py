@@ -693,7 +693,7 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
         },
         instructions="Answer using all supplied context.",
     )
-    tool = Tool(search)
+    tool = Tool(search, description="Search for documents.")
     demo_profile = Profile(
         name="Ada",
         location=Location(city="London", country="UK"),
@@ -1245,7 +1245,7 @@ def test_chat_adapter_native_tool_calling_still_enables_native_reasoning():
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolReasoningSignature,
         demos=[],
-        inputs={"question": "Q?", "tools": [Tool(search)]},
+        inputs={"question": "Q?", "tools": [Tool(search, description="Search for documents.")]},
         lm=NativeToolReasoningLM([{}]),
     )
 
@@ -1269,7 +1269,7 @@ def test_chat_adapter_nonnative_strips_native_tool_kwargs():
         adapter=ChatAdapter(use_native_function_calling=False),
         task_spec=NonNativeToolSignature,
         demos=[],
-        inputs={"question": "Q?", "tools": [Tool(search)]},
+        inputs={"question": "Q?", "tools": [Tool(search, description="Search for documents.")]},
         config={
             "tool_choice": {"mode": "required", "allowed": ["submit"], "parallel": True},
         },
@@ -1295,7 +1295,6 @@ def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
         adapter=ChatAdapter(),
         task_spec=CodeSignature,
         demos=[{"question": "Q1", "reasoning": Reasoning(content="Think"), "code": python_code(code="print('hi')")}],
-        # ty:ignore[unknown-argument]
         inputs={"question": "Q2"},
     )
 
@@ -1374,7 +1373,7 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolSignature,
         demos=[],
-        inputs={"question": "Q?", "tools": [Tool(search)]},
+        inputs={"question": "Q?", "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1456,7 +1455,7 @@ def test_adapter_native_tool_calling_can_request_parallel_tool_calls(adapter):
         adapter=adapter,
         task_spec=NativeToolSignature,
         demos=[],
-        inputs={"question": "Q?", "tools": [Tool(search)]},
+        inputs={"question": "Q?", "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1486,7 +1485,7 @@ def test_adapter_native_tool_calling_respects_lm_kwargs_parallel_tool_call_overr
         adapter=ChatAdapter(use_native_function_calling=True, parallel_tool_calls=True),
         task_spec=NativeToolSignature,
         demos=[],
-        inputs={"question": "Q?", "tools": [Tool(search)]},
+        inputs={"question": "Q?", "tools": [Tool(search, description="Search for documents.")]},
         config={"tool_choice": {"mode": "auto", "parallel": False}},
         lm=FunctionCallingLM([{}]),
     )
@@ -1532,7 +1531,7 @@ def test_chat_adapter_native_tool_history_replay():
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
         demos=[],
-        inputs={"question": "Q2", "history": history, "tools": [Tool(search)]},
+        inputs={"question": "Q2", "history": history, "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1609,7 +1608,7 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
         demos=[],
-        inputs={"question": "Q2", "history": history, "tools": [Tool(search)]},
+        inputs={"question": "Q2", "history": history, "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1653,7 +1652,7 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
         demos=[],
-        inputs={"history": history, "tools": [Tool(search)]},
+        inputs={"history": history, "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1718,7 +1717,7 @@ def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_i
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
         demos=[],
-        inputs={"question": "Q2", "history": history, "tools": [Tool(search)]},
+        inputs={"question": "Q2", "history": history, "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1758,7 +1757,7 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
         adapter=ChatAdapter(use_native_function_calling=False),
         task_spec=ToolHistorySignature,
         demos=[],
-        inputs={"question": "Q2", "history": history, "tools": [Tool(search)]},
+        inputs={"question": "Q2", "history": history, "tools": [Tool(search, description="Search for documents.")]},
     )
 
     expected_messages = [
@@ -1823,7 +1822,7 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
             "Q2\n"
             "\n"
             "[[ ## tools ## ]]\n"
-            "[\"search. It takes arguments {'query': {'type': 'string'}}.\"]\n"
+            "[\"search, whose description is <desc>Search for documents.</desc>. It takes arguments {'query': {'type': 'string'}}.\"]\n"
             "\n"
             "Respond with the corresponding output fields, starting with the field `[[ ## next_thought ## ]]`, then "
             '`[[ ## tool_calls ## ]]` (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]}), and then ending with the '
@@ -1869,7 +1868,7 @@ def test_non_native_tool_history_remains_text_based(adapter):
                     }
                 ]
             ),
-            "tools": [Tool(search)],
+            "tools": [Tool(search, description="Search for documents.")],
         },
     )
 
@@ -1934,7 +1933,7 @@ def test_chat_adapter_format_exact_messages_with_tool_input():
         adapter=ChatAdapter(),
         task_spec=ToolSignature,
         demos=[],
-        inputs={"question": "Q?", "tools": [Tool(search)]},
+        inputs={"question": "Q?", "tools": [Tool(search, description="Search for documents.")]},
     )
 
     expected_messages = [
@@ -2028,7 +2027,7 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
         },
         instructions="Answer carefully using every available signal.",
     )
-    tool = Tool(search)
+    tool = Tool(search, description="Search for documents.")
     demo_profile = Profile(
         name="Ada",
         location=Location(city="London", country="UK"),
@@ -2586,7 +2585,10 @@ def test_chat_adapter_with_tool():
         """Get the population for a country"""
         return f"The population of {country} in {year} is 1000000"
 
-    tools = [Tool(get_weather), Tool(get_population)]
+    tools = [
+        Tool(get_weather, description="Get the weather for a city"),
+        Tool(get_population, description="Get the population for a country"),
+    ]
 
     adapter = ChatAdapter()
     messages = adapter_format_as_openai(
@@ -2890,7 +2892,7 @@ def test_chat_adapter_toolcalls_native_function_calling():
     def get_weather(city: str) -> str:
         return f"The weather in {city} is sunny"
 
-    tools = [Tool(get_weather)]
+    tools = [Tool(get_weather, description="Get the weather for a city")]
 
     adapter = JSONAdapter(use_native_function_calling=True)
 
@@ -2970,7 +2972,7 @@ def test_chat_adapter_toolcalls_vague_match():
     def get_weather(city: str) -> str:
         return f"The weather in {city} is sunny"
 
-    tools = [Tool(get_weather)]
+    tools = [Tool(get_weather, description="Get the weather for a city")]
 
     adapter = ChatAdapter()
 
@@ -3149,7 +3151,7 @@ def test_null_content_raises_adapter_parse_error():
     )
 
     with settings.context(lm=lm), mock.patch("litellm.acompletion", new_callable=mock.AsyncMock, return_value=response):
-        cot = ChainOfThought("question -> answer")
+        cot = ChainOfThought(ts("question -> answer"))
         with pytest.raises(AdapterParseError):
             asyncio.run(cot.acall(question="test"))
 
@@ -3165,7 +3167,7 @@ def test_empty_string_content_raises_adapter_parse_error():
     )
 
     with settings.context(lm=lm), mock.patch("litellm.acompletion", new_callable=mock.AsyncMock, return_value=response):
-        cot = ChainOfThought("question -> answer")
+        cot = ChainOfThought(ts("question -> answer"))
         with pytest.raises(AdapterParseError):
             asyncio.run(cot.acall(question="test"))
 
