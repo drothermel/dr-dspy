@@ -8,7 +8,7 @@ from dspy.clients.base_lm import BaseLM
 from dspy.compile.resolve import resolve_adapter, resolve_lm_config
 from dspy.core.types import LMMessage
 from dspy.core.types.config import LMConfig
-from dspy.dsp.utils.settings import settings
+from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec
 from dspy.task_spec.formatting import get_field_spec_description_string
 from dspy.utils.transparency import reset_active_call_metadata, set_active_call_metadata
@@ -52,12 +52,12 @@ class TwoStepAdapter(Adapter):
             "TwoStepAdapter.parse is not supported. Structured extraction runs in TwoStepAdapter.acall."
         )
 
-    async def _run_extraction(self, *, original_task_spec: TaskSpec, text: str) -> dict[str, Any]:
+    async def _run_extraction(self, *, original_task_spec: TaskSpec, text: str, run: RunContext) -> dict[str, Any]:
         from dspy.adapters.call.pipeline import AdapterCallPipeline
 
-        transparency = settings.get("transparency", "strict")
+        transparency = run.telemetry.transparency
         extraction_adapter, _adapter_notes = resolve_adapter(
-            self.extraction_adapter or settings.adapter, transparency=transparency
+            self.extraction_adapter or run.adapter, transparency=transparency
         )
         extractor_task_spec = self._create_extractor_task_spec(original_task_spec)
         config, _provenance = resolve_lm_config(self.extraction_model, LMConfig())
@@ -72,6 +72,7 @@ class TwoStepAdapter(Adapter):
                 task_spec=extractor_task_spec,
                 demos=[],
                 inputs={"text": text},
+                run=run,
             )
         finally:
             reset_active_call_metadata(metadata_token)

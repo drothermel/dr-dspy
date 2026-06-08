@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from dspy.adapters.base.adapter import Adapter
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types.config import LMConfig
+    from dspy.runtime.run_context import RunContext
     from dspy.task_spec import TaskSpec
 
 
@@ -25,6 +26,7 @@ class AdapterCallPipeline:
         task_spec: TaskSpec,
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
+        run: RunContext,
         allow_parse_fallback: bool = True,
     ) -> list[dict[str, Any]]:
         if getattr(adapter, "call_mode", None) == "two_step":
@@ -37,6 +39,7 @@ class AdapterCallPipeline:
                 task_spec=task_spec,
                 demos=demos,
                 inputs=inputs,
+                run=run,
             )
 
         response_format_policy = adapter.response_format_policy or NoOpResponseFormatPolicy()
@@ -49,6 +52,7 @@ class AdapterCallPipeline:
                 task_spec=task_spec,
                 demos=demos,
                 inputs=inputs,
+                run=run,
                 allow_parse_fallback=allow_parse_fallback,
             )
 
@@ -71,11 +75,11 @@ class AdapterCallPipeline:
         task_spec: TaskSpec,
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
+        run: RunContext,
         allow_parse_fallback: bool,
     ) -> list[dict[str, Any]]:
         from dspy.compile.resolve import resolve_call, resolve_lm_config
         from dspy.core.types.history import _history_request_messages_as_openai
-        from dspy.dsp.utils.settings import settings
         from dspy.utils.transparency import ACTIVE_CALL_METADATA, ACTIVE_COMPILED_CALL, validate_compiled_call
 
         try:
@@ -105,11 +109,11 @@ class AdapterCallPipeline:
                 phase=metadata.get("phase", "adapter"),
                 lm_role=metadata.get("lm_role", "default"),
             )
-            transparency = settings.get("transparency", "strict")
+            transparency = run.telemetry.transparency
             validate_compiled_call(compiled, transparency)
             token = ACTIVE_COMPILED_CALL.set(compiled)
             try:
-                response = await adapter._call_lm(lm=lm, request=request)
+                response = await adapter._call_lm(lm=lm, request=request, run=run)
             finally:
                 ACTIVE_COMPILED_CALL.reset(token)
             return adapter._call_postprocess(
@@ -134,5 +138,6 @@ class AdapterCallPipeline:
                 task_spec=task_spec,
                 demos=demos,
                 inputs=inputs,
+                run=run,
                 error=error,
             )

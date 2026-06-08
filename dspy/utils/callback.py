@@ -5,7 +5,7 @@ import uuid
 from contextvars import ContextVar
 from typing import Any, Callable, Literal, TypeVar
 
-from dspy.dsp.utils.settings import settings
+from dspy.runtime.run_context import RunContext
 
 ACTIVE_CALL_ID = ContextVar("active_call_id", default=None)
 logger = logging.getLogger(__name__)
@@ -50,7 +50,8 @@ def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F |
 
             @functools.wraps(fn)
             async def async_wrapper(instance, *args, **kwargs):
-                callbacks = _get_active_callbacks(instance)
+                run = kwargs.get("run")
+                callbacks = _get_active_callbacks(instance, run)
                 if not callbacks:
                     return await fn(instance, *args, **kwargs)
                 call_id = uuid.uuid4().hex
@@ -90,7 +91,8 @@ def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F |
 
         @functools.wraps(fn)
         def sync_wrapper(instance, *args, **kwargs):
-            callbacks = _get_active_callbacks(instance)
+            run = kwargs.get("run")
+            callbacks = _get_active_callbacks(instance, run)
             if not callbacks:
                 return fn(instance, *args, **kwargs)
             call_id = uuid.uuid4().hex
@@ -133,8 +135,9 @@ def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F |
     return decorator
 
 
-def _get_active_callbacks(instance: Any) -> list[BaseCallback]:
-    return settings.get("callbacks", []) + getattr(instance, "callbacks", [])
+def _get_active_callbacks(instance: Any, run: RunContext | None = None) -> list[BaseCallback]:
+    callbacks = list(run.callbacks) if run else []
+    return callbacks + getattr(instance, "callbacks", [])
 
 
 def _execute_start_callbacks(

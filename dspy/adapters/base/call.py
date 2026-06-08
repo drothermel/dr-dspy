@@ -12,6 +12,7 @@ from dspy.adapters.types.tool import ToolCalls
 from dspy.core.types import LMMessage, LMRequest, LMResponse
 from dspy.core.types.coercion import _coerce_tool_spec
 from dspy.core.types.config import LMConfig, LMToolChoice, LMToolSpec, coerce_lm_config, merge_lm_request_config
+from dspy.runtime.run_context import RunContext
 from dspy.task_spec import TaskSpec
 from dspy.utils.exceptions import AdapterParseError
 
@@ -136,8 +137,8 @@ class AdapterCallMixin(AdapterNativeMixin):
             model=lm.model, messages=list(messages), tools=tools, config=merge_lm_request_config(lm=lm, config=config)
         )
 
-    async def _call_lm(self, lm: BaseLM, request: LMRequest) -> LMResponse:
-        return await lm(request)
+    async def _call_lm(self, lm: BaseLM, request: LMRequest, *, run: RunContext) -> LMResponse:
+        return await lm(request, run=run)
 
     async def acall(
         self,
@@ -147,6 +148,7 @@ class AdapterCallMixin(AdapterNativeMixin):
         task_spec: TaskSpec,
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
+        run: RunContext,
     ) -> list[dict[str, Any]]:
         from dspy.adapters.call.pipeline import AdapterCallPipeline
 
@@ -157,4 +159,5 @@ class AdapterCallMixin(AdapterNativeMixin):
             task_spec=task_spec,
             demos=demos,
             inputs=inputs,
+            run=run,
         )

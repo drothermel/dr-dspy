@@ -8,7 +8,7 @@ from typing import Any, TextIO
 from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
 from dspy.core.types import LMHistoryEntry, LMRequest, LMResponse
 from dspy.core.types.history import _history_request_messages_as_openai
-from dspy.dsp.utils.settings import settings
+from dspy.runtime.run_context import RunContext
 from dspy.utils.callback import BaseCallback, with_callbacks
 from dspy.utils.inspect_history import pretty_print_history
 from dspy.utils.run_log import append_call_record, redact_config, redact_messages
@@ -67,7 +67,7 @@ class BaseLM:
         return dict(temperature=temperature, max_tokens=max_tokens, **kwargs)
 
     @with_callbacks(kind="lm")
-    async def __call__(self, request: LMRequest) -> LMResponse:
+    async def __call__(self, request: LMRequest, *, run: RunContext) -> LMResponse:
         if not isinstance(request, LMRequest):
             raise TypeError(
                 f"{type(self).__name__}.__call__ expects dspy.core.types.LMRequest, not {type(request).__name__}."
@@ -77,10 +77,10 @@ class BaseLM:
             raise TypeError(
                 f"{type(self).__name__}.aforward(request) must return dspy.core.types.LMResponse, but got {type(response).__name__}."
             )
-        return self._finalize_lm_response(request=request, response=response)
+        return self._finalize_lm_response(request=request, response=response, run=run)
 
-    async def acall(self, request: LMRequest) -> LMResponse:
-        return await self.__call__(request)
+    async def acall(self, request: LMRequest, *, run: RunContext) -> LMResponse:
+        return await self.__call__(request, run=run)
 
     @property
     def supports_function_calling(self) -> bool:
@@ -98,13 +98,13 @@ class BaseLM:
     def supported_params(self) -> set[str]:
         return set()
 
-    def _finalize_lm_response(self, request: LMRequest, response: LMResponse) -> LMResponse:
-        if settings.usage_tracker:
+    def _finalize_lm_response(self, request: LMRequest, response: LMResponse, *, run: RunContext) -> LMResponse:
+        if run.usage_tracker:
             usage = response.usage_as_dict()
             if usage:
-                settings.usage_tracker.add_usage(lm=self.model, usage_entry=usage)
+                run.usage_tracker.add_usage(lm=self.model, usage_entry=usage)
         entry = None
-        if not settings.disable_history:
+        if not run.telemetry.disable_history:
             entry = LMHistoryEntry(
                 request=request,
                 response=response,
@@ -112,8 +112,8 @@ class BaseLM:
                 uuid=str(uuid.uuid4()),
                 model_type=getattr(self, "model_type", None),
             )
-            self.update_history(entry)
-        if settings.get("run_log_enabled", True):
+            self.update_history(entry, run=run)
+        if run.telemetry.run_log_enabled:
             self._append_run_log_entry(request=request, response=response, history_entry=entry)
         return response
 
@@ -220,20 +220,20 @@ class BaseLM:
     def inspect_history(self, n: int = 1, file: "TextIO | None" = None) -> None:
         pretty_print_history(history=self.history, n=n, file=file)
 
-    def update_history(self, entry: LMHistoryEntry) -> None:
-        if settings.disable_history:
+    def update_history(self, entry: LMHistoryEntry, *, run: RunContext) -> None:
+        if run.telemetry.disable_history:
             return
+        max_history_size = run.telemetry.max_history_size
         if len(GLOBAL_HISTORY) >= MAX_HISTORY_SIZE:
             GLOBAL_HISTORY.pop(0)
         GLOBAL_HISTORY.append(entry)
-        if settings.max_history_size == 0:
+        if max_history_size == 0:
             return
-        if len(self.history) >= settings.max_history_size:
+        if len(self.history) >= max_history_size:
             self.history.pop(0)
         self.history.append(entry)
-        caller_modules = settings.caller_modules or []
-        for module in caller_modules:
-            if len(module.history) >= settings.max_history_size:
+        for module in run.caller_modules:
+            if len(module.history) >= max_history_size:
                 module.history.pop(0)
             module.history.append(entry)
 

@@ -8,12 +8,12 @@ from pydantic_core import PydanticUndefined
 from typing_extensions import override
 
 from dspy.clients.base_lm import BaseLM
-from dspy.compile.resolve import resolve_adapter, resolve_lm_config
+from dspy.compile.resolve import resolve_lm_config
 from dspy.core.types.config import _merge_lm_config, coerce_lm_config
-from dspy.dsp.utils.settings import settings
 from dspy.predict.parameter import Parameter
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
+from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
 from dspy.task_spec.task_spec import TaskSpec
 from dspy.utils.callback import BaseCallback
@@ -39,14 +39,20 @@ def _sanitize_lm_state(lm_state: dict, allow_unsafe_lm_state: bool) -> dict:
 
 
 class Predict(Module, Parameter):
-    def __init__(self, task_spec: TaskSpec, callbacks: list[BaseCallback] | None = None, **config) -> None:
+    def __init__(
+        self,
+        task_spec: TaskSpec,
+        callbacks: list[BaseCallback] | None = None,
+        run: RunContext | None = None,
+        **config,
+    ) -> None:
         if isinstance(task_spec, str):
             raise TypeError(
                 "Predict requires a TaskSpec instance, not a string. Use a TaskSpec subclass or make_task_spec(...) to create one."
             )
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"Predict requires a TaskSpec instance, got {type(task_spec).__name__}.")
-        super().__init__(callbacks=callbacks)
+        super().__init__(callbacks=callbacks, run=run)
         self.stage = random.randbytes(8).hex()
         self.task_spec: TaskSpec = task_spec
         self.config = config
@@ -118,6 +124,7 @@ class Predict(Module, Parameter):
         assert "new_signature" not in kwargs, "new_signature is no longer a valid keyword argument."
         if "signature" in kwargs:
             raise TypeError("The 'signature' keyword argument is no longer supported. Pass 'task_spec' instead.")
+        run = resolve_run(run=kwargs.pop("run", None), bound_run=self.run)
         task_spec = kwargs.pop("task_spec", self.task_spec)
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"Predict expected a TaskSpec, got {type(task_spec).__name__}.")
@@ -130,14 +137,16 @@ class Predict(Module, Parameter):
             config = merged if merged is not None else coerce_lm_config(override)
         else:
             config = base_config
-        lm = kwargs.pop("lm", self.lm) or settings.lm
+        lm = kwargs.pop("lm", self.lm) or run.lm
         if lm is None:
             raise ValueError(
-                "No LM is loaded. Configure one with `from dspy.clients.lm import LM; from dspy.dsp.utils.settings import settings; settings.configure(lm=LM('openai/gpt-4o-mini'))`."
+                "No LM is loaded. Pass run=RunContext.create(lm=LM(...), adapter=...) to the call, "
+                "or bind run at Module/Predict construction."
             )
         if isinstance(lm, str):
             raise ValueError(
-                f"""LM must be an instance of `dspy.clients.base_lm.BaseLM`, not a string. Instead of using a string like 'settings.configure(lm="{lm}")', configure the LM like 'settings.configure(lm=LM("{lm}"))' after importing `LM` from `dspy.clients.lm` and `settings` from `dspy.dsp.utils.settings`."""
+                f"LM must be an instance of `dspy.clients.base_lm.BaseLM`, not a string. "
+                f"Create a RunContext with `RunContext.create(lm=LM('{lm}'), adapter=...)` instead."
             )
         if not isinstance(lm, BaseLM):
             raise ValueError(
@@ -161,7 +170,7 @@ class Predict(Module, Parameter):
                 extra_fields,
                 list(input_fields.keys()),
             )
-        if settings.warn_on_type_mismatch:
+        if run.telemetry.warn_on_type_mismatch:
             for field_name, field_info in input_fields.items():
                 if field_name in kwargs:
                     value = kwargs[field_name]
@@ -184,28 +193,33 @@ class Predict(Module, Parameter):
         if missing:
             present = [k for k in input_fields if k in kwargs]
             logger.warning("Not all input fields were provided to module. Present: %s. Missing: %s.", present, missing)
-        return (lm, config, task_spec, demos, kwargs)
+        return (lm, config, task_spec, demos, kwargs, run)
 
-    def _forward_postprocess(self, completions, task_spec, **kwargs):
+    def _forward_postprocess(self, completions, task_spec, run, **kwargs):
         pred = Prediction.from_completions(completions, task_spec=task_spec)
-        if kwargs.pop("_trace", True) and settings.trace is not None and (settings.max_trace_size > 0):
-            trace = settings.trace
-            if len(trace) >= settings.max_trace_size:
+        if kwargs.pop("_trace", True) and run.trace is not None and (run.telemetry.max_trace_size > 0):
+            trace = run.trace
+            if len(trace) >= run.telemetry.max_trace_size:
                 trace.pop(0)
             trace.append((self, {**kwargs}, pred))
         return pred
 
     async def aforward(self, **kwargs):
-        lm, config, task_spec, demos, kwargs = self._forward_preprocess(**kwargs)
-        transparency = settings.get("transparency", "strict")
-        adapter, _adapter_notes = resolve_adapter(settings.adapter, transparency=transparency)
+        lm, config, task_spec, demos, kwargs, run = self._forward_preprocess(**kwargs)
         config, _provenance = resolve_lm_config(lm, config)
         metadata_token = set_active_call_metadata(module=type(self).__name__, phase="predict", lm_role="default")
         try:
-            completions = await adapter.acall(lm=lm, config=config, task_spec=task_spec, demos=demos, inputs=kwargs)
+            completions = await run.adapter.acall(
+                lm=lm,
+                config=config,
+                task_spec=task_spec,
+                demos=demos,
+                inputs=kwargs,
+                run=run,
+            )
         finally:
             reset_active_call_metadata(metadata_token)
-        return self._forward_postprocess(completions, task_spec, **kwargs)
+        return self._forward_postprocess(completions, task_spec, run, **kwargs)
 
     def update_config(self, **kwargs) -> None:
         self.config = {**self.config, **kwargs}

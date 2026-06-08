@@ -30,7 +30,10 @@ def resolve_adapter(
 
     raise TransparencyViolation(
         "adapter not configured.",
-        fixes=["settings.configure(adapter=JSONAdapter())", "or pass adapter=... in settings.context(...)"],
+        fixes=[
+            "RunContext.create(lm=LM(...), adapter=JSONAdapter())",
+            "or pass adapter=... when creating RunContext",
+        ],
     )
 
 

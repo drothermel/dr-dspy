@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 from collections import defaultdict
 from contextlib import contextmanager
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any, Generator
 
 from pydantic import BaseModel
 
-from dspy.dsp.utils.settings import settings
+if TYPE_CHECKING:
+    from dspy.runtime.run_context import RunContext
 
 
 class UsageTracker:
@@ -51,7 +54,11 @@ class UsageTracker:
 
 
 @contextmanager
-def track_usage() -> Generator[UsageTracker, None, None]:
+def track_usage(run: RunContext) -> Generator[UsageTracker, None, None]:
     tracker = UsageTracker()
-    with settings.context(usage_tracker=tracker):
+    previous = run.usage_tracker
+    run.usage_tracker = tracker
+    try:
         yield tracker
+    finally:
+        run.usage_tracker = previous

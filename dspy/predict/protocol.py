@@ -11,6 +11,7 @@ class Predictor(Protocol):
     task_spec: TaskSpec
     demos: list[Any]
     lm: Any
+    run: Any | None
 
     def dump_state(self, json_mode: bool = True) -> dict[str, Any]: ...
 

@@ -4,12 +4,12 @@ from typing import Any, TextIO
 
 from typing_extensions import override
 
-from dspy.dsp.utils.settings import settings, thread_local_overrides
 from dspy.predict.parallel import Parallel
 from dspy.predict.protocol import Predictor
 from dspy.primitives.base_module import BaseModule
 from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
+from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.utils import magicattr
 from dspy.utils.callback import with_callbacks
 from dspy.utils.inspect_history import pretty_print_history
@@ -35,8 +35,9 @@ class Module(BaseModule, metaclass=ProgramMeta):
         obj.callbacks = []
         obj.history = []
 
-    def __init__(self, callbacks=None) -> None:
+    def __init__(self, callbacks=None, run: RunContext | None = None) -> None:
         self.callbacks = callbacks or []
+        self.run = run
         self._compiled = False
         self.history = []
 
@@ -55,17 +56,19 @@ class Module(BaseModule, metaclass=ProgramMeta):
 
     @with_callbacks(kind="module")
     async def __call__(self, *args, **kwargs) -> Prediction:
-        caller_modules = settings.caller_modules or []
-        caller_modules = list(caller_modules)
-        caller_modules.append(self)
-        with settings.context(caller_modules=caller_modules):
-            if settings.track_usage and thread_local_overrides.get().get("usage_tracker") is None:
-                with track_usage() as usage_tracker:
+        run = resolve_run(run=kwargs.pop("run", None), bound_run=self.run)
+        kwargs["run"] = run
+        run.caller_modules.append(self)
+        try:
+            if run.telemetry.track_usage and run.usage_tracker is None:
+                with track_usage(run) as usage_tracker:
                     output = await self.aforward(*args, **kwargs)
                 tokens = usage_tracker.get_total_tokens()
                 self._set_lm_usage(tokens, output)
                 return output
             return await self.aforward(*args, **kwargs)
+        finally:
+            run.caller_modules.pop()
 
     acall = __call__
 

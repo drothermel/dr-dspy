@@ -7,7 +7,7 @@ from dspy.compile.resolve import resolve_call, resolve_lm_config
 from dspy.core.types import LMRequest
 from dspy.core.types.config import coerce_lm_config, merge_lm_request_config
 from dspy.core.types.history import _history_request_messages_as_openai
-from dspy.dsp.utils.settings import settings
+from dspy.runtime.run_context import RunContext
 from dspy.utils.exceptions import AdapterParseError, LMError
 from dspy.utils.transparency import (
     ACTIVE_COMPILED_CALL,
@@ -33,6 +33,7 @@ class TwoStepCallExecutor:
         task_spec: TaskSpec,
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
+        run: RunContext,
     ) -> list[dict[str, Any]]:
         resolved_config = coerce_lm_config(config)
         messages = adapter.format(task_spec=task_spec, demos=demos, inputs=inputs)
@@ -42,7 +43,7 @@ class TwoStepCallExecutor:
             messages=messages,
             config=merge_lm_request_config(lm=lm, config=merged_config),
         )
-        transparency = settings.get("transparency", "strict")
+        transparency = run.telemetry.transparency
         main_compiled = resolve_call(
             lm=lm,
             adapter=adapter,
@@ -58,7 +59,7 @@ class TwoStepCallExecutor:
         main_token = ACTIVE_COMPILED_CALL.set(main_compiled)
         metadata_token = set_active_call_metadata(module="TwoStepAdapter", phase="two_step.main", lm_role="default")
         try:
-            response = await lm.acall(request)
+            response = await lm.acall(request, run=run)
         finally:
             ACTIVE_COMPILED_CALL.reset(main_token)
             reset_active_call_metadata(metadata_token)
@@ -69,7 +70,7 @@ class TwoStepCallExecutor:
             output_logprobs = output.logprobs
             text = output.text
             try:
-                value = await adapter._run_extraction(original_task_spec=task_spec, text=text or "")
+                value = await adapter._run_extraction(original_task_spec=task_spec, text=text or "", run=run)
             except LMError:
                 raise
             except Exception as e:
