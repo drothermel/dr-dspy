@@ -49,11 +49,11 @@ class InferRules(BootstrapFewShot):
                 predictor.signature.instructions = instructions_list[i]
 
             for i, predictor in enumerate(candidate_predictors):
-                rules = await self.induce_natural_language_rules(predictor, trainset)
+                rules = await self.induce_natural_language_rules(predictor=predictor, trainset=trainset)
                 predictor.signature.instructions = instructions_list[i]
-                self.update_program_instructions(predictor, rules)
+                self.update_program_instructions(predictor=predictor, natural_language_rules=rules)
 
-            score = await self.evaluate_program(candidate_program, valset)
+            score = await self.evaluate_program(program=candidate_program, dataset=valset)
 
             if score > best_score:
                 best_score = score
@@ -66,10 +66,10 @@ class InferRules(BootstrapFewShot):
         return best_program
 
     async def induce_natural_language_rules(self, predictor, trainset):
-        demos = self.get_predictor_demos(trainset, predictor)
+        demos = self.get_predictor_demos(trainset=trainset, predictor=predictor)
         signature = predictor.signature
         while True:
-            examples_text = self.format_examples(demos, signature)
+            examples_text = self.format_examples(demos=demos, signature=signature)
             try:
                 return await self.rules_induction_program(examples_text)
             except Exception as e:

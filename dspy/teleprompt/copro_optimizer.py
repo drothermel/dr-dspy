@@ -99,7 +99,7 @@ class COPRO(Teleprompter):
             repeat = False
             if c["score"] == last_batch_score:
                 for c2 in last_batch:
-                    if self._check_candidates_equal(c, c2):
+                    if self._check_candidates_equal(candidate1=c, candidate2=c2):
                         repeat = True
                         break
                 if not repeat:
@@ -216,7 +216,7 @@ class COPRO(Teleprompter):
                         .with_instructions(instruction)
                         .with_updated_fields(last_key, prefix=prefix)
                     )
-                    self._set_signature(p_new, updated_signature)
+                    self._set_signature(predictor=p_new, updated_signature=updated_signature)
 
                     # Score the instruction / prefix
                     for i, predictor in enumerate(module_clone.predictors()):
@@ -266,7 +266,7 @@ class COPRO(Teleprompter):
                     .with_instructions(best_candidate["instruction"])
                     .with_updated_fields(last_key, prefix=best_candidate["prefix"])
                 )
-                self._set_signature(p_new, updated_signature)
+                self._set_signature(predictor=p_new, updated_signature=updated_signature)
 
                 logger.debug(
                     f"Updating Predictor {id(p_old)} to:\ni: {best_candidate['instruction']}\n"

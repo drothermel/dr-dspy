@@ -64,7 +64,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
         trace_data = []
 
         teachers = teacher if isinstance(teacher, list) else [teacher]
-        teachers = [prepare_teacher(student, cast("Module | None", t)) for t in teachers]
+        teachers = [prepare_teacher(student=student, teacher=cast("Module | None", t)) for t in teachers]
         num_threads = self.num_threads or settings.num_threads
         for t in teachers:
             trace_data += await bootstrap_trace_data(
@@ -239,20 +239,20 @@ def prepare_student(student: Module) -> Module:
     return student
 
 
-def prepare_teacher(student: Module, teacher: Module | None = None) -> Module:
+def prepare_teacher(*, student: Module, teacher: Module | None = None) -> Module:
     if teacher is None:
         return student
 
     # Ensuring that the student and teacher are structurally equivalent
-    assert_structural_equivalency(student, teacher)
+    assert_structural_equivalency(program1=student, program2=teacher)
 
     # Ensuring that the student and teacher programs do not share predictors
-    assert_no_shared_predictor(student, teacher)
+    assert_no_shared_predictor(program1=student, program2=teacher)
 
     return teacher
 
 
-def assert_structural_equivalency(program1: object, program2: object) -> None:
+def assert_structural_equivalency(*, program1: object, program2: object) -> None:
     assert isinstance(program1, Module)
     assert isinstance(program2, Module)
 
@@ -269,7 +269,7 @@ def assert_structural_equivalency(program1: object, program2: object) -> None:
         assert isinstance(pred2, Predict)
 
 
-def assert_no_shared_predictor(program1: Module, program2: Module) -> None:
+def assert_no_shared_predictor(*, program1: Module, program2: Module) -> None:
     id_to_name1 = {id(p): n for n, p in program1.named_predictors()}
     id_to_name2 = {id(p): n for n, p in program2.named_predictors()}
     shared_ids = set(id_to_name1.keys()) & set(id_to_name2.keys())

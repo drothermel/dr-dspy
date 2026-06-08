@@ -86,7 +86,9 @@ class SingleComponentMultiModalProposer(Module):
         }
 
         # Create a rich multimodal examples_with_feedback that includes both text and images
-        predict_kwargs["examples_with_feedback"] = self._create_multimodal_examples(formatted_examples, image_map)
+        predict_kwargs["examples_with_feedback"] = self._create_multimodal_examples(
+            formatted_text=formatted_examples, image_map=image_map
+        )
 
         # Use current dspy LM settings (GEPA will pass reflection_lm via context)
         result = await self.propose_instruction(**predict_kwargs)
@@ -208,7 +210,7 @@ class SingleComponentMultiModalProposer(Module):
                 s = ""
                 for k, v in value.items():
                     s += f"{'#' * level} {k}\n"
-                    s += render_value_with_images(v, min(level + 1, 6), example_images)
+                    s += render_value_with_images(v, level=min(level + 1, 6), example_images=example_images)
                 if not value:
                     s += "\n"
                 return s
@@ -216,7 +218,7 @@ class SingleComponentMultiModalProposer(Module):
                 s = ""
                 for i, item in enumerate(value):
                     s += f"{'#' * level} Item {i + 1}\n"
-                    s += render_value_with_images(item, min(level + 1, 6), example_images)
+                    s += render_value_with_images(item, level=min(level + 1, 6), example_images=example_images)
                 if not value:
                     s += "\n"
                 return s
@@ -236,7 +238,9 @@ class SingleComponentMultiModalProposer(Module):
         image_map = {}
 
         for i, example_data in enumerate(reflective_dataset):
-            formatted_example, example_images = convert_sample_to_markdown_with_images(example_data, i + 1)
+            formatted_example, example_images = convert_sample_to_markdown_with_images(
+                sample=example_data, example_num=i + 1
+            )
             formatted_parts.append(formatted_example)
 
             if example_images:

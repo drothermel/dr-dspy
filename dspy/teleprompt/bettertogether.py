@@ -274,8 +274,10 @@ class BetterTogether(Teleprompter):
         logger.info(f"{BLUE}Trainset size:{ENDC} {len(trainset)}")
         logger.info(f"{BLUE}Validation ratio:{ENDC} {valset_ratio if valset is None else 'using provided valset'}")
 
-        student, teacher = self._prepare_student_and_teacher(student, teacher)
-        trainset, valset = self._prepare_trainset_and_valset(trainset, valset, valset_ratio)
+        student, teacher = self._prepare_student_and_teacher(student=student, teacher=teacher)
+        trainset, valset = self._prepare_trainset_and_valset(
+            trainset=trainset, valset=valset, valset_ratio=valset_ratio
+        )
         effective_max_errors = max_errors if max_errors is not None else settings.max_errors
         parsed_strategy = self._prepare_strategy(strategy)
         optimizer_compile_args = self._prepare_optimizer_compile_args(optimizer_compile_args, teacher)
@@ -312,7 +314,7 @@ class BetterTogether(Teleprompter):
         if not teacher:
             return student, None
         teacher = [teacher] if not isinstance(teacher, list) else teacher
-        teacher = [prepare_teacher(student, cast("Module | None", t)) for t in teacher]
+        teacher = [prepare_teacher(student=student, teacher=cast("Module | None", t)) for t in teacher]
 
         return student, teacher
 
@@ -376,7 +378,7 @@ class BetterTogether(Teleprompter):
                     f"Invalid optimizer key '{optimizer_key}'. Valid keys are: {list(self.optimizers.keys())}"
                 )
             optimizer = self.optimizers[optimizer_key]
-            self._validate_compile_args(optimizer, optimizer_key, compile_args)
+            self._validate_compile_args(optimizer=optimizer, optimizer_key=optimizer_key, compile_args=compile_args)
 
             if optimizer.__class__.__name__ == "GEPA":
                 # GEPA accepts a teacher argument, but raises an error if it's set.
@@ -428,7 +430,7 @@ class BetterTogether(Teleprompter):
         score = await self._evaluate_on_valset(
             student, valset, rng, num_threads, effective_max_errors, provide_traceback
         )
-        self._add_candidate(candidate_programs, student, strategy="", score=score)
+        self._add_candidate(candidate_programs=candidate_programs, student=student, strategy="", score=score)
         logger.info(f"{YELLOW}Baseline score:{ENDC} {score}")
 
         for ind, step_code in enumerate(parsed_strategy):
@@ -561,14 +563,16 @@ class BetterTogether(Teleprompter):
         # Note: launch() and kill() are no-ops for most API-based LMs; these mainly affect local
         # LMs that need launch or clean up routines.
         lms_relaunched = False
-        if self._models_changed(student, pred_lms_before):
+        if self._models_changed(student=student, pred_lms_before=pred_lms_before):
             launch_lms(student)
             lms_relaunched = True
 
         score = await self._evaluate_on_valset(
             student, valset, rng, num_threads, effective_max_errors, provide_traceback
         )
-        self._add_candidate(candidate_programs, student, current_strategy, score)
+        self._add_candidate(
+            candidate_programs=candidate_programs, student=student, strategy=current_strategy, score=score
+        )
 
         valid_scores = [cp["score"] for cp in candidate_programs if cp["score"] is not None]
         best_score_so_far = max(valid_scores) if valid_scores else float("-inf")
@@ -622,5 +626,11 @@ class BetterTogether(Teleprompter):
             display_progress=True,
             provide_traceback=provide_traceback,
         )
-        eval_result = await eval_candidate_program(len(valset), valset, program, evaluate, rng)
+        eval_result = await eval_candidate_program(
+            batch_size=len(valset),
+            trainset=valset,
+            candidate_program=program,
+            evaluate=evaluate,
+            rng=rng,
+        )
         return eval_result.score

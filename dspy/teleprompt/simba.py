@@ -188,7 +188,9 @@ class SIMBA(Teleprompter):
 
             # We'll generate (program, model) pairs for the trajectory sampling.
             # Prepare distinct LMs (with different temperatures, etc.) from the baseline=programs[0].
-            models = prepare_models_for_resampling(programs[0], self.num_candidates, self.teacher_settings)
+            models = prepare_models_for_resampling(
+                program=programs[0], n=self.num_candidates, teacher_settings=self.teacher_settings
+            )
             top_programs = top_k_plus_baseline(self.num_candidates)
 
             exec_pairs = []
@@ -197,7 +199,9 @@ class SIMBA(Teleprompter):
             # For each model, for each example, pick a program from the pool via softmax
             for model in models:
                 for example in batch:
-                    chosen_prog_idx = softmax_sample(rng, top_programs, self.temperature_for_sampling)
+                    chosen_prog_idx = softmax_sample(
+                        rng_obj=rng, program_idxs=top_programs, temperature=self.temperature_for_sampling
+                    )
                     candidate_system = programs[chosen_prog_idx].deepcopy()
                     candidate_system.set_lm(model)
 
@@ -205,7 +209,7 @@ class SIMBA(Teleprompter):
                         predictor2name[id(predictor)] = name
 
                     # Use the special wrap that includes the 'example' in the output
-                    wrapped_candidate_system = wrap_program(candidate_system, self.metric)
+                    wrapped_candidate_system = wrap_program(program=candidate_system, metric=self.metric)
                     exec_pairs.append((wrapped_candidate_system, example))
 
             # STEP 2: Execute
@@ -254,7 +258,9 @@ class SIMBA(Teleprompter):
 
                 # pick source program
                 src_prog_idx = softmax_sample(
-                    rng, top_k_plus_baseline(self.num_candidates), self.temperature_for_candidates
+                    rng_obj=rng,
+                    program_idxs=top_k_plus_baseline(self.num_candidates),
+                    temperature=self.temperature_for_candidates,
                 )
                 system_candidate = programs[src_prog_idx].deepcopy()
 
@@ -308,7 +314,9 @@ class SIMBA(Teleprompter):
                 f"Batch {batch_idx + 1}: Evaluating {len(system_candidates)} programs on {self.bsize} examples."
             )
 
-            exec_pairs = [(wrap_program(sys, self.metric), ex) for sys in system_candidates for ex in batch]
+            exec_pairs = [
+                (wrap_program(program=sys, metric=self.metric), ex) for sys in system_candidates for ex in batch
+            ]
             outputs = cast("list[dict[str, Any]]", await run_parallel(exec_pairs))
             assert len(outputs) == len(exec_pairs) == len(system_candidates) * self.bsize
 
@@ -347,7 +355,9 @@ class SIMBA(Teleprompter):
 
         candidate_programs = [winning_programs[i].deepcopy() for i in program_idxs]
         logger.info(f"VALIDATION: Evaluating {len(candidate_programs)} programs on the full trainset.")
-        exec_pairs = [(wrap_program(sys, self.metric), ex) for sys in candidate_programs for ex in trainset]
+        exec_pairs = [
+            (wrap_program(program=sys, metric=self.metric), ex) for sys in candidate_programs for ex in trainset
+        ]
         outputs = cast("list[dict[str, Any]]", await run_parallel(exec_pairs))
 
         scores = []

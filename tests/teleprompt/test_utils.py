@@ -23,7 +23,14 @@ def test_eval_candidate_program_full_trainset():
     evaluate = AsyncMock(return_value=0)
     batch_size = 10
 
-    result = asyncio.run(eval_candidate_program(batch_size, trainset, candidate_program, evaluate))
+    result = asyncio.run(
+        eval_candidate_program(
+            batch_size=batch_size,
+            trainset=trainset,
+            candidate_program=candidate_program,
+            evaluate=evaluate,
+        )
+    )
 
     evaluate.assert_awaited_once()
     assert evaluate.await_args is not None
@@ -39,7 +46,14 @@ def test_eval_candidate_program_minibatch():
     evaluate = AsyncMock(return_value=0)
     batch_size = 3
 
-    result = asyncio.run(eval_candidate_program(batch_size, trainset, candidate_program, evaluate))
+    result = asyncio.run(
+        eval_candidate_program(
+            batch_size=batch_size,
+            trainset=trainset,
+            candidate_program=candidate_program,
+            evaluate=evaluate,
+        )
+    )
 
     evaluate.assert_awaited_once()
     assert evaluate.await_args is not None
@@ -55,7 +69,14 @@ def test_eval_candidate_program_failure():
     evaluate = AsyncMock(side_effect=ValueError("Error"))
     batch_size = 3
 
-    result = asyncio.run(eval_candidate_program(batch_size, trainset, candidate_program, evaluate))
+    result = asyncio.run(
+        eval_candidate_program(
+            batch_size=batch_size,
+            trainset=trainset,
+            candidate_program=candidate_program,
+            evaluate=evaluate,
+        )
+    )
 
     assert result.score == 0.0
 

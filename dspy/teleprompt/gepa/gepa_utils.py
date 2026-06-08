@@ -161,7 +161,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
 
     @override
     def evaluate(self, batch, candidate, capture_traces=False):
-        return _run_async_from_sync(self._aevaluate(batch, candidate, capture_traces))
+        return _run_async_from_sync(self._aevaluate(batch=batch, candidate=candidate, capture_traces=capture_traces))
 
     async def _aevaluate(self, batch, candidate, capture_traces=False):
         program = self.build_program(candidate)

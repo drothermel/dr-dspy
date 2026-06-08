@@ -355,7 +355,7 @@ class GRPO(FinetuneTeleprompter):
             teacher = student
         teachers = cast("list[Module]", teacher) if isinstance(teacher, list) else [cast("Module", teacher)]
         for t in teachers:
-            assert_structural_equivalency(student, t)
+            assert_structural_equivalency(program1=student, program2=t)
             all_predictors_have_lms(t)
 
         assert student in teachers, (

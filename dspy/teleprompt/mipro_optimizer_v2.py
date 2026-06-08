@@ -153,7 +153,7 @@ class MIPROv2(Teleprompter):
         # If auto is None, and num_trials is not provided (but num_candidates is), raise an error that suggests a good num_trials value
         if self.auto is None and (self.num_candidates is not None and num_trials is None):
             raise ValueError(
-                f"If auto is None, num_trials must also be provided. Given num_candidates={self.num_candidates}, we'd recommend setting num_trials to ~{self._set_num_trials_from_num_candidates(student, zeroshot_opt, self.num_candidates)}."
+                f"If auto is None, num_trials must also be provided. Given num_candidates={self.num_candidates}, we'd recommend setting num_trials to ~{self._set_num_trials_from_num_candidates(program=student, zeroshot_opt=zeroshot_opt, num_candidates=self.num_candidates)}."
             )
 
         # If auto is None, and num_candidates or num_trials is None, raise an error
@@ -293,7 +293,7 @@ class MIPROv2(Teleprompter):
 
         auto_settings = AUTO_RUN_SETTINGS[self.auto]
 
-        valset = create_minibatch(valset, batch_size=auto_settings["val_size"], rng=self.rng)
+        valset = create_minibatch(trainset=valset, batch_size=auto_settings["val_size"], rng=self.rng)
         minibatch = len(valset) > MIN_MINIBATCH_SIZE
 
         # Set num instruct candidates to 1/2 of N if optimizing with few-shot examples, otherwise set to N
@@ -302,7 +302,9 @@ class MIPROv2(Teleprompter):
         num_instruct_candidates = auto_settings["n"] if zeroshot_opt else int(auto_settings["n"] * 0.5)
         num_fewshot_candidates = auto_settings["n"]
 
-        num_trials = self._set_num_trials_from_num_candidates(program, zeroshot_opt, auto_settings["n"])
+        num_trials = self._set_num_trials_from_num_candidates(
+            program=program, zeroshot_opt=zeroshot_opt, num_candidates=auto_settings["n"]
+        )
 
         return num_trials, valset, minibatch, num_instruct_candidates, num_fewshot_candidates
 
@@ -515,12 +517,22 @@ class MIPROv2(Teleprompter):
         )
         logger.info(f"== Trial {1} / {adjusted_num_trials} - Full Evaluation of Default Program ==")
 
-        default_score = (await eval_candidate_program(len(valset), valset, program, evaluate, self.rng)).score
+        default_score = (
+            await eval_candidate_program(
+                batch_size=len(valset),
+                trainset=valset,
+                candidate_program=program,
+                evaluate=evaluate,
+                rng=self.rng,
+            )
+        ).score
         logger.info(f"Default program score: {default_score}\n")
 
         trial_logs = {}
         trial_logs[1] = {}
-        trial_logs[1]["full_eval_program_path"] = save_candidate_program(program, self.log_dir, -1)
+        trial_logs[1]["full_eval_program_path"] = save_candidate_program(
+            program=program, log_dir=self.log_dir, trial_num=-1
+        )
         trial_logs[1]["full_eval_score"] = default_score
         trial_logs[1]["total_eval_calls_so_far"] = len(valset)
         trial_logs[1]["full_eval_program"] = program.deepcopy()
@@ -560,7 +572,13 @@ class MIPROv2(Teleprompter):
 
             batch_size = minibatch_size if minibatch else len(valset)
             score = _run_async_from_sync(
-                eval_candidate_program(batch_size, valset, candidate_program, evaluate, self.rng)
+                eval_candidate_program(
+                    batch_size=batch_size,
+                    trainset=valset,
+                    candidate_program=candidate_program,
+                    evaluate=evaluate,
+                    rng=self.rng,
+                )
             ).score
             total_eval_calls += batch_size
 
@@ -641,7 +659,11 @@ class MIPROv2(Teleprompter):
         # TODO: Account for the default program being evaluated on a different sample count before adding it as an Optuna baseline trial.
         trial = optuna.trial.create_trial(
             params=default_params,
-            distributions=self._get_param_distributions(program, instruction_candidates, demo_candidates),
+            distributions=self._get_param_distributions(
+                program=program,
+                instruction_candidates=instruction_candidates,
+                demo_candidates=demo_candidates,
+            ),
             value=default_score,
         )
         study.add_trial(trial)
@@ -681,7 +703,9 @@ class MIPROv2(Teleprompter):
         candidate_program,
         total_eval_calls,
     ) -> None:
-        trial_logs[trial_num]["mb_program_path"] = save_candidate_program(candidate_program, self.log_dir, trial_num)
+        trial_logs[trial_num]["mb_program_path"] = save_candidate_program(
+            program=candidate_program, log_dir=self.log_dir, trial_num=trial_num
+        )
         trial_logs[trial_num]["mb_score"] = score
         trial_logs[trial_num]["total_eval_calls_so_far"] = total_eval_calls
         trial_logs[trial_num]["mb_program"] = candidate_program.deepcopy()
@@ -713,7 +737,7 @@ class MIPROv2(Teleprompter):
         total_eval_calls,
     ) -> None:
         trial_logs[trial_num]["full_eval_program_path"] = save_candidate_program(
-            candidate_program, self.log_dir, trial_num
+            program=candidate_program, log_dir=self.log_dir, trial_num=trial_num
         )
         trial_logs[trial_num]["full_eval_score"] = score
         trial_logs[trial_num]["total_eval_calls_so_far"] = total_eval_calls
@@ -743,7 +767,7 @@ class MIPROv2(Teleprompter):
             )
             selected_instruction = instruction_candidates[i][instruction_idx]
             updated_signature = get_signature(predictor).with_instructions(selected_instruction)
-            set_signature(predictor, updated_signature)
+            set_signature(predictor=predictor, updated_signature=updated_signature)
             trial_logs[trial_num][f"{i}_predictor_instruction"] = instruction_idx
             chosen_params.append(f"Predictor {i}: Instruction {instruction_idx}")
             raw_chosen_params[f"{i}_predictor_instruction"] = instruction_idx
@@ -793,17 +817,27 @@ class MIPROv2(Teleprompter):
         logger.info(f"===== Trial {trial_num + 1} / {adjusted_num_trials} - Full Evaluation =====")
 
         highest_mean_program, mean_score, combo_key, params = get_program_with_highest_avg_score(
-            param_score_dict, fully_evaled_param_combos
+            param_score_dict=param_score_dict, fully_evaled_param_combos=fully_evaled_param_combos
         )
         logger.info(f"Doing full eval on next top averaging program (Avg Score: {mean_score}) from minibatch trials...")
         full_eval_score = (
-            await eval_candidate_program(len(valset), valset, highest_mean_program, evaluate, self.rng)
+            await eval_candidate_program(
+                batch_size=len(valset),
+                trainset=valset,
+                candidate_program=highest_mean_program,
+                evaluate=evaluate,
+                rng=self.rng,
+            )
         ).score
         score_data.append({"score": full_eval_score, "program": highest_mean_program, "full_eval": True})
 
         trial = optuna.trial.create_trial(
             params=params,
-            distributions=self._get_param_distributions(best_program, instruction_candidates, demo_candidates),
+            distributions=self._get_param_distributions(
+                program=best_program,
+                instruction_candidates=instruction_candidates,
+                demo_candidates=demo_candidates,
+            ),
             value=full_eval_score,
         )
         study.add_trial(trial)

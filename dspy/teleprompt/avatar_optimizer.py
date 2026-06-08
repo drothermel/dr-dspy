@@ -78,7 +78,9 @@ class _AvatarEvalModule(Module):
 
     async def aforward(self, **kwargs):
         example = Example(**kwargs)
-        return await self._optimizer.process_example(self._actor, example, self._return_outputs)
+        return await self._optimizer.process_example(
+            actor=self._actor, example=example, return_outputs=self._return_outputs
+        )
 
 
 class AvatarOptimizer(Teleprompter):
@@ -155,7 +157,7 @@ class AvatarOptimizer(Teleprompter):
         pos_inputs = []
         neg_inputs = []
 
-        avg_score, results = await self.thread_safe_evaluator(trainset, actor, return_outputs=True)
+        avg_score, results = await self.thread_safe_evaluator(devset=trainset, actor=actor, return_outputs=True)
 
         for example, prediction, score in results:
             if score >= self.upper_bound:

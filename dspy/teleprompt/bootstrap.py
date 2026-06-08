@@ -88,7 +88,7 @@ class BootstrapFewShot(Teleprompter):
     async def compile(self, student, *, teacher=None, trainset):
         self.trainset = trainset
 
-        await self._prepare_student_and_teacher(student, teacher)
+        await self._prepare_student_and_teacher(student=student, teacher=teacher)
         self._prepare_predictor_mappings()
         await self._bootstrap()
 
@@ -163,7 +163,7 @@ class BootstrapFewShot(Teleprompter):
             for round_idx in range(self.max_rounds):
                 bootstrap_attempts += 1
 
-                if await self._bootstrap_one_example(example, round_idx):
+                if await self._bootstrap_one_example(example=example, round_idx=round_idx):
                     bootstrapped[example_idx] = True
                     break
 

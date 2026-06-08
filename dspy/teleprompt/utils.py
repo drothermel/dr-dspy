@@ -17,7 +17,7 @@ This file consists of helper functions for our variety of optimizers.
 logger = logging.getLogger(__name__)
 
 
-def create_minibatch(trainset, batch_size=50, rng=None):
+def create_minibatch(*, trainset, batch_size=50, rng=None):
     """Create a minibatch from the trainset."""
 
     # Ensure batch_size isn't larger than the size of the dataset
@@ -33,7 +33,7 @@ def create_minibatch(trainset, batch_size=50, rng=None):
     return [trainset[i] for i in sampled_indices]
 
 
-async def eval_candidate_program(batch_size, trainset, candidate_program, evaluate, rng=None):
+async def eval_candidate_program(*, batch_size, trainset, candidate_program, evaluate, rng=None):
     """Evaluate a candidate program on the trainset, using the specified batch size."""
 
     try:
@@ -43,7 +43,7 @@ async def eval_candidate_program(batch_size, trainset, candidate_program, evalua
         # Or evaluate on a minibatch
         return await evaluate(
             candidate_program,
-            devset=create_minibatch(trainset, batch_size, rng),
+            devset=create_minibatch(trainset=trainset, batch_size=batch_size, rng=rng),
             callback_metadata={"metric_key": "eval_minibatch"},
         )
     except Exception:
@@ -102,7 +102,7 @@ async def eval_candidate_program_with_pruning(
     return score, trial_logs, total_eval_size, False
 
 
-def get_program_with_highest_avg_score(param_score_dict, fully_evaled_param_combos):
+def get_program_with_highest_avg_score(*, param_score_dict, fully_evaled_param_combos):
     """Used as a helper function for bayesian + minibatching optimizers. Returns the program with the highest average score from the batches evaluated so far."""
 
     # Calculate the mean for each combination of categorical parameters, based on past trials
@@ -192,7 +192,7 @@ def print_full_program(program) -> None:
         *_, _last_field = get_signature(predictor).fields.values()
 
 
-def save_candidate_program(program, log_dir, trial_num, note=None):
+def save_candidate_program(*, program, log_dir, trial_num, note=None):
     """Save the candidate program to the log directory."""
 
     if log_dir is None:
@@ -214,7 +214,7 @@ def save_candidate_program(program, log_dir, trial_num, note=None):
     return save_path
 
 
-def save_file_to_log_dir(source_file_path, log_dir) -> None:
+def save_file_to_log_dir(*, source_file_path, log_dir) -> None:
     if log_dir is None:
         return
     """Save a file to our log directory"""
@@ -271,7 +271,7 @@ def get_token_usage(model) -> tuple[int, int]:
     return total_input_tokens, total_output_tokens
 
 
-def log_token_usage(trial_logs, trial_num, model_dict) -> None:
+def log_token_usage(*, trial_logs, trial_num, model_dict) -> None:
     """
     Extract total input and output tokens used by each model and log to trial_logs[trial_num]["token_usage"].
     """
@@ -300,7 +300,7 @@ def get_signature(predictor):
     return predictor.signature
 
 
-def set_signature(predictor, updated_signature) -> None:
+def set_signature(*, predictor, updated_signature) -> None:
     assert hasattr(predictor, "signature")
     predictor.signature = updated_signature
 

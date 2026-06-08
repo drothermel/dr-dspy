@@ -164,7 +164,7 @@ class GenerateModuleInstruction(Module):
                 for example in candidate_set:
                     if "augmented" in example:
                         fields_to_use = get_signature(program.predictors()[pred_i]).fields
-                        yield create_example_string(fields_to_use, example)
+                        yield create_example_string(fields=fields_to_use, example=example)
                         count += 1
                         if count >= max_examples:
                             return
@@ -179,7 +179,7 @@ class GenerateModuleInstruction(Module):
                 + demo_candidates[pred_i][:demo_set_i]
             )
 
-            example_strings = gather_examples_from_sets(adjacent_sets, num_demos_in_context)
+            example_strings = gather_examples_from_sets(candidate_sets=adjacent_sets, max_examples=num_demos_in_context)
             task_demos = "\n\n".join(example_strings) + "\n\n"
 
         # demo_set_i == 0 is the no-demo baseline candidate.
@@ -380,10 +380,10 @@ class GroundedProposer(Proposer):
         """This method is responsible for returning a single instruction for a given predictor, using the specified criteria."""
 
         instruction_history = create_predictor_level_history_string(
-            program,
-            pred_i,
-            trial_logs,
-            MAX_INSTRUCT_IN_HISTORY,
+            base_program=program,
+            predictor_i=pred_i,
+            trial_logs=trial_logs,
+            top_n=MAX_INSTRUCT_IN_HISTORY,
         )
 
         instruction_generator = GenerateModuleInstruction(

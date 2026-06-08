@@ -17,7 +17,7 @@ from dspy.signatures.signature import Signature
 logger = logging.getLogger(__name__)
 
 
-def prepare_models_for_resampling(program: Module, n: int, teacher_settings: dict | None = None):
+def prepare_models_for_resampling(*, program: Module, n: int, teacher_settings: dict | None = None):
     lm = program.get_lm() or settings.lm
 
     start_rollout_id = lm.kwargs.get("rollout_id", 0)
@@ -37,7 +37,7 @@ def prepare_models_for_resampling(program: Module, n: int, teacher_settings: dic
     return models
 
 
-def wrap_program(program: Module, metric: Callable):
+def wrap_program(*, program: Module, metric: Callable):
     async def wrapped_program(example):
         with settings.context(trace=[]):
             prediction, trace, score = None, None, 0.0

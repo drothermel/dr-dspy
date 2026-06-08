@@ -69,7 +69,7 @@ def get_program_instruction_set_string(program) -> str:
     return f"[{', '.join(instruction_list)}]"
 
 
-def create_predictor_level_history_string(base_program, predictor_i, trial_logs, top_n):
+def create_predictor_level_history_string(*, base_program, predictor_i, trial_logs, top_n):
     instruction_aggregate = {}
     instruction_history = []
 
@@ -118,7 +118,7 @@ def create_predictor_level_history_string(base_program, predictor_i, trial_logs,
     return predictor_history_string
 
 
-def create_example_string(fields, example):
+def create_example_string(*, fields, example):
 
     output = []
     for field_name, field_values in fields.items():
