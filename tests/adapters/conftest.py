@@ -86,7 +86,7 @@ class CapturingLM(BaseLM):
         raise StopAdapterCallCapture
 
 
-async def _format_messages_and_lm_kwargs(adapter, signature, demos, inputs, config=None, lm=None, lm_kwargs=None):
+async def _format_messages_and_lm_kwargs(*, adapter, signature, demos, inputs, config=None, lm=None, lm_kwargs=None):
     if lm_kwargs is not None:
         if config is not None:
             raise TypeError("Pass either `config` or `lm_kwargs`, not both.")
@@ -110,10 +110,22 @@ async def _format_messages_and_lm_kwargs(adapter, signature, demos, inputs, conf
     )
 
 
-def format_messages_and_lm_kwargs(adapter, signature, demos, inputs, config=None, lm=None, lm_kwargs=None):
-    return asyncio.run(_format_messages_and_lm_kwargs(adapter, signature, demos, inputs, config, lm, lm_kwargs))
+def format_messages_and_lm_kwargs(*, adapter, signature, demos, inputs, config=None, lm=None, lm_kwargs=None):
+    return asyncio.run(
+        _format_messages_and_lm_kwargs(
+            adapter=adapter,
+            signature=signature,
+            demos=demos,
+            inputs=inputs,
+            config=config,
+            lm=lm,
+            lm_kwargs=lm_kwargs,
+        )
+    )
 
 
-def adapter_format_as_openai(adapter, signature, demos, inputs):
+def adapter_format_as_openai(*, adapter, signature, demos, inputs):
     """Return OpenAI-chat-shaped messages from adapter.format()."""
-    return [message_to_openai_chat(message) for message in adapter.format(signature, demos, inputs)]
+    return [
+        message_to_openai_chat(message) for message in adapter.format(signature=signature, demos=demos, inputs=inputs)
+    ]

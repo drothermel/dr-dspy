@@ -173,7 +173,7 @@ def test_call_caching_false_overrides_instance_true(cache):
         mock_litellm.return_value = MockEmbeddingResponse([[0.1, 0.2, 0.3]])
         embedding = Embedder(model, caching=True)
         asyncio.run(embedding(inputs))
-        asyncio.run(embedding(inputs, caching=False))
+        asyncio.run(embedding(inputs=inputs, caching=False))
         assert mock_litellm.call_count == 2
 
 
@@ -183,8 +183,8 @@ def test_call_caching_true_overrides_instance_false(cache):
     with patch("litellm.embedding") as mock_litellm:
         mock_litellm.return_value = MockEmbeddingResponse([[0.1, 0.2, 0.3]])
         embedding = Embedder(model, caching=False)
-        asyncio.run(embedding(inputs, caching=True))
-        asyncio.run(embedding(inputs, caching=True))
+        asyncio.run(embedding(inputs=inputs, caching=True))
+        asyncio.run(embedding(inputs=inputs, caching=True))
         assert mock_litellm.call_count == 1
 
 
@@ -196,7 +196,7 @@ async def test_acall_caching_false_overrides_instance_true(cache):
         mock_litellm.return_value = MockEmbeddingResponse([[0.1, 0.2, 0.3]])
         embedding = Embedder(model, caching=True)
         await embedding.acall(inputs)
-        await embedding.acall(inputs, caching=False)
+        await embedding.acall(inputs=inputs, caching=False)
         assert mock_litellm.call_count == 2
 
 
@@ -207,6 +207,6 @@ async def test_acall_caching_true_overrides_instance_false(cache):
     with patch("litellm.aembedding") as mock_litellm:
         mock_litellm.return_value = MockEmbeddingResponse([[0.1, 0.2, 0.3]])
         embedding = Embedder(model, caching=False)
-        await embedding.acall(inputs, caching=True)
-        await embedding.acall(inputs, caching=True)
+        await embedding.acall(inputs=inputs, caching=True)
+        await embedding.acall(inputs=inputs, caching=True)
         assert mock_litellm.call_count == 1

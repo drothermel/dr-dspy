@@ -60,8 +60,8 @@ def test_json_adapter_format_exact_messages_for_simple_signature():
         answer: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        JSONAdapter(),
-        StringSignature,
+        adapter=JSONAdapter(),
+        signature=StringSignature,
         demos=[],
         inputs={"question": "What is the capital of France?"},
     )
@@ -108,8 +108,8 @@ def test_json_adapter_format_exact_messages_with_demo_and_typed_output():
         confidence: float = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        JSONAdapter(),
-        MultiAnswer,
+        adapter=JSONAdapter(),
+        signature=MultiAnswer,
         demos=[{"question": "Q1", "answer": "A1", "confidence": 0.9}],
         inputs={"question": "Q2"},
     )
@@ -169,7 +169,9 @@ def test_json_adapter_format_exact_messages_with_described_and_bool_outputs():
         output1: str = OutputField(desc="String output field")
         output2: bool = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(JSONAdapter(), TestSignature, [], {"input1": "Test input"})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        adapter=JSONAdapter(), signature=TestSignature, demos=[], inputs={"input1": "Test input"}
+    )
 
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
@@ -257,8 +259,8 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
         ]
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        JSONAdapter(),
-        RichRenderingSignature,
+        adapter=JSONAdapter(),
+        signature=RichRenderingSignature,
         demos=[
             {
                 "image": Image("https://example.com/demo.png"),
@@ -418,7 +420,10 @@ def test_json_adapter_format_exact_messages_with_int_and_mapping_outputs():
         metadata: dict[str, int] = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        JSONAdapter(), IntDictSignature, [], {"question": "Count things"}
+        adapter=JSONAdapter(),
+        signature=IntDictSignature,
+        demos=[],
+        inputs={"question": "Count things"},
     )
 
     expected_messages = [
@@ -474,7 +479,9 @@ def test_json_adapter_format_exact_messages_with_literal_and_enum_outputs():
         decision: Literal["accept", "reject"] = OutputField()
         label: Label = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(JSONAdapter(), LiteralEnumSignature, [], {"text": "Looks good"})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        adapter=JSONAdapter(), signature=LiteralEnumSignature, demos=[], inputs={"text": "Looks good"}
+    )
 
     expected_messages = [
         {
@@ -532,7 +539,9 @@ def test_json_adapter_format_exact_messages_with_nested_pydantic_output():
         question: str = InputField()
         summary: JsonNestedSummary = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(JSONAdapter(), PydanticSignature, [], {"question": "Summarize"})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        adapter=JSONAdapter(), signature=PydanticSignature, demos=[], inputs={"question": "Summarize"}
+    )
 
     expected_messages = [
         {
@@ -588,10 +597,10 @@ def test_json_adapter_format_exact_messages_with_incomplete_demo():
         score: float = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        JSONAdapter(),
-        IncompleteDemoSignature,
-        [{"question": "Q1", "answer": "A1"}],
-        {"question": "Q2", "context": "C2"},
+        adapter=JSONAdapter(),
+        signature=IncompleteDemoSignature,
+        demos=[{"question": "Q1", "answer": "A1"}],
+        inputs={"question": "Q2", "context": "C2"},
     )
 
     expected_messages = [
@@ -671,10 +680,10 @@ def test_json_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
         tool_calls: ToolCalls = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        JSONAdapter(use_native_function_calling=True),
-        NativeToolSignature,
-        [],
-        {"question": "Q?", "tools": [Tool(search)]},
+        adapter=JSONAdapter(use_native_function_calling=True),
+        signature=NativeToolSignature,
+        demos=[],
+        inputs={"question": "Q?", "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -730,10 +739,12 @@ def test_json_adapter_format_exact_messages_with_tool_calls_output_demo():
         tool_calls: ToolCalls = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        JSONAdapter(use_native_function_calling=False),
-        ToolCallsSignature,
-        [{"question": "Q1", "tool_calls": ToolCalls.from_dict_list([{"name": "search", "args": {"query": "cats"}}])}],
-        {"question": "Q2"},
+        adapter=JSONAdapter(use_native_function_calling=False),
+        signature=ToolCallsSignature,
+        demos=[
+            {"question": "Q1", "tool_calls": ToolCalls.from_dict_list([{"name": "search", "args": {"query": "cats"}}])}
+        ],
+        inputs={"question": "Q2"},
     )
 
     expected_messages = [
@@ -814,10 +825,10 @@ def test_json_adapter_format_exact_non_native_tool_result_history_field():
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
 
     messages, _lm_kwargs = format_messages_and_lm_kwargs(
-        JSONAdapter(use_native_function_calling=False),
-        ToolHistorySignature,
-        [],
-        {
+        adapter=JSONAdapter(use_native_function_calling=False),
+        signature=ToolHistorySignature,
+        demos=[],
+        inputs={
             "question": "Q2",
             "history": History(
                 messages=[
@@ -1089,7 +1100,7 @@ def test_json_adapter_formats_image():
         text: str = OutputField()
 
     adapter = JSONAdapter()
-    messages = adapter_format_as_openai(adapter, MySignature, [], {"image": image})
+    messages = adapter_format_as_openai(adapter=adapter, signature=MySignature, demos=[], inputs={"image": image})
 
     assert len(messages) == 2
     user_message_content = messages[1]["content"]
@@ -1123,7 +1134,10 @@ def test_json_adapter_formats_image_with_few_shot_examples():
         ),
     ]
     messages = adapter_format_as_openai(
-        adapter, MySignature, demos, {"image": Image(url="https://example.com/image3.jpg")}
+        adapter=adapter,
+        signature=MySignature,
+        demos=demos,
+        inputs={"image": Image(url="https://example.com/image3.jpg")},
     )
 
     # 1 system message, 2 few shot examples (1 user and assistant message for each example), 1 user message
@@ -1150,7 +1164,9 @@ def test_json_adapter_formats_image_with_nested_images():
     image_wrapper = ImageWrapper(images=[image1, image2, image3], tag=["test", "example"])
 
     adapter = JSONAdapter()
-    messages = adapter_format_as_openai(adapter, MySignature, [], {"image": image_wrapper})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=MySignature, demos=[], inputs={"image": image_wrapper}
+    )
 
     expected_image1_content = {"type": "image_url", "image_url": {"url": "https://example.com/image1.jpg"}}
     expected_image2_content = {"type": "image_url", "image_url": {"url": "https://example.com/image2.jpg"}}
@@ -1175,7 +1191,9 @@ def test_json_adapter_formats_with_nested_documents():
     document_wrapper = DocumentWrapper(documents=[doc1, doc2])
 
     adapter = JSONAdapter()
-    messages = adapter_format_as_openai(adapter, MySignature, [], {"document": document_wrapper})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=MySignature, demos=[], inputs={"document": document_wrapper}
+    )
 
     expected_doc1_content = {
         "type": "document",
@@ -1215,7 +1233,9 @@ def test_json_adapter_formats_image_with_few_shot_examples_with_nested_images():
 
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = JSONAdapter()
-    messages = adapter_format_as_openai(adapter, MySignature, demos, {"image": image_wrapper_2})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=MySignature, demos=demos, inputs={"image": image_wrapper_2}
+    )
 
     assert len(messages) == 4
 
@@ -1252,7 +1272,10 @@ def test_json_adapter_with_tool():
 
     adapter = JSONAdapter()
     messages = adapter_format_as_openai(
-        adapter, MySignature, [], {"question": "What is the weather in Tokyo?", "tools": tools}
+        adapter=adapter,
+        signature=MySignature,
+        demos=[],
+        inputs={"question": "What is the weather in Tokyo?", "tools": tools},
     )
 
     assert len(messages) == 2
@@ -1342,7 +1365,9 @@ def test_json_adapter_with_code():
         result: str = OutputField()
 
     adapter = JSONAdapter()
-    messages = adapter_format_as_openai(adapter, CodeAnalysis, [], {"code": "print('Hello, world!')"})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=CodeAnalysis, demos=[], inputs={"code": "print('Hello, world!')"}
+    )
 
     assert len(messages) == 2
 
@@ -1392,7 +1417,10 @@ def test_json_adapter_formats_conversation_history():
 
     adapter = JSONAdapter()
     messages = adapter_format_as_openai(
-        adapter, MySignature, [], {"question": "What is the capital of France?", "history": history}
+        adapter=adapter,
+        signature=MySignature,
+        demos=[],
+        inputs={"question": "What is the capital of France?", "history": history},
     )
 
     assert len(messages) == 6

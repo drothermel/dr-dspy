@@ -119,7 +119,9 @@ def test_chat_adapter_quotes_literals_as_expected(
         output_text: output_literal = OutputField()
 
     adapter = ChatAdapter()
-    messages = adapter_format_as_openai(adapter, TestSignature, [], {"input_text": input_value})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=TestSignature, demos=[], inputs={"input_text": input_value}
+    )
     content = messages[0]["content"]
 
     assert expected_input_str in content
@@ -157,7 +159,10 @@ def test_chat_adapter_format_exact_messages_for_simple_signature():
         answer: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(), QA, [], {"question": "What is the capital of France?"}
+        adapter=ChatAdapter(),
+        signature=QA,
+        demos=[],
+        inputs={"question": "What is the capital of France?"},
     )
 
     expected_lm_kwargs = {}
@@ -201,8 +206,8 @@ def test_chat_adapter_format_exact_messages_with_demo_and_typed_outputs():
         scores: list[float] = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(),
-        MultiAnswer,
+        adapter=ChatAdapter(),
+        signature=MultiAnswer,
         demos=[{"question": "Q1", "answers": ["A1", "A2"], "scores": [0.1, 0.9]}],
         inputs={"question": "Q2"},
     )
@@ -278,10 +283,10 @@ def test_chat_adapter_format_exact_messages_with_nested_pydantic_models():
         summary: Summary = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(),
-        PydanticSignature,
-        [],
-        {"person": Person(name="Ada", address=Address(city="London", country="UK"), tags=["math", "code"])},
+        adapter=ChatAdapter(),
+        signature=PydanticSignature,
+        demos=[],
+        inputs={"person": Person(name="Ada", address=Address(city="London", country="UK"), tags=["math", "code"])},
     )
 
     expected_messages = [
@@ -331,10 +336,10 @@ def test_chat_adapter_format_exact_messages_with_incomplete_demo():
         confidence: float = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(),
-        IncompleteDemoSignature,
-        [{"question": "Q1", "answer": "A1"}],
-        {"question": "Q2", "context": "C2"},
+        adapter=ChatAdapter(),
+        signature=IncompleteDemoSignature,
+        demos=[{"question": "Q1", "answer": "A1"}],
+        inputs={"question": "Q2", "context": "C2"},
     )
 
     expected_messages = [
@@ -415,10 +420,10 @@ def test_chat_adapter_format_exact_messages_with_history():
         ]
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(),
-        HistorySignature,
-        [],
-        {"history": history, "question": "What is 3+3?"},
+        adapter=ChatAdapter(),
+        signature=HistorySignature,
+        demos=[],
+        inputs={"history": history, "question": "What is 3+3?"},
     )
 
     expected_messages = [
@@ -469,7 +474,10 @@ def test_chat_adapter_format_exact_messages_with_list_value_for_string_input():
         answer: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(), ListAsStringSignature, [], {"context": ["alpha", "beta"]}
+        adapter=ChatAdapter(),
+        signature=ListAsStringSignature,
+        demos=[],
+        inputs={"context": ["alpha", "beta"]},
     )
 
     expected_messages = [
@@ -513,7 +521,10 @@ def test_chat_adapter_format_exact_messages_with_literal_output():
         verdict: Literal["yes", "no"] = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(), LiteralSignature, [], {"question": "Is the sky blue?"}
+        adapter=ChatAdapter(),
+        signature=LiteralSignature,
+        demos=[],
+        inputs={"question": "Is the sky blue?"},
     )
 
     expected_messages = [
@@ -561,10 +572,10 @@ def test_chat_adapter_format_exact_messages_with_multimodal_custom_type_inputs()
         answer: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(),
-        CustomTypeSignature,
-        [],
-        {
+        adapter=ChatAdapter(),
+        signature=CustomTypeSignature,
+        demos=[],
+        inputs={
             "image": Image("https://example.com/cat.png"),
             "audio": Audio(data="QUJD", audio_format="wav"),
             "file": File.from_file_id("file-123", filename="notes.txt"),
@@ -689,8 +700,8 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
         ]
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(),
-        RichRenderingSignature,
+        adapter=ChatAdapter(),
+        signature=RichRenderingSignature,
         demos=[
             {
                 "image": Image("https://example.com/demo.png"),
@@ -850,7 +861,10 @@ def test_chat_adapter_format_exact_messages_with_base_custom_type_input():
         answer: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(), EventSignature, [], {"event": Event(label="launch")}
+        adapter=ChatAdapter(),
+        signature=EventSignature,
+        demos=[],
+        inputs={"event": Event(label="launch")},
     )
 
     expected_messages = [
@@ -901,9 +915,9 @@ def test_chat_adapter_format_exact_messages_with_citations_output_demo():
         citations: Citations = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(),
-        CitationSignature,
-        [
+        adapter=ChatAdapter(),
+        signature=CitationSignature,
+        demos=[
             {
                 "question": "Q1",
                 "citations": Citations.from_dict_list(
@@ -918,7 +932,7 @@ def test_chat_adapter_format_exact_messages_with_citations_output_demo():
                 ),
             }
         ],
-        {"question": "Q2"},
+        inputs={"question": "Q2"},
     )
 
     expected_messages = [
@@ -1031,10 +1045,10 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_citations(
         citations: Citations = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(),
-        CitationSignature,
-        [],
-        {"question": "Q?"},
+        adapter=ChatAdapter(),
+        signature=CitationSignature,
+        demos=[],
+        inputs={"question": "Q?"},
         lm=AnthropicLM(),
     )
 
@@ -1078,10 +1092,10 @@ def test_chat_adapter_format_exact_messages_preserves_passthrough_lm_kwargs():
         answer: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(),
-        PassthroughSignature,
-        [],
-        {"question": "Q?"},
+        adapter=ChatAdapter(),
+        signature=PassthroughSignature,
+        demos=[],
+        inputs={"question": "Q?"},
         config={
             "temperature": 0.7,
             "max_tokens": 42,
@@ -1137,10 +1151,10 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_reasoning(
         answer: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(),
-        NativeReasoningSignature,
-        [],
-        {"question": "Q?"},
+        adapter=ChatAdapter(),
+        signature=NativeReasoningSignature,
+        demos=[],
+        inputs={"question": "Q?"},
         lm=ReasoningLM([{}]),
     )
 
@@ -1200,10 +1214,10 @@ def test_chat_adapter_native_tool_calling_still_enables_native_reasoning():
         tool_calls: ToolCalls = OutputField()
 
     _, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(use_native_function_calling=True),
-        NativeToolReasoningSignature,
-        [],
-        {"question": "Q?", "tools": [Tool(search)]},
+        adapter=ChatAdapter(use_native_function_calling=True),
+        signature=NativeToolReasoningSignature,
+        demos=[],
+        inputs={"question": "Q?", "tools": [Tool(search)]},
         lm=NativeToolReasoningLM([{}]),
     )
 
@@ -1221,10 +1235,10 @@ def test_chat_adapter_nonnative_strips_native_tool_kwargs():
         tool_calls: ToolCalls = OutputField()
 
     _, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(use_native_function_calling=False),
-        NonNativeToolSignature,
-        [],
-        {"question": "Q?", "tools": [Tool(search)]},
+        adapter=ChatAdapter(use_native_function_calling=False),
+        signature=NonNativeToolSignature,
+        demos=[],
+        inputs={"question": "Q?", "tools": [Tool(search)]},
         config={
             "tool_choice": {"mode": "required", "allowed": ["submit"], "parallel": True},
         },
@@ -1244,10 +1258,11 @@ def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
         code: python_code = OutputField()  # ty:ignore[invalid-type-form]
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(),
-        CodeSignature,
-        [{"question": "Q1", "reasoning": Reasoning(content="Think"), "code": python_code(code="print('hi')")}],  # ty:ignore[unknown-argument]
-        {"question": "Q2"},
+        adapter=ChatAdapter(),
+        signature=CodeSignature,
+        demos=[{"question": "Q1", "reasoning": Reasoning(content="Think"), "code": python_code(code="print('hi')")}],
+        # ty:ignore[unknown-argument]
+        inputs={"question": "Q2"},
     )
 
     expected_messages = [
@@ -1319,10 +1334,10 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
         tool_calls: ToolCalls = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(use_native_function_calling=True),
-        NativeToolSignature,
-        [],
-        {"question": "Q?", "tools": [Tool(search)]},
+        adapter=ChatAdapter(use_native_function_calling=True),
+        signature=NativeToolSignature,
+        demos=[],
+        inputs={"question": "Q?", "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1398,10 +1413,10 @@ def test_adapter_native_tool_calling_can_request_parallel_tool_calls(adapter):
         tool_calls: ToolCalls = OutputField()
 
     _messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter,
-        NativeToolSignature,
-        [],
-        {"question": "Q?", "tools": [Tool(search)]},
+        adapter=adapter,
+        signature=NativeToolSignature,
+        demos=[],
+        inputs={"question": "Q?", "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1425,10 +1440,10 @@ def test_adapter_native_tool_calling_respects_lm_kwargs_parallel_tool_call_overr
         tool_calls: ToolCalls = OutputField()
 
     _messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(use_native_function_calling=True, parallel_tool_calls=True),
-        NativeToolSignature,
-        [],
-        {"question": "Q?", "tools": [Tool(search)]},
+        adapter=ChatAdapter(use_native_function_calling=True, parallel_tool_calls=True),
+        signature=NativeToolSignature,
+        demos=[],
+        inputs={"question": "Q?", "tools": [Tool(search)]},
         config={"tool_choice": {"mode": "auto", "parallel": False}},
         lm=FunctionCallingLM([{}]),
     )
@@ -1468,10 +1483,10 @@ def test_chat_adapter_native_tool_history_replay():
     )
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(use_native_function_calling=True),
-        NativeToolHistorySignature,
-        [],
-        {"question": "Q2", "history": history, "tools": [Tool(search)]},
+        adapter=ChatAdapter(use_native_function_calling=True),
+        signature=NativeToolHistorySignature,
+        demos=[],
+        inputs={"question": "Q2", "history": history, "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1542,10 +1557,10 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
     )
 
     messages, _lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(use_native_function_calling=True),
-        NativeToolHistorySignature,
-        [],
-        {"question": "Q2", "history": history, "tools": [Tool(search)]},
+        adapter=ChatAdapter(use_native_function_calling=True),
+        signature=NativeToolHistorySignature,
+        demos=[],
+        inputs={"question": "Q2", "history": history, "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1583,10 +1598,10 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
     )
 
     messages, _ = format_messages_and_lm_kwargs(
-        ChatAdapter(use_native_function_calling=True),
-        NativeToolHistorySignature,
-        [],
-        {"history": history, "tools": [Tool(search)]},
+        adapter=ChatAdapter(use_native_function_calling=True),
+        signature=NativeToolHistorySignature,
+        demos=[],
+        inputs={"history": history, "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1645,10 +1660,10 @@ def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_i
     )
 
     messages, _ = format_messages_and_lm_kwargs(
-        ChatAdapter(use_native_function_calling=True),
-        NativeToolHistorySignature,
-        [],
-        {"question": "Q2", "history": history, "tools": [Tool(search)]},
+        adapter=ChatAdapter(use_native_function_calling=True),
+        signature=NativeToolHistorySignature,
+        demos=[],
+        inputs={"question": "Q2", "history": history, "tools": [Tool(search)]},
         lm=FunctionCallingLM([{}]),
     )
 
@@ -1682,10 +1697,10 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
     )
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(use_native_function_calling=False),
-        ToolHistorySignature,
-        [],
-        {"question": "Q2", "history": history, "tools": [Tool(search)]},
+        adapter=ChatAdapter(use_native_function_calling=False),
+        signature=ToolHistorySignature,
+        demos=[],
+        inputs={"question": "Q2", "history": history, "tools": [Tool(search)]},
     )
 
     expected_messages = [
@@ -1779,10 +1794,10 @@ def test_non_native_tool_history_remains_text_based(adapter):
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
     messages = adapter_format_as_openai(
-        adapter,
-        ToolHistorySignature,
-        [],
-        {
+        adapter=adapter,
+        signature=ToolHistorySignature,
+        demos=[],
+        inputs={
             "question": "Q2",
             "history": History(
                 messages=[
@@ -1824,10 +1839,10 @@ def test_chat_adapter_format_accepts_custom_history_formatter_returning_messages
         answer: str = OutputField()
 
     messages = adapter_format_as_openai(
-        CustomHistoryAdapter(),
-        HistorySignature,
-        [],
-        {
+        adapter=CustomHistoryAdapter(),
+        signature=HistorySignature,
+        demos=[],
+        inputs={
             "question": "Q2",
             "history": History(messages=[{"question": "Q1"}]),
         },
@@ -1849,10 +1864,10 @@ def test_chat_adapter_format_exact_messages_with_tool_input():
         answer: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(),
-        ToolSignature,
-        [],
-        {"question": "Q?", "tools": [Tool(search)]},
+        adapter=ChatAdapter(),
+        signature=ToolSignature,
+        demos=[],
+        inputs={"question": "Q?", "tools": [Tool(search)]},
     )
 
     expected_messages = [
@@ -1969,8 +1984,8 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
         ]
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        ChatAdapter(),
-        KitchenSinkSignature,
+        adapter=ChatAdapter(),
+        signature=KitchenSinkSignature,
         demos=[
             {
                 "image": Image("https://example.com/demo.png"),
@@ -2259,10 +2274,10 @@ def test_chat_adapter_with_pydantic_models():
 
     adapter = ChatAdapter()
     messages = adapter_format_as_openai(
-        adapter,
-        TestSignature,
-        [],
-        {
+        adapter=adapter,
+        signature=TestSignature,
+        demos=[],
+        inputs={
             "owner": PetOwner(name="John", num_pets=5, dogs=DogClass(dog_breeds=["labrador", "chihuahua"], num_dogs=2)),
             "question": "How many non-dog pets does John have?",
         },
@@ -2345,7 +2360,7 @@ def test_chat_adapter_formats_image():
         text: str = OutputField()
 
     adapter = ChatAdapter()
-    messages = adapter_format_as_openai(adapter, MySignature, [], {"image": image})
+    messages = adapter_format_as_openai(adapter=adapter, signature=MySignature, demos=[], inputs={"image": image})
 
     assert len(messages) == 2
     user_message_content = messages[1]["content"]
@@ -2379,7 +2394,10 @@ def test_chat_adapter_formats_image_with_few_shot_examples():
         ),
     ]
     messages = adapter_format_as_openai(
-        adapter, MySignature, demos, {"image": Image(url="https://example.com/image3.jpg")}
+        adapter=adapter,
+        signature=MySignature,
+        demos=demos,
+        inputs={"image": Image(url="https://example.com/image3.jpg")},
     )
 
     # 1 system message, 2 few shot examples (1 user and assistant message for each example), 1 user message
@@ -2409,7 +2427,9 @@ def test_chat_adapter_formats_image_with_nested_images():
     image_wrapper = ImageWrapper(images=[image1, image2, image3], tag=["test", "example"])
 
     adapter = ChatAdapter()
-    messages = adapter_format_as_openai(adapter, MySignature, [], {"image": image_wrapper})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=MySignature, demos=[], inputs={"image": image_wrapper}
+    )
 
     expected_image1_content = {"type": "image_url", "image_url": {"url": "https://example.com/image1.jpg"}}
     expected_image2_content = {"type": "image_url", "image_url": {"url": "https://example.com/image2.jpg"}}
@@ -2443,7 +2463,9 @@ def test_chat_adapter_formats_image_with_few_shot_examples_with_nested_images():
 
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = ChatAdapter()
-    messages = adapter_format_as_openai(adapter, MySignature, demos, {"image": image_wrapper_2})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=MySignature, demos=demos, inputs={"image": image_wrapper_2}
+    )
 
     assert len(messages) == 4
 
@@ -2480,7 +2502,10 @@ def test_chat_adapter_with_tool():
 
     adapter = ChatAdapter()
     messages = adapter_format_as_openai(
-        adapter, MySignature, [], {"question": "What is the weather in Tokyo?", "tools": tools}
+        adapter=adapter,
+        signature=MySignature,
+        demos=[],
+        inputs={"question": "What is the weather in Tokyo?", "tools": tools},
     )
 
     assert len(messages) == 2
@@ -2507,7 +2532,9 @@ def test_chat_adapter_with_code():
         result: str = OutputField()
 
     adapter = ChatAdapter()
-    messages = adapter_format_as_openai(adapter, CodeAnalysis, [], {"code": "print('Hello, world!')"})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=CodeAnalysis, demos=[], inputs={"code": "print('Hello, world!')"}
+    )
 
     assert len(messages) == 2
 
@@ -2552,7 +2579,9 @@ def test_code_output_field_omits_json_schema_in_prompt():
         code: Code = OutputField()
 
     adapter = ChatAdapter()
-    messages = adapter_format_as_openai(adapter, CodeGeneration, [], {"question": "Hello"})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=CodeGeneration, demos=[], inputs={"question": "Hello"}
+    )
     system_content = messages[0]["content"]
 
     assert Code.description() in system_content
@@ -2569,7 +2598,9 @@ def test_citations_output_field_keeps_json_schema_in_prompt():
         citations: Citations = OutputField()
 
     adapter = ChatAdapter()
-    messages = adapter_format_as_openai(adapter, CitationGeneration, [], {"question": "Hello"})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=CitationGeneration, demos=[], inputs={"question": "Hello"}
+    )
     system_content = messages[0]["content"]
 
     assert "must adhere to the JSON schema" in system_content
@@ -2591,7 +2622,10 @@ def test_chat_adapter_formats_conversation_history():
 
     adapter = ChatAdapter()
     messages = adapter_format_as_openai(
-        adapter, MySignature, [], {"question": "What is the capital of France?", "history": history}
+        adapter=adapter,
+        signature=MySignature,
+        demos=[],
+        inputs={"question": "What is the capital of France?", "history": history},
     )
 
     assert len(messages) == 6

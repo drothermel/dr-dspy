@@ -221,7 +221,9 @@ def test_xml_adapter_formats_nested_images():
 
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = XMLAdapter()
-    messages = adapter_format_as_openai(adapter, MySignature, demos, {"image": image_wrapper_2})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=MySignature, demos=demos, inputs={"image": image_wrapper_2}
+    )
 
     assert len(messages) == 4
 
@@ -246,7 +248,9 @@ def test_xml_adapter_with_code():
         result: str = OutputField()
 
     adapter = XMLAdapter()
-    messages = adapter_format_as_openai(adapter, CodeAnalysis, [], {"code": "print('Hello, world!')"})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=CodeAnalysis, demos=[], inputs={"code": "print('Hello, world!')"}
+    )
 
     assert len(messages) == 2
 
@@ -288,7 +292,9 @@ def test_xml_adapter_full_prompt():
         answer: str = OutputField()
 
     adapter = XMLAdapter()
-    messages = adapter_format_as_openai(adapter, QA, [], {"query": "when was Marie Curie born"})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=QA, demos=[], inputs={"query": "when was Marie Curie born"}
+    )
 
     assert len(messages) == 2
     assert messages[0]["role"] == "system"
@@ -325,8 +331,8 @@ def test_xml_adapter_format_exact_messages_for_simple_signature():
         answer: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        XMLAdapter(),
-        StringSignature,
+        adapter=XMLAdapter(),
+        signature=StringSignature,
         demos=[],
         inputs={"question": "why did a chicken cross the kitchen?"},
     )
@@ -379,10 +385,10 @@ def test_xml_adapter_format_exact_non_native_tool_result_history_field():
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
 
     messages, _lm_kwargs = format_messages_and_lm_kwargs(
-        XMLAdapter(use_native_function_calling=False),
-        ToolHistorySignature,
-        [],
-        {
+        adapter=XMLAdapter(use_native_function_calling=False),
+        signature=ToolHistorySignature,
+        demos=[],
+        inputs={
             "question": "Q2",
             "history": History(
                 messages=[
@@ -422,8 +428,8 @@ def test_xml_adapter_format_exact_messages_for_two_input_signature():
         judgement: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        XMLAdapter(),
-        StringSignature,
+        adapter=XMLAdapter(),
+        signature=StringSignature,
         demos=[],
         inputs={"question": "why did a chicken cross the kitchen?", "answer": "To get to the other side!"},
     )
@@ -477,8 +483,8 @@ def test_xml_adapter_format_exact_messages_with_demo_and_typed_output():
         score: float = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        XMLAdapter(),
-        MultiAnswer,
+        adapter=XMLAdapter(),
+        signature=MultiAnswer,
         demos=[{"question": "Q1", "answer": "A1", "score": 0.9}],
         inputs={"question": "Q2"},
     )
@@ -586,8 +592,8 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
         ]
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        XMLAdapter(),
-        RichRenderingSignature,
+        adapter=XMLAdapter(),
+        signature=RichRenderingSignature,
         demos=[
             {
                 "image": Image("https://example.com/demo.png"),
@@ -746,7 +752,9 @@ def test_xml_adapter_format_exact_messages_with_nested_pydantic_output():
         question: str = InputField()
         summary: XmlSummary = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(XMLAdapter(), PydanticSignature, [], {"question": "Summarize"})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        adapter=XMLAdapter(), signature=PydanticSignature, demos=[], inputs={"question": "Summarize"}
+    )
 
     expected_messages = [
         {
@@ -795,10 +803,10 @@ def test_xml_adapter_format_exact_messages_with_incomplete_demo():
         score: float = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        XMLAdapter(),
-        IncompleteDemoSignature,
-        [{"question": "Q1", "answer": "A1"}],
-        {"question": "Q2", "context": "C2"},
+        adapter=XMLAdapter(),
+        signature=IncompleteDemoSignature,
+        demos=[{"question": "Q1", "answer": "A1"}],
+        inputs={"question": "Q2", "context": "C2"},
     )
 
     expected_messages = [

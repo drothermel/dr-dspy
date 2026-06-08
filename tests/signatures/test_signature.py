@@ -135,13 +135,13 @@ def test_insert_field_at_various_positions():
         input1: str = InputField()
         output1: int = OutputField()
 
-    s1 = InitialSignature.prepend("new_input_start", InputField(), str)
-    s2 = InitialSignature.append("new_input_end", InputField(), str)
+    s1 = InitialSignature.prepend(name="new_input_start", field=InputField(), type_=str)
+    s2 = InitialSignature.append(name="new_input_end", field=InputField(), type_=str)
     assert list(s1.input_fields.keys())[0] == "new_input_start"  # noqa: RUF015
     assert list(s2.input_fields.keys())[-1] == "new_input_end"
 
-    s3 = InitialSignature.prepend("new_output_start", OutputField(), str)
-    s4 = InitialSignature.append("new_output_end", OutputField(), str)
+    s3 = InitialSignature.prepend(name="new_output_start", field=OutputField(), type_=str)
+    s4 = InitialSignature.append(name="new_output_end", field=OutputField(), type_=str)
     assert list(s3.output_fields.keys())[0] == "new_output_start"  # noqa: RUF015
     assert list(s4.output_fields.keys())[-1] == "new_output_end"
 
@@ -496,7 +496,7 @@ def test_pep604_union_type_insert():
     # This test ensures that inserting a field into a signature with a PEP 604 UnionType works
 
     # Insert a new input field at the start
-    NewSig = PEP604Signature.prepend("new_input", InputField(), float | int)
+    NewSig = PEP604Signature.prepend(name="new_input", field=InputField(), type_=float | int)
     assert "new_input" in NewSig.input_fields
 
     new_input_annotation = NewSig.input_fields["new_input"].annotation

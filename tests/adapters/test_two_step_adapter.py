@@ -36,7 +36,10 @@ def test_two_step_adapter_format_exact_messages_for_simple_signature_with_demo()
 
     adapter = TwoStepAdapter(DummyLM([{"answer": "x"}]))
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter, QA, [{"question": "Q1", "answer": "A1"}], {"question": "Q2"}
+        adapter=adapter,
+        signature=QA,
+        demos=[{"question": "Q1", "answer": "A1"}],
+        inputs={"question": "Q2"},
     )
 
     expected_messages = [
@@ -67,7 +70,9 @@ def test_two_step_adapter_format_exact_messages_with_typed_outputs():
         answer: str = OutputField()
 
     adapter = TwoStepAdapter(DummyLM([{"count": 1, "answer": "x"}]))
-    messages, lm_kwargs = format_messages_and_lm_kwargs(adapter, TypedSignature, [], {"question": "Q"})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        adapter=adapter, signature=TypedSignature, demos=[], inputs={"question": "Q"}
+    )
 
     expected_messages = [
         {

@@ -75,7 +75,10 @@ def test_baml_adapter_format_exact_messages_for_simple_signature_with_demo():
         answer: str = OutputField()
 
     messages, lm_kwargs = format_messages_and_lm_kwargs(
-        BAMLAdapter(), QA, [{"question": "Q1", "answer": "A1"}], {"question": "Q2"}
+        adapter=BAMLAdapter(),
+        signature=QA,
+        demos=[{"question": "Q1", "answer": "A1"}],
+        inputs={"question": "Q2"},
     )
 
     expected_messages = [
@@ -122,7 +125,9 @@ def test_baml_adapter_format_exact_messages_with_nested_output():
         question: str = InputField()
         answer: BamlNested = OutputField()
 
-    messages, lm_kwargs = format_messages_and_lm_kwargs(BAMLAdapter(), TypedSignature, [], {"question": "Q"})
+    messages, lm_kwargs = format_messages_and_lm_kwargs(
+        adapter=BAMLAdapter(), signature=TypedSignature, demos=[], inputs={"question": "Q"}
+    )
 
     expected_messages = [
         {
@@ -288,7 +293,10 @@ def test_baml_adapter_formats_pydantic_inputs_as_clean_json():
     )
 
     messages = adapter_format_as_openai(
-        adapter, TestSignature, [], {"patient": patient, "question": "What is the diagnosis?"}
+        adapter=adapter,
+        signature=TestSignature,
+        demos=[],
+        inputs={"patient": patient, "question": "What is the diagnosis?"},
     )
 
     user_message = messages[-1]["content"]
@@ -311,7 +319,10 @@ def test_baml_adapter_handles_mixed_input_types():
     patient = PatientDetails(name="Jane Doe", age=30)
 
     messages = adapter_format_as_openai(
-        adapter, TestSignature, [], {"patient": patient, "priority": 1, "notes": "Urgent case"}
+        adapter=adapter,
+        signature=TestSignature,
+        demos=[],
+        inputs={"patient": patient, "priority": 1, "notes": "Urgent case"},
     )
 
     user_message = messages[-1]["content"]
@@ -390,7 +401,9 @@ def test_baml_adapter_with_images():
         tag=["test", "medical"],
     )
 
-    messages = adapter_format_as_openai(adapter, TestSignature, [], {"image_data": image_wrapper})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=TestSignature, demos=[], inputs={"image_data": image_wrapper}
+    )
 
     user_message = messages[-1]["content"]
     image_contents = [
@@ -422,7 +435,10 @@ def test_baml_adapter_with_tools():
 
     adapter = BAMLAdapter()
     messages = adapter_format_as_openai(
-        adapter, TestSignature, [], {"question": "Schedule an appointment for John", "tools": tools}
+        adapter=adapter,
+        signature=TestSignature,
+        demos=[],
+        inputs={"question": "Schedule an appointment for John", "tools": tools},
     )
 
     user_message = messages[-1]["content"]
@@ -442,7 +458,10 @@ def test_baml_adapter_with_code():
 
     adapter = BAMLAdapter()
     messages = adapter_format_as_openai(
-        adapter, CodeAnalysisSignature, [], {"code": "def hello():\n    print('Hello, world!')"}
+        adapter=adapter,
+        signature=CodeAnalysisSignature,
+        demos=[],
+        inputs={"code": "def hello():\n    print('Hello, world!')"},
     )
 
     user_message = messages[-1]["content"]
@@ -490,7 +509,10 @@ def test_baml_adapter_with_conversation_history():
 
     adapter = BAMLAdapter()
     messages = adapter_format_as_openai(
-        adapter, TestSignature, [], {"history": history, "question": "What medications should we avoid?"}
+        adapter=adapter,
+        signature=TestSignature,
+        demos=[],
+        inputs={"history": history, "question": "What medications should we avoid?"},
     )
 
     assert len(messages) == 6  # system + 2 history pairs + user
@@ -650,7 +672,9 @@ def test_baml_adapter_multiple_pydantic_input_fields():
     user_profile = UserProfile(name="John Doe", email="john@example.com", age=30)
     system_config = SystemConfig(timeout=300, debug=True, endpoints=["api1", "api2"])
 
-    messages = adapter_format_as_openai(adapter, TestSignature, [], {"input_1": user_profile, "input_2": system_config})
+    messages = adapter_format_as_openai(
+        adapter=adapter, signature=TestSignature, demos=[], inputs={"input_1": user_profile, "input_2": system_config}
+    )
 
     user_message = messages[-1]["content"]
 
