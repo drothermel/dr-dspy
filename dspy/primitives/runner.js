@@ -102,6 +102,7 @@ const JSONRPC_PROTOCOL_ERRORS = {
 };
 
 // Application errors (range: -32000 to -32099)
+/* JSONRPC_APP_ERRORS_BEGIN */
 const JSONRPC_APP_ERRORS = {
   SyntaxError: -32000,
   NameError: -32001,
@@ -114,6 +115,7 @@ const JSONRPC_APP_ERRORS = {
   CodeInterpreterError: -32008,
   Unknown: -32099,
 };
+/* JSONRPC_APP_ERRORS_END */
 
 const jsonrpcRequest = (method, params, id) =>
   JSON.stringify({ jsonrpc: "2.0", method, params, id });
@@ -245,19 +247,21 @@ while (true) {
   const params = input.params || {};
   const requestId = input.id; // May be undefined for notifications
 
-  // Handle notifications (no response expected)
-  if (method === "sync_file") {
-    try {
-      const virtualPath = params.virtual_path;
-      const hostPath = params.host_path || virtualPath;
-      await Deno.writeFile(hostPath, pyodide.FS.readFile(virtualPath));
-    } catch (e) { /* ignore sync errors */ }
-    continue;
-  }
-
   if (method === "shutdown") break;
 
   // Handle requests (expect response)
+  if (method === "sync_file") {
+    const virtualPath = params.virtual_path;
+    const hostPath = params.host_path || virtualPath;
+    try {
+      await Deno.writeFile(hostPath, pyodide.FS.readFile(virtualPath));
+      console.log(jsonrpcResult({ synced: hostPath }, requestId));
+    } catch (e) {
+      console.log(jsonrpcError(JSONRPC_APP_ERRORS.RuntimeError, `Failed to sync file: ${e.message}`, requestId));
+    }
+    continue;
+  }
+
   if (method === "mount_file") {
     const hostPath = params.host_path;
     const virtualPath = params.virtual_path || hostPath;

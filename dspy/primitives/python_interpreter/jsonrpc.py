@@ -4,6 +4,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Any
 
+# JSONRPC_APP_ERRORS_BEGIN
 JSONRPC_APP_ERRORS = {
     "SyntaxError": -32000,
     "NameError": -32001,
@@ -16,6 +17,7 @@ JSONRPC_APP_ERRORS = {
     "CodeInterpreterError": -32008,
     "Unknown": -32099,
 }
+# JSONRPC_APP_ERRORS_END
 
 
 def canonicalize_path(path: PathLike | str) -> str:

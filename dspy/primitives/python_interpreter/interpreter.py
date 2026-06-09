@@ -92,15 +92,18 @@ class PythonInterpreter:
                 "PythonInterpreter is not thread-safe and cannot be shared across threads. Create a separate interpreter instance for each thread."
             )
 
-    def execute(self, code: str, variables: dict[str, Any] | None = None) -> Any:
-        self._check_thread_ownership()
-        variables = variables or {}
-        code = inject_variables(interpreter=self, code=code, variables=variables)
+    def _prepare_sandbox(self) -> None:
         ensure_deno_process(self)
         mount_files(self)
         register_tools(self)
         for name, value in self._pending_large_vars.items():
             inject_large_var(interpreter=self, name=name, value=value)
+
+    def execute(self, code: str, variables: dict[str, Any] | None = None) -> Any:
+        self._check_thread_ownership()
+        variables = variables or {}
+        code = inject_variables(interpreter=self, code=code, variables=variables)
+        self._prepare_sandbox()
         self._request_id += 1
         execute_request_id = self._request_id
         input_data = jsonrpc_request(method="execute", params={"code": code}, id=execute_request_id)
@@ -109,11 +112,7 @@ class PythonInterpreter:
             stdin.write(input_data + "\n")
             stdin.flush()
         except BrokenPipeError:
-            ensure_deno_process(self)
-            mount_files(self)
-            register_tools(self)
-            for name, value in self._pending_large_vars.items():
-                inject_large_var(interpreter=self, name=name, value=value)
+            self._prepare_sandbox()
             stdin = deno_process.deno_stdin(self)
             try:
                 stdin.write(input_data + "\n")

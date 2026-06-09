@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import IO, TYPE_CHECKING
 
 from dspy.primitives.code_interpreter import CodeInterpreterError
-from dspy.primitives.python_interpreter.jsonrpc import canonicalize_path, jsonrpc_notification, jsonrpc_request
+from dspy.primitives.python_interpreter.jsonrpc import canonicalize_path, jsonrpc_request
 
 if TYPE_CHECKING:
     from dspy.primitives.python_interpreter.interpreter import PythonInterpreter
@@ -97,10 +97,12 @@ def sync_files(interpreter: "PythonInterpreter") -> None:
     for path in interpreter.enable_write_paths:
         host_path = canonicalize_path(path)
         virtual_path = interpreter._sandbox_virtual_paths.get(host_path, f"/sandbox/{Path(path).name}")
-        sync_msg = jsonrpc_notification("sync_file", {"virtual_path": virtual_path, "host_path": host_path})
-        stdin = deno_stdin(interpreter)
-        stdin.write(sync_msg + "\n")
-        stdin.flush()
+        send_request(
+            interpreter=interpreter,
+            method="sync_file",
+            params={"virtual_path": virtual_path, "host_path": host_path},
+            context=f"syncing {path}",
+        )
 
 
 def ensure_deno_process(interpreter: "PythonInterpreter") -> None:

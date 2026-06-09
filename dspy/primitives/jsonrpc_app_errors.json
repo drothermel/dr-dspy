@@ -1,0 +1,12 @@
+{
+  "SyntaxError": -32000,
+  "NameError": -32001,
+  "TypeError": -32002,
+  "ValueError": -32003,
+  "AttributeError": -32004,
+  "IndexError": -32005,
+  "KeyError": -32006,
+  "RuntimeError": -32007,
+  "CodeInterpreterError": -32008,
+  "Unknown": -32099
+}
