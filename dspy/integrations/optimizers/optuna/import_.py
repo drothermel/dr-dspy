@@ -1,5 +1,7 @@
 from typing import Any
 
+from dspy._internal.lazy_import import _detect_dspy_dist
+
 
 def import_optuna(*, feature: str = "Optuna") -> Any:
     try:
@@ -7,7 +9,8 @@ def import_optuna(*, feature: str = "Optuna") -> Any:
     except ModuleNotFoundError as exc:
         if exc.name == "optuna":
             raise ImportError(
-                f"{feature} requires optional dependency 'optuna'. Install it with `pip install dspy[optuna]`."
+                f"{feature} requires optional dependency 'optuna'. "
+                f"Install it with `pip install {_detect_dspy_dist()}[optuna]`."
             ) from exc
         raise
     return optuna
