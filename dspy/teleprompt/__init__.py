@@ -30,7 +30,7 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "EvaluateCompileParams": ("dspy.teleprompt.compile_params", "EvaluateCompileParams"),
     "GEPA": ("dspy.teleprompt.gepa.gepa", "GEPA"),
     "GEPACompileParams": ("dspy.teleprompt.compile_params", "GEPACompileParams"),
-    "GRPO": ("dspy.teleprompt.grpo", "GRPO"),
+    "GRPO": ("dspy.teleprompt.grpo.optimizer", "GRPO"),
     "GRPOCompileParams": ("dspy.teleprompt.compile_params", "GRPOCompileParams"),
     "InferRules": ("dspy.teleprompt.infer_rules", "InferRules"),
     "InferRulesCompileParams": ("dspy.teleprompt.compile_params", "InferRulesCompileParams"),

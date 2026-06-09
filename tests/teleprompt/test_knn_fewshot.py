@@ -60,8 +60,22 @@ def test_knn_few_shot_forward_uses_neighbors(setup_knn_few_shot, make_run):
     compile_result = asyncio.run(knn_few_shot.compile(student, params=KNNFewShotCompileParams(), run=run))
     compiled_student = compile_result.program
     asyncio.run(compiled_student(question="What is the capital of Spain?", run=run))
-    assert len(compiled_student.predictor.demos) == 2
-    assert all(isinstance(demo, Example) for demo in compiled_student.predictor.demos)
+    predictor = compiled_student.named_predictors()[0][1]
+    assert len(predictor.demos) == 2
+    assert all(isinstance(demo, Example) for demo in predictor.demos)
+
+
+def test_knn_few_shot_does_not_mutate_inner_forward(setup_knn_few_shot, make_run):
+    student = SimpleModule(ts("question -> answer"))
+    lm = DummyLM([{"answer": "Madrid"}])
+    run = make_run(lm=lm)
+    student.set_lm(lm)
+    original_impl = object.__getattribute__(student, "_aforward_impl")
+    compile_result = asyncio.run(setup_knn_few_shot.compile(student, params=KNNFewShotCompileParams(), run=run))
+    restored_impl = object.__getattribute__(student, "_aforward_impl")
+    assert restored_impl.__func__ is original_impl.__func__
+    assert restored_impl.__self__ is original_impl.__self__
+    asyncio.run(compile_result.program(question="What is the capital of Spain?", run=run))
 
 
 def test_knn_does_not_bootstrap_on_forward(setup_knn_few_shot, make_run):

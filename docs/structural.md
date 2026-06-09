@@ -490,6 +490,8 @@ tool-calling agent for new work.
 
 ### P3.2 Decompose GRPO and optimizer trace orchestration
 
+**Status:** Done (2026-06).
+
 **Sources:** Manual review; External cross-package review.
 
 Problem:
@@ -517,6 +519,14 @@ Details to preserve:
 - Test GRPO extraction against small deterministic fixtures before and after the
   split.
 - Keep `RunContext` requirements explicit at optimizer/integration boundaries.
+
+**Delivered:** `dspy/teleprompt/grpo/{optimizer,session,sampling,trace_grid,rollout_groups,batch_dispatch,validation_metrics,wait,types}.py`;
+`GRPO.compile()` orchestrates extracted helpers with per-compile `GRPOCompileSession`;
+validation eval routes through `make_optimizer_evaluator`; iterative `wait_until` replaces
+recursive polling (B.8); GRPO validation uses explicit `ValueError`/`TypeError` (B.9);
+`KNNFewShotModule` composition wrapper replaces KNN `_aforward_impl` monkey-patching;
+`run_gepa_sync` contract locked in `tests/integrations/optimizers/gepa/test_sync_bridge.py`;
+fixture tests under `tests/teleprompt/grpo/`.
 
 ### P3.3 Normalize optimizer shared helpers and candidate models
 
