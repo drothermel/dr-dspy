@@ -93,6 +93,25 @@ Coordinate these assumptions with the updated `dr-llm` repo:
 - `PoolBackend.submit_batch` plus drain remains a dr-llm-native prefill workflow. `DrLlmPoolLM` should document or expose only the workflow it actually supports.
 - dr-llm v1 is text-only. Rejecting tools, multimodal parts, unsupported roles, structured response formats, stop sequences, logprobs, prompt cache, and unsupported reasoning fields is expected unless the dr-llm contract changes.
 
+## Alignment with the dr-llm Prompt
+
+The paired `docs/final_review_drllm.md` prompt treats this document as the consumer contract. Keep these rows aligned when updating status, writing docs, or handing work to another agent:
+
+| dr-dspy ID | Wait for or consume this dr-llm output |
+| --- | --- |
+| `P0-8` | Stable dr-llm class/import names and serialized constructor fields that are safe for builtin LM state loading. |
+| `P0-9` | Documented and tested `PoolBackend.aacquire(..., session_id=...)` semantics, including same-session no-replacement behavior and metadata non-isolation. |
+| `P0-10` / `P2-6` | Exact `BackendRequest` field shapes for OpenRouter reasoning disabled, OpenRouter provider-specific effort, OpenAI minimal thinking, Google thinking off, `EffortSpec.MAX` if supported, and explicit no-sampling-override behavior. |
+| `P0-11` | dr-llm backend close idempotency or the exact close/use-after-close expectations wrappers must enforce. |
+| `P2-1` | Stable `AcquireResult(responses, claimed_from_cache, generated)` semantics and per-response provenance fields. |
+| `P2-2` | Confirmation that metadata and extensions do not affect fingerprints while provider-output-affecting controls do. |
+| `P2-3` | dr-llm's decision for unset `n`, `n=1`, and any native or emulated multi-completion path. |
+| `P2-4` | The final typed unsupported-feature surface for the text-only v1 backend. |
+| `P2-5` | Backend/provider-control guidance only; TaskSpec experiment scaffolding stays in this repo. |
+| `V-2` | The exact dr-llm OpenRouter `gpt-5-nano` live-smoke fields or command that the dr-dspy live integration test should mirror. |
+
+Do not mark a bridge-related row done if the paired dr-llm prompt has not produced enough detail to implement or test the DSPy bridge without guessing. If the dr-llm side intentionally leaves a decision to this repo, record that decision in this document's status notes before closing the row.
+
 ## Implementation Workstreams
 
 ### P0-1: Fix Public Import Cycles
@@ -238,6 +257,7 @@ Required outcome:
 
 - Saved programs using builtin dr-llm LMs reload through the normal safe path.
 - Custom LM loading remains protected.
+- The safe-load allowlist is based on dr-llm-confirmed builtin class/import names and serialized constructor fields.
 - Add direct and pool `dump_state`/`load_state` round-trip tests.
 
 ### P0-9: Make Pool Acquisition Session Identity Explicit and Safe
@@ -255,6 +275,7 @@ Required outcome:
 - No-session fallback behavior is explicit and tested.
 - Repeated `acquire_samples(...)` calls have intentional no-replacement semantics only when a stable session is configured.
 - Docs tell experiment authors to pass an explicit stable session identity unless disk logging is known-safe.
+- The wrapper behavior matches the dr-llm prompt's final `PoolBackend.aacquire(..., session_id=...)` contract, including metadata non-isolation.
 - Direct `aforward` remains cache-first and unaffected.
 
 ### P0-10: Bridge Provider-Specific dr-llm Reasoning and Config Controls
@@ -287,6 +308,7 @@ Required outcome:
 
 - Decide and implement a clear public surface for dr-llm-native provider controls, or document a deliberate non-goal and preserve typed rejection.
 - Default T1 compression configs can be represented faithfully through dr-dspy only if provider-specific request parity is implemented.
+- Use the exact request field shapes handed off by the dr-llm prompt; do not duplicate provider payload construction in dr-dspy when a dr-llm helper or model should own it.
 - Add mapping and contract tests that compare expected `BackendRequest` fields for the default T1 model-control cases.
 - Do not silently approximate provider-specific reasoning with generic `effort`.
 
@@ -311,6 +333,7 @@ Required outcome:
 - Pool LM copies cannot accidentally double-close or use a torn-down backend.
 - Calls after close fail clearly.
 - If dr-llm `PoolBackend.close()` is made idempotent, still keep the wrapper state coherent.
+- If dr-llm documents non-idempotent or resource-specific close behavior, enforce the wrapper-side guard explicitly and test it.
 - Add focused lifecycle tests.
 
 ### P1-1: Fix OpenAI Reasoning-Model Validation
@@ -559,6 +582,7 @@ Reference:
 Required outcome:
 
 - Decide whether to expose aggregate provenance directly, record it in telemetry, or document how to reconstruct it from per-response provider data.
+- Preserve the dr-llm `AcquireResult(responses, claimed_from_cache, generated)` meaning if exposing aggregate data through DSPy.
 - Preserve per-response provenance in `provider_data`.
 
 ### P2-2: Document Pool Fingerprint and Metadata Behavior
@@ -573,6 +597,7 @@ References:
 Required outcome:
 
 - Docs state that metadata is not cache or claim isolation.
+- Tests reflect the dr-llm fingerprint contract: metadata and extensions do not affect fingerprints, provider-output-affecting controls do.
 - Experiments that need isolation should change generation-relevant request fields, pool namespace/config, or session identity as appropriate.
 
 ### P2-3: Handle dr-llm `n=1` Contract for Optimizer Proposal Paths
@@ -590,6 +615,7 @@ Required outcome:
 
 - Allow `n=1` if dr-llm semantics are identical to unset `n`, or reject it with an exact error and document optimizer limitations.
 - COPRO breadth should either use a supported alternate LM, emulated loop, native multi-completion support, or a clear typed rejection.
+- Match dr-llm's documented `n` behavior instead of inventing DSPy-only semantics.
 - Add contract and optimizer-path tests.
 
 ### P2-4: Document and Test dr-llm v1 Supported Scope
@@ -620,6 +646,7 @@ Required outcome:
 
 - Docs and tests make the support matrix obvious.
 - Rejections are typed and actionable.
+- The support matrix matches the final dr-llm v1 unsupported-feature surface.
 
 ### P2-5: Add or Document the `nl-code` TaskSpec Experiment Path
 
@@ -655,6 +682,7 @@ References:
 Required outcome:
 
 - Either implement these controls or document them as non-goals for the current release.
+- Tie each implemented or deferred control back to the exact dr-llm field, helper, or explicit non-goal.
 - Add tests for any implemented serialization or mapping behavior.
 
 ### P2-7: Address Smaller DSPy Footguns Where In Scope
@@ -714,6 +742,8 @@ uv run pytest tests/clients/dr_llm/test_contract.py tests/clients/dr_llm/test_ma
 Postgres integration checks were skipped during review because no integration DSN was configured. Do not require Postgres integration for ordinary unit verification, but document any integration command that would strengthen confidence when a DSN is available.
 
 The final plan must include a non-optional live provider smoke test for OpenRouter `gpt-5-nano`. The local environment is expected to provide `OPENROUTER_API_KEY`. Add a dedicated live test, mark it with the repo's live-LLM marker convention, and run it before marking `V-1` or `V-2` done. The test should actually hit the OpenRouter endpoint through `DrLlmDirectLM` or the direct dr-llm request path used by the bridge, assert that the response content is non-empty, and assert provider/provenance metadata strongly enough to catch accidental routing through a different provider.
+
+Mirror the final dr-llm live-smoke handoff where possible: use the same OpenRouter model identity, provider-specific controls, and provenance expectations, then run through the dr-dspy integration surface. A dr-llm CLI smoke test alone does not satisfy `V-2`.
 
 ## Experiment Readiness Checklist
 
