@@ -13,7 +13,7 @@ import time
 from typing import TYPE_CHECKING, Any, cast
 
 from dspy.clients.finetune.provider import TrainingJob, _UnsupportedReinforceJob
-from dspy.clients.finetune.utils import TrainDataFormat, save_data
+from dspy.clients.finetune.utils import TrainDataFormat, save_data, validate_data_format
 
 if TYPE_CHECKING:
     from dspy.clients.finetune.protocol import ReinforceJob as ReinforceJobProtocol
@@ -141,8 +141,11 @@ class LocalProvider:
             model = model[7:]
         if model.startswith("local:"):
             model = model[6:]
+        if not isinstance(train_data_format, TrainDataFormat):
+            raise TypeError(f"Expected TrainDataFormat, got {type(train_data_format).__name__}.")
         if train_data_format != TrainDataFormat.CHAT:
             raise ValueError("Only chat models are supported for local finetuning.")
+        validate_data_format(train_data, train_data_format)
         data_path = save_data(train_data)
         logger.info(f"Train data saved to {data_path}")
         output_dir = create_output_dir(model_name=model, data_path=data_path)

@@ -109,8 +109,8 @@ def validate_data_format(data: list[dict[str, Any]], data_format: TrainDataForma
         TrainDataFormat.CHAT: find_data_error_chat,
         TrainDataFormat.COMPLETION: find_data_errors_completion,
     }
-    err = f"Data format {data_format} is not supported."
-    assert data_format in find_err_funcs, err
+    if data_format not in find_err_funcs:
+        raise ValueError(f"Data format {data_format} is not supported.")
     find_err_func = find_err_funcs[data_format]
     if not isinstance(data, list):
         err = f"Data is not a list. Found data type: {type(data)}"
@@ -132,21 +132,24 @@ def validate_data_format(data: list[dict[str, Any]], data_format: TrainDataForma
         raise ValueError(err)
 
 
-def find_data_errors_completion(data_dict: dict[str, str]) -> str | None:
-    keys = ["prompt", "completion"]
-    assert isinstance(data_dict, dict)
-    expected_keys = sorted(keys)
+def find_data_errors_completion(data_dict: dict[str, Any]) -> str | None:
+    if "prompt" not in data_dict:
+        return 'Expected Keys: ["completion", "prompt"]; Found Keys: ' + str(sorted(data_dict.keys()))
+    completion_key = "completion" if "completion" in data_dict else "response" if "response" in data_dict else None
+    if completion_key is None:
+        return 'Expected Keys: ["completion", "prompt"]; Found Keys: ' + str(sorted(data_dict.keys()))
+    expected_keys = sorted(["prompt", completion_key])
     found_keys = sorted(data_dict.keys())
     if set(expected_keys) != set(found_keys):
         return f"Expected Keys: {expected_keys}; Found Keys: {found_keys}"
-    for key in keys:
-        if not isinstance(data_dict[key], str):
-            return f"Expected `{key}` to be of type `str`. Found: {type(data_dict[key])}"
+    if not isinstance(data_dict["prompt"], str):
+        return f"Expected `prompt` to be of type `str`. Found: {type(data_dict['prompt'])}"
+    if not isinstance(data_dict[completion_key], str):
+        return f"Expected `{completion_key}` to be of type `str`. Found: {type(data_dict[completion_key])}"
     return None
 
 
 def find_data_error_chat(messages: dict[str, Any]) -> str | None:
-    assert isinstance(messages, dict)
     expected_keys = ["messages"]
     found_keys = sorted(messages.keys())
     if set(expected_keys) != set(found_keys):
@@ -163,7 +166,6 @@ def find_data_error_chat(messages: dict[str, Any]) -> str | None:
 
 
 def find_data_error_chat_message(message: dict[str, Any]) -> str | None:
-    assert isinstance(message, dict)
     message_keys = sorted(["role", "content"])
     found_keys = sorted(message.keys())
     if set(message_keys) != set(found_keys):

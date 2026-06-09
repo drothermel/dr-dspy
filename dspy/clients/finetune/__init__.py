@@ -10,6 +10,7 @@ from dspy.clients.finetune.utils import (
     TrainDataFormat,
     TrainingStatus,
     infer_data_format,
+    validate_data_format,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "TrainingJob",
     "TrainingStatus",
     "infer_data_format",
+    "validate_data_format",
 ]

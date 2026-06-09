@@ -10,7 +10,7 @@ import orjson
 from typing_extensions import override
 
 from dspy.clients.finetune.provider import TrainingJob, _UnsupportedReinforceJob
-from dspy.clients.finetune.utils import TrainDataFormat, get_finetune_directory
+from dspy.clients.finetune.utils import TrainDataFormat, get_finetune_directory, validate_data_format
 
 if TYPE_CHECKING:
     from databricks.sdk import WorkspaceClient
@@ -172,9 +172,8 @@ class DatabricksProvider:
             raise ValueError("The `train_data_path` must be provided to finetune on Databricks.")
         if not isinstance(train_data_format, TrainDataFormat):
             raise TypeError(f"Expected TrainDataFormat after normalization, got {type(train_data_format).__name__}.")
-        train_kwargs["train_data_path"] = DatabricksProvider.upload_data(
-            train_data, train_kwargs["train_data_path"], train_data_format
-        )
+        validate_data_format(train_data, train_data_format)
+        train_kwargs["train_data_path"] = DatabricksProvider.upload_data(train_data, train_kwargs["train_data_path"])
         databricks_job = job
         try:
             from databricks.model_training import foundation_model as fm
@@ -213,9 +212,9 @@ class DatabricksProvider:
         return f"databricks/{databricks_job.endpoint_name}"
 
     @staticmethod
-    def upload_data(train_data: list[dict[str, Any]], databricks_unity_catalog_path: str, data_format: TrainDataFormat):
+    def upload_data(train_data: list[dict[str, Any]], databricks_unity_catalog_path: str):
         logger.info("Uploading finetuning data to Databricks Unity Catalog...")
-        file_path = _save_data_to_local_file(train_data=train_data, data_format=data_format)
+        file_path = _save_data_to_local_file(train_data=train_data)
         w = _get_workspace_client()
         _create_directory_in_databricks_unity_catalog(w=w, databricks_unity_catalog_path=databricks_unity_catalog_path)
         try:
@@ -264,7 +263,7 @@ def _create_directory_in_databricks_unity_catalog(w: WorkspaceClient, databricks
         logger.info(f"Successfully created directory {databricks_unity_catalog_path} in Databricks Unity Catalog!")
 
 
-def _save_data_to_local_file(train_data: list[dict[str, Any]], data_format: TrainDataFormat):
+def _save_data_to_local_file(train_data: list[dict[str, Any]]):
     import uuid
 
     file_name = f"finetuning_{uuid.uuid4()}.jsonl"
@@ -273,38 +272,5 @@ def _save_data_to_local_file(train_data: list[dict[str, Any]], data_format: Trai
     file_path = os.path.abspath(file_path)
     with open(file_path, "wb") as f:
         for item in train_data:
-            if data_format == TrainDataFormat.CHAT:
-                _validate_chat_data(item)
-            elif data_format == TrainDataFormat.COMPLETION:
-                _validate_completion_data(item)
             f.write(orjson.dumps(item) + b"\n")
     return file_path
-
-
-def _validate_chat_data(data: dict[str, Any]) -> None:
-    if "messages" not in data:
-        raise ValueError(
-            f"Each finetuning data must be a dict with a 'messages' key when `task=CHAT_COMPLETION`, but received: {data}"
-        )
-    if not isinstance(data["messages"], list):
-        raise ValueError(
-            f"The value of the 'messages' key in each finetuning data must be a list of dicts with keys 'role' and 'content' when `task=CHAT_COMPLETION`, but received: {data['messages']}"
-        )
-    for message in data["messages"]:
-        if "role" not in message:
-            raise ValueError(f"Each message in the 'messages' list must contain a 'role' key, but received: {message}.")
-        if "content" not in message:
-            raise ValueError(
-                f"Each message in the 'messages' list must contain a 'content' key, but received: {message}."
-            )
-
-
-def _validate_completion_data(data: dict[str, Any]) -> None:
-    if "prompt" not in data:
-        raise ValueError(
-            f"Each finetuning data must be a dict with a 'prompt' key when `task=INSTRUCTION_FINETUNE`, but received: {data}"
-        )
-    if "response" not in data and "completion" not in data:
-        raise ValueError(
-            f"Each finetuning data must be a dict with a 'response' or 'completion' key when `task=INSTRUCTION_FINETUNE`, but received: {data}"
-        )

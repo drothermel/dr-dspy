@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from typing_extensions import override
 
 from dspy.clients.finetune.provider import TrainingJob, _UnsupportedReinforceJob
-from dspy.clients.finetune.utils import TrainDataFormat, TrainingStatus, save_data
+from dspy.clients.finetune.utils import TrainDataFormat, TrainingStatus, save_data, validate_data_format
 
 if TYPE_CHECKING:
     from dspy.clients.finetune.protocol import ReinforceJob as ReinforceJobProtocol
@@ -85,7 +85,7 @@ class OpenAIProvider:
         model = OpenAIProvider._remove_provider_prefix(model)
         if not isinstance(train_data_format, TrainDataFormat):
             raise TypeError(f"Expected TrainDataFormat, got {type(train_data_format).__name__}.")
-        OpenAIProvider.validate_data_format(train_data_format)
+        validate_data_format(train_data, train_data_format)
         data_path = save_data(train_data)
         provider_file_id = OpenAIProvider.upload_data(data_path)
         job.provider_file_id = provider_file_id
@@ -133,13 +133,6 @@ class OpenAIProvider:
         provider_job = _openai().fine_tuning.jobs.retrieve(job_id)
         provider_status = provider_job.status
         return provider_status_to_training_status.get(provider_status, TrainingStatus.pending)
-
-    @staticmethod
-    def validate_data_format(data_format: TrainDataFormat) -> None:
-        supported_data_formats = [TrainDataFormat.CHAT, TrainDataFormat.COMPLETION]
-        if data_format not in supported_data_formats:
-            err_msg = f"OpenAI does not support the data format {data_format}."
-            raise ValueError(err_msg)
 
     @staticmethod
     def upload_data(data_path: str) -> str:
