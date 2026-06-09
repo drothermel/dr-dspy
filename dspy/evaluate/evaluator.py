@@ -26,6 +26,8 @@ from dspy.teleprompt.trace_helpers import run_program_with_trace
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["Evaluate", "EvaluationResult"]
+
 
 class EvaluationResult(Prediction):
     def __init__(self, score: float, results: list[tuple["Example", Prediction, Any]]) -> None:

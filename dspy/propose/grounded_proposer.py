@@ -15,6 +15,9 @@ from dspy.teleprompt.task_spec_context import get_prompt_model, get_task_spec
 from dspy.teleprompt.utils import optimizer_lm_context
 
 logger = logging.getLogger(__name__)
+
+__all__ = ["GroundedProposer"]
+
 MAX_INSTRUCT_IN_HISTORY = 5
 TIPS = {
     "none": "",

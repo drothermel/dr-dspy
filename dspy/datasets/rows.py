@@ -2,6 +2,8 @@ from collections.abc import Iterable, Mapping, Sequence
 
 from dspy.primitives import Example
 
+__all__ = ["rows_to_examples"]
+
 
 def rows_to_examples(
     rows: Iterable[Mapping[str, object]], fields: Sequence[str] | None, input_keys: tuple[str, ...]

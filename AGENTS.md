@@ -252,10 +252,13 @@ Task input validation runs in `AdapterCallPipeline.execute`; do not rely on dupl
 ## Import tiers
 
 1. **Public spine:** `dspy.runtime`, `dspy.core.types`, `dspy.task_spec`, `dspy.errors`, `dspy.persistence`, `dspy.serialization`, `dspy.primitives` (`Example`, `Module`, `Prediction`, `PythonInterpreter`, … — see `docs/migration/primitives.md`)
-2. **Integrations:** `dspy.integrations.*` (optional extras: `mcp`, `langchain`, `optuna`, `gepa`, `datasets`; import vendor modules directly, e.g. `dspy.integrations.finetune.openai`, `dspy.integrations.retrieval.weaviate`, `dspy.integrations.optimizers.gepa.adapter`, `dspy.integrations.datasets.huggingface`, `dspy.integrations.datasets.hotpotqa`). Finetune provider/model-id conventions: `docs/migration/finetune.md`.
+2. **Integrations:** `dspy.integrations.*` (optional extras: `mcp`, `langchain`, `optuna`, `gepa`, `datasets`; import vendor modules directly, e.g. `dspy.integrations.finetune.openai`, `dspy.integrations.retrieval.weaviate`, `dspy.integrations.optimizers.gepa.adapter`, `dspy.integrations.datasets.huggingface`, `dspy.integrations.datasets.hotpotqa`). Dataset migration: `docs/migration/datasets.md`. Finetune provider/model-id conventions: `docs/migration/finetune.md`.
 3. **Client format helpers:** `dspy.clients.openai_format.*` submodules only (empty package `__init__`; e.g. `dspy.clients.openai_format.chat_request`, `dspy.clients.openai_format.parse`)
-4. **Evaluation:** `dspy.evaluate.evaluator` (`Evaluate`, `EvaluationResult`); other helpers under `dspy.evaluate.*` submodules
-5. **Internal / test-only:** `dspy._internal.*`, `dspy.testing.*`
+4. **Evaluation:** `dspy.evaluate.evaluator` (`Evaluate`, `EvaluationResult`); metrics in `dspy.evaluate.metrics`, LLM judges in `dspy.evaluate.auto_evaluation`, metric dispatch in `dspy.evaluate.metric_invoke`
+5. **Retrievers:** `dspy.retrievers.types` (`RetrievedPassage`, `QueryRetriever`); built-in `dspy.retrievers.embeddings`
+6. **Datasets (spine):** `dspy.datasets.dataset` (`Dataset`), `dspy.datasets.rows` (`rows_to_examples`)
+7. **Propose:** `dspy.propose.grounded_proposer`, `dspy.propose.source_format` (teleprompt / predict internals)
+8. **Internal / test-only:** `dspy._internal.*`, `dspy.testing.*`
 
 ## Do not import from (internal/legacy)
 

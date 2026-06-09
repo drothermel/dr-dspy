@@ -5,6 +5,13 @@ from dspy.datasets.rows import rows_to_examples
 from dspy.integrations.datasets.import_ import import_datasets
 from dspy.primitives import Example
 
+__all__ = [
+    "examples_from_huggingface",
+    "examples_from_csv",
+    "examples_from_json",
+    "examples_from_parquet",
+]
+
 
 def _hf_datasets() -> Any:
     return import_datasets(feature="examples_from_huggingface")

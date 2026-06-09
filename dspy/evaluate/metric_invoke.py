@@ -8,6 +8,8 @@ from dspy.primitives import Module, Prediction
 if TYPE_CHECKING:
     from dspy.runtime.run_context import RunContext
 
+__all__ = ["call_metric", "invoke_metric", "normalize_metric_score"]
+
 
 def normalize_metric_score(output: Any) -> float:
     if isinstance(output, bool):

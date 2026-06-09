@@ -6,6 +6,16 @@ from dspy.primitives import Module
 from dspy.propose.source_format import get_formatted_source
 from dspy.teleprompt.task_spec_context import get_task_spec
 
+__all__ = [
+    "strip_prefix",
+    "get_dspy_source_code",
+    "create_example_string",
+    "create_instruction_set_history_string",
+    "create_predictor_level_history_string",
+    "get_program_instruction_set_string",
+    "parse_list_of_instructions",
+]
+
 
 def strip_prefix(text):
     pattern = "^[\\*\\s]*(([\\w\\'\\-]+\\s+){0,4}[\\w\\'\\-]+):\\s*"

@@ -2,6 +2,8 @@ from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives import Module, Prediction
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 
+__all__ = ["SemanticF1", "CompleteAndGrounded"]
+
 
 class SemanticRecallPrecisionTaskSpec(TaskSpec):
     name: str = "framework.evaluate.semantic_recall_precision"

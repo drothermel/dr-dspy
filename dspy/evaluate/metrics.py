@@ -3,6 +3,18 @@ import string
 import unicodedata
 from collections import Counter
 
+__all__ = [
+    "answer_exact_match",
+    "normalize_text",
+    "EM",
+    "F1",
+    "HotPotF1",
+    "em_score",
+    "f1_score",
+    "hotpot_f1_score",
+    "precision_score",
+]
+
 
 def EM(prediction, answers_list):
     if not isinstance(answers_list, list):

@@ -14,6 +14,8 @@ from dspy.retrievers.types import RetrievedPassage
 
 np = require("numpy")
 
+__all__ = ["Embeddings", "EmbeddingsWithScores"]
+
 
 class FaissIndex(Protocol):
     def search(self, query_embeddings: np.ndarray, num_candidates: int) -> tuple[np.ndarray, np.ndarray]: ...

@@ -8,6 +8,8 @@ from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.task_spec_context import get_prompt_model
 from dspy.teleprompt.utils import optimizer_lm_context
 
+__all__ = ["create_dataset_summary"]
+
 
 class ObservationSummarizerTaskSpec(TaskSpec):
     name: str = "framework.propose.observation_summarizer"

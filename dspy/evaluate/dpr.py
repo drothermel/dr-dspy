@@ -2,6 +2,8 @@ import unicodedata
 
 import regex
 
+__all__ = ["has_answer", "DPR_normalize"]
+
 _ALPHA_NUM = "[\\p{L}\\p{N}\\p{M}]+"
 _NON_WS = "[^\\p{Z}\\p{C}]"
 _TOKEN_RE = regex.compile(

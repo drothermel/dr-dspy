@@ -9,6 +9,8 @@ from dspy.primitives import Example
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+__all__ = ["Dataset"]
+
 
 class Dataset:
     def __init__(
