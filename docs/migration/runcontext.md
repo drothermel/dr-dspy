@@ -79,11 +79,36 @@ result = await predict(
 )
 ```
 
+For concurrent batch or trace capture, prefer `fork_worker_run` so each worker gets
+isolated `optimization_trace` and `call_log` buffers:
+
+```python
+from dspy.runtime.run_fork import fork_worker_run
+
+worker = fork_worker_run(run, lm=other_lm)
+result = await predict(question="...", run=worker)
+```
+
+`Parallel` and trace capture helpers use `fork_worker_run` internally.
+
 Nested config updates accept model copies or dict patches:
 
 ```python
 child = run.fork(telemetry={"transparency": "strict"})
 ```
+
+## Ambient run scope
+
+Module calls establish a task-local ambient scope via `call_scope` in
+`dspy/runtime/active_run.py`. That scope owns:
+
+- `ACTIVE_RUN` for tool callbacks that do not receive `run=`
+- the caller-module stack used for call-log fan-out
+- active usage trackers created by `track_usage`
+
+`RunContext.usage_tracker` remains an optional configured sink set through
+`create`/`fork`; it is not mutated during calls. Pass `run=` explicitly at spine
+APIs; do not rely on implicit global run state outside module/tool execution.
 
 ## Tests
 

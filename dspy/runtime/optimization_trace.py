@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, TypedDict
 
 from dspy.errors import AdapterParseError
 from dspy.primitives import Example, Module, Prediction
+from dspy.runtime.run_fork import fork_worker_run
 
 if TYPE_CHECKING:
     from dspy.runtime.call_options import ModuleCallOptions
@@ -83,7 +84,7 @@ async def _capture_forward(
     log_format_failures: bool = False,
     **kwargs: Any,
 ) -> tuple[Prediction | FailedPrediction, list[OptimizationTraceStep]]:
-    item_run = run.fork(optimization_trace=[], call_log=[])
+    item_run = fork_worker_run(run)
     try:
         prediction = await program.aforward(run=item_run, options=options, **kwargs)
         return prediction, list(item_run.optimization_trace)

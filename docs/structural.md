@@ -219,6 +219,8 @@ append moved out of `BaseLM`; `RunContext.inspect_call_log` / `read_call_log` on
 
 ### P1.3 Make ambient run state ownership explicit
 
+**Status:** Done (2026-06).
+
 **Sources:** Both reviews; Spine parallel review.
 
 Problem:
@@ -244,6 +246,12 @@ Details to preserve:
 - `fork()` explicit override validation should remain.
 - Existing evaluator and optimizer paths that already fork should stay
   semantically unchanged.
+
+**Delivered:** `dspy/runtime/run_log_policy.py` for create/fork disk-session policy;
+`dspy/runtime/active_run.py` owns `ACTIVE_RUN`, `call_scope`, caller stack, and
+task-local usage tracking; `caller_modules` removed from `RunContext`;
+`init_run_log` removed (disk logging driven by `telemetry.call_log` only);
+`fork_worker_run` in `dspy/runtime/run_fork.py` for batch/trace isolation.
 
 ### P1.4 Simplify callback and batch execution infrastructure
 

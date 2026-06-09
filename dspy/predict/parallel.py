@@ -6,6 +6,7 @@ from dspy.primitives import Example
 from dspy.primitives.batch_result import BatchFailure, BatchResult
 from dspy.runtime.async_parallel import BoundedRunStats, resolve_max_concurrency, resolve_max_errors, run_bounded
 from dspy.runtime.run_context import RunContext, resolve_run
+from dspy.runtime.run_fork import fork_worker_run
 
 
 class Parallel:
@@ -40,7 +41,7 @@ class Parallel:
         module, example = pair
         run = self._active_run
         assert run is not None
-        item_run = run.fork(optimization_trace=[], call_log=[])
+        item_run = fork_worker_run(run)
         if isinstance(example, Example):
             if self.access_examples:
                 return await module(**example.as_inputs(), run=item_run)
