@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import importlib
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
+from dspy._internal.lazy_import import import_optional
 from dspy.evaluate.metrics import max_hotpot_f1_score
 
 if TYPE_CHECKING:
@@ -45,10 +45,14 @@ class MathEquivalenceModule(Protocol):
 
 def math_metric(example: Example, pred: Prediction, trace: Any = None) -> bool:
     del trace
-    try:
-        math_equivalence = cast("MathEquivalenceModule", importlib.import_module("math_equivalence"))
-    except ImportError as err:
-        raise ImportError("MATH's metric requires `pip install git+https://github.com/hendrycks/math.git`") from err
+    math_equivalence = cast(
+        "MathEquivalenceModule",
+        import_optional(
+            "math_equivalence",
+            feature="MATH metric",
+            install_command="Install via `pip install git+https://github.com/hendrycks/math.git`.",
+        ),
+    )
     return math_equivalence.is_equiv(example.answer, pred.answer)
 
 

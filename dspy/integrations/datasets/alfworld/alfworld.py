@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import contextlib
-import importlib
 import queue
 import random
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast
 
+from dspy._internal.lazy_import import import_optional
 from dspy.datasets.dataset import Dataset
 
 if TYPE_CHECKING:
@@ -20,18 +20,18 @@ class MessageQueue(Protocol):
 
 
 def env_worker(inq: MessageQueue, outq: MessageQueue) -> None:
-    try:
-        import io
-        from contextlib import redirect_stderr, redirect_stdout
+    import io
+    from contextlib import redirect_stderr, redirect_stdout
 
-        import yaml
-    except ImportError as err:
-        raise ImportError(
-            "alfworld is not installed. Please install it via `pip install alfworld==0.3.5` then run `alfworld-download`."
-        ) from err
+    import yaml
+
+    environment = import_optional(
+        "alfworld.agents.environment",
+        feature="ALFWorld",
+        install_command="Install via `pip install alfworld==0.3.5` then run `alfworld-download`.",
+    )
     buf = io.StringIO()
     config_path = Path(__file__).resolve().parent / "base_config.yml"
-    environment = importlib.import_module("alfworld.agents.environment")
     with config_path.open() as f:
         config = yaml.safe_load(f)
     with redirect_stdout(buf), redirect_stderr(buf):
@@ -65,12 +65,11 @@ class EnvPool:
         self.size = size
         self.workers = []
         self.available = queue.Queue()
-        try:
-            mp = cast("Any", importlib.import_module("multiprocess"))
-        except ImportError as err:
-            raise ImportError(
-                "multiprocess is not installed. Please install it via `pip install multiprocess`."
-            ) from err
+        mp = import_optional(
+                "multiprocess",
+                feature="ALFWorld",
+                install_command="Install via `pip install multiprocess`.",
+            )
         with contextlib.suppress(RuntimeError):
             mp.set_start_method("spawn", force=True)
         ctx = mp.get_context("spawn")

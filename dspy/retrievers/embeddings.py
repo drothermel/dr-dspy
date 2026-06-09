@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 from typing_extensions import override
 
-from dspy._internal.lazy_import import require
+from dspy._internal.lazy_import import import_optional, require
 from dspy._internal.unbatchify import Unbatchify
 from dspy.persistence.embeddings import load_embeddings_into, save_embeddings
 from dspy.retrievers.types import RetrievedPassage
@@ -104,10 +104,11 @@ class Embeddings:
         nbytes = 32
         partitions = int(2 * np.sqrt(len(self.corpus)))
         dim = self.corpus_embeddings.shape[1]
-        try:
-            import faiss
-        except ImportError:
-            raise ImportError("Please `pip install faiss-cpu` or increase `brute_force_threshold` to avoid FAISS.")
+        faiss = import_optional(
+            "faiss",
+            feature="FAISS vector retrieval",
+            install_command="Install with `pip install faiss-cpu` or increase `brute_force_threshold` to avoid FAISS.",
+        )
         quantizer = faiss.IndexFlatL2(dim)
         index = faiss.IndexIVFPQ(quantizer, dim, partitions, nbytes, 8)
         index.train(self.corpus_embeddings)

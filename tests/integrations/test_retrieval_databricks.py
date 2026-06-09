@@ -3,20 +3,18 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any, cast
 
+import pytest
+
 import dspy.integrations.retrieval.databricks as databricks_rm
 
 if TYPE_CHECKING:
-    import pytest
+    pass
 
 
-def test_databricks_rm_import_handles_missing_sdk_parent(monkeypatch: pytest.MonkeyPatch) -> None:
-    def missing_parent_package(name: str) -> object:
-        if name == "databricks.sdk":
-            raise ModuleNotFoundError("No module named 'databricks'")
-        raise AssertionError(f"unexpected module lookup: {name}")
-
-    monkeypatch.setattr(databricks_rm, "find_spec", missing_parent_package)
-    assert databricks_rm._is_databricks_sdk_installed() is False
+def test_databricks_rm_sdk_unavailable_without_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("dspy.integrations.retrieval.databricks.is_available", lambda _: False)
+    with pytest.raises(ValueError, match="databricks-sdk"):
+        databricks_rm.DatabricksRM(databricks_index_name="index")
 
 
 def test_databricks_rm_direct_call_returns_retrieved_passages(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -36,7 +34,7 @@ def test_databricks_rm_direct_call_returns_retrieved_passages(monkeypatch: pytes
         assert kwargs["k"] == 2
         return response
 
-    monkeypatch.setattr(databricks_rm, "_databricks_sdk_installed", False)
+    monkeypatch.setattr("dspy.integrations.retrieval.databricks.is_available", lambda _: False)
     monkeypatch.setattr(databricks_rm.DatabricksRM, "_query_via_requests", staticmethod(fake_query_via_requests))
     auth_value = "not-a-secret"
     retriever = databricks_rm.DatabricksRM(

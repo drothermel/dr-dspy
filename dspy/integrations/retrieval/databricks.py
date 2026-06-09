@@ -1,20 +1,10 @@
 import asyncio
 import json
 import os
-from importlib.util import find_spec
 from typing import Any
 
+from dspy._internal.lazy_import import import_optional, is_available
 from dspy.retrievers.types import RetrievedPassage
-
-
-def _is_databricks_sdk_installed() -> bool:
-    try:
-        return find_spec("databricks.sdk") is not None
-    except ModuleNotFoundError:
-        return False
-
-
-_databricks_sdk_installed = _is_databricks_sdk_installed()
 
 
 class DatabricksRMError(Exception):
@@ -49,7 +39,7 @@ class DatabricksRM:
             if databricks_client_secret is not None
             else os.environ.get("DATABRICKS_CLIENT_SECRET")
         )
-        if not _databricks_sdk_installed and (self.databricks_token, self.databricks_endpoint).count(None) > 0:
+        if not is_available("databricks.sdk") and (self.databricks_token, self.databricks_endpoint).count(None) > 0:
             raise ValueError(
                 "To retrieve documents with Databricks Vector Search, you must install the databricks-sdk Python library, supply the databricks_token and databricks_endpoint parameters, or set the DATABRICKS_TOKEN and DATABRICKS_HOST environment variables. You may also supply a service principal the databricks_client_id and databricks_client_secret parameters, or set the DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET"
             )
@@ -62,14 +52,12 @@ class DatabricksRM:
         self.text_column_name = text_column_name
         self.use_with_databricks_agent_framework = use_with_databricks_agent_framework
         if self.use_with_databricks_agent_framework:
-            try:
-                import mlflow
-
-                mlflow.models.set_retriever_schema(primary_key="doc_id", text_column="page_content", doc_uri="doc_uri")
-            except ImportError as err:
-                raise ImportError(
-                    "To use the `DatabricksRM` retriever module with the Databricks Mosaic Agent Framework, you must install the mlflow Python library. Please install mlflow via `pip install mlflow`."
-                ) from err
+            mlflow = import_optional(
+                "mlflow",
+                feature="Databricks Mosaic Agent Framework",
+                install_command="Install mlflow via `pip install mlflow`.",
+            )
+            mlflow.models.set_retriever_schema(primary_key="doc_id", text_column="page_content", doc_uri="doc_uri")
 
     async def __call__(
         self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
@@ -130,7 +118,7 @@ class DatabricksRM:
             query_text = None
         else:
             raise TypeError("Query must be a string or a list of floats.")
-        if _databricks_sdk_installed:
+        if is_available("databricks.sdk"):
             results = self._query_via_databricks_sdk(
                 index_name=self.databricks_index_name,
                 k=self.k,

@@ -1,10 +1,13 @@
 import asyncio
-import importlib
 from typing import Any
 
 import requests
 
+from dspy._internal.lazy_import import import_optional
 from dspy.retrievers.types import RetrievedPassage
+
+_COLBERT_INSTALL_COMMAND = "Install with `pip install colbert-ai`."
+_TORCH_INSTALL_COMMAND = "Install with `pip install torch`."
 
 
 def _to_passage(psg: dict[str, Any]) -> RetrievedPassage:
@@ -82,9 +85,9 @@ class ColBERTv2RetrieverLocal:
         self.searcher = self.get_index()
 
     def build_index(self) -> None:
-        colbert = importlib.import_module("colbert")
+        colbert = import_optional("colbert", feature="ColBERT local retrieval", install_command=_COLBERT_INSTALL_COMMAND)
         Indexer = colbert.Indexer
-        infra = importlib.import_module("colbert.infra")
+        infra = import_optional("colbert.infra", feature="ColBERT local retrieval", install_command=_COLBERT_INSTALL_COMMAND)
         Run = infra.Run
         RunConfig = infra.RunConfig
         with Run().context(RunConfig(nranks=self.colbert_config.nranks, experiment=self.colbert_config.experiment)):
@@ -92,9 +95,9 @@ class ColBERTv2RetrieverLocal:
             indexer.index(name=self.colbert_config.index_name, collection=self.passages, overwrite=True)
 
     def get_index(self):
-        colbert = importlib.import_module("colbert")
+        colbert = import_optional("colbert", feature="ColBERT local retrieval", install_command=_COLBERT_INSTALL_COMMAND)
         Searcher = colbert.Searcher
-        infra = importlib.import_module("colbert.infra")
+        infra = import_optional("colbert.infra", feature="ColBERT local retrieval", install_command=_COLBERT_INSTALL_COMMAND)
         Run = infra.Run
         RunConfig = infra.RunConfig
         with Run().context(RunConfig(experiment=self.colbert_config.experiment)):
@@ -107,7 +110,7 @@ class ColBERTv2RetrieverLocal:
         return await asyncio.to_thread(self._search, query, k, **kwargs)
 
     def _search(self, query: str, k: int = 7, **kwargs: Any) -> list[RetrievedPassage]:
-        torch = importlib.import_module("torch")
+        torch = import_optional("torch", feature="ColBERT local retrieval", install_command=_TORCH_INSTALL_COMMAND)
         filtered_pids: list[int] = kwargs.get("filtered_pids") or []
         if filtered_pids:
             assert isinstance(filtered_pids, list) and all(isinstance(pid, int) for pid in filtered_pids), (
@@ -146,7 +149,7 @@ class ColBERTv2RerankerLocal:
         assert len(passages) > 0, "Passages should not be empty"
         import numpy as np
 
-        colbert = importlib.import_module("colbert")
+        colbert = import_optional("colbert", feature="ColBERT local reranking", install_command=_COLBERT_INSTALL_COMMAND)
         ColBERT = colbert.modeling.colbert.ColBERT
         DocTokenizer = colbert.modeling.tokenization.doc_tokenization.DocTokenizer
         QueryTokenizer = colbert.modeling.tokenization.query_tokenization.QueryTokenizer

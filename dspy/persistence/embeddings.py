@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import srsly
 
-from dspy._internal.lazy_import import require
+from dspy._internal.lazy_import import import_optional, require
 from dspy._internal.unbatchify import Unbatchify
 
 if TYPE_CHECKING:
@@ -34,13 +34,11 @@ def save_embeddings(retriever: Embeddings, path: str | Path) -> None:
     srsly.write_json(save_path / CONFIG_FILENAME, config)
     np.save(save_path / CORPUS_EMBEDDINGS_FILENAME, retriever.corpus_embeddings)
     if retriever.index is not None:
-        try:
-            import faiss
-        except ImportError as exc:
-            raise ImportError(
-                "FAISS index is configured but `faiss-cpu` is not installed. "
-                "Install faiss-cpu or rebuild without a FAISS index."
-            ) from exc
+        faiss = import_optional(
+            "faiss",
+            feature="FAISS index persistence",
+            install_command="Install with `pip install faiss-cpu` or rebuild without a FAISS index.",
+        )
         faiss.write_index(retriever.index, str(save_path / FAISS_INDEX_FILENAME))
 
 
@@ -75,12 +73,11 @@ def load_embeddings_into(
     if config["has_faiss_index"]:
         if not faiss_index_path.exists():
             raise FileNotFoundError(f"Saved config expects a FAISS index but file not found: {faiss_index_path}")
-        try:
-            import faiss
-        except ImportError as exc:
-            raise ImportError(
-                "Saved embeddings require FAISS but `faiss-cpu` is not installed. Install faiss-cpu to load this index."
-            ) from exc
+        faiss = import_optional(
+            "faiss",
+            feature="FAISS index loading",
+            install_command="Install with `pip install faiss-cpu` to load this index.",
+        )
         retriever.index = faiss.read_index(str(faiss_index_path))
     else:
         retriever.index = None

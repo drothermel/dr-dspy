@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 import orjson
 from typing_extensions import override
 
+from dspy._internal.lazy_import import import_optional
 from dspy.clients.finetune.provider import TrainingJob, UnsupportedReinforceJob
 from dspy.clients.finetune.utils import TrainDataFormat, get_finetune_directory, validate_data_format
 
@@ -32,12 +33,11 @@ class TrainingJobDatabricks(TrainingJob):
     def status(self):
         if not self.finetuning_run:
             return None
-        try:
-            from databricks.model_training import foundation_model as fm
-        except ImportError:
-            raise ImportError(
-                "To use Databricks finetuning, please install the databricks_genai package via `pip install databricks_genai`."
-            )
+        fm = import_optional(
+            "databricks.model_training.foundation_model",
+            feature="Databricks finetuning",
+            install_command="Install the databricks_genai package via `pip install databricks_genai`.",
+        )
         run = fm.get(self.finetuning_run)
         return run.status
 
@@ -184,12 +184,11 @@ class DatabricksProvider:
         validate_data_format(train_data, train_data_format)
         train_kwargs["train_data_path"] = DatabricksProvider.upload_data(train_data, train_kwargs["train_data_path"])
         databricks_job = job
-        try:
-            from databricks.model_training import foundation_model as fm
-        except ImportError:
-            raise ImportError(
-                "To use Databricks finetuning, please install the databricks_genai package via `pip install databricks_genai`."
-            )
+        fm = import_optional(
+            "databricks.model_training.foundation_model",
+            feature="Databricks finetuning",
+            install_command="Install the databricks_genai package via `pip install databricks_genai`.",
+        )
         if "register_to" not in train_kwargs:
             raise ValueError("The `register_to` must be provided to finetune on Databricks.")
         databricks_host = train_kwargs.pop("databricks_host", None)
@@ -237,13 +236,12 @@ class DatabricksProvider:
 
 
 def _get_workspace_client() -> WorkspaceClient:
-    try:
-        from databricks.sdk import WorkspaceClient
-    except ImportError:
-        raise ImportError(
-            "To use Databricks finetuning, please install the databricks-sdk package via `pip install databricks-sdk`."
-        )
-    return WorkspaceClient()
+    sdk = import_optional(
+        "databricks.sdk",
+        feature="Databricks finetuning",
+        install_command="Install the databricks-sdk package via `pip install databricks-sdk`.",
+    )
+    return sdk.WorkspaceClient()
 
 
 def _create_directory_in_databricks_unity_catalog(w: WorkspaceClient, databricks_unity_catalog_path: str) -> None:

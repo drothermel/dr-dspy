@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import datetime
-import importlib.util
 import logging
 import random
 import socket
@@ -12,6 +11,7 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any, cast
 
+from dspy._internal.lazy_import import import_optional, is_available
 from dspy.clients.finetune.provider import TrainingJob, UnsupportedReinforceJob
 from dspy.clients.finetune.utils import TrainDataFormat, save_data, validate_data_format
 
@@ -20,16 +20,10 @@ if TYPE_CHECKING:
     from dspy.clients.lm import LM
 logger = logging.getLogger(__name__)
 
-
-def _sglang_available() -> bool:
-    import sys
-
-    if "sglang" in sys.modules:
-        return True
-    try:
-        return importlib.util.find_spec("sglang") is not None
-    except (ImportError, ValueError, AttributeError):
-        return False
+_SGLANG_INSTALL_COMMAND = (
+    "Navigate to https://docs.sglang.ai/start/install.html for the latest installation instructions."
+)
+_LOCAL_FINETUNE_INSTALL_COMMAND = "Run `pip install -U torch transformers accelerate trl peft`."
 
 
 class LocalProvider:
@@ -44,9 +38,11 @@ class LocalProvider:
 
     @staticmethod
     def launch(lm: LM, launch_kwargs: dict[str, Any] | None = None) -> None:
-        if not _sglang_available():
-            raise ImportError(
-                "For local model launching, please install sglang.Navigate to https://docs.sglang.ai/start/install.html for the latest installation instructions!"
+        if not is_available("sglang"):
+            import_optional(
+                "sglang",
+                feature="local model launching",
+                install_command=_SGLANG_INSTALL_COMMAND,
             )
         if hasattr(lm, "process"):
             logger.info("Server is already launched.")
@@ -117,7 +113,12 @@ class LocalProvider:
 
     @staticmethod
     def kill(lm: LM, _launch_kwargs: dict[str, Any] | None = None) -> None:
-        from sglang.utils import terminate_process
+        sglang_utils = import_optional(
+            "sglang.utils",
+            feature="local model launching",
+            install_command=_SGLANG_INSTALL_COMMAND,
+        )
+        terminate_process = sglang_utils.terminate_process
 
         if not hasattr(lm, "process"):
             logger.info("No running server to kill.")
@@ -182,14 +183,14 @@ def create_output_dir(model_name, data_path):
 
 
 def train_sft_locally(model_name, train_data, train_kwargs):
-    try:
-        import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer
-        from trl import SFTConfig, SFTTrainer, setup_chat_format
-    except ImportError:
-        raise ImportError(
-            "For local finetuning, please install torch, transformers, and trl by running `pip install -U torch transformers accelerate trl peft`"
-        )
+    import_optional(
+        "torch",
+        feature="local finetuning",
+        install_command=_LOCAL_FINETUNE_INSTALL_COMMAND,
+    )
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from trl import SFTConfig, SFTTrainer, setup_chat_format
     device = train_kwargs.get("device", None)
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
