@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import datetime
 import importlib.util
@@ -10,13 +12,12 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any, cast
 
-from typing_extensions import override
-
-from dspy.clients.provider import Provider, TrainingJob
+from dspy.clients.provider import TrainingJob, _UnsupportedReinforceJob
 from dspy.clients.utils_finetune import TrainDataFormat, save_data
 
 if TYPE_CHECKING:
     from dspy.clients.lm import LM
+    from dspy.clients.protocol import ReinforceJob as ReinforceJobProtocol
 logger = logging.getLogger(__name__)
 
 
@@ -31,15 +32,14 @@ def _sglang_available() -> bool:
         return False
 
 
-class LocalProvider(Provider):
-    def __init__(self) -> None:
-        super().__init__()
-        self.finetunable = True
-        self.TrainingJob = TrainingJob
+class LocalProvider:
+    finetunable = True
+    reinforceable = False
+    TrainingJob: type[TrainingJob] = TrainingJob
+    ReinforceJob: type[ReinforceJobProtocol] = _UnsupportedReinforceJob
 
     @staticmethod
-    @override
-    def launch(lm: "LM", launch_kwargs: dict[str, Any] | None = None) -> None:
+    def launch(lm: LM, launch_kwargs: dict[str, Any] | None = None) -> None:
         if not _sglang_available():
             raise ImportError(
                 "For local model launching, please install sglang.Navigate to https://docs.sglang.ai/start/install.html for the latest installation instructions!"
@@ -112,8 +112,7 @@ class LocalProvider(Provider):
         lm_attrs.thread = thread
 
     @staticmethod
-    @override
-    def kill(lm: "LM", launch_kwargs: dict[str, Any] | None = None) -> None:
+    def kill(lm: LM, _launch_kwargs: dict[str, Any] | None = None) -> None:
         from sglang.utils import terminate_process
 
         if not hasattr(lm, "process"):
@@ -131,9 +130,8 @@ class LocalProvider(Provider):
         logger.info("Server killed.")
 
     @staticmethod
-    @override
     def finetune(
-        job: TrainingJob,
+        _job: TrainingJob,
         model: str,
         train_data: list[dict[str, Any]],
         train_data_format: TrainDataFormat | str | None,

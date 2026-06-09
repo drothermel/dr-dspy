@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import re
@@ -7,11 +9,13 @@ from typing import TYPE_CHECKING, Any
 import orjson
 from typing_extensions import override
 
-from dspy.clients.provider import Provider, TrainingJob
+from dspy.clients.provider import TrainingJob, _UnsupportedReinforceJob
 from dspy.clients.utils_finetune import TrainDataFormat, get_finetune_directory
 
 if TYPE_CHECKING:
     from databricks.sdk import WorkspaceClient
+
+    from dspy.clients.protocol import ReinforceJob as ReinforceJobProtocol
 logger = logging.getLogger(__name__)
 
 
@@ -38,14 +42,23 @@ class TrainingJobDatabricks(TrainingJob):
         return run.status
 
 
-class DatabricksProvider(Provider):
+class DatabricksProvider:
     finetunable = True
-    TrainingJob = TrainingJobDatabricks
+    reinforceable = False
+    TrainingJob: type[TrainingJob] = TrainingJobDatabricks
+    ReinforceJob: type[ReinforceJobProtocol] = _UnsupportedReinforceJob
 
     @staticmethod
-    @override
     def is_provider_model(_model: str) -> bool:
         return False
+
+    @staticmethod
+    def launch(_lm: Any, _launch_kwargs: dict[str, Any] | None = None) -> None:
+        raise NotImplementedError
+
+    @staticmethod
+    def kill(_lm: Any, _launch_kwargs: dict[str, Any] | None = None) -> None:
+        raise NotImplementedError
 
     @staticmethod
     def deploy_finetuned_model(
@@ -138,8 +151,7 @@ class DatabricksProvider(Provider):
         )
 
     @staticmethod
-    @override
-    def finetune(  # ty:ignore[invalid-method-override]
+    def finetune(
         job: TrainingJob,
         model: str,
         train_data: list[dict[str, Any]],
@@ -216,7 +228,7 @@ class DatabricksProvider(Provider):
             raise ValueError(f"Failed to upload finetuning data to Databricks Unity Catalog: {e}")
 
 
-def _get_workspace_client() -> "WorkspaceClient":
+def _get_workspace_client() -> WorkspaceClient:
     try:
         from databricks.sdk import WorkspaceClient
     except ImportError:
@@ -226,7 +238,7 @@ def _get_workspace_client() -> "WorkspaceClient":
     return WorkspaceClient()
 
 
-def _create_directory_in_databricks_unity_catalog(w: "WorkspaceClient", databricks_unity_catalog_path: str) -> None:
+def _create_directory_in_databricks_unity_catalog(w: WorkspaceClient, databricks_unity_catalog_path: str) -> None:
     pattern = "^/Volumes/(?P<catalog>[^/]+)/(?P<schema>[^/]+)/(?P<volume>[^/]+)(/[^/]+)+$"
     match = re.match(pattern, databricks_unity_catalog_path)
     if not match:

@@ -28,7 +28,8 @@ from dspy.clients.openai_format import (
     usage_from_response,
 )
 from dspy.clients.openai_format.reasoning_models import is_openai_reasoning_model
-from dspy.clients.provider import Provider, ReinforceJob, TrainingJob
+from dspy.clients.protocol import FinetuneProvider, ReinforceJob
+from dspy.clients.provider import DefaultFinetuneProvider, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat
 from dspy.core.types import LMRequest, LMResponse
 from dspy.core.types.config import merge_lm_request_config
@@ -56,7 +57,7 @@ class LM(BaseLM):
         max_tokens: int | None = None,
         callbacks: list[Callback] | None = None,
         num_retries: int = 3,
-        provider: Provider | None = None,
+        provider: FinetuneProvider | None = None,
         finetuning_model: str | None = None,
         launch_kwargs: dict[str, Any] | None = None,
         train_kwargs: dict[str, Any] | None = None,
@@ -299,10 +300,10 @@ class LM(BaseLM):
             logger.exception(err)
             job.set_result(err)
 
-    def infer_provider(self) -> Provider:
+    def infer_provider(self) -> FinetuneProvider:
         if OpenAIProvider.is_provider_model(self.model):
             return OpenAIProvider()
-        return Provider()
+        return DefaultFinetuneProvider()
 
     @override
     def dump_state(self):

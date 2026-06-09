@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import time
 from datetime import datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from dspy.clients.provider import Provider, TrainingJob
+from dspy.clients.provider import TrainingJob, _UnsupportedReinforceJob
 from dspy.clients.utils_finetune import TrainDataFormat, TrainingStatus, save_data
+
+if TYPE_CHECKING:
+    from dspy.clients.protocol import ReinforceJob as ReinforceJobProtocol
 
 
 def _openai() -> Any:
@@ -43,16 +48,23 @@ class TrainingJobOpenAI(TrainingJob):
         return OpenAIProvider.get_training_status(self.provider_job_id)
 
 
-class OpenAIProvider(Provider):
-    def __init__(self) -> None:
-        super().__init__()
-        self.finetunable = True
-        self.TrainingJob = TrainingJobOpenAI
+class OpenAIProvider:
+    finetunable = True
+    reinforceable = False
+    TrainingJob: type[TrainingJob] = TrainingJobOpenAI
+    ReinforceJob: type[ReinforceJobProtocol] = _UnsupportedReinforceJob
 
     @staticmethod
-    @override
     def is_provider_model(_model: str) -> bool:
         return bool(_model.startswith(("openai/", "ft:")))
+
+    @staticmethod
+    def launch(_lm: Any, _launch_kwargs: dict[str, Any] | None = None) -> None:
+        raise NotImplementedError
+
+    @staticmethod
+    def kill(_lm: Any, _launch_kwargs: dict[str, Any] | None = None) -> None:
+        raise NotImplementedError
 
     @staticmethod
     def _remove_provider_prefix(model: str) -> str:
@@ -60,7 +72,6 @@ class OpenAIProvider(Provider):
         return model.replace(provider_prefix, "")
 
     @staticmethod
-    @override
     def finetune(
         job: TrainingJob,
         model: str,
@@ -68,7 +79,7 @@ class OpenAIProvider(Provider):
         train_data_format: TrainDataFormat | str | None,
         train_kwargs: dict[str, Any] | None = None,
     ) -> str:
-        job = cast("TrainingJobOpenAI", job)
+        job = job
         model = OpenAIProvider._remove_provider_prefix(model)
         if not isinstance(train_data_format, TrainDataFormat):
             raise TypeError(f"Expected TrainDataFormat, got {type(train_data_format).__name__}.")

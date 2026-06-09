@@ -1,14 +1,15 @@
-from abc import abstractmethod
+from __future__ import annotations
+
 from concurrent.futures import Future
-from threading import Thread
 from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from dspy.clients.utils_finetune import TrainDataFormat
-
 if TYPE_CHECKING:
-    from dspy.clients.lm import LM
+    from threading import Thread
+
+    from dspy.clients.protocol import ReinforceJob as ReinforceJobProtocol
+    from dspy.clients.utils_finetune import GRPOStatus, TrainDataFormat
 
 
 class TrainingJob(Future):
@@ -31,66 +32,55 @@ class TrainingJob(Future):
     def cancel(self) -> bool:
         return super().cancel()
 
-    @abstractmethod
     def status(self) -> Any:
         raise NotImplementedError
 
 
-class ReinforceJob:
-    def __init__(self, lm: "LM", train_kwargs: dict[str, Any] | None = None) -> None:
-        self.lm = lm
-        self.train_kwargs = train_kwargs or {}
-        self.checkpoints = {}
-        self.last_checkpoint = None
+class _UnsupportedReinforceJob:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        raise RuntimeError("Reinforce is not supported by this provider.")
 
-    @abstractmethod
-    def initialize(self):
-        raise NotImplementedError
+    def initialize(self) -> None:
+        raise RuntimeError("Reinforce is not supported by this provider.")
 
-    @abstractmethod
-    def step(self, train_data: list[dict[str, Any]], train_data_format: TrainDataFormat | str | None = None):
-        raise NotImplementedError
+    def get_status(self) -> GRPOStatus:
+        raise RuntimeError("Reinforce is not supported by this provider.")
 
-    @abstractmethod
-    def terminate(self):
-        raise NotImplementedError
+    def step(
+        self,
+        train_data: list[dict[str, Any]],
+        train_data_format: TrainDataFormat | str | None = None,
+    ) -> None:
+        raise RuntimeError("Reinforce is not supported by this provider.")
 
-    @abstractmethod
-    def save_checkpoint(self, checkpoint_name: str):
-        raise NotImplementedError
-
-    def cancel(self):
-        raise NotImplementedError
-
-    def status(self) -> Any:
-        raise NotImplementedError
+    def terminate(self) -> None:
+        raise RuntimeError("Reinforce is not supported by this provider.")
 
 
-class Provider:
-    def __init__(self) -> None:
-        self.finetunable = False
-        self.reinforceable = False
-        self.TrainingJob = TrainingJob
-        self.ReinforceJob = ReinforceJob
+class DefaultFinetuneProvider:
+    finetunable = False
+    reinforceable = False
+    TrainingJob: type[TrainingJob] = TrainingJob
+    ReinforceJob: type[ReinforceJobProtocol] = _UnsupportedReinforceJob
 
     @staticmethod
     def is_provider_model(_model: str) -> bool:
         return False
 
     @staticmethod
-    def launch(lm: "LM", launch_kwargs: dict[str, Any] | None = None) -> None:
+    def launch(_lm: Any, _launch_kwargs: dict[str, Any] | None = None) -> None:
         raise NotImplementedError
 
     @staticmethod
-    def kill(lm: "LM", launch_kwargs: dict[str, Any] | None = None) -> None:
+    def kill(_lm: Any, _launch_kwargs: dict[str, Any] | None = None) -> None:
         raise NotImplementedError
 
     @staticmethod
     def finetune(
-        job: TrainingJob,
-        model: str,
-        train_data: list[dict[str, Any]],
-        train_data_format: TrainDataFormat | str | None,
-        train_kwargs: dict[str, Any] | None = None,
+        _job: TrainingJob,
+        _model: str,
+        _train_data: list[dict[str, Any]],
+        _train_data_format: TrainDataFormat | None,
+        _train_kwargs: dict[str, Any] | None = None,
     ) -> str:
         raise NotImplementedError
