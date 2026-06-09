@@ -35,7 +35,6 @@ from dspy.core.types.parts import (
     LMToolResultPart,
     LMVideoPart,
 )
-from dspy.core.types.parts.openai import parts_from_openai_content
 from dspy.core.types.request import LMRequest, LMRequestPatch
 from dspy.core.types.response import CallRecord, LMOutput, LMResponse, LMUsage
 from dspy.core.types.stream import (
@@ -81,7 +80,6 @@ __all__ = [
     "merge_lm_config",
     "merge_lm_request_config",
     "merge_provider_options",
-    "parts_from_openai_content",
     "ModuleCallOptions",
     "PredictOptions",
     "LMDocumentPart",

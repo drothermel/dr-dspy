@@ -15,7 +15,9 @@ class LMResponseLike(Protocol):
 def _coerce_message(value: dict[str, Any] | LMMessage) -> LMMessage:
     if isinstance(value, LMMessage):
         return value
-    return LMMessage(**value)
+    from dspy.clients.openai_format.chat_request import message_from_openai_chat
+
+    return message_from_openai_chat(value)
 
 
 def _is_lm_response(value: Any) -> bool:

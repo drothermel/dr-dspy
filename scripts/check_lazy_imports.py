@@ -24,7 +24,8 @@ ALLOWLIST_SUFFIXES = (
     "integrations/optimizers/gepa/adapter.py",
     # deferred Pydantic model_rebuild; breaks base_lm ↔ run_context import cycle
     "runtime/run_context_model.py",
-    # breaks openai_format.serialize ↔ core.types import cycle (LM import path)
+    # breaks openai_format.parse ↔ core.types.coercion import cycle
+    "core/types/coercion.py",
     "teleprompt/grpo.py",
     "teleprompt/bootstrap_finetune.py",
     "evaluate/metrics.py",

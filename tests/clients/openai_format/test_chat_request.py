@@ -1,15 +1,17 @@
 from typing import Any, cast
 
 from dspy.adapters.types.tool import ToolCallResults, ToolCalls
-from dspy.clients.openai_format.chat_request import to_openai_chat_request
-from dspy.core.types import LMMessage, LMRequest, LMToolResultPart
+from dspy.clients.openai_format.chat_request import message_from_openai_chat, to_openai_chat_request
+from dspy.core.types import LMRequest, LMToolResultPart
 
 
 def test_tool_call_results_can_round_trip_as_native_tool_result_message():
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     results = ToolCallResults.from_tool_calls_and_values([tool_call], ['{"items": ["cat"]}'])
     result = results.tool_call_results[0]
-    message = cast("Any", LMMessage)(role="tool", tool_call_id=result.call_id, name=result.name, content=result.value)
+    message = message_from_openai_chat(
+        {"role": "tool", "tool_call_id": result.call_id, "name": result.name, "content": result.value}
+    )
     assert len(message.parts) == 1
     assert isinstance(message.parts[0], LMToolResultPart)
     assert message.parts[0].call_id == "call_1"

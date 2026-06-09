@@ -2,19 +2,26 @@ from __future__ import annotations
 
 import json
 import logging
+import mimetypes
 from typing import Any
+from urllib.parse import urlparse
 
 from dspy.clients.openai_format.media import get_value, model_dump, split_data_uri
 from dspy.core.types.parts import (
     LMAudioPart,
     LMBinaryPart,
     LMCitationPart,
+    LMDocumentPart,
     LMImagePart,
+    LMOpaquePart,
+    LMPart,
     LMRefusalPart,
     LMTextPart,
     LMThinkingPart,
     LMToolCallPart,
+    LMVideoPart,
 )
+from dspy.core.types.parts.models import _coerce_part
 from dspy.core.types.request import LMRequest
 from dspy.core.types.response import LMOutput, LMResponse, LMUsage
 from dspy.errors import LMInvalidRequestError
@@ -112,12 +119,9 @@ def responses_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
 def message_content_to_parts(content: Any) -> list[Any]:
     if isinstance(content, str):
         return [LMTextPart(text=content)]
-    if not isinstance(content, list):
-        return [LMTextPart(text=str(content))]
-    parts = []
-    for item in content:
-        parts.extend(response_content_item_to_parts(item))
-    return parts
+    if isinstance(content, list):
+        return parts_from_openai_content(content)
+    return [LMTextPart(text=str(content))]
 
 
 def response_content_item_to_parts(item: Any) -> list[Any]:
@@ -306,3 +310,149 @@ def usage_from_response(response: Any) -> LMUsage | None:
                 data[key] = value
         usage = data
     return LMUsage(**dict(usage))
+
+
+def parts_from_openai_content(content: Any) -> list[LMPart]:
+    if content is None:
+        return []
+    if isinstance(content, str):
+        return [LMTextPart(text=content)]
+    if not isinstance(content, list):
+        return [_coerce_part(content)]
+    parts: list[LMPart] = []
+    for item in content:
+        item_type = item.get("type") if isinstance(item, dict) else None
+        if item_type == "text":
+            parts.append(LMTextPart(text=item.get("text", ""), metadata=item.get("metadata", {}) or {}))
+        elif item_type == "image_url":
+            image = item.get("image_url", {})
+            if not isinstance(image, dict):
+                raise TypeError("Image content block must be a mapping.")
+            url = image.get("url")
+            if url is None:
+                raise ValueError("Image content block requires url.")
+            parts.append(_image_source_to_part(url))
+        elif item_type == "input_audio":
+            audio = item.get("input_audio", {})
+            parts.append(_audio_dict_to_part(audio))
+        elif item_type == "file":
+            parts.append(_binary_dict_to_part(item.get("file", {})))
+        elif item_type == "document":
+            parts.append(_document_dict_to_part(item))
+        elif item_type == "video":
+            video = item.get("video", {})
+            parts.append(_media_dict_to_video_part(video))
+        elif isinstance(item, dict):
+            parts.append(LMOpaquePart(block=item))
+        else:
+            parts.append(_coerce_part(item))
+    return parts
+
+
+def _image_source_to_part(source: str) -> LMImagePart:
+    if not isinstance(source, str):
+        raise TypeError("Image URL must be a string.")
+    if source.startswith("data:"):
+        media_type, data = split_data_uri(source)
+        return LMImagePart(data=data, media_type=media_type)
+    media_type = mimetypes.guess_type(urlparse(source).path)[0] or "image/png"
+    return LMImagePart(url=source, media_type=media_type)
+
+
+def _audio_dict_to_part(audio: dict[str, Any]) -> LMAudioPart:
+    if not isinstance(audio, dict):
+        raise TypeError("Audio content block must be a mapping.")
+    audio_format = audio.get("format") or "wav"
+    if not isinstance(audio_format, str):
+        raise TypeError("Audio format must be a string.")
+    media_type = audio_format if "/" in audio_format else f"audio/{audio_format}"
+    if audio.get("data") is not None:
+        data = audio["data"]
+        if isinstance(data, str) and data.startswith("data:"):
+            media_type, data = split_data_uri(data)
+        return LMAudioPart(data=data, media_type=media_type)
+    if audio.get("url") is not None:
+        return LMAudioPart(url=audio["url"], media_type=media_type)
+    if audio.get("file_id") is not None:
+        return LMAudioPart(file_id=audio["file_id"], media_type=media_type)
+    if audio.get("path") is not None:
+        return LMAudioPart(path=audio["path"], media_type=media_type)
+    raise ValueError("Audio content block requires data, url, file_id, or path.")
+
+
+def _binary_dict_to_part(file: dict[str, Any]) -> LMBinaryPart:
+    if file.get("file_data") is not None:
+        media_type, data = split_data_uri(file["file_data"])
+        return LMBinaryPart(data=data, media_type=media_type, filename=file.get("filename"))
+    if file.get("data") is not None:
+        media_type, data = split_data_uri(file["data"])
+        return LMBinaryPart(data=data, media_type=media_type, filename=file.get("filename"))
+    if file.get("file_id") is not None:
+        return LMBinaryPart(file_id=file["file_id"], filename=file.get("filename"))
+    raise ValueError("Binary content block requires data, file_data, or file_id.")
+
+
+def _document_dict_to_part(item: dict[str, Any]) -> LMDocumentPart:
+    title = item.get("title")
+    context = item.get("context")
+    citations = item.get("citations") or {}
+    media_type = item.get("media_type") or "application/pdf"
+    for source_key in ("data", "url", "file_id", "path"):
+        if item.get(source_key) is not None:
+            return LMDocumentPart(
+                **{source_key: item[source_key]},
+                media_type=media_type,
+                title=title,
+                context=context,
+            )
+    source = item.get("source")
+    if isinstance(source, dict):
+        return LMDocumentPart(
+            source=source,
+            citations=citations if isinstance(citations, dict) else {},
+            title=title,
+            context=context,
+        )
+    if isinstance(source, str):
+        source_kwargs = _media_source_kwargs(source, default_media_type=media_type)
+        return LMDocumentPart(
+            data=source_kwargs.get("data"),
+            url=source_kwargs.get("url"),
+            file_id=source_kwargs.get("file_id"),
+            media_type=source_kwargs.get("media_type", media_type),
+            title=title,
+            context=context,
+        )
+    raise ValueError("Document content block requires source.")
+
+
+def _media_dict_to_video_part(video: dict[str, Any]) -> LMVideoPart:
+    if video.get("data") is not None:
+        data = video["data"]
+        if isinstance(data, str) and data.startswith("data:"):
+            media_type, data = split_data_uri(data)
+        else:
+            media_type = video.get("media_type") or "video/mp4"
+        return LMVideoPart(data=data, media_type=media_type)
+    if video.get("url") is not None:
+        return LMVideoPart(url=video["url"], media_type=video.get("media_type") or "video/mp4")
+    if video.get("file_id") is not None:
+        return LMVideoPart(file_id=video["file_id"], media_type=video.get("media_type") or "video/mp4")
+    if video.get("path") is not None:
+        return LMVideoPart(path=video["path"], media_type=video.get("media_type") or "video/mp4")
+    raise ValueError("Video content block requires data, url, file_id, or path.")
+
+
+def _media_source_kwargs(source: str, *, default_media_type: str) -> dict[str, str]:
+    if source.startswith("data:"):
+        media_type, data = split_data_uri(source)
+        return {"data": data, "media_type": media_type}
+    parsed = urlparse(source)
+    if parsed.scheme in {"http", "https"}:
+        media_type = mimetypes.guess_type(parsed.path)[0] or default_media_type
+        return {"url": source, "media_type": media_type}
+    return {"file_id": source, "media_type": default_media_type}
+
+
+def tool_calls_from_openai_chat(tool_calls: list[Any]) -> list[LMToolCallPart]:
+    return [provider_tool_call_to_part(tool_call) for tool_call in tool_calls]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from dspy.clients.openai_format.parse import parts_from_openai_content, tool_calls_from_openai_chat
 from dspy.clients.openai_format.serialize import (
     assistant_tool_call_to_openai,
     common_config_kwargs,
@@ -10,9 +11,36 @@ from dspy.clients.openai_format.serialize import (
     tool_result_to_openai,
     tool_to_openai,
 )
-from dspy.core.types.messages import LMMessage
+from dspy.core.types.messages import LMMessage, LMMessageRole
 from dspy.core.types.parts import LMToolCallPart, LMToolResultPart
+from dspy.core.types.parts.models import _coerce_part
 from dspy.core.types.request import LMRequest
+
+
+def message_from_openai_chat(data: dict[str, Any]) -> LMMessage:
+    payload = dict(data)
+    role_value = payload.pop("role")
+    role = role_value if isinstance(role_value, LMMessageRole) else LMMessageRole(role_value)
+    if role == LMMessageRole.TOOL:
+        content = payload.pop("content", None)
+        call_id = payload.pop("tool_call_id", None)
+        tool_name = payload.pop("name", None)
+        if payload:
+            raise ValueError(f"Unexpected tool message fields: {sorted(payload)}")
+        return LMMessage(
+            role=role,
+            parts=[LMToolResultPart(call_id=call_id, name=tool_name, content=parts_from_openai_content(content))],
+        )
+    name = payload.pop("name", None)
+    tool_calls = payload.pop("tool_calls", None) or []
+    if "parts" in payload:
+        parts = [_coerce_part(part) for part in payload.pop("parts")]
+    else:
+        parts = parts_from_openai_content(payload.pop("content", None))
+    parts.extend(tool_calls_from_openai_chat(tool_calls))
+    if payload:
+        raise ValueError(f"Unexpected message fields: {sorted(payload)}")
+    return LMMessage(role=role, parts=parts, name=name)
 
 
 def message_to_openai_chat(message: LMMessage) -> dict[str, Any]:
