@@ -40,6 +40,8 @@ input_field("turn_log", TurnLog)
 
 ReAct, ReActV2, CodeAct, and Avatar return `Prediction(..., turn_log=turn_log)`. RLM uses `REPLHistory` with the same `turn_log` field name.
 
+Avatar uses canonical `dspy.adapters.types.tool.Tool` instances (same as other agent modules). The actor predictor outputs an `Action` with `tool_name` and structured `tool_args` (JSON dict), executed via `await tool.acall(**tool_args)`. `Prediction.actions` records `ActionOutput` entries with the same `tool_args` shape.
+
 Immutability: `append_turn` returns a new instance; never mutate `.turns` in place.
 
 ## Call observability (`CallRecord` / `run.call_log`)
