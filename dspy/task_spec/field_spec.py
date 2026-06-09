@@ -80,44 +80,6 @@ class FieldSpec(BaseModel):
     has_default: bool = False
     default: Any = None
 
-    @classmethod
-    def input(
-        cls,
-        name: str,
-        type_: Any = str,
-        *,
-        desc: str | None = None,
-        prefix: str | None = None,
-        is_type_undefined: bool = False,
-        constraints: str | None = None,
-        default: Any = _UNSET,
-    ) -> "FieldSpec":
-        if desc is None:
-            raise TypeError("desc is required. Use input_field(..., desc=...) with an explicit description.")
-        return input_field(
-            name,
-            type_,
-            desc=desc,
-            prefix=prefix,
-            is_type_undefined=is_type_undefined,
-            constraints=constraints,
-            default=default,
-        )
-
-    @classmethod
-    def output(
-        cls,
-        name: str,
-        type_: Any = str,
-        *,
-        desc: str | None = None,
-        prefix: str | None = None,
-        constraints: str | None = None,
-    ) -> "FieldSpec":
-        if desc is None:
-            raise TypeError("desc is required. Use output_field(..., desc=...) with an explicit description.")
-        return output_field(name, type_, desc=desc, prefix=prefix, constraints=constraints)
-
     def with_updates(
         self, *, desc: str | None = None, prefix: str | None = None, type_: Any = None, constraints: str | None = None
     ) -> "FieldSpec":
