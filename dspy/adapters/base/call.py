@@ -42,13 +42,17 @@ class AdapterCallMixin(AdapterNativeMixin):
         else:
             tool_call_input_field_name = self._get_tool_call_input_field_name(task_spec)
             tool_call_output_field_name = self._get_tool_call_output_field_name(task_spec)
-            if tool_call_output_field_name and tool_call_input_field_name is None:
-                raise ValueError(
-                    f"You provided an output field {tool_call_output_field_name} to receive the tool calls information, but did not provide any tools as the input. Please provide a list of tools as the input by adding an input field with type `list[dspy.adapters.types.tool.Tool]`."
-                )
-            if tool_call_output_field_name and lm.supports_function_calling:
+            if tool_call_output_field_name:
                 if tool_call_input_field_name is None:
-                    raise ValueError("Tool call input field is required when native function calling is enabled.")
+                    raise ValueError(
+                        f"You provided an output field {tool_call_output_field_name} to receive the tool calls information, but did not provide any tools as the input. Please provide a list of tools as the input by adding an input field with type `list[dspy.adapters.types.tool.Tool]`."
+                    )
+                if not lm.supports_function_calling:
+                    raise ValueError(
+                        f"Adapter {type(self).__name__} has use_native_function_calling=True but "
+                        f"model {lm.model!r} does not support function calling. "
+                        "Use an LM with supports_function_calling=True or disable native function calling."
+                    )
                 input_tools = inputs[tool_call_input_field_name]
                 input_tools = input_tools if isinstance(input_tools, list) else [input_tools]
                 tools = [coerce_tool_spec(tool) for tool in input_tools]
@@ -101,14 +105,11 @@ class AdapterCallMixin(AdapterNativeMixin):
             if text is not None and (not (tool_calls and tool_call_output_field_name)):
                 value = self.parse(task_spec=processed_task_spec, completion=text)
             elif tool_calls and tool_call_output_field_name:
-                try:
-                    value = (
-                        self.parse(task_spec=processed_task_spec, completion=text)
-                        if text and processed_task_spec.output_fields
-                        else {}
-                    )
-                except AdapterParseError:
-                    value = {}
+                value = (
+                    self.parse(task_spec=processed_task_spec, completion=text)
+                    if text and processed_task_spec.output_fields
+                    else {}
+                )
             elif text is None and (not processed_task_spec.output_fields):
                 value = {}
             else:

@@ -2234,6 +2234,94 @@ def test_tool_call_with_structured_content_preserves_other_outputs():
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
 
 
+def test_native_fc_raises_when_lm_does_not_support_function_calling():
+    class NoFunctionCallingLM(DummyLM):
+        @property
+        @override
+        def supports_function_calling(self):
+            return False
+
+    def search(query: str) -> str:
+        return query
+
+    adapter = ChatAdapter(use_native_function_calling=True)
+    task_spec = make_task_spec(
+        {
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
+        },
+        instructions="Given the fields `question`, `tools`, produce the fields `tool_calls`.",
+    )
+    with pytest.raises(ValueError, match="does not support function calling"):
+        adapter._call_preprocess(
+            lm=NoFunctionCallingLM([{}]),
+            config={},
+            task_spec=task_spec,
+            inputs={"question": "test", "tools": [Tool(search, description="Search.")]},
+        )
+
+
+def test_tool_calls_with_malformed_text_raises_parse_error():
+    adapter = ChatAdapter(use_native_function_calling=True)
+    original_task_spec = make_task_spec(
+        {
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "answer": output_field("answer", desc="The answer."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
+        },
+        instructions="Given the fields `question`, `tools`, produce the fields `answer`, `tool_calls`.",
+    )
+    processed_task_spec = original_task_spec.delete("tools").delete("tool_calls")
+    outputs = [
+        {
+            "text": "this is not valid structured output",
+            "tool_calls": [
+                {"function": {"name": "search", "arguments": '{"query": "test"}'}, "id": "call_1", "type": "function"}
+            ],
+        }
+    ]
+    with pytest.raises(AdapterParseError):
+        adapter._call_postprocess(
+            processed_task_spec=processed_task_spec,
+            original_task_spec=original_task_spec,
+            response=outputs_to_lm_response(outputs),
+            _lm=DummyLM([{}]),
+            _config={},
+        )
+
+
+def test_tool_calls_without_text_output_fields_skips_text_parse():
+    adapter = ChatAdapter(use_native_function_calling=True)
+    original_task_spec = make_task_spec(
+        {
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
+        },
+        instructions="Given the fields `question`, `tools`, produce the fields `tool_calls`.",
+    )
+    processed_task_spec = original_task_spec.delete("tools").delete("tool_calls")
+    outputs = [
+        {
+            "text": "unstructured completion text",
+            "tool_calls": [
+                {"function": {"name": "search", "arguments": '{"query": "test"}'}, "id": "call_1", "type": "function"}
+            ],
+        }
+    ]
+    result = adapter._call_postprocess(
+        processed_task_spec=processed_task_spec,
+        original_task_spec=original_task_spec,
+        response=outputs_to_lm_response(outputs),
+        _lm=DummyLM([{}]),
+        _config={},
+    )
+    assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
+    assert "answer" not in result[0] or result[0].get("answer") is None
+
+
 def test_provider_tool_calls_preserve_id_and_repair_arguments():
     adapter = ChatAdapter(use_native_function_calling=True)
     task_spec = make_task_spec(
