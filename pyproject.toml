@@ -11,12 +11,13 @@ description = "DSPy"
 readme = "README.md"
 authors = [{ name = "Omar Khattab", email = "okhattab@stanford.edu" }]
 license = {file = "LICENSE"}
-requires-python = ">=3.10, <3.15"
+requires-python = ">=3.12, <3.15"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3"
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
     "openai>=2.20.0,<3.0.0",
@@ -27,8 +28,9 @@ dependencies = [
     "pydantic>=2.13.0,<3.0.0",
     "litellm>=1.88.0",
     "json-repair>=0.54.2,<1.0.0",
-    "tenacity>=8.2.3", # undeclared runtime dep of litellm, needed for exponential_backoff_retry
+    "tenacity>=9.1.2", # undeclared runtime dep of litellm, needed for exponential_backoff_retry
     "cloudpickle>=3.1.2,<4.0.0",
+    "dr-llm==4.3.0",
     "srsly>=2.5.3,<3.0.0",
 ]
 
@@ -36,7 +38,7 @@ dependencies = [
 anthropic = ["anthropic>=0.18.0,<1.0.0"]
 gepa = ["gepa[dspy]==0.1.1"]
 weaviate = ["weaviate-client>=4.5.4,<4.22.0"]
-mcp = ["mcp>=1.5.0,<2.0.0; python_version >= '3.10'"]
+mcp = ["mcp>=1.5.0,<2.0.0"]
 langchain = ["langchain_core>=1.0.0,<2.0.0"]
 optuna = ["optuna>=3.4.0"]
 numpy = ["numpy>=1.26.0,<3.0.0"]
@@ -52,12 +54,12 @@ dev = [
     "datamodel_code_generator>=0.26.3",
     "build>=1.0.3",
     "numpy>=1.26.0,<3.0.0",
-    "litellm[proxy]>=1.88.0; sys_platform != 'win32' and python_version < '3.14'",
+    "litellm>=1.88.0; sys_platform != 'win32' and python_version < '3.14'",
     "pytest-xdist>=3.8.0",
     "pytest-testmon>=2.2.0",
 ]
 test_extras = [
-    "mcp>=1.5.0,<2.0.0; python_version >= '3.10'",
+    "mcp>=1.5.0,<2.0.0",
     "datasets>=2.14.6",
     "pandas>=2.1.1",
     "optuna>=3.4.0",
@@ -132,7 +134,7 @@ exclude = [
 
 line-length = 120
 indent-width = 4
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = [
@@ -178,6 +180,7 @@ ignore = [
     "ANN", # Defer full annotation linting to the ty rollout
     "ARG001", # Allow unused callback/metric/interface parameters
     "ARG002", # Allow unused interface/override arguments
+    "ASYNC109", # Allow timeout parameters in async APIs with existing semantics
     "BLE001", # Allow broad catches around user/tool/provider boundaries
     "B039", # Preserve existing ContextVar default behavior during lint rollout
     "N806", # Allow mathematical/third-party alias names
@@ -204,6 +207,8 @@ ignore = [
     "TRY401", # Allow explicit exception objects in log messages
     "UP007", # Preserve runtime typing expressions
     "UP045", # Preserve runtime Optional construction
+    "UP046", # Defer PEP 695 generic class syntax migration
+    "UP047", # Defer PEP 695 generic function syntax migration
 ]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -282,7 +287,6 @@ allowed-unresolved-imports = [
     "peft.**",
     "sglang.**",
     "soundfile",
-    "tomli",
     "tomllib",
     "torch.**",
     "transformers.**",
@@ -322,4 +326,4 @@ include = ["dspy/adapters/**", "dspy/clients/**"]
 unknown-argument = "ignore"
 
 [tool.ty.environment]
-python-version = "3.11"
+python-version = "3.12"

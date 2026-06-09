@@ -110,10 +110,8 @@ def test_require_stub_falls_back_to_module_name():
 
 
 def test_install_hints_match_pyproject_extras(pytestconfig):
-    try:
-        import tomllib
-    except ModuleNotFoundError:
-        import tomli as tomllib
+    import tomllib
+
     pyproject = pytestconfig.rootpath / "pyproject.toml"
     data = tomllib.loads(pyproject.read_text())
     extras = set(data["project"]["optional-dependencies"])

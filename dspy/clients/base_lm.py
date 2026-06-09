@@ -142,7 +142,7 @@ class BaseLM:
             record = CallRecord(
                 request=request,
                 response=response,
-                timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
                 uuid=str(uuid.uuid4()),
                 model_type=getattr(self, "model_type", None),
             )
@@ -181,7 +181,7 @@ class BaseLM:
         ]
         record = {
             "call_id": call_id,
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             "caller": {
                 "module": compiled.module if compiled else "unknown",
                 "phase": compiled.phase if compiled else "unknown",

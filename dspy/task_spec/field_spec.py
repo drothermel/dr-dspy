@@ -1,5 +1,5 @@
 import re
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 _UNSET = object()
 
 
-class FieldRole(str, Enum):
+class FieldRole(StrEnum):
     INPUT = "input"
     OUTPUT = "output"
 

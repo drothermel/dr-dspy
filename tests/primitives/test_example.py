@@ -138,10 +138,10 @@ def test_example_to_dict_with_history():
     assert "history" in result
     assert isinstance(result["history"], dict)
     assert "turns" in result["history"]
-    assert result["history"]["turns"] == (
+    assert result["history"]["turns"] == [
         {"question": "What is the capital of France?", "answer": "Paris"},
         {"question": "What is the capital of Germany?", "answer": "Berlin"},
-    )
+    ]
     import json
 
     json_str = json.dumps(result)

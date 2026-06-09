@@ -99,7 +99,7 @@ def redact_config(config: dict[str, Any]) -> dict[str, Any]:
 def create_run_log_session(
     *, call_log_dir: str | None, settings_snapshot: dict[str, Any] | None = None
 ) -> RunLogSession:
-    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+    timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
     run_dir = resolve_log_root(call_log_dir) / resolve_run_bucket() / timestamp
     run_dir.mkdir(parents=True, exist_ok=True)
     snapshot = to_jsonable(settings_snapshot or {})
