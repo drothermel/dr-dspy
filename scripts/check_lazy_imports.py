@@ -23,6 +23,8 @@ ALLOWLIST_SUFFIXES = (
     "teleprompt/gepa/gepa.py",
     # deferred Pydantic model_rebuild; breaks base_lm ↔ run_context import cycle
     "runtime/run_context_model.py",
+    # lazy terminal pretty-print; keeps RunContext spine import light
+    "runtime/call_log/inspect.py",
     # breaks openai_format.parse ↔ core.types.coercion import cycle
     "core/types/coercion.py",
     "evaluate/metrics.py",

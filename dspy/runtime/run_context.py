@@ -6,10 +6,9 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TextIO
 
 from pydantic import BaseModel, ConfigDict, Field, SkipValidation
 
-from dspy.clients.openai_format.chat_request import request_messages_as_openai
 from dspy.core.types import CallRecord
+from dspy.runtime.call_log.inspect import inspect_call_log_for_run, read_call_log_for_run
 from dspy.runtime.config import CallSite, ExecutionConfig, TelemetryConfig
-from dspy.runtime.inspect_call_log import pretty_print_call_log
 from dspy.runtime.run_context_model import rebuild_run_context_model
 from dspy.runtime.run_log_session import RunLogSession, ensure_log_session, init_log_session
 
@@ -130,14 +129,10 @@ class RunContext(BaseModel):
         return forked
 
     def inspect_call_log(self, n: int = 1, file: TextIO | None = None) -> None:
-        pretty_print_call_log(call_log=self.call_log, n=n, file=file)
+        inspect_call_log_for_run(self, n=n, file=file)
 
     def read_call_log(self, n: int = 10) -> list[dict[str, Any]]:
-        records = self.call_log[-n:]
-        for entry in records:
-            if not isinstance(entry, CallRecord):
-                raise TypeError(f"call_log entry must be CallRecord, got {type(entry)!r}")
-        return [{**entry.to_dict(), "messages": request_messages_as_openai(entry.request)} for entry in records]
+        return read_call_log_for_run(self, n=n)
 
 
 def resolve_run(

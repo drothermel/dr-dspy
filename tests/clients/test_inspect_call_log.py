@@ -139,6 +139,31 @@ def test_inspect_call_log_handles_empty_outputs():
     assert "Response:" not in out.getvalue()
 
 
+def test_inspect_call_log_assistant_message_with_only_tool_calls():
+    out = StringIO()
+    history = [
+        CallRecord(
+            request=LMRequest(
+                model="test",
+                messages=[
+                    LMMessage(
+                        role=LMMessageRole.ASSISTANT,
+                        parts=[LMToolCallPart(name="search", args={"query": "cats"}, id="call_1")],
+                    )
+                ],
+            ),
+            response=LMResponse.from_text("ok", model="test"),
+            timestamp="2024-01-01T00:00:00",
+            uuid="uuid-assistant-tool-only",
+        )
+    ]
+    pretty_print_call_log(history, n=1, file=out)
+    rendered = out.getvalue()
+    assert "Assistant message:" in rendered
+    assert "Tool calls:" in rendered
+    assert "search" in rendered
+
+
 def test_inspect_call_log_n_larger_than_history(capsys, make_run):
     lm = DummyLM([{"response": "Hello"}])
     run = make_run(lm=lm)

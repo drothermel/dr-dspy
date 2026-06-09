@@ -4,7 +4,7 @@ import copy
 import logging
 from collections import deque
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TextIO, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import cloudpickle
 import orjson
@@ -15,7 +15,7 @@ from dspy.persistence import save_program as persist_program
 from dspy.predict.parallel import Parallel
 from dspy.predict.protocol import Predictor
 from dspy.primitives.prediction import Prediction
-from dspy.runtime import Callback, RunContext, pretty_print_call_log, resolve_run, track_usage, with_callbacks
+from dspy.runtime import Callback, RunContext, resolve_run, track_usage, with_callbacks
 from dspy.runtime.callback import ACTIVE_RUN
 
 if TYPE_CHECKING:
@@ -320,9 +320,6 @@ class Module:
         for name, predictor in self.named_predictors():
             s.append(f"{name} = {predictor}")
         return "\n".join(s)
-
-    def inspect_call_log(self, n: int = 1, file: TextIO | None = None) -> None:
-        pretty_print_call_log(call_log=self.call_log, n=n, file=file)
 
     async def batch(
         self,

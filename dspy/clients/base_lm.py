@@ -5,7 +5,7 @@ import datetime
 import importlib
 import inspect
 import uuid
-from typing import TYPE_CHECKING, Any, TextIO
+from typing import TYPE_CHECKING, Any
 
 from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
 from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
@@ -15,7 +15,6 @@ from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_option
 from dspy.runtime.call_log.coordinator import append_disk_call, record_call
 from dspy.runtime.callback import Callback, with_callbacks
 from dspy.runtime.config import disk_call_log_enabled, memory_call_log_enabled
-from dspy.runtime.inspect_call_log import pretty_print_call_log
 
 if TYPE_CHECKING:
     from dspy.runtime.run_context import RunContext
@@ -248,6 +247,3 @@ class BaseLM:
         new_kwargs.update(new_instance.provider_options.to_kwargs())
         new_instance.kwargs = validate_lm_kwargs(new_kwargs)
         return new_instance
-
-    def inspect_call_log(self, n: int = 1, file: TextIO | None = None) -> None:
-        pretty_print_call_log(call_log=self.call_log, n=n, file=file)

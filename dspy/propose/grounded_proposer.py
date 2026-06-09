@@ -21,6 +21,7 @@ from dspy.propose.utils import (
     get_dspy_source_code,
     strip_prefix,
 )
+from dspy.runtime.inspect_call_log import pretty_print_call_log
 from dspy.task_spec.predictor_context import get_task_spec, resolve_optimizer_lm
 from dspy.teleprompt.core.evaluator import optimizer_lm_context
 
@@ -334,5 +335,5 @@ class GroundedProposer:
                 )
             ).proposed_instruction
         if self.verbose:
-            self.prompt_model.inspect_call_log(n=1)
+            pretty_print_call_log(self.prompt_model.call_log, n=1)
         return strip_prefix(proposed_instruction)

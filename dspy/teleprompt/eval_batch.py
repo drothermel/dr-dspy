@@ -42,5 +42,5 @@ def get_program_with_highest_avg_score(*, param_score_dict, fully_evaled_param_c
 
 async def get_task_model_history_for_full_example(candidate_program, task_model, devset, evaluate, run: RunContext):
     _ = await evaluate(candidate_program, run=run, devset=devset[:1])
-    _ = task_model.inspect_call_log(n=len(candidate_program.predictors()))
-    return task_model.inspect_call_log(n=len(candidate_program.predictors()))
+    n = len(candidate_program.predictors())
+    return list(task_model.call_log[-n:])

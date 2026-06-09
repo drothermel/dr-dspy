@@ -137,7 +137,7 @@ class COPRO:
             candidates[id(predictor)] = instruct.completions
             evaluated_candidates[id(predictor)] = {}
         if self.prompt_model:
-            logger.debug(f"{self.prompt_model.inspect_call_log(n=1)}")
+            logger.debug("prompt_model call_log size=%s", len(self.prompt_model.call_log))
         latest_candidates = candidates
         all_candidates = candidates
         module_clone = module.deepcopy()
@@ -166,7 +166,7 @@ class COPRO:
                     )
                     score = (await evaluator(module_clone, run=run, devset=trainset, **evaluate_call_kwargs)).score
                     if self.prompt_model:
-                        logger.debug(f"prompt_model.inspect_call_log(n=1) {self.prompt_model.inspect_call_log(n=1)}")
+                        logger.debug("prompt_model call_log size=%s", len(self.prompt_model.call_log))
                     total_calls += 1
                     replace_entry = True
                     logger.debug(f"(instruction, prefix) {(instruction, prefix)}")
