@@ -1,5 +1,5 @@
 from dspy.core.types.call_options import ModuleCallOptions
-from dspy.history import TurnEvent, TurnLog
+from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.avatar.models import Action, ActionOutput, Tool
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
@@ -71,11 +71,21 @@ class Avatar(Module):
             if key in inputs:
                 args[key] = inputs[key]
         turn_log = TurnLog.empty()
+        actor_inputs = {key: value for key, value in args.items() if key != "turn_log"}
         action_results: list[ActionOutput] = []
         max_iters = inputs.get("max_iters", self.max_iters)
         remaining = max_iters
         while remaining > 0:
-            actor_output = await self.actor(**args, turn_log=turn_log, run=run, options=options)
+            extracted = await call_with_turn_log_truncation(
+                self.actor,
+                turn_log=turn_log,
+                run=run,
+                options=options,
+                max_attempts=3,
+                **actor_inputs,
+            )
+            turn_log = extracted.turn_log
+            actor_output = extracted.result
             action = actor_output.action
             tool_name = action.tool_name
             tool_input_query = action.tool_input_query
@@ -95,7 +105,16 @@ class Avatar(Module):
                 TurnEvent(action=action, result=tool_output if tool_output is not None else "")
             )
             remaining -= 1
-        final_answer = await self.finish(**args, turn_log=turn_log, run=run, options=options)
+        extracted = await call_with_turn_log_truncation(
+            self.finish,
+            turn_log=turn_log,
+            run=run,
+            options=options,
+            max_attempts=3,
+            **actor_inputs,
+        )
+        final_answer = extracted.result
+        turn_log = extracted.turn_log
         return Prediction(
             **{key: getattr(final_answer, key) for key in self.output_fields},
             turn_log=turn_log,

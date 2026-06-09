@@ -17,8 +17,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from dspy.adapters.types.tool import ToolCalls  # noqa: TC001
-
 
 class TurnEvent(BaseModel):
     """Single agent turn log entry.
@@ -33,7 +31,7 @@ class TurnEvent(BaseModel):
     next_thought: Any | None = None
     tool_name: str | None = None
     tool_args: dict[str, Any] | None = None
-    tool_calls: ToolCalls | None = None
+    tool_calls: Any | None = None
     observation: Any | None = None
     generated_code: str | None = None
     code_output: str | None = None

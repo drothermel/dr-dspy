@@ -4,10 +4,8 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import pydantic
-from pydantic import Field
+from pydantic import Field, TypeAdapter
 from typing_extensions import override
-
-from dspy.task_spec.json_serialize import serialize_for_json
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -31,7 +29,7 @@ class REPLVariable(pydantic.BaseModel):
     def from_value(
         cls, name: str, value: Any, field: FieldSpec | None = None, preview_chars: int = 1000
     ) -> REPLVariable:
-        jsonable = serialize_for_json(value)
+        jsonable = TypeAdapter(type(value)).dump_python(value, mode="json")
         value_str = json.dumps(jsonable, indent=2) if isinstance(jsonable, (dict, list)) else str(jsonable)
         is_truncated = len(value_str) > preview_chars
         if is_truncated:
@@ -117,6 +115,13 @@ class REPLHistory(pydantic.BaseModel):
     def append(self, *, reasoning: str = "", code: str, output: str) -> REPLHistory:
         new_entry = REPLEntry(reasoning=reasoning, code=code, output=output)
         return REPLHistory(entries=list(self.entries) + [new_entry], max_output_chars=self.max_output_chars)
+
+    def truncate_oldest(self, n: int = 1) -> REPLHistory:
+        if len(self.entries) < n + 1:
+            raise ValueError(
+                "The REPL history is too long so your prompt exceeded the context window, but the history cannot be truncated because it only has one entry."
+            )
+        return REPLHistory(entries=self.entries[n:], max_output_chars=self.max_output_chars)
 
     def __len__(self) -> int:
         return len(self.entries)

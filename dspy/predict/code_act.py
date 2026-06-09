@@ -86,7 +86,11 @@ class CodeAct(Module):
         turn_log = TurnLog.empty()
         max_iters = inputs.pop("max_iters", self.max_iters)
         for _idx in range(max_iters):
-            code_data = await self.codeact(turn_log=turn_log, run=run, options=options, **inputs)
+            extracted = await call_with_turn_log_truncation(
+                self.codeact, turn_log=turn_log, run=run, options=options, **inputs
+            )
+            turn_log = extracted.turn_log
+            code_data = extracted.result
             code, error = self._parse_code(code_data)
             if error:
                 turn_log = turn_log.append_turn(TurnEvent(observation=f"Failed to parse the generated code: {error}"))

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Protocol, Self, runtime_checkable
 
 if TYPE_CHECKING:
     from dspy.core.types.call_options import ModuleCallOptions
+    from dspy.history.repl_history import REPLHistory
     from dspy.history.turn_event import TurnEvent
     from dspy.history.turn_log import TurnLog
     from dspy.runtime.run_context import RunContext
@@ -28,6 +29,17 @@ class TurnLogModule(Protocol):
         self,
         *,
         turn_log: TurnLog,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **kwargs: Any,
+    ) -> Any: ...
+
+
+class REPLHistoryModule(Protocol):
+    async def __call__(
+        self,
+        *,
+        turn_log: REPLHistory,
         run: RunContext,
         options: ModuleCallOptions | None = None,
         **kwargs: Any,

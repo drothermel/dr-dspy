@@ -10,6 +10,7 @@ import pydantic
 from dspy.adapters.utils import parse_value
 from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.history.repl_history import REPLEntry, REPLHistory, REPLVariable
+from dspy.history.truncation import call_with_repl_history_truncation
 from dspy.predict.rlm.sync_bridge import _strip_code_fences
 from dspy.predict.rlm.tools import make_llm_tools
 from dspy.primitives.code_interpreter import SIMPLE_TYPES, CodeInterpreter, CodeInterpreterError, FinalOutput
@@ -247,13 +248,16 @@ async def aexecute_iteration(
     options: ModuleCallOptions | None = None,
 ) -> Prediction | REPLHistory:
     variables_info = [variable.format() for variable in variables]
-    pred = await rlm.generate_action(
-        variables_info=variables_info,
+    extracted = await call_with_repl_history_truncation(
+        rlm.generate_action,
         turn_log=history,
-        iteration=f"{iteration + 1}/{rlm.max_iterations}",
         run=run,
         options=options,
+        variables_info=variables_info,
+        iteration=f"{iteration + 1}/{rlm.max_iterations}",
     )
+    history = extracted.turn_log
+    pred = extracted.result
     if rlm.verbose:
         logger.info(
             f"RLM iteration {iteration + 1}/{rlm.max_iterations}\nReasoning: {pred.reasoning}\nCode:\n{pred.code}"
