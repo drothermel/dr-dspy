@@ -31,7 +31,7 @@ def test_alfworld_dataset_contract():
 def test_gsm8k_dataset_contract():
     dataset = GSM8K(train_size=4, dev_size=2, test_size=2)
     assert isinstance(dataset, Dataset)
-    assert dataset.default_metric is gsm8k_metric
+    assert GSM8K.default_metric is gsm8k_metric
     assert dataset.default_input_keys == ("question",)
     train = dataset.train
     assert len(train) == 4
@@ -44,7 +44,7 @@ def test_gsm8k_dataset_contract():
 def test_math_dataset_contract():
     dataset = MATH("algebra", train_size=2, dev_size=2, test_size=2)
     assert isinstance(dataset, Dataset)
-    assert dataset.default_metric is math_metric
+    assert MATH.default_metric is math_metric
     assert len(dataset.train) == 2
     assert dataset.train[0].dspy_split == "train"
 
@@ -53,5 +53,5 @@ def test_math_dataset_contract():
 def test_hotpotqa_dataset_contract():
     dataset = HotPotQA(train_size=2, dev_size=2, test_size=2)
     assert isinstance(dataset, Dataset)
-    assert dataset.default_metric is hotpotqa_metric
+    assert HotPotQA.default_metric is hotpotqa_metric
     assert len(dataset.test) == 2

@@ -21,6 +21,7 @@ from dspy.clients.lm import LM
 from dspy.history import TurnLog
 from dspy.task_spec import input_field, make_task_spec, output_field
 from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs, make_adapter_run
+from tests.history.turn_fixtures import task_io_turn
 from tests.task_spec.helpers import ts
 
 
@@ -428,8 +429,8 @@ def test_baml_adapter_with_conversation_history():
     history = TurnLog.model_validate(
         {
             "turns": [
-                {"question": "What is the patient's age?", "answer": "45 years old"},
-                {"question": "Any allergies?", "answer": "Penicillin allergy"},
+                task_io_turn(question="What is the patient's age?", answer="45 years old"),
+                task_io_turn(question="Any allergies?", answer="Penicillin allergy"),
             ],
         }
     )

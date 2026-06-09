@@ -41,6 +41,7 @@ from tests.adapters.conftest import (
     format_messages_and_lm_kwargs,
     make_adapter_run,
 )
+from tests.history.turn_fixtures import react_v2_turn, task_io_turn
 from tests.task_spec.helpers import ts
 
 
@@ -285,7 +286,10 @@ def test_chat_adapter_format_exact_messages_with_history():
     )
     history = TurnLog.model_validate(
         {
-            "turns": [{"question": "What is 1+1?", "answer": "2"}, {"question": "What is 2+2?", "answer": "4"}],
+            "turns": [
+                task_io_turn(question="What is 1+1?", answer="2"),
+                task_io_turn(question="What is 2+2?", answer="4"),
+            ],
         }
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -453,11 +457,11 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
     history = TurnLog.model_validate(
         {
             "turns": [
-                {
-                    "profile": demo_profile,
-                    "question": "Who is Ada?",
-                    "answer": AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
-                }
+                task_io_turn(
+                    profile=demo_profile,
+                    question="Who is Ada?",
+                    answer=AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
+                )
             ],
         }
     )
@@ -1001,11 +1005,11 @@ def test_chat_adapter_native_tool_history_replay():
     history = TurnLog.model_validate(
         {
             "turns": [
-                {
-                    "question": "Q1",
-                    "next_thought": Reasoning(content="I should search."),
-                    "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
-                }
+                react_v2_turn(
+                    pending_inputs={"question": "Q1"},
+                    next_thought=Reasoning(content="I should search."),
+                    tool_calls=ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
+                )
             ],
         }
     )
@@ -1067,11 +1071,11 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
     history = TurnLog.model_validate(
         {
             "turns": [
-                {
-                    "question": "Q1",
-                    "next_thought": Reasoning(content="I should search twice."),
-                    "tool_calls": tool_calls.model_copy(update={"tool_call_results": tool_call_results}),
-                }
+                react_v2_turn(
+                    pending_inputs={"question": "Q1"},
+                    next_thought=Reasoning(content="I should search twice."),
+                    tool_calls=tool_calls.model_copy(update={"tool_call_results": tool_call_results}),
+                )
             ],
         }
     )
@@ -1113,7 +1117,7 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat result"])
     history = TurnLog.model_validate(
         {
-            "turns": [{"tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results)}],
+            "turns": [react_v2_turn(tool_calls=ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results))],
         }
     )
     messages, _ = format_messages_and_lm_kwargs(
@@ -1174,7 +1178,11 @@ def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_i
     history = TurnLog.model_validate(
         {
             "turns": [
-                {"question": "Q1", "next_thought": Reasoning(content="I should search."), "tool_calls": tool_calls}
+                react_v2_turn(
+                    pending_inputs={"question": "Q1"},
+                    next_thought=Reasoning(content="I should search."),
+                    tool_calls=tool_calls,
+                )
             ],
         }
     )
@@ -1211,11 +1219,11 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
     history = TurnLog.model_validate(
         {
             "turns": [
-                {
-                    "question": "Q1",
-                    "next_thought": "I should search.",
-                    "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
-                }
+                react_v2_turn(
+                    pending_inputs={"question": "Q1"},
+                    next_thought="I should search.",
+                    tool_calls=ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
+                )
             ],
         }
     )
@@ -1277,11 +1285,11 @@ def test_non_native_tool_history_remains_text_based(adapter):
             "turn_log": TurnLog.model_validate(
                 {
                     "turns": [
-                        {
-                            "question": "Q1",
-                            "next_thought": "I should search.",
-                            "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
-                        }
+                        react_v2_turn(
+                            pending_inputs={"question": "Q1"},
+                            next_thought="I should search.",
+                            tool_calls=ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
+                        )
                     ],
                 }
             ),
@@ -1325,7 +1333,7 @@ def test_chat_adapter_format_accepts_custom_history_formatter_returning_messages
             "question": "Q2",
             "turn_log": TurnLog.model_validate(
                 {
-                    "turns": [{"question": "Q1"}],
+                    "turns": [react_v2_turn(pending_inputs={"question": "Q1"})],
                 }
             ),
         },
@@ -1425,14 +1433,14 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
     history = TurnLog.model_validate(
         {
             "turns": [
-                {
-                    "profile": demo_profile,
-                    "context": ["old note", "older note"],
-                    "question": "Who is Ada?",
-                    "answer": AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
-                    "verdict": "yes",
-                    "confidence": 0.8,
-                }
+                task_io_turn(
+                    profile=demo_profile,
+                    context=["old note", "older note"],
+                    question="Who is Ada?",
+                    answer=AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
+                    verdict="yes",
+                    confidence=0.8,
+                )
             ],
         }
     )
@@ -1895,8 +1903,8 @@ def test_chat_adapter_formats_conversation_history():
     history = TurnLog.model_validate(
         {
             "turns": [
-                {"question": "What is the capital of France?", "answer": "Paris"},
-                {"question": "What is the capital of Germany?", "answer": "Berlin"},
+                task_io_turn(question="What is the capital of France?", answer="Paris"),
+                task_io_turn(question="What is the capital of Germany?", answer="Berlin"),
             ],
         }
     )

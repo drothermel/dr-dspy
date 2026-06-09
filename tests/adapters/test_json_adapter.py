@@ -32,6 +32,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Example
 from dspy.task_spec import input_field, make_task_spec, output_field
 from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs, make_adapter_run
+from tests.history.turn_fixtures import react_v2_turn, task_io_turn
 from tests.task_spec.helpers import ts
 
 
@@ -164,11 +165,11 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
     history = TurnLog.model_validate(
         {
             "turns": [
-                {
-                    "profile": demo_profile,
-                    "question": "Who is Ada?",
-                    "answer": AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
-                }
+                task_io_turn(
+                    profile=demo_profile,
+                    question="Who is Ada?",
+                    answer=AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
+                )
             ],
         }
     )
@@ -507,11 +508,11 @@ def test_json_adapter_format_exact_non_native_tool_result_history_field():
             "turn_log": TurnLog.model_validate(
                 {
                     "turns": [
-                        {
-                            "question": "Q1",
-                            "next_thought": "I should search.",
-                            "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
-                        }
+                        react_v2_turn(
+                            pending_inputs={"question": "Q1"},
+                            next_thought="I should search.",
+                            tool_calls=ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
+                        )
                     ],
                 }
             ),
@@ -1006,8 +1007,8 @@ def test_json_adapter_formats_conversation_history():
     history = TurnLog.model_validate(
         {
             "turns": [
-                {"question": "What is the capital of France?", "answer": "Paris"},
-                {"question": "What is the capital of Germany?", "answer": "Berlin"},
+                task_io_turn(question="What is the capital of France?", answer="Paris"),
+                task_io_turn(question="What is the capital of Germany?", answer="Berlin"),
             ],
         }
     )
