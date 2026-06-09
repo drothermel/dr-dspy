@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from dspy.history.repl_history import REPLHistory
+from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult
 from dspy.predict.predict import Predict
 from dspy.predict.rlm import execution as rlm_execution
 from dspy.predict.rlm import task_specs as rlm_task_specs
@@ -68,7 +69,8 @@ class RLM(Module):
         with rlm_execution.interpreter_context(self, execution_tools) as repl:
             regular_args = rlm_execution.prepare_serializable_vars(input_args, repl)
             history = REPLHistory(max_output_chars=self.max_output_chars)
-            for iteration in range(self.max_iterations):
+
+            async def step(iteration: int, history: REPLHistory) -> AgentStepResult[REPLHistory]:
                 result = await rlm_execution.aexecute_iteration(
                     self,
                     repl,
@@ -81,12 +83,24 @@ class RLM(Module):
                     options=options,
                 )
                 if isinstance(result, Prediction):
-                    return result
-                history = result
+                    return AgentStepResult(
+                        history=history,
+                        control=AgentLoopControl.RETURN,
+                        return_value=result,
+                    )
+                return AgentStepResult(history=result)
+
+            loop_result = await AgentLoopRunner[REPLHistory]().run(
+                max_iters=self.max_iterations,
+                initial_history=history,
+                step=step,
+            )
+            if loop_result.return_value is not None:
+                return loop_result.return_value
             return await rlm_execution.aextract_fallback(
                 self,
                 variables,
-                history,
+                loop_result.history,
                 output_field_names,
                 run=run,
                 options=options,
