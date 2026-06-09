@@ -8,9 +8,9 @@ import pytest
 try:
     import numpy as np
 except ImportError:
-    pytest.skip("numpy is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
+    pytest.skip(reason="numpy is not installed", allow_module_level=True)
 if importlib.util.find_spec("litellm") is None:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
+    pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from dspy.clients.embedding import Embedder
 
 

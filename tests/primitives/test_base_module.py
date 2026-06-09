@@ -14,7 +14,7 @@ try:
     from litellm import Choices, Message, ModelResponse
     from litellm.types.utils import Usage
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
+    pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
 from dspy.predict.chain_of_thought import ChainOfThought
@@ -83,7 +83,7 @@ def test_save_and_load_with_json(tmp_path, make_run):
     model.predict.task_spec = model.predict.task_spec.with_instructions("You are a helpful assistant.")
     model.predict.demos = [
         Example.from_record(
-            {"q": "What is the capital of France?", "a": "Paris", "reasoning": "n/a"}, input_keys=("q")
+            {"q": "What is the capital of France?", "a": "Paris", "reasoning": "n/a"}, input_keys=("q",)
         ),
         Example.from_record(
             {

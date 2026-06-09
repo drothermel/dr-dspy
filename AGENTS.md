@@ -1,11 +1,14 @@
-Before commiting run:
+## Commit gates (required)
+
+Before committing, run these in order. **Each command must exit 0** — do not commit if any gate fails.
+
 ```
 uv run ruff check --fix
 uv run ty check --fix
 uv run ruff format
 ```
 
-Then fix any remaining issues and reformat before committing.
+`uv run ty check --fix` is a required commit gate: fix or resolve every reported diagnostic before committing. Re-run the full sequence after fixes.
 
 ## Async-only public API
 

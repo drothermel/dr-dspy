@@ -13,7 +13,7 @@ from dspy.utils.dummies import DummyLM
 try:
     from litellm.utils import ChatCompletionMessageToolCall, Choices, Function, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
+    pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types.audio import Audio
@@ -280,7 +280,12 @@ def test_chat_adapter_format_exact_messages_with_history():
         },
         instructions="Given the fields `history`, `question`, produce the fields `answer`.",
     )
-    history = TurnLog(turns=({"question": "What is 1+1?", "answer": "2"}, {"question": "What is 2+2?", "answer": "4"}))
+    history = TurnLog(
+        turns=(
+            {"question": "What is 1+1?", "answer": "2"},
+            {"question": "What is 2+2?", "answer": "4"},
+        )
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(),
         task_spec=HistorySignature,
@@ -446,7 +451,7 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
                 "profile": demo_profile,
                 "question": "Who is Ada?",
                 "answer": AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
-            }
+            },
         )
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -981,7 +986,7 @@ def test_chat_adapter_native_tool_history_replay():
                 "question": "Q1",
                 "next_thought": Reasoning(content="I should search."),
                 "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
-            }
+            },
         )
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -1045,7 +1050,7 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
                 "question": "Q1",
                 "next_thought": Reasoning(content="I should search twice."),
                 "tool_calls": tool_calls.model_copy(update={"tool_call_results": tool_call_results}),
-            }
+            },
         )
     )
     messages, _lm_kwargs = format_messages_and_lm_kwargs(
@@ -1084,7 +1089,7 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
     )
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat result"])
-    history = TurnLog(turns=({"tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results)}))
+    history = TurnLog(turns=({"tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results)},))
     messages, _ = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
@@ -1141,7 +1146,7 @@ def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_i
     tool_call = ToolCalls.ToolCall(id=tool_call_id, name="search", args={"query": "cats"})
     tool_calls = ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results)
     history = TurnLog(
-        turns=({"question": "Q1", "next_thought": Reasoning(content="I should search."), "tool_calls": tool_calls})
+        turns=({"question": "Q1", "next_thought": Reasoning(content="I should search."), "tool_calls": tool_calls},)
     )
     messages, _ = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(use_native_function_calling=True),
@@ -1179,7 +1184,7 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
                 "question": "Q1",
                 "next_thought": "I should search.",
                 "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
-            }
+            },
         )
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -1243,7 +1248,7 @@ def test_non_native_tool_history_remains_text_based(adapter):
                         "question": "Q1",
                         "next_thought": "I should search.",
                         "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
-                    }
+                    },
                 )
             ),
             "tools": [Tool(search, description="Search for documents.")],
@@ -1282,7 +1287,7 @@ def test_chat_adapter_format_accepts_custom_history_formatter_returning_messages
         adapter=CustomHistoryAdapter(),
         task_spec=HistorySignature,
         demos=[],
-        inputs={"question": "Q2", "history": TurnLog(turns=({"question": "Q1"}))},
+        inputs={"question": "Q2", "history": TurnLog(turns=({"question": "Q1"},))},
     )
     assert messages[1] == {"role": "user", "content": "custom history"}
     assert messages[2]["role"] == "user"
@@ -1385,7 +1390,7 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
                 "answer": AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
                 "verdict": "yes",
                 "confidence": 0.8,
-            }
+            },
         )
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(

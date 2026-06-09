@@ -87,12 +87,12 @@ def pytest_collection_finish(session):
     message = "Unbound run=run in tests (use run fixture or run = make_run(...)):\n" + "\n".join(
         v.format() for v in violations
     )
-    pytest.exit(message, returncode=1)
+    raise pytest.UsageError(message)
 
 
 @pytest.fixture
 def lm_for_test():
     model = os.environ.get("LM_FOR_TEST", None)
     if model is None:
-        pytest.skip("LM_FOR_TEST is not set in the environment variables")  # ty: ignore[too-many-positional-arguments]
+        pytest.skip(reason="LM_FOR_TEST is not set in the environment variables")
     return model

@@ -158,7 +158,7 @@ def test_image_input_formats(
     }
     actual_input = input_map[image_input]
     if image_input in ["pil_image", "encoded_pil_image"]:
-        pytest.xfail(f"{description} not fully supported without Image coercion")  # ty: ignore[too-many-positional-arguments]
+        pytest.xfail(f"{description} not fully supported without Image coercion")
     result = asyncio.run(predictor(image=actual_input, class_labels=["dog", "cat", "bird"], run=run))
     assert result.probabilities == expected["probabilities"]
     assert count_messages_with_image_url_pattern(lm.call_log[-1].messages_as_openai) == 1
@@ -301,7 +301,7 @@ def test_save_load_pydantic_model(make_run):
         output="Multiple photos",
     )
     examples = [
-        Example.from_record({"model_input": model_input, "output": "Multiple photos"}, input_keys=("model_input"))
+        Example.from_record({"model_input": model_input, "output": "Multiple photos"}, input_keys=("model_input",))
     ]
     predictor, lm, run = setup_predictor(PydanticSignature, {"output": "Multiple photos"}, make_run)
     optimizer = LabeledFewShot(k=1)

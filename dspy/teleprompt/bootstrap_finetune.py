@@ -2,6 +2,7 @@ import logging
 from collections import defaultdict
 from typing import Any, Callable, cast
 
+from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.adapters.base import Adapter
@@ -47,7 +48,8 @@ class BootstrapFinetune(FinetuneTeleprompter):
         self.max_concurrency = max_concurrency
 
     @override
-    async def compile(self, student: Module, *, params: BootstrapFinetuneCompileParams, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+        params = BootstrapFinetuneCompileParams.model_validate(params)
         trainset = params.trainset
         teacher = params.teacher
         logger.info("Preparing the student and teacher programs...")

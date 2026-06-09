@@ -9,7 +9,7 @@ pytestmark = [pytest.mark.extra, pytest.mark.asyncio]
 
 
 def mock_example(question: str, answer: str) -> Example:
-    return Example.from_record({"question": question, "answer": answer}, input_keys=("question"))
+    return Example.from_record({"question": question, "answer": answer}, input_keys=("question",))
 
 
 @pytest.fixture

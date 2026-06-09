@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 
 import pytest
 from typing_extensions import override
@@ -46,7 +47,7 @@ def test_propose_instruction_for_predictor(demo_candidates, make_run):
 
     class TrackingDummyLM(DummyLM):
         @override
-        def copy(self, **kwargs: object):
+        def copy(self, **kwargs: Any):
             self.last_copy_kwargs = kwargs
             return super().copy(**kwargs)
 

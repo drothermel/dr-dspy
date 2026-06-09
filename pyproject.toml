@@ -294,5 +294,32 @@ include = ["dspy/adapters/types/tool/tool.py"]
 [tool.ty.overrides.rules]
 unknown-argument = "ignore"
 
+[[tool.ty.overrides]]
+include = ["tests/**"]
+[tool.ty.overrides.rules]
+invalid-method-override = "ignore"
+unknown-argument = "ignore"
+too-many-positional-arguments = "ignore"
+
+[[tool.ty.overrides]]
+include = [
+    "dspy/evaluate/auto_evaluation.py",
+    "dspy/predict/multi_chain_comparison.py",
+    "dspy/teleprompt/gepa/instruction_proposal.py",
+    "dspy/teleprompt/infer_rules.py",
+    "dspy/teleprompt/ensemble.py",
+    "dspy/teleprompt/knn_fewshot.py",
+    "dspy/teleprompt/avatar_optimizer.py",
+    "dspy/retrievers/**",
+    "dspy/propose/grounded_proposer.py",
+]
+[tool.ty.overrides.rules]
+invalid-method-override = "ignore"
+
+[[tool.ty.overrides]]
+include = ["dspy/adapters/**", "dspy/clients/**"]
+[tool.ty.overrides.rules]
+unknown-argument = "ignore"
+
 [tool.ty.environment]
-python-version = "3.10"
+python-version = "3.11"

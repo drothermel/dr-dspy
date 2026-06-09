@@ -17,7 +17,7 @@ def simple_metric(example, prediction, trace=None):
 
 
 examples = [
-    Example.from_record({"input": "What is the color of the sky?", "output": "blue"}, input_keys=("input")),
+    Example.from_record({"input": "What is the color of the sky?", "output": "blue"}, input_keys=("input",)),
     Example.from_record({"input": "What does the fox say?", "output": "Ring-ding-ding-ding-dingeringeding!"}),
 ]
 trainset = [examples[0]]

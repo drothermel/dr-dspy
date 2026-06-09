@@ -170,7 +170,8 @@ class AvatarOptimizer(Teleprompter):
         return (avg_score, pos_inputs, neg_inputs)
 
     @override
-    async def compile(self, student, *, params: AvatarOptimizerCompileParams, run: RunContext):
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+        params = AvatarOptimizerCompileParams.model_validate(params)
         trainset = params.trainset
         best_actor = deepcopy(student)
         best_score = -999 if self.optimize_for == "max" else 999
@@ -199,6 +200,6 @@ class AvatarOptimizer(Teleprompter):
                 self.optimize_for == "min" and best_score > score
             ):
                 set_task_spec(predictor=best_actor.actor, task_spec=actor_task_spec.with_instructions(new_instruction))
-                best_actor.actor_clone = deepcopy(best_actor.actor)
+                best_actor.actor_clone = deepcopy(best_actor.actor)  # ty: ignore[unresolved-attribute]
                 best_score = score
         return best_actor

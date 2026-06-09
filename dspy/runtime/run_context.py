@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, TextIO
+from typing import TYPE_CHECKING, Any, Literal, TextIO
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,7 +30,7 @@ class CallLogMode(StrEnum):
 class TelemetryConfig(BaseModel):
     transparency: TransparencyMode = "strict"
     track_usage: bool = False
-    call_log: CallLogMode = CallLogMode.both
+    call_log: CallLogMode | Literal["off", "memory", "disk", "both"] = "both"
     max_call_log_entries: int = 10000
     call_log_dir: str | None = None
     max_optimization_trace_entries: int = 10000
@@ -40,7 +40,8 @@ class TelemetryConfig(BaseModel):
 def effective_call_log_mode(telemetry: TelemetryConfig) -> CallLogMode:
     if telemetry.max_call_log_entries == 0:
         return CallLogMode.off
-    return telemetry.call_log
+    mode = telemetry.call_log
+    return mode if isinstance(mode, CallLogMode) else CallLogMode(mode)
 
 
 def memory_call_log_enabled(telemetry: TelemetryConfig) -> bool:

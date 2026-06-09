@@ -2,6 +2,7 @@ import logging
 import math
 import random
 
+from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.evaluate.evaluate import Evaluate
@@ -28,7 +29,8 @@ class InferRules(BootstrapFewShot):
         self.max_errors = kwargs.get("max_errors")
 
     @override
-    async def compile(self, student, *, params: InferRulesCompileParams, run: RunContext):
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+        params = InferRulesCompileParams.model_validate(params)
         trainset = params.trainset
         valset = params.valset
         if valset is None:
@@ -63,7 +65,7 @@ class InferRules(BootstrapFewShot):
                 best_program = candidate_program
             logger.info(f"Evaluated Candidate {candidate_idx + 1} with score {score}. Current best score: {best_score}")
         logger.info(f"Final best score: {best_score}")
-        return best_program
+        return best_program if best_program is not None else original_program
 
     async def induce_natural_language_rules(self, predictor, trainset, *, run: RunContext):
         demos = self.get_predictor_demos(trainset=trainset, predictor=predictor)

@@ -1,8 +1,11 @@
 import random
+from typing import Any, cast
 
+from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.evaluate.evaluate import Evaluate
+from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import (
     BootstrapFewShotCompileParams,
@@ -42,7 +45,8 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         self.max_labeled_demos = max_labeled_demos
 
     @override
-    async def compile(self, student, *, params: RandomSearchCompileParams, run: RunContext):
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+        params = RandomSearchCompileParams.model_validate(params)
         self.trainset = params.trainset
         self.valset = params.valset or params.trainset
         teacher = params.teacher
@@ -116,8 +120,7 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
             score_data.append({"score": score, "subscores": subscores, "seed": seed, "program": program})
             if self.stop_at_score is not None and score >= self.stop_at_score:
                 break
-        best_program.candidate_programs = score_data
-        best_program.candidate_programs = sorted(
-            best_program.candidate_programs, key=lambda x: x["score"], reverse=True
-        )
+        compiled = cast("Any", best_program)
+        compiled.candidate_programs = score_data
+        compiled.candidate_programs = sorted(compiled.candidate_programs, key=lambda x: x["score"], reverse=True)
         return best_program

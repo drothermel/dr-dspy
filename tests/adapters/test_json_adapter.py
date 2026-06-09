@@ -17,7 +17,7 @@ try:
     from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
     from litellm.utils import ChatCompletionMessageToolCall, Choices, Function, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
+    pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from openai.types.responses import ResponseOutputMessage
 
 from dspy.adapters.json_adapter import JSONAdapter
@@ -167,7 +167,7 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
                 "profile": demo_profile,
                 "question": "Who is Ada?",
                 "answer": AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
-            }
+            },
         )
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -502,7 +502,7 @@ def test_json_adapter_format_exact_non_native_tool_result_history_field():
                         "question": "Q1",
                         "next_thought": "I should search.",
                         "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
-                    }
+                    },
                 )
             ),
             "tools": [Tool(search, description="Search for documents.")],
@@ -1346,7 +1346,7 @@ def test_json_adapter_with_responses_api(make_run):
     TestSignature = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
     api_response = ResponsesAPIResponse(
         id="resp_1",
-        created_at=0.0,
+        created_at=0,
         error=None,
         incomplete_details=None,
         instructions=None,

@@ -214,7 +214,7 @@ def test_evaluation_result_repr(make_run):
 
 def test_evaluate_save_as_json_with_history(make_run):
     run = make_run(lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
-    history1 = TurnLog(turns=({"question": "Previous Q1", "answer": "Previous A1"}))
+    history1 = TurnLog(turns=({"question": "Previous Q1", "answer": "Previous A1"},))
     history2 = TurnLog(
         turns=(
             {"question": "Previous Q2", "answer": "Previous A2"},
@@ -259,7 +259,7 @@ def test_evaluate_save_as_json_with_history(make_run):
 
 def test_evaluate_save_as_csv_with_history(make_run):
     run = make_run(lm=DummyLM({"What is 1+1?": {"answer": "2"}}))
-    history = TurnLog(turns=({"question": "Previous Q", "answer": "Previous A"}))
+    history = TurnLog(turns=({"question": "Previous Q", "answer": "Previous A"},))
     devset = [
         Example.from_record({"question": "What is 1+1?", "answer": "2", "turn_log": history}, input_keys=("question",))
     ]

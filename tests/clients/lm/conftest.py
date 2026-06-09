@@ -10,7 +10,7 @@ try:
     from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
     from litellm.utils import Choices, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
+    pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm import LM
 from dspy.core.types import LMConfig, LMRequest, LMResponse
@@ -20,7 +20,7 @@ from dspy.core.types.config import _lm_config_data_from_kwargs
 def make_response(output_blocks):
     return ResponsesAPIResponse(
         id="resp_1",
-        created_at=0.0,
+        created_at=0,
         error=None,
         incomplete_details=None,
         instructions=None,

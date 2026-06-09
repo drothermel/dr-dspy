@@ -13,11 +13,13 @@ from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.lazy_import import require
 
 if TYPE_CHECKING:
+    from pydantic import BaseModel
+
     from dspy.clients.lm import LM
     from dspy.primitives.example import Example
     from dspy.primitives.module import Module
     from dspy.runtime.run_context import RunContext
-from dspy.teleprompt.compile_params import SIMBACompileParams  # noqa: TC001 — compile signature
+from dspy.teleprompt.compile_params import SIMBACompileParams
 
 np = require("numpy")
 logger = logging.getLogger(__name__)
@@ -56,7 +58,8 @@ class SIMBA(Teleprompter):
             self.strategies = [append_a_rule]
 
     @override
-    async def compile(self, student: Module, *, params: SIMBACompileParams, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+        params = SIMBACompileParams.model_validate(params)
         trainset = params.trainset
         assert len(trainset) >= self.bsize, f"Trainset too small: {len(trainset)} < {self.bsize}"
         prompt_model = get_prompt_model(self.prompt_model, run)

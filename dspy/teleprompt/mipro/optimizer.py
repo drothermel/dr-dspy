@@ -1,5 +1,6 @@
 from typing import Any, Callable, Literal
 
+from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.evaluate.evaluate import Evaluate
@@ -66,7 +67,8 @@ class MIPROv2(Teleprompter):
         self.rng = None
 
     @override
-    async def compile(self, student: Any, *, params: MIPROv2CompileParams, run: RunContext) -> Any:
+    async def compile(self, student: Any, *, params: BaseModel, run: RunContext) -> Any:
+        params = MIPROv2CompileParams.model_validate(params)
         trainset = params.trainset
         teacher = params.teacher
         valset = params.valset

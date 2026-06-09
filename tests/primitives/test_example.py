@@ -98,12 +98,12 @@ def test_example_get():
 
 
 def test_example_with_inputs():
-    example = Example.from_record({"a": 1, "b": 2}, input_keys=("a"))
+    example = Example.from_record({"a": 1, "b": 2}, input_keys=("a",))
     assert example._input_keys == {"a"}
 
 
 def test_example_inputs_labels():
-    example = Example.from_record({"a": 1, "b": 2}, input_keys=("a"))
+    example = Example.from_record({"a": 1, "b": 2}, input_keys=("a",))
     inputs = example.as_inputs()
     assert inputs == {"a": 1}
     labels = example.as_labels()

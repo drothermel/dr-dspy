@@ -2,9 +2,11 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, cast
 
+from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.evaluate.evaluate import Evaluate
+from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, BootstrapOptunaCompileParams
 from dspy.teleprompt.teleprompt import Teleprompter
@@ -75,13 +77,20 @@ class BootstrapFewShotWithOptuna(Teleprompter):
         return cast("Any", result).score
 
     @override
-    async def compile(self, student, *, params: BootstrapOptunaCompileParams, run: RunContext):
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+        params = BootstrapOptunaCompileParams.model_validate(params)
         optuna = _import_optuna()
         self.trainset = params.trainset
         self.valset = params.valset or params.trainset
         self.run = run
         self.student = student.reset_copy()
-        self.teacher = params.teacher.deepcopy() if params.teacher is not None else student.reset_copy()
+        teacher = params.teacher
+        if teacher is None:
+            self.teacher = student.reset_copy()
+        elif isinstance(teacher, list):
+            self.teacher = cast("Module", teacher[0]).deepcopy()
+        else:
+            self.teacher = teacher.deepcopy()
         max_demos = params.max_demos
         teleprompter_optimize = BootstrapFewShot(
             metric=self.metric,

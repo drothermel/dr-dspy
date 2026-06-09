@@ -24,7 +24,7 @@ def test_tool_call_results_history_serialization_round_trip():
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "hello"})
     results = ToolCallResults.from_tool_calls_and_values([tool_call], [{"answer": "world"}])
     tool_calls = ToolCalls(tool_calls=[tool_call], tool_call_results=results)
-    history = TurnLog(turns=({"tool_calls": tool_calls}))
+    history = TurnLog(turns=({"tool_calls": tool_calls},))
     dumped = history.model_dump(mode="json")
     restored = TurnLog.model_validate(dumped)
     assert dumped == {

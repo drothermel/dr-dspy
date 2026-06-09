@@ -10,7 +10,7 @@ from dspy.utils.exceptions import AdapterParseError
 try:
     from litellm import Choices, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
+    pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from dspy.adapters.format_shared import FieldInfoWithName
 from dspy.adapters.types.code import Code
 from dspy.adapters.types.image import Image
@@ -328,7 +328,7 @@ def test_xml_adapter_format_exact_non_native_tool_result_history_field():
                         "question": "Q1",
                         "next_thought": "I should search.",
                         "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
-                    }
+                    },
                 )
             ),
             "tools": [Tool(search, description="Search for documents.")],
@@ -440,7 +440,7 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
                 "profile": demo_profile,
                 "question": "Who is Ada?",
                 "answer": AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
-            }
+            },
         )
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(

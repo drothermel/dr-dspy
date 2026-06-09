@@ -9,7 +9,7 @@ import pytest
 try:
     from litellm.types.llms.openai import ResponsesAPIResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
+    pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from openai.types.responses import ResponseOutputMessage, ResponseReasoningItem
 from openai.types.responses.response_reasoning_item import Summary
 
@@ -338,7 +338,7 @@ def test_responses_api_with_none_usage(make_run):
 
     api_response = ResponsesAPIResponse(
         id="resp_1",
-        created_at=0.0,
+        created_at=0,
         error=None,
         incomplete_details=cast("Any", {"reason": "max_output_tokens"}),
         instructions=None,
@@ -385,7 +385,7 @@ def test_responses_api_with_none_usage(make_run):
 async def test_responses_api_with_none_usage_async(make_run):
     api_response = ResponsesAPIResponse(
         id="resp_1",
-        created_at=0.0,
+        created_at=0,
         error=None,
         incomplete_details=cast("Any", {"reason": "max_output_tokens"}),
         instructions=None,

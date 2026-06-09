@@ -6,6 +6,7 @@ import random
 from collections import Counter, deque
 from typing import Any, Callable, Literal, cast
 
+from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.adapters.base import Adapter
@@ -270,7 +271,8 @@ class GRPO(FinetuneTeleprompter):
         return [original_trainset[i] for i in selected_ids]
 
     @override
-    async def compile(self, student: Module, *, params: GRPOCompileParams, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+        params = GRPOCompileParams.model_validate(params)
         trainset = params.trainset
         teacher = params.teacher
         valset = params.valset

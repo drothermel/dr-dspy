@@ -7,7 +7,7 @@ import pytest
 from dspy.utils.mcp import convert_mcp_tool
 
 if importlib.util.find_spec("mcp") is None:
-    pytest.skip("mcp is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
+    pytest.skip(reason="mcp is not installed", allow_module_level=True)
 
 
 @pytest.mark.asyncio

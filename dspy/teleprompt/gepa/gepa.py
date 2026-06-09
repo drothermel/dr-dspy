@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 from typing_extensions import override
 
 from dspy.primitives.prediction import Prediction
-from dspy.teleprompt.compile_params import GEPACompileParams  # noqa: TC001 — compile signature
+from dspy.teleprompt.compile_params import GEPACompileParams
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.annotation import experimental
 
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from gepa import GEPAResult
     from gepa.core.adapter import ProposalFn
     from gepa.proposer.reflective_mutation.base import ReflectionComponentSelector
+    from pydantic import BaseModel
 
     from dspy.clients.lm import LM
     from dspy.primitives.example import Example
@@ -209,7 +210,8 @@ class GEPA(Teleprompter):
         return total
 
     @override
-    async def compile(self, student: Module, *, params: GEPACompileParams, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+        params = GEPACompileParams.model_validate(params)
         trainset = params.trainset
         teacher = params.teacher
         valset = params.valset

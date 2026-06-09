@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import types
-from typing import Annotated, Any, Literal, Union, get_args, get_origin
+from typing import Annotated, Any, Literal, Union, cast, get_args, get_origin
 
 from pydantic_core import PydanticUndefined
 
@@ -54,8 +54,11 @@ def validate_task_inputs(task_spec: TaskSpec, inputs: dict[str, Any]) -> dict[st
             continue
         value = validated[field_name]
         expected_type = field_info.annotation
-        json_schema_extra = field_info.json_schema_extra or {}
-        if value is None or json_schema_extra.get(IS_TYPE_UNDEFINED, False):
+        json_schema_extra = field_info.json_schema_extra
+        schema_extra = cast("dict[str, Any]", json_schema_extra) if isinstance(json_schema_extra, dict) else {}
+        if value is None or schema_extra.get(IS_TYPE_UNDEFINED):
+            continue
+        if expected_type is None or not isinstance(expected_type, type):
             continue
         if not _is_value_compatible_with_type(value, expected_type):
             raise ValueError(

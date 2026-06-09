@@ -3,9 +3,11 @@ import random
 import threading
 
 import tqdm
+from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.primitives.example import Example
+from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, LabeledFewShotCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec
@@ -39,7 +41,8 @@ class BootstrapFewShot(Teleprompter):
         self.error_lock = threading.Lock()
 
     @override
-    async def compile(self, student, *, params: BootstrapFewShotCompileParams, run: RunContext):
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+        params = BootstrapFewShotCompileParams.model_validate(params)
         self.trainset = params.trainset
         await self._prepare_student_and_teacher(student=student, teacher=params.teacher, run=run)
         self._prepare_predictor_mappings()

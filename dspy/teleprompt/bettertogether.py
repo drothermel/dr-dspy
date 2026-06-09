@@ -1,6 +1,6 @@
 import logging
 import random
-from typing import Callable
+from typing import Callable, cast
 
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import override
@@ -96,7 +96,8 @@ class BetterTogether(Teleprompter):
         self.optimizers: dict[str, Teleprompter] = optimizers
 
     @override
-    async def compile(self, student: Module, *, params: BetterTogetherCompileParams, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+        params = BetterTogetherCompileParams.model_validate(params)
         logger.info(f"\n{BOLD}==> BETTERTOGETHER COMPILATION STARTED <=={ENDC}")
         logger.info(f"{BLUE}Strategy:{ENDC} {params.strategy}")
         logger.info(f"{BLUE}Trainset size:{ENDC} {len(params.trainset)}")
@@ -140,7 +141,7 @@ class BetterTogether(Teleprompter):
         if not teacher:
             return (student, None)
         teacher = [teacher] if not isinstance(teacher, list) else teacher
-        teacher = [prepare_teacher(student=student, teacher=t) for t in teacher]
+        teacher = [prepare_teacher(student=student, teacher=cast("Module", t)) for t in teacher]
         return (student, teacher)
 
     def _prepare_trainset_and_valset(

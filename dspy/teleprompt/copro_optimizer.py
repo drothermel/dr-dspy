@@ -2,11 +2,13 @@ import logging
 import statistics
 from collections import defaultdict
 
+from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.core.types.config import LMConfig
 from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.predict import Predict
+from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.compile_params import COPROCompileParams
@@ -100,7 +102,8 @@ class COPRO(Teleprompter):
         logger.debug(f"p: {list(task_spec.fields.values())[-1].prefix}")
 
     @override
-    async def compile(self, student, *, params: COPROCompileParams, run: RunContext):
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+        params = COPROCompileParams.model_validate(params)
         module = student.deepcopy()
         evaluate_kwargs = params.evaluate.model_dump(exclude_none=True)
         trainset = params.trainset

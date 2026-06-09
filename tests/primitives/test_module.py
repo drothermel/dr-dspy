@@ -228,7 +228,7 @@ def test_load_state_is_transactional():
             self.b = ChainOfThought(Sig)
 
     source = Prog()
-    sentinel = Example.from_record({"question": "q1", "answer": "a1"}, input_keys=("question"))
+    sentinel = Example.from_record({"question": "q1", "answer": "a1"}, input_keys=("question",))
     source.a.predict.demos = [sentinel]
     source.b.predict.demos = [sentinel]
     with tempfile.TemporaryDirectory() as d:

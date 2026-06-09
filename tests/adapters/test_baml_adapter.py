@@ -11,7 +11,7 @@ try:
     from litellm import Choices, Message
     from litellm.files.main import ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
+    pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from dspy.adapters.baml_adapter import COMMENT_SYMBOL, INDENTATION, BAMLAdapter
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types.code import Code

@@ -1,5 +1,6 @@
 import random
 
+from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.core.types.call_options import ModuleCallOptions
@@ -17,7 +18,8 @@ class Ensemble(Teleprompter):
         self.deterministic = deterministic
 
     @override
-    async def compile(self, student: Module, *, params: EnsembleCompileParams, run: RunContext):
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+        params = EnsembleCompileParams.model_validate(params)
         programs = params.programs
         size = self.size
         reduce_fn = self.reduce_fn

@@ -17,7 +17,7 @@ from dspy.runtime import CallLogMode, TelemetryConfig
 try:
     from litellm import ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
+    pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from pydantic import BaseModel, HttpUrl
 
 from dspy.adapters.chat_adapter import ChatAdapter
@@ -723,7 +723,7 @@ def test_call_predict_with_chat_history(adapter_type, make_run):
     asyncio.run(
         program(
             question="are you sure that's correct?",
-            history=TurnLog(turns=({"question": "what's the capital of france?", "answer": "paris"})),
+            history=TurnLog(turns=({"question": "what's the capital of france?", "answer": "paris"},)),
             run=run,
         )
     )

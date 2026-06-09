@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from dspy.clients.base_lm import BaseLM
@@ -20,4 +20,4 @@ def _lm_class_registry() -> dict[str, type]:
 
 
 def get_lm_class(class_path: str) -> type[BaseLM]:
-    return _lm_class_registry()[class_path]
+    return cast("type[BaseLM]", _lm_class_registry()[class_path])

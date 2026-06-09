@@ -32,19 +32,19 @@ examples = [
         input_keys=("input",),
     ),
     Example.from_record(
-        {"input": "Why can't fish fall in love?", "output": "Because love is in the air"}, input_keys=("input")
+        {"input": "Why can't fish fall in love?", "output": "Because love is in the air"}, input_keys=("input",)
     ),
     Example.from_record(
         {"input": "What would bring world peace?", "output": "8 billion people meeting for a tea party in my backyard"},
-        input_keys=("input"),
+        input_keys=("input",),
     ),
 ]
 trainset = examples[:2]
 valset = [examples[2]]
 
 
-def _bt_params(**kwargs):
-    defaults = {"trainset": trainset, "valset": valset}
+def _bt_params(**kwargs: Any) -> BetterTogetherCompileParams:
+    defaults: dict[str, Any] = {"trainset": trainset, "valset": valset}
     defaults.update(kwargs)
     return BetterTogetherCompileParams(**defaults)
 
@@ -345,11 +345,13 @@ def test_compile_args_override_global_params(make_run):
                     run=run,
                 )
             )
-    assert mock_p.received_params.trainset == override_trainset
-    assert mock_p.received_params.valset == override_valset
-    assert mock_p.received_params.teacher is override_teacher
-    assert mock_p.received_params.trainset != trainset
-    assert mock_p.received_params.valset != valset
+    received = mock_p.received_params
+    assert isinstance(received, RandomSearchCompileParams)
+    assert received.trainset == override_trainset
+    assert received.valset == override_valset
+    assert received.teacher is override_teacher
+    assert received.trainset != trainset
+    assert received.valset != valset
 
 
 def test_trainset_shuffling_between_steps(make_run):

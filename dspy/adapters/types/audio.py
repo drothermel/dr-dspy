@@ -71,7 +71,7 @@ class Audio(Type):
         if not SF_AVAILABLE:
             raise ImportError("soundfile is required to process audio arrays.")
         byte_buffer = io.BytesIO()
-        sf.write(byte_buffer, array, sampling_rate, format=format.upper(), subtype="PCM_16")
+        sf.write(byte_buffer, array, sampling_rate, format=format.upper(), subtype="PCM_16")  # ty: ignore[invalid-argument-type]
         encoded_data = base64.b64encode(byte_buffer.getvalue()).decode("utf-8")
         return cls(data=encoded_data, audio_format=format)
 

@@ -15,7 +15,8 @@ class Prediction(Example):
         self._lm_usage = None
 
     @classmethod
-    def from_record(cls, record: Mapping[str, Any]) -> "Prediction":
+    def from_record(cls, record: Mapping[str, Any], *, input_keys: tuple[str, ...] = ()) -> "Prediction":
+        del input_keys
         return cls(**dict(record))
 
     def get_lm_usage(self):

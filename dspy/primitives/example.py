@@ -60,11 +60,11 @@ class Example:
         return self.__repr__()
 
     @override
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, Example) and self._store == other._store and self.input_keys == other.input_keys
 
     @override
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((tuple(sorted(self._store.items())), self.input_keys))
 
     def keys(self, include_dspy=False):
