@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Literal
+from typing import Any
 
 import pydantic
 
@@ -157,19 +157,6 @@ def assistant_tool_call_to_openai(call: LMToolCallPart) -> dict[str, Any]:
 
 def tool_result_to_openai(result: LMToolResultPart) -> dict[str, Any]:
     return {"content": parts_to_openai_content(result.content)}
-
-
-def config_to_provider_kwargs(
-    config: LMConfig,
-    *,
-    model: str | None = None,
-    endpoint: Literal["chat", "responses", "text"] = "chat",
-) -> dict[str, Any]:
-    if endpoint == "text":
-        return text_config_kwargs(config)
-    if endpoint == "responses":
-        return responses_config_kwargs(config, model=model)
-    return common_config_kwargs(config, model=model, endpoint=endpoint)
 
 
 def common_config_kwargs(config: LMConfig, *, model: str | None = None, endpoint: str = "chat") -> dict[str, Any]:

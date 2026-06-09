@@ -462,10 +462,14 @@ def test_load_state(make_run):
     )
     loaded_lm = LM.load_state(lm.dump_state())
     assert isinstance(loaded_lm, LM)
-    loaded_state = loaded_lm.dump_state()
-    original_state = lm.dump_state()
-    for key in ("model", "model_type", "temperature", "max_tokens", "num_retries", "_dspy_provider_options"):
-        assert loaded_state[key] == original_state[key]
+    assert loaded_lm.dump_state() == lm.dump_state()
+
+
+def test_load_state_round_trips_developer_role(make_run):
+    lm = LM("openai/gpt-4o-mini", use_developer_role=True)
+    loaded_lm = LM.load_state(lm.dump_state())
+    assert loaded_lm.use_developer_role is True
+    assert loaded_lm.dump_state() == lm.dump_state()
 
 
 def test_reasoning_model_load_state_round_trips_canonical_state(make_run):

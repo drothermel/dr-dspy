@@ -248,7 +248,19 @@ class LM(BaseLM):
     @classmethod
     @override
     def load_state(cls, state: dict[str, Any], *, allow_custom_lm_class: bool = False):
-        return super().load_state(validate_lm_state(dict(state)), allow_custom_lm_class=allow_custom_lm_class)
+        state = validate_lm_state(dict(state))
+        finetuning_model = state.pop("finetuning_model", None)
+        launch_kwargs = state.pop("launch_kwargs", {}) or {}
+        train_kwargs = state.pop("train_kwargs", {}) or {}
+        use_developer_role = state.pop("use_developer_role", False)
+        instance = super().load_state(state, allow_custom_lm_class=allow_custom_lm_class)
+        if not isinstance(instance, LM):
+            raise TypeError(f"Expected LM instance from load_state, got {type(instance).__name__}.")
+        instance.finetuning_model = finetuning_model
+        instance.launch_kwargs = launch_kwargs
+        instance.train_kwargs = train_kwargs
+        instance.use_developer_role = use_developer_role
+        return instance
 
     def _check_truncation(self, results) -> None:
         if self.model_type != "responses" and any(c.finish_reason == "length" for c in results["choices"]):
