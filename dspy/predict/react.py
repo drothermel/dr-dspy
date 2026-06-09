@@ -3,7 +3,7 @@ from typing import Any
 
 from dspy.adapters.types.tool import Tool
 from dspy.history import TurnEvent, TurnLog, call_with_history_truncation
-from dspy.predict.agent_helpers import format_tool_exception
+from dspy.predict.agent_loop import format_tool_exception
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict

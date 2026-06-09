@@ -10,7 +10,7 @@ from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.core.types import LMConfig, LMToolChoice
 from dspy.errors import AdapterParseError
 from dspy.history import TruncationExhaustedError, TurnEvent, TurnLog, call_with_history_truncation
-from dspy.predict.agent_helpers import format_tool_exception
+from dspy.predict.agent_loop import format_tool_exception
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.call_options import PredictOptions
 from dspy.predict.predict import Predict
