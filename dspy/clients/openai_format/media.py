@@ -67,6 +67,9 @@ def _rebuild_pydantic_serializers(value: Any) -> None:
 
 
 def model_dump(value: Any) -> dict[str, Any]:
+    # LiteLLM/OpenAI response objects are usually Pydantic models; try model_dump first.
+    # When serializers are stale (MockValSer / cross-version pydantic), rebuild and retry.
+    # Non-Pydantic provider objects fall through to the attribute scan below.
     if hasattr(value, "model_dump"):
         try:
             return value.model_dump(exclude_none=True)
