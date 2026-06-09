@@ -295,6 +295,8 @@ are clear.
 
 ### P2.1 Consolidate recursive JSON serialization
 
+**Status:** Done (2026-06).
+
 **Sources:** External cross-package review.
 
 Problem:
@@ -317,6 +319,16 @@ Details to preserve:
 - Circular-reference handling should remain available.
 - Human-readable formatted strings should be explicit exceptions, not accidental
   serializer drift.
+
+**Delivered:** Unified recursive conversion in `dspy.serialization.json.to_jsonable`
+(with `strict=True` for interpreter large-var JSON); deleted
+`dspy/task_spec/json_serialize.py`; migrated adapters, REPL previews, optimizer
+payloads (Refine, SIMBA), GEPA reflection, `CallRecord.to_dict` json mode, and
+predict state through `to_jsonable`; removed duplicated `recursive_mask` and
+`_json_default`; extracted shared `inspect_modules` to
+`dspy/teleprompt/core/inspect_modules.py`. OpenAI wire `model_dump` in
+`dspy/clients/openai_format/media.py` and Python-literal injection in the
+interpreter remain separate responsibilities.
 
 ### P2.2 Split core type modules by domain concept
 
