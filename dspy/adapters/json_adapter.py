@@ -141,17 +141,30 @@ class JSONAdapter(Adapter):
                 lm_response=completion,
                 message="LM response cannot be serialized to a JSON object.",
             )
-        fields = {k: v for k, v in fields.items() if k in task_spec.output_fields}
-        for k, v in fields.items():
-            if k in task_spec.output_fields:
-                fields[k] = parse_output_field(
-                    adapter_name="JSONAdapter",
-                    task_spec=task_spec,
-                    field_name=k,
-                    raw_value=v,
-                    lm_response=completion,
-                    field=task_spec.output_fields[k],
-                    repair=self.allow_json_repair,
-                )
-        validate_parsed_fields(adapter_name="JSONAdapter", task_spec=task_spec, lm_response=completion, fields=fields)
-        return fields
+        expected_keys = set(task_spec.output_fields.keys())
+        extra_keys = sorted(set(fields.keys()) - expected_keys)
+        if extra_keys:
+            raise AdapterParseError(
+                adapter_name="JSONAdapter",
+                task_spec=task_spec,
+                lm_response=completion,
+                parsed_result=fields,
+                message=f"unexpected field(s): {extra_keys}",
+            )
+        parsed_fields: dict[str, Any] = {}
+        for k in expected_keys:
+            if k not in fields:
+                continue
+            parsed_fields[k] = parse_output_field(
+                adapter_name="JSONAdapter",
+                task_spec=task_spec,
+                field_name=k,
+                raw_value=fields[k],
+                lm_response=completion,
+                field=task_spec.output_fields[k],
+                repair=self.allow_json_repair,
+            )
+        validate_parsed_fields(
+            adapter_name="JSONAdapter", task_spec=task_spec, lm_response=completion, fields=parsed_fields
+        )
+        return parsed_fields

@@ -307,3 +307,19 @@ def test_format_system_message():
     system_message = adapter.format_system_message(MySignature)
     expected_system_message = 'Your input fields are:\n1. `question` (str): The question.\nYour output fields are:\n1. `answers` (list[str]): The answers.\n2. `scores` (list[float]): The scores.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<answers>\n{answers}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "string"}}\n</answers>\n\n<scores>\n{scores}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "number"}}\n</scores>\nIn adhering to this structure, your objective is: \n        Answer the question with multiple answers and scores'
     assert system_message == expected_system_message
+
+
+def test_xml_adapter_forwards_json_repair_flag():
+    task_spec = make_task_spec(
+        {
+            "question": input_field("question", desc="q"),
+            "payload": output_field("payload", type_=dict[str, str], desc="payload"),
+        },
+        instructions="answer",
+    )
+    adapter = XMLAdapter(allow_json_repair=True)
+    with mock.patch("dspy.adapters.xml_adapter.parse_output_field", return_value={"ok": "yes"}) as parse_field:
+        parsed = adapter.parse(task_spec=task_spec, completion="<payload>{'ok': 'yes'}</payload>")
+    assert parsed == {"payload": {"ok": "yes"}}
+    parse_field.assert_called_once()
+    assert parse_field.call_args.kwargs["repair"] is True

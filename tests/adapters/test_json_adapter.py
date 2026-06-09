@@ -830,3 +830,10 @@ def test_format_system_message():
     system_message = adapter.format_system_message(MySignature)
     expected_system_message = 'Your input fields are:\n1. `question` (str): The question.\nYour output fields are:\n1. `answers` (list[str]): The answers.\n2. `scores` (list[float]): The scores.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\nInputs will have the following structure:\n\n[[ ## question ## ]]\n{question}\n\nOutputs will be a JSON object with the following fields.\n\n{\n  "answers": "{answers}        # note: the value you produce must adhere to the JSON schema: {\\"type\\": \\"array\\", \\"items\\": {\\"type\\": \\"string\\"}}",\n  "scores": "{scores}        # note: the value you produce must adhere to the JSON schema: {\\"type\\": \\"array\\", \\"items\\": {\\"type\\": \\"number\\"}}"\n}\nIn adhering to this structure, your objective is: \n        Answer the question with multiple answers and scores'
     assert system_message == expected_system_message
+
+
+def test_json_adapter_parse_raises_on_unexpected_fields():
+    signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
+    adapter = JSONAdapter()
+    with pytest.raises(AdapterParseError, match="unexpected field\\(s\\): \\['extra'\\]"):
+        adapter.parse(task_spec=signature, completion='{"answer": "Paris", "extra": "noise"}')

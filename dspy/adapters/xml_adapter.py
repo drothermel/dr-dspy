@@ -175,6 +175,7 @@ class XMLAdapter(Adapter):
                 raw_value=v,
                 lm_response=completion,
                 field=task_spec.output_fields[k],
+                repair=self.allow_json_repair,
             )
             for k, v in raw_fields.items()
         }
