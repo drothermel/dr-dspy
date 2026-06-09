@@ -8,11 +8,11 @@ from dspy.adapters.two_step_adapter import TwoStepAdapter
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import message_to_openai_chat
 from dspy.core.types import LMRequest, LMResponse
+from dspy.errors import AdapterParseError
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.testing import DummyLM
-from dspy.utils.exceptions import AdapterParseError
 from tests.adapters.conftest import format_messages_and_lm_kwargs
 from tests.task_spec.helpers import ts
 

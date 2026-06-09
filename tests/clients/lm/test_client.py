@@ -30,10 +30,10 @@ from dspy.core.types import (
     ToolResult,
     User,
 )
+from dspy.errors import LMConfigurationError
 from dspy.predict.predict import Predict
 from dspy.runtime import CallLogMode, TelemetryConfig
 from dspy.runtime.usage_tracker import track_usage
-from dspy.utils.exceptions import LMConfigurationError
 from tests.clients.lm.conftest import _direct_lm_case, _request
 from tests.task_spec.helpers import ts
 

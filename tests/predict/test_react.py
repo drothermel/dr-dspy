@@ -10,12 +10,12 @@ import dspy.adapters.base as adapter_base
 import dspy.adapters.utils as adapter_utils
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool
+from dspy.errors import ContextWindowExceededError
 from dspy.history import TurnEvent
 from dspy.predict.react import ReAct
 from dspy.primitives.prediction import Prediction
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.testing import DummyLM
-from dspy.utils.exceptions import ContextWindowExceededError
 from tests.task_spec.helpers import ts
 
 

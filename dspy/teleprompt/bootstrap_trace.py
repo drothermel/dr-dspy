@@ -4,13 +4,13 @@ from types import MethodType
 from typing import Any, Callable, TypedDict, cast
 
 from dspy.core.types.call_options import ModuleCallOptions
+from dspy.errors import AdapterParseError
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.task_spec_context import get_task_spec
 from dspy.teleprompt.utils import make_optimizer_evaluator
-from dspy.utils.exceptions import AdapterParseError
 
 logger = logging.getLogger(__name__)
 

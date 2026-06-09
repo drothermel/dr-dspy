@@ -20,9 +20,9 @@ from dspy.core.types import (
     coerce_tool_spec,
     merge_lm_request_config,
 )
+from dspy.errors import AdapterParseError
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import TaskSpec
-from dspy.utils.exceptions import AdapterParseError
 
 if TYPE_CHECKING:
     from dspy.adapters.base.adapter import Adapter

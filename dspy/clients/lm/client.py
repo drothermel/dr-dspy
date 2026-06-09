@@ -33,8 +33,8 @@ from dspy.clients.utils_finetune import TrainDataFormat
 from dspy.core.types import LMRequest, LMResponse
 from dspy.core.types.config import merge_lm_request_config
 from dspy.core.types.lm_provider import LMProviderOptions
+from dspy.errors import ContextWindowExceededError, LMConfigurationError, LMError, LMUnsupportedFeatureError
 from dspy.runtime.callback import BaseCallback
-from dspy.utils.exceptions import ContextWindowExceededError, LMConfigurationError, LMError, LMUnsupportedFeatureError
 
 from ..base_lm import BaseLM
 

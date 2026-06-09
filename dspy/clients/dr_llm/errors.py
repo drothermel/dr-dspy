@@ -15,7 +15,7 @@ from dspy.clients.lm.errors import (
     _exception_status,
     _lm_error_class_from_status,
 )
-from dspy.utils.exceptions import (
+from dspy.errors import (
     LMConfigurationError,
     LMError,
     LMInvalidRequestError,

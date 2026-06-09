@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Protocol
 
 from dspy.core.types.config import LMConfig, coerce_lm_config
-from dspy.utils.exceptions import LMError
+from dspy.errors import LMError
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable

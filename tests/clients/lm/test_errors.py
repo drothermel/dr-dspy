@@ -15,7 +15,7 @@ except ImportError:
 from openai import RateLimitError
 
 from dspy.clients.lm import LM
-from dspy.utils.exceptions import ContextWindowExceededError, LMError, LMRateLimitError, LMUnexpectedError
+from dspy.errors import ContextWindowExceededError, LMError, LMRateLimitError, LMUnexpectedError
 from tests.clients.lm.conftest import _request
 
 

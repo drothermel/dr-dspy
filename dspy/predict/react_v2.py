@@ -9,6 +9,7 @@ from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
 from dspy.core.types.config import LMConfig, LMToolChoice
+from dspy.errors import AdapterParseError, ContextWindowExceededError
 from dspy.history import TurnEvent, TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
@@ -16,7 +17,6 @@ from dspy.primitives.prediction import Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 from dspy.utils.annotation import experimental
-from dspy.utils.exceptions import AdapterParseError, ContextWindowExceededError
 
 logger = logging.getLogger(__name__)
 

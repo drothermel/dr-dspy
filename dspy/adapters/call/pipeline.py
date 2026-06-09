@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 from dspy.adapters.call.policies.parse_fallback import NoOpParseFallbackPolicy
 from dspy.adapters.call.policies.response_format import NoOpResponseFormatPolicy
 from dspy.core.types.config import coerce_lm_config
-from dspy.utils.exceptions import AdapterParseError, LMError
+from dspy.errors import AdapterParseError, LMError
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

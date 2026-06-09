@@ -32,7 +32,7 @@ from dspy.core.types import (
     LMToolSpec,
     LMVideoPart,
 )
-from dspy.utils.exceptions import LMUnsupportedFeatureError
+from dspy.errors import LMUnsupportedFeatureError
 
 
 def parts_to_openai_content(parts: list[Any]) -> str | list[dict[str, Any]]:

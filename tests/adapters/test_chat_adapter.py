@@ -29,12 +29,12 @@ from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
 from dspy.clients.openai_format import provider_tool_call_to_part
 from dspy.core.types import LMOutput, LMPart, LMResponse, LMTextPart, LMThinkingPart
+from dspy.errors import AdapterParseError
 from dspy.history import TurnLog
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.utils.exceptions import AdapterParseError
 from tests.adapters.conftest import (
     adapter_format_as_openai,
     default_model_response,
@@ -2117,7 +2117,7 @@ def test_format_system_message(make_run):
 
 
 def test_null_content_raises_adapter_parse_error(make_run):
-    from dspy.utils.exceptions import AdapterParseError
+    from dspy.errors import AdapterParseError
 
     lm = LM("openai/gpt-4o-mini")
     response = ModelResponse(choices=[Choices(message=Message(content=None))], model="openai/gpt-4o-mini")
@@ -2129,7 +2129,7 @@ def test_null_content_raises_adapter_parse_error(make_run):
 
 
 def test_empty_string_content_raises_adapter_parse_error(make_run):
-    from dspy.utils.exceptions import AdapterParseError
+    from dspy.errors import AdapterParseError
 
     lm = LM("openai/gpt-4o-mini")
     response = ModelResponse(choices=[Choices(message=Message(content=""))], model="openai/gpt-4o-mini")

@@ -5,7 +5,7 @@ from unittest import mock
 import pydantic
 import pytest
 
-from dspy.utils.exceptions import AdapterParseError
+from dspy.errors import AdapterParseError
 
 try:
     from litellm import Choices, Message, ModelResponse

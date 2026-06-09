@@ -4,7 +4,7 @@ from dr_llm.backends.errors import BackendAcquireTimeoutError, BackendUnsupporte
 from dr_llm.errors import ProviderTransportError
 
 from dspy.clients.dr_llm.errors import wrap_backend_exception
-from dspy.utils.exceptions import LMTimeoutError, LMTransportError, LMUnsupportedFeatureError
+from dspy.errors import LMTimeoutError, LMTransportError, LMUnsupportedFeatureError
 
 
 def test_wrap_backend_unsupported_feature() -> None:

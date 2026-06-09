@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from dspy.adapters.types.tool import Tool
 from dspy.core.types.call_options import ModuleCallOptions
+from dspy.errors import ContextWindowExceededError
 from dspy.history import TurnEvent, TurnLog
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
@@ -16,7 +17,6 @@ from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
-from dspy.utils.exceptions import ContextWindowExceededError
 from dspy.utils.source_format import get_formatted_source
 
 logger = logging.getLogger(__name__)

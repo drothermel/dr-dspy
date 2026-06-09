@@ -18,7 +18,7 @@ from dspy.core.types.parts import (
     LMToolCallPart,
     LMVideoPart,
 )
-from dspy.utils.exceptions import LMUnsupportedFeatureError
+from dspy.errors import LMUnsupportedFeatureError
 
 if TYPE_CHECKING:
     from dr_llm.llm.response import LlmResponse

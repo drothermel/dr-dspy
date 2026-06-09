@@ -6,7 +6,7 @@ import pytest
 from dspy.adapters.call.policies.parse_fallback import NoOpParseFallbackPolicy
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.clients.lm import LM
-from dspy.utils.exceptions import AdapterParseError, LMError
+from dspy.errors import AdapterParseError, LMError
 from tests.adapters.conftest import Choices, Message, ModelResponse, make_adapter_run
 from tests.task_spec.helpers import ts
 

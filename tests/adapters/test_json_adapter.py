@@ -8,8 +8,8 @@ import pytest
 from typing_extensions import override
 
 from dspy.adapters.types.document import Document
+from dspy.errors import AdapterParseError
 from dspy.testing import DummyLM
-from dspy.utils.exceptions import AdapterParseError
 
 if TYPE_CHECKING:
     from litellm.utils import ModelResponse
@@ -26,11 +26,11 @@ from dspy.adapters.types.image import Image
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.clients.lm import LM
+from dspy.errors import LMUnexpectedError
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.utils.exceptions import LMUnexpectedError
 from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs, make_adapter_run
 from tests.task_spec.helpers import ts
 

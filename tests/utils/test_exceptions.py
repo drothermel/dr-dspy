@@ -1,4 +1,4 @@
-from dspy.utils.exceptions import (
+from dspy.errors import (
     AdapterParseError,
     ContextWindowExceededError,
     DSPyError,

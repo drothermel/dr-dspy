@@ -6,7 +6,7 @@ from dspy.adapters.call.tool_output import attach_tool_calls_to_value
 from dspy.core.types import LMRequest
 from dspy.core.types.config import coerce_lm_config, merge_lm_request_config
 from dspy.core.types.openai_compat import request_messages_as_openai
-from dspy.utils.exceptions import AdapterParseError, LMError
+from dspy.errors import AdapterParseError, LMError
 
 if TYPE_CHECKING:
     from dspy.adapters.two_step_adapter import TwoStepAdapter
