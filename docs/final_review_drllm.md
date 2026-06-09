@@ -4,6 +4,25 @@ You are a smart coding agent working in the `dr-llm` repository, currently locat
 
 The paired DSPy-side review is in `../dr-dspy/docs/final_review_dspy.md`. Read it before editing code. Your goal is not to reproduce every DSPy bugfix inside `dr-llm`; your goal is to make `dr-llm` expose clear, stable backend behavior and provider controls so the updated `dr-dspy` integration can immediately run text-only experiments through either `DrLlmDirectLM` or `DrLlmPoolLM`.
 
+## Alignment with the dr-dspy Prompt
+
+The `dr-dspy` prompt is the consumer of this work. Keep these workstream IDs aligned when updating this document and when writing the final handoff:
+
+| dr-dspy ID | dr-dspy need | dr-llm-side output expected from this prompt |
+| --- | --- | --- |
+| `P0-8` | Safe state loading for builtin dr-llm LMs | Confirm stable class/import names and serialized constructor fields that `dr-dspy` should allow through its safe load path. |
+| `P0-9` | Pool acquisition session identity | Document and test `PoolBackend.aacquire(..., session_id=...)` semantics, including same-session no-replacement behavior and metadata non-isolation. |
+| `P0-10` / `P2-6` | Provider-specific reasoning/config bridge | Provide exact `BackendRequest` field shapes for OpenRouter reasoning disabled, OpenRouter provider-specific effort, OpenAI minimal thinking, Google thinking off, `EffortSpec.MAX` if supported, and explicit no-sampling-override behavior. |
+| `P0-11` | Pool lifecycle | Verify or implement idempotent backend close and preserve clear expectations for use after close. |
+| `P2-1` | Pool aggregate provenance | Preserve `AcquireResult(responses, claimed_from_cache, generated)` and per-response provenance so `dr-dspy` can expose or record it. |
+| `P2-2` | Pool fingerprint and metadata docs | Test or document that metadata and extensions do not affect fingerprints, while provider-output-affecting controls do. |
+| `P2-3` | `n=1` optimizer contract | State whether `dr-llm` treats single-completion requests as unset `n`, rejects them, or supports a native/emulated multi-completion path. |
+| `P2-4` | dr-llm v1 scope docs/tests | Keep unsupported feature errors early and typed for text-only DSPy wrappers. |
+| `P2-5` | `nl-code` TaskSpec experiment scaffold | Provide backend/provider-control guidance only; the TaskSpec scaffold itself remains a `dr-dspy` responsibility. |
+| `V-2` | Live OpenRouter `gpt-5-nano` endpoint test | Ensure the dr-llm OpenRouter path works with `OPENROUTER_API_KEY`, and hand off the exact fields/command needed for the dr-dspy live integration test. |
+
+Do not mark a dr-llm phase done if its output leaves the corresponding dr-dspy workstream without enough detail to implement or test the bridge. If a decision belongs in `dr-dspy`, state that explicitly and give the dr-dspy agent the exact contract it should code against.
+
 ## Current Status
 
 Update these rows as you go. Use one of: `todo`, `in_progress`, `blocked`, `done`, or `not_applicable`.
@@ -243,11 +262,11 @@ Run the relevant checks in `dr-llm`. Update the command, result, and notes colum
 | Provider-control unit tests you added or updated | todo |  |
 | Pool lifecycle/provenance tests you added or updated | todo |  |
 | Postgres pool integration test with `DR_LLM_TEST_DATABASE_URL` or `DR_LLM_DATABASE_URL` | todo |  |
-| Live OpenRouter smoke test against `openrouter/openai/gpt-5-nano` | todo | Required before marking the plan fully tested. Use the repo's local OpenRouter API key environment variable, expected to be `OPENROUTER_API_KEY`, and verify the call actually reaches OpenRouter, returns nonempty text, and records OpenRouter/provider provenance. |
+| Live OpenRouter smoke test against `openrouter/openai/gpt-5-nano` | todo | Required before marking the plan fully tested. Use the repo's local OpenRouter API key environment variable, expected to be `OPENROUTER_API_KEY`, verify the call actually reaches OpenRouter, returns nonempty text, and records OpenRouter/provider provenance. Also document the exact command or test that `dr-dspy` should run for its `V-2` integration check. |
 
 If Postgres credentials are unavailable, mark only the Postgres row `blocked` and include the missing environment variable or service. The OpenRouter `gpt-5-nano` live test is part of the full acceptance bar; if `OPENROUTER_API_KEY` is unexpectedly unavailable, mark the row `blocked`, explain the missing environment variable, and do not describe the plan as fully tested.
 
-For the live OpenRouter test, add or run a checked-in live test when possible. A CLI smoke command is acceptable only if it verifies the response and provenance, for example an equivalent of `uv run dr-llm query --provider openrouter --model openai/gpt-5-nano --message "Return exactly: dr-llm live ok"` plus an assertion that the returned content is nonempty and came from the OpenRouter provider path.
+For the live OpenRouter test, add or run a checked-in live test when possible. A CLI smoke command is acceptable only for the dr-llm-side check if it verifies the response and provenance, for example an equivalent of `uv run dr-llm query --provider openrouter --model openai/gpt-5-nano --message "Return exactly: dr-llm live ok"` plus an assertion that the returned content is nonempty and came from the OpenRouter provider path. The paired `dr-dspy` `V-2` check must still hit OpenRouter through `DrLlmDirectLM("openrouter/openai/gpt-5-nano", ...)` or the direct dr-llm request path used by that bridge, then assert nonempty text and provider/provenance metadata strongly enough to catch accidental routing through another provider.
 
 ## Cross-Repo Readiness Checklist for dr-dspy
 
