@@ -7,7 +7,7 @@ from dspy.clients.dr_llm.mapping import (
     lm_request_to_backend_request,
     split_provider_model,
 )
-from dspy.core.types import LMRequest, User
+from dspy.core.types import LMMessage, LMRequest, User
 from dspy.core.types.config import LMConfig
 from dspy.core.types.parts import LMImagePart, LMTextPart
 from dspy.utils.dummies import DummyLM
@@ -48,6 +48,16 @@ def test_lm_request_rejects_tools() -> None:
     request = make_lm_request()
     request = request.model_copy(update={"tools": [{"type": "function", "name": "f", "parameters": {}}]})
     with pytest.raises(LMUnsupportedFeatureError):
+        lm_request_to_backend_request(request, lm=lm)
+
+
+def test_lm_request_rejects_unsupported_roles() -> None:
+    lm = DummyLM([{"answer": "x"}])
+    request = LMRequest(
+        model="openai/gpt-4.1-mini",
+        messages=[LMMessage(role="tool", parts=[LMTextPart(text="result")])],
+    )
+    with pytest.raises(LMUnsupportedFeatureError, match="role"):
         lm_request_to_backend_request(request, lm=lm)
 
 

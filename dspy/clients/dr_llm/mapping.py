@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from dr_llm.llm.response import LlmResponse
 
 _MessageRole = Literal["system", "user", "assistant"]
+_ALLOWED_MESSAGE_ROLES = frozenset({"system", "user", "assistant"})
 
 _UNSUPPORTED_PART_TYPES = (
     LMImagePart,
@@ -71,6 +72,12 @@ def _reject_unsupported_request(request: LMRequest) -> None:
             features=["response_format"],
         )
     for message in request.messages:
+        if message.role not in _ALLOWED_MESSAGE_ROLES:
+            raise LMUnsupportedFeatureError(
+                f"dr-llm backends v1 do not support message role {message.role!r}.",
+                model=request.model,
+                features=["role"],
+            )
         _reject_unsupported_parts(message.parts, model=request.model)
 
 
