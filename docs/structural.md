@@ -834,6 +834,8 @@ duplicated image/document tests from adapter files; contributor docs in
 
 ### P5.4 Normalize pytest marker and live integration policy
 
+**Status:** Done (2026-06).
+
 **Sources:** Manual test-suite review.
 
 Problem:
@@ -859,3 +861,11 @@ Details to preserve:
 - Environment checks remain useful as secondary skip reasons after opt-in.
 - `tests/README.md` should explain default-skipped categories, dependencies,
   credentials, and example commands.
+
+**Delivered:** All opt-in markers (`integration`, `llm_call`, `deno`, `slow`)
+defined in `pyproject.toml`; `tests/conftest.py` owns CLI flags and skip logic
+only; shared `require_env` in `tests/test_utils/require_env.py`; Databricks live
+tests under `tests/integrations/finetune/test_databricks_live.py`; mocked
+provider coverage in `tests/clients/finetune/test_databricks_provider.py`;
+removed `extra` and `reliability` markers; contributor docs in
+`tests/README.md` and `AGENTS.md`.

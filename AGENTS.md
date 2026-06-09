@@ -212,7 +212,11 @@ samples = asyncio.run(pool.acquire_samples(request, n=10, run=run))
 - **v1 limits**: text-only; tools, multimodal parts, `response_format`, `stop`, `n`, `logprobs`, `tool_choice`, `prompt_cache`, `LMConfig.extensions`, and unsupported `reasoning` fields (`max_tokens`, `summary`) raise typed errors. Only `reasoning.effort` maps to `BackendRequest.effort`.
 - **Lifecycle**: use `with DrLlmPoolLM(...) as pool:` (preferred) or call `pool.close()` to tear down the pool consumer when you are done with the LM.
 
-Integration tests (`pytest -m integration -n0 tests/clients/dr_llm/test_integration_pool.py`) require Postgres via `DR_LLM_TEST_DATABASE_URL` or `DR_LLM_DATABASE_URL`. Spin up a disposable database with `uv run dr-llm project create <name>` and export the returned DSN.
+Integration tests require Postgres via `DR_LLM_TEST_DATABASE_URL` or `DR_LLM_DATABASE_URL`. See [tests/README.md](tests/README.md) for the full pytest marker policy. Spin up a disposable database with `uv run dr-llm project create <name>` and export the returned DSN, then run:
+
+```bash
+uv run pytest --integration -n0 tests/clients/dr_llm/test_integration_pool.py
+```
 
 Live direct-provider smoke test (uses your `OPENAI_API_KEY` via dr-llm’s default registry):
 

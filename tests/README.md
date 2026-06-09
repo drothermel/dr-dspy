@@ -33,6 +33,34 @@ For affected-test reruns, use pytest-testmon. The first run builds `.testmondata
 uv run pytest --testmon
 ```
 
+## Opt-in test categories
+
+Markers are defined in `pyproject.toml`. By default, pytest skips tests marked
+`integration`, `llm_call`, `deno`, or `slow`. Pass the matching CLI flag to opt
+in (`--integration`, `--llm_call`, `--deno`, `--slow`). You can also select by
+marker expression (for example `-m integration`).
+
+Credential and dependency checks still apply as secondary skip reasons after
+opt-in. Use `require_env` from `tests.test_utils` in live tests.
+
+| Marker | Flag | Requires | Examples |
+|--------|------|----------|----------|
+| `integration` | `--integration` | External infra (Postgres, HuggingFace downloads, Databricks workspace, MCP stdio server, local litellm proxy) | `tests/clients/dr_llm/test_integration_pool.py`, `tests/integrations/datasets/test_benchmark_datasets.py` |
+| `llm_call` | `--llm_call` | Live LLM provider credentials (`OPENAI_API_KEY`, `LM_FOR_TEST`, provider-specific `LM_FOR_TEST_*`) | `tests/clients/test_lm_direct_live.py` |
+| `deno` | `--deno` | Deno runtime installed | `tests/primitives/python_interpreter/`, RLM integration tests |
+| `slow` | `--slow` | (none) | Multi-round bootstrap compile tests under `tests/persistence/` |
+
+Example commands:
+
+```bash
+uv run pytest                                          # default unit suite
+uv run pytest --integration -n 0                       # Postgres pool, HF datasets, litellm proxy, MCP
+uv run pytest --llm_call -n 0 tests/clients/test_lm_direct_live.py
+uv run pytest --integration --llm_call -n 0 tests/integrations/finetune/test_databricks_live.py
+uv run pytest --deno -n 0 tests/primitives/python_interpreter/
+uv run pytest --slow -n 0 tests/persistence/
+```
+
 ## Test doubles
 
 Shared LM and retrieval doubles live under `tests/test_utils/`:
