@@ -7,7 +7,7 @@ from typing import Any, Callable, Protocol, TypedDict, cast
 from typing_extensions import override
 
 from dspy._internal.lazy_import import _detect_dspy_dist
-from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.field_type import is_field_type
 from dspy.history import TurnLog
 from dspy.integrations.optimizers.gepa.task_specs import FrameworkGepaInstructionProposalTaskSpec
 from dspy.predict.predict import Predict
@@ -265,7 +265,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 for input_key, input_val in inputs.items():
                     if contains_history and input_key == history_key_name:
                         continue
-                    if isinstance(input_val, Type) and self.custom_instruction_proposer is not None:
+                    if is_field_type(input_val) and self.custom_instruction_proposer is not None:
                         new_inputs[input_key] = input_val
                     else:
                         new_inputs[input_key] = str(input_val)

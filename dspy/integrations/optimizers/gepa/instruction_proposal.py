@@ -4,7 +4,7 @@ from typing import Any, cast
 
 from typing_extensions import override
 
-from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.field_type import FieldType, is_field_type
 from dspy.integrations.optimizers.gepa.adapter import AsyncProposalFn, ReflectiveExample
 from dspy.predict.predict import Predict
 from dspy.primitives import Module
@@ -53,7 +53,7 @@ class SingleComponentMultiModalProposer(Module):
 
     def _format_examples_with_pattern_analysis(
         self, reflective_dataset: list[ReflectiveExample]
-    ) -> tuple[str, dict[int, list[Type]]]:
+    ) -> tuple[str, dict[int, list[FieldType]]]:
         formatted_examples, image_map = self._format_examples_for_instruction_generation(reflective_dataset)
         feedback_analysis = self._analyze_feedback_patterns(reflective_dataset)
         if feedback_analysis["summary"]:
@@ -108,12 +108,12 @@ class SingleComponentMultiModalProposer(Module):
 
     def _format_examples_for_instruction_generation(
         self, reflective_dataset: list[ReflectiveExample]
-    ) -> tuple[str, dict[int, list[Type]]]:
+    ) -> tuple[str, dict[int, list[FieldType]]]:
 
         def render_value_with_images(value, level=3, example_images=None):
             if example_images is None:
                 example_images = []
-            if isinstance(value, Type):
+            if is_field_type(value):
                 image_idx = len(example_images) + 1
                 example_images.append(value)
                 return f"[IMAGE-{image_idx} - see visual content]\n\n"
@@ -161,7 +161,7 @@ class SingleComponentMultiModalProposer(Module):
             )
         return (formatted_text, image_map)
 
-    def _create_multimodal_examples(self, formatted_text: str, image_map: dict[int, list[Type]]) -> Any:
+    def _create_multimodal_examples(self, formatted_text: str, image_map: dict[int, list[FieldType]]) -> Any:
         if not image_map:
             return formatted_text
         all_images = []

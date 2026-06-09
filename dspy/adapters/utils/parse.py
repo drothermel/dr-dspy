@@ -14,10 +14,9 @@ from typing import Any, Literal, Union, cast, get_args, get_origin
 import pydantic
 from pydantic import TypeAdapter
 
-from dspy.adapters.types.base_type import Type as DspyType
+from dspy.adapters.types.field_type import is_field_type_class
 from dspy.adapters.utils.json_loads import load_json
 from dspy.errors import AdapterParseError
-from dspy.task_spec.field_format import _annotation_is_subclass
 from dspy.task_spec.field_spec import FieldSpec
 
 
@@ -114,7 +113,7 @@ def parse_value(value: object, annotation: object, *, repair: bool = False) -> o
     try:
         return TypeAdapter(annotation).validate_python(candidate)
     except pydantic.ValidationError as e:
-        if _annotation_is_subclass(annotation=annotation, expected_base=DspyType):
+        if is_field_type_class(annotation):
             try:
                 return TypeAdapter(annotation).validate_python(value)
             except Exception:

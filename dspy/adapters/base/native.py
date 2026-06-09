@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
-from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.citation import Citations
+from dspy.adapters.types.field_type import NativeResponseFieldType, implements_parse_lm_output
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.core.types.config import LMConfig, LMReasoningConfig, NativeAdaptationMode
 from dspy.task_spec import TaskSpec
@@ -12,13 +12,13 @@ from dspy.task_spec import TaskSpec
 if TYPE_CHECKING:
     from dspy.clients.base_lm import BaseLM
 
-_DEFAULT_NATIVE_RESPONSE_TYPES = [Citations, Reasoning]
+_DEFAULT_NATIVE_RESPONSE_TYPES: list[type[NativeResponseFieldType]] = [Citations, Reasoning]
 
 
 class AdapterNativeMixin:
     @staticmethod
-    def _ensure_native_response_type_parses_output(native_type: type[Type]) -> None:
-        if native_type.parse_lm_output.__func__ is Type.parse_lm_output.__func__:
+    def _ensure_native_response_type_parses_output(native_type: type[NativeResponseFieldType]) -> None:
+        if not implements_parse_lm_output(native_type):
             raise TypeError(
                 f"{native_type.__name__} is listed in native_response_types but does not implement parse_lm_output(). Native response fields must parse typed LMOutput values."
             )

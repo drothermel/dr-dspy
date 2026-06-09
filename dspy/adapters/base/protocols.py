@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 if TYPE_CHECKING:
-    from dspy.adapters.types.base_type import Type
+    from dspy.adapters.types.field_type import NativeResponseFieldType
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types import LMMessage, UserMessageContent
     from dspy.core.types.config import LMConfig
@@ -45,12 +45,12 @@ class ChatFormattableAdapter(FormattableAdapter, Protocol):
 
 
 class NativeAdaptableAdapter(Protocol):
-    native_response_types: list[type[Type]]
+    native_response_types: list[type[NativeResponseFieldType]]
     use_native_function_calling: bool
     parallel_tool_calls: bool | None
 
     @staticmethod
-    def _ensure_native_response_type_parses_output(native_type: type[Type]) -> None: ...
+    def _ensure_native_response_type_parses_output(native_type: type[NativeResponseFieldType]) -> None: ...
 
     def _adapt_reasoning_native(
         self, task_spec: TaskSpec, field_name: str, lm: BaseLM, config: LMConfig

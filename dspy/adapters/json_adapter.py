@@ -18,7 +18,7 @@ from dspy.task_spec.field_spec import FieldRole
 from dspy.task_spec.json_serialize import serialize_for_json
 
 if TYPE_CHECKING:
-    from dspy.adapters.types.base_type import Type
+    from dspy.adapters.types.field_type import NativeResponseFieldType
     from dspy.runtime.callback import Callback
     from dspy.task_spec import TaskSpec
 
@@ -36,7 +36,7 @@ class JSONAdapter(ChatFormatMixin, Adapter):
         callbacks: list[Callback] | None = None,
         use_native_function_calling: bool = True,
         parallel_tool_calls: bool | None = None,
-        native_response_types: list[type[Type]] | None = None,
+        native_response_types: list[type[NativeResponseFieldType]] | None = None,
         allow_json_repair: bool = True,
     ) -> None:
         super().__init__(

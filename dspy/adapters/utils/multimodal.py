@@ -4,7 +4,11 @@ from typing import Any, cast
 
 import pydantic
 
-from dspy.adapters.types.base_type import Type as DspyType
+from dspy.adapters.types.field_type import (
+    is_field_type,
+    renders_as_content_blocks_value,
+    to_content_blocks_value,
+)
 from dspy.task_spec import TaskSpec, format_field_value
 from dspy.task_spec.field_spec import FieldSpec
 
@@ -39,8 +43,8 @@ def _parse_serialized_content_block_string(value: object) -> list[dict[str, Any]
 
 
 def value_contains_multimodal_custom_type(value: object) -> bool:
-    if isinstance(value, DspyType):
-        return value.renders_as_content_blocks()
+    if is_field_type(value):
+        return renders_as_content_blocks_value(value)
     if _parse_serialized_content_block_string(value) is not None:
         return True
     if _is_openai_content_blocks(value):
@@ -65,8 +69,8 @@ def inputs_include_multimodal_custom_type_values(task_spec: TaskSpec, inputs: Ma
 
 
 def collect_multimodal_content_blocks(value: object) -> list[dict[str, Any]]:
-    if isinstance(value, DspyType):
-        return value.to_content_blocks() if value.renders_as_content_blocks() else []
+    if is_field_type(value):
+        return to_content_blocks_value(value) if renders_as_content_blocks_value(value) else []
     if blocks := _parse_serialized_content_block_string(value):
         return blocks
     if _is_openai_content_blocks(value):
@@ -95,8 +99,12 @@ def field_value_to_content_blocks(
     if field_wrapper == "xml":
         open_tag = f"{prefix}<{field_name}>\n"
         close_tag = f"\n</{field_name}>"
-        if isinstance(value, DspyType) and value.renders_as_content_blocks():
-            return [{"type": "text", "text": open_tag}, *value.to_content_blocks(), {"type": "text", "text": close_tag}]
+        if is_field_type(value) and renders_as_content_blocks_value(value):
+            return [
+                {"type": "text", "text": open_tag},
+                *to_content_blocks_value(value),
+                {"type": "text", "text": close_tag},
+            ]
         nested_blocks = collect_multimodal_content_blocks(value)
         if nested_blocks:
             return [{"type": "text", "text": open_tag}, *nested_blocks, {"type": "text", "text": close_tag}]
@@ -105,8 +113,8 @@ def field_value_to_content_blocks(
     header = f"{prefix}[[ ## {field_name} ## ]]\n"
     if _is_openai_content_blocks(value):
         return [{"type": "text", "text": header}, *cast("list[dict[str, Any]]", value)]
-    if isinstance(value, DspyType) and value.renders_as_content_blocks():
-        return [{"type": "text", "text": header}, *value.to_content_blocks()]
+    if is_field_type(value) and renders_as_content_blocks_value(value):
+        return [{"type": "text", "text": header}, *to_content_blocks_value(value)]
     nested_blocks = collect_multimodal_content_blocks(value)
     if nested_blocks:
         return [{"type": "text", "text": header}, *nested_blocks]

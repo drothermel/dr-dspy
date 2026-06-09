@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any, cast
 from dspy.adapters.base.native import AdapterNativeMixin
 from dspy.adapters.base.protocols import ComposedAdapterT
 from dspy.adapters.call.postprocess import enrich_parsed_value_from_lm_output
-from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.citation import Citations
+from dspy.adapters.types.field_type import is_field_type_class
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.core.types import (
     LMConfig,
@@ -81,7 +81,7 @@ class AdapterCallMixin(AdapterNativeMixin):
             if not (
                 isinstance(field_type, type)
                 and field_type in self.native_response_types
-                and issubclass(field_type, Type)
+                and is_field_type_class(field_type)
             ):
                 continue
             self._ensure_native_response_type_parses_output(field_type)

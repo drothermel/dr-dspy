@@ -14,7 +14,7 @@ from dspy.errors import AdapterParseError
 
 if TYPE_CHECKING:
     from dspy.adapters.call.policies.parse_fallback import NoOpParseFallbackPolicy
-    from dspy.adapters.types.base_type import Type
+    from dspy.adapters.types.field_type import NativeResponseFieldType
     from dspy.runtime.callback import Callback
     from dspy.task_spec import TaskSpec
 
@@ -46,7 +46,7 @@ class ChatAdapter(ChatFormatMixin, Adapter):
         self,
         callbacks: list[Callback] | None = None,
         use_native_function_calling: bool = False,
-        native_response_types: list[type[Type]] | None = None,
+        native_response_types: list[type[NativeResponseFieldType]] | None = None,
         parallel_tool_calls: bool | None = None,
         allow_json_repair: bool = False,
         json_fallback: JSONAdapter | None = None,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol
 
 from dspy.adapters.base.tool_calls import attach_tool_calls_to_parsed_value
-from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.field_type import NativeResponseFieldType, is_field_type_class
 
 if TYPE_CHECKING:
     from dspy.core.types import LMOutput
@@ -11,15 +11,17 @@ if TYPE_CHECKING:
 
 
 class PostprocessEnrichmentAdapter(Protocol):
-    native_response_types: list[type[Type]]
+    native_response_types: list[type[NativeResponseFieldType]]
 
     def _get_tool_call_output_field_name(self, task_spec: TaskSpec) -> str | None: ...
 
 
-def strip_native_response_output_fields(task_spec: TaskSpec, native_response_types: list[type[Type]]) -> TaskSpec:
+def strip_native_response_output_fields(
+    task_spec: TaskSpec, native_response_types: list[type[NativeResponseFieldType]]
+) -> TaskSpec:
     for name, field in task_spec.output_fields.items():
         field_type = field.type_
-        if isinstance(field_type, type) and field_type in native_response_types and issubclass(field_type, Type):
+        if isinstance(field_type, type) and field_type in native_response_types and is_field_type_class(field_type):
             task_spec = task_spec.delete(name)
     return task_spec
 
@@ -44,7 +46,7 @@ def enrich_parsed_value_from_lm_output(
         if (
             isinstance(field_type, type)
             and field_type in adapter.native_response_types
-            and issubclass(field_type, Type)
+            and is_field_type_class(field_type)
         ):
             parsed_value = field_type.parse_lm_output(output)
             if parsed_value is not None:
