@@ -124,7 +124,7 @@ def get_dspy_source_code(module):
                     and item.task_spec is not None
                     and (item.task_spec.name + "_sig" not in completed_set)
                 ):
-                    header.append(item.task_spec.to_declaration())
+                    header.append(item.task_spec.to_debug_string())
                     completed_set.add(item.task_spec.name + "_sig")
             if isinstance(item, Module):
                 code = get_dspy_source_code(item).strip()

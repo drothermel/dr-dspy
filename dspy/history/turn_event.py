@@ -14,8 +14,8 @@ class TurnEvent(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    thought: str | None = None
-    next_thought: str | None = None
+    thought: Any | None = None
+    next_thought: Any | None = None
     tool_name: str | None = None
     tool_args: dict[str, Any] | None = None
     tool_calls: Any | None = None

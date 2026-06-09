@@ -76,7 +76,7 @@ def _is_value_compatible_with_type(value: Any, expected: type) -> bool:
     if expected is str and isinstance(value, list) and all(isinstance(item, str) for item in value):
         return True
     try:
-        TypeAdapter(expected).validate_python(value)
+        TypeAdapter(expected).validate_python(value, strict=True)
     except ValidationError:
         return False
     return True

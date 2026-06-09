@@ -155,7 +155,8 @@ class TaskSpec(BaseModel):
         validate_task_spec(spec)
         return spec
 
-    def to_declaration(self) -> str:
+    def to_debug_string(self) -> str:
+        """Human-readable debug dump; not stable for parsing or persistence."""
         field_lines = [
             f"  {field.role.value} {field.name}: {field.type_!r} desc={field.desc!r} prefix={field.prefix!r}"
             for field in (*self.inputs, *self.outputs)

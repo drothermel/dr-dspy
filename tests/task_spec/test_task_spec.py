@@ -172,9 +172,9 @@ def test_serialize_round_trip():
     assert restored.input_fields["question"].type_ is int
 
 
-def test_to_declaration():
+def test_to_debug_string():
     spec = ts("q -> a", instructions="Answer.")
-    declaration = spec.to_declaration()
+    declaration = spec.to_debug_string()
     assert "TaskSpec" in declaration
     assert "Answer." in declaration
     assert "q -> a" in declaration
