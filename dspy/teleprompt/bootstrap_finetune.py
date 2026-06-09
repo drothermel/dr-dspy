@@ -1,4 +1,6 @@
+import asyncio
 import logging
+import random
 from collections import defaultdict
 from typing import Any
 
@@ -10,13 +12,23 @@ from dspy.clients.lm import LM
 from dspy.predict.predict import Predict
 from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
-from dspy.teleprompt.bootstrap_trace import bootstrap_trace_data
+from dspy.teleprompt.bootstrap_trace import TraceData, bootstrap_trace_data
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 
 logger = logging.getLogger(__name__)
+
+
+def filter_trace_data_for_finetune(
+    trace_data: list[TraceData],
+    *,
+    metric: OptimizerMetric | None,
+) -> list[TraceData]:
+    if metric is None:
+        return trace_data
+    return [entry for entry in trace_data if entry["score"] is not None]
 
 
 class FinetuneTeleprompter:
@@ -75,7 +87,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
             training_key = (pred.lm, data_pred_ind)
             if training_key not in key_to_data:
                 train_data, data_format = self._prepare_finetune_data(
-                    trace_data=trace_data, lm=pred.lm, pred_ind=data_pred_ind, run=run
+                    trace_data=trace_data, lm=pred.lm, target_pred_ind=data_pred_ind, run=run
                 )
                 logger.info(f"Using {len(train_data)} data points for fine-tuning the model: {pred.lm.model}")
                 finetune_kwargs = {
@@ -91,7 +103,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
                 f"BootstrapFinetune requires `max_concurrency` to be bigger than or equal to the number of fine-tuning jobs. There are {len(key_to_data)} fine-tuning jobs to start, but the number of threads is: {max_concurrency}! If the `multitask` flag is set to False, the number of fine-tuning jobs will be equal to the number of predictors in the student program. If the `multitask` flag is set to True, the number of fine-tuning jobs will be equal to: 1 if there is only a context LM, or the number of unique LMs attached to the predictors in the student program. In any case, the number of fine-tuning jobs will be less than or equal to the number of predictors."
             )
         logger.info(f"{len(key_to_data)} fine-tuning job(s) to start")
-        key_to_lm = self.finetune_lms(key_to_data)
+        key_to_lm = await self.finetune_lms(key_to_data)
         logger.info("Updating the student program with the fine-tuned LMs...")
         for pred_ind, pred in enumerate(student.predictors()):
             data_pred_ind = None if self.multitask else pred_ind
@@ -105,7 +117,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
         return CompileResult.with_compiled_program(student)
 
     @staticmethod
-    def finetune_lms(finetune_dict) -> dict[Any, LM]:
+    async def finetune_lms(finetune_dict) -> dict[Any, LM]:
         num_jobs = len(finetune_dict)
         logger.info(f"Starting {num_jobs} fine-tuning job(s)...")
         key_to_job = {}
@@ -116,23 +128,32 @@ class BootstrapFinetune(FinetuneTeleprompter):
             )
             lm.kill()
             key_to_job[key] = lm.finetune(**finetune_kwargs)
-        key_to_lm = {}
-        for ind, (key, job) in enumerate(key_to_job.items()):
-            result = job.result()
+
+        async def wait_for_job(ind: int, key: Any, job) -> tuple[Any, LM]:
+            result = await asyncio.to_thread(job.result)
             if isinstance(result, Exception):
                 raise result
-            key_to_lm[key] = result
             assert job.thread is not None
-            job.thread.join()
+            await asyncio.to_thread(job.thread.join)
             logger.info(f"Job {ind + 1}/{num_jobs} is done")
-        return key_to_lm
+            return key, result
+
+        finished = await asyncio.gather(
+            *[wait_for_job(ind, key, job) for ind, (key, job) in enumerate(key_to_job.items())]
+        )
+        return dict(finished)
 
     def _prepare_finetune_data(
-        self, trace_data: list[dict[str, Any]], lm: LM, pred_ind: int | None, *, run: RunContext
+        self,
+        trace_data: list[TraceData],
+        lm: LM,
+        target_pred_ind: int | None,
+        *,
+        run: RunContext,
     ):
         if self.metric:
             logger.info(f"Collected data for {len(trace_data)} examples")
-            trace_data = [d for d in trace_data if d["score"]]
+            trace_data = filter_trace_data_for_finetune(trace_data, metric=self.metric)
             logger.info(f"After filtering with the metric, {len(trace_data)} examples remain")
         data = []
         from dspy.runtime.transparency import resolve_adapter
@@ -141,21 +162,25 @@ class BootstrapFinetune(FinetuneTeleprompter):
         adapter, _ = resolve_adapter(configured_adapter or run.adapter)
         data_format = infer_data_format(adapter)
         for item in trace_data:
-            for pred_ind, _ in enumerate(item["trace"]):
-                include_data = pred_ind is None or pred_ind == pred_ind
+            for trace_pred_idx, _ in enumerate(item["trace"]):
+                include_data = target_pred_ind is None or trace_pred_idx == target_pred_ind
                 if include_data:
                     call_data = build_call_data_from_trace(
-                        trace=item["trace"], pred_ind=pred_ind, adapter=adapter, exclude_demos=self.exclude_demos
+                        trace=item["trace"],
+                        pred_ind=trace_pred_idx,
+                        adapter=adapter,
+                        exclude_demos=self.exclude_demos,
                     )
                     data.append(call_data)
-        import random
-
         random.Random(0).shuffle(data)
         return (data, data_format)
 
 
 def build_call_data_from_trace(
-    trace: list[dict], pred_ind: int, adapter: Adapter, exclude_demos: bool = False
+    trace: list[tuple[Any, dict[str, Any], Any]],
+    pred_ind: int,
+    adapter: Adapter,
+    exclude_demos: bool = False,
 ) -> dict[str, list[dict[str, Any]]]:
     pred, inputs, outputs = trace[pred_ind]
     demos = [] if exclude_demos else pred.demos
