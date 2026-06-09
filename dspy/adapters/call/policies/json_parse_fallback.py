@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from dspy.adapters.call.pipeline import AdapterCallPipeline
-
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from dspy.adapters.base.adapter import Adapter
+    from dspy.adapters.call.policies.parse_fallback import PipelineExecutor
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types import LMConfig
     from dspy.errors import AdapterParseError
@@ -16,8 +15,14 @@ if TYPE_CHECKING:
 
 
 class JSONParseFallbackPolicy:
-    def __init__(self, fallback_factory: Callable[[], Adapter]) -> None:
+    def __init__(
+        self,
+        fallback_factory: Callable[[], Adapter],
+        *,
+        pipeline_executor: PipelineExecutor,
+    ) -> None:
         self._fallback_factory = fallback_factory
+        self._pipeline_executor = pipeline_executor
 
     async def execute_fallback(
         self,
@@ -31,8 +36,9 @@ class JSONParseFallbackPolicy:
         run: RunContext,
         error: AdapterParseError,
     ) -> list[dict[str, Any]]:
+        _ = (adapter, error)
         fallback = self._fallback_factory()
-        return await AdapterCallPipeline.execute(
+        return await self._pipeline_executor(
             fallback,
             lm=lm,
             config=config,

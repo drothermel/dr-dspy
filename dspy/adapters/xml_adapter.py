@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from dspy.adapters.base import Adapter
 from dspy.adapters.call.capabilities import AdapterCapabilities
+from dspy.adapters.call.pipeline import AdapterCallPipeline
 from dspy.adapters.call.policies.json_parse_fallback import JSONParseFallbackPolicy
 from dspy.adapters.format.prompt_sections import (
     format_field_description,
@@ -61,7 +62,10 @@ class XMLAdapter(Adapter):
         self.field_formatter = XmlFieldFormatter()
         self._json_fallback = json_fallback
         if parse_fallback_policy is None:
-            self.parse_fallback_policy = JSONParseFallbackPolicy(fallback_factory=self._json_adapter_fallback)
+            self.parse_fallback_policy = JSONParseFallbackPolicy(
+                fallback_factory=self._json_adapter_fallback,
+                pipeline_executor=AdapterCallPipeline.execute,
+            )
         else:
             self.parse_fallback_policy = parse_fallback_policy
 

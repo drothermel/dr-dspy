@@ -5,10 +5,11 @@ from typing import Any, Literal, Union, cast, get_args, get_origin
 from pydantic import BaseModel
 from typing_extensions import override
 
+from dspy.adapters.format.prompt_sections import format_header_user_message_content
 from dspy.adapters.format_field_structure import build_field_structure_instructions
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.prompt_format import format_field_value as original_format_field_value
-from dspy.adapters.utils import build_multimodal_user_message_content, inputs_include_multimodal_custom_type_values
+from dspy.adapters.utils import inputs_include_multimodal_custom_type_values
 from dspy.task_spec import TaskSpec
 
 COMMENT_SYMBOL = "#"
@@ -144,14 +145,14 @@ class BAMLAdapter(JSONAdapter):
         main_request: bool = False,
     ) -> str | list[dict[str, Any]]:
         if inputs_include_multimodal_custom_type_values(task_spec=task_spec, inputs=inputs):
-            output_requirements = self.user_message_output_requirements(task_spec) if main_request else None
-            return build_multimodal_user_message_content(
-                task_spec=task_spec,
-                inputs=inputs,
+            return format_header_user_message_content(
+                self._require_field_formatter(),
+                task_spec,
+                inputs,
                 prefix=prefix,
                 suffix=suffix,
                 main_request=main_request,
-                output_requirements=output_requirements,
+                output_requirements_fn=self.user_message_output_requirements,
             )
         messages = [prefix]
         for key, field in task_spec.input_fields.items():

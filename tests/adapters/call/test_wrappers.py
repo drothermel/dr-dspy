@@ -57,7 +57,7 @@ async def test_hint_injecting_adapter_refreshes_policies_from_inner():
 
     new_policy = NoOpResponseFormatPolicy()
     inner.response_format_policy = new_policy
-    wrapper._sync_policies_from_inner()
+    wrapper._sync_from_inner()
     assert wrapper.response_format_policy is new_policy
 
 
