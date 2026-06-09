@@ -88,7 +88,9 @@ class ReActV2(Module):
     ):
         run = resolve_run(run=run, bound_run=self.run)
         max_iters = input_args.pop("max_iters", self.max_iters)
-        turn_log = coerce_turn_log(input_args.pop("turn_log", input_args.pop("history", None)))
+        if "history" in input_args:
+            raise ValueError("ReActV2 accepts `turn_log=` only; the `history=` keyword was removed.")
+        turn_log = coerce_turn_log(input_args.pop("turn_log", None))
         pending_inputs = {name: input_args[name] for name in self.task_spec.input_fields if name in input_args}
         break_reason = "max_iters"
         for turn_index in range(max_iters):

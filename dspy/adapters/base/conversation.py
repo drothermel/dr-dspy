@@ -13,7 +13,6 @@ from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.utils import build_lm_message
 from dspy.core.types import LMMessage
 from dspy.history.discovery import is_conversation_turn_log_type
-from dspy.history.turn_event import TurnEvent
 from dspy.task_spec import TaskSpec
 
 
@@ -52,7 +51,7 @@ class AdapterConversationMixin:
             return []
         messages = []
         for turn in conversation_history:
-            message = turn.to_dict() if isinstance(turn, TurnEvent) else turn
+            message = turn.model_dump(mode="json", exclude_none=True)
             tool_call_field_name, tool_calls = _tool_calls_from_message(message)
             tool_call_results = (
                 ToolCallResults.model_validate(tool_calls.tool_call_results)

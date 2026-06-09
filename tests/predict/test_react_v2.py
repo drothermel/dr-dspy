@@ -2,6 +2,7 @@ import asyncio
 import json
 from typing import Any
 
+import pytest
 from typing_extensions import override
 
 from dspy.adapters.chat_adapter import ChatAdapter
@@ -9,6 +10,7 @@ from dspy.adapters.types.tool import Tool, ToolCalls
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format.chat_request import message_to_openai_chat
 from dspy.core.types import LMOutput, LMRequest, LMResponse, LMToolCallPart, LMUsage
+from dspy.history import TurnLog
 from dspy.predict.react_v2 import ReActV2
 from dspy.testing import DummyLM
 from tests.adapters.conftest import captured_lm_kwargs
@@ -16,7 +18,7 @@ from tests.task_spec.helpers import ts
 
 
 def _turn_dict(turn) -> dict:
-    return turn.to_dict()
+    return turn.model_dump(mode="json", exclude_none=True)
 
 
 def _turn_tool_calls(turn):
@@ -161,6 +163,12 @@ def test_react_v2_unknown_tool_observation_can_continue(make_run):
     assert first_result.call_id == "call_0_0"
     assert "Unknown tool" in first_result.value
     assert pred.answer == "done"
+
+
+def test_react_v2_rejects_history_keyword(make_run):
+    run = make_run(lm=DummyLM([{}]), adapter=ChatAdapter())
+    with pytest.raises(ValueError, match="turn_log=` only"):
+        asyncio.run(ReActV2(ts("question -> answer"), tools=[])(history=TurnLog.empty(), run=run))
 
 
 def test_react_v2_accepts_serialized_history_input(make_run):

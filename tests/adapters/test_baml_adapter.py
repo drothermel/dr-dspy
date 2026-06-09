@@ -419,11 +419,11 @@ def test_baml_adapter_with_code():
 def test_baml_adapter_with_conversation_history():
     TestSignature = make_task_spec(
         {
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "question": input_field("question", desc="The question."),
             "answer": output_field("answer", desc="The answer."),
         },
-        instructions="Given the fields `history`, `question`, produce the fields `answer`.",
+        instructions="Given the fields `turn_log`, `question`, produce the fields `answer`.",
     )
     history = TurnLog(
         turns=(
@@ -436,7 +436,7 @@ def test_baml_adapter_with_conversation_history():
         adapter=adapter,
         task_spec=TestSignature,
         demos=[],
-        inputs={"history": history, "question": "What medications should we avoid?"},
+        inputs={"turn_log": history, "question": "What medications should we avoid?"},
     )
     assert len(messages) == 6
     assert "What is the patient's age?" in messages[1]["content"]

@@ -20,7 +20,7 @@ from tests.task_spec.helpers import ts
 
 
 def _turn_dict(turn: TurnEvent) -> dict:
-    return turn.to_dict()
+    return turn.model_dump(mode="json", exclude_none=True)
 
 
 def _turns_from_flat(flat: dict) -> tuple:
@@ -82,7 +82,7 @@ def test_tool_observation_preserves_custom_type(make_run):
     run = make_run(lm=lm, adapter=adapter)
     react = ReAct(ts("question -> answer"), tools=[Tool(make_images, description="Create images.")])
     pred = asyncio.run(react(question="Draw me something red", run=run))
-    observation = _turn_dict(pred.turn_log.turns[0])["observation"]
+    observation = pred.turn_log.turns[0].observation
     assert isinstance(observation, tuple)
     assert len(observation) == 2
     assert all(hasattr(item, "url") or hasattr(item, "data") for item in observation)

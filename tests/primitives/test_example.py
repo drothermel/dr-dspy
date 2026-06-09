@@ -125,20 +125,20 @@ def test_example_to_dict():
     assert example.to_dict() == {"a": 1, "b": 2}
 
 
-def test_example_to_dict_with_history():
-    history = TurnLog(
+def test_example_to_dict_with_turn_log():
+    turn_log = TurnLog(
         turns=(
             {"question": "What is the capital of France?", "answer": "Paris"},
             {"question": "What is the capital of Germany?", "answer": "Berlin"},
         )
     )
-    example = Example.from_record({"question": "Test question", "history": history, "answer": "Test answer"})
+    example = Example.from_record({"question": "Test question", "turn_log": turn_log, "answer": "Test answer"})
     result = example.to_dict()
     assert isinstance(result, dict)
-    assert "history" in result
-    assert isinstance(result["history"], dict)
-    assert "turns" in result["history"]
-    assert result["history"]["turns"] == [
+    assert "turn_log" in result
+    assert isinstance(result["turn_log"], dict)
+    assert "turns" in result["turn_log"]
+    assert result["turn_log"]["turns"] == [
         {"question": "What is the capital of France?", "answer": "Paris"},
         {"question": "What is the capital of Germany?", "answer": "Berlin"},
     ]
@@ -146,4 +146,4 @@ def test_example_to_dict_with_history():
 
     json_str = json.dumps(result)
     restored = json.loads(json_str)
-    assert list(restored["history"]["turns"]) == list(result["history"]["turns"])
+    assert list(restored["turn_log"]["turns"]) == list(result["turn_log"]["turns"])

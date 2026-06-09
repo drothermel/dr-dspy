@@ -277,11 +277,11 @@ def test_chat_adapter_format_exact_messages_with_incomplete_demo():
 def test_chat_adapter_format_exact_messages_with_history():
     HistorySignature = make_task_spec(
         {
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "question": input_field("question", desc="The question."),
             "answer": output_field("answer", desc="The answer."),
         },
-        instructions="Given the fields `history`, `question`, produce the fields `answer`.",
+        instructions="Given the fields `turn_log`, `question`, produce the fields `answer`.",
     )
     history = TurnLog(
         turns=(
@@ -293,12 +293,12 @@ def test_chat_adapter_format_exact_messages_with_history():
         adapter=ChatAdapter(),
         task_spec=HistorySignature,
         demos=[],
-        inputs={"history": history, "question": "What is 3+3?"},
+        inputs={"turn_log": history, "question": "What is 3+3?"},
     )
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n1. `history` (TurnLog): The history.\n2. `question` (str): The question.\nYour output fields are:\n1. `answer` (str): The answer.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## history ## ]]\n{history}\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `history`, `question`, produce the fields `answer`.",
+            "content": "Your input fields are:\n1. `turn_log` (TurnLog): The history.\n2. `question` (str): The question.\nYour output fields are:\n1. `answer` (str): The answer.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## turn_log ## ]]\n{turn_log}\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `turn_log`, `question`, produce the fields `answer`.",
         },
         {"role": "user", "content": "[[ ## question ## ]]\nWhat is 1+1?"},
         {"role": "assistant", "content": "[[ ## answer ## ]]\n2\n\n[[ ## completed ## ]]\n"},
@@ -437,7 +437,7 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
 
     RichRenderingSignature = make_task_spec(
         {
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "image": input_field("image", type_=Image, desc="The image."),
             "tools": input_field("tools", type_=list[Tool], desc="The tools."),
             "profile": input_field("profile", type_=Profile, desc="The profile."),
@@ -473,7 +473,7 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
             }
         ],
         inputs={
-            "history": history,
+            "turn_log": history,
             "image": Image("https://example.com/current.png"),
             "tools": [tool],
             "profile": current_profile,
@@ -483,7 +483,7 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
     expected_messages = [
         {
             "role": "system",
-            "content": 'Your input fields are:\n1. `history` (TurnLog): The history.\n2. `image` (Image): The image.\n3. `tools` (list[Tool]): The tools.\n4. `profile` (Profile): The profile.\n5. `question` (str): The question.\nYour output fields are:\n1. `answer` (AnswerCard): The answer.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## history ## ]]\n{history}\n\n[[ ## image ## ]]\n{image}\n\n[[ ## tools ## ]]\n{tools}\n\n[[ ## profile ## ]]\n{profile}\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, "sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, "required": ["answer", "sources"], "title": "AnswerCard"}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Answer using all supplied context.',
+            "content": 'Your input fields are:\n1. `turn_log` (TurnLog): The history.\n2. `image` (Image): The image.\n3. `tools` (list[Tool]): The tools.\n4. `profile` (Profile): The profile.\n5. `question` (str): The question.\nYour output fields are:\n1. `answer` (AnswerCard): The answer.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## turn_log ## ]]\n{turn_log}\n\n[[ ## image ## ]]\n{image}\n\n[[ ## tools ## ]]\n{tools}\n\n[[ ## profile ## ]]\n{profile}\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, "sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, "required": ["answer", "sources"], "title": "AnswerCard"}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Answer using all supplied context.',
         },
         {
             "role": "user",
@@ -988,12 +988,12 @@ def test_chat_adapter_native_tool_history_replay():
     NativeToolHistorySignature = make_task_spec(
         {
             "question": input_field("question", desc="The question."),
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "tools": input_field("tools", type_=list[Tool], desc="The tools."),
             "next_thought": output_field("next_thought", type_=Reasoning, desc="The next thought."),
             "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
-        instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
+        instructions="Given the fields `question`, `turn_log`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], [{"items": ["cat"]}])
@@ -1010,7 +1010,7 @@ def test_chat_adapter_native_tool_history_replay():
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
         demos=[],
-        inputs={"question": "Q2", "history": history, "tools": [Tool(search, description="Search for documents.")]},
+        inputs={"question": "Q2", "turn_log": history, "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
     assert messages[1]["role"] == "user"
@@ -1047,12 +1047,12 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
     NativeToolHistorySignature = make_task_spec(
         {
             "question": input_field("question", desc="The question."),
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "tools": input_field("tools", type_=list[Tool], desc="The tools."),
             "next_thought": output_field("next_thought", type_=Reasoning, desc="The next thought."),
             "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
-        instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
+        instructions="Given the fields `question`, `turn_log`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
     tool_calls = ToolCalls(
         tool_calls=[
@@ -1074,7 +1074,7 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
         demos=[],
-        inputs={"question": "Q2", "history": history, "tools": [Tool(search, description="Search for documents.")]},
+        inputs={"question": "Q2", "turn_log": history, "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
     assert [tool_call["id"] for tool_call in messages[2]["tool_calls"]] == ["call_1", "call_2"]
@@ -1097,12 +1097,12 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
 
     NativeToolHistorySignature = make_task_spec(
         {
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "tools": input_field("tools", type_=list[Tool], desc="The tools."),
             "next_thought": output_field("next_thought", type_=Reasoning, desc="The next thought."),
             "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
-        instructions="Given the fields `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
+        instructions="Given the fields `turn_log`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat result"])
@@ -1111,7 +1111,7 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
         demos=[],
-        inputs={"history": history, "tools": [Tool(search, description="Search for documents.")]},
+        inputs={"turn_log": history, "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
     assert messages[1]["role"] == "assistant"
@@ -1153,12 +1153,12 @@ def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_i
     NativeToolHistorySignature = make_task_spec(
         {
             "question": input_field("question", desc="The question."),
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "tools": input_field("tools", type_=list[Tool], desc="The tools."),
             "next_thought": output_field("next_thought", type_=Reasoning, desc="The next thought."),
             "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
-        instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
+        instructions="Given the fields `question`, `turn_log`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
     tool_call = ToolCalls.ToolCall(id=tool_call_id, name="search", args={"query": "cats"})
     tool_calls = ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results)
@@ -1169,7 +1169,7 @@ def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_i
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
         demos=[],
-        inputs={"question": "Q2", "history": history, "tools": [Tool(search, description="Search for documents.")]},
+        inputs={"question": "Q2", "turn_log": history, "tools": [Tool(search, description="Search for documents.")]},
         lm=FunctionCallingLM([{}]),
     )
     assert all("tool_calls" not in message for message in messages)
@@ -1186,12 +1186,12 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
     ToolHistorySignature = make_task_spec(
         {
             "question": input_field("question", desc="The question."),
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "tools": input_field("tools", type_=list[Tool], desc="The tools."),
             "next_thought": output_field("next_thought", desc="The next thought."),
             "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
-        instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
+        instructions="Given the fields `question`, `turn_log`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
@@ -1208,12 +1208,12 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
         adapter=ChatAdapter(use_native_function_calling=False),
         task_spec=ToolHistorySignature,
         demos=[],
-        inputs={"question": "Q2", "history": history, "tools": [Tool(search, description="Search for documents.")]},
+        inputs={"question": "Q2", "turn_log": history, "tools": [Tool(search, description="Search for documents.")]},
     )
     expected_messages = [
         {
             "role": "system",
-            "content": 'Your input fields are:\n1. `question` (str): The question.\n2. `history` (TurnLog): The history.\n3. `tools` (list[Tool]): The tools.\nYour output fields are:\n1. `next_thought` (str): The next thought.\n2. `tool_calls` (ToolCalls): The tool calls.\n    Type description of ToolCalls: Tool calls must be a JSON object with `tool_calls`, a list of calls. Each call must include `name` and `args`. Example: {"tool_calls": [{"name": "search", "args": {"query": "cats"}}]}\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## history ## ]]\n{history}\n\n[[ ## tools ## ]]\n{tools}\n\n[[ ## next_thought ## ]]\n{next_thought}\n\n[[ ## tool_calls ## ]]\n{tool_calls}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "$defs": {"ToolCall": {"type": "object", "properties": {"args": {"type": "object", "additionalProperties": true, "title": "Args"}, "name": {"type": "string", "title": "Name"}}, "required": ["name", "args"], "title": "ToolCall"}}, "properties": {"tool_calls": {"type": "array", "items": {"$ref": "#/$defs/ToolCall"}, "title": "Tool Calls"}}, "required": ["tool_calls"], "title": "ToolCalls"}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.',
+            "content": 'Your input fields are:\n1. `question` (str): The question.\n2. `turn_log` (TurnLog): The history.\n3. `tools` (list[Tool]): The tools.\nYour output fields are:\n1. `next_thought` (str): The next thought.\n2. `tool_calls` (ToolCalls): The tool calls.\n    Type description of ToolCalls: Tool calls must be a JSON object with `tool_calls`, a list of calls. Each call must include `name` and `args`. Example: {"tool_calls": [{"name": "search", "args": {"query": "cats"}}]}\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## turn_log ## ]]\n{turn_log}\n\n[[ ## tools ## ]]\n{tools}\n\n[[ ## next_thought ## ]]\n{next_thought}\n\n[[ ## tool_calls ## ]]\n{tool_calls}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "$defs": {"ToolCall": {"type": "object", "properties": {"args": {"type": "object", "additionalProperties": true, "title": "Args"}, "name": {"type": "string", "title": "Name"}}, "required": ["name", "args"], "title": "ToolCall"}}, "properties": {"tool_calls": {"type": "array", "items": {"$ref": "#/$defs/ToolCall"}, "title": "Tool Calls"}}, "required": ["tool_calls"], "title": "ToolCalls"}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `turn_log`, `tools`, produce the fields `next_thought`, `tool_calls`.',
         },
         {"role": "user", "content": "[[ ## question ## ]]\nQ1"},
         {
@@ -1244,12 +1244,12 @@ def test_non_native_tool_history_remains_text_based(adapter):
     ToolHistorySignature = make_task_spec(
         {
             "question": input_field("question", desc="The question."),
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "tools": input_field("tools", type_=list[Tool], desc="The tools."),
             "next_thought": output_field("next_thought", desc="The next thought."),
             "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
-        instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
+        instructions="Given the fields `question`, `turn_log`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
@@ -1259,7 +1259,7 @@ def test_non_native_tool_history_remains_text_based(adapter):
         demos=[],
         inputs={
             "question": "Q2",
-            "history": TurnLog(
+            "turn_log": TurnLog(
                 turns=(
                     {
                         "question": "Q1",
@@ -1295,16 +1295,16 @@ def test_chat_adapter_format_accepts_custom_history_formatter_returning_messages
     HistorySignature = make_task_spec(
         {
             "question": input_field("question", desc="The question."),
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "answer": output_field("answer", desc="The answer."),
         },
-        instructions="Given the fields `question`, `history`, produce the fields `answer`.",
+        instructions="Given the fields `question`, `turn_log`, produce the fields `answer`.",
     )
     messages = adapter_format_as_openai(
         adapter=CustomHistoryAdapter(),
         task_spec=HistorySignature,
         demos=[],
-        inputs={"question": "Q2", "history": TurnLog(turns=({"question": "Q1"},))},
+        inputs={"question": "Q2", "turn_log": TurnLog(turns=({"question": "Q1"},))},
     )
     assert messages[1] == {"role": "user", "content": "custom history"}
     assert messages[2]["role"] == "user"
@@ -1377,7 +1377,7 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
 
     KitchenSinkSignature = make_task_spec(
         {
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "image": input_field("image", type_=Image, desc="The image."),
             "audio": input_field("audio", type_=Audio, desc="The audio."),
             "file": input_field("file", type_=File, desc="The file."),
@@ -1434,7 +1434,7 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
             },
         ],
         inputs={
-            "history": history,
+            "turn_log": history,
             "image": Image("https://example.com/current.png"),
             "audio": Audio(data="Q1VSUkVOVA==", audio_format="wav"),
             "file": File.from_file_id("file-current", filename="current.txt"),
@@ -1449,7 +1449,7 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
     expected_messages = [
         {
             "role": "system",
-            "content": 'Your input fields are:\n1. `history` (TurnLog): The history.\n2. `image` (Image): The image.\n3. `audio` (Audio): The audio.\n4. `file` (File): The file.\n5. `document` (Document): The document.\n    Type description of Document: A document containing text content that can be referenced and cited. Include the full text content and optionally a title for proper referencing.\n6. `event` (Event): The event.\n    Type description of Event: An event block.\n7. `tools` (list[Tool]): The tools.\n8. `profile` (Profile): The profile.\n9. `context` (str): The context.\n10. `question` (str): The question.\nYour output fields are:\n1. `answer` (AnswerCard): The answer.\n2. `verdict` (Literal[\'yes\', \'no\']): The verdict.\n3. `confidence` (float): The confidence.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## history ## ]]\n{history}\n\n[[ ## image ## ]]\n{image}\n\n[[ ## audio ## ]]\n{audio}\n\n[[ ## file ## ]]\n{file}\n\n[[ ## document ## ]]\n{document}\n\n[[ ## event ## ]]\n{event}\n\n[[ ## tools ## ]]\n{tools}\n\n[[ ## profile ## ]]\n{profile}\n\n[[ ## context ## ]]\n{context}\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, "sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, "required": ["answer", "sources"], "title": "AnswerCard"}\n\n[[ ## verdict ## ]]\n{verdict}        # note: the value you produce must exactly match (no extra characters) one of: yes; no\n\n[[ ## confidence ## ]]\n{confidence}        # note: the value you produce must be a single float value\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Answer carefully using every available signal.',
+            "content": 'Your input fields are:\n1. `turn_log` (TurnLog): The history.\n2. `image` (Image): The image.\n3. `audio` (Audio): The audio.\n4. `file` (File): The file.\n5. `document` (Document): The document.\n    Type description of Document: A document containing text content that can be referenced and cited. Include the full text content and optionally a title for proper referencing.\n6. `event` (Event): The event.\n    Type description of Event: An event block.\n7. `tools` (list[Tool]): The tools.\n8. `profile` (Profile): The profile.\n9. `context` (str): The context.\n10. `question` (str): The question.\nYour output fields are:\n1. `answer` (AnswerCard): The answer.\n2. `verdict` (Literal[\'yes\', \'no\']): The verdict.\n3. `confidence` (float): The confidence.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## turn_log ## ]]\n{turn_log}\n\n[[ ## image ## ]]\n{image}\n\n[[ ## audio ## ]]\n{audio}\n\n[[ ## file ## ]]\n{file}\n\n[[ ## document ## ]]\n{document}\n\n[[ ## event ## ]]\n{event}\n\n[[ ## tools ## ]]\n{tools}\n\n[[ ## profile ## ]]\n{profile}\n\n[[ ## context ## ]]\n{context}\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, "sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, "required": ["answer", "sources"], "title": "AnswerCard"}\n\n[[ ## verdict ## ]]\n{verdict}        # note: the value you produce must exactly match (no extra characters) one of: yes; no\n\n[[ ## confidence ## ]]\n{confidence}        # note: the value you produce must be a single float value\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Answer carefully using every available signal.',
         },
         {
             "role": "user",
@@ -1861,10 +1861,10 @@ def test_chat_adapter_formats_conversation_history():
     MySignature = make_task_spec(
         {
             "question": input_field("question", desc="The question."),
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "answer": output_field("answer", desc="The answer."),
         },
-        instructions="Given the fields `question`, `history`, produce the fields `answer`.",
+        instructions="Given the fields `question`, `turn_log`, produce the fields `answer`.",
     )
     history = TurnLog(
         turns=(
@@ -1877,7 +1877,7 @@ def test_chat_adapter_formats_conversation_history():
         adapter=adapter,
         task_spec=MySignature,
         demos=[],
-        inputs={"question": "What is the capital of France?", "history": history},
+        inputs={"question": "What is the capital of France?", "turn_log": history},
     )
     assert len(messages) == 6
     assert messages[1]["content"] == "[[ ## question ## ]]\nWhat is the capital of France?"

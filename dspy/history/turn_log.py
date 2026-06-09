@@ -14,29 +14,37 @@ class TurnLog(BaseModel):
     @field_validator("turns", mode="after")
     @classmethod
     def _ensure_turn_events(cls, value: tuple[TurnEvent | dict[str, Any], ...]) -> tuple[TurnEvent, ...]:
-        return tuple(turn if isinstance(turn, TurnEvent) else TurnEvent.model_validate(turn) for turn in value)
-
-    @field_serializer("turns")
-    def _serialize_turns(self, turns: tuple[TurnEvent, ...]) -> tuple[dict[str, Any], ...]:
-        return tuple(turn.to_dict() for turn in turns)
+        return tuple(item if isinstance(item, TurnEvent) else TurnEvent.model_validate(item) for item in value)
 
     @field_validator("turns", mode="before")
     @classmethod
-    def _coerce_turns(cls, value: Any) -> Any:
+    def _coerce_turns(cls, value: Any) -> tuple[TurnEvent, ...]:
         if isinstance(value, TurnEvent):
             return (value,)
         if isinstance(value, dict):
             return (TurnEvent.model_validate(value),)
-        if isinstance(value, list):
-            return tuple(TurnEvent.model_validate(item) if isinstance(item, dict) else item for item in value)
-        return value
+        if isinstance(value, (list, tuple)):
+            coerced: list[TurnEvent] = []
+            for index, item in enumerate(value):
+                if isinstance(item, TurnEvent):
+                    coerced.append(item)
+                elif isinstance(item, dict):
+                    coerced.append(TurnEvent.model_validate(item))
+                else:
+                    raise TypeError(f"TurnLog turns[{index}] must be a TurnEvent or dict, got {type(item).__name__}.")
+            return tuple(coerced)
+        raise TypeError(f"TurnLog turns must be a TurnEvent, dict, list, or tuple, got {type(value).__name__}.")
+
+    @field_serializer("turns")
+    def _serialize_turns(self, turns: tuple[TurnEvent, ...]) -> tuple[dict[str, Any], ...]:
+        return tuple(turn.model_dump(mode="json", exclude_none=True) for turn in turns)
 
     @classmethod
     def empty(cls) -> TurnLog:
         return cls()
 
     def append_turn(self, event: TurnEvent) -> TurnLog:
-        if not event.to_dict():
+        if not event.model_dump(exclude_none=True):
             raise ValueError("Cannot append an empty TurnEvent; at least one field must be set.")
         return TurnLog(turns=(*self.turns, event))
 

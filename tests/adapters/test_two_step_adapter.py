@@ -82,11 +82,11 @@ def test_two_step_adapter_format_exact_messages_with_typed_outputs(make_run):
 def test_two_step_adapter_format_includes_turn_log_history(make_run):
     QAWithHistory = make_task_spec(
         {
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "question": input_field("question", desc="The question."),
             "answer": output_field("answer", desc="The answer."),
         },
-        instructions="Given the fields `history`, `question`, produce the fields `answer`.",
+        instructions="Given the fields `turn_log`, `question`, produce the fields `answer`.",
     )
     adapter = TwoStepAdapter(DummyLM([{"answer": "x"}]), extraction_adapter=ChatAdapter())
     history = TurnLog(turns=({"question": "Q1", "answer": "A1"},))
@@ -94,7 +94,7 @@ def test_two_step_adapter_format_includes_turn_log_history(make_run):
         adapter=adapter,
         task_spec=QAWithHistory,
         demos=[],
-        inputs={"history": history, "question": "Q2"},
+        inputs={"turn_log": history, "question": "Q2"},
     )
     assert messages[0]["role"] == "system"
     assert messages[1]["role"] == "user"

@@ -326,12 +326,12 @@ def test_xml_adapter_format_exact_non_native_tool_result_history_field():
     ToolHistorySignature = make_task_spec(
         {
             "question": input_field("question", desc="The question."),
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "tools": input_field("tools", type_=list[Tool], desc="The tools."),
             "next_thought": output_field("next_thought", desc="The next thought."),
             "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
-        instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
+        instructions="Given the fields `question`, `turn_log`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
@@ -341,7 +341,7 @@ def test_xml_adapter_format_exact_non_native_tool_result_history_field():
         demos=[],
         inputs={
             "question": "Q2",
-            "history": TurnLog(
+            "turn_log": TurnLog(
                 turns=(
                     {
                         "question": "Q1",
@@ -439,7 +439,7 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
 
     RichRenderingSignature = make_task_spec(
         {
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "image": input_field("image", type_=Image, desc="The image."),
             "tools": input_field("tools", type_=list[Tool], desc="The tools."),
             "profile": input_field("profile", type_=Profile, desc="The profile."),
@@ -475,7 +475,7 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
             }
         ],
         inputs={
-            "history": history,
+            "turn_log": history,
             "image": Image("https://example.com/current.png"),
             "tools": [tool],
             "profile": current_profile,
@@ -485,7 +485,7 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
     expected_messages = [
         {
             "role": "system",
-            "content": 'Your input fields are:\n1. `history` (TurnLog): The history.\n2. `image` (Image): The image.\n3. `tools` (list[Tool]): The tools.\n4. `profile` (Profile): The profile.\n5. `question` (str): The question.\nYour output fields are:\n1. `answer` (AnswerCard): The answer.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<history>\n{history}\n</history>\n\n<image>\n{image}\n</image>\n\n<tools>\n{tools}\n</tools>\n\n<profile>\n{profile}\n</profile>\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, "sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, "required": ["answer", "sources"], "title": "AnswerCard"}\n</answer>\nIn adhering to this structure, your objective is: \n        Answer using all supplied context.',
+            "content": 'Your input fields are:\n1. `turn_log` (TurnLog): The history.\n2. `image` (Image): The image.\n3. `tools` (list[Tool]): The tools.\n4. `profile` (Profile): The profile.\n5. `question` (str): The question.\nYour output fields are:\n1. `answer` (AnswerCard): The answer.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<history>\n{turn_log}\n</history>\n\n<image>\n{image}\n</image>\n\n<tools>\n{tools}\n</tools>\n\n<profile>\n{profile}\n</profile>\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, "sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, "required": ["answer", "sources"], "title": "AnswerCard"}\n</answer>\nIn adhering to this structure, your objective is: \n        Answer using all supplied context.',
         },
         {
             "role": "user",

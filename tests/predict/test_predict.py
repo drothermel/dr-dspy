@@ -712,7 +712,7 @@ def test_call_predict_with_chat_history(adapter_type, make_run):
     MySignature = make_task_spec(
         {
             "question": input_field("question", desc="The question."),
-            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
             "answer": output_field("answer", desc="The answer."),
         },
         instructions="Answer with chat history.",
@@ -728,7 +728,7 @@ def test_call_predict_with_chat_history(adapter_type, make_run):
     asyncio.run(
         program(
             question="are you sure that's correct?",
-            history=TurnLog(turns=({"question": "what's the capital of france?", "answer": "paris"},)),
+            turn_log=TurnLog(turns=({"question": "what's the capital of france?", "answer": "paris"},)),
             run=run,
         )
     )

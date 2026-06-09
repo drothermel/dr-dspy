@@ -1,5 +1,5 @@
-import inspect
-from typing import TYPE_CHECKING, Any, Callable, cast
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 import pydantic
 from pydantic import TypeAdapter
@@ -60,23 +60,16 @@ class ToolCalls(Type):
 
         @override
         def format(self) -> dict[str, Any]:
-            return {"name": self.name, "args": self.args}
+            data: dict[str, Any] = {"name": self.name, "args": self.args}
+            if self.id is not None:
+                data["id"] = self.id
+            return data
 
-        def execute(self, functions: dict[str, Callable[..., object]] | list["Tool"] | None = None) -> object:
-            func = None
-            if functions is None:
-                current_frame = inspect.currentframe()
-                frame = current_frame.f_back if current_frame is not None else None
-                try:
-                    if frame is not None:
-                        caller_globals = frame.f_globals
-                        caller_locals = frame.f_locals
-                        func = caller_locals.get(self.name) or caller_globals.get(self.name)
-                finally:
-                    del frame
-            elif isinstance(functions, dict):
-                func = functions.get(self.name)
-            elif isinstance(functions, list):
+        def execute(self, functions: dict[str, Callable[..., object]] | Sequence["Tool"]) -> object:
+            func: Callable[..., object] | None = None
+            if isinstance(functions, dict):
+                func = cast("dict[str, Callable[..., object]]", functions).get(self.name)
+            else:
                 for tool in functions:
                     if tool.name == self.name:
                         func = tool.func

@@ -46,7 +46,7 @@ def test_tool_calls_format_from_dict_list():
     assert result["tool_calls"][1]["name"] == "translate"
 
 
-def test_tool_calls_preserves_ids_from_dict_list_and_format_omits_ids():
+def test_tool_calls_preserves_ids_from_dict_list_and_format_includes_set_ids():
     tool_calls = ToolCalls.from_dict_list(
         [
             {"id": "call_1", "name": "search", "args": {"query": "hello"}},
@@ -56,7 +56,7 @@ def test_tool_calls_preserves_ids_from_dict_list_and_format_omits_ids():
     assert tool_calls.tool_calls[0].id == "call_1"
     assert tool_calls.tool_calls[1].id is None
     formatted = tool_calls.format()["tool_calls"]
-    assert "id" not in formatted[0]
+    assert formatted[0]["id"] == "call_1"
     assert "id" not in formatted[1]
 
 
@@ -161,28 +161,7 @@ def test_tool_call_execute():
 
 
 @requires_jsonschema
-def test_tool_call_execute_with_local_functions():
-
-    def main():
-
-        def local_add(a: int, b: int) -> int:
-            return a + b
-
-        def local_multiply(x: int, y: int) -> int:
-            return x * y
-
-        tool_call1 = ToolCalls.ToolCall(name="local_add", args={"a": 10, "b": 15})
-        result1 = tool_call1.execute()
-        assert result1 == 25
-        tool_call2 = ToolCalls.ToolCall(name="local_multiply", args={"x": 4, "y": 7})
-        result2 = tool_call2.execute()
-        assert result2 == 28
-        try:
-            globals()["local_add"] = lambda a, b: a + b + 1000
-            precedence_call = ToolCalls.ToolCall(name="local_add", args={"a": 1, "b": 2})
-            result = precedence_call.execute()
-            assert result == 3
-        finally:
-            globals().pop("local_add", None)
-
-    main()
+def test_tool_call_execute_requires_explicit_functions():
+    tool_call = ToolCalls.ToolCall(name="local_add", args={"a": 1, "b": 2})
+    with pytest.raises(TypeError, match="required positional argument"):
+        tool_call.execute()  # ty: ignore[missing-argument]
