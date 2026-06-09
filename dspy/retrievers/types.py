@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict
 __all__ = ["QueryRetriever", "RetrievedPassage"]
 
 QueryT = TypeVar("QueryT", contravariant=True)
-ResultT = TypeVar("ResultT", covariant=True)
 
 
 class RetrievedPassage(BaseModel):
@@ -15,12 +14,13 @@ class RetrievedPassage(BaseModel):
 
     long_text: str
     score: float | None = None
-    pid: int | None = None
+    pid: int | str | None = None
+    metadata: dict[str, object] | None = None
 
 
-class QueryRetriever(Protocol[QueryT, ResultT]):
+class QueryRetriever(Protocol[QueryT]):
     k: int
 
-    async def __call__(self, query: QueryT, /) -> ResultT: ...
+    async def __call__(self, query: QueryT, /) -> list[RetrievedPassage]: ...
 
-    async def aforward(self, query: QueryT, /) -> ResultT: ...
+    async def aforward(self, query: QueryT, /) -> list[RetrievedPassage]: ...

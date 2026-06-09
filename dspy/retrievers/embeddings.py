@@ -10,7 +10,7 @@ from typing_extensions import override
 
 from dspy._internal.lazy_import import require
 from dspy._internal.unbatchify import Unbatchify
-from dspy.primitives import Prediction
+from dspy.retrievers.types import RetrievedPassage
 
 np = require("numpy")
 
@@ -21,6 +21,21 @@ class FaissIndex(Protocol):
 
 Embedder = Callable[[list[str]], np.ndarray]
 SearchResult = tuple[list[str], list[int], list[float]]
+
+
+def _search_result_to_passages(
+    passages: list[str],
+    indices: list[int],
+    scores: list[float] | None = None,
+) -> list[RetrievedPassage]:
+    return [
+        RetrievedPassage(
+            long_text=text,
+            pid=pid,
+            score=scores[i] if scores is not None else None,
+        )
+        for i, (text, pid) in enumerate(zip(passages, indices, strict=True))
+    ]
 
 
 class Embeddings:
@@ -49,12 +64,12 @@ class Embeddings:
         self.index = self._build_faiss() if len(corpus) >= brute_force_threshold else None
         self.search_fn = Unbatchify(self._batch_forward)
 
-    async def __call__(self, query: str) -> Prediction:
+    async def __call__(self, query: str) -> list[RetrievedPassage]:
         return await self.aforward(query)
 
-    async def aforward(self, query: str) -> Prediction:
+    async def aforward(self, query: str) -> list[RetrievedPassage]:
         passages, indices, _scores = await asyncio.to_thread(self.search_fn, query)
-        return Prediction(passages=passages, indices=indices)
+        return _search_result_to_passages(passages, indices)
 
     def close(self) -> None:
         self.search_fn.close()
@@ -163,6 +178,6 @@ class Embeddings:
 
 class EmbeddingsWithScores(Embeddings):
     @override
-    async def aforward(self, query: str) -> Prediction:
+    async def aforward(self, query: str) -> list[RetrievedPassage]:
         passages, indices, scores = await asyncio.to_thread(self.search_fn, query)
-        return Prediction(passages=passages, indices=indices, scores=scores)
+        return _search_result_to_passages(passages, indices, scores)

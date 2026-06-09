@@ -1,11 +1,10 @@
 import asyncio
 import json
 import os
-from dataclasses import dataclass
 from importlib.util import find_spec
 from typing import Any
 
-from dspy.primitives import Prediction
+from dspy.retrievers.types import RetrievedPassage
 
 
 def _is_databricks_sdk_installed() -> bool:
@@ -20,16 +19,6 @@ _databricks_sdk_installed = _is_databricks_sdk_installed()
 
 class DatabricksRMError(Exception):
     pass
-
-
-@dataclass
-class Document:
-    page_content: str
-    metadata: dict[str, Any]
-    type: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"page_content": self.page_content, "metadata": self.metadata, "type": self.type}
 
 
 class DatabricksRM:
@@ -84,12 +73,12 @@ class DatabricksRM:
 
     async def __call__(
         self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
-    ) -> Prediction | list[dict[str, Any]]:
+    ) -> list[RetrievedPassage]:
         return await self.aforward(query=query, query_type=query_type, filters_json=filters_json)
 
     async def aforward(
         self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
-    ) -> Prediction | list[dict[str, Any]]:
+    ) -> list[RetrievedPassage]:
         return await asyncio.to_thread(self._query, query=query, query_type=query_type, filters_json=filters_json)
 
     def _extract_doc_ids(self, item: dict[str, Any]) -> str:
@@ -111,9 +100,28 @@ class DatabricksRM:
             }
         return extra_columns
 
+    def _to_passages(self, sorted_docs: list[dict[str, Any]]) -> list[RetrievedPassage]:
+        passages: list[RetrievedPassage] = []
+        for doc in sorted_docs:
+            extra = self._get_extra_columns(doc)
+            doc_uri = doc[self.docs_uri_column_name] if self.docs_uri_column_name else None
+            metadata: dict[str, object] = {**extra}
+            if doc_uri is not None:
+                metadata["doc_uri"] = doc_uri
+            score_val = doc.get("score")
+            passages.append(
+                RetrievedPassage(
+                    long_text=doc[self.text_column_name],
+                    pid=self._extract_doc_ids(doc),
+                    score=float(score_val) if score_val is not None else None,
+                    metadata=metadata or None,
+                )
+            )
+        return passages
+
     def _query(
         self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
-    ) -> Prediction | list[dict[str, Any]]:
+    ) -> list[RetrievedPassage]:
         if isinstance(query, str):
             query_text = query
             query_vector = None
@@ -165,25 +173,7 @@ class DatabricksRM:
                 item = dict(zip(col_names, data_row, strict=False))
                 items += [item]
         sorted_docs = sorted(items, key=lambda x: x["score"], reverse=True)[: self.k]
-        if self.use_with_databricks_agent_framework:
-            return [
-                Document(
-                    page_content=doc[self.text_column_name],
-                    metadata={
-                        "doc_id": self._extract_doc_ids(doc),
-                        "doc_uri": doc[self.docs_uri_column_name] if self.docs_uri_column_name else None,
-                    }
-                    | self._get_extra_columns(doc),
-                    type="Document",
-                ).to_dict()
-                for doc in sorted_docs
-            ]
-        return Prediction(
-            docs=[doc[self.text_column_name] for doc in sorted_docs],
-            doc_ids=[self._extract_doc_ids(doc) for doc in sorted_docs],
-            doc_uris=[doc[self.docs_uri_column_name] for doc in sorted_docs] if self.docs_uri_column_name else None,
-            extra_columns=[self._get_extra_columns(item) for item in sorted_docs],
-        )
+        return self._to_passages(sorted_docs)
 
     @staticmethod
     def _query_via_databricks_sdk(

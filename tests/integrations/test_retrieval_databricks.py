@@ -19,7 +19,7 @@ def test_databricks_rm_import_handles_missing_sdk_parent(monkeypatch: pytest.Mon
     assert databricks_rm._is_databricks_sdk_installed() is False
 
 
-def test_databricks_rm_direct_call_preserves_prediction_shape(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_databricks_rm_direct_call_returns_retrieved_passages(monkeypatch: pytest.MonkeyPatch) -> None:
     response = {
         "manifest": {"columns": [{"name": "id"}, {"name": "text"}, {"name": "score"}, {"name": "source"}]},
         "result": {
@@ -47,7 +47,13 @@ def test_databricks_rm_direct_call_preserves_prediction_shape(monkeypatch: pytes
         text_column_name="text",
         k=2,
     )
+    from dspy.retrievers.types import RetrievedPassage
+
     result = cast("Any", asyncio.run(retriever("example query")))
-    assert result.docs == ["High score", "Middle score"]
-    assert result.doc_ids == ["high", "mid"]
-    assert result.extra_columns == [{"score": 0.9, "source": "b"}, {"score": 0.5, "source": "c"}]
+    assert len(result) == 2
+    assert all(isinstance(p, RetrievedPassage) for p in result)
+    assert [p.long_text for p in result] == ["High score", "Middle score"]
+    assert [p.pid for p in result] == ["high", "mid"]
+    assert result[0].score == 0.9
+    assert result[0].metadata is not None
+    assert result[0].metadata.get("source") == "b"

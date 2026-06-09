@@ -22,16 +22,14 @@ class ColBERTv2:
         self.post_requests = post_requests
         self.url = f"{url}:{port}" if port else url
 
-    async def __call__(self, query: str, k: int = 10, simplify: bool = False) -> list[str] | list[RetrievedPassage]:
-        return await self.aforward(query, k=k, simplify=simplify)
+    async def __call__(self, query: str, k: int = 10) -> list[RetrievedPassage]:
+        return await self.aforward(query, k=k)
 
-    async def aforward(self, query: str, k: int = 10, simplify: bool = False) -> list[str] | list[RetrievedPassage]:
+    async def aforward(self, query: str, k: int = 10) -> list[RetrievedPassage]:
         if self.post_requests:
             topk: list[dict[str, Any]] = await asyncio.to_thread(colbertv2_post_request, self.url, query, k)
         else:
             topk: list[dict[str, Any]] = await asyncio.to_thread(colbertv2_get_request, self.url, query, k)
-        if simplify:
-            return [psg["long_text"] for psg in topk]
         return [_to_passage(psg) for psg in topk]
 
 
