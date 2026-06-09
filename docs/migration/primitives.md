@@ -3,7 +3,7 @@
 `dspy.primitives` now exposes a canonical public barrel. Prefer importing exported symbols from the package root; submodule paths remain valid for deep internals (for example `dspy.primitives.python_interpreter.jsonrpc`).
 
 ```python
-from dspy.primitives import Example, Module, Prediction, PythonInterpreter
+from dspy.primitives import BatchFailure, BatchResult, Example, Module, Prediction, PythonInterpreter
 ```
 
 ## Breaking changes
@@ -28,6 +28,8 @@ Call modules with `await module(..., run=run)`. Direct `await module.aforward(..
 ## Interpreter and sandbox
 
 - `PythonInterpreter`, `CodeInterpreterError`, and `FinalOutput` are exported from `dspy.primitives`.
+- `PythonInterpreter.tools` is a read-only mapping view; mutate tools via the constructor or internal `_tools` during runtime injection (for example RLM execution setup).
+- Sandbox tool registration advertises scalar types and homogeneous `list` / `dict` containers. Parameterized annotations such as `list[str]` map to their container origin.
 - JSON-RPC application error codes are generated from `dspy/primitives/jsonrpc_app_errors.json` via `scripts/generate_jsonrpc_errors.py`.
 - Import interpreter internals from `dspy.primitives.python_interpreter` when needed.
 
@@ -35,3 +37,6 @@ Call modules with `await module(..., run=run)`. Direct `await module.aforward(..
 
 - `Example` and `Prediction` compose a shared `RecordStore` for attribute and mapping access.
 - Use `Example.from_record(record, input_keys=(...))` for labeled training rows; use `Prediction.from_record(record)` for model outputs.
+- `Prediction` equality compares store fields and attached `Completions` objects (identity), not numeric scores.
+- `Prediction` rich comparisons and arithmetic (`+`, `/`, `<`, etc.) coerce through `float(prediction["score"])`. Missing `score` raises `ValueError`.
+- `Module.batch` and `Parallel(...)(pairs)` return `BatchResult` with `.results` and `.failures` (`BatchFailure` entries with `.input` and `.exception`).
