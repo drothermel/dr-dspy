@@ -24,6 +24,10 @@
   - `LMHistoryEntry` → `CallRecord`; `lm/module.history` → `call_log`; removed `GLOBAL_HISTORY` / `inspect_history()`.
   - `run.trace` → `run.optimization_trace`; telemetry unified under `TelemetryConfig.call_log` (`CallLogMode`).
   - Disk logging scoped to `RunContext.log_session`; use `run.inspect_call_log()` / `run.read_call_log()`.
+- Primitives hard cutover (see `docs/migration/primitives.md`):
+  - `Parameter` marker removed; `Predict(Module)` only; use `Predictor` protocol for isinstance checks.
+  - `BaseModule.named_parameters()` / `parameters()` → `named_predictors()` / `predictors()`.
+  - `BatchResult.failures` is always populated for failed indices; `return_failed_examples=`, `Parallel.failed_examples`, and `Parallel.exceptions` removed.
 
 ### Migration
 
