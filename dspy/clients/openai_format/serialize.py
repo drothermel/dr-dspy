@@ -68,7 +68,15 @@ def part_to_openai_blocks(part: Any) -> list[dict[str, Any]]:
         return [{"type": "text", "text": part.text}]
     if isinstance(part, LMToolResultPart):
         return part_to_openai_blocks(LMTextPart(text="".join(part_text(value) for value in part.content)))
-    return [{"type": "text", "text": str(part)}]
+    if isinstance(part, LMToolCallPart):
+        raise LMUnsupportedFeatureError(
+            "OpenAI-format tool calls must be serialized at the message layer, not via part_to_openai_blocks.",
+            features=["tools"],
+        )
+    raise LMUnsupportedFeatureError(
+        f"OpenAI-format serialization does not support message part type {type(part).__name__}.",
+        features=["part_type"],
+    )
 
 
 def image_to_openai(image: LMImagePart) -> dict[str, Any]:
