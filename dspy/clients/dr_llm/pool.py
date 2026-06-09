@@ -9,10 +9,14 @@ from dr_llm.llm import CallMode
 from dr_llm.llm.providers.default_registry import build_default_registry
 from typing_extensions import override
 
-from dspy.clients.base_lm import BaseLM
+from dspy.clients.base_lm import LM_CLASS_STATE_KEY, PROVIDER_OPTIONS_STATE_KEY, BaseLM
 from dspy.clients.dr_llm.capabilities import (
     supported_params_v1,
     supports_reasoning_from_capabilities,
+)
+from dspy.clients.dr_llm.contract import (
+    provider_options_from_serialized_state,
+    validate_dr_llm_ctor,
 )
 from dspy.clients.dr_llm.errors import wrap_backend_exception
 from dspy.clients.dr_llm.mapping import (
@@ -20,6 +24,8 @@ from dspy.clients.dr_llm.mapping import (
     lm_request_to_backend_request,
     probe_backend_request,
 )
+from dspy.clients.lm_strict import validate_lm_state
+from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.runtime.run_log import resolve_run_bucket
 
 if TYPE_CHECKING:
@@ -53,17 +59,16 @@ class DrLlmPoolLM(BaseLM):
         temperature: float | None = None,
         max_tokens: int | None = None,
         callbacks: list[Callback] | None = None,
-        num_retries: int = 3,
-        **kwargs: Any,
     ) -> None:
+        validate_dr_llm_ctor(model=model)
         super().__init__(
             model=model,
             model_type="chat",
             temperature=temperature,
             max_tokens=max_tokens,
             callbacks=callbacks,
-            num_retries=num_retries,
-            provider_options=kwargs.pop("provider_options", None),
+            num_retries=0,
+            provider_options=LMProviderOptions(),
         )
         self._mode = mode
         self._registry = registry or build_default_registry()
@@ -141,22 +146,26 @@ class DrLlmPoolLM(BaseLM):
     @classmethod
     @override
     def load_state(cls, state: dict[str, Any], *, allow_custom_lm_class: bool = False) -> DrLlmPoolLM:
-        state = dict(state)
+        state = validate_lm_state(dict(state))
+        state.pop(LM_CLASS_STATE_KEY, None)
         mode_raw = state.pop("dr_llm_mode", CallMode.api)
         mode = CallMode(mode_raw) if isinstance(mode_raw, str) else mode_raw
         pool_config_raw = state.pop("dr_llm_pool_config")
         pool_config = PoolBackendConfig(**pool_config_raw)
         session_id = state.pop("dr_llm_session_id", None)
-        base = super().load_state(state, allow_custom_lm_class=allow_custom_lm_class)
-        instance = cls(
-            model=base.model,
+        model = state.pop("model")
+        state.pop("model_type", "chat")
+        state.pop("num_retries", 3)
+        provider_data = state.pop(PROVIDER_OPTIONS_STATE_KEY, None)
+        temperature = state.pop("temperature", None)
+        max_tokens = state.pop("max_tokens", None)
+        provider_options = provider_options_from_serialized_state(provider_data=provider_data, remaining=state)
+        validate_dr_llm_ctor(model=model, provider_options=provider_options)
+        return cls(
+            model=model,
             pool_config=pool_config,
             mode=mode,
             session_id=session_id,
-            temperature=base.kwargs.get("temperature"),
-            max_tokens=base.kwargs.get("max_tokens"),
-            num_retries=base.num_retries,
-            provider_options=base.provider_options,
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
-        instance.callbacks = list(base.callbacks)
-        return instance
