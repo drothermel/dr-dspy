@@ -1,5 +1,7 @@
 import os
 
+os.environ.setdefault("DISABLE_AIOHTTP_TRANSPORT", "True")
+
 import pytest
 
 from tests.test_utils.run_binding import collect_run_binding_violations

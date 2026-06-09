@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import Coroutine
+from collections.abc import Coroutine, Iterator
 from typing import TYPE_CHECKING, Any, TypeVar
 from unittest import mock
 
@@ -9,6 +9,9 @@ from typing_extensions import override
 if TYPE_CHECKING:
     from litellm.utils import ModelResponse
 try:
+    import litellm
+
+    litellm.disable_aiohttp_transport = True
     from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
     from litellm.utils import Choices, Message, ModelResponse
 except ImportError:
@@ -20,24 +23,84 @@ from dspy.core.types import LMConfig, LMRequest, LMResponse, coerce_lm_config, m
 _T = TypeVar("_T")
 
 
-async def _flush_litellm_logging_worker() -> None:
+async def _cleanup_litellm_after_async_run() -> None:
+    try:
+        from litellm.llms.custom_httpx.async_client_cleanup import close_litellm_async_clients
+    except ImportError:
+        close_clients = None
+    else:
+        close_clients = close_litellm_async_clients
+
     try:
         from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
     except ImportError:
-        return
-    worker = GLOBAL_LOGGING_WORKER
+        worker = None
+    else:
+        worker = GLOBAL_LOGGING_WORKER
+
+    if worker is not None:
+        try:
+            await asyncio.wait_for(worker.clear_queue(), timeout=2.0)
+        except TimeoutError:
+            pass
+
+    if close_clients is not None:
+        try:
+            await asyncio.wait_for(close_clients(), timeout=2.0)
+        except TimeoutError:
+            pass
+
     try:
-        await asyncio.wait_for(worker.clear_queue(), timeout=2.0)
-    except TimeoutError:
+        import litellm
+        from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler
+
+        cache_dict = getattr(litellm.in_memory_llm_clients_cache, "cache_dict", {})
+        try:
+            from openai import AsyncOpenAI
+        except ImportError:
+            async_openai = None
+        else:
+            async_openai = AsyncOpenAI
+
+        for handler in list(cache_dict.values()):
+            if isinstance(handler, AsyncHTTPHandler) or (
+                async_openai is not None and isinstance(handler, async_openai)
+            ):
+                try:
+                    await handler.close()
+                except Exception:
+                    pass
+
+        litellm.in_memory_llm_clients_cache.flush_cache()
+    except (ImportError, AttributeError):
         pass
 
 
-def run_async(coro: Coroutine[Any, Any, _T]) -> _T:
-    async def wrapped() -> _T:
+def cleanup_litellm_after_test() -> None:
+    asyncio.run(_cleanup_litellm_after_async_run())
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_litellm_after_async_lm_test(request: pytest.FixtureRequest) -> Iterator[None]:
+    yield
+    if asyncio.iscoroutinefunction(request.function):
+        cleanup_litellm_after_test()
+
+
+def run_async(*coros: Coroutine[Any, Any, Any]) -> Any:
+    if not coros:
+        msg = "run_async requires at least one coroutine"
+        raise ValueError(msg)
+
+    async def run_sequential() -> Any:
+        results = [await coro for coro in coros]
+        return results[0] if len(results) == 1 else tuple(results)
+
+    async def wrapped() -> Any:
         try:
-            return await coro
+            return await run_sequential()
         finally:
-            await _flush_litellm_logging_worker()
+            await _cleanup_litellm_after_async_run()
 
     return asyncio.run(wrapped())
 

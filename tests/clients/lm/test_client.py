@@ -43,28 +43,26 @@ def test_chat_lms_can_be_queried(litellm_test_server, make_run):
     api_base, _ = litellm_test_server
     provider_options = LMProviderOptions(api_base=api_base, api_key="fakekey")
     openai_lm = LM(model="openai/dspy-test-model", provider_options=provider_options, model_type="chat")
-    assert run_async(openai_lm(_request(openai_lm, prompt="openai query"), run=make_run(lm=openai_lm))).text == "Hi!"
     azure_openai_lm = LM(model="azure/dspy-test-model", provider_options=provider_options, model_type="chat")
-    assert (
-        run_async(
-            azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query"), run=make_run(lm=azure_openai_lm))
-        ).text
-        == "Hi!"
+    openai_result, azure_result = run_async(
+        openai_lm(_request(openai_lm, prompt="openai query"), run=make_run(lm=openai_lm)),
+        azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query"), run=make_run(lm=azure_openai_lm)),
     )
+    assert openai_result.text == "Hi!"
+    assert azure_result.text == "Hi!"
 
 
 def test_text_lms_can_be_queried(litellm_test_server, make_run):
     api_base, _ = litellm_test_server
     provider_options = LMProviderOptions(api_base=api_base, api_key="fakekey")
     openai_lm = LM(model="openai/dspy-test-model", provider_options=provider_options, model_type="text")
-    assert run_async(openai_lm(_request(openai_lm, prompt="openai query"), run=make_run(lm=openai_lm))).text == "Hi!"
     azure_openai_lm = LM(model="azure/dspy-test-model", provider_options=provider_options, model_type="text")
-    assert (
-        run_async(
-            azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query"), run=make_run(lm=azure_openai_lm))
-        ).text
-        == "Hi!"
+    openai_result, azure_result = run_async(
+        openai_lm(_request(openai_lm, prompt="openai query"), run=make_run(lm=openai_lm)),
+        azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query"), run=make_run(lm=azure_openai_lm)),
     )
+    assert openai_result.text == "Hi!"
+    assert azure_result.text == "Hi!"
 
 
 def test_lm_calls_support_callables(litellm_test_server, make_run):
@@ -290,13 +288,16 @@ def test_base_lm_experimental_direct_messages_can_reuse_lm_response_as_assistant
         lm_kind, ["DSPy programs LM pipelines.", "DSPy programs pipelines."]
     )
     try:
-        first = run_async(lm(_request(lm, prompt="Explain DSPy in one sentence."), run=make_run(lm=lm)))
-        follow_up = run_async(
-            lm(
+
+        async def _query_twice():
+            first = await lm(_request(lm, prompt="Explain DSPy in one sentence."), run=make_run(lm=lm))
+            follow_up = await lm(
                 _request(lm, User("Explain DSPy in one sentence."), first, User("Now make it even shorter.")),
                 run=make_run(lm=lm),
             )
-        )
+            return first, follow_up
+
+        first, follow_up = run_async(_query_twice())
     finally:
         if patcher is not None:
             patcher.stop()

@@ -1,4 +1,3 @@
-import asyncio
 import time
 from typing import TYPE_CHECKING
 from unittest import mock
@@ -25,7 +24,7 @@ from dspy.errors import (
     LMTransportError,
     LMUnexpectedError,
 )
-from tests.clients.lm.conftest import _request
+from tests.clients.lm.conftest import _request, run_async
 
 
 def test_lm_wraps_litellm_errors_with_metadata(make_run):
@@ -85,7 +84,7 @@ def test_lm_preserves_existing_lm_error_without_self_cause(make_run):
         mock.patch("dspy.clients.lm.transport.alitellm_completion", side_effect=error),
         pytest.raises(LMRateLimitError) as exc_info,
     ):
-        asyncio.run(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
+        run_async(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
     assert exc_info.value is error
     assert exc_info.value.__cause__ is None
 
@@ -106,7 +105,7 @@ def test_retry_number_set_correctly(make_run):
     lm = LM("openai/gpt-4o-mini", num_retries=3)
     mock_response = ModelResponse(choices=[Choices(message=Message(content="answer"))], model="openai/gpt-4o-mini")
     with mock.patch("litellm.acompletion", mock.AsyncMock(return_value=mock_response)) as mock_completion:
-        asyncio.run(lm(_request(lm, prompt="query"), run=make_run(lm=lm)))
+        run_async(lm(_request(lm, prompt="query"), run=make_run(lm=lm)))
     assert mock_completion.call_args.kwargs["num_retries"] == 3
 
 
@@ -125,7 +124,7 @@ def test_retry_made_on_system_errors(make_run):
         mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create),
         pytest.raises(LMRateLimitError),
     ):
-        asyncio.run(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
+        run_async(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
     assert retry_tracking[0] == 4
 
 
@@ -144,6 +143,6 @@ def test_exponential_backoff_retry(make_run):
         mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create),
         pytest.raises(LMRateLimitError),
     ):
-        asyncio.run(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
+        run_async(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
     for i in range(1, len(time_counter) - 1):
         assert time_counter[i + 1] - time_counter[i] >= 2 ** (i - 1)
