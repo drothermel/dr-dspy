@@ -30,6 +30,7 @@ from dspy.primitives import BatchFailure, BatchResult, Example, Module, Predicti
 | `Embeddings.from_saved(path, embedder)` | `dspy.persistence.load_embeddings(path, embedder=embedder)` |
 | `Module.load(...)` returns `None` | returns `Self` (supports chaining) |
 | `Module.load_state` / `Module.load` without `custom_types` | both accept optional `custom_types` for `TaskSpec.from_dict` |
+| `example.get` / `prediction.items` when store has colliding keys | dot access returns API methods; use `example["get"]` / `prediction["items"]` for field values |
 
 See `docs/migration/persistence.md` for the persistence spine API.
 

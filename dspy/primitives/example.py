@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from dspy.primitives._record_mixins import RecordStoreFacade
+from dspy.primitives.record_backed import RecordStoreFacade
 from dspy.primitives.record_store import RecordStore
 
 if TYPE_CHECKING:

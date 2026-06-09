@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import types
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from typing_extensions import override
@@ -8,6 +9,18 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dspy.primitives.record_store import RecordStore
+
+
+def _is_public_api_name(cls: type, key: str) -> bool:
+    for base in cls.__mro__:
+        if base is object:
+            break
+        descriptor = base.__dict__.get(key)
+        if descriptor is None:
+            continue
+        if isinstance(descriptor, (types.FunctionType, types.MethodType, classmethod, staticmethod, property)):
+            return True
+    return False
 
 
 class RecordBacked:
@@ -25,11 +38,17 @@ class RecordBacked:
         reserved = type.__getattribute__(cls, "_RECORD_RESERVED")
         if key in reserved:
             return object.__getattribute__(self, key)
+
+        try:
+            return object.__getattribute__(self, key)
+        except AttributeError:
+            pass
+
         store_attr = type.__getattribute__(cls, "_RECORD_ATTR")
         store = object.__getattribute__(self, store_attr)
         if key in store:
             return store[key]
-        return object.__getattribute__(self, key)
+        raise AttributeError(f"{cls.__name__!r} object has no attribute {key!r}")
 
     @override
     def __setattr__(self, key: str, value: Any) -> None:
@@ -41,10 +60,17 @@ class RecordBacked:
         reserved = type.__getattribute__(cls, "_RECORD_RESERVED")
         if key in reserved:
             object.__setattr__(self, key, value)
-        else:
-            store_attr = type.__getattribute__(cls, "_RECORD_ATTR")
-            store = object.__getattribute__(self, store_attr)
-            store[key] = value
+            return
+
+        if _is_public_api_name(cls, key):
+            raise AttributeError(
+                f"Cannot set attribute {key!r} on {cls.__name__}; use bracket notation "
+                f"({cls.__name__}[{key!r}] = value) for dynamic fields that collide with API names."
+            )
+
+        store_attr = type.__getattribute__(cls, "_RECORD_ATTR")
+        store = object.__getattribute__(self, store_attr)
+        store[key] = value
 
 
 class RecordStoreFacade(RecordBacked):

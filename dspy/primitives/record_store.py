@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from dspy.primitives._record_mixins import RecordBacked
+from dspy.primitives.record_backed import RecordBacked
 from dspy.serialization.json import to_jsonable
 
 if TYPE_CHECKING:

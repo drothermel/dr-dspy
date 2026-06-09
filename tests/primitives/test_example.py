@@ -91,11 +91,20 @@ def test_example_is_unhashable():
 
 def test_example_attr_store_collision():
     example = Example.from_record({"get": 1})
-    assert example.get == 1
+    assert callable(example.get)
     assert example["get"] == 1
     example["fork"] = "stored"
-    assert example.fork == "stored"
+    assert callable(example.fork)
     assert example["fork"] == "stored"
+    with pytest.raises(AttributeError, match="bracket notation"):
+        example.fork = "via-dot"  # ty: ignore[invalid-assignment]
+
+
+def test_example_attr_collision_methods_win_on_dot_access():
+    example = Example.from_record({"keys": 1, "items": 2, "to_dict": 3})
+    assert set(example.keys()) == {"keys", "items", "to_dict"}
+    assert ("keys", 1) in example.items()
+    assert example.to_dict() == {"keys": 1, "items": 2, "to_dict": 3}
 
 
 def test_example_keys_values_items():

@@ -28,6 +28,14 @@ def test_prediction_from_record():
     assert prediction.answer == "Paris"
 
 
+def test_prediction_attr_collision_methods_win_on_dot_access():
+    prediction = Prediction.from_record({"items": [], "get": 1})
+    assert callable(prediction.items)
+    assert callable(prediction.get)
+    assert prediction["items"] == []
+    assert prediction["get"] == 1
+
+
 def test_prediction_from_record_rejects_input_keys():
     with pytest.raises(TypeError):
         Prediction.from_record({"answer": "Paris"}, input_keys=("answer",))
