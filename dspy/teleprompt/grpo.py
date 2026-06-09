@@ -41,7 +41,7 @@ class GRPO(FinetuneTeleprompter):
         train_kwargs: dict[str, Any] | dict[LM, dict[str, Any]] | None = None,
         adapter: Adapter | dict[LM, Adapter] | None = None,
         exclude_demos: bool = False,
-        num_threads: int = 6,
+        max_concurrency: int = 6,
         num_train_steps: int = 100,
         seed: int = 0,
         num_dspy_examples_per_grpo_step: int = 1,
@@ -61,7 +61,7 @@ class GRPO(FinetuneTeleprompter):
         self.multitask = multitask
         self.adapter: dict[LM, Adapter] = self.convert_to_lm_dict(adapter)
         self.exclude_demos = exclude_demos
-        self.num_threads = num_threads
+        self.max_concurrency = max_concurrency
         self.num_train_steps = num_train_steps
         self.rng = random.Random(seed)
         self.num_dspy_examples_per_grpo_step = num_dspy_examples_per_grpo_step
@@ -145,7 +145,7 @@ class GRPO(FinetuneTeleprompter):
                     )
                 valset_evaluator = Evaluate(
                     devset=valset + trainset,
-                    num_threads=self.num_threads,
+                    max_concurrency=self.max_concurrency,
                     display_progress=True,
                     provide_traceback=False,
                     max_errors=len(valset) * 10,
@@ -177,7 +177,7 @@ class GRPO(FinetuneTeleprompter):
                     logger.info("Using user provided validation set and not reporting train scores.")
                 valset_evaluator = Evaluate(
                     devset=valset,
-                    num_threads=self.num_threads,
+                    max_concurrency=self.max_concurrency,
                     display_progress=True,
                     provide_traceback=False,
                     max_errors=len(valset) * 10,
@@ -207,7 +207,7 @@ class GRPO(FinetuneTeleprompter):
                 logger.info("Using trainset as validation set.")
             valset_evaluator = Evaluate(
                 devset=trainset,
-                num_threads=self.num_threads,
+                max_concurrency=self.max_concurrency,
                 display_progress=True,
                 provide_traceback=False,
                 max_errors=len(trainset) * 10,
@@ -371,7 +371,7 @@ class GRPO(FinetuneTeleprompter):
                     dataset=subsample_training_dataset_repeated,
                     run=run,
                     metric=self.metric,
-                    num_threads=self.num_threads,
+                    max_concurrency=self.max_concurrency,
                     raise_on_error=False,
                     capture_failed_parses=True,
                     failure_score=self.failure_score,

@@ -68,7 +68,7 @@ def test_bootstrap_trace_data(make_run):
                 program=program,
                 dataset=dataset,
                 metric=exact_match_metric,
-                num_threads=1,
+                max_concurrency=1,
                 raise_on_error=False,
                 capture_failed_parses=True,
                 run=run,

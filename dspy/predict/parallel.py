@@ -4,14 +4,13 @@ from typing import Any
 
 from dspy.primitives.example import Example
 from dspy.runtime.run_context import RunContext, resolve_run
-from dspy.utils.async_parallel import BoundedRunStats, run_bounded
+from dspy.utils.async_parallel import BoundedRunStats, resolve_max_concurrency, run_bounded
 
 
 class Parallel:
     def __init__(
         self,
         run: RunContext | None = None,
-        num_threads: int | None = None,
         max_concurrency: int | None = None,
         max_errors: int | None = None,
         access_examples: bool = True,
@@ -23,9 +22,7 @@ class Parallel:
     ) -> None:
         self.run = run
         exec_cfg = run.execution if run is not None else None
-        concurrency = max_concurrency if max_concurrency is not None else num_threads
-        self.max_concurrency = concurrency or (exec_cfg.num_threads if exec_cfg is not None else None)
-        self.num_threads = self.max_concurrency
+        self.max_concurrency = max_concurrency or (exec_cfg.max_concurrency if exec_cfg is not None else None)
         if max_errors is None and exec_cfg is not None:
             self.max_errors = exec_cfg.max_errors
         else:
@@ -67,13 +64,15 @@ class Parallel:
         self,
         exec_pairs: list[tuple[Any, Any]],
         run: RunContext | None = None,
-        num_threads: int | None = None,
         max_concurrency: int | None = None,
     ) -> list[Any] | tuple[list[Any], list[Any], list[BaseException]]:
         run = resolve_run(run=run, bound_run=self.run)
         self._active_run = run
-        concurrency = max_concurrency if max_concurrency is not None else num_threads
-        concurrency = concurrency or self.max_concurrency or run.execution.num_threads
+        concurrency = resolve_max_concurrency(
+            explicit=max_concurrency,
+            configured=self.max_concurrency,
+            run=run,
+        )
         max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors
         provide_traceback = (
             self.provide_traceback if self.provide_traceback is not None else run.execution.provide_traceback

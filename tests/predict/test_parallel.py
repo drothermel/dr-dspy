@@ -25,7 +25,7 @@ def test_parallel_module(make_run):
             super().__init__()
             self.predictor = Predict(ts("input -> output"))
             self.predictor2 = Predict(ts("input -> output"))
-            self.parallel = Parallel(num_threads=2)
+            self.parallel = Parallel(max_concurrency=2)
 
         async def aforward(self, *, run, options=None, **inputs):
             example = {"input": inputs["input"]}
@@ -71,7 +71,7 @@ def test_batch_module(make_run):
             super().__init__()
             self.predictor = Predict(ts("input -> output"))
             self.predictor2 = Predict(ts("input -> output, reasoning"))
-            self.parallel = Parallel(num_threads=2)
+            self.parallel = Parallel(max_concurrency=2)
 
         async def aforward(self, *, run, options=None, **inputs):
             examples = [Example.from_record({"input": inputs["input"]}, input_keys=("input",))] * 5
@@ -106,7 +106,7 @@ def test_nested_parallel_module(make_run):
             super().__init__()
             self.predictor = Predict(ts("input -> output"))
             self.predictor2 = Predict(ts("input -> output"))
-            self.parallel = Parallel(num_threads=2)
+            self.parallel = Parallel(max_concurrency=2)
 
         async def aforward(self, *, run, options=None, **inputs):
             example = {"input": inputs["input"]}

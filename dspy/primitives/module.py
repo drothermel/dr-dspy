@@ -128,7 +128,6 @@ class Module(BaseModule, metaclass=ProgramMeta):
         self,
         examples: list[Example],
         run: RunContext,
-        num_threads: int | None = None,
         max_concurrency: int | None = None,
         max_errors: int | None = None,
         return_failed_examples: bool = False,
@@ -140,7 +139,6 @@ class Module(BaseModule, metaclass=ProgramMeta):
         exec_pairs = [(self, example.as_inputs()) for example in examples]
         parallel_executor = Parallel(
             run=run,
-            num_threads=num_threads,
             max_concurrency=max_concurrency,
             max_errors=max_errors,
             return_failed_examples=return_failed_examples,

@@ -21,7 +21,7 @@ Reserved names (`lm`, `config`, `demos`, `task_spec`, `trace`, `prediction`) mus
 | `Example(a=1, b=2)` / `Example({"a": 1})` | `Example.from_record({"a": 1, "b": 2}, input_keys=("a",))` |
 | `example.inputs()` | `example.as_inputs()` |
 | `await knn(query)` | `await knn.acall(inputs=query)` |
-| `teleprompter.compile(student, trainset=..., num_threads=4, run=run)` | `teleprompter.compile(student, trainset=..., evaluate=EvaluateCompileParams(num_threads=4), run=run)` (COPRO) |
+| `teleprompter.compile(student, trainset=..., max_concurrency=4, run=run)` | `teleprompter.compile(student, trainset=..., evaluate=EvaluateCompileParams(max_concurrency=4), run=run)` (COPRO) |
 
 ## PredictOptions
 
@@ -203,7 +203,7 @@ COPRO example — before:
 compiled = await copro.compile(
     student,
     trainset=trainset,
-    num_threads=4,
+    max_concurrency=4,
     display_progress=True,
     run=run,
 )
@@ -217,7 +217,7 @@ from dspy.teleprompt.compile_params import EvaluateCompileParams
 compiled = await copro.compile(
     student,
     trainset=trainset,
-    evaluate=EvaluateCompileParams(num_threads=4, display_progress=True),
+    evaluate=EvaluateCompileParams(max_concurrency=4, display_progress=True),
     run=run,
 )
 ```

@@ -54,7 +54,10 @@ def test_signature_optimizer_optimization_process(make_run):
     student = SimpleModule(ts("input -> output"))
     optimized_student = asyncio.run(
         optimizer.compile(
-            student, trainset=trainset, evaluate=EvaluateCompileParams(num_threads=1, display_progress=False), run=run
+            student,
+            trainset=trainset,
+            evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            run=run,
         )
     )
     assert optimized_student is not student, "Optimization did not modify the student"
@@ -76,7 +79,10 @@ def test_signature_optimizer_statistics_tracking(make_run):
     student = SimpleModule(ts("input -> output"))
     optimized_student = asyncio.run(
         optimizer.compile(
-            student, trainset=trainset, evaluate=EvaluateCompileParams(num_threads=1, display_progress=False), run=run
+            student,
+            trainset=trainset,
+            evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            run=run,
         )
     )
     assert hasattr(optimized_student, "total_calls"), "Total calls statistic not tracked"
@@ -101,7 +107,10 @@ def test_optimization_and_output_verification(make_run):
     student = SimpleModule(ts("input -> output"))
     optimized_student = asyncio.run(
         optimizer.compile(
-            student, trainset=trainset, evaluate=EvaluateCompileParams(num_threads=1, display_progress=False), run=run
+            student,
+            trainset=trainset,
+            evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            run=run,
         )
     )
     test_input = "What is the capital of France?"
@@ -120,7 +129,10 @@ def test_statistics_tracking_during_optimization(make_run):
     student = SimpleModule(ts("input -> output"))
     optimized_student = asyncio.run(
         optimizer.compile(
-            student, trainset=trainset, evaluate=EvaluateCompileParams(num_threads=1, display_progress=False), run=run
+            student,
+            trainset=trainset,
+            evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            run=run,
         )
     )
     assert hasattr(optimized_student, "total_calls"), "Optimizer did not track total metric calls"

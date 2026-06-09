@@ -108,7 +108,6 @@ class COPRO(Teleprompter):
             for key, value in evaluate_kwargs.items()
             if key
             in {
-                "num_threads",
                 "max_concurrency",
                 "display_progress",
                 "display_table",

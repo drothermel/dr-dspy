@@ -37,14 +37,14 @@ class BootstrapFinetune(FinetuneTeleprompter):
         train_kwargs: dict[str, Any] | dict[LM, dict[str, Any]] | None = None,
         adapter: Adapter | dict[LM, Adapter] | None = None,
         exclude_demos: bool = False,
-        num_threads: int | None = None,
+        max_concurrency: int | None = None,
     ) -> None:
         super().__init__(train_kwargs=train_kwargs)
         self.metric = metric
         self.multitask = multitask
         self.adapter: dict[LM, Adapter] = self.convert_to_lm_dict(adapter)
         self.exclude_demos = exclude_demos
-        self.num_threads = num_threads
+        self.max_concurrency = max_concurrency
 
     @override
     async def compile(
@@ -61,10 +61,10 @@ class BootstrapFinetune(FinetuneTeleprompter):
         trace_data = []
         teachers = teacher if isinstance(teacher, list) else [teacher]
         teachers = [prepare_teacher(student=student, teacher=cast("Module | None", t)) for t in teachers]
-        num_threads = self.num_threads or run.execution.num_threads
+        max_concurrency = self.max_concurrency or run.execution.max_concurrency
         for t in teachers:
             trace_data += await bootstrap_trace_data(
-                program=t, dataset=trainset, metric=self.metric, num_threads=num_threads, run=run
+                program=t, dataset=trainset, metric=self.metric, max_concurrency=max_concurrency, run=run
             )
         logger.info("Preparing the train data...")
         key_to_data = {}
@@ -88,9 +88,9 @@ class BootstrapFinetune(FinetuneTeleprompter):
                 }
                 key_to_data[training_key] = finetune_kwargs
         logger.info("Starting LM fine-tuning...")
-        if len(key_to_data) > num_threads:
+        if len(key_to_data) > max_concurrency:
             raise ValueError(
-                f"BootstrapFinetune requires `num_threads` to be bigger than or equal to the number of fine-tuning jobs. There are {len(key_to_data)} fine-tuning jobs to start, but the number of threads is: {num_threads}! If the `multitask` flag is set to False, the number of fine-tuning jobs will be equal to the number of predictors in the student program. If the `multitask` flag is set to True, the number of fine-tuning jobs will be equal to: 1 if there is only a context LM, or the number of unique LMs attached to the predictors in the student program. In any case, the number of fine-tuning jobs will be less than or equal to the number of predictors."
+                f"BootstrapFinetune requires `max_concurrency` to be bigger than or equal to the number of fine-tuning jobs. There are {len(key_to_data)} fine-tuning jobs to start, but the number of threads is: {max_concurrency}! If the `multitask` flag is set to False, the number of fine-tuning jobs will be equal to the number of predictors in the student program. If the `multitask` flag is set to True, the number of fine-tuning jobs will be equal to: 1 if there is only a context LM, or the number of unique LMs attached to the predictors in the student program. In any case, the number of fine-tuning jobs will be less than or equal to the number of predictors."
             )
         logger.info(f"{len(key_to_data)} fine-tuning job(s) to start")
         key_to_lm = self.finetune_lms(key_to_data)

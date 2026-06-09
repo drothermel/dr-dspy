@@ -12,7 +12,6 @@ from dspy.runtime.run_context import RunContext  # noqa: TC001 — pydantic fiel
 class EvaluateCompileParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    num_threads: int | None = None
     max_concurrency: int | None = None
     display_progress: bool = False
     display_table: bool | int = False
@@ -105,7 +104,7 @@ class BetterTogetherCompileParams(BaseModel):
     trainset: list[Example]
     teacher: Module | list[Module] | None = None
     valset: list[Example] | None = None
-    num_threads: int | None = None
+    max_concurrency: int | None = None
     max_errors: int | None = None
     provide_traceback: bool | None = None
     seed: int | None = None

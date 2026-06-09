@@ -33,7 +33,7 @@ class SIMBA(Teleprompter):
         prompt_model: LM | None = None,
         teacher_run: RunContext | None = None,
         demo_input_field_maxlen: int = 100000,
-        num_threads: int | None = None,
+        max_concurrency: int | None = None,
         temperature_for_sampling: float = 0.2,
         temperature_for_candidates: float = 0.2,
     ) -> None:
@@ -45,7 +45,7 @@ class SIMBA(Teleprompter):
         self.prompt_model = prompt_model
         self.teacher_run = teacher_run
         self.demo_input_field_maxlen = demo_input_field_maxlen
-        self.num_threads = num_threads
+        self.max_concurrency = max_concurrency
         self.temperature_for_sampling = temperature_for_sampling
         self.temperature_for_candidates = temperature_for_candidates
         if self.max_demos > 0:
@@ -103,7 +103,7 @@ class SIMBA(Teleprompter):
         data_indices = list(range(len(trainset)))
         rng.shuffle(data_indices)
         instance_idx = 0
-        run_parallel = Parallel(run=run, access_examples=False, num_threads=self.num_threads)
+        run_parallel = Parallel(run=run, access_examples=False, max_concurrency=self.max_concurrency)
         trial_logs = {}
         for batch_idx in range(self.max_steps):
             trial_logs[batch_idx] = {}

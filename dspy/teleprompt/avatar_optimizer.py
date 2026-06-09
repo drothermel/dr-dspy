@@ -116,12 +116,14 @@ class AvatarOptimizer(Teleprompter):
                 return (example, None, 0)
             return 0
 
-    async def thread_safe_evaluator(self, devset, actor, return_outputs=False, num_threads=None, *, run: RunContext):
+    async def thread_safe_evaluator(
+        self, devset, actor, return_outputs=False, max_concurrency=None, *, run: RunContext
+    ):
         total_score = 0
         total_examples = len(devset)
-        num_threads = num_threads or run.execution.num_threads
+        max_concurrency = max_concurrency or run.execution.max_concurrency
         eval_module = _AvatarEvalModule(self, actor, return_outputs)
-        run_parallel = Parallel(run=run, num_threads=num_threads, disable_progress_bar=False)
+        run_parallel = Parallel(run=run, max_concurrency=max_concurrency, disable_progress_bar=False)
         exec_pairs = [(eval_module, example) for example in devset]
         parallel_results = await run_parallel(exec_pairs)
         if return_outputs:

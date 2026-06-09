@@ -53,7 +53,7 @@ async def test_copro_smoke_strict(make_run):
     compiled = await teleprompter.compile(
         student,
         trainset=[Example.from_record({"question": "2+2", "answer": "4"}, input_keys=("question",))],
-        evaluate=EvaluateCompileParams(num_threads=1),
+        evaluate=EvaluateCompileParams(max_concurrency=1),
         run=run,
     )
     assert compiled is not None

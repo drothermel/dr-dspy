@@ -77,7 +77,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         metric_fn: Callable,
         feedback_map: dict[str, Callable],
         failure_score=0.0,
-        num_threads: int | None = None,
+        max_concurrency: int | None = None,
         add_format_failure_as_feedback: bool = False,
         rng: random.Random | None = None,
         reflection_lm=None,
@@ -90,7 +90,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         self.metric_fn = metric_fn
         self.feedback_map = feedback_map
         self.failure_score = failure_score
-        self.num_threads = num_threads
+        self.max_concurrency = max_concurrency
         self.add_format_failure_as_feedback = add_format_failure_as_feedback
         self.rng = rng or random.Random(0)
         self.reflection_lm = reflection_lm
@@ -164,7 +164,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 dataset=batch,
                 run=self.run,
                 metric=self.metric_fn,
-                num_threads=self.num_threads,
+                max_concurrency=self.max_concurrency,
                 raise_on_error=False,
                 capture_failed_parses=True,
                 failure_score=self.failure_score,
@@ -188,7 +188,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         evaluator = Evaluate(
             devset=batch,
             metric=self.metric_fn,
-            num_threads=self.num_threads,
+            max_concurrency=self.max_concurrency,
             failure_score=self.failure_score,
             provide_traceback=True,
             max_errors=len(batch) * 100,

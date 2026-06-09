@@ -26,7 +26,7 @@ def test_evaluate_initialization(make_run):
     ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False)
     assert ev.devset == devset
     assert ev.metric == answer_exact_match
-    assert ev.num_threads is None
+    assert ev.max_concurrency is None
     assert not ev.display_progress
 
 
@@ -51,7 +51,7 @@ def test_evaluate_single_thread_runs_in_main_thread(make_run):
         return original_metric(example, prediction, trace)
 
     program = Predict(ts("question -> answer"))
-    ev = Evaluate(devset=devset, metric=tracking_metric, display_progress=False, num_threads=1)
+    ev = Evaluate(devset=devset, metric=tracking_metric, display_progress=False, max_concurrency=1)
     result = asyncio.run(ev(program, run=run))
     assert result.score == 100.0
     assert all(t is threading.main_thread() for t in execution_threads)
@@ -87,7 +87,7 @@ def test_multithread_evaluate_call(make_run):
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
     program = Predict(ts("question -> answer"))
     assert asyncio.run(program(question="What is 1+1?", run=run)).answer == "2"
-    ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False, num_threads=2)
+    ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False, max_concurrency=2)
     result = asyncio.run(ev(program, run=run))
     assert result.score == 100.0
 
@@ -117,7 +117,7 @@ def test_multi_thread_evaluate_call_cancelled(monkeypatch, make_run):
 
     input_thread = threading.Thread(target=sleep_then_interrupt)
     input_thread.start()
-    ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False, num_threads=2)
+    ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False, max_concurrency=2)
     with pytest.raises(KeyboardInterrupt):
         asyncio.run(ev(program, run=run))
 

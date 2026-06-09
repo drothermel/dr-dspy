@@ -52,7 +52,7 @@ class BetterTogether(Teleprompter):
         trainset: list[Example],
         teacher: Module | list[Module] | None = None,
         valset: list[Example] | None = None,
-        num_threads: int | None = None,
+        max_concurrency: int | None = None,
         max_errors: int | None = None,
         provide_traceback: bool | None = None,
         seed: int | None = None,
@@ -78,7 +78,7 @@ class BetterTogether(Teleprompter):
             trainset,
             teacher,
             valset,
-            num_threads,
+            max_concurrency,
             effective_max_errors,
             provide_traceback,
             seed,
@@ -176,7 +176,7 @@ class BetterTogether(Teleprompter):
         trainset: list[Example],
         teacher: list[Module] | None,
         valset: list[Example] | None,
-        num_threads: int | None,
+        max_concurrency: int | None,
         effective_max_errors: int | None,
         provide_traceback: bool | None,
         seed: int | None,
@@ -194,7 +194,7 @@ class BetterTogether(Teleprompter):
         launch_lms(student)
         flag_lms_launched = True
         score = await self._evaluate_on_valset(
-            student, valset, rng, num_threads, effective_max_errors, provide_traceback, run
+            student, valset, rng, max_concurrency, effective_max_errors, provide_traceback, run
         )
         self._add_candidate(candidate_programs=candidate_programs, student=student, strategy="", score=score)
         logger.info(f"{YELLOW}Baseline score:{ENDC} {score}")
@@ -221,7 +221,7 @@ class BetterTogether(Teleprompter):
                     candidate_programs,
                     current_strategy,
                     rng,
-                    num_threads,
+                    max_concurrency,
                     effective_max_errors,
                     provide_traceback,
                     run,
@@ -274,7 +274,7 @@ class BetterTogether(Teleprompter):
         candidate_programs: list,
         current_strategy: str,
         rng: random.Random,
-        num_threads: int | None,
+        max_concurrency: int | None,
         effective_max_errors: int | None,
         provide_traceback: bool | None,
         run: RunContext,
@@ -298,7 +298,7 @@ class BetterTogether(Teleprompter):
             launch_lms(student)
             lms_relaunched = True
         score = await self._evaluate_on_valset(
-            student, valset, rng, num_threads, effective_max_errors, provide_traceback, run
+            student, valset, rng, max_concurrency, effective_max_errors, provide_traceback, run
         )
         self._add_candidate(
             candidate_programs=candidate_programs, student=student, strategy=current_strategy, score=score
@@ -322,7 +322,7 @@ class BetterTogether(Teleprompter):
         program: Module,
         valset: list[Example] | None,
         rng: random.Random,
-        num_threads: int | None,
+        max_concurrency: int | None,
         effective_max_errors: int | None,
         provide_traceback: bool | None,
         run: RunContext,
@@ -334,7 +334,7 @@ class BetterTogether(Teleprompter):
         evaluate = Evaluate(
             devset=valset,
             metric=self.metric,
-            num_threads=num_threads,
+            max_concurrency=max_concurrency,
             max_errors=effective_max_errors,
             display_table=False,
             display_progress=True,

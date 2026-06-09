@@ -19,7 +19,7 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         max_labeled_demos=16,
         max_rounds=1,
         num_candidate_programs=16,
-        num_threads=None,
+        max_concurrency=None,
         max_errors=None,
         stop_at_score=None,
         metric_threshold=None,
@@ -27,7 +27,7 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         self.metric = metric
         self.teacher_run = teacher_run
         self.max_rounds = max_rounds
-        self.num_threads = num_threads
+        self.max_concurrency = max_concurrency
         self.stop_at_score = stop_at_score
         self.metric_threshold = metric_threshold
         self.min_num_samples = 1
@@ -84,7 +84,7 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
             evaluate = Evaluate(
                 devset=self.valset,
                 metric=self.metric,
-                num_threads=self.num_threads,
+                max_concurrency=self.max_concurrency,
                 max_errors=effective_max_errors,
                 display_table=False,
                 display_progress=True,

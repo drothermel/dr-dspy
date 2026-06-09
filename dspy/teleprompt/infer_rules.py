@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
 
 
 class InferRules(BootstrapFewShot):
-    def __init__(self, num_candidates=10, num_rules=10, num_threads=None, teacher_run=None, **kwargs) -> None:
+    def __init__(self, num_candidates=10, num_rules=10, max_concurrency=None, teacher_run=None, **kwargs) -> None:
         super().__init__(teacher_run=teacher_run, **kwargs)
         self.num_candidates = num_candidates
         self.num_rules = num_rules
-        self.num_threads = num_threads
+        self.max_concurrency = max_concurrency
         self.rules_induction_program = RulesInductionProgram(num_rules, teacher_run=teacher_run)
         self.metric = kwargs.get("metric")
         self.max_errors = kwargs.get("max_errors")
@@ -113,7 +113,7 @@ class InferRules(BootstrapFewShot):
         evaluate = Evaluate(
             devset=dataset,
             metric=self.metric,
-            num_threads=self.num_threads,
+            max_concurrency=self.max_concurrency,
             max_errors=effective_max_errors,
             display_table=False,
             display_progress=True,

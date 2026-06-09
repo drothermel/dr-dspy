@@ -95,5 +95,5 @@ def test_fork_callbacks_and_trace():
 def test_default_execution_config():
     lm = DummyLM([{"answer": "ok"}])
     run = RunContext.create(lm=lm, adapter=JSONAdapter(), init_run_log=False)
-    assert run.execution.num_threads == 8
+    assert run.execution.max_concurrency == 8
     assert run.execution.max_errors == 10

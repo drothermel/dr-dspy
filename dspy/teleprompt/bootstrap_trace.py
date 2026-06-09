@@ -34,7 +34,7 @@ async def bootstrap_trace_data(
     dataset: list[Example],
     run: RunContext,
     metric: Callable | None = None,
-    num_threads: int | None = None,
+    max_concurrency: int | None = None,
     raise_on_error=True,
     capture_failed_parses=False,
     failure_score: float = 0,
@@ -45,7 +45,7 @@ async def bootstrap_trace_data(
     _ = capture_failed_parses
     evaluator = Evaluate(
         devset=dataset,
-        num_threads=num_threads,
+        max_concurrency=max_concurrency,
         display_progress=True,
         provide_traceback=False,
         max_errors=len(dataset) * 10,

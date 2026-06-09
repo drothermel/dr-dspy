@@ -34,12 +34,12 @@ class BootstrapFewShotWithOptuna(Teleprompter):
         max_labeled_demos=16,
         max_rounds=1,
         num_candidate_programs=16,
-        num_threads=None,
+        max_concurrency=None,
     ) -> None:
         self.metric = metric
         self.teacher_run = teacher_run
         self.max_rounds = max_rounds
-        self.num_threads = num_threads
+        self.max_concurrency = max_concurrency
         self.min_num_samples = 1
         self.max_num_samples = max_bootstrapped_demos
         self.num_candidate_sets = num_candidate_programs
@@ -49,7 +49,7 @@ class BootstrapFewShotWithOptuna(Teleprompter):
         evaluate = Evaluate(
             devset=self.valset,
             metric=self.metric,
-            num_threads=self.num_threads,
+            max_concurrency=self.max_concurrency,
             display_table=False,
             display_progress=True,
         )

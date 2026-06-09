@@ -20,7 +20,7 @@ import tqdm
 
 from dspy.primitives.prediction import Prediction
 from dspy.runtime.run_context import RunContext
-from dspy.utils.async_parallel import run_bounded
+from dspy.utils.async_parallel import resolve_max_concurrency, run_bounded
 from dspy.utils.callback import with_callbacks
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,6 @@ class Evaluate:
         *,
         devset: list["Example"],
         metric: Callable | None = None,
-        num_threads: int | None = None,
         max_concurrency: int | None = None,
         display_progress: bool = False,
         display_table: bool | int = False,
@@ -53,8 +52,7 @@ class Evaluate:
     ) -> None:
         self.devset = devset
         self.metric = metric
-        self.max_concurrency = max_concurrency if max_concurrency is not None else num_threads
-        self.num_threads = self.max_concurrency
+        self.max_concurrency = max_concurrency
         self.display_progress = display_progress
         self.display_table = display_table
         self.max_errors = max_errors
@@ -70,7 +68,6 @@ class Evaluate:
         run: RunContext,
         metric: Callable | None = None,
         devset: list["Example"] | None = None,
-        num_threads: int | None = None,
         max_concurrency: int | None = None,
         display_progress: bool | None = None,
         display_table: bool | int | None = None,
@@ -80,12 +77,10 @@ class Evaluate:
     ) -> EvaluationResult:
         metric = metric if metric is not None else self.metric
         devset = devset if devset is not None else self.devset
-        concurrency = (
-            max_concurrency
-            if max_concurrency is not None
-            else num_threads
-            if num_threads is not None
-            else self.max_concurrency
+        concurrency = resolve_max_concurrency(
+            explicit=max_concurrency,
+            configured=self.max_concurrency,
+            run=run,
         )
         display_progress = display_progress if display_progress is not None else self.display_progress
         display_table = display_table if display_table is not None else self.display_table
@@ -111,7 +106,7 @@ class Evaluate:
         results, _stats = await run_bounded(
             items=devset,
             fn=process_item,
-            max_concurrency=concurrency or run.execution.num_threads,
+            max_concurrency=concurrency,
             disable_progress_bar=not display_progress,
             max_errors=max_errors,
             provide_traceback=provide_traceback,

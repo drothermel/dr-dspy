@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 class ExecutionConfig(BaseModel):
-    num_threads: int = 8
+    max_concurrency: int = 8
     max_errors: int = 10
     provide_traceback: bool = False
     allow_tool_async_sync_conversion: bool = False

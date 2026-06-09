@@ -8,7 +8,28 @@ import tqdm
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Sequence
+
+    from dspy.runtime.run_context import RunContext
+
 logger = logging.getLogger(__name__)
+
+
+def resolve_max_concurrency(
+    *,
+    explicit: int | None = None,
+    configured: int | None = None,
+    run: RunContext | None = None,
+    default: int = 8,
+) -> int:
+    if explicit is not None:
+        return explicit
+    if configured is not None:
+        return configured
+    if run is not None:
+        return run.execution.max_concurrency
+    return default
+
+
 T = TypeVar("T")
 R = TypeVar("R")
 

@@ -126,7 +126,7 @@ class GEPA(Teleprompter):
         component_selector: ReflectionComponentSelector | str = "round_robin",
         use_merge: bool = True,
         max_merge_invocations: int | None = 5,
-        num_threads: int | None = None,
+        max_concurrency: int | None = None,
         failure_score: float = 0.0,
         perfect_score: float = 1.0,
         log_dir: str | None = None,
@@ -163,7 +163,7 @@ class GEPA(Teleprompter):
         self.add_format_failure_as_feedback = add_format_failure_as_feedback
         self.use_merge = use_merge
         self.max_merge_invocations = max_merge_invocations
-        self.num_threads = num_threads
+        self.max_concurrency = max_concurrency
         self.failure_score = failure_score
         self.perfect_score = perfect_score
         self.log_dir = log_dir
@@ -277,7 +277,7 @@ class GEPA(Teleprompter):
             metric_fn=self.metric_fn,
             feedback_map=feedback_map,
             failure_score=self.failure_score,
-            num_threads=self.num_threads,
+            max_concurrency=self.max_concurrency,
             add_format_failure_as_feedback=self.add_format_failure_as_feedback,
             rng=rng,
             reflection_lm=self.reflection_lm,

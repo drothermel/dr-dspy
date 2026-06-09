@@ -30,7 +30,7 @@ class MIPROv2(Teleprompter):
         max_labeled_demos: int = 4,
         auto: Literal["light", "medium", "heavy"] | None = "light",
         num_candidates: int | None = None,
-        num_threads: int | None = None,
+        max_concurrency: int | None = None,
         max_errors: int | None = None,
         seed: int = 9,
         init_temperature: float = 1.0,
@@ -58,7 +58,7 @@ class MIPROv2(Teleprompter):
         self.teacher_run = teacher_run
         self.prompt_model_total_calls = 0
         self.total_calls = 0
-        self.num_threads = num_threads
+        self.max_concurrency = max_concurrency
         self.max_errors = max_errors
         self.metric_threshold = metric_threshold
         self.seed = seed
@@ -127,7 +127,7 @@ class MIPROv2(Teleprompter):
         evaluate = Evaluate(
             devset=valset,
             metric=self.metric,
-            num_threads=self.num_threads,
+            max_concurrency=self.max_concurrency,
             max_errors=effective_max_errors,
             display_table=False,
             display_progress=True,
