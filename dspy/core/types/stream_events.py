@@ -89,3 +89,9 @@ class LMStreamErrorEvent(LMStreamEvent):
     type: Literal["error"] = "error"
     error: Exception
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    def to_json(self) -> str:
+        import orjson
+
+        payload = {"type": self.type, "error": str(self.error), "error_type": type(self.error).__name__}
+        return orjson.dumps(payload).decode()

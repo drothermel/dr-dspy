@@ -41,3 +41,13 @@ def test_stream_builder_rejects_incomplete_tool_call_arguments():
     )
     with pytest.raises(ValueError, match="tool-call arguments"):
         builder.to_response()
+
+
+def test_lm_stream_error_event_serializes_to_json():
+    from dspy.core.types.stream_events import LMStreamErrorEvent
+
+    event = LMStreamErrorEvent(error=RuntimeError("stream failed"))
+    payload = event.to_json()
+    assert '"type":"error"' in payload.replace(" ", "")
+    assert "stream failed" in payload
+    assert "RuntimeError" in payload
