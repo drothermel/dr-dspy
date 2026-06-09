@@ -129,19 +129,6 @@ def interpreter_context(rlm: RLM, execution_tools: dict[str, Callable]) -> Itera
             repl.shutdown()
 
 
-def extract_fallback(
-    rlm: RLM, variables: list[REPLVariable], history: REPLHistory, output_field_names: list[str]
-) -> Prediction:
-    logger.warning("RLM reached max iterations, using extract to get final output")
-    variables_info = [variable.format() for variable in variables]
-    extract_pred = rlm.extract(variables_info=variables_info, turn_log=history)
-    return Prediction(
-        turn_log=history,
-        final_reasoning="Extract forced final output",
-        **{name: getattr(extract_pred, name) for name in output_field_names},
-    )
-
-
 async def aextract_fallback(
     rlm: RLM,
     variables: list[REPLVariable],
@@ -220,33 +207,6 @@ def execute_code(repl: CodeInterpreter, code: str, input_args: dict[str, Any]) -
         return repl.execute(code, variables=dict(input_args))
     except (CodeInterpreterError, SyntaxError) as e:
         return f"[Error] {e}"
-
-
-def execute_iteration(
-    rlm: RLM,
-    repl: CodeInterpreter,
-    variables: list[REPLVariable],
-    history: REPLHistory,
-    iteration: int,
-    input_args: dict[str, Any],
-    output_field_names: list[str],
-) -> Prediction | REPLHistory:
-    variables_info = [variable.format() for variable in variables]
-    action = rlm.generate_action(
-        variables_info=variables_info, turn_log=history, iteration=f"{iteration + 1}/{rlm.max_iterations}"
-    )
-    if rlm.verbose:
-        logger.info(
-            f"RLM iteration {iteration + 1}/{rlm.max_iterations}\nReasoning: {action.reasoning}\nCode:\n{action.code}"
-        )
-    try:
-        code = _strip_code_fences(action.code)
-    except SyntaxError as e:
-        code = action.code
-        result = f"[Error] {e}"
-        return process_execution_result(rlm, action, code, result, history, output_field_names)
-    result = execute_code(repl, code, input_args)
-    return process_execution_result(rlm, action, code, result, history, output_field_names)
 
 
 async def aexecute_iteration(

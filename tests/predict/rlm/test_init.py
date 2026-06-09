@@ -7,6 +7,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool
 from dspy.clients.lm import LM
 from dspy.predict.rlm import RLM
+from dspy.predict.rlm import tools as rlm_tools
 from dspy.testing import DummyLM
 from tests.mock_interpreter import MockInterpreter
 from tests.predict.rlm.conftest import FailingSubLM
@@ -105,7 +106,7 @@ class TestRLMInitialization:
         sub_lm = FailingSubLM()
         run = make_run(lm=sub_lm)
         rlm = RLM(ts("context -> answer"), max_llm_calls=10, sub_lm=sub_lm)
-        tools = rlm._make_llm_tools(run=run)
+        tools = rlm_tools.make_llm_tools(rlm, run=run)
         results = tools["llm_query_batched"](prompts=["test prompt"])
         assert len(results) == 1
         assert results[0].startswith("[ERROR]")
@@ -117,7 +118,7 @@ class TestRLMInitialization:
         sub_lm = DummyLM([{"response": "response"} for _ in range(11)], adapter=ChatAdapter())
         run = make_run(lm=sub_lm, adapter=ChatAdapter())
         rlm = RLM(ts("context -> answer"), max_llm_calls=10, sub_lm=sub_lm)
-        tools = rlm._make_llm_tools(run=run)
+        tools = rlm_tools.make_llm_tools(rlm, run=run)
         call_count = [0]
         errors = []
 

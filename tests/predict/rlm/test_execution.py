@@ -4,7 +4,9 @@ import pytest
 
 from dspy.adapters.types.tool import Tool
 from dspy.history import REPLEntry, REPLHistory, REPLVariable, TurnEvent
-from dspy.predict.rlm import RLM, _strip_code_fences
+from dspy.predict.rlm import RLM
+from dspy.predict.rlm import execution as rlm_execution
+from dspy.predict.rlm.sync_bridge import _strip_code_fences
 from dspy.primitives import CodeInterpreterError, FinalOutput
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.testing import DummyLM
@@ -58,20 +60,16 @@ class TestRLMFormatting:
         assert "iteration" in action_sig.input_fields
 
     def test_format_output(self):
-        rlm = RLM(ts("context -> answer"))
-        formatted = rlm._format_output("output text")
+        formatted = rlm_execution.format_output("output text")
         assert "output text" in formatted
 
     def test_format_output_empty(self):
-        rlm = RLM(ts("context -> answer"))
-        formatted = rlm._format_output("")
+        formatted = rlm_execution.format_output("")
         assert "no output" in formatted.lower()
 
     def test_format_output_passthrough(self):
-        rlm = RLM(ts("context -> answer"), max_output_chars=100)
-        long_output = "a" * 200
-        formatted = rlm._format_output(long_output)
-        assert formatted == long_output
+        formatted = rlm_execution.format_output("a" * 200)
+        assert formatted == "a" * 200
 
     def test_format_variable_info_string(self):
         var = REPLVariable.from_value("context", "Hello world", preview_chars=5)
@@ -92,7 +90,7 @@ class TestRLMFormatting:
 
     def test_build_variables_multiple(self):
         rlm = RLM(ts("context, query -> answer"))
-        variables = rlm._build_variables(context="Hello world", query="What is this?")
+        variables = rlm_execution.build_variables(rlm, context="Hello world", query="What is this?")
         assert len(variables) == 2
         formatted = "\n\n".join(v.format() for v in variables)
         assert "Variable: `context`" in formatted
@@ -201,7 +199,7 @@ class TestREPLTypes:
             name="QASig",
         )
         rlm = RLM(QASig, max_iterations=3)
-        variables = rlm._build_variables(context="Some text", question="What?")
+        variables = rlm_execution.build_variables(rlm, context="Some text", question="What?")
         context_var = next(v for v in variables if v.name == "context")
         assert context_var.desc == "Background information"
         question_var = next(v for v in variables if v.name == "question")
