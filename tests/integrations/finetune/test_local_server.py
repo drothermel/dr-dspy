@@ -66,7 +66,7 @@ def test_kill_local_server_restores_endpoint():
     lm.kwargs["api_base"] = "http://localhost:8000/v1"
     lm.kwargs["api_key"] = "local"
 
-    with patch("dspy._internal.lazy_import.import_optional") as import_optional:
+    with patch("dspy.integrations.finetune.local_server.import_optional") as import_optional:
         import_optional.return_value.terminate_process = MagicMock()
         kill_local_server(lm)
 

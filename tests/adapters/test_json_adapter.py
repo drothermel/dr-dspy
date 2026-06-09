@@ -251,8 +251,8 @@ def test_json_adapter_parse_raise_error_on_mismatch_fields():
     assert e.value.adapter_name == "JSONAdapter"
     assert e.value.task_spec == signature
     assert e.value.lm_response == "{'answer1': 'Paris'}"
-    assert e.value.parsed_result == {}
-    assert "missing field(s): ['answer']" in str(e.value)
+    assert e.value.parsed_result == {"answer1": "Paris"}
+    assert "unexpected field(s): ['answer1']" in str(e.value)
 
 
 def test_json_adapter_with_tool():
@@ -292,7 +292,7 @@ def test_json_adapter_with_tool():
     assert "{'country': {'type': 'string'}, 'year': {'type': 'integer'}}" in messages[1]["content"]
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content='{"answer":"sunny","tool_calls":{"tool_calls":[]}}'))],
+            choices=[Choices(message=Message(content='{"answer":"sunny"}'))],
             model="openai/gpt-4o-mini",
         )
         lm = LM(model="openai/gpt-4o-mini")
