@@ -106,7 +106,7 @@ Environment variables:
 
 When `telemetry.call_log` is `disk` or `both`, `RunContext.create(...)` creates `{DSPY_LOG_DIR}/{DSPY_RUN_ID}/{timestamp}/` with `run.json` and append-only `calls.jsonl` for every LM call.
 
-Inspect calls with `run.inspect_call_log()` or `run.read_call_log()`. See `docs/migration/history.md` for the full agent vs call vs optimization vocabulary.
+Inspect calls with `run.inspect_call_log()` or `run.read_call_log()` (RunContext only). When memory `call_log` is empty and disk logging is enabled, both APIs tail `run.log_session` `calls.jsonl`. For per-LM or per-module lists, use `pretty_print_call_log(lm.call_log)` from `dspy.runtime`. See `docs/migration/history.md` for the full agent vs call vs optimization vocabulary.
 
 Optimizer/bootstrap teacher contexts must include a configured `adapter` (use `optimizer_lm_context` from `dspy.teleprompt.core`).
 

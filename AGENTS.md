@@ -161,7 +161,7 @@ Environment variables:
 - `DSPY_LOG_DIR` — root directory for run logs (default: `logs/` relative to cwd)
 - `DSPY_RUN_ID` — experiment bucket name (default: `default_run`)
 
-Each `RunContext.create(...)` with `call_log` in `(disk, both)` creates `{DSPY_LOG_DIR}/{DSPY_RUN_ID}/{timestamp}/` with `run.json` and append-only `calls.jsonl` for every LM call. Use `run.inspect_call_log()` or `run.read_call_log()` to inspect calls.
+Each `RunContext.create(...)` with `call_log` in `(disk, both)` creates `{DSPY_LOG_DIR}/{DSPY_RUN_ID}/{timestamp}/` with `run.json` and append-only `calls.jsonl` for every LM call. Use `run.inspect_call_log()` or `run.read_call_log()` to inspect calls (RunContext only; disk JSONL fallback when memory is empty). For scoped LM/module lists use `pretty_print_call_log(lm.call_log)` from `dspy.runtime`.
 
 See `docs/migration/runcontext.md` for the full settings → RunContext translation table.
 See `docs/migration/history.md` for turn logs, call logs, and optimization traces.

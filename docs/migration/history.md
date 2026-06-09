@@ -24,7 +24,7 @@ Dict-shaped `turn_log` / `REPLHistory` values passed as task inputs are normaliz
 | `disable_history`, `max_history_size`, `run_log_enabled` | `TelemetryConfig.call_log` (`CallLogMode`) |
 | `run.trace`, `max_trace_size` | `run.optimization_trace`, `max_optimization_trace_entries` |
 | ReAct/CodeAct `trajectory` dict | `TurnLog` via `turn_log` |
-| `utils/inspect_history.py` | `utils/inspect_call_log.py` |
+| `utils/inspect_history.py` | `dspy/runtime/inspect_call_log.py` (`pretty_print_call_log`) |
 
 ## Agent turn logs (`TurnLog`)
 
@@ -57,12 +57,16 @@ run = RunContext.create(
 
 await program(question="...", run=run)
 
-run.inspect_call_log(n=1)          # pretty-print last call
-records = run.read_call_log(n=10)  # notebook-friendly list[dict]
+run.inspect_call_log(n=1)          # pretty-print last call (RunContext only)
+records = run.read_call_log(n=10)  # notebook-friendly list[dict]; tails calls.jsonl when memory is empty and call_log is disk|both
 lm.call_log[-1].request.messages   # typed LMRequest on CallRecord
+
+# Scoped debugging (per-LM or per-module lists)
+from dspy.runtime import pretty_print_call_log
+pretty_print_call_log(lm.call_log, n=1)
 ```
 
-`CallLogMode`: `off` | `memory` | `disk` | `both` (default). `max_call_log_entries=0` disables memory logging.
+`CallLogMode`: `off` | `memory` | `disk` | `both` (default). `max_call_log_entries=0` disables memory logging. With `call_log=disk`, `run.read_call_log()` and `run.inspect_call_log()` read from `run.log_session` disk records.
 
 Disk logging is scoped to `RunContext.log_session` (no process-global session). Forked runs share the same disk session but isolate memory via `run.fork(call_log=[], optimization_trace=[])`.
 

@@ -97,20 +97,6 @@ Fix direction:
 - Add a test that mutating the original dict after construction does not affect
   `Completions`.
 
-### B.6 Harden `inspect_call_log` against content-less assistant messages
-
-**Source:** Spine parallel review.
-
-`dspy/runtime/inspect_call_log.py` mixes required-key indexing (`msg["content"]`,
-`msg["role"]`) with defensive `.get()` elsewhere. An OpenAI-format assistant
-message carrying only `tool_calls` has no `content`, so `msg["content"]` raises
-`KeyError` and aborts the entire debug print.
-
-Fix direction:
-
-- Use `.get("content")` and treat absent content as empty.
-- Keep the rest of the pretty-printer behavior unchanged.
-
 ### B.7 Clarify `Module.load_state` atomicity
 
 **Source:** Spine parallel review.

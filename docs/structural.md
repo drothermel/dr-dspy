@@ -182,6 +182,8 @@ replaces `validate_compiled_call`; `ModuleCallOptions` in `dspy.runtime.call_opt
 
 ### P1.2 Centralize run logs, call logs, and inspection
 
+**Status:** Done (2026-06).
+
 **Sources:** Both reviews; External review.
 
 Problem:
@@ -207,6 +209,13 @@ Details to preserve:
 - Current call-log records and append timing should remain stable.
 - Debug pretty-printing can be lazy-imported so ordinary `RunContext` imports do
   not pull terminal formatting helpers.
+
+**Delivered:** `dspy/runtime/log_paths.py`, `log_redaction.py`, `run_log_session.py`;
+`dspy/runtime/call_log/{coordinator,disk_record,inspect}.py`; memory fan-out and disk
+append moved out of `BaseLM`; `RunContext.inspect_call_log` / `read_call_log` only
+(with disk JSONL fallback when memory is empty); removed `Module.inspect_call_log` and
+`BaseLM.inspect_call_log`; lazy pretty-print via `call_log/inspect.py`; deleted
+`dspy/runtime/run_log.py`.
 
 ### P1.3 Make ambient run state ownership explicit
 
