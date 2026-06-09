@@ -5,6 +5,7 @@ import pytest
 from dspy.adapters.call.pipeline import AdapterCallPipeline
 from dspy.adapters.call.wrappers import HintInjectingAdapter
 from dspy.adapters.chat_adapter import ChatAdapter
+from dspy.clients.lm import LM
 from tests.adapters.conftest import CapturingLM, StopAdapterCallCapture, make_adapter_run
 from tests.task_spec.helpers import ts
 
@@ -58,3 +59,69 @@ async def test_hint_injecting_adapter_refreshes_policies_from_inner():
     inner.response_format_policy = new_policy
     wrapper._sync_policies_from_inner()
     assert wrapper.response_format_policy is new_policy
+
+
+@pytest.mark.asyncio
+async def test_hint_injecting_adapter_injects_hint_into_user_message():
+    inner = ChatAdapter()
+    task_spec = ts("question -> answer", instructions="Answer the question.")
+    wrapper = HintInjectingAdapter(
+        inner=inner,
+        hint_map={"predict": "focus on brevity"},
+        task_spec_to_name={task_spec: "predict"},
+    )
+    lm = CapturingLM(LM("openai/gpt-4o-mini"))
+    with pytest.raises(StopAdapterCallCapture):
+        await wrapper(
+            lm=lm,
+            config={},
+            task_spec=task_spec,
+            demos=[],
+            inputs={"question": "What is DSPy?"},
+            run=make_adapter_run(lm=lm, adapter=wrapper),
+        )
+    user_message = lm.calls[0]["request"].messages[-1].text
+    assert isinstance(user_message, str)
+    assert "focus on brevity" in user_message
+    assert "[[ ## hint_ ## ]]" in user_message
+
+
+@pytest.mark.asyncio
+async def test_hint_injecting_adapter_uses_na_for_unknown_task_spec():
+    inner = ChatAdapter()
+    task_spec = ts("question -> answer", instructions="Answer the question.")
+    wrapper = HintInjectingAdapter(inner=inner, hint_map={}, task_spec_to_name={})
+    lm = CapturingLM(LM("openai/gpt-4o-mini"))
+    with pytest.raises(StopAdapterCallCapture):
+        await wrapper(
+            lm=lm,
+            config={},
+            task_spec=task_spec,
+            demos=[],
+            inputs={"question": "What is DSPy?"},
+            run=make_adapter_run(lm=lm, adapter=wrapper),
+        )
+    user_message = lm.calls[0]["request"].messages[-1].text
+    assert isinstance(user_message, str)
+    assert "N/A" in user_message
+
+
+@pytest.mark.asyncio
+async def test_hint_injecting_adapter_syncs_capabilities_on_each_call():
+    from dataclasses import replace
+
+    inner = ChatAdapter()
+    wrapper = HintInjectingAdapter(inner=inner, hint_map={}, task_spec_to_name={})
+    inner.capabilities = replace(inner.capabilities, supports_finetune=not inner.capabilities.supports_finetune)
+    task_spec = ts("question -> answer", instructions="Answer.")
+    lm = CapturingLM(LM("openai/gpt-4o-mini"))
+    with pytest.raises(StopAdapterCallCapture):
+        await wrapper(
+            lm=lm,
+            config={},
+            task_spec=task_spec,
+            demos=[],
+            inputs={"question": "hi"},
+            run=make_adapter_run(lm=lm, adapter=wrapper),
+        )
+    assert wrapper.capabilities.supports_finetune == inner.capabilities.supports_finetune
