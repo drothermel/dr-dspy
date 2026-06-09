@@ -1,5 +1,4 @@
 import logging
-import random
 from typing import Any
 
 from typing_extensions import override
@@ -49,21 +48,17 @@ class Predict(Module):
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"Predict requires a TaskSpec instance, got {type(task_spec).__name__}.")
         super().__init__(callbacks=callbacks, run=run)
-        self.stage = random.randbytes(8).hex()
         self.task_spec: TaskSpec = task_spec
         self.config = config or LMConfig()
         self.reset()
 
     def reset(self) -> None:
         self.lm = None
-        self.traces = []
-        self.train = []
         self.demos = []
 
     @override
     def dump_state(self, json_mode=True):
-        state_keys = ["traces", "train"]
-        state = {k: getattr(self, k) for k in state_keys}
+        state: dict[str, Any] = {}
         state["demos"] = []
         for demo in self.demos:
             demo = demo.fork()

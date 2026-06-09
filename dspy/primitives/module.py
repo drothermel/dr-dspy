@@ -21,7 +21,7 @@ from dspy.runtime.callback import ACTIVE_RUN
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-    from dspy.core.types import LMForward
+    from dspy.clients.base_lm import BaseLM
     from dspy.core.types.call_options import ModuleCallOptions
     from dspy.primitives.batch_result import BatchResult
     from dspy.primitives.example import Example
@@ -292,17 +292,17 @@ class Module:
     ) -> Prediction:
         raise NotImplementedError(f"{type(self).__name__} must implement _aforward_impl().")
 
-    def set_lm(self, lm: LMForward | None) -> None:
+    def set_lm(self, lm: BaseLM | None) -> None:
         for _, predictor in self.named_predictors():
             predictor.lm = lm
 
-    def get_lm(self) -> LMForward:
+    def get_lm(self) -> BaseLM:
         lm = self.optional_lm()
         if lm is None:
             raise ValueError("No LM is configured on this module's predictors.")
         return lm
 
-    def optional_lm(self) -> LMForward | None:
+    def optional_lm(self) -> BaseLM | None:
         """Return the module's LM when all predictors share one; otherwise ``None`` or raise."""
         all_used_lms = [predictor.lm for _, predictor in self.named_predictors()]
         if not all_used_lms:

@@ -97,13 +97,9 @@ def test_initialization_with_string_signature():
 def test_reset_method(make_run):
     predict_instance = Predict(pspec("input -> output"))
     cast("Any", predict_instance).lm = "modified"
-    predict_instance.traces = ["trace"]
-    predict_instance.train = ["train"]
     predict_instance.demos = ["demo"]
     predict_instance.reset()
     assert predict_instance.lm is None
-    assert predict_instance.traces == []
-    assert predict_instance.train == []
     assert predict_instance.demos == []
 
 

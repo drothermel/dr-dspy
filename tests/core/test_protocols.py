@@ -22,6 +22,14 @@ def test_predict_satisfies_predictor_protocol(make_run):
     assert isinstance(predict, Predictor)
 
 
+def test_predict_with_run_satisfies_predictor_protocol(make_run):
+    run = make_run(lm=DummyLM([{"a": "ok"}]))
+    predict = Predict(ts("q -> a", instructions="Answer."), run=run)
+    predict.lm = run.lm
+    assert isinstance(predict, Predictor)
+    assert predict.demos == []
+
+
 def test_turn_log_satisfies_conversation_turn_log_protocol():
     assert isinstance(TurnLog.empty(), ConversationTurnLog)
 
