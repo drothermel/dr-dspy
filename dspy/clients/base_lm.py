@@ -20,7 +20,7 @@ from dspy.runtime.run_log import RunLogSession, append_call_record, redact_confi
 
 if TYPE_CHECKING:
     from dspy.runtime.run_context import RunContext
-    from dspy.runtime.transparency import CompiledCall
+    from dspy.runtime.transparency.types import CompiledCall
 
 LM_CLASS_STATE_KEY = "_dspy_lm_class"
 PROVIDER_OPTIONS_STATE_KEY = "_dspy_provider_options"

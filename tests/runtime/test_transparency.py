@@ -4,10 +4,12 @@ from pathlib import Path
 import pytest
 
 from dspy.adapters.json_adapter import JSONAdapter
-from dspy.core.types import LM_CONFIG_PROVENANCE_FIELDS, LMConfig
+from dspy.core.types import LMConfig
 from dspy.predict.predict import Predict
 from dspy.runtime import CallLogMode, TelemetryConfig, TransparencyMode
-from dspy.runtime.transparency import CompiledCall, TransparencyViolation, validate_compiled_call
+from dspy.runtime.transparency.report import enforce_compiled_call_transparency
+from dspy.runtime.transparency.resolve import LM_CONFIG_PROVENANCE_FIELDS
+from dspy.runtime.transparency.types import CompiledCall, TransparencyViolation
 from dspy.task_spec import TaskSpec, input_field, output_field
 from dspy.testing import DummyLM
 
@@ -24,7 +26,7 @@ def test_provenance_fields_match_lm_config():
     assert set(LM_CONFIG_PROVENANCE_FIELDS) == expected
 
 
-def test_validate_compiled_call_warn_reports_config_violations(make_run):
+def test_enforce_compiled_call_transparency_warn_reports_config_violations(make_run):
     call = CompiledCall(
         call_id="1",
         adapter_class="JSONAdapter",
@@ -34,23 +36,23 @@ def test_validate_compiled_call_warn_reports_config_violations(make_run):
         lm_model="openai/gpt-4o-mini",
         cache=False,
     )
-    violations = validate_compiled_call(call, TransparencyMode.warn)
+    violations = enforce_compiled_call_transparency(call, TransparencyMode.warn)
     assert violations == []
 
 
-def test_validate_compiled_call_strict_raises_on_missing_adapter(make_run):
+def test_enforce_compiled_call_transparency_strict_raises_on_missing_adapter(make_run):
     call = CompiledCall(call_id="1", adapter_class="", lm_model="openai/gpt-4o-mini", cache=False)
     with pytest.raises(TransparencyViolation, match="adapter not configured"):
-        validate_compiled_call(call, TransparencyMode.strict)
+        enforce_compiled_call_transparency(call, TransparencyMode.strict)
 
 
-def test_validate_compiled_call_warn_mode_does_not_raise(make_run):
+def test_enforce_compiled_call_transparency_warn_mode_does_not_raise(make_run):
     call = CompiledCall(call_id="1", adapter_class="", lm_model="openai/gpt-4o-mini", cache=False)
-    violations = validate_compiled_call(call, TransparencyMode.warn)
+    violations = enforce_compiled_call_transparency(call, TransparencyMode.warn)
     assert violations
 
 
-def test_validate_compiled_call_strict_reports_missing_max_tokens_from_lm_kwargs(make_run):
+def test_enforce_compiled_call_transparency_strict_reports_missing_max_tokens_from_lm_kwargs(make_run):
     call = CompiledCall(
         call_id="1",
         adapter_class="JSONAdapter",
@@ -62,10 +64,10 @@ def test_validate_compiled_call_strict_reports_missing_max_tokens_from_lm_kwargs
         cache=False,
     )
     with pytest.raises(TransparencyViolation, match="max_tokens"):
-        validate_compiled_call(call, TransparencyMode.strict)
+        enforce_compiled_call_transparency(call, TransparencyMode.strict)
 
 
-def test_validate_compiled_call_strict_passes_when_max_tokens_in_lm_kwargs(make_run):
+def test_enforce_compiled_call_transparency_strict_passes_when_max_tokens_in_lm_kwargs(make_run):
     call = CompiledCall(
         call_id="1",
         adapter_class="JSONAdapter",
@@ -76,10 +78,10 @@ def test_validate_compiled_call_strict_passes_when_max_tokens_in_lm_kwargs(make_
         lm_kwargs={"max_tokens": 4000},
         cache=False,
     )
-    validate_compiled_call(call, TransparencyMode.strict)
+    enforce_compiled_call_transparency(call, TransparencyMode.strict)
 
 
-def test_validate_compiled_call_strict_passes_for_explicit_call(make_run):
+def test_enforce_compiled_call_transparency_strict_passes_for_explicit_call(make_run):
     call = CompiledCall(
         call_id="1",
         adapter_class="JSONAdapter",
@@ -89,7 +91,7 @@ def test_validate_compiled_call_strict_passes_for_explicit_call(make_run):
         lm_model="openai/gpt-4o-mini",
         cache=False,
     )
-    validate_compiled_call(call, TransparencyMode.strict)
+    enforce_compiled_call_transparency(call, TransparencyMode.strict)
 
 
 def test_predict_lm_call_appends_jsonl(tmp_path, monkeypatch, make_run):

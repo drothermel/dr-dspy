@@ -14,7 +14,8 @@ from dspy.runtime.callback import ACTIVE_CALL_ID, Callback, NoOpCallback, with_c
 from dspy.runtime.config import CallLogMode, CallSite, ExecutionConfig, TelemetryConfig, TransparencyMode
 from dspy.runtime.inspect_call_log import pretty_print_call_log
 from dspy.runtime.run_context import RunContext, resolve_run
-from dspy.runtime.transparency import CompiledCall, TransparencyViolation, validate_compiled_call
+from dspy.runtime.transparency.report import enforce_compiled_call_transparency
+from dspy.runtime.transparency.types import CompiledCall, TransparencyViolation
 from dspy.runtime.usage_tracker import UsageTracker, track_usage
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
@@ -39,6 +40,7 @@ __all__ = [
     "TransparencyMode",
     "TransparencyViolation",
     "UsageTracker",
+    "enforce_compiled_call_transparency",
     "pretty_print_call_log",
     "resolve_max_concurrency",
     "resolve_max_errors",
@@ -46,7 +48,6 @@ __all__ = [
     "run_bounded",
     "run_with_trace",
     "track_usage",
-    "validate_compiled_call",
     "with_callbacks",
 ]
 

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from dspy.evaluate.evaluator import Evaluate
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.config import CallSite
-from dspy.runtime.transparency import resolve_adapter
+from dspy.runtime.transparency.resolve import require_adapter
 
 if TYPE_CHECKING:
     from dspy.evaluate.metric_contract import OptimizerMetric
@@ -42,7 +42,7 @@ def optimizer_run_context(
     lm_role: str,
     **extra,
 ) -> RunContext:
-    resolved_adapter, _notes = resolve_adapter(adapter or run.adapter)
+    resolved_adapter = require_adapter(adapter or run.adapter)
     return run.fork(lm=lm, adapter=resolved_adapter, **extra)
 
 

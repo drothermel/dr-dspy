@@ -10,7 +10,7 @@ from dspy.predict.options import reject_reserved_predict_inputs, resolve_predict
 from dspy.primitives import Module, Prediction
 from dspy.runtime.callback import Callback
 from dspy.runtime.run_context import RunContext
-from dspy.runtime.transparency import resolve_call_site, resolve_lm_config
+from dspy.runtime.transparency.resolve import merge_call_config, resolve_call_site
 from dspy.serialization.json import to_jsonable
 from dspy.task_spec.task_spec import TaskSpec
 
@@ -165,7 +165,7 @@ class Predict(Module):
             options=predict_options,
             run=run,
         )
-        config, _provenance = resolve_lm_config(lm, config)
+        config = merge_call_config(lm, config)
         call_site = resolve_call_site(
             run=run,
             default_module=type(self).__name__,

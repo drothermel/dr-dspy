@@ -7,7 +7,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from dspy.clients.openai_format.chat_request import request_messages_as_openai
 from dspy.core.types import LMRequest, LMResponse  # noqa: TC001
 from dspy.core.types.config import LMConfig, coerce_lm_config
-from dspy.runtime.transparency import resolve_call, resolve_call_site, resolve_lm_config, validate_compiled_call
+from dspy.runtime.transparency.report import enforce_compiled_call_transparency
+from dspy.runtime.transparency.resolve import (
+    merge_call_config,
+    resolve_call,
+    resolve_call_site,
+    trace_config_provenance,
+)
 from dspy.task_spec import TaskSpec  # noqa: TC001
 
 if TYPE_CHECKING:
@@ -49,7 +55,8 @@ def prepare_adapter_call(
     ]
     messages = adapter.format(task_spec=processed_task_spec, demos=demos, inputs=inputs)
     request = adapter._render_request(lm=lm, config=resolved_config, tools=tools, messages=messages)
-    request_config, provenance = resolve_lm_config(lm, resolved_config)
+    request_config = merge_call_config(lm, resolved_config)
+    provenance = trace_config_provenance(lm, request_config)
     return PreparedAdapterCall(
         original_task_spec=task_spec,
         processed_task_spec=processed_task_spec,
@@ -87,5 +94,5 @@ async def invoke_adapter_lm(
         phase=site.phase,
         lm_role=site.lm_role,
     )
-    validate_compiled_call(compiled, run.telemetry.transparency)
+    enforce_compiled_call_transparency(compiled, run.telemetry.transparency)
     return await adapter._call_lm(lm=lm, request=prepared.request, run=run, compiled=compiled)

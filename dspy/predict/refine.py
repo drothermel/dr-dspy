@@ -12,7 +12,7 @@ from dspy.primitives import Module, Prediction
 from dspy.propose.source_format import get_formatted_source
 from dspy.runtime import run_with_trace
 from dspy.runtime.run_context import RunContext, resolve_run
-from dspy.runtime.transparency import resolve_adapter
+from dspy.runtime.transparency.resolve import require_adapter
 from dspy.task_spec.framework.refine import OfferFeedbackTaskSpec
 
 
@@ -45,7 +45,7 @@ class Refine(Module):
         **inputs,
     ):
         run = resolve_run(run=run, bound_run=self.run)
-        adapter, _ = resolve_adapter(run.adapter)
+        adapter = require_adapter(run.adapter)
         advice: dict[str, str] | None = None
 
         async def execute_with_advice(attempt: SamplingAttempt) -> tuple[Prediction, list]:

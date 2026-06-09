@@ -159,10 +159,10 @@ class BootstrapFinetune(FinetuneTeleprompter):
             trace_data = filter_trace_data_for_finetune(trace_data, metric=self.metric)
             logger.info(f"After filtering with the metric, {len(trace_data)} examples remain")
         data = []
-        from dspy.runtime.transparency import resolve_adapter
+        from dspy.runtime.transparency.resolve import require_adapter
 
         configured_adapter = self.adapter[lm] if isinstance(self.adapter, dict) else self.adapter
-        adapter, _ = resolve_adapter(configured_adapter or run.adapter)
+        adapter = require_adapter(configured_adapter or run.adapter)
         data_format = infer_data_format(adapter)
         for item in trace_data:
             for trace_pred_idx, _ in enumerate(item["trace"]):

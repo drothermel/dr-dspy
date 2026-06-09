@@ -13,7 +13,7 @@ from dspy.core.types.config import LMConfig
 from dspy.errors import AdapterOperationError
 from dspy.runtime.config import CallSite
 from dspy.runtime.run_context import RunContext
-from dspy.runtime.transparency import resolve_adapter, resolve_lm_config
+from dspy.runtime.transparency.resolve import merge_call_config, require_adapter
 from dspy.task_spec import TaskSpec
 
 
@@ -47,12 +47,12 @@ class TwoStepAdapter(Adapter):
         )
 
     async def _run_extraction(self, *, original_task_spec: TaskSpec, text: str, run: RunContext) -> dict[str, Any]:
-        extraction_adapter, _adapter_notes = resolve_adapter(self.extraction_adapter or run.adapter)
+        extraction_adapter = require_adapter(self.extraction_adapter or run.adapter)
         extractor_task_spec = build_extractor_task_spec(
             original_task_spec,
             native_response_types=self.native_response_types,
         )
-        config, _provenance = resolve_lm_config(self.extraction_model, LMConfig())
+        config = merge_call_config(self.extraction_model, LMConfig())
         extraction_site = CallSite(
             module="TwoStepAdapter",
             phase="two_step.extraction",

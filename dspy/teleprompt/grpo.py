@@ -473,12 +473,12 @@ class GRPO(FinetuneTeleprompter):
                             assert trace_pred_id == pred_id
                             predictor = trace_instance[0]
                             pred_lm = predictor.lm
-                            from dspy.runtime.transparency import resolve_adapter
+                            from dspy.runtime.transparency.resolve import require_adapter
 
                             configured_adapter = (
                                 self.adapter[pred_lm] if isinstance(self.adapter, dict) else self.adapter
                             )
-                            adapter, _ = resolve_adapter(configured_adapter or run.adapter)
+                            adapter = require_adapter(configured_adapter or run.adapter)
                             if not adapter.capabilities.supports_finetune:
                                 raise TypeError(
                                     f"Adapter {adapter} does not support finetune data formatting. "

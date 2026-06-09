@@ -110,7 +110,7 @@ async def test_invoke_adapter_lm_passes_mutations_to_compiled_call():
         captured.append(list(compiled.task_spec_mutations))
 
     with (
-        patch("dspy.adapters.call.stages.validate_compiled_call", side_effect=capture_validate),
+        patch("dspy.adapters.call.stages.enforce_compiled_call_transparency", side_effect=capture_validate),
         pytest.raises(StopAdapterCallCapture),
     ):
         await invoke_adapter_lm(adapter, prepared, lm=lm, run=run)
