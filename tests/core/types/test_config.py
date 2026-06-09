@@ -12,6 +12,29 @@ from dspy.core.types import (
     LMUsage,
     User,
 )
+from dspy.core.types.config import _merge_config_overrides, _merge_lm_config
+
+
+def test_merge_lm_config_merges_extensions():
+    left = LMConfig(extensions={"a": 1})
+    right = LMConfig(extensions={"b": 2})
+    merged = _merge_lm_config(left, right)
+    assert merged is not None
+    assert merged.extensions == {"a": 1, "b": 2}
+
+
+def test_merge_config_overrides_clears_extensions_when_none():
+    config = LMConfig(extensions={"a": 1})
+    merged = _merge_config_overrides(config, {"extensions": None})
+    assert merged.extensions == {}
+
+
+def test_merge_lm_config_empty_right_extensions_preserves_left_keys():
+    left = LMConfig(extensions={"a": 1})
+    right = LMConfig(extensions={})
+    merged = _merge_lm_config(left, right)
+    assert merged is not None
+    assert merged.extensions == {"a": 1}
 
 
 def test_config_extensions_surface_in_history_kwargs():

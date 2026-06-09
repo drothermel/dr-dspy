@@ -3,6 +3,7 @@ from typing import Any, cast
 import pytest
 
 from dspy.core.types import LMAudioPart, LMDocumentPart, LMMessage, LMToolCallPart, LMVideoPart, User
+from dspy.core.types.parts.tool_calls import tool_call_part_to_openai
 from tests.core.types.conftest import history_entry
 
 
@@ -98,3 +99,16 @@ def test_document_source_url_stays_url_and_round_trips_through_history_messages(
     assert isinstance(round_tripped, LMDocumentPart)
     assert round_tripped.url == "https://example.com/report.pdf"
     assert round_tripped.data is None
+
+
+def test_tool_call_part_to_openai_preserves_canonical_fields_over_provider_data():
+    call = LMToolCallPart(
+        id="call_1",
+        name="search",
+        args={"query": "dspy"},
+        provider_data={"type": "custom", "id": "override", "function": {"name": "wrong", "arguments": "{}"}},
+    )
+    payload = tool_call_part_to_openai(call)
+    assert payload["type"] == "function"
+    assert payload["id"] == "call_1"
+    assert payload["function"] == {"name": "search", "arguments": '{"query": "dspy"}'}

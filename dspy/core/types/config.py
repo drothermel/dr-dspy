@@ -100,7 +100,12 @@ def _merge_lm_config(left: LMConfig | None, right: LMConfig | None) -> LMConfig 
     for key in right.model_fields_set:
         value = getattr(right, key)
         if key == "extensions":
-            extensions = dict(value) if value is not None else {}
+            if value is None:
+                extensions = {}
+            elif isinstance(value, Mapping):
+                extensions.update(value)
+            else:
+                extensions = dict(value)
             continue
         if key in ("reasoning", "tool_choice", "prompt_cache") and value is not None:
             left_value = data.get(key)
