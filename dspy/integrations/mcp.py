@@ -1,5 +1,6 @@
-import json
 from typing import TYPE_CHECKING, Any
+
+import orjson
 
 from dspy._internal.lazy_import import import_optional
 from dspy.adapters.types.tool import Tool, convert_input_schema_to_tool_args
@@ -32,7 +33,7 @@ def _convert_mcp_tool_result(call_tool_result: "mcp.types.CallToolResult") -> st
         if len(error_content) == 1 and isinstance(error_content[0], str):
             details = error_content[0]
         else:
-            details = json.dumps(error_content, ensure_ascii=False, default=str)
+            details = orjson.dumps(error_content).decode()
         raise RuntimeError(f"Failed to call MCP tool: {details}")
     if len(tool_content) == 1 and isinstance(call_tool_result.content[0], TextContent):
         return tool_content[0]

@@ -43,7 +43,7 @@ class SamplingState(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     best_pred: Prediction | None = None
-    best_trace: list | None = None
+    best_trace: list[Any] | None = None
     best_reward: float = -float("inf")
 
 
@@ -55,7 +55,7 @@ class SamplingMetadata(BaseModel):
     failures: int
     threshold: float | None = None
     threshold_met: bool = False
-    best_trace: list | None = None
+    best_trace: list[Any] | None = None
 
 
 def set_sampling_metadata(prediction: Prediction, metadata: SamplingMetadata) -> None:
