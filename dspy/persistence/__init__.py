@@ -13,7 +13,7 @@ import orjson
 from dspy.__metadata__ import __version__
 
 if TYPE_CHECKING:
-    from dspy.primitives import BaseModule
+    from dspy.primitives.module import Module
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def warn_dependency_version_drift(
 
 
 def save_program(
-    module: BaseModule,
+    module: Module,
     path: str | Path,
     *,
     modules_to_serialize: list[object] | None = None,

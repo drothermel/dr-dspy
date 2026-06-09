@@ -1,7 +1,6 @@
 import importlib
 from typing import Any
 
-from dspy.primitives.base_module import BaseModule
 from dspy.primitives.batch_result import BatchFailure, BatchResult
 from dspy.primitives.code_interpreter import (
     CodeInterpreter,
@@ -14,7 +13,6 @@ from dspy.primitives.record_store import RecordStore
 from dspy.primitives.sandbox_protocol import SandboxSerializable, build_repl_variable
 
 __all__ = [
-    "BaseModule",
     "BatchFailure",
     "BatchResult",
     "Module",
