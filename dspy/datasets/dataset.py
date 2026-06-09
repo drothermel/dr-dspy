@@ -1,3 +1,9 @@
+"""In-memory dataset with train/dev/test partitioning.
+
+Import ``Dataset`` from ``dspy.datasets.dataset``. Splits are materialized lazily on
+first access and shuffled with the configured seeds.
+"""
+
 from __future__ import annotations
 
 import random

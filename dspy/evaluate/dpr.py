@@ -1,3 +1,8 @@
+"""DPR-style passage normalization helpers for token overlap metrics.
+
+Import from ``dspy.evaluate.dpr`` when matching upstream DPR evaluation behavior.
+"""
+
 import unicodedata
 
 import regex
