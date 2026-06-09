@@ -1,7 +1,7 @@
 import logging
 from typing import Any, TextIO
 
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.parallel import Parallel
@@ -27,24 +27,7 @@ def _warn_direct_aforward_once(cls: type) -> None:
     )
 
 
-class ProgramMeta(type):
-    @override
-    def __call__(cls, *args, **kwargs):
-        obj = cls.__new__(cls, *args, **kwargs)
-        if isinstance(obj, cls):
-            cls.__init__(obj, *args, **kwargs)
-        return obj
-
-
-class Module(BaseModule, metaclass=ProgramMeta):
-    def __new__(cls, *_args: Any, **_kwargs: Any) -> Self:
-        instance = super().__new__(cls)
-        instance._compiled = False
-        instance.callbacks = []
-        instance.call_log = []
-        instance.run = None
-        return instance
-
+class Module(BaseModule):
     def __init__(self, callbacks=None, run: RunContext | None = None) -> None:
         self.callbacks = callbacks or []
         self.run = run
@@ -63,6 +46,10 @@ class Module(BaseModule, metaclass=ProgramMeta):
             self.call_log = []
         if not hasattr(self, "callbacks"):
             self.callbacks = []
+        if not hasattr(self, "_compiled"):
+            self._compiled = False
+        if not hasattr(self, "run"):
+            self.run = None
 
     @with_callbacks(kind="module")
     async def __call__(
@@ -177,7 +164,3 @@ class Module(BaseModule, metaclass=ProgramMeta):
             logger.warning(
                 "Failed to set LM usage. Please return `dspy.primitives.prediction.Prediction` object from Module to enable usage tracking."
             )
-
-    @override
-    def __getattribute__(self, name: str) -> Any:
-        return super().__getattribute__(name)

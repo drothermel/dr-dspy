@@ -328,6 +328,7 @@ def test_usage_tracker_no_side_effect(make_run):
 
     class MyProgram(Module):
         def __init__(self):
+            super().__init__()
             self.predict = Predict(QUESTION_ANSWER_TASK_SPEC)
 
         async def _aforward_impl(self, question: str, **kwargs: object) -> str:
