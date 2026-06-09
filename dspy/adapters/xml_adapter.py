@@ -5,14 +5,14 @@ from typing_extensions import override
 
 from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.chat_adapter import ChatAdapter
-from dspy.adapters.format_field_structure import build_field_structure_instructions
+from dspy.adapters.format_field_structure import build_field_structure_instructions, build_role_field_sections
 from dspy.adapters.utils import (
     build_multimodal_user_message_content,
     inputs_include_multimodal_custom_type_values,
     parse_output_field,
     validate_parsed_fields,
 )
-from dspy.task_spec import FieldBinding, TaskSpec, field_bindings, format_field_value, translate_field_type
+from dspy.task_spec import FieldBinding, TaskSpec, format_field_value
 from dspy.task_spec.field_spec import FIELD_NAME_BODY, FieldRole
 
 
@@ -26,7 +26,7 @@ class XMLAdapter(ChatAdapter):
     field_pattern = re.compile(rf"<(?P<name>{FIELD_NAME_BODY})>((?P<content>.*?))</\1>", re.DOTALL)
 
     @override
-    def format_field_with_value(self, fields_with_values: dict[FieldBinding, Any]) -> str:
+    def format_field_with_value(self, fields_with_values: dict[FieldBinding, Any], **kwargs: Any) -> str:
         output = []
         for binding, field_value in fields_with_values.items():
             formatted = format_field_value(field=binding.field, value=field_value)
@@ -35,16 +35,9 @@ class XMLAdapter(ChatAdapter):
 
     @override
     def format_field_structure(self, task_spec: TaskSpec) -> str:
-        def format_task_spec_fields_for_instructions(role: FieldRole) -> str:
-            return self.format_field_with_value(
-                fields_with_values={
-                    binding: translate_field_type(binding.field) for binding in field_bindings(task_spec, role=role)
-                }
-            )
-
         return build_field_structure_instructions(
-            input_section=format_task_spec_fields_for_instructions(FieldRole.INPUT),
-            output_section=format_task_spec_fields_for_instructions(FieldRole.OUTPUT),
+            input_section=build_role_field_sections(self, task_spec, FieldRole.INPUT),
+            output_section=build_role_field_sections(self, task_spec, FieldRole.OUTPUT),
         )
 
     @override

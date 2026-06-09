@@ -18,7 +18,7 @@ def _is_tool_call_dict(data: dict[str, Any]) -> bool:
     return ("name" in data and ("args" in data or "arguments" in data)) or "function" in data
 
 
-def _normalize_tool_call_dict(data: dict[str, Any], *, repair: bool = False) -> dict[str, Any]:
+def normalize_tool_call_dict(data: dict[str, Any], *, repair: bool = False) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError(f"Received invalid tool call value for `dspy.adapters.types.tool.ToolCalls`: {data}")
     if "function" in data:
@@ -102,7 +102,7 @@ class ToolCalls(Type):
 
     @classmethod
     def from_dict_list(cls, tool_calls_dicts: list[dict[str, Any]]) -> "ToolCalls":
-        tool_calls = [cls.ToolCall(**_normalize_tool_call_dict(item)) for item in tool_calls_dicts]
+        tool_calls = [cls.ToolCall(**normalize_tool_call_dict(item)) for item in tool_calls_dicts]
         return cls(tool_calls=tool_calls)
 
     @classmethod
@@ -133,7 +133,7 @@ class ToolCalls(Type):
             isinstance(item, dict) and _is_tool_call_dict(cast("dict[str, Any]", item)) for item in data
         ):
             return {
-                "tool_calls": [cls.ToolCall(**_normalize_tool_call_dict(cast("dict[str, Any]", item))) for item in data]
+                "tool_calls": [cls.ToolCall(**normalize_tool_call_dict(cast("dict[str, Any]", item))) for item in data]
             }
         if isinstance(data, dict):
             data = cast("dict[str, Any]", data)
@@ -142,7 +142,7 @@ class ToolCalls(Type):
                 if isinstance(tool_calls_data, list):
                     normalized = {
                         "tool_calls": [
-                            cls.ToolCall(**_normalize_tool_call_dict(cast("dict[str, Any]", item)))
+                            cls.ToolCall(**normalize_tool_call_dict(cast("dict[str, Any]", item)))
                             if isinstance(item, dict)
                             else item
                             for item in tool_calls_data
@@ -152,5 +152,5 @@ class ToolCalls(Type):
                         normalized["tool_call_results"] = data["tool_call_results"]
                     return normalized
             elif _is_tool_call_dict(data):
-                return {"tool_calls": [cls.ToolCall(**_normalize_tool_call_dict(data))]}
+                return {"tool_calls": [cls.ToolCall(**normalize_tool_call_dict(data))]}
         raise ValueError(f"Received invalid value for `dspy.adapters.types.tool.ToolCalls`: {data}")

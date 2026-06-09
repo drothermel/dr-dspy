@@ -15,9 +15,9 @@ import pydantic
 from pydantic import TypeAdapter
 
 from dspy.adapters.types.base_type import Type as DspyType
-from dspy.adapters.utils.fields import _annotation_is_subclass
 from dspy.adapters.utils.json_loads import load_json
 from dspy.errors import AdapterParseError
+from dspy.task_spec.field_format import _annotation_is_subclass
 from dspy.task_spec.field_spec import FieldSpec
 
 

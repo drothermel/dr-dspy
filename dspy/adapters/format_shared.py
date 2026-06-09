@@ -4,16 +4,14 @@ import re
 import textwrap
 from typing import TYPE_CHECKING, Any, cast
 
-from dspy.adapters.format_field_structure import build_field_structure_instructions
+from dspy.adapters.format_field_structure import build_field_structure_instructions, build_role_field_sections
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import build_multimodal_user_message_content, inputs_include_multimodal_custom_type_values
 from dspy.clients.openai_format.chat_request import message_to_openai_chat
 from dspy.task_spec import (
     FieldBinding,
-    field_bindings,
     format_field_value,
     get_annotation_name,
-    translate_field_type,
 )
 from dspy.task_spec.field_spec import FIELD_NAME_BODY, FieldRole
 from dspy.task_spec.formatting import get_field_spec_description_string
@@ -33,6 +31,14 @@ def format_fields_with_headers(fields_with_values: dict[FieldBinding, Any]) -> s
     return "\n\n".join(output).strip()
 
 
+def output_field_type_hint(field_type: object) -> str:
+    if field_type == ToolCalls:
+        return ' (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]})'
+    if field_type is not str:
+        return f" (must be formatted as a valid Python {get_annotation_name(field_type)})"
+    return ""
+
+
 class ChatFormatMixin:
     def format_field_description(self, task_spec: TaskSpec) -> str:
         return (
@@ -41,16 +47,9 @@ class ChatFormatMixin:
         )
 
     def format_field_structure(self, task_spec: TaskSpec) -> str:
-        def format_task_spec_fields_for_instructions(role: FieldRole) -> str:
-            return self.format_field_with_value(
-                fields_with_values={
-                    binding: translate_field_type(binding.field) for binding in field_bindings(task_spec, role=role)
-                }
-            )
-
         return build_field_structure_instructions(
-            input_section=format_task_spec_fields_for_instructions(FieldRole.INPUT),
-            output_section=format_task_spec_fields_for_instructions(FieldRole.OUTPUT),
+            input_section=build_role_field_sections(self, task_spec, FieldRole.INPUT),
+            output_section=build_role_field_sections(self, task_spec, FieldRole.OUTPUT),
             completed_marker="[[ ## completed ## ]]\n",
         )
 
@@ -91,16 +90,9 @@ class ChatFormatMixin:
         return "\n\n".join(messages).strip()
 
     def user_message_output_requirements(self, task_spec: TaskSpec) -> str:
-        def type_info(field_type: object) -> str:
-            if field_type == ToolCalls:
-                return ' (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]})'
-            if field_type is not str:
-                return f" (must be formatted as a valid Python {get_annotation_name(field_type)})"
-            return ""
-
         message = "Respond with the corresponding output fields, starting with the field "
         message += ", then ".join(
-            f"`[[ ## {f} ## ]]`{type_info(field.type_)}" for f, field in task_spec.output_fields.items()
+            f"`[[ ## {f} ## ]]`{output_field_type_hint(field.type_)}" for f, field in task_spec.output_fields.items()
         )
         message += ", and then ending with the marker for `[[ ## completed ## ]]`."
         return message
@@ -122,7 +114,7 @@ class ChatFormatMixin:
         assistant_message_content += "\n\n[[ ## completed ## ]]\n"
         return assistant_message_content
 
-    def format_field_with_value(self, fields_with_values: dict[FieldBinding, Any]) -> str:
+    def format_field_with_value(self, fields_with_values: dict[FieldBinding, Any], **kwargs: Any) -> str:
         return format_fields_with_headers(fields_with_values)
 
     def format_finetune_data(

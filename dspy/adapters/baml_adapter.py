@@ -5,6 +5,7 @@ from typing import Any, Literal, Union, cast, get_args, get_origin
 from pydantic import BaseModel
 from typing_extensions import override
 
+from dspy.adapters.format_field_structure import build_field_structure_instructions
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.utils import build_multimodal_user_message_content, inputs_include_multimodal_custom_type_values
 from dspy.task_spec import TaskSpec
@@ -111,26 +112,27 @@ class BAMLAdapter(JSONAdapter):
     @override
     def format_field_structure(self, task_spec: TaskSpec) -> str:
         self._validate_output_field_types(task_spec)
-        sections = []
-        sections.append(
-            "All interactions will be structured in the following way, with the appropriate values filled in.\n"
-        )
+        input_lines: list[str] = []
         if task_spec.input_fields:
             for name in task_spec.input_fields:
-                sections.append(f"[[ ## {name} ## ]]")
-                sections.append(f"{{{name}}}")
-                sections.append("")
+                input_lines.append(f"[[ ## {name} ## ]]")
+                input_lines.append(f"{{{name}}}")
+                input_lines.append("")
+        output_lines: list[str] = []
         if task_spec.output_fields:
             for name, field in task_spec.output_fields.items():
                 field_type = field.type_
-                sections.append(f"[[ ## {name} ## ]]")
+                output_lines.append(f"[[ ## {name} ## ]]")
                 if field.desc and field.desc != f"${{{name}}}":
-                    sections.append(f"{COMMENT_SYMBOL} {field.desc}")
-                sections.append(
+                    output_lines.append(f"{COMMENT_SYMBOL} {field.desc}")
+                output_lines.append(
                     f"Output field `{name}` should be of type: {_render_type_str(annotation=field_type, indent=0)}\n"
                 )
-        sections.append("[[ ## completed ## ]]")
-        return "\n".join(sections)
+        return build_field_structure_instructions(
+            input_section="\n".join(input_lines).strip(),
+            output_section="\n".join(output_lines).strip(),
+            completed_marker="[[ ## completed ## ]]",
+        )
 
     @override
     def format_user_message_content(

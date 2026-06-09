@@ -4,21 +4,13 @@ import json
 from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.types.tool import ToolCalls
+from dspy.adapters.types.tool.tool_calls import normalize_tool_call_dict
 from dspy.adapters.utils.json_loads import load_json
 from dspy.core.types import LMToolCallPart
 from dspy.task_spec.json_serialize import serialize_for_json
 
 if TYPE_CHECKING:
     from dspy.core.types import LMOutput
-
-
-def _load_provider_tool_arguments(arguments: str) -> dict[str, Any]:
-    """Parse provider tool-call argument strings (external wire data; repair enabled)."""
-    try:
-        parsed = load_json(arguments, repair=False)
-    except json.JSONDecodeError:
-        parsed = load_json(arguments, repair=True)
-    return parsed if isinstance(parsed, dict) else {}
 
 
 def read_provider_field(value: object, key: str, default: object = None) -> object:
@@ -35,21 +27,24 @@ def _provider_tool_call_to_tool_call_dict(tool_call: object) -> dict[str, Any]:
         if not args:
             raw_arguments = tool_call.provider_data.get("raw_arguments") or tool_call.provider_data.get("arguments")
             if isinstance(raw_arguments, str):
-                args = _load_provider_tool_arguments(raw_arguments)
-        return {"id": tool_call.id, "name": tool_call.name, "args": args}
+                args = load_json(raw_arguments, repair=True)
+                if not isinstance(args, dict):
+                    args = {}
+        return normalize_tool_call_dict(
+            {"id": tool_call.id, "name": tool_call.name, "args": args},
+            repair=True,
+        )
     function = read_provider_field(value=tool_call, key="function", default={}) or {}
     arguments = read_provider_field(value=function, key="arguments", default={})
-    if isinstance(arguments, str):
-        parsed_arguments = _load_provider_tool_arguments(arguments)
-    elif isinstance(arguments, dict):
-        parsed_arguments = arguments
-    else:
-        parsed_arguments = {}
-    return {
-        "id": read_provider_field(value=tool_call, key="id") or read_provider_field(value=tool_call, key="call_id"),
-        "name": read_provider_field(value=function, key="name") or read_provider_field(value=tool_call, key="name"),
-        "args": parsed_arguments,
-    }
+    parsed_arguments = arguments if isinstance(arguments, (str, dict)) else {}
+    return normalize_tool_call_dict(
+        {
+            "id": read_provider_field(value=tool_call, key="id") or read_provider_field(value=tool_call, key="call_id"),
+            "name": read_provider_field(value=function, key="name") or read_provider_field(value=tool_call, key="name"),
+            "args": parsed_arguments,
+        },
+        repair=True,
+    )
 
 
 def _tool_calls_from_message(message: dict[str, Any]) -> tuple[str | None, ToolCalls | None]:

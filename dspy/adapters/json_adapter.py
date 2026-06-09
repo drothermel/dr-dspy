@@ -9,12 +9,11 @@ from typing_extensions import override
 from dspy.adapters.base import Adapter
 from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.call.policies.response_format import StructuredOutputPolicy
-from dspy.adapters.format_field_structure import build_field_structure_instructions
-from dspy.adapters.format_shared import ChatFormatMixin
-from dspy.adapters.types.tool import ToolCalls
+from dspy.adapters.format_field_structure import build_field_structure_instructions, build_role_field_sections
+from dspy.adapters.format_shared import ChatFormatMixin, format_fields_with_headers, output_field_type_hint
 from dspy.adapters.utils import load_json, parse_output_field, validate_parsed_fields
 from dspy.errors import AdapterParseError
-from dspy.task_spec import FieldBinding, field_bindings, format_field_value, get_annotation_name, translate_field_type
+from dspy.task_spec import FieldBinding
 from dspy.task_spec.field_spec import FieldRole
 from dspy.task_spec.json_serialize import serialize_for_json
 
@@ -51,34 +50,19 @@ class JSONAdapter(ChatFormatMixin, Adapter):
 
     @override
     def format_field_structure(self, task_spec: TaskSpec) -> str:
-        def format_task_spec_fields_for_instructions(role: FieldRole, role_label: str) -> str:
-            return self.format_field_with_value(
-                fields_with_values={
-                    binding: translate_field_type(binding.field) for binding in field_bindings(task_spec, role=role)
-                },
-                role=role_label,
-            )
-
         return build_field_structure_instructions(
             input_preamble="Inputs will have the following structure:",
-            input_section=format_task_spec_fields_for_instructions(FieldRole.INPUT, "user"),
+            input_section=build_role_field_sections(self, task_spec, FieldRole.INPUT, role_label="user"),
             output_preamble="Outputs will be a JSON object with the following fields.",
-            output_section=format_task_spec_fields_for_instructions(FieldRole.OUTPUT, "assistant"),
+            output_section=build_role_field_sections(self, task_spec, FieldRole.OUTPUT, role_label="assistant"),
         )
 
     @override
     def user_message_output_requirements(self, task_spec: TaskSpec) -> str:
-        def type_info(field_type: object) -> str:
-            if field_type == ToolCalls:
-                return ' (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]})'
-            return (
-                f" (must be formatted as a valid Python {get_annotation_name(field_type)})"
-                if field_type is not str
-                else ""
-            )
-
         message = "Respond with a JSON object in the following order of fields: "
-        message += ", then ".join(f"`{f}`{type_info(field.type_)}" for f, field in task_spec.output_fields.items())
+        message += ", then ".join(
+            f"`{f}`{output_field_type_hint(field.type_)}" for f, field in task_spec.output_fields.items()
+        )
         message += "."
         return message
 
@@ -134,12 +118,8 @@ class JSONAdapter(ChatFormatMixin, Adapter):
         return fields
 
     @override
-    def format_field_with_value(self, fields_with_values: dict[FieldBinding, Any], role: str = "user") -> str:
-        if role == "user":
-            output = []
-            for binding, field_value in fields_with_values.items():
-                formatted_field_value = format_field_value(field=binding.field, value=field_value)
-                output.append(f"[[ ## {binding.name} ## ]]\n{formatted_field_value}")
-            return "\n\n".join(output).strip()
+    def format_field_with_value(self, fields_with_values: dict[FieldBinding, Any], **kwargs: Any) -> str:
+        if kwargs.get("role", "user") == "user":
+            return format_fields_with_headers(fields_with_values)
         d = {binding.name: value for binding, value in fields_with_values.items()}
         return json.dumps(serialize_for_json(d), indent=2, ensure_ascii=False)
