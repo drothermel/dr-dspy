@@ -8,7 +8,7 @@ from dspy.clients.base_lm import BaseLM
 from dspy.compile.resolve import resolve_lm_config
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
 from dspy.core.types.config import LMConfig, _merge_lm_config, coerce_lm_config
-from dspy.predict.call_validation import resolve_predict_options, validate_task_inputs
+from dspy.predict.call_validation import resolve_predict_options
 from dspy.predict.parameter import Parameter
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
@@ -116,7 +116,6 @@ class Predict(Module, Parameter):
         task_spec = options.task_spec or self.task_spec
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"Predict expected a TaskSpec, got {type(task_spec).__name__}.")
-        validated_inputs = validate_task_inputs(task_spec, inputs)
         demos = options.demos if options.demos is not None else self.demos
         base_config = self.config
         if options.config is not None:
@@ -148,7 +147,7 @@ class Predict(Module, Parameter):
             extensions = dict(config.extensions)
             extensions["prediction"] = prediction
             config = config.model_copy(update={"extensions": extensions})
-        return lm, config, task_spec, demos, validated_inputs, run, options.trace
+        return lm, config, task_spec, demos, inputs, run, options.trace
 
     def _forward_postprocess(self, completions, task_spec, run, inputs, *, trace: bool):
         pred = Prediction.from_completions(completions, task_spec=task_spec)
@@ -168,7 +167,7 @@ class Predict(Module, Parameter):
         **inputs: Any,
     ) -> Prediction:
         predict_options = resolve_predict_options(options if isinstance(options, PredictOptions) else None)
-        lm, config, task_spec, demos, validated_inputs, run, trace = self._forward_preprocess(
+        lm, config, task_spec, demos, inputs, run, trace = self._forward_preprocess(
             inputs=inputs,
             options=predict_options,
             run=run,
@@ -184,11 +183,11 @@ class Predict(Module, Parameter):
             config=config,
             task_spec=task_spec,
             demos=demos,
-            inputs=validated_inputs,
+            inputs=inputs,
             run=run,
             call_site=call_site,
         )
-        return self._forward_postprocess(completions, task_spec, run, validated_inputs, trace=trace)
+        return self._forward_postprocess(completions, task_spec, run, inputs, trace=trace)
 
     def update_config(self, config: LMConfig) -> None:
         merged = _merge_lm_config(self.config, config)

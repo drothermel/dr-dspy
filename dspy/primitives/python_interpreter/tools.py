@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from dspy.primitives.code_interpreter import SIMPLE_TYPES, CodeInterpreterError
 from dspy.primitives.python_interpreter.deno_process import deno_stdin, send_request
-from dspy.primitives.python_interpreter.jsonrpc import JSONRPC_APP_ERRORS, await_in_sync, jsonrpc_error, jsonrpc_result
+from dspy.primitives.python_interpreter.jsonrpc import JSONRPC_APP_ERRORS, jsonrpc_error, jsonrpc_result
 
 if TYPE_CHECKING:
     from dspy.primitives.python_interpreter.interpreter import PythonInterpreter
@@ -53,7 +53,10 @@ def handle_tool_call(interpreter: "PythonInterpreter", request: dict) -> None:
             raise CodeInterpreterError(f"Unknown tool: {tool_name}")
         result = interpreter.tools[tool_name](**kwargs)
         if asyncio.iscoroutine(result):
-            result = await_in_sync(result)
+            raise TypeError(
+                "Python interpreter tools invoked from the sync JSON-RPC path must not return coroutines. "
+                "Provide a synchronous callable."
+            )
         is_json = isinstance(result, (list, dict))
         response = jsonrpc_result(
             result={

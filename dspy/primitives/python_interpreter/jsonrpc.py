@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 from os import PathLike
@@ -43,13 +42,3 @@ def jsonrpc_error(code: int, message: str, id: int | str, data: dict[str, Any] |
     if data:
         err["data"] = data
     return json.dumps({"jsonrpc": "2.0", "error": err, "id": id})
-
-
-def await_in_sync(coroutine: Any) -> Any:
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-    if loop is None:
-        return asyncio.run(coroutine)
-    return loop.run_until_complete(coroutine)

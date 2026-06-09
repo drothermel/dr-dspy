@@ -32,6 +32,9 @@ class AdapterCallPipeline:
         call_site: CallSite | None = None,
         allow_parse_fallback: bool = True,
     ) -> list[dict[str, Any]]:
+        from dspy.predict.call_validation import validate_task_inputs
+
+        inputs = validate_task_inputs(task_spec, inputs)
         if getattr(adapter, "call_mode", None) == "two_step":
             from dspy.adapters.call.two_step import TwoStepCallExecutor
 
