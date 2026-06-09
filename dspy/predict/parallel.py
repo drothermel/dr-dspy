@@ -48,16 +48,17 @@ class Parallel:
         module, example = pair
         run = self._active_run
         assert run is not None
+        item_run = run.fork(optimization_trace=[], call_log=[])
         if isinstance(example, Example):
             if self.access_examples:
-                return await module(**example.as_inputs(), run=run)
-            return await module(example, run=run)
+                return await module(**example.as_inputs(), run=item_run)
+            return await module(example, run=item_run)
         if isinstance(example, dict):
-            return await module(**example, run=run)
+            return await module(**example, run=item_run)
         if isinstance(example, list) and module.__class__.__name__ == "Parallel":
-            return await module(example, run=run)
+            return await module(example, run=item_run)
         if isinstance(example, tuple):
-            return await module(*example, run=run)
+            return await module(*example, run=item_run)
         raise ValueError(
             f"Invalid example type: {type(example)}, only supported types are Example, dict, list and tuple"
         )

@@ -104,9 +104,9 @@ class AvatarOptimizer(Teleprompter):
     async def process_example(self, actor, example, return_outputs, *, run: RunContext):
         actor = deepcopy(actor)
         try:
-            item_run = run.fork(trace=[])
+            item_run = run.fork(optimization_trace=[], call_log=[])
             prediction = await actor(**example.as_inputs(), run=item_run)
-            trace = list(item_run.trace)
+            trace = list(item_run.optimization_trace)
             score = self.metric(example, prediction, trace)
             if return_outputs:
                 return (example, prediction, score)

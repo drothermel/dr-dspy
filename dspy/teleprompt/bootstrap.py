@@ -98,17 +98,17 @@ class BootstrapFewShot(Teleprompter):
         predictor_cache = {}
         trace: list = []
         try:
-            teacher_run = (self.teacher_run or run).fork(trace=[])
+            teacher_run = (self.teacher_run or run).fork(optimization_trace=[])
             lm = teacher_run.lm
             lm = lm.copy(temperature=1.0) if round_idx > 0 else lm
             if round_idx > 0:
                 teacher_run = teacher_run.fork(lm=lm)
-            item_run = teacher_run.fork(trace=[])
+            item_run = teacher_run.fork(optimization_trace=[], call_log=[])
             for name, predictor in teacher.named_predictors():
                 predictor_cache[name] = predictor.demos
                 predictor.demos = [x for x in predictor.demos if x != example]
             prediction = await teacher(**example.as_inputs(), run=item_run)
-            trace = list(item_run.trace)
+            trace = list(item_run.optimization_trace)
             for name, predictor in teacher.named_predictors():
                 predictor.demos = predictor_cache[name]
             if self.metric:

@@ -13,7 +13,7 @@ from dspy.runtime.run_context import RunContext, disk_call_log_enabled, memory_c
 from dspy.utils.callback import BaseCallback, with_callbacks
 from dspy.utils.inspect_call_log import pretty_print_call_log
 from dspy.utils.run_log import RunLogSession, append_call_record, redact_config, redact_messages
-from dspy.utils.transparency import ACTIVE_CALL_METADATA, ACTIVE_COMPILED_CALL
+from dspy.utils.transparency import ACTIVE_CALL_METADATA, ACTIVE_COMPILED_CALL, CompiledCall
 
 LM_CLASS_STATE_KEY = "_dspy_lm_class"
 PROVIDER_OPTIONS_STATE_KEY = "_dspy_provider_options"
@@ -93,7 +93,7 @@ class BaseLM:
         return kwargs
 
     @with_callbacks(kind="lm")
-    async def __call__(self, request: LMRequest, *, run: RunContext) -> LMResponse:
+    async def __call__(self, request: LMRequest, *, run: RunContext, compiled: CompiledCall | None = None) -> LMResponse:
         if not isinstance(request, LMRequest):
             raise TypeError(
                 f"{type(self).__name__}.__call__ expects dspy.core.types.LMRequest, not {type(request).__name__}."
@@ -103,10 +103,12 @@ class BaseLM:
             raise TypeError(
                 f"{type(self).__name__}.aforward(request) must return dspy.core.types.LMResponse, but got {type(response).__name__}."
             )
-        return self._finalize_lm_response(request=request, response=response, run=run)
+        return self._finalize_lm_response(request=request, response=response, run=run, compiled=compiled)
 
-    async def acall(self, request: LMRequest, *, run: RunContext) -> LMResponse:
-        return await self.__call__(request, run=run)
+    async def acall(
+        self, request: LMRequest, *, run: RunContext, compiled: CompiledCall | None = None
+    ) -> LMResponse:
+        return await self.__call__(request, run=run, compiled=compiled)
 
     @property
     def supports_function_calling(self) -> bool:
@@ -128,7 +130,9 @@ class BaseLM:
     def cache(self) -> bool | None:
         return self.provider_options.cache
 
-    def _finalize_lm_response(self, request: LMRequest, response: LMResponse, *, run: RunContext) -> LMResponse:
+    def _finalize_lm_response(
+        self, request: LMRequest, response: LMResponse, *, run: RunContext, compiled: CompiledCall | None = None
+    ) -> LMResponse:
         if run.usage_tracker:
             usage = response.usage_as_dict()
             if usage:
@@ -152,6 +156,7 @@ class BaseLM:
                 response=response,
                 call_record=record,
                 session=run.log_session,
+                compiled=compiled,
             )
         return response
 
@@ -162,8 +167,10 @@ class BaseLM:
         response: LMResponse,
         call_record: CallRecord | None,
         session: RunLogSession | None,
+        compiled: CompiledCall | None = None,
     ) -> None:
-        compiled = ACTIVE_COMPILED_CALL.get()
+        if compiled is None:
+            compiled = ACTIVE_COMPILED_CALL.get()
         metadata = ACTIVE_CALL_METADATA.get()
         call_id = compiled.call_id if compiled is not None else call_record.uuid if call_record else str(uuid.uuid4())
         messages = _history_request_messages_as_openai(request)

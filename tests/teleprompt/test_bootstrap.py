@@ -52,7 +52,7 @@ def test_bootstrap_effectiveness(make_run):
     student = SimpleModule(ts("input -> output"))
     teacher = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "blue"}, {"output": "Ring-ding-ding-ding-dingeringeding!"}], follow_examples=True)
-    run = make_run(lm=lm, trace=[])
+    run = make_run(lm=lm, optimization_trace=[])
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
     compiled_student = asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset, run=run))
     assert len(compiled_student.predictor.demos) == 1

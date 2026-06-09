@@ -152,9 +152,9 @@ class Predict(Module, Parameter):
 
     def _forward_postprocess(self, completions, task_spec, run, inputs, *, trace: bool):
         pred = Prediction.from_completions(completions, task_spec=task_spec)
-        if trace and run.trace is not None and run.telemetry.max_trace_size > 0:
-            trace_list = run.trace
-            if len(trace_list) >= run.telemetry.max_trace_size:
+        if trace and run.optimization_trace is not None and run.telemetry.max_optimization_trace_entries > 0:
+            trace_list = run.optimization_trace
+            if len(trace_list) >= run.telemetry.max_optimization_trace_entries:
                 trace_list.pop(0)
             trace_list.append((self, dict(inputs), pred))
         return pred

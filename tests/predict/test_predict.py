@@ -976,10 +976,10 @@ def test_dump_state_pydantic_non_primitive_types(make_run):
 
 def test_trace_size_limit(make_run):
     program = Predict(pspec("question -> answer"))
-    run = make_run(lm=DummyLM([{"answer": "Paris"}]), telemetry=TelemetryConfig(max_trace_size=3))
+    run = make_run(lm=DummyLM([{"answer": "Paris"}]), telemetry=TelemetryConfig(max_optimization_trace_entries=3))
     for _ in range(10):
         asyncio.run(program(question="What is the capital of France?", run=run))
-    assert len(run.trace) == 3
+    assert len(run.optimization_trace) == 3
 
 
 def test_disable_trace(make_run):
@@ -987,7 +987,7 @@ def test_disable_trace(make_run):
     run = make_run(lm=DummyLM([{"answer": "Paris"}]))
     for _ in range(10):
         asyncio.run(program(question="What is the capital of France?", run=run, options=PredictOptions(trace=False)))
-    assert run.trace == []
+    assert run.optimization_trace == []
 
 
 def test_per_module_history_size_limit(make_run):

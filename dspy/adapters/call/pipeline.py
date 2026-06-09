@@ -114,7 +114,7 @@ class AdapterCallPipeline:
             validate_compiled_call(compiled, transparency)
             token = ACTIVE_COMPILED_CALL.set(compiled)
             try:
-                response = await adapter._call_lm(lm=lm, request=request, run=run)
+                response = await adapter._call_lm(lm=lm, request=request, run=run, compiled=compiled)
             finally:
                 ACTIVE_COMPILED_CALL.reset(token)
             return adapter._call_postprocess(

@@ -235,15 +235,15 @@ def test_evaluate_save_as_json_with_history(make_run):
         assert len(data) == 2
         assert "history" in data[0]
         assert isinstance(data[0]["history"], dict)
-        assert "messages" in data[0]["history"]
-        assert len(data[0]["history"]["messages"]) == 1
-        assert data[0]["history"]["messages"][0] == {"question": "Previous Q1", "answer": "Previous A1"}
+        assert "turns" in data[0]["history"]
+        assert len(data[0]["history"]["turns"]) == 1
+        assert data[0]["history"]["turns"][0] == {"question": "Previous Q1", "answer": "Previous A1"}
         assert "history" in data[1]
         assert isinstance(data[1]["history"], dict)
-        assert "messages" in data[1]["history"]
-        assert len(data[1]["history"]["messages"]) == 2
-        assert data[1]["history"]["messages"][0] == {"question": "Previous Q2", "answer": "Previous A2"}
-        assert data[1]["history"]["messages"][1] == {"question": "Previous Q3", "answer": "Previous A3"}
+        assert "turns" in data[1]["history"]
+        assert len(data[1]["history"]["turns"]) == 2
+        assert data[1]["history"]["turns"][0] == {"question": "Previous Q2", "answer": "Previous A2"}
+        assert data[1]["history"]["turns"][1] == {"question": "Previous Q3", "answer": "Previous A3"}
     finally:
         import os
 
@@ -271,7 +271,7 @@ def test_evaluate_save_as_csv_with_history(make_run):
             rows = list(reader)
         assert len(rows) == 1
         assert "history" in rows[0]
-        assert "messages" in rows[0]["history"]
+        assert "turns" in rows[0]["history"]
     finally:
         import os
 

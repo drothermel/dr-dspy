@@ -98,9 +98,9 @@ class Evaluate:
         tqdm.tqdm._instances.clear()
 
         async def process_item(example):
-            item_run = run.fork(trace=[])
+            item_run = run.fork(optimization_trace=[], call_log=[])
             prediction = await program(**example.as_inputs(), run=item_run)
-            trace = list(item_run.trace)
+            trace = list(item_run.optimization_trace)
             score = metric(example, prediction, trace)
             return (prediction, score)
 

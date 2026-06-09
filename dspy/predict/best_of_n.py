@@ -35,9 +35,9 @@ class BestOfN(Module):
             mod = self.module.deepcopy()
             mod.set_lm(lm_)
             try:
-                item_run = run.fork(trace=[])
+                item_run = run.fork(optimization_trace=[], call_log=[])
                 pred = await mod(**inputs, run=item_run, options=options)
-                trace = list(item_run.trace)
+                trace = list(item_run.optimization_trace)
                 reward = self.reward_fn(inputs, pred)
                 if reward > best_reward:
                     best_reward, best_pred, best_trace = (reward, pred, trace)
@@ -48,5 +48,5 @@ class BestOfN(Module):
                     raise
                 self.fail_count -= 1
         if best_trace:
-            run.trace.extend(best_trace)
+            run.optimization_trace.extend(best_trace)
         return best_pred

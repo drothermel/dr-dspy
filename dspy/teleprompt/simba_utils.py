@@ -35,13 +35,13 @@ def prepare_models_for_resampling(*, program: Module, n: int, run: RunContext, t
 def wrap_program(*, program: Module, metric: Callable, run: RunContext):
 
     async def wrapped_program(example):
-        item_run = run.fork(trace=[])
+        item_run = run.fork(optimization_trace=[], call_log=[])
         prediction, trace, score = (None, None, 0.0)
         try:
             prediction = await program(**example.as_inputs(), run=item_run)
         except Exception as e:
             logger.warning(e)
-        trace = list(item_run.trace)
+        trace = list(item_run.optimization_trace)
         output = None
         score = 0.0
         output_metadata = {}
@@ -144,7 +144,7 @@ async def append_a_rule(bucket, system, *, run: RunContext, **kwargs) -> bool:
         for k, v in kwargs.items()
     }
     with optimizer_lm_context(
-        run, lm=prompt_model, phase="simba.offer_feedback", lm_role="prompt_model", trace=[]
+        run, lm=prompt_model, phase="simba.offer_feedback", lm_role="prompt_model", optimization_trace=[]
     ) as opt_run:
         advice_program = Predict(SimbaOfferFeedbackTaskSpec())
         advice = (await advice_program(**kwargs, run=opt_run)).module_advice

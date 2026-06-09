@@ -59,7 +59,7 @@ class TwoStepCallExecutor:
         main_token = ACTIVE_COMPILED_CALL.set(main_compiled)
         metadata_token = set_active_call_metadata(module="TwoStepAdapter", phase="two_step.main", lm_role="default")
         try:
-            response = await lm.acall(request, run=run)
+            response = await lm.acall(request, run=run, compiled=main_compiled)
         finally:
             ACTIVE_COMPILED_CALL.reset(main_token)
             reset_active_call_metadata(metadata_token)

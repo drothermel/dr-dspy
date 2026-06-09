@@ -142,7 +142,7 @@ class RulesInductionProgram(Module):
         self.rng = random.Random(0)
 
     async def aforward(self, examples_text, *, run: RunContext):
-        teacher_run = (self.teacher_run or run).fork(trace=[])
+        teacher_run = (self.teacher_run or run).fork(optimization_trace=[])
         lm = teacher_run.lm.copy(temperature=1.0)
         with optimizer_lm_context(run, lm=lm, phase="infer_rules.induction", lm_role="teacher") as opt_run:
             rules = (await self.rules_induction(examples_text=examples_text, run=opt_run)).natural_language_rules

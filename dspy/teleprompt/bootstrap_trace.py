@@ -67,9 +67,9 @@ async def bootstrap_trace_data(
         options: ModuleCallOptions | None = None,
         **kwargs,
     ):
-        item_run = run.fork(trace=[])
+        item_run = run.fork(optimization_trace=[], call_log=[])
         try:
-            return (await original_aforward(run=item_run, options=options, **kwargs), list(item_run.trace))
+            return (await original_aforward(run=item_run, options=options, **kwargs), list(item_run.optimization_trace))
         except AdapterParseError as e:
             completion_str = e.lm_response
             parsed_result = e.parsed_result
@@ -84,7 +84,7 @@ async def bootstrap_trace_data(
                     break
             if found_pred is None:
                 raise ValueError(f"Failed to find the predictor for the failed task spec: {failed_task_spec}")
-            trace = list(item_run.trace)
+            trace = list(item_run.optimization_trace)
             if present:
                 failed_pred = FailedPrediction(
                     completion_text=completion_str,

@@ -34,7 +34,7 @@ class TelemetryConfig(BaseModel):
     call_log: CallLogMode = CallLogMode.both
     max_call_log_entries: int = 10000
     call_log_dir: str | None = None
-    max_trace_size: int = 10000
+    max_optimization_trace_entries: int = 10000
     warn_on_type_mismatch: bool = True
 
 
@@ -60,7 +60,7 @@ class RunContext(BaseModel):
     lm: Any
     adapter: Any
     callbacks: list[Any] = Field(default_factory=list)
-    trace: list[Any] = Field(default_factory=list)
+    optimization_trace: list[Any] = Field(default_factory=list)
     call_log: list[Any] = Field(default_factory=list)
     usage_tracker: Any | None = None
     retrieval: Any | None = None
@@ -76,7 +76,7 @@ class RunContext(BaseModel):
         lm: Any,
         adapter: Any,
         callbacks: list[Any] | None = None,
-        trace: list[Any] | None = None,
+        optimization_trace: list[Any] | None = None,
         call_log: list[Any] | None = None,
         usage_tracker: UsageTracker | None = None,
         retrieval: Any | None = None,
@@ -95,7 +95,7 @@ class RunContext(BaseModel):
             lm=lm,
             adapter=adapter,
             callbacks=list(callbacks or []),
-            trace=list(trace) if trace is not None else [],
+            optimization_trace=list(optimization_trace) if optimization_trace is not None else [],
             call_log=list(call_log) if call_log is not None else [],
             usage_tracker=usage_tracker,
             retrieval=retrieval,
@@ -115,7 +115,7 @@ class RunContext(BaseModel):
             telemetry = self.telemetry.model_copy(update=telemetry)
 
         callbacks = list(overrides.pop("callbacks", self.callbacks))
-        trace = list(overrides.pop("trace", self.trace))
+        optimization_trace = list(overrides.pop("optimization_trace", self.optimization_trace))
         call_log = list(overrides.pop("call_log", self.call_log))
         log_session = overrides.pop("log_session", self.log_session)
 
@@ -123,7 +123,7 @@ class RunContext(BaseModel):
             lm=overrides.pop("lm", self.lm),
             adapter=overrides.pop("adapter", self.adapter),
             callbacks=callbacks,
-            trace=trace,
+            optimization_trace=optimization_trace,
             call_log=call_log,
             usage_tracker=overrides.pop("usage_tracker", self.usage_tracker),
             retrieval=overrides.pop("retrieval", self.retrieval),

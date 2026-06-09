@@ -25,21 +25,21 @@ def test_fork_replaces_lm_and_clears_caller_modules():
     adapter = JSONAdapter()
     run = RunContext.create(lm=lm, adapter=adapter, init_run_log=False)
     run.caller_modules.append("parent")
-    forked = run.fork(lm=other_lm, trace=[])
+    forked = run.fork(lm=other_lm, optimization_trace=[])
     assert forked.lm is other_lm
-    assert forked.trace == []
+    assert forked.optimization_trace == []
     assert forked.caller_modules == []
-    assert run.trace == []
+    assert run.optimization_trace == []
 
 
 def test_fork_copies_trace_by_default():
     lm = DummyLM([{"answer": "ok"}])
     adapter = JSONAdapter()
-    run = RunContext.create(lm=lm, adapter=adapter, trace=[("a",)], init_run_log=False)
+    run = RunContext.create(lm=lm, adapter=adapter, optimization_trace=[("a",)], init_run_log=False)
     forked = run.fork()
-    assert forked.trace == [("a",)]
-    forked.trace.append(("b",))
-    assert run.trace == [("a",)]
+    assert forked.optimization_trace == [("a",)]
+    forked.optimization_trace.append(("b",))
+    assert run.optimization_trace == [("a",)]
 
 
 def test_fork_nested_config_updates():
@@ -60,7 +60,7 @@ def test_resolve_run_prefers_call_override():
     lm = DummyLM([{"answer": "ok"}])
     adapter = JSONAdapter()
     bound = RunContext.create(lm=lm, adapter=adapter, init_run_log=False)
-    override = bound.fork(trace=["override"])
+    override = bound.fork(optimization_trace=["override"])
     assert resolve_run(run=override, bound_run=bound) is override
 
 
@@ -86,9 +86,9 @@ def test_fork_callbacks_and_trace():
     lm = DummyLM([{"answer": "ok"}])
     adapter = JSONAdapter()
     run = RunContext.create(lm=lm, adapter=adapter, callbacks=[lambda x: x], init_run_log=False)
-    forked = run.fork(lm=DummyLM([{"answer": "other"}]), callbacks=[], trace=[1])
+    forked = run.fork(lm=DummyLM([{"answer": "other"}]), callbacks=[], optimization_trace=[1])
     assert len(forked.callbacks) == 0
-    assert forked.trace == [1]
+    assert forked.optimization_trace == [1]
     assert len(run.callbacks) == 1
 
 

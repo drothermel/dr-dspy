@@ -84,7 +84,7 @@ class Refine(Module):
             task_spec2name = {predictor.task_spec: name for name, predictor in mod.named_predictors()}
             module_names = [name for name, _ in mod.named_predictors()]
             try:
-                item_run = run.fork(trace=[])
+                item_run = run.fork(optimization_trace=[], call_log=[])
                 if not advice:
                     outputs = await mod(**inputs, run=item_run, options=options)
                 else:
@@ -95,7 +95,7 @@ class Refine(Module):
                     )
                     hint_run = item_run.fork(adapter=hint_adapter)
                     outputs = await mod(**inputs, run=hint_run, options=options)
-                trace = list(item_run.trace)
+                trace = list(item_run.optimization_trace)
                 reward = self.reward_fn(inputs, outputs)
                 if reward > best_reward:
                     best_reward, best_pred, best_trace = (reward, outputs, trace)
@@ -126,7 +126,7 @@ class Refine(Module):
                     raise
                 self.fail_count -= 1
         if best_trace:
-            run.trace.extend(best_trace)
+            run.optimization_trace.extend(best_trace)
         return best_pred
 
 
