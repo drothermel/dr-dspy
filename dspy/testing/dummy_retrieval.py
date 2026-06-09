@@ -14,8 +14,8 @@ class DummyVectorizer:
         self.max_length = max_length
         self.n_gram = n_gram
         self.P = 10**9 + 7
-        random.seed(123)
-        self.coeffs = [random.randrange(1, self.P) for _ in range(n_gram)]
+        rng = random.Random(123)
+        self.coeffs = [rng.randrange(1, self.P) for _ in range(n_gram)]
 
     def _hash(self, gram):
         h = 1
