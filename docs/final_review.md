@@ -377,17 +377,104 @@ The reviewed experiment docs describe two distinct stacks. The `nl_latents` pool
 
 Impact: treating dr-dspy as a drop-in reproduction path for both families will produce non-comparable numbers. Pool experiments never went through DSPy, and DSPy optimization runs did not use the dr-llm pool grid.
 
-### High: nl_latents pool curves cannot be exactly reproduced through dr-dspy `Predict`
+### Context: compression experiment surface reviewed
 
-The nl_latents encoder/decoder pool prompts are raw single-user-message templates, for example budgeted encoder prompts that append a character-budget instruction directly to code and decoder prompts that ask for functional Python from the description. Routing those through dr-dspy `Predict` changes the wire prompt by adding adapter/system scaffolding and field wrappers. It also changes the model-control surface because dr-dspy v1 does not expose dr-llm authoring controls such as OpenRouter reasoning toggles, GPT-5 minimal thinking, or explicit empty sampling overrides used by catalog entries.
+The last-week optimization-shift baseline used `mimo-v2-flash`, `llama-3.3-nemotron-super-49b-v1.5`, `gpt-oss-20b`, and `gpt-5-nano` over prompted character budgets `32`, `64`, `128`, `256`, `512`, and `1024`. The encoder prompt was raw code plus "Provide a concise natural language description of the code using at most {{BUDGET}} characters." The decoder prompt was the generated description plus "Write functional code in Python according to the description." The main curve plotted representation compression ratio against decoder pass rate, with fixed lossless compression/minification baselines beside the raw representations.
+
+The two compression planning docs prioritize an encoder-only or representation-policy-only optimizer pass, with compressed-output length visible in the metric:
+
+| Plan | Optimizer | Target | Key setup |
+| --- | --- | --- | --- |
+| Optimizer ranking | MIPROv2 | encoder-only | `auto=medium`, demos disabled, `seed=9`, `init_temperature=1.0`, valset around `50` to `69`. |
+| Optimizer ranking | COPRO | encoder-only | `breadth=6`, `depth=2`, compression-aware metric on the compile set. |
+| Optimizer ranking | GEPA | encoder-only | `max_metric_calls=64` to `128`, `reflection_minibatch_size=3`, compression feedback. |
+| Optimizer ranking | SIMBA | encoder rules | `max_demos=0`, `bsize=16` to `32`, low candidate temperatures. |
+| Optimizer ranking | InferRules | encoder rules | `num_rules=3` to `5`, small demo budget. |
+| Shift plot | MIPROv2 | representation-policy section only | `auto=light` smoke, then `medium`, with heldout final paired eval. |
+| Shift plot fallback | GEPA | representation-policy section only | constrained `max_metric_calls=64` to `128`; inspect prompt bloat. |
+
+Impact: the optimizer surface mostly exists in dr-dspy, but the experiment harness still has to provide the mutable prompt section, compression-aware metric, exact split discipline, decoder scaffold accounting, and final paired curve evaluation.
+
+### High: last-week compression model controls are only partially expressible through DrLlmLM
+
+The observed `nl_latents` compression curves used these request controls:
+
+| nl_latents config | Model string | Key request controls | dr-dspy status today |
+| --- | --- | --- | --- |
+| `openrouter/xiaomi/mimo-v2-flash/off/v1` | `openrouter/xiaomi/mimo-v2-flash` | OpenRouter `reasoning.enabled=false`, `temperature=0.7`, `top_p=0.95` | Sampling approximable; reasoning toggle missing. |
+| `openrouter/nvidia/llama-3.3-nemotron-super-49b-v1.5/off/v1` | `openrouter/nvidia/llama-3.3-nemotron-super-49b-v1.5` | OpenRouter `reasoning.enabled=false`, `temperature=0.7`, `top_p=0.95` | Sampling approximable; reasoning toggle missing. |
+| `openrouter/openai/gpt-oss-20b/low/v1` | `openrouter/openai/gpt-oss-20b` | OpenRouter `reasoning.effort=low`, `BackendRequest.effort=na` | Current mapping puts effort on the wrong field. |
+| `openrouter/openai/gpt-5-nano/low/v1` | `openrouter/openai/gpt-5-nano` | OpenRouter `reasoning.effort=low`, `BackendRequest.effort=na` | Current mapping puts effort on the wrong field. |
+| `openai/gpt-5-nano/minimal/v1` | `openai/gpt-5-nano` | OpenAI `thinking_level=minimal`, no sampling override | Minimal thinking is not representable. |
+| `google/gemini-2.5-flash-lite/off/v1` | `google/gemini-2.5-flash-lite` | Google `thinking_level=off`, `temperature=0.7`, `top_p=0.95` | Sampling approximable; Google thinking control missing. |
+
+References:
+- `../nl_latents/src/nl_latents/sampling/llm/catalog.py`
+- `dspy/clients/dr_llm/base.py`
+- `dspy/clients/dr_llm/mapping.py`
+- `../dr-llm/src/dr_llm/llm/providers/impls/openrouter/request_controls.py`
+- `../dr-llm/src/dr_llm/llm/providers/impls/openai/request_controls.py`
+- `../dr-llm/src/dr_llm/llm/providers/impls/google/request_controls.py`
+
+Impact: even when the model string matches, provider payloads and pool fingerprints are not exact unless dr-dspy can carry provider-specific dr-llm reasoning objects. Per-call `LMConfig(top_p=0.95)` can match ordinary sampling, but constructor defaults currently only preserve `temperature` and `max_tokens`.
+
+### High: default nl_latents T1 configs are rejected through current dr-dspy mapping
+
+The default T1 compression setup in `../nl_latents/scripts/code_comp_t1/shared_config.sh` uses `humaneval-plus`, budgets `64,128,256`, one encoder sample and one decoder sample per config, and same-as-encoder decoder LLM mode. Its default LLM config IDs are:
+
+- `openrouter/xiaomi/mimo-v2-flash/off/v1`
+- `openrouter/nvidia/llama-3.3-nemotron-super-49b-v1.5/off/v1`
+- `openrouter/openai/gpt-5-nano/low/v1`
+- `openrouter/openai/gpt-oss-20b/low/v1`
+- `openai/gpt-5-nano/minimal/v1`
+
+Those catalog entries use dr-llm-native `BackendRequest.reasoning` shapes: OpenRouter disabled reasoning (`{"kind": "openrouter", "enabled": false}`), OpenRouter effort (`{"kind": "openrouter", "effort": "low"}`), and OpenAI minimal thinking (`{"kind": "openai", "thinking_level": "minimal"}`). Current dr-dspy maps only `LMReasoningConfig.effort` to `BackendRequest.effort` and hard-codes `BackendRequest.reasoning=None`.
+
+Focused validation through the dr-llm provider registry showed all five default T1 configs fail when represented through current dr-dspy mapping:
+
+- MiMo and Nemotron: `reasoning is required for provider='openrouter'`.
+- OpenRouter GPT-5 nano and GPT-OSS 20B: `effort is not supported for provider='openrouter'`.
+- Direct OpenAI GPT-5 nano: `effort is not supported for provider='openai'`.
 
 References:
 - `dspy/clients/dr_llm/mapping.py`
 - `dspy/clients/dr_llm/contract.py`
+- `../nl_latents/scripts/code_comp_t1/shared_config.sh`
+- `../nl_latents/src/nl_latents/sampling/llm/catalog.py`
+- `../dr-llm/src/dr_llm/backends/models.py`
 - `../dr-llm/src/dr_llm/llm/config.py`
 - `../dr-llm/src/dr_llm/llm/providers/concepts/reasoning.py`
 
-Impact: exact nl_latents pool replication should stay on nl_latents plus dr-llm pool infrastructure, or call dr-llm `build_request_from_config()` directly. Using dr-dspy modules will change prompts, fingerprints, and often provider controls.
+Impact: the current dr-dspy setup cannot carry exact default T1 requests through either `DrLlmDirectLM` or `DrLlmPoolLM`. The dr-llm direct and pool backends can carry the exact requests, but dr-dspy needs an explicit dr-llm config/request path or provider-specific reasoning support before it can be used for this experiment family.
+
+### High: nl_latents pool curves cannot be exactly reproduced through dr-dspy `Predict`
+
+The nl_latents encoder/decoder pool prompts are raw single-user-message templates. The budgeted encoder prompt is exactly `{{CODE}}` followed by a character-budget instruction, and the decoder prompt is exactly `{{DESCRIPTION}}` followed by "Write functional code in Python according to the description." The encoder and decoder request builders both render one `role="user"` message and no system message.
+
+Routing those calls through dr-dspy `Predict` changes the wire prompt by adding adapter/system scaffolding, field descriptions, field structure, output requirements, and field wrappers. `MessageAssembler` always appends a system message for adapter-formatted calls, and `ChatAdapter`/`JSONAdapter` add task output-format requirements. This scaffold is useful for DSPy programs, but it is not part of the T1 raw-prompt experiment.
+
+References:
+- `../nl_latents/prompt_spaces/t1-budgeted-encoder__code.json`
+- `../nl_latents/prompt_spaces/t1-description-decoder__code.json`
+- `../nl_latents/src/nl_latents/sampling/encoder/request.py`
+- `../nl_latents/src/nl_latents/sampling/decoder/request.py`
+- `dspy/adapters/base/adapter.py`
+- `dspy/adapters/format/message_assembler.py`
+
+Impact: exact nl_latents pool replication should stay on nl_latents plus dr-llm pool infrastructure, call dr-llm `build_request_from_config()` directly, or use a deliberately raw DSPy LM request path. Using `Predict(TaskSpec)` will change prompts and invalidate bit-exact comparisons.
+
+### High: nl_latents pools and DrLlmPoolLM pools are different systems
+
+The existing nl_latents experiments use `dr_llm.pool.LlmPoolBackend` through a grid seeding workflow. Each row stores key axes such as prompt template, data sample, and LLM config ID, plus serialized `LlmConfig` and messages. `DrLlmPoolLM` uses `dr_llm.backends.PoolBackend`, where the primary key is `request_fingerprint` over a canonical `BackendRequest`.
+
+References:
+- `../nl_latents/src/nl_latents/sampling/encoder/pool.py`
+- `../nl_latents/src/nl_latents/sampling/decoder/pool.py`
+- `dspy/clients/dr_llm/pool.py`
+- `../dr-llm/src/dr_llm/backends/pool.py`
+- `../dr-llm/src/dr_llm/backends/fingerprint.py`
+
+Impact: pointing `DrLlmPoolLM` at an nl_latents-seeded encoder or decoder pool will not produce cache hits. Exact curve replication should stay on the nl_latents pool harness, or the requests must be re-seeded through `PoolBackend` after the dr-dspy request-shape gaps are fixed.
 
 ### Medium: nl-code DSPy reproduction is feasible only after an explicit port
 
@@ -427,15 +514,17 @@ References:
 
 Impact: users who want to pre-seed a grid and drain workers must still use dr-llm's `PoolBackend` directly. `aforward` on a miss does generate and insert one sample, but that is not the same workflow as worker-backed batch fill or nl_latents-style curve orchestration.
 
-### Medium: `LMConfig(n=1)` is rejected even though only multi-sampling is unsupported
+### Medium: dr-llm prompt-model use breaks proposal paths that set `n`
 
-The dr-llm contract rejects any non-`None` `config.n` but reports that `n>1` is unsupported. I confirmed `LMConfig(n=1)` raises `LMUnsupportedFeatureError`.
+The dr-llm contract rejects any non-`None` `config.n` but reports that `n>1` is unsupported. I confirmed `LMConfig(n=1)` raises `LMUnsupportedFeatureError`. This matters for optimizers, not just direct user calls: MIPRO's grounded proposer and dataset-summary flows use single-completion `n=1`, while COPRO proposal calls use `n=breadth-1`.
 
 References:
 - `dspy/clients/dr_llm/contract.py`
+- `dspy/teleprompt/copro_optimizer.py`
+- `dspy/propose/grounded_proposer.py`
 - `dspy/propose/dataset_summary_generator.py`
 
-Impact: internal flows that explicitly set `LMConfig(n=1)`, including dataset summary proposal calls, fail when dr-llm is used as the prompt model even though the request is semantically a single completion.
+Impact: the compression docs' MIPRO and COPRO optimizer runs can use `DrLlmDirectLM` as the task LM only if proposal calls use another LM or this contract changes. Allowing `n=1` would fix some MIPRO paths; COPRO breadth still needs either multi-completion support or an emulated loop of single completions.
 
 ### Low/Medium: pool acquire aggregate provenance is dropped
 
@@ -464,7 +553,7 @@ The experiment-control deltas are larger than that for exact parity:
 
 - OpenRouter reasoning-off controls such as `reasoning_enabled=False` have no dr-dspy v1 equivalent; `EffortSpec.NA` is not the same as an explicit disabled toggle.
 - GPT-5 minimal thinking through dr-llm thinking-level controls is not representable by DSPy's `ReasoningEffort`.
-- GPT-5 low effort through OpenRouter is the closest mapped case via `LMConfig(reasoning={"effort": "low"})`.
+- OpenRouter effort controls are not equivalent to DSPy's generic `ReasoningEffort`; current mapping sends them as `BackendRequest.effort`, which OpenRouter rejects for the T1 GPT-5 nano and GPT-OSS configs.
 - Suppressing provider-default sampling with explicit empty sampling controls is not exposed on the dr-dspy constructor surface.
 
 References:
@@ -477,13 +566,15 @@ Impact: these are not correctness bugs for the default text-only path, but they 
 
 ### Alignment Notes
 
-The core request/response boundary mostly aligns with `../dr-llm`: text-only messages are converted to `BackendRequest`, provider/model splitting maps `openai/gpt-4.1-mini` to `ProviderName.OPENAI` plus `gpt-4.1-mini`, DSPy reasoning effort maps to `BackendRequest.effort`, unsupported tools/multimodal/structured-output fields are rejected, response provenance is preserved in `provider_data`, error translation maps dr-llm backend/provider errors into the DSPy `LMError` hierarchy, and pool miss-to-hit plus session acquire semantics are covered by tests. Capabilities probing through a dedicated `DirectBackend` for pool LMs also matches dr-llm's current design because `PoolBackend` has no public `.capabilities()` API.
+The core request/response boundary mostly aligns with `../dr-llm`: text-only messages are converted to `BackendRequest`, provider/model splitting maps `openai/gpt-4.1-mini` to `ProviderName.OPENAI` plus `gpt-4.1-mini`, unsupported tools/multimodal/structured-output fields are rejected, response provenance is preserved in `provider_data`, error translation maps dr-llm backend/provider errors into the DSPy `LMError` hierarchy, and pool miss-to-hit plus session acquire semantics are covered by tests. DSPy reasoning effort maps to `BackendRequest.effort` for providers that actually use dr-llm `EffortSpec`, but it does not cover provider-specific `BackendRequest.reasoning`. Capabilities probing through a dedicated `DirectBackend` for pool LMs also matches dr-llm's current design because `PoolBackend` has no public `.capabilities()` API.
 
 Direct path guidance: `DrLlmDirectLM` is ready for text-only programs with `JSONAdapter` or `XMLAdapter`. Configure auth and routing through the dr-llm registry/environment, not `LMProviderOptions`.
 
 Pool path guidance: use `aforward` for cache-first single completions, and use `acquire_samples` only with an explicit stable session identity unless disk logging provides a known-safe session. Use dr-llm `PoolBackend.submit_batch` plus `await_drain` directly for batch pre-fill workflows today.
 
-Experiment parity guidance: keep nl_latents pool curves on the raw dr-llm/nl_latents infrastructure for exact replication. For nl-code reproduction, port the code-spec programs and metrics to TaskSpec/Predict, run with `DrLlmDirectLM` plus `ChatAdapter`, match optimizer compile settings and splits, and disclose remaining reasoning-control and adapter-scaffold differences. Do not use the pool backend for optimizer runs unless cached sampling is an intentional new experiment condition.
+Experiment parity guidance: keep nl_latents pool curves on the raw dr-llm/nl_latents infrastructure for exact replication until dr-dspy exposes provider-specific dr-llm reasoning/config controls and a raw single-message request path. For nl-code reproduction, port the code-spec programs and metrics to TaskSpec/Predict, run with `DrLlmDirectLM` plus `ChatAdapter`, match optimizer compile settings and splits, and disclose remaining LiteLLM-vs-dr-llm wire differences. Do not use the pool backend for optimizer runs unless cached sampling is an intentional new experiment condition.
+
+Compression optimizer guidance: the documented optimizer knobs are present in dr-dspy for MIPROv2, COPRO, GEPA, SIMBA, and InferRules, but the experiment-specific pieces are not framework-native. "Optimize only the representation-policy section" needs experiment-layer TaskSpec composition, compression-aware scoring needs a custom metric over pass rate and representation length, and decoder scaffold accounting needs run metadata. SIMBA also remains blocked by the parallel `run=` forwarding issue noted above if it is included in the full compression ranking.
 
 ### dr-llm Verification Notes
 
@@ -494,5 +585,7 @@ I did not modify implementation code during this focused review. I ran:
 - Postgres integration checks in both repos: skipped because no integration DSN was configured.
 
 I also used focused local scripts to confirm the safe state-load failure, shallow pool copy/double-close behavior, and `LMConfig(n=1)` rejection. Remaining gaps worth covering with durable tests: a full `Predict` + `JSONAdapter` + `DrLlmDirectLM` + `RunContext` happy path, direct and pool `dump_state`/`load_state` round trips, and a pool acquire test that makes the no-session fallback behavior explicit.
+
+For the compression parity pass, I used source inspection and focused local scripts to compare T1 dr-llm catalog payloads against dr-dspy `LMRequest` to `BackendRequest` mapping. The no-provider-call validator check confirmed that all five default T1 configs are rejected through current dr-dspy mapping before any live API call.
 
 Experiment-parity checks not run: live provider calls, nl-code session replay, or nl_latents curve replay. Useful next checks would be a wire-parity probe comparing dr-llm `build_request_from_config()` payloads to `DrLlmDirectLM` backend requests for the same messages, a prompt-parity diff between nl-code ChatAdapter rendering and nl_latents raw templates, and a one-task HumanEval smoke optimizer after porting the TaskSpecs and metric.
