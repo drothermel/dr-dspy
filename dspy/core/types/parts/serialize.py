@@ -4,7 +4,6 @@ import json
 from typing import Any
 
 from dspy.core.types.parts.models import LMPart, LMRefusalPart, LMTextPart, LMThinkingPart, LMToolCallPart
-from dspy.core.types.parts.tool_calls import tool_call_part_to_openai
 
 
 def _part_to_value(part: LMPart) -> Any:
@@ -23,10 +22,6 @@ def _finalize_stream_part(part: LMPart) -> LMPart:
     if isinstance(part, LMToolCallPart) and "args_buffer" in part.provider_data:
         return part.model_copy(update={"args": _parse_json_object_strict(part.provider_data["args_buffer"])})
     return part
-
-
-def _tool_call_to_provider_dict(call: LMToolCallPart) -> dict[str, Any]:
-    return tool_call_part_to_openai(call, include_provider_data=False)
 
 
 def _parse_json_object(value: str) -> dict[str, Any]:

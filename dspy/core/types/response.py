@@ -27,7 +27,7 @@ from dspy.core.types.parts import (
     LMVideoPart,
 )
 from dspy.core.types.parts.models import _coerce_part
-from dspy.core.types.parts.serialize import _part_to_value, _tool_call_to_provider_dict
+from dspy.core.types.parts.serialize import _part_to_value
 from dspy.core.types.request import LMRequest
 
 
@@ -133,7 +133,9 @@ class LMOutput(BaseModel):
         if self.reasoning_content is not None:
             data["reasoning_content"] = self.reasoning_content
         if self.tool_calls:
-            data["tool_calls"] = [_tool_call_to_provider_dict(call) for call in self.tool_calls]
+            data["tool_calls"] = [
+                {"name": call.name, "args": dict(call.args), "id": call.id} for call in self.tool_calls
+            ]
         if self.citations:
             data["citations"] = [citation.model_dump(exclude_none=True) for citation in self.citations]
         if self.logprobs is not None:
