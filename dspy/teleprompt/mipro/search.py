@@ -1,11 +1,10 @@
 import logging
-from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 from dspy.evaluate.evaluator import Evaluate
 from dspy.integrations.optimizers.optuna.distributions import get_param_distributions
 from dspy.integrations.optimizers.optuna.import_ import import_optuna
-from dspy.integrations.optimizers.optuna.study import add_observed_trial, create_maximize_study
+from dspy.integrations.optimizers.optuna.study import add_observed_trial, create_maximize_study, run_ask_tell_loop
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
 from dspy.teleprompt.console_styles import ENDC, GREEN
@@ -17,6 +16,7 @@ from dspy.teleprompt.mipro.evaluate import (
     perform_full_evaluation,
     select_and_insert_instructions_and_demos,
 )
+from dspy.teleprompt.mipro.session import MIPROSearchSession
 
 if TYPE_CHECKING:
     import optuna
@@ -40,16 +40,16 @@ async def run_trial(
     minibatch_full_eval_steps: int,
     adjusted_num_trials: int,
     study: "optuna.Study",
-    state: dict[str, Any],
+    session: MIPROSearchSession,
     run: RunContext,
 ) -> float:
-    best_program = state["best_program"]
-    best_score = state["best_score"]
-    trial_logs = state["trial_logs"]
-    total_eval_calls = state["total_eval_calls"]
-    score_data = state["score_data"]
-    param_score_dict = state["param_score_dict"]
-    fully_evaled_param_combos = state["fully_evaled_param_combos"]
+    best_program = session.best_program
+    best_score = session.best_score
+    trial_logs = session.trial_logs
+    total_eval_calls = session.total_eval_calls
+    score_data = session.score_data
+    param_score_dict = session.param_score_dict
+    fully_evaled_param_combos = session.fully_evaled_param_combos
     trial_num = trial.number + 1
     if minibatch:
         logger.info(f"== Trial {trial_num} / {adjusted_num_trials} - Minibatch ==")
@@ -80,7 +80,7 @@ async def run_trial(
         best_score = score
         best_program = candidate_program.deepcopy()
         logger.info(f"{GREEN}Best full score so far!{ENDC} Score: {score}")
-    score_data.append({"score": score, "program": candidate_program, "full_eval": batch_size >= len(valset)})
+    score_data.append(ProgramCandidate(score=score, program=candidate_program, full_eval=batch_size >= len(valset)))
     if minibatch:
         log_minibatch_eval(
             optimizer,
@@ -133,9 +133,9 @@ async def run_trial(
             demo_candidates,
             run=run,
         )
-    state["best_program"] = best_program
-    state["best_score"] = best_score
-    state["total_eval_calls"] = total_eval_calls
+    session.best_program = best_program
+    session.best_score = best_score
+    session.total_eval_calls = total_eval_calls
     return score
 
 
@@ -188,9 +188,7 @@ async def optimize_prompt_parameters(
     best_score = default_score
     best_program = program.deepcopy()
     total_eval_calls = len(valset)
-    score_data = [{"score": best_score, "program": program.deepcopy(), "full_eval": True}]
-    param_score_dict = defaultdict(list)
-    fully_evaled_param_combos = {}
+    score_data = [ProgramCandidate(score=best_score, program=program.deepcopy(), full_eval=True)]
     study = create_maximize_study(seed=seed, feature="MIPROv2")
     default_params = {f"{i}_predictor_instruction": 0 for i in range(len(program.predictors()))}
     if demo_candidates:
@@ -204,59 +202,53 @@ async def optimize_prompt_parameters(
         value=default_score,
         feature="MIPROv2",
     )
-    state = {
-        "best_program": best_program,
-        "best_score": best_score,
-        "trial_logs": trial_logs,
-        "total_eval_calls": total_eval_calls,
-        "score_data": score_data,
-        "param_score_dict": param_score_dict,
-        "fully_evaled_param_combos": fully_evaled_param_combos,
-    }
-    trial_kwargs = {
-        "optimizer": optimizer,
-        "program": program,
-        "instruction_candidates": instruction_candidates,
-        "demo_candidates": demo_candidates,
-        "evaluate": evaluate,
-        "valset": valset,
-        "num_trials": num_trials,
-        "minibatch": minibatch,
-        "minibatch_size": minibatch_size,
-        "minibatch_full_eval_steps": minibatch_full_eval_steps,
-        "adjusted_num_trials": adjusted_num_trials,
-        "study": study,
-        "state": state,
-        "run": run,
-    }
-    for _ in range(num_trials):
-        optuna_trial = study.ask()
-        score = await run_trial(optimizer, optuna_trial, **trial_kwargs)
-        study.tell(optuna_trial, score)
-    best_program = state["best_program"]
-    best_score = state["best_score"]
-    trial_logs = state["trial_logs"]
-    score_data = state["score_data"]
+    session = MIPROSearchSession(
+        best_program=best_program,
+        best_score=best_score,
+        trial_logs=trial_logs,
+        total_eval_calls=total_eval_calls,
+        score_data=score_data,
+    )
+
+    async def _trial_fn(trial):
+        return await run_trial(
+            optimizer,
+            trial,
+            program=program,
+            instruction_candidates=instruction_candidates,
+            demo_candidates=demo_candidates,
+            evaluate=evaluate,
+            valset=valset,
+            num_trials=num_trials,
+            minibatch=minibatch,
+            minibatch_size=minibatch_size,
+            minibatch_full_eval_steps=minibatch_full_eval_steps,
+            adjusted_num_trials=adjusted_num_trials,
+            study=study,
+            session=session,
+            run=run,
+        )
+
+    await run_ask_tell_loop(study, num_trials, _trial_fn)
+    best_program = session.best_program
+    best_score = session.best_score
+    trial_logs = session.trial_logs
+    score_data = session.score_data
     if best_program is None:
         return CompileResult(program=program)
     candidates: list[ProgramCandidate] = []
     if optimizer.track_stats:
-        sorted_score_data = sorted(score_data, key=lambda entry: entry["score"], reverse=True)
-        candidates = [
-            ProgramCandidate(
-                score=entry["score"],
-                program=entry["program"],
-                full_eval=entry["full_eval"],
-            )
-            for entry in sorted_score_data
-        ]
+        candidates = sorted(
+            score_data,
+            key=lambda entry: entry.score if entry.score is not None else float("-inf"),
+            reverse=True,
+        )
     logger.info(f"Returning best identified program with score {best_score}!")
     return CompileResult(
         program=best_program,
         candidates=candidates,
         stats=CompileStats(
-            metric_calls=optimizer.total_calls,
-            prompt_model_calls=optimizer.prompt_model_total_calls,
+            metric_calls=session.total_eval_calls,
             best_score=best_score,
             trial_logs=trial_logs if optimizer.track_stats else {},
         ),

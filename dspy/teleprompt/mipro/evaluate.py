@@ -6,6 +6,7 @@ from dspy.integrations.optimizers.optuna.distributions import get_param_distribu
 from dspy.integrations.optimizers.optuna.study import add_observed_trial
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
+from dspy.teleprompt.compilation import ProgramCandidate
 from dspy.teleprompt.console_styles import ENDC, GREEN
 from dspy.teleprompt.eval_batch import eval_candidate_program, get_program_with_highest_avg_score
 from dspy.teleprompt.log_utils import save_candidate_program
@@ -38,9 +39,9 @@ def log_minibatch_eval(
     trial_logs[trial_num]["total_eval_calls_so_far"] = total_eval_calls
     trial_logs[trial_num]["mb_program"] = candidate_program.deepcopy()
     logger.info(f"Score: {score} on minibatch of size {batch_size} with parameters {chosen_params}.")
-    minibatch_scores = ", ".join([f"{s['score']}" for s in score_data if not s["full_eval"]])
+    minibatch_scores = ", ".join([f"{s.score}" for s in score_data if not s.full_eval])
     logger.info(f"Minibatch scores so far: {'[' + minibatch_scores + ']'}")
-    full_eval_scores = ", ".join([f"{s['score']}" for s in score_data if s["full_eval"]])
+    full_eval_scores = ", ".join([f"{s.score}" for s in score_data if s.full_eval])
     trajectory = "[" + full_eval_scores + "]"
     logger.info(f"Full eval scores so far: {trajectory}")
     logger.info(f"Best full score so far: {best_score}")
@@ -69,7 +70,7 @@ def log_normal_eval(
     trial_logs[trial_num]["total_eval_calls_so_far"] = total_eval_calls
     trial_logs[trial_num]["full_eval_program"] = candidate_program.deepcopy()
     logger.info(f"Score: {score} with parameters {chosen_params}.")
-    full_eval_scores = ", ".join([f"{s['score']}" for s in score_data if s["full_eval"]])
+    full_eval_scores = ", ".join([f"{s.score}" for s in score_data if s.full_eval])
     logger.info(f"Scores so far: {'[' + full_eval_scores + ']'}")
     logger.info(f"Best score so far: {best_score}")
     logger.info(f"{'=' * len(f'===== Trial {trial.number + 1} / {num_trials} =====')}\n\n")
@@ -135,7 +136,7 @@ async def perform_full_evaluation(
             rng=optimizer.rng,
         )
     ).score
-    score_data.append({"score": full_eval_score, "program": highest_mean_program, "full_eval": True})
+    score_data.append(ProgramCandidate(score=full_eval_score, program=highest_mean_program, full_eval=True))
     add_observed_trial(
         study,
         params=params,
@@ -158,7 +159,7 @@ async def perform_full_evaluation(
         logger.info(f"{GREEN}New best full eval score!{ENDC} Score: {full_eval_score}")
         best_score = full_eval_score
         best_program = highest_mean_program.deepcopy()
-    full_eval_scores = ", ".join([f"{s['score']}" for s in score_data if s["full_eval"]])
+    full_eval_scores = ", ".join([f"{s.score}" for s in score_data if s.full_eval])
     trajectory = "[" + full_eval_scores + "]"
     logger.info(f"Full eval scores so far: {trajectory}")
     logger.info(f"Best full score so far: {best_score}")

@@ -64,8 +64,6 @@ class MIPROv2:
         self.track_stats = track_stats
         self.log_dir = log_dir
         self.teacher_run = teacher_run
-        self.prompt_model_total_calls = 0
-        self.total_calls = 0
         self.max_concurrency = max_concurrency
         self.max_errors = max_errors
         self.metric_threshold = metric_threshold
