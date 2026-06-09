@@ -252,7 +252,7 @@ Task input validation runs in `AdapterCallPipeline.execute`; do not rely on dupl
 ## Import tiers
 
 1. **Public spine:** `dspy.runtime`, `dspy.core.types`, `dspy.task_spec`, `dspy.errors`, `dspy.persistence`, `dspy.serialization`
-2. **Integrations:** `dspy.integrations.*` (optional extras: `mcp`, `langchain`, `optuna`, `gepa`, `datasets`; import vendor modules directly, e.g. `dspy.integrations.finetune.openai`, `dspy.integrations.retrieval.weaviate`, `dspy.integrations.optimizers.gepa.adapter`, `dspy.integrations.datasets.huggingface`, `dspy.integrations.datasets.hotpotqa`)
+2. **Integrations:** `dspy.integrations.*` (optional extras: `mcp`, `langchain`, `optuna`, `gepa`, `datasets`; import vendor modules directly, e.g. `dspy.integrations.finetune.openai`, `dspy.integrations.retrieval.weaviate`, `dspy.integrations.optimizers.gepa.adapter`, `dspy.integrations.datasets.huggingface`, `dspy.integrations.datasets.hotpotqa`). Finetune provider/model-id conventions: `docs/migration/finetune.md`.
 3. **Client format helpers:** `dspy.clients.openai_format.*` submodules only (empty package `__init__`; e.g. `dspy.clients.openai_format.chat_request`, `dspy.clients.openai_format.parse`)
 4. **Evaluation:** `dspy.evaluate.evaluator` (`Evaluate`, `EvaluationResult`); other helpers under `dspy.evaluate.*` submodules
 5. **Internal / test-only:** `dspy._internal.*`, `dspy.testing.*`
