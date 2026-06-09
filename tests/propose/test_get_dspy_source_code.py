@@ -26,5 +26,5 @@ def test_get_dspy_source_code_skips_builtin_predict():
 
 def test_get_dspy_source_code_raises_for_unsourcable_class():
     UnsourcableProgram = type("UnsourcableProgram", (Module,), {})
-    with pytest.raises(OSError, match="source code not available|could not find class definition"):
+    with pytest.raises(OSError, match=r"source code not available|could not find class definition"):
         get_dspy_source_code(UnsourcableProgram())

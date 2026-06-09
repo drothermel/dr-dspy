@@ -126,6 +126,50 @@ Each `RunContext.create(...)` with `call_log` in `(disk, both)` creates `{DSPY_L
 See `docs/migration/runcontext.md` for the full settings → RunContext translation table.
 See `docs/migration/history.md` for turn logs, call logs, and optimization traces.
 
+## dr-llm backends (optional)
+
+`LM` (LiteLLM) remains the default builtin. For dr-llm 4.3.0 provider orchestration and Postgres-backed response pools, use `DrLlmDirectLM` or `DrLlmPoolLM`:
+
+```python
+import asyncio
+
+from dr_llm.backends.models import PoolBackendConfig
+
+from dspy.adapters.json_adapter import JSONAdapter
+from dspy.clients.dr_llm import DrLlmDirectLM, DrLlmPoolLM
+from dspy.runtime import RunContext
+
+direct = DrLlmDirectLM("openai/gpt-4.1-mini", temperature=0.0, max_tokens=4000)
+run = RunContext.create(lm=direct, adapter=JSONAdapter(), init_run_log=False)
+result = asyncio.run(program(question="What is DSPy?", run=run))
+
+pool = DrLlmPoolLM(
+    "openai/gpt-4.1-mini",
+    pool_config=PoolBackendConfig(
+        pool_name="my_exp",
+        database_url="postgresql://user:pass@localhost/dr_llm",
+    ),
+    session_id="optimizer-session",  # optional override
+)
+samples = asyncio.run(pool.acquire_samples(request, n=10, run=run))
+```
+
+- **Direct** (`aforward`): calls `DirectBackend.acomplete` — one provider response per request.
+- **Pool** (`aforward`): cache-first `PoolBackend.acomplete` (no session claims).
+- **Pool acquire** (`acquire_samples`): session-scoped no-replacement sampling via `PoolBackend.aacquire(request, session_id, n)`. Session ID defaults to `{DSPY_RUN_ID}:{log_session.timestamp}` when disk logging is enabled; pass `session_id=` on the LM or to `acquire_samples` to override.
+- **v1 limits**: text-only; tools, multimodal parts, and `response_format` raise `LMUnsupportedFeatureError`.
+- **Lifecycle**: call `pool.close()` to tear down the pool consumer (tests); long-running notebooks may omit.
+
+Integration tests (`pytest -m integration -n0 tests/clients/dr_llm/test_integration_pool.py`) require Postgres via `DR_LLM_TEST_DATABASE_URL` or `DR_LLM_DATABASE_URL`. Spin up a disposable database with `uv run dr-llm project create <name>` and export the returned DSN.
+
+Live direct-provider smoke test (uses your `OPENAI_API_KEY` via dr-llm’s default registry):
+
+```bash
+uv run pytest tests/clients/dr_llm/test_integration_direct_live.py --llm_call -n0 -v
+```
+
+Override the model with `LM_FOR_TEST_DIRECT_DR_LLM=openai/gpt-4.1-mini`. Quick dr-llm-only sanity check without DSPy: `uv run dr-llm query --provider openai --model gpt-4.1-mini --message "ping"`.
+
 ## Strict call-site kwargs
 
 Pass task inputs as keywords, `run=` for `RunContext`, and `options=PredictOptions(...)` for per-call overrides (`lm`, `config`, `demos`, `task_spec`, `trace`, `prediction`). Do not pass reserved names as flat task-input kwargs.

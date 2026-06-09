@@ -13,9 +13,15 @@ _REGISTRY: dict[str, type] | None = None
 def _lm_class_registry() -> dict[str, type]:
     global _REGISTRY
     if _REGISTRY is None:
+        from dspy.clients.dr_llm.direct import DrLlmDirectLM
+        from dspy.clients.dr_llm.pool import DrLlmPoolLM
         from dspy.clients.lm.client import LM
 
-        _REGISTRY = {BUILTIN_LM_CLASS_PATH: LM}
+        _REGISTRY = {
+            BUILTIN_LM_CLASS_PATH: LM,
+            "dspy.clients.dr_llm.direct.DrLlmDirectLM": DrLlmDirectLM,
+            "dspy.clients.dr_llm.pool.DrLlmPoolLM": DrLlmPoolLM,
+        }
     return _REGISTRY
 
 
