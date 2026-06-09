@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from dspy.utils.async_parallel import BoundedRunAbortedError, run_bounded
+from dspy.runtime.async_parallel import BoundedRunAbortedError, run_bounded
 
 
 @pytest.mark.asyncio

@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from dspy.utils.async_parallel import BoundedRunAbortedError, run_bounded
+from dspy.runtime.async_parallel import BoundedRunAbortedError, run_bounded
 
 
 async def _run_bounded(items, fn, **kwargs):

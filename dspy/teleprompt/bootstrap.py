@@ -7,11 +7,12 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.primitives.module import Module
+from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, LabeledFewShotCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
-from dspy.teleprompt.utils import resolve_max_errors, run_program_with_trace, trace_to_demos
+from dspy.teleprompt.utils import run_program_with_trace, trace_to_demos
 from dspy.utils.hasher import Hasher
 
 from .vanilla import LabeledFewShot

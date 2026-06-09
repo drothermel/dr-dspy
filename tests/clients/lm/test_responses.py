@@ -15,7 +15,7 @@ from openai.types.responses.response_reasoning_item import Summary
 
 from dspy.clients.lm import LM
 from dspy.core.types import LMConfig, LMProviderOptions
-from dspy.utils.usage_tracker import track_usage
+from dspy.runtime.usage_tracker import track_usage
 from tests.clients.lm.conftest import _request, make_response
 
 

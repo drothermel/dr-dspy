@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
+from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_finetune import (
     BootstrapFinetune,
@@ -26,7 +27,7 @@ from dspy.teleprompt.compile_params import (
 from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.teleprompt.teleprompt import Teleprompter
-from dspy.teleprompt.utils import make_optimizer_evaluator, resolve_max_errors
+from dspy.teleprompt.utils import make_optimizer_evaluator
 
 logger = logging.getLogger(__name__)
 YELLOW = "\x1b[93m"

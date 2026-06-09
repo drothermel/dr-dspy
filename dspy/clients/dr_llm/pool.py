@@ -20,7 +20,7 @@ from dspy.clients.dr_llm.mapping import (
     lm_request_to_backend_request,
     probe_backend_request,
 )
-from dspy.utils.run_log import resolve_run_bucket
+from dspy.runtime.run_log import resolve_run_bucket
 
 if TYPE_CHECKING:
     from dr_llm.llm.providers.core.registry import ProviderRegistry

@@ -785,7 +785,7 @@ def test_lm_usage_with_parallel(make_run):
 
 @pytest.mark.asyncio
 async def test_lm_usage_with_async(make_run):
-    from dspy.utils.usage_tracker import UsageTracker
+    from dspy.runtime.usage_tracker import UsageTracker
 
     program = Predict(pspec("question -> answer"))
     original_aforward = program.aforward

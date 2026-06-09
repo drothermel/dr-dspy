@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.primitives.module import Module
+from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import (
     BootstrapFewShotCompileParams,
@@ -12,7 +13,7 @@ from dspy.teleprompt.compile_params import (
     RandomSearchCompileParams,
 )
 from dspy.teleprompt.teleprompt import Teleprompter
-from dspy.teleprompt.utils import make_optimizer_evaluator, resolve_max_errors
+from dspy.teleprompt.utils import make_optimizer_evaluator
 
 from .bootstrap import BootstrapFewShot
 from .vanilla import LabeledFewShot
