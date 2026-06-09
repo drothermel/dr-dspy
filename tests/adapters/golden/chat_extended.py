@@ -266,7 +266,7 @@ CHAT_EXTENDED_GOLDEN_CASES: tuple[GoldenPromptCase, ...] = (
                 '"string"}, {"type": "null"}], "default": null, "title": "Document Title"}, "end_char_index": {"type": '
                 '"integer", "title": "End Char Index"}, "start_char_index": {"type": "integer", "title": "Start Char '
                 'Index"}, "supported_text": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null, "title": '
-                '"Supported Text"}}, "required": ["cited_text", "document_index", "start_char_index", "end_char_index"], '
+                '"Supported Text"}, "url": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null, "title": "Url"}}, "required": ["cited_text", "document_index", "start_char_index", "end_char_index"], '
                 '"title": "Citation"}}, "properties": {"citations": {"type": "array", "items": {"$ref": '
                 '"#/$defs/Citation"}, "title": "Citations"}}, "required": ["citations"], "title": "Citations"}\n'
                 "\n"

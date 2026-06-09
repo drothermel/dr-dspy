@@ -5,10 +5,10 @@ from dspy.core.types import LMProviderOptions
 from dspy.integrations.finetune.local import LocalProvider
 
 
-@patch("dspy.integrations.finetune.local.threading.Thread")
-@patch("dspy.integrations.finetune.local.subprocess.Popen")
-@patch("dspy.integrations.finetune.local.get_free_port")
-@patch("dspy.integrations.finetune.local.wait_for_server")
+@patch("dspy.integrations.finetune.local_server.threading.Thread")
+@patch("dspy.integrations.finetune.local_server.subprocess.Popen")
+@patch("dspy.integrations.finetune.local_server.get_free_port")
+@patch("dspy.integrations.finetune.local_server.wait_for_server")
 def test_command_with_spaces_in_path(mock_wait, mock_port, mock_popen, mock_thread):
     mock_port.return_value = 8000
     mock_process = mock.Mock()
@@ -31,10 +31,10 @@ def test_command_with_spaces_in_path(mock_wait, mock_port, mock_popen, mock_thre
         assert command[model_index + 1] == "/path/to/my models/llama"
 
 
-@patch("dspy.integrations.finetune.local.threading.Thread")
-@patch("dspy.integrations.finetune.local.subprocess.Popen")
-@patch("dspy.integrations.finetune.local.get_free_port")
-@patch("dspy.integrations.finetune.local.wait_for_server")
+@patch("dspy.integrations.finetune.local_server.threading.Thread")
+@patch("dspy.integrations.finetune.local_server.subprocess.Popen")
+@patch("dspy.integrations.finetune.local_server.get_free_port")
+@patch("dspy.integrations.finetune.local_server.wait_for_server")
 def test_command_construction_prevents_injection(mock_wait, mock_port, mock_popen, mock_thread):
     mock_port.return_value = 8000
     mock_process = mock.Mock()
@@ -57,10 +57,10 @@ def test_command_construction_prevents_injection(mock_wait, mock_port, mock_pope
         assert command[model_index + 1] == "model --trust-remote-code"
 
 
-@patch("dspy.integrations.finetune.local.threading.Thread")
-@patch("dspy.integrations.finetune.local.subprocess.Popen")
-@patch("dspy.integrations.finetune.local.get_free_port")
-@patch("dspy.integrations.finetune.local.wait_for_server")
+@patch("dspy.integrations.finetune.local_server.threading.Thread")
+@patch("dspy.integrations.finetune.local_server.subprocess.Popen")
+@patch("dspy.integrations.finetune.local_server.get_free_port")
+@patch("dspy.integrations.finetune.local_server.wait_for_server")
 def test_command_is_list_not_string(mock_wait, mock_port, mock_popen, mock_thread):
     mock_port.return_value = 8000
     mock_process = mock.Mock()

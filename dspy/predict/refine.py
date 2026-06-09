@@ -16,6 +16,13 @@ from dspy.task_spec.framework.refine import OfferFeedbackTaskSpec
 from dspy.teleprompt.core.inspect_modules import inspect_modules
 
 
+def _predictor_name_from_trace(predictor: object) -> str:
+    stamped = getattr(predictor, "_dspy_predictor_name", None)
+    if isinstance(stamped, str):
+        return stamped
+    raise KeyError(f"No predictor name stamped on trace predictor {predictor!r}")
+
+
 class Refine(Module):
     def __init__(
         self,
@@ -78,11 +85,16 @@ class Refine(Module):
             nonlocal advice
             mod = attempt.module.deepcopy()
             mod.set_lm(attempt.lm.copy(temperature=1.0))
-            predictor_id_to_name = stamp_predictor_names(mod)
+            stamp_predictor_names(mod)
             module_names = [name for name, _ in mod.named_predictors()]
             modules = {"program_code": self.module_code, "modules_defn": inspect_modules(mod)}
             trajectory = [
-                {"module_name": predictor_id_to_name[id(p)], "inputs": i, "outputs": dict(o)} for p, i, o in trace
+                {
+                    "module_name": _predictor_name_from_trace(p),
+                    "inputs": i,
+                    "outputs": dict(o),
+                }
+                for p, i, o in trace
             ]
             trajectory_payload = {
                 "program_inputs": attempt.inputs,

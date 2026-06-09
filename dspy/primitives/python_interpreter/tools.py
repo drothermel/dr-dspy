@@ -84,10 +84,7 @@ def handle_tool_call(interpreter: "PythonInterpreter", request: dict) -> None:
             raise CodeInterpreterError(f"Unknown tool: {tool_name}")
         result = interpreter._tools[tool_name](**kwargs)
         if asyncio.iscoroutine(result):
-            raise TypeError(
-                "Python interpreter tools invoked from the sync JSON-RPC path must not return coroutines. "
-                "Provide a synchronous callable."
-            )
+            result = asyncio.run(result)
         is_json = isinstance(result, (list, dict))
         response = jsonrpc_result(
             result={
