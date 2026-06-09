@@ -44,6 +44,13 @@ class BoundedRunStats:
         self.exceptions_map: dict[int, BaseException] = {}
 
 
+class BoundedRunAbortedError(RuntimeError):
+    def __init__(self, stats: BoundedRunStats, *, reason: str = "max_errors exceeded") -> None:
+        self.stats = stats
+        self.reason = reason
+        super().__init__(f"Execution cancelled: {reason}. Failed indices: {stats.failed_indices}")
+
+
 async def run_bounded(
     *,
     items: Sequence[T],
@@ -112,5 +119,5 @@ async def run_bounded(
     finally:
         pbar.close()
     if cancel.is_set():
-        raise RuntimeError("Execution cancelled due to errors or interruption.")
+        raise BoundedRunAbortedError(stats, reason="max_errors exceeded")
     return (results, stats)

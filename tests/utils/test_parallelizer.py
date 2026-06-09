@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from dspy.utils.async_parallel import run_bounded
+from dspy.utils.async_parallel import BoundedRunAbortedError, run_bounded
 
 
 async def _run_bounded(items, fn, **kwargs):
@@ -41,7 +41,7 @@ def test_max_errors_handling(make_run):
         return item
 
     data = [1, 2, 3, 4, 5]
-    with pytest.raises(RuntimeError, match=r"Execution cancelled due to errors or interruption\."):
+    with pytest.raises(BoundedRunAbortedError, match="Failed indices"):
         asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=3, max_errors=1))
 
 
@@ -107,7 +107,7 @@ def test_sequential_max_errors_exceeded(make_run):
         return item
 
     data = [1, 2, 3, 4, 5]
-    with pytest.raises(RuntimeError, match=r"Execution cancelled due to errors or interruption\."):
+    with pytest.raises(BoundedRunAbortedError, match="Failed indices"):
         asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=1, max_errors=1))
 
 
