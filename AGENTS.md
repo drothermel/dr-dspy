@@ -148,6 +148,26 @@ See `docs/migration/call-options.md` for before/after examples.
 
 Optimizer/bootstrap teacher contexts must include a configured `adapter` (use `optimizer_lm_context` from `dspy.teleprompt.utils`).
 
+Teleprompter evaluation and trace helpers live in `dspy.teleprompt.utils`:
+
+```python
+from dspy.teleprompt.utils import make_optimizer_evaluator, resolve_max_errors, run_program_with_trace, trace_to_demos
+
+evaluate = make_optimizer_evaluator(
+    run,
+    devset=valset,
+    metric=my_metric,
+    max_concurrency=8,
+    max_errors=resolve_max_errors(None, run),
+)
+prediction, trace = await run_program_with_trace(program, example, run)
+demos_by_predictor = trace_to_demos(trace, predictor2name)
+```
+
+GEPA custom instruction proposers must implement `AsyncProposalFn` with `async def __call__(...)`. Sync proposers and `await_in_sync` interpreter tool bridges are removed.
+
+Task input validation runs in `AdapterCallPipeline.execute`; do not rely on duplicate validation in `Predict`.
+
 ## Internal call-site conventions
 
 - Use keyword arguments for multi-arg calls to DSPy-internal functions when meaning is not obvious from position.

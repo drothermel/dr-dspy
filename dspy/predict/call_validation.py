@@ -58,7 +58,7 @@ def validate_task_inputs(task_spec: TaskSpec, inputs: dict[str, Any]) -> dict[st
         schema_extra = cast("dict[str, Any]", json_schema_extra) if isinstance(json_schema_extra, dict) else {}
         if value is None or schema_extra.get(IS_TYPE_UNDEFINED):
             continue
-        if expected_type is None or not isinstance(expected_type, type):
+        if expected_type is None:
             continue
         if not _is_value_compatible_with_type(value, expected_type):
             raise ValueError(
