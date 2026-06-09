@@ -1,7 +1,7 @@
 import os
 
 
-def download(url) -> None:
+def download(url: str) -> None:
     import requests
 
     filename = os.path.basename(url)

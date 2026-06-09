@@ -30,10 +30,17 @@ def wrap_backend_exception(exc: Exception, *, model: str | None = None) -> LMErr
     if isinstance(exc, LMError):
         return exc
     if isinstance(exc, BackendUnsupportedFeatureError):
+        features = getattr(exc, "features", None) or getattr(exc, "feature", None)
+        if isinstance(features, str):
+            feature_list = [features]
+        elif isinstance(features, (list, tuple, set)):
+            feature_list = [str(item) for item in features]
+        else:
+            feature_list = ["dr_llm_backend_v1"]
         return LMUnsupportedFeatureError(
             str(exc),
             model=model,
-            features=["dr_llm_backend_v1"],
+            features=feature_list,
         )
     if isinstance(exc, (BackendAcquireTimeoutError, BackendDrainTimeoutError)):
         return LMTimeoutError(str(exc), model=model)

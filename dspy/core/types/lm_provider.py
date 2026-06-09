@@ -6,7 +6,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class LMProviderOptions(BaseModel):
-    """LiteLLM / provider connection and passthrough options for BaseLM construction."""
+    """LiteLLM / provider connection and passthrough options for BaseLM construction.
+
+    ``api_base`` is the canonical endpoint override. ``base_url`` is accepted as an
+    alias and normalized to ``api_base`` when only ``base_url`` is set.
+    """
 
     model_config = ConfigDict(extra="forbid")
 

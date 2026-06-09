@@ -10,7 +10,7 @@ class DSPyLoggingStream:
     def __init__(self) -> None:
         self._enabled = True
 
-    def write(self, text) -> None:
+    def write(self, text: str) -> None:
         if self._enabled:
             sys.stderr.write(text)
 
@@ -19,11 +19,11 @@ class DSPyLoggingStream:
             sys.stderr.flush()
 
     @property
-    def enabled(self):
+    def enabled(self) -> bool:
         return self._enabled
 
     @enabled.setter
-    def enabled(self, value) -> None:
+    def enabled(self, value: bool) -> None:
         self._enabled = value
 
 
@@ -38,7 +38,7 @@ def enable_logging() -> None:
     DSPY_LOGGING_STREAM.enabled = True
 
 
-def configure_dspy_loggers(root_module_name) -> None:
+def configure_dspy_loggers(root_module_name: str) -> None:
     formatter = logging.Formatter(fmt=LOGGING_LINE_FORMAT, datefmt=LOGGING_DATETIME_FORMAT)
     dspy_handler_name = "dspy_handler"
     handler = logging.StreamHandler(stream=DSPY_LOGGING_STREAM)

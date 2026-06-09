@@ -87,13 +87,19 @@ def _reject_unsupported_request(request: LMRequest) -> None:
         _reject_unsupported_parts(message.parts, model=request.model)
 
 
+def _unsupported_features_for_part(part: LMPart) -> list[str]:
+    if isinstance(part, LMToolCallPart):
+        return ["tools"]
+    return ["multimodal"]
+
+
 def _reject_unsupported_parts(parts: list[LMPart], *, model: str) -> None:
     for part in parts:
         if isinstance(part, _UNSUPPORTED_PART_TYPES):
             raise LMUnsupportedFeatureError(
                 f"dr-llm backends v1 do not support message part type {type(part).__name__}.",
                 model=model,
-                features=["multimodal", "tools"],
+                features=_unsupported_features_for_part(part),
             )
 
 
@@ -118,7 +124,7 @@ def _sampling_from_config(config: LMConfig) -> SamplingControls | None:
 
 def _effort_from_config(config: LMConfig) -> EffortSpec:
     reasoning = config.reasoning
-    if reasoning is not None and reasoning.effort:
+    if reasoning is not None and reasoning.effort is not None:
         try:
             return EffortSpec(reasoning.effort.lower())
         except ValueError:

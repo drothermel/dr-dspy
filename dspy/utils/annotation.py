@@ -3,22 +3,15 @@ from typing import Any, Callable, ParamSpec, TypeVar, cast, overload
 P = ParamSpec("P")
 R = TypeVar("R")
 T = TypeVar("T")
+_Decorated = type[T] | Callable[P, R]
 
 
 @overload
-def experimental(f: type[T], version: str | None = None) -> type[T]: ...
+def experimental(f: _Decorated, version: str | None = None) -> _Decorated: ...
 
 
 @overload
-def experimental(f: Callable[P, R], version: str | None = None) -> Callable[P, R]: ...
-
-
-@overload
-def experimental(f: None = None, version: str | None = None) -> Callable[[type[T]], type[T]]: ...
-
-
-@overload
-def experimental(f: None = None, version: str | None = None) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
+def experimental(f: None = None, version: str | None = None) -> Callable[[_Decorated], _Decorated]: ...
 
 
 def experimental(f: type[T] | Callable[P, R] | None = None, version: str | None = None) -> Any:
