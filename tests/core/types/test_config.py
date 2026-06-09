@@ -9,7 +9,6 @@ from dspy.core.types import (
     LMProviderOptions,
     LMReasoningConfig,
     LMRequest,
-    LMRequestPatch,
     LMResponse,
     LMToolChoice,
     LMUsage,
@@ -111,15 +110,6 @@ def test_merge_provider_options_scalar_override():
     assert merged is not None
     assert merged.api_key == "right-key"
     assert merged.timeout == 10.0
-
-
-def test_lm_request_patch_merge_uses_merge_lm_config():
-    patch = LMRequestPatch(config=LMConfig(temperature=0.1, extensions={"a": 1}))
-    other = LMRequestPatch(config=LMConfig(extensions={"b": 2}))
-    merged = patch.merge(other)
-    assert merged.config is not None
-    assert merged.config.temperature == 0.1
-    assert merged.config.extensions == {"a": 1, "b": 2}
 
 
 def test_config_extensions_surface_in_history_kwargs():

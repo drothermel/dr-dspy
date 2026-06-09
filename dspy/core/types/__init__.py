@@ -31,7 +31,7 @@ from dspy.core.types.parts import (
     LMToolResultPart,
     LMVideoPart,
 )
-from dspy.core.types.request import LMRequest, LMRequestPatch
+from dspy.core.types.request import LMRequest
 from dspy.core.types.response import CallRecord, LMOutput, LMResponse, LMUsage
 from dspy.core.types.stream import (
     AsyncLMStream,
@@ -92,7 +92,6 @@ __all__ = [
     "UserMessageContent",
     "LMRefusalPart",
     "LMRequest",
-    "LMRequestPatch",
     "LMResponse",
     "LMStream",
     "LMStreamDeltaEvent",
