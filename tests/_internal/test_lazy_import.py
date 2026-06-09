@@ -1,3 +1,4 @@
+import importlib
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -122,16 +123,15 @@ def test_import_optional_succeeds_for_stdlib():
 
 
 def test_import_optional_raises_with_extra_hint(monkeypatch):
-    import builtins
+    real_import_module = importlib.import_module
 
-    real_import = builtins.__import__
-
-    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+    def fake_import_module(name: str, package: str | None = None):
         if name == "datasets":
             raise ModuleNotFoundError("No module named 'datasets'", name="datasets")
-        return real_import(name, globals, locals, fromlist, level)
+        return real_import_module(name, package)
 
-    monkeypatch.setattr(builtins, "__import__", fake_import)
+    monkeypatch.delitem(sys.modules, "datasets", raising=False)
+    monkeypatch.setattr(importlib, "import_module", fake_import_module)
     dist = _detect_dspy_dist()
     with pytest.raises(ImportError) as exc_info:
         import_optional("datasets", extra="datasets", feature="Test feature")
@@ -151,16 +151,14 @@ def test_import_optional_uses_install_command_override():
 
 
 def test_import_optional_reraises_transitive_module_not_found(monkeypatch):
-    import builtins
+    real_import_module = importlib.import_module
 
-    real_import = builtins.__import__
-
-    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+    def fake_import_module(name: str, package: str | None = None):
         if name == "optuna":
             raise ModuleNotFoundError("No module named 'missing_transitive'", name="missing_transitive")
-        return real_import(name, globals, locals, fromlist, level)
+        return real_import_module(name, package)
 
-    monkeypatch.setattr(builtins, "__import__", fake_import)
+    monkeypatch.setattr(importlib, "import_module", fake_import_module)
     with pytest.raises(ModuleNotFoundError, match="missing_transitive"):
         import_optional("optuna", extra="optuna", feature="Optuna")
 

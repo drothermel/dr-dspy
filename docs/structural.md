@@ -678,6 +678,8 @@ and injectable `session_id_resolver=` on `DrLlmPoolLM`.
 
 ### P4.4 Unify optional dependency import patterns
 
+**Status:** Done (2026-06).
+
 **Sources:** External review; External cross-package review.
 
 Problem:
@@ -698,6 +700,15 @@ Details to preserve:
 
 - Feature-specific install hints are valuable and should stay.
 - Optional dependencies should remain lazy where they are currently lazy.
+
+**Delivered:** Shared `_format_optional_import_error` in
+`dspy/_internal/lazy_import.py`; eager `import_optional()` alongside lazy
+`require()` and `is_available()`; deleted `integrations/datasets/import_.py` and
+`integrations/optimizers/optuna/import_.py` wrappers; migrated datasets,
+optuna, weaviate, gepa, vendor integrations (databricks, local/sglang/torch,
+faiss, colbert, alfworld, math metric), and adapter/tool paths (PIL, soundfile,
+mcp, langchain); contributor docs in `docs/migration/dependencies.md` and
+`AGENTS.md`.
 
 ## P5: Simplify Primitives, Test Helpers, and Test Suite Structure
 

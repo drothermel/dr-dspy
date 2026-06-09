@@ -42,12 +42,14 @@ ALLOWLIST_SUFFIXES = (
 
 OPTIONAL_DEP_MODULES = frozenset(
     {
+        "datasets",
         "gepa",
-        "optuna",
-        "litellm",
-        "mcp",
         "langchain",
         "langchain_core",
+        "litellm",
+        "mcp",
+        "optuna",
+        "weaviate",
     }
 )
 

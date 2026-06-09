@@ -293,3 +293,4 @@ Task input validation runs in `AdapterCallPipeline.execute` via `dspy.task_spec.
 - Use keyword arguments for multi-arg calls to DSPy-internal functions when meaning is not obvious from position.
 - Do not add keyword-only `*` to public constructors or documented callback protocols (e.g. `metric(example, prediction, trace)`).
 - Spine APIs require keywords at call sites: `run_bounded(items=..., fn=...)`, `await adapter(lm=..., config=..., task_spec=..., demos=..., inputs=..., run=...)`.
+- Optional third-party dependencies use `dspy._internal.lazy_import` (`require` for lazy module-level bindings, `import_optional` for eager call sites, `is_available` for capability probes). Do not add bespoke try/except install-hint blocks.
