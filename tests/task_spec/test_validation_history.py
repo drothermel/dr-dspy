@@ -1,6 +1,5 @@
 from dspy.history import REPLHistory, TurnLog
-from dspy.predict.call_validation import validate_task_inputs
-from dspy.task_spec import input_field, make_task_spec, output_field
+from dspy.task_spec import input_field, make_task_spec, output_field, validate_task_inputs
 
 
 def test_validate_task_inputs_coerces_dict_turn_log():

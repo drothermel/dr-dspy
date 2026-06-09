@@ -9,6 +9,7 @@ from dspy.adapters.call.two_step import TWO_STEP_MAIN_CALL_SITE, finalize_two_st
 from dspy.adapters.call.two_step_protocol import is_two_step_adapter
 from dspy.core.types.config import coerce_lm_config
 from dspy.errors import AdapterParseError, LMError
+from dspy.task_spec import validate_task_inputs
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Mapping
@@ -35,8 +36,6 @@ class AdapterCallPipeline:
         call_site: CallSite | None = None,
         allow_parse_fallback: bool = True,
     ) -> list[dict[str, Any]]:
-        from dspy.predict.call_validation import validate_task_inputs
-
         inputs = validate_task_inputs(task_spec, inputs)
         base_adapter = adapter
         if is_two_step_adapter(adapter):

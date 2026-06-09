@@ -26,8 +26,6 @@ ALLOWLIST_SUFFIXES = (
     "runtime/run_context_model.py",
     # breaks openai_format.parse ↔ core.types.coercion import cycle
     "core/types/coercion.py",
-    # breaks adapters.call.pipeline ↔ predict package import cycle
-    "adapters/call/pipeline.py",
     "teleprompt/grpo.py",
     "teleprompt/bootstrap_finetune.py",
     "evaluate/metrics.py",

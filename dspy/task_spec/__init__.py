@@ -20,7 +20,7 @@ from dspy.task_spec.field_spec import (
 from dspy.task_spec.parse import parse_task_spec_string
 from dspy.task_spec.serialize import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
 from dspy.task_spec.task_spec import TaskSpec, validate_task_spec
-from dspy.task_spec.validation import validate_task_inputs_from_spec
+from dspy.task_spec.validation import validate_task_inputs, validate_task_inputs_from_spec
 
 __all__ = [
     "FIELD_NAME_PATTERN",
@@ -40,6 +40,7 @@ __all__ = [
     "output_field",
     "parse_task_spec_string",
     "validate_field_name",
+    "validate_task_inputs",
     "validate_task_inputs_from_spec",
     "validate_task_spec",
 ]

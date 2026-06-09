@@ -11,10 +11,24 @@ from typing import TYPE_CHECKING, Annotated, Any, Union, get_args, get_origin
 
 from pydantic import TypeAdapter, ValidationError
 
+from dspy.history.discovery import is_agent_history_type
 from dspy.task_spec.annotation_format import get_type_name
 
 if TYPE_CHECKING:
     from dspy.task_spec.task_spec import TaskSpec
+
+
+def validate_task_inputs(task_spec: TaskSpec, inputs: dict[str, Any]) -> dict[str, Any]:
+    validated = validate_task_inputs_from_spec(task_spec, inputs)
+    for field_name, field in task_spec.input_fields.items():
+        if field_name not in validated:
+            continue
+        value = validated[field_name]
+        if value is None or field.is_type_undefined:
+            continue
+        if is_agent_history_type(field.type_):
+            validated[field_name] = TypeAdapter(field.type_).validate_python(value)
+    return validated
 
 
 def validate_task_inputs_from_spec(task_spec: TaskSpec, inputs: dict[str, Any]) -> dict[str, Any]:

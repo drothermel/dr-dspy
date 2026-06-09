@@ -6,7 +6,7 @@ from typing_extensions import override
 from dspy.clients.base_lm import BaseLM
 from dspy.core.types import LMConfig, coerce_lm_config, merge_lm_config
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
-from dspy.predict.call_validation import resolve_predict_options
+from dspy.predict.options import reject_reserved_predict_inputs, resolve_predict_options
 from dspy.primitives import Module, Prediction
 from dspy.runtime.callback import Callback
 from dspy.runtime.run_context import RunContext
@@ -158,6 +158,7 @@ class Predict(Module):
         options: ModuleCallOptions | None = None,
         **inputs: Any,
     ) -> Prediction:
+        reject_reserved_predict_inputs(inputs)
         predict_options = resolve_predict_options(options if isinstance(options, PredictOptions) else None)
         lm, config, task_spec, demos, inputs, run, trace = self._forward_preprocess(
             inputs=inputs,
