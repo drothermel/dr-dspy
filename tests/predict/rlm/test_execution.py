@@ -276,7 +276,7 @@ class TestRLMToolExceptions:
         run = make_run(lm=DummyLM([{}]))
         result = asyncio.run(rlm(query="test", run=run))
         assert result.answer == "recovered"
-        first_step = result.trajectory[0]
+        first_step = result.turn_log.entries[0].model_dump()
         assert first_step["code"] == "print(x)"
 
     def test_syntax_error_from_execute_is_recoverable(self, make_run):
@@ -291,7 +291,7 @@ class TestRLMToolExceptions:
         run = make_run(lm=DummyLM([{}]))
         result = asyncio.run(rlm(query="test", run=run))
         assert result.answer == "recovered"
-        assert result.trajectory[0]["output"].startswith("[Error] invalid syntax")
+        assert result.turn_log.entries[0].output.startswith("[Error] invalid syntax")
 
     def test_syntax_error_from_strip_code_fences_is_recoverable(self, make_run):
         mock = MockInterpreter(responses=[FinalOutput({"answer": "recovered"})])
@@ -305,7 +305,7 @@ class TestRLMToolExceptions:
         run = make_run(lm=DummyLM([{}]))
         result = asyncio.run(rlm(query="test", run=run))
         assert result.answer == "recovered"
-        assert result.trajectory[0]["output"].startswith("[Error]")
+        assert result.turn_log.entries[0].output.startswith("[Error]")
 
 
 class TestRLMAsyncMock:

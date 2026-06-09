@@ -123,9 +123,9 @@ def extract_fallback(
 ) -> Prediction:
     logger.warning("RLM reached max iterations, using extract to get final output")
     variables_info = [variable.format() for variable in variables]
-    extract_pred = rlm.extract(variables_info=variables_info, repl_history=history)
+    extract_pred = rlm.extract(variables_info=variables_info, turn_log=history)
     return Prediction(
-        trajectory=[e.model_dump() for e in history],
+        turn_log=history,
         final_reasoning="Extract forced final output",
         **{name: getattr(extract_pred, name) for name in output_field_names},
     )
@@ -144,12 +144,12 @@ async def aextract_fallback(
     variables_info = [variable.format() for variable in variables]
     extract_pred = await rlm.extract(
         variables_info=variables_info,
-        repl_history=history,
+        turn_log=history,
         run=run,
         options=options,
     )
     return Prediction(
-        trajectory=[e.model_dump() for e in history],
+        turn_log=history,
         final_reasoning="Extract forced final output",
         **{name: getattr(extract_pred, name) for name in output_field_names},
     )
@@ -194,9 +194,7 @@ def process_execution_result(
         if error:
             return history.append(reasoning=pred.reasoning, code=code, output=error)
         final_history = history.append(reasoning=pred.reasoning, code=code, output=f"FINAL: {parsed_outputs}")
-        return Prediction(
-            **parsed_outputs or {}, trajectory=[e.model_dump() for e in final_history], final_reasoning=pred.reasoning
-        )
+        return Prediction(**parsed_outputs or {}, turn_log=final_history, final_reasoning=pred.reasoning)
     output = "\n".join(map(str, result)) if isinstance(result, list) else str(result) if result else ""
     output = format_output(output)
     if rlm.verbose:
@@ -222,7 +220,7 @@ def execute_iteration(
 ) -> Prediction | REPLHistory:
     variables_info = [variable.format() for variable in variables]
     action = rlm.generate_action(
-        variables_info=variables_info, repl_history=history, iteration=f"{iteration + 1}/{rlm.max_iterations}"
+        variables_info=variables_info, turn_log=history, iteration=f"{iteration + 1}/{rlm.max_iterations}"
     )
     if rlm.verbose:
         logger.info(
@@ -253,7 +251,7 @@ async def aexecute_iteration(
     variables_info = [variable.format() for variable in variables]
     pred = await rlm.generate_action(
         variables_info=variables_info,
-        repl_history=history,
+        turn_log=history,
         iteration=f"{iteration + 1}/{rlm.max_iterations}",
         run=run,
         options=options,

@@ -32,8 +32,8 @@ def build_task_specs(rlm: RLM) -> tuple[TaskSpec, TaskSpec]:
             "variables_info": input_field(
                 "variables_info", str, desc="Metadata about the variables available in the REPL"
             ),
-            "repl_history": input_field(
-                "repl_history", REPLHistory, desc="Previous REPL code executions and their outputs"
+            "turn_log": input_field(
+                "turn_log", REPLHistory, desc="Previous REPL code executions and their outputs"
             ),
             "iteration": input_field(
                 "iteration", str, desc="Current iteration number (1-indexed) out of max_iterations"
@@ -66,7 +66,7 @@ def build_task_specs(rlm: RLM) -> tuple[TaskSpec, TaskSpec]:
             "variables_info": input_field(
                 "variables_info", str, desc="Metadata about the variables available in the REPL"
             ),
-            "repl_history": input_field("repl_history", REPLHistory, desc="Your REPL interactions so far"),
+            "turn_log": input_field("turn_log", REPLHistory, desc="Your REPL interactions so far"),
             **rlm.task_spec.output_fields,
         },
         instructions=full_extract_instructions,

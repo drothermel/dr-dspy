@@ -143,7 +143,7 @@ class TestRLMDynamicSignature:
         rlm = RLM(ts("document, question -> summary, answer"))
         action_sig = rlm.generate_action.task_spec
         assert "variables_info" in action_sig.input_fields
-        assert "repl_history" in action_sig.input_fields
+        assert "turn_log" in action_sig.input_fields
         assert "reasoning" in action_sig.output_fields
         assert "code" in action_sig.output_fields
         instructions = action_sig.instructions
@@ -159,7 +159,7 @@ class TestRLMDynamicSignature:
         rlm = RLM(ts("document, question -> summary, key_facts, confidence"))
         extract_sig = rlm.extract.task_spec
         assert "variables_info" in extract_sig.input_fields
-        assert "repl_history" in extract_sig.input_fields
+        assert "turn_log" in extract_sig.input_fields
         assert "summary" in extract_sig.output_fields
         assert "key_facts" in extract_sig.output_fields
         assert "confidence" in extract_sig.output_fields

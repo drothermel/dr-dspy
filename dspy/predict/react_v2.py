@@ -65,7 +65,7 @@ class ReActV2(Module):
             fields[name] = input_field(
                 name, _optional_annotation(field.type_), desc=field.desc if field.desc != f"${{{name}}}" else None
             )
-        fields["history"] = input_field("history", TurnLog)
+        fields["turn_log"] = input_field("turn_log", TurnLog)
         fields["tools"] = input_field("tools", list[Tool])
         fields["next_thought"] = output_field("next_thought", Reasoning)
         fields["tool_calls"] = output_field("tool_calls", ToolCalls)
@@ -92,13 +92,13 @@ class ReActV2(Module):
     ):
         run = resolve_run(run=run, bound_run=self.run)
         max_iters = input_args.pop("max_iters", self.max_iters)
-        history = _coerce_history(input_args.pop("history", None))
+        turn_log = _coerce_turn_log(input_args.pop("turn_log", input_args.pop("history", None)))
         pending_inputs = {name: input_args[name] for name in self.task_spec.input_fields if name in input_args}
         break_reason = "max_iters"
         for turn_index in range(max_iters):
             try:
                 pred = await self.react(
-                    history=history,
+                    turn_log=turn_log,
                     tools=list(self.tools.values()),
                     **pending_inputs,
                     run=run,
@@ -121,11 +121,11 @@ class ReActV2(Module):
             event = self._history_event(pending_inputs, pred, tool_calls, tool_call_results)
             if final_outputs is not None:
                 event.update(final_outputs)
-            history = history.append_turn(event)
+            turn_log = turn_log.append_turn(event)
             pending_inputs = {}
             if final_outputs is not None:
-                return Prediction(**final_outputs, history=history, termination_reason="submit")
-        return await self._forced_submit(history, pending_inputs, break_reason, max_iters, run=run)
+                return Prediction(**final_outputs, turn_log=turn_log, termination_reason="submit")
+        return await self._forced_submit(turn_log, pending_inputs, break_reason, max_iters, run=run)
 
     def _execute_tool_calls(self, tool_calls: ToolCalls) -> tuple[ToolCallResults, dict[str, Any] | None]:
         values = []
@@ -165,7 +165,7 @@ class ReActV2(Module):
 
     async def _forced_submit(
         self,
-        history: TurnLog,
+        turn_log: TurnLog,
         pending_inputs: dict[str, Any],
         break_reason: str,
         turn_index: int,
@@ -174,7 +174,7 @@ class ReActV2(Module):
     ) -> Prediction:
         try:
             pred = await self.react(
-                history=history,
+                turn_log=turn_log,
                 tools=list(self.tools.values()),
                 options=PredictOptions(
                     config=LMConfig(
@@ -188,18 +188,18 @@ class ReActV2(Module):
             tool_calls = _ensure_tool_call_ids(_coerce_tool_calls(getattr(pred, "tool_calls", None)), turn_index)
         except (AdapterParseError, ValueError, ContextWindowExceededError) as err:
             logger.warning("Forced submit failed: %s", _fmt_exc(err))
-            return Prediction(history=history, termination_reason=break_reason or "failed")
+            return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
         submit_calls = ToolCalls(tool_calls=[call for call in tool_calls.tool_calls if call.name == "submit"])
         if not submit_calls.tool_calls:
-            return Prediction(history=history, termination_reason=break_reason or "failed")
+            return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
         tool_call_results, final_outputs = self._execute_tool_calls(submit_calls)
         event = self._history_event(pending_inputs, pred, submit_calls, tool_call_results)
         if final_outputs is not None:
             event.update(final_outputs)
-        history = history.append_turn(event)
+        turn_log = turn_log.append_turn(event)
         if final_outputs is not None:
-            return Prediction(**final_outputs, history=history, termination_reason="forced_submit")
-        return Prediction(history=history, termination_reason=break_reason or "failed")
+            return Prediction(**final_outputs, turn_log=turn_log, termination_reason="forced_submit")
+        return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
 
 
 def _json_schema_for_annotation(annotation: Any) -> dict[str, Any]:
@@ -218,16 +218,16 @@ def _optional_annotation(annotation: Any) -> Any:
         return annotation
 
 
-def _coerce_history(history: Any) -> TurnLog:
-    if history is None:
+def _coerce_turn_log(turn_log: Any) -> TurnLog:
+    if turn_log is None:
         return TurnLog.empty()
-    if isinstance(history, TurnLog):
-        return history
-    if isinstance(history, dict) and "messages" in history:
-        return TurnLog(turns=tuple(history["messages"]))
-    if isinstance(history, dict) and "turns" in history:
-        return TurnLog.model_validate(history)
-    return TurnLog.model_validate(history)
+    if isinstance(turn_log, TurnLog):
+        return turn_log
+    if isinstance(turn_log, dict) and "messages" in turn_log:
+        return TurnLog(turns=tuple(turn_log["messages"]))
+    if isinstance(turn_log, dict) and "turns" in turn_log:
+        return TurnLog.model_validate(turn_log)
+    return TurnLog.model_validate(turn_log)
 
 
 def _coerce_tool_calls(tool_calls: Any) -> ToolCalls:

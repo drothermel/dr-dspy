@@ -1,32 +1,36 @@
 import inspect
+import json
 import logging
+import re
 
 from typing_extensions import override
 
 from dspy.adapters.types.tool import Tool
 from dspy.core.types.call_options import ModuleCallOptions
+from dspy.history import TurnLog
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
-from dspy.predict.program_of_thought import ProgramOfThought
-from dspy.predict.react import ReAct
+from dspy.primitives.code_interpreter import FinalOutput
+from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
+from dspy.utils.exceptions import ContextWindowExceededError
 from dspy.utils.source_format import get_formatted_source
 
 logger = logging.getLogger(__name__)
 
 
-class CodeAct(ReAct, ProgramOfThought):
+class CodeAct(Module):
     def __init__(
         self, task_spec: TaskSpec, tools: list[Tool], max_iters: int = 5, interpreter: PythonInterpreter | None = None
     ) -> None:
+        super().__init__()
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"CodeAct requires a TaskSpec instance, got {type(task_spec).__name__}.")
         self.task_spec = task_spec
         self.max_iters = max_iters
-        self.history = []
         tools_by_name: dict[str, Tool] = {}
         for tool in tools:
             if not isinstance(tool, Tool):
@@ -41,7 +45,7 @@ class CodeAct(ReAct, ProgramOfThought):
         instructions = self._build_instructions(task_spec, tools_by_name)
         codeact_task_spec = (
             make_task_spec(dict(task_spec.input_fields), instructions="\n".join(instructions))
-            .append(input_field("trajectory", str))
+            .append(input_field("turn_log", TurnLog))
             .append(
                 output_field(
                     "generated_code",
@@ -53,7 +57,7 @@ class CodeAct(ReAct, ProgramOfThought):
         )
         extract_task_spec = make_task_spec(
             {**task_spec.input_fields, **task_spec.output_fields}, instructions=task_spec.instructions
-        ).append(input_field("trajectory", str))
+        ).append(input_field("turn_log", TurnLog))
         self.tools: dict[str, Tool] = tools_by_name
         self.codeact = Predict(codeact_task_spec)
         self.extractor = ChainOfThought(extract_task_spec)
@@ -80,25 +84,77 @@ class CodeAct(ReAct, ProgramOfThought):
     ):
         for tool in self.tools.values():
             self.interpreter(get_formatted_source(tool.func))
-        trajectory = {}
+        turn_log = TurnLog.empty()
         max_iters = inputs.pop("max_iters", self.max_iters)
-        for idx in range(max_iters):
-            code_data = await self.codeact(trajectory=trajectory, run=run, options=options, **inputs)
-            output = None
+        for _idx in range(max_iters):
+            code_data = await self.codeact(turn_log=turn_log, run=run, options=options, **inputs)
             code, error = self._parse_code(code_data)
             if error:
-                trajectory[f"observation_{idx}"] = f"Failed to parse the generated code: {error}"
+                turn_log = turn_log.append_turn({"observation": f"Failed to parse the generated code: {error}"})
                 continue
-            trajectory[f"generated_code_{idx}"] = code
             output, error = self._execute_code(code)
+            event: dict = {"generated_code": code}
             if not error:
-                trajectory[f"code_output_{idx}"] = output
+                event["code_output"] = output
             else:
-                trajectory[f"observation_{idx}"] = f"Failed to execute the generated code: {error}"
+                event["observation"] = f"Failed to execute the generated code: {error}"
+            turn_log = turn_log.append_turn(event)
             if code_data.finished:
                 break
-        extract = await self._call_with_potential_trajectory_truncation(
-            self.extractor, trajectory, run, options=options, **inputs
+        extract = await self._call_with_potential_turn_log_truncation(
+            self.extractor, turn_log, run, options=options, **inputs
         )
         self.interpreter.shutdown()
-        return Prediction(trajectory=trajectory, **extract)
+        return Prediction(turn_log=turn_log, **extract)
+
+    async def _call_with_potential_turn_log_truncation(
+        self, module, turn_log: TurnLog, run, *, options=None, **input_args
+    ):
+        for _ in range(3):
+            try:
+                return await module(
+                    **input_args,
+                    turn_log=turn_log,
+                    run=run,
+                    options=options,
+                )
+            except ContextWindowExceededError:
+                logger.warning("Turn log exceeded the context window, truncating the oldest turn.")
+                turn_log = self.truncate_turn_log(turn_log)
+        raise ValueError("The context window was exceeded even after 3 attempts to truncate the turn log.")
+
+    def truncate_turn_log(self, turn_log: TurnLog) -> TurnLog:
+        if len(turn_log.turns) < 2:
+            raise ValueError(
+                "The turn log is too long so your prompt exceeded the context window, but the turn log cannot be truncated because it only has one turn."
+            )
+        return TurnLog(turns=turn_log.turns[1:])
+
+    def _parse_code(self, code_data):
+        code = getattr(code_data, "generated_code", "")
+        if hasattr(code_data, "get"):
+            code = code_data.get("generated_code", code)
+        code = code.split("---", 1)[0].split("\n\n\n", 1)[0]
+        code_match = re.search("```python[ \\n](.*?)[ \\n]```?", code, re.DOTALL)
+        code_block = code_match.group(1) if code_match else code
+        if not code_block:
+            return (code, "Error: Empty code after parsing.")
+        if "\n" not in code_block and code_block.count("=") > 1:
+            return (code, "Error: Code format is not correct.")
+        lines = code_block.split("\n")
+        last_line_match = re.match("^(\\w+)\\s*=", lines[-1].strip())
+        if last_line_match and len(lines) > 1:
+            code_block += "\n" + last_line_match.group(1)
+        return (code_block, None)
+
+    def _execute_code(self, code):
+        if not code:
+            return (None, "Error: Empty code before execution.")
+        try:
+            result = self.interpreter.execute(code)
+            if isinstance(result, FinalOutput):
+                result = result.output
+            output = json.dumps(result)
+            return (output, None)
+        except Exception as e:
+            return (None, str(e))

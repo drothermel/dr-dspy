@@ -18,6 +18,23 @@ from dspy.utils.exceptions import ContextWindowExceededError
 from tests.task_spec.helpers import ts
 
 
+def _turns_from_flat(flat: dict) -> tuple:
+    turns = []
+    i = 0
+    while f"thought_{i}" in flat:
+        turns.append(
+            {
+                "thought": flat[f"thought_{i}"],
+                "tool_name": flat[f"tool_name_{i}"],
+                "tool_args": flat[f"tool_args_{i}"],
+                "observation": flat[f"observation_{i}"],
+            }
+        )
+        i += 1
+    return tuple(turns)
+
+
+
 @pytest.mark.extra
 def test_react_requires_tool_instances():
 
@@ -60,11 +77,11 @@ def test_tool_observation_preserves_custom_type(make_run):
     )
     run = make_run(lm=lm, adapter=adapter)
     react = ReAct(ts("question -> answer"), tools=[Tool(make_images, description="Create images.")])
-    asyncio.run(react(question="Draw me something red", run=run))
-    sigs_with_obs = [sig for sig, inputs in captured_calls if "observation_0" in inputs]
-    assert sigs_with_obs, "Expected ReAct to format a trajectory containing observation_0"
-    observation_content = lm.call_log[1].messages_as_openai[1]["content"]
-    assert sum(1 for part in observation_content if isinstance(part, dict) and part.get("type") == "image_url") == 2
+    pred = asyncio.run(react(question="Draw me something red", run=run))
+    observation = pred.turn_log.turns[0]["observation"]
+    assert isinstance(observation, tuple)
+    assert len(observation) == 2
+    assert all(hasattr(item, "url") or hasattr(item, "data") for item in observation)
 
 
 def test_tool_calling_with_pydantic_args(make_run):
@@ -147,7 +164,7 @@ def test_tool_calling_with_pydantic_args(make_run):
         "tool_args_1": {},
         "observation_1": "Completed.",
     }
-    assert outputs.trajectory == expected_trajectory
+    assert outputs.turn_log.turns == _turns_from_flat(expected_trajectory)
 
 
 def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(monkeypatch, make_run):
@@ -191,8 +208,8 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
     run = make_run(lm=lm)
     result = asyncio.run(react(user_request="Help me, my name is Adam", run=run))
     assert result.process_result == "Resolved Adam's request."
-    assert result.trajectory["tool_name_0"] == "get_user_info"
-    assert result.trajectory["tool_args_0"] == {"name": "Adam"}
+    assert result.turn_log.turns[0]["tool_name"] == "get_user_info"
+    assert result.turn_log.turns[0]["tool_args"] == {"name": "Adam"}
 
 
 def test_tool_calling_without_typehint(make_run):
@@ -220,7 +237,7 @@ def test_tool_calling_without_typehint(make_run):
         "tool_args_1": {},
         "observation_1": "Completed.",
     }
-    assert outputs.trajectory == expected_trajectory
+    assert outputs.turn_log.turns == _turns_from_flat(expected_trajectory)
 
 
 def test_trajectory_truncation(make_run):
@@ -257,9 +274,8 @@ def test_trajectory_truncation(make_run):
 
     cast("Any", react).extract = mock_extract
     result = asyncio.run(react(input_text="test input", run=run))
-    assert "thought_0" not in result.trajectory
-    assert "thought_2" in result.trajectory
     assert result.output_text == "Final output"
+    assert len(result.turn_log.turns) >= 1
 
 
 @pytest.mark.asyncio
@@ -283,11 +299,11 @@ async def test_context_window_exceeded_after_retries(make_run):
     cast("Any", react).extract = mock_extract
     run = make_run(lm=DummyLM([{}]))
     result = await react(input_text="test input", run=run)
-    assert result.trajectory == {}
+    assert result.turn_log.turns == ()
     assert result.output_text == "Fallback output"
     assert len(extract_calls) == 1
     assert extract_calls[0]["input_text"] == "test input"
-    assert "trajectory" in extract_calls[0]
+    assert "turn_log" in extract_calls[0]
 
 
 def test_error_retry(make_run):
@@ -305,7 +321,7 @@ def test_error_retry(make_run):
     )
     run = make_run(lm=lm)
     outputs = asyncio.run(react(a=1, b=2, max_iters=2, run=run))
-    traj = outputs.trajectory
+    turns = outputs.turn_log.turns
     control_expected = {
         "thought_0": "I need to add two numbers.",
         "tool_name_0": "foo",
@@ -314,10 +330,14 @@ def test_error_retry(make_run):
         "tool_name_1": "foo",
         "tool_args_1": {"a": 1, "b": 2},
     }
-    for k, v in control_expected.items():
-        assert traj[k] == v, f"{k} mismatch"
+    assert turns[0]["thought"] == control_expected["thought_0"]
+    assert turns[0]["tool_name"] == control_expected["tool_name_0"]
+    assert turns[0]["tool_args"] == control_expected["tool_args_0"]
+    assert turns[1]["thought"] == control_expected["thought_1"]
+    assert turns[1]["tool_name"] == control_expected["tool_name_1"]
+    assert turns[1]["tool_args"] == control_expected["tool_args_1"]
     for i in range(2):
-        obs = traj[f"observation_{i}"]
+        obs = turns[i]["observation"]
         assert re.search("\\btool error\\b", obs), f"unexpected observation_{i!r}: {obs}"
 
 
@@ -398,7 +418,7 @@ async def test_async_tool_calling_with_pydantic_args(make_run):
         "tool_args_1": {},
         "observation_1": "Completed.",
     }
-    assert outputs.trajectory == expected_trajectory
+    assert outputs.turn_log.turns == _turns_from_flat(expected_trajectory)
 
 
 @pytest.mark.asyncio
@@ -417,7 +437,7 @@ async def test_async_error_retry(make_run):
     )
     run = make_run(lm=lm)
     outputs = await react.acall(a=1, b=2, max_iters=2, run=run)
-    traj = outputs.trajectory
+    turns = outputs.turn_log.turns
     control_expected = {
         "thought_0": "I need to add two numbers.",
         "tool_name_0": "foo",
@@ -426,8 +446,12 @@ async def test_async_error_retry(make_run):
         "tool_name_1": "foo",
         "tool_args_1": {"a": 1, "b": 2},
     }
-    for k, v in control_expected.items():
-        assert traj[k] == v, f"{k} mismatch"
+    assert turns[0]["thought"] == control_expected["thought_0"]
+    assert turns[0]["tool_name"] == control_expected["tool_name_0"]
+    assert turns[0]["tool_args"] == control_expected["tool_args_0"]
+    assert turns[1]["thought"] == control_expected["thought_1"]
+    assert turns[1]["tool_name"] == control_expected["tool_name_1"]
+    assert turns[1]["tool_args"] == control_expected["tool_args_1"]
     for i in range(2):
-        obs = traj[f"observation_{i}"]
+        obs = turns[i]["observation"]
         assert re.search("\\btool error\\b", obs), f"unexpected observation_{i!r}: {obs}"

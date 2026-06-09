@@ -129,7 +129,7 @@ class TestRLMWithDummyLM:
             rlm = RLM(ts("query -> answer: int"), max_iterations=5)
             result = asyncio.run(rlm(query="Double ten", run=run))
             assert result.answer == 20
-            assert len(result.trajectory) == 2
+            assert len(result.turn_log.entries) == 2
 
     def test_with_input_variables_e2e(self, make_run):
         with dummy_lm_context(
@@ -182,7 +182,7 @@ class TestRLMWithDummyLM:
             rlm = RLM(ts("query -> answer: int"), max_iterations=5)
             result = await rlm.aforward(query="Double ten", run=run)
             assert result.answer == 20
-            assert len(result.trajectory) == 2
+            assert len(result.turn_log.entries) == 2
 
     @pytest.mark.asyncio
     async def test_aforward_with_input_variables_e2e(self, make_run):
