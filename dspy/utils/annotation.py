@@ -1,34 +1,33 @@
-from typing import Any, Callable, ParamSpec, TypeVar, cast, overload
+from collections.abc import Callable
+from typing import Any, TypeVar, cast, overload
 
-P = ParamSpec("P")
-R = TypeVar("R")
-T = TypeVar("T")
-_Decorated = type[T] | Callable[P, R]
+F = TypeVar("F", type, Callable[..., Any])
+
+
+def _mark_experimental(api: object, version: str | None) -> None:
+    marked = cast("Any", api)
+    marked.__dspy_experimental__ = True
+    marked.__dspy_experimental_version__ = version
 
 
 @overload
-def experimental(f: _Decorated, version: str | None = None) -> _Decorated: ...
+def experimental(f: F, version: str | None = None) -> F: ...
 
 
 @overload
-def experimental(f: None = None, version: str | None = None) -> Callable[[_Decorated], _Decorated]: ...
+def experimental(f: None = None, version: str | None = None) -> Callable[[F], F]: ...
 
 
-def experimental(f: type[T] | Callable[P, R] | None = None, version: str | None = None) -> Any:
-    if f:
-        return _experimental(f, version)
+def experimental(f: F | None = None, version: str | None = None) -> F | Callable[[F], F]:
+    if f is not None:
+        _mark_experimental(f, version)
+        return f
 
-    def decorator(f: Callable[P, R]) -> Callable[P, R]:
-        return _experimental(f, version)
+    def decorator(fn: F) -> F:
+        _mark_experimental(fn, version)
+        return fn
 
     return decorator
-
-
-def _experimental(api: Callable[P, R], version: str | None = None) -> Callable[P, R]:
-    api_any = cast("Any", api)
-    api_any.__dspy_experimental__ = True
-    api_any.__dspy_experimental_version__ = version
-    return api
 
 
 def is_experimental(api: object) -> bool:

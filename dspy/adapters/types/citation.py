@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import pydantic
 from typing_extensions import override
@@ -45,7 +45,7 @@ class Citations(Type):
     citations: list[Citation]
 
     @classmethod
-    def from_dict_list(cls, citations_dicts: list[dict[str, Any]]) -> Citations:
+    def from_dict_list(cls, citations_dicts: list[dict[str, Any]]) -> Self:
         citations = [cls.Citation(**item) for item in citations_dicts]
         return cls(citations=citations)
 
