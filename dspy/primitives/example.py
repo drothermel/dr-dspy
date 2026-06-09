@@ -25,7 +25,6 @@ class Example(_RecordBacked):
         else:
             store = RecordStore(_store)
         object.__setattr__(self, "_store", store)
-        object.__setattr__(self, "_demos", [])
         object.__setattr__(self, "_input_keys", _input_keys)
 
     @classmethod
@@ -56,7 +55,7 @@ class Example(_RecordBacked):
     @override
     def __repr__(self) -> str:
         d = {k: v for k, v in self._store.items() if not k.startswith("dspy_")}
-        return f"Example({d})" + f" (input_keys={sorted(self.input_keys)})"
+        return f"Example({d}) (input_keys={sorted(self.input_keys)})"
 
     @override
     def __str__(self) -> str:
@@ -66,16 +65,16 @@ class Example(_RecordBacked):
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Example) and self._store == other._store and self.input_keys == other.input_keys
 
-    def keys(self, include_dspy=False):
+    def keys(self, include_dspy: bool = False) -> list[str]:
         return self._store.keys(include_dspy=include_dspy)
 
-    def values(self, include_dspy=False):
+    def values(self, include_dspy: bool = False) -> list[Any]:
         return self._store.values(include_dspy=include_dspy)
 
-    def items(self, include_dspy=False):
+    def items(self, include_dspy: bool = False) -> list[tuple[str, Any]]:
         return self._store.items(include_dspy=include_dspy)
 
-    def get(self, key, default=None):
+    def get(self, key: str, default: Any = None) -> Any:
         return self._store.get(key, default)
 
     def with_input_keys(self, *keys: str) -> "Example":
@@ -93,7 +92,7 @@ class Example(_RecordBacked):
         return {key: self._store[key] for key in self._store if key not in input_keys and not key.startswith("dspy_")}
 
     def __iter__(self):
-        return iter(dict(self._store))
+        return iter(self._store)
 
     def fork(self, **updates: Any) -> "Example":
         store = self._store.copy()
@@ -107,7 +106,7 @@ class Example(_RecordBacked):
                 store[key] = value
         return Example(_store=store, _input_keys=input_keys)
 
-    def without(self, *keys):
+    def without(self, *keys: str) -> "Example":
         copied = self.fork()
         for key in keys:
             del copied[key]

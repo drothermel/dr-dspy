@@ -10,6 +10,8 @@ class Prediction(_RecordBacked):
     _RECORD_ATTR = "_store"
     _RECORD_RESERVED = frozenset({"_store", "_completions", "_lm_usage"})
 
+    __hash__ = None
+
     def __init__(self, **kwargs: Any) -> None:
         object.__setattr__(self, "_store", RecordStore(kwargs))
         object.__setattr__(self, "_completions", None)
@@ -28,8 +30,9 @@ class Prediction(_RecordBacked):
     @classmethod
     def from_completions(cls, list_or_dict, task_spec=None):
         obj = cls()
-        obj._completions = Completions(list_or_dict, task_spec=task_spec)
-        object.__setattr__(obj, "_store", RecordStore({k: v[0] for k, v in obj._completions.items()}))
+        completions = Completions(list_or_dict, task_spec=task_spec)
+        object.__setattr__(obj, "_completions", completions)
+        object.__setattr__(obj, "_store", RecordStore({k: v[0] for k, v in completions.items()}))
         return obj
 
     def __getitem__(self, key: str) -> Any:
@@ -44,14 +47,23 @@ class Prediction(_RecordBacked):
     def __iter__(self):
         return iter(self._store)
 
-    def keys(self, include_dspy=False):
+    def keys(self, include_dspy: bool = False) -> list[str]:
         return self._store.keys(include_dspy=include_dspy)
 
-    def items(self, include_dspy=False):
+    def values(self, include_dspy: bool = False) -> list[Any]:
+        return self._store.values(include_dspy=include_dspy)
+
+    def items(self, include_dspy: bool = False) -> list[tuple[str, Any]]:
         return self._store.items(include_dspy=include_dspy)
 
-    def get(self, key, default=None):
+    def get(self, key: str, default: Any = None) -> Any:
         return self._store.get(key, default)
+
+    @override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Prediction):
+            return NotImplemented
+        return self._store == other._store and self._completions == other._completions
 
     def to_dict(self) -> dict[str, Any]:
         return self._store.to_dict()

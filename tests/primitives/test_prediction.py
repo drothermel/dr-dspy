@@ -38,3 +38,23 @@ def test_prediction_is_not_example():
     example = Example.from_record({"answer": "Paris"})
     assert not isinstance(prediction, Example)
     assert prediction != example
+
+
+def test_prediction_is_unhashable():
+    prediction = Prediction.from_record({"answer": "Paris"})
+    with pytest.raises(TypeError):
+        hash(prediction)
+
+
+def test_prediction_eq():
+    prediction1 = Prediction.from_record({"answer": "Paris"})
+    prediction2 = Prediction.from_record({"answer": "Paris"})
+    prediction3 = Prediction.from_record({"answer": "London"})
+    assert prediction1 == prediction2
+    assert prediction1 != prediction3
+
+
+def test_prediction_values():
+    prediction = Prediction.from_record({"answer": "Paris", "dspy_hidden": 1})
+    assert prediction.values() == ["Paris"]
+    assert prediction.values(include_dspy=True) == ["Paris", 1]
