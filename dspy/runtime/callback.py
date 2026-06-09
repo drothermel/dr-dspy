@@ -2,25 +2,24 @@ from __future__ import annotations
 
 import functools
 import inspect
-import logging
-import uuid
-from contextvars import ContextVar
-from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, TypeVar
+from typing import Any, Callable, Protocol, TypeVar
 
-if TYPE_CHECKING:
-    from dspy.runtime.run_context import RunContext
+from dspy.runtime.callback_dispatch import (
+    ACTIVE_CALL_ID,
+    CallbackKind,
+    ainvoke_with_callbacks,
+    get_active_callbacks,
+    invoke_with_callbacks,
+)
 
-from dspy.runtime.active_run import get_active_run
+__all__ = [
+    "ACTIVE_CALL_ID",
+    "Callback",
+    "CallbackKind",
+    "NoOpCallback",
+    "with_callbacks",
+]
 
-ACTIVE_CALL_ID: ContextVar[str | None] = ContextVar("active_call_id", default=None)
-logger = logging.getLogger(__name__)
-
-
-def _callable_name(fn: Callable[..., Any]) -> str:
-    return getattr(fn, "__name__", type(fn).__name__)
-
-
-CallbackKind = Literal["module", "lm", "adapter", "tool", "evaluate"]
 F = TypeVar("F", bound=Callable[..., Any])
 
 
@@ -96,219 +95,46 @@ class NoOpCallback:
         pass
 
 
-def _begin_callback_scope(
-    *,
-    instance: Any,
-    fn: Callable[..., Any],
-    kind: CallbackKind,
-    callbacks: list[Callback],
-    args: tuple[Any, ...],
-    kwargs: dict[str, Any],
-) -> tuple[str, str | None]:
-    call_id = uuid.uuid4().hex
-    _execute_start_callbacks(
-        instance=instance,
-        fn=fn,
-        kind=kind,
-        call_id=call_id,
-        callbacks=callbacks,
-        args=args,
-        kwargs=kwargs,
-    )
-    parent_call_id = ACTIVE_CALL_ID.get()
-    ACTIVE_CALL_ID.set(call_id)
-    return call_id, parent_call_id
+def with_callbacks(fn: F | None = None, *, kind: CallbackKind | str = CallbackKind.MODULE) -> F | Callable[[F], F]:
+    callback_kind = CallbackKind(kind)
 
-
-def _end_callback_scope(
-    *,
-    instance: Any,
-    fn: Callable[..., Any],
-    kind: CallbackKind,
-    call_id: str,
-    parent_call_id: str | None,
-    results: Any,
-    exception: Exception | None,
-    callbacks: list[Callback],
-) -> None:
-    ACTIVE_CALL_ID.set(parent_call_id)
-    _execute_end_callbacks(
-        instance=instance,
-        fn=fn,
-        kind=kind,
-        call_id=call_id,
-        results=results,
-        exception=exception,
-        callbacks=callbacks,
-    )
-
-
-def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F | Callable[[F], F]:
     def decorator(fn: F) -> F:
         if inspect.iscoroutinefunction(fn):
 
             @functools.wraps(fn)
             async def async_wrapper(instance, *args, **kwargs):
                 run = kwargs.get("run")
-                callbacks = _get_active_callbacks(instance, run, kind=kind)
+                callbacks = get_active_callbacks(instance, run, kind=callback_kind)
                 if not callbacks:
                     return await fn(instance, *args, **kwargs)
-                call_id, parent_call_id = _begin_callback_scope(
+                return await ainvoke_with_callbacks(
                     instance=instance,
                     fn=fn,
-                    kind=kind,
+                    kind=callback_kind,
                     callbacks=callbacks,
                     args=args,
                     kwargs=kwargs,
                 )
-                results = None
-                exception = None
-                try:
-                    results = await fn(instance, *args, **kwargs)
-                except Exception as e:
-                    exception = e
-                    raise exception
-                else:
-                    return results
-                finally:
-                    _end_callback_scope(
-                        instance=instance,
-                        fn=fn,
-                        kind=kind,
-                        call_id=call_id,
-                        parent_call_id=parent_call_id,
-                        results=results,
-                        exception=exception,
-                        callbacks=callbacks,
-                    )
 
             return async_wrapper  # ty:ignore[invalid-return-type]
 
         @functools.wraps(fn)
         def sync_wrapper(instance, *args, **kwargs):
             run = kwargs.get("run")
-            callbacks = _get_active_callbacks(instance, run, kind=kind)
+            callbacks = get_active_callbacks(instance, run, kind=callback_kind)
             if not callbacks:
                 return fn(instance, *args, **kwargs)
-            call_id, parent_call_id = _begin_callback_scope(
+            return invoke_with_callbacks(
                 instance=instance,
                 fn=fn,
-                kind=kind,
+                kind=callback_kind,
                 callbacks=callbacks,
                 args=args,
                 kwargs=kwargs,
             )
-            results = None
-            exception = None
-            try:
-                results = fn(instance, *args, **kwargs)
-            except Exception as e:
-                exception = e
-                raise exception
-            else:
-                return results
-            finally:
-                _end_callback_scope(
-                    instance=instance,
-                    fn=fn,
-                    kind=kind,
-                    call_id=call_id,
-                    parent_call_id=parent_call_id,
-                    results=results,
-                    exception=exception,
-                    callbacks=callbacks,
-                )
 
         return sync_wrapper  # ty:ignore[invalid-return-type]
 
     if fn is not None:
         return decorator(fn)
     return decorator
-
-
-def _get_active_callbacks(instance: Any, run: RunContext | None = None, *, kind: CallbackKind) -> list[Callback]:
-    effective_run = run if run is not None else (get_active_run() if kind == "tool" else None)
-    callbacks = list(effective_run.callbacks) if effective_run else []
-    return callbacks + getattr(instance, "callbacks", [])
-
-
-def _execute_start_callbacks(
-    *,
-    instance: Any,
-    fn: Callable[..., Any],
-    kind: CallbackKind,
-    call_id: str,
-    callbacks: list[Callback],
-    args: tuple[Any, ...],
-    kwargs: dict[str, Any],
-) -> None:
-    signature = inspect.signature(fn)
-    bound_arguments = signature.bind_partial(instance, *args, **kwargs)
-    bound_arguments.apply_defaults()
-    inputs = dict(bound_arguments.arguments)
-    if "self" in inputs:
-        inputs.pop("self")
-    elif "instance" in inputs:
-        inputs.pop("instance")
-    for callback in callbacks:
-        try:
-            _get_on_start_handler(callback=callback, kind=kind, fn=fn)(
-                call_id=call_id, instance=instance, inputs=inputs
-            )
-        except Exception as e:
-            logger.warning(f"Error when calling callback {callback}: {e}")
-
-
-def _execute_end_callbacks(
-    *,
-    instance: Any,
-    fn: Callable[..., Any],
-    kind: CallbackKind,
-    call_id: str,
-    results: Any,
-    exception: Exception | None,
-    callbacks: list[Callback],
-) -> None:
-    for callback in callbacks:
-        try:
-            _get_on_end_handler(callback=callback, kind=kind, fn=fn)(
-                call_id=call_id, outputs=results, exception=exception
-            )
-        except Exception as e:
-            logger.warning(
-                f"Error when applying callback {callback}'s end handler on function {_callable_name(fn)}: {e}."
-            )
-
-
-def _get_on_start_handler(*, callback: Callback, kind: CallbackKind, fn: Callable[..., Any]) -> Callable[..., Any]:
-    if kind == "lm":
-        return callback.on_lm_start
-    if kind == "evaluate":
-        return callback.on_evaluate_start
-    if kind == "adapter":
-        fn_name = _callable_name(fn)
-        if fn_name == "format":
-            return callback.on_adapter_format_start
-        if fn_name == "parse":
-            return callback.on_adapter_parse_start
-        raise ValueError(f"Unsupported adapter method for using callback: {fn_name}.")
-    if kind == "tool":
-        return callback.on_tool_start
-    return callback.on_module_start
-
-
-def _get_on_end_handler(*, callback: Callback, kind: CallbackKind, fn: Callable[..., Any]) -> Callable[..., Any]:
-    if kind == "lm":
-        return callback.on_lm_end
-    if kind == "evaluate":
-        return callback.on_evaluate_end
-    if kind == "adapter":
-        fn_name = _callable_name(fn)
-        if fn_name == "format":
-            return callback.on_adapter_format_end
-        if fn_name == "parse":
-            return callback.on_adapter_parse_end
-        raise ValueError(f"Unsupported adapter method for using callback: {fn_name}.")
-    if kind == "tool":
-        return callback.on_tool_end
-    return callback.on_module_end
