@@ -187,7 +187,7 @@ samples = asyncio.run(pool.acquire_samples(request, n=10, run=run))
 - **Pool acquire** (`acquire_samples`): session-scoped no-replacement sampling via `PoolBackend.aacquire(request, session_id, n)`. Session ID defaults to `{DSPY_RUN_ID}:{log_session.timestamp}` when disk logging is enabled; pass `session_id=` on the LM or to `acquire_samples` to override.
 - **Auth/routing**: configure providers via the dr-llm registry and environment (for example `OPENAI_API_KEY`). `DrLlmDirectLM` / `DrLlmPoolLM` do **not** accept `provider_options`, `num_retries`, or LiteLLM-style passthrough kwargs — misconfiguration raises at construction.
 - **v1 limits**: text-only; tools, multimodal parts, `response_format`, `stop`, `n`, `logprobs`, `tool_choice`, `prompt_cache`, `LMConfig.extensions`, and unsupported `reasoning` fields (`max_tokens`, `summary`) raise typed errors. Only `reasoning.effort` maps to `BackendRequest.effort`.
-- **Lifecycle**: call `pool.close()` to tear down the pool consumer (tests); long-running notebooks may omit.
+- **Lifecycle**: use `with DrLlmPoolLM(...) as pool:` (preferred) or call `pool.close()` to tear down the pool consumer when you are done with the LM.
 
 Integration tests (`pytest -m integration -n0 tests/clients/dr_llm/test_integration_pool.py`) require Postgres via `DR_LLM_TEST_DATABASE_URL` or `DR_LLM_DATABASE_URL`. Spin up a disposable database with `uv run dr-llm project create <name>` and export the returned DSN.
 

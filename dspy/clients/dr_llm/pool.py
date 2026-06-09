@@ -56,7 +56,9 @@ class DrLlmPoolLM(DrLlmLM):
         )
         self._pool_config = pool_config
         self._default_session_id = session_id
+        self._closed = False
         self._backend = PoolBackend(pool_config, registry=self._registry)
+        # Capabilities probe only; DirectBackend has no lifecycle teardown.
         self._direct_backend = DirectBackend(self._registry)
 
     @property
@@ -70,10 +72,16 @@ class DrLlmPoolLM(DrLlmLM):
         return self._direct_backend
 
     def close(self) -> None:
-        direct_close = getattr(self._direct_backend, "close", None)
-        if callable(direct_close):
-            direct_close()
+        if self._closed:
+            return
         self._backend.close()
+        self._closed = True
+
+    def __enter__(self) -> DrLlmPoolLM:
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self.close()
 
     async def acquire_samples(
         self,

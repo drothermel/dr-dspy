@@ -8,6 +8,7 @@ from dr_llm.llm import CallMode
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.dr_llm import DrLlmPoolLM, resolve_pool_session_id
+from dspy.errors import LMUnexpectedError
 from dspy.runtime.run_context import RunContext
 from dspy.testing import DummyLM
 from tests.clients.dr_llm._helpers import make_backend_response, make_lm_request
@@ -76,7 +77,7 @@ def test_dr_llm_pool_lm_acquire_samples() -> None:
     assert await_args.args[1] == "fixed-session"
 
 
-def test_dr_llm_pool_lm_close_closes_both_backends() -> None:
+def test_dr_llm_pool_lm_close_closes_pool_backend_only() -> None:
     pool_backend = MagicMock()
     direct_backend = MagicMock()
     direct_backend.capabilities.return_value = _capabilities()
@@ -90,5 +91,62 @@ def test_dr_llm_pool_lm_close_closes_both_backends() -> None:
         lm = DrLlmPoolLM("openai/gpt-4.1-mini", pool_config=config)
         lm.close()
 
-    direct_backend.close.assert_called_once()
+    pool_backend.close.assert_called_once()
+
+
+def test_dr_llm_pool_lm_close_is_idempotent() -> None:
+    pool_backend = MagicMock()
+    direct_backend = MagicMock()
+    direct_backend.capabilities.return_value = _capabilities()
+
+    config = PoolBackendConfig(pool_name="test_pool", database_url="postgresql://localhost/test")
+
+    with (
+        patch("dspy.clients.dr_llm.pool.PoolBackend", return_value=pool_backend),
+        patch("dspy.clients.dr_llm.pool.DirectBackend", return_value=direct_backend),
+    ):
+        lm = DrLlmPoolLM("openai/gpt-4.1-mini", pool_config=config)
+        lm.close()
+        lm.close()
+
+    pool_backend.close.assert_called_once()
+
+
+def test_dr_llm_pool_lm_context_manager_closes_on_exit() -> None:
+    pool_backend = MagicMock()
+    direct_backend = MagicMock()
+    direct_backend.capabilities.return_value = _capabilities()
+
+    config = PoolBackendConfig(pool_name="test_pool", database_url="postgresql://localhost/test")
+
+    with (
+        patch("dspy.clients.dr_llm.pool.PoolBackend", return_value=pool_backend),
+        patch("dspy.clients.dr_llm.pool.DirectBackend", return_value=direct_backend),
+        DrLlmPoolLM("openai/gpt-4.1-mini", pool_config=config) as lm,
+    ):
+        assert lm.model == "openai/gpt-4.1-mini"
+
+    pool_backend.close.assert_called_once()
+
+
+def test_dr_llm_pool_lm_close_after_failed_acquire() -> None:
+    pool_backend = MagicMock()
+    pool_backend.aacquire = AsyncMock(side_effect=RuntimeError("acquire failed"))
+    direct_backend = MagicMock()
+    direct_backend.capabilities.return_value = _capabilities()
+
+    config = PoolBackendConfig(pool_name="test_pool", database_url="postgresql://localhost/test")
+    run = RunContext.create(lm=DummyLM([{"answer": "x"}]), adapter=JSONAdapter(), init_run_log=False)
+
+    with (
+        patch("dspy.clients.dr_llm.pool.PoolBackend", return_value=pool_backend),
+        patch("dspy.clients.dr_llm.pool.DirectBackend", return_value=direct_backend),
+    ):
+        lm = DrLlmPoolLM("openai/gpt-4.1-mini", pool_config=config)
+        try:
+            asyncio.run(lm.acquire_samples(make_lm_request(), n=1, run=run))
+        except LMUnexpectedError:
+            pass
+        lm.close()
+
     pool_backend.close.assert_called_once()
