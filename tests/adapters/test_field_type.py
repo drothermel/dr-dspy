@@ -1,16 +1,19 @@
 import pydantic
 
-from dspy.adapters.types.base_type import Type as DSPyType
+from dspy.adapters.types.field_type import FieldTypeMixin, extract_field_types_from_annotation
 from dspy.task_spec import input_field, make_task_spec, output_field
 
 
-def test_basic_extract_custom_type_from_annotation():
+def test_basic_extract_field_types_from_annotation():
 
-    class Event(DSPyType):
+    class Event(FieldTypeMixin):
         event_name: str
         start_date_time: str
         end_date_time: str | None
         location: str | None
+
+        def format(self) -> str:
+            return self.event_name
 
     extract_event = make_task_spec(
         {
@@ -19,7 +22,7 @@ def test_basic_extract_custom_type_from_annotation():
         },
         instructions="Extract all events from the email content.",
     )
-    assert DSPyType.extract_custom_type_from_annotation(extract_event.output_fields["event"].type_) == [Event]
+    assert extract_field_types_from_annotation(extract_event.output_fields["event"].type_) == [Event]
     extract_events = make_task_spec(
         {
             "email": input_field("email", desc="The email."),
@@ -27,21 +30,27 @@ def test_basic_extract_custom_type_from_annotation():
         },
         instructions="Extract all events from the email content.",
     )
-    assert DSPyType.extract_custom_type_from_annotation(extract_events.output_fields["events"].type_) == [Event]
+    assert extract_field_types_from_annotation(extract_events.output_fields["events"].type_) == [Event]
 
 
-def test_extract_custom_type_from_annotation_with_nested_type():
+def test_extract_field_types_from_annotation_with_nested_type():
 
-    class Event(DSPyType):
+    class Event(FieldTypeMixin):
         event_name: str
         start_date_time: str
         end_date_time: str | None
         location: str | None
 
-    class EventIdentifier(DSPyType):
+        def format(self) -> str:
+            return self.event_name
+
+    class EventIdentifier(FieldTypeMixin):
         model_config = pydantic.ConfigDict(frozen=True)
         event_id: str
         event_name: str
+
+        def format(self) -> str:
+            return self.event_id
 
     extract_events = make_task_spec(
         {
@@ -50,7 +59,7 @@ def test_extract_custom_type_from_annotation_with_nested_type():
         },
         instructions="Extract all events from the email content.",
     )
-    assert DSPyType.extract_custom_type_from_annotation(extract_events.output_fields["events"].type_) == [
+    assert extract_field_types_from_annotation(extract_events.output_fields["events"].type_) == [
         EventIdentifier,
         Event,
     ]

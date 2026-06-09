@@ -17,10 +17,10 @@ except ImportError:
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types.audio import Audio
-from dspy.adapters.types.base_type import Type as DSPyType
 from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.code import Code
 from dspy.adapters.types.document import Document
+from dspy.adapters.types.field_type import FieldTypeMixin
 from dspy.adapters.types.file import File
 from dspy.adapters.types.image import Image
 from dspy.adapters.types.reasoning import Reasoning
@@ -546,7 +546,7 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
 
 def test_chat_adapter_format_exact_messages_with_base_custom_type_input():
 
-    class Event(DSPyType):
+    class Event(FieldTypeMixin):
         label: str
 
         @override
@@ -1374,7 +1374,7 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
     def search(query: str, k: int = 3) -> str:
         return query
 
-    class Event(DSPyType):
+    class Event(FieldTypeMixin):
         label: str
 
         @override
@@ -2379,7 +2379,7 @@ def test_provider_tool_calls_preserve_id_and_repair_arguments():
 
 def test_native_response_type_without_parse_lm_output_raises():
 
-    class OpaqueType(DSPyType):
+    class OpaqueType(FieldTypeMixin):
         label: str
 
         @override
