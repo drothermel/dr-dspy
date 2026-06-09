@@ -11,7 +11,7 @@ if importlib.util.find_spec("mcp") is None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.extra
+@pytest.mark.integration
 async def test_convert_mcp_tool():
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client

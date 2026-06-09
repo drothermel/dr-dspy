@@ -67,7 +67,7 @@ def test_save_model_with_custom_signature(tmp_path, make_run):
     assert predict.task_spec == loaded_predict.task_spec
 
 
-@pytest.mark.extra
+@pytest.mark.slow
 def test_save_compiled_model(tmp_path, make_run):
     predict = Predict(QA_TASK_SPEC)
     run = make_run(lm=DummyLM([{"answer": "blue"}, {"answer": "white"}] * 10))

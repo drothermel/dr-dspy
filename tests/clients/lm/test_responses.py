@@ -56,6 +56,7 @@ def test_lm_replaces_system_with_developer_role(make_run):
         assert mock_completion.call_args.kwargs["request"]["input"][0]["role"] == "developer"
 
 
+@pytest.mark.integration
 def test_responses_api_tool_calls(litellm_test_server, make_run):
     api_base, _ = litellm_test_server
     expected_tool_call = {

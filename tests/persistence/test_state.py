@@ -21,6 +21,15 @@ from tests.test_utils import DummyLM
 QA_TASK_SPEC = ts("question->answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",)))
 
 
+def _demo_roundtrip_payload(demo: Example) -> dict:
+    record = demo.to_dict()
+    for key in ("current_date", "target_date"):
+        value = record.get(key)
+        if hasattr(value, "isoformat"):
+            record[key] = value.isoformat()
+    return record
+
+
 def test_load_state_is_transactional():
     Sig = ts("question -> answer")
 
@@ -75,7 +84,7 @@ def test_save_and_load_with_json(tmp_path, make_run):
     assert new_model.predict.demos[1] == model.predict.demos[1].to_dict()
 
 
-@pytest.mark.extra
+@pytest.mark.slow
 def test_save_and_load_with_pkl(tmp_path, make_run):
     import datetime
 
@@ -116,7 +125,9 @@ def test_save_and_load_with_pkl(tmp_path, make_run):
     new_cot = ChainOfThought(MySignature)
     new_cot.load(save_path, allow_pickle=True)
     assert str(new_cot.predict.task_spec) == str(compiled_cot.predict.task_spec)
-    assert new_cot.predict.demos == compiled_cot.predict.demos
+    assert [_demo_roundtrip_payload(d) for d in new_cot.predict.demos] == [
+        _demo_roundtrip_payload(d) for d in compiled_cot.predict.demos
+    ]
 
 
 def test_pkl_file_loading_requires_explicit_permission(tmp_path):

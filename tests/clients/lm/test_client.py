@@ -39,6 +39,7 @@ from tests.clients.lm.conftest import _direct_lm_case, _request, run_async
 from tests.task_spec.helpers import ts
 
 
+@pytest.mark.integration
 def test_chat_lms_can_be_queried(litellm_test_server, make_run):
     api_base, _ = litellm_test_server
     provider_options = LMProviderOptions(api_base=api_base, api_key="fakekey")
@@ -52,6 +53,7 @@ def test_chat_lms_can_be_queried(litellm_test_server, make_run):
     assert azure_result.text == "Hi!"
 
 
+@pytest.mark.integration
 def test_text_lms_can_be_queried(litellm_test_server, make_run):
     api_base, _ = litellm_test_server
     provider_options = LMProviderOptions(api_base=api_base, api_key="fakekey")
@@ -65,6 +67,7 @@ def test_text_lms_can_be_queried(litellm_test_server, make_run):
     assert azure_result.text == "Hi!"
 
 
+@pytest.mark.integration
 def test_lm_calls_support_callables(litellm_test_server, make_run):
     api_base, _ = litellm_test_server
     with mock.patch("litellm.acompletion", autospec=True, wraps=litellm.acompletion) as spy_completion:
@@ -89,6 +92,7 @@ def test_lm_calls_support_callables(litellm_test_server, make_run):
         assert call_args["azure_ad_token_provider"] is azure_ad_token_provider
 
 
+@pytest.mark.integration
 def test_lm_calls_support_pydantic_models(litellm_test_server, make_run):
     api_base, _ = litellm_test_server
 

@@ -5,7 +5,7 @@ from dspy.predict.knn import KNN
 from dspy.primitives import Example
 from tests.test_utils import DummyVectorizer
 
-pytestmark = [pytest.mark.extra, pytest.mark.asyncio]
+pytestmark = pytest.mark.asyncio
 
 
 def mock_example(question: str, answer: str) -> Example:

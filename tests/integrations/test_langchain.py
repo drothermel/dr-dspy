@@ -12,12 +12,12 @@ from dspy.integrations.langchain import convert_langchain_tool
 
 
 @pytest.mark.asyncio
-@pytest.mark.extra
 async def test_convert_custom_simple_tool():
     from langchain_core.tools import tool
 
     @tool
     def add(a: int, b: int) -> int:
+        """Add two numbers."""
         return a + b
 
     converted_tool = convert_langchain_tool(add)
@@ -33,7 +33,6 @@ async def test_convert_custom_simple_tool():
 
 
 @pytest.mark.asyncio
-@pytest.mark.extra
 async def test_convert_custom_tool_with_custom_class():
     from langchain_core.tools import tool
 
@@ -43,6 +42,7 @@ async def test_convert_custom_tool_with_custom_class():
 
     @tool
     def get_age(profile: Profile) -> int:
+        """Get the age of the profile."""
         return profile.age
 
     converted_tool = convert_langchain_tool(get_age)
