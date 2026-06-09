@@ -6,7 +6,7 @@ from typing import Any, cast
 
 import pytest
 
-from dspy.integrations.retrieval import WeaviateRM
+from dspy.integrations.retrieval.weaviate import WeaviateRM
 
 
 def test_weaviate_module_does_not_eagerly_import_weaviate() -> None:
