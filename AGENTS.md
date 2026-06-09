@@ -248,7 +248,13 @@ Trace and compile-spine helpers:
 
 ```python
 from dspy.runtime import run_with_trace
-from dspy.teleprompt import collect_trace_data, make_optimizer_evaluator, resolve_max_errors, trace_to_demos
+from dspy.teleprompt import (
+    collect_trace_data,
+    make_optimizer_evaluator,
+    make_trace_collection_evaluator,
+    resolve_max_errors,
+    trace_to_demos,
+)
 
 evaluate = make_optimizer_evaluator(
     run,

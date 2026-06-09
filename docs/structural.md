@@ -530,6 +530,8 @@ fixture tests under `tests/teleprompt/grpo/`.
 
 ### P3.3 Normalize optimizer shared helpers and candidate models
 
+**Status:** Done (2026-06).
+
 **Sources:** External cross-package review.
 
 Problem:
@@ -556,6 +558,15 @@ Details to preserve:
 - Optimizer instances should hold configuration, not mutable per-compile state.
 - Document which optimizers mutate the input student and which operate on
   copies.
+
+**Delivered:** Hoisted evaluators in RandomSearch, InferRules, BootstrapOptuna,
+and BetterTogether; MIPRO routes through `run_ask_tell_loop` with
+`MIPROSearchSession` and accurate `CompileStats.metric_calls`;
+`CoproEvaluatedCandidate` replaces COPRO dict records;
+`GRPOValidationEvaluators` + `build_validation_evaluators` for GRPO validation;
+`collect_trace_data` requires `evaluator=` with `make_trace_collection_evaluator`
+helper; `BootstrapCompileSession` and `OptunaCompileSession` remove per-compile
+`self.*` state; student-mutation contract in `docs/migration/teleprompt.md`.
 
 ## P4: Clarify Public API, Imports, and Package Organization
 

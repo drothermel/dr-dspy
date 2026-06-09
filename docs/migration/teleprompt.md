@@ -129,9 +129,17 @@ student = inner.program
 
 ## Evaluation helpers
 
+Hoist one `make_optimizer_evaluator(...)` per compile when devset, metric, and concurrency are invariant across candidate loops. Pass the resulting `Evaluate` into search steps instead of rebuilding it per trial.
+
 ```python
 from dspy.runtime import run_with_trace
-from dspy.teleprompt import collect_trace_data, make_optimizer_evaluator, resolve_max_errors, trace_to_demos
+from dspy.teleprompt import (
+    collect_trace_data,
+    make_optimizer_evaluator,
+    make_trace_collection_evaluator,
+    resolve_max_errors,
+    trace_to_demos,
+)
 
 evaluate = make_optimizer_evaluator(
     run,
@@ -140,9 +148,38 @@ evaluate = make_optimizer_evaluator(
     max_concurrency=8,
     max_errors=resolve_max_errors(None, run),
 )
+trace_evaluator = make_trace_collection_evaluator(
+    run,
+    dataset=trainset,
+    max_concurrency=8,
+    max_errors=resolve_max_errors(None, run),
+)
+trace_rows = await collect_trace_data(
+    program=program,
+    dataset=trainset,
+    run=run,
+    evaluator=trace_evaluator,
+    metric=my_metric,
+    capture_parse_failures=True,
+)
 prediction, trace = await run_with_trace(program, example, run)
 demos_by_predictor = trace_to_demos(trace, predictor2name)
 ```
+
+`collect_trace_data` requires a pre-built `evaluator=`. Use `make_trace_collection_evaluator` at call sites (or hoist once when the dataset size is stable across repeated calls).
+
+## Student mutation contract
+
+| Optimizer | Input `student` | Notes |
+| --- | --- | --- |
+| GRPO, BootstrapFinetune, BetterTogether | Mutated in place | LM and/or demo updates on the same object |
+| Bootstrap, COPRO, MIPRO, SIMBA, RandomSearch, Optuna, GEPA, Avatar, KNN | Copy or wrapper | Input module left untouched |
+
+## Candidate models
+
+- Public compile boundary: `ProgramCandidate` on `CompileResult.candidates`.
+- COPRO internal search records: `CoproEvaluatedCandidate` in `dspy.teleprompt.copro.types` (converted to `ProgramCandidate` at return).
+- MIPRO search session: `MIPROSearchSession.score_data` is `list[ProgramCandidate]`.
 
 ## Optimizer metric contract
 

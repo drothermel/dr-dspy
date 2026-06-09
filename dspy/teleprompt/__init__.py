@@ -46,6 +46,10 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "SIMBACompileParams": ("dspy.teleprompt.compile_params", "SIMBACompileParams"),
     "compile_candidate_program": ("dspy.teleprompt.candidate_ladder", "compile_candidate_program"),
     "collect_trace_data": ("dspy.teleprompt.core.trace_collection", "collect_trace_data"),
+    "make_trace_collection_evaluator": (
+        "dspy.teleprompt.core.trace_collection",
+        "make_trace_collection_evaluator",
+    ),
     "generate_demo_candidate_sets": ("dspy.teleprompt.candidate_ladder", "generate_demo_candidate_sets"),
     "make_optimizer_evaluator": ("dspy.teleprompt.core.evaluator", "make_optimizer_evaluator"),
     "resolve_max_errors": ("dspy.runtime.async_parallel", "resolve_max_errors"),
@@ -97,6 +101,7 @@ __all__ = [
     "Teleprompter",
     "compile_candidate_program",
     "collect_trace_data",
+    "make_trace_collection_evaluator",
     "compile_params_type",
     "generate_demo_candidate_sets",
     "make_optimizer_evaluator",
