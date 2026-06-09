@@ -1,28 +1,36 @@
 import asyncio
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+from uuid import uuid4
 
+from dspy._internal.lazy_import import _detect_dspy_dist
 from dspy.retrievers.types import RetrievedPassage
 
-try:
-    from uuid import uuid4
-
+if TYPE_CHECKING:
     import weaviate
-    from weaviate.util import get_valid_uuid
-except ImportError as err:
-    raise ImportError(
-        "The 'weaviate' extra is required to use WeaviateRM. Install it with `pip install dspy-ai[weaviate]`"
-    ) from err
+
+
+def _require_weaviate() -> Any:
+    try:
+        import weaviate as weaviate_module
+
+        return weaviate_module
+    except ImportError as err:
+        raise ImportError(
+            f"The 'weaviate' extra is required to use WeaviateRM. "
+            f"Install it with `pip install {_detect_dspy_dist()}[weaviate]`"
+        ) from err
 
 
 class WeaviateRM:
     def __init__(
         self,
         weaviate_collection_name: str,
-        weaviate_client: weaviate.WeaviateClient | weaviate.Client,
+        weaviate_client: "weaviate.WeaviateClient | weaviate.Client",
         weaviate_collection_text_key: str | None = "content",
         k: int = 3,
         tenant_id: str | None = None,
     ) -> None:
+        _require_weaviate()
         self._weaviate_collection_name = weaviate_collection_name
         self._weaviate_client = weaviate_client
         self._weaviate_collection_text_key = weaviate_collection_text_key
@@ -93,6 +101,9 @@ class WeaviateRM:
 
     def insert(self, new_object_properties: dict[str, object]) -> None:
         if self._client_type == "WeaviateClient":
+            _require_weaviate()
+            from weaviate.util import get_valid_uuid
+
             cast("Any", self._weaviate_collection).data.insert(
                 properties=cast("Any", new_object_properties), uuid=get_valid_uuid(uuid4())
             )

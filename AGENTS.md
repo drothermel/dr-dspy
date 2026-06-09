@@ -244,7 +244,7 @@ Task input validation runs in `AdapterCallPipeline.execute`; do not rely on dupl
 ## Import tiers
 
 1. **Public spine:** `dspy.runtime`, `dspy.core.types`, `dspy.task_spec`, `dspy.errors`, `dspy.persistence`, `dspy.serialization`
-2. **Integrations:** `dspy.integrations.*` (optional extras: `mcp`, `langchain`; vendor finetune providers under `dspy.integrations.finetune`)
+2. **Integrations:** `dspy.integrations.*` (optional extras: `mcp`, `langchain`; vendor finetune providers under `dspy.integrations.finetune`; vendor retrieval integrations under `dspy.integrations.retrieval`)
 3. **Internal / test-only:** `dspy._internal.*`, `dspy.testing.*`
 
 ## Do not import from (internal/legacy)

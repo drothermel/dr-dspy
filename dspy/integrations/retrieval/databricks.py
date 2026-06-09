@@ -77,10 +77,10 @@ class DatabricksRM:
                 import mlflow
 
                 mlflow.models.set_retriever_schema(primary_key="doc_id", text_column="page_content", doc_uri="doc_uri")
-            except ImportError:
-                raise ValueError(
+            except ImportError as err:
+                raise ImportError(
                     "To use the `DatabricksRM` retriever module with the Databricks Mosaic Agent Framework, you must install the mlflow Python library. Please install mlflow via `pip install mlflow`."
-                )
+                ) from err
 
     async def __call__(
         self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
