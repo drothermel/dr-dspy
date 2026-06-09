@@ -323,3 +323,6 @@ unknown-argument = "ignore"
 
 [tool.ty.environment]
 python-version = "3.12"
+
+[tool.uv.sources]
+dr-llm = { path = "../dr-llm", editable = true }
