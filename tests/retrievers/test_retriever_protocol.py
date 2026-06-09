@@ -85,7 +85,7 @@ def test_databricks_rm_direct_call_preserves_prediction_shape(monkeypatch: pytes
 
 def test_weaviate_rm_direct_call_preserves_long_text_shape() -> None:
     pytest.importorskip("weaviate")
-    from dspy.retrievers.weaviate_rm import WeaviateRM
+    from dspy.integrations.retrieval import WeaviateRM
 
     class FakeQuery:
         def __init__(self) -> None:
