@@ -2,7 +2,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from dspy.runtime.run_context import RunContext
-from dspy.teleprompt.demo_sets import create_n_fewshot_demo_sets
+from dspy.teleprompt.candidate_ladder import CandidateLadderConfig, generate_demo_candidate_sets
 from dspy.teleprompt.mipro.settings import BOOTSTRAPPED_FEWSHOT_EXAMPLES_IN_CONTEXT, LABELED_FEWSHOT_EXAMPLES_IN_CONTEXT
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ async def bootstrap_fewshot_examples(
     max_errors: int | None,
     metric_threshold: float | None,
     run: RunContext,
-) -> list | None:
+) -> dict[int, list] | None:
     logger.info("\n==> STEP 1: BOOTSTRAP FEWSHOT EXAMPLES <==")
     if max_bootstrapped_demos > 0:
         logger.info(
@@ -35,18 +35,22 @@ async def bootstrap_fewshot_examples(
     zeroshot = max_bootstrapped_demos == 0 and max_labeled_demos == 0
     if max_errors is None:
         max_errors = run.execution.max_errors
-    return await create_n_fewshot_demo_sets(
-        student=program,
-        num_candidate_sets=num_fewshot_candidates,
-        trainset=trainset,
+    ladder_config = CandidateLadderConfig(
+        num_random=num_fewshot_candidates,
+        include_baseline=True,
+        include_labeled_fewshot=True,
+        include_bootstrap=True,
         max_labeled_demos=LABELED_FEWSHOT_EXAMPLES_IN_CONTEXT if zeroshot else max_labeled_demos,
         max_bootstrapped_demos=BOOTSTRAPPED_FEWSHOT_EXAMPLES_IN_CONTEXT if zeroshot else max_bootstrapped_demos,
+    )
+    return await generate_demo_candidate_sets(
+        student=program,
+        config=ladder_config,
+        trainset=trainset,
         metric=optimizer.metric,
         max_errors=max_errors,
         teacher=teacher,
         teacher_run=optimizer.teacher_run,
         run=run,
-        seed=seed,
         metric_threshold=metric_threshold,
-        rng=optimizer.rng,
     )

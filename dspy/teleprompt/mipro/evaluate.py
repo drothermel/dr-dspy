@@ -78,7 +78,7 @@ def log_normal_eval(
 def select_and_insert_instructions_and_demos(
     candidate_program: Any,
     instruction_candidates: dict[int, list[str]],
-    demo_candidates: list | None,
+    demo_candidates: dict[int, list] | None,
     trial: "optuna.trial.Trial",
     trial_logs: dict,
     trial_num: int,
@@ -117,7 +117,7 @@ async def perform_full_evaluation(
     best_program: Any,
     study: "optuna.Study",
     instruction_candidates: dict[int, list[str]],
-    demo_candidates: list | None,
+    demo_candidates: dict[int, list] | None,
     run: RunContext,
 ):
     logger.info(f"===== Trial {trial_num + 1} / {adjusted_num_trials} - Full Evaluation =====")

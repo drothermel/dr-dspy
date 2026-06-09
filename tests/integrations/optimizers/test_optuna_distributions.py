@@ -10,7 +10,7 @@ def test_get_param_distributions_builds_instruction_and_demo_keys() -> None:
     program = SimpleNamespace()
     program.predictors = lambda: [SimpleNamespace(), SimpleNamespace()]
     instruction_candidates = {0: ["a", "b"], 1: ["c"]}
-    demo_candidates = [["d1", "d2"], ["d3"]]
+    demo_candidates = {0: ["d1", "d2"], 1: ["d3"]}
 
     distributions = get_param_distributions(
         program=program,

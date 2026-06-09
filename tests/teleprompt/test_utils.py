@@ -1,13 +1,9 @@
 import asyncio
-from typing import Any, cast
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock
 
-from dspy.predict.predict import Predict
-from dspy.primitives import Example, Module
-from dspy.teleprompt.demo_sets import create_n_fewshot_demo_sets
+from dspy.primitives import Module
 from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.testing import DummyLM
-from tests.task_spec.helpers import ts
 
 
 class DummyModule(Module):
@@ -80,33 +76,3 @@ def test_eval_candidate_program_failure(make_run):
         )
     )
     assert result.score == 0.0
-
-
-def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled(make_run):
-    student = DummyModule()
-    cast("Any", student).predictor = Predict(ts("input -> output"))
-    trainset = [Example.from_record({"input": "test", "output": "test"}, input_keys=("input",))]
-    lm = DummyLM([{"output": "test"}])
-    run = make_run(lm=lm)
-    with patch("dspy.teleprompt.demo_sets.BootstrapFewShot") as MockBootstrap:
-        mock_instance = Mock()
-        mock_instance.compile = AsyncMock(return_value=student)
-        MockBootstrap.return_value = mock_instance
-        asyncio.run(
-            create_n_fewshot_demo_sets(
-                student=student,
-                num_candidate_sets=4,
-                trainset=trainset,
-                max_labeled_demos=1,
-                max_bootstrapped_demos=1,
-                metric=lambda _ex, _pred, _trace=None: 1.0,
-                run=run,
-                metric_threshold=0.9,
-            )
-        )
-        calls = MockBootstrap.call_args_list
-        assert len(calls) >= 1, "BootstrapFewShot was never called"
-        for call in calls:
-            _, kwargs = call
-            assert "metric_threshold" in kwargs, f"metric_threshold missing from BootstrapFewShot call: {kwargs}"
-            assert kwargs["metric_threshold"] == 0.9, f"metric_threshold={kwargs['metric_threshold']}, expected 0.9"

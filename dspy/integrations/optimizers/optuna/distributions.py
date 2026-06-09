@@ -6,7 +6,7 @@ from dspy.integrations.optimizers.optuna.import_ import import_optuna
 def get_param_distributions(
     program: Any,
     instruction_candidates: dict[int, list[str]],
-    demo_candidates: list | None,
+    demo_candidates: dict[int, list] | None,
 ) -> dict[str, Any]:
     optuna = import_optuna(feature="MIPROv2")
     categorical_distribution = optuna.distributions.CategoricalDistribution

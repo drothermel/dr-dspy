@@ -15,7 +15,7 @@ async def propose_instructions(
     optimizer: "MIPROv2",
     program: Any,
     trainset: list,
-    demo_candidates: list | None,
+    demo_candidates: dict[int, list] | None,
     view_data_batch_size: int,
     program_aware_proposer: bool,
     data_aware_proposer: bool,
