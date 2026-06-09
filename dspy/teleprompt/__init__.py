@@ -45,11 +45,11 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "SIMBA": ("dspy.teleprompt.simba", "SIMBA"),
     "SIMBACompileParams": ("dspy.teleprompt.compile_params", "SIMBACompileParams"),
     "compile_candidate_program": ("dspy.teleprompt.candidate_ladder", "compile_candidate_program"),
+    "collect_trace_data": ("dspy.teleprompt.core.trace_collection", "collect_trace_data"),
     "generate_demo_candidate_sets": ("dspy.teleprompt.candidate_ladder", "generate_demo_candidate_sets"),
-    "make_optimizer_evaluator": ("dspy.teleprompt.utils", "make_optimizer_evaluator"),
+    "make_optimizer_evaluator": ("dspy.teleprompt.core.evaluator", "make_optimizer_evaluator"),
     "resolve_max_errors": ("dspy.runtime.async_parallel", "resolve_max_errors"),
-    "run_program_with_trace": ("dspy.teleprompt.trace_helpers", "run_program_with_trace"),
-    "trace_to_demos": ("dspy.teleprompt.trace_helpers", "trace_to_demos"),
+    "trace_to_demos": ("dspy.teleprompt.core.demos", "trace_to_demos"),
 }
 
 # Type alias exported from candidate_ladder (not a module attribute).
@@ -96,12 +96,12 @@ __all__ = [
     "SIMBACompileParams",
     "Teleprompter",
     "compile_candidate_program",
+    "collect_trace_data",
     "compile_params_type",
     "generate_demo_candidate_sets",
     "make_optimizer_evaluator",
     "register_teleprompter",
     "resolve_max_errors",
-    "run_program_with_trace",
     "trace_to_demos",
 ]
 

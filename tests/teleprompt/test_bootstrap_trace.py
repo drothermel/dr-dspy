@@ -12,8 +12,9 @@ from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module, Prediction
+from dspy.runtime.optimization_trace import FailedPrediction
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.teleprompt.bootstrap_trace import FailedPrediction, bootstrap_trace_data
+from dspy.teleprompt.core.trace_collection import collect_trace_data
 
 
 def test_bootstrap_trace_data(make_run):
@@ -62,13 +63,13 @@ def test_bootstrap_trace_data(make_run):
 
     with mock.patch("litellm.acompletion", new=mock.AsyncMock(side_effect=completion_side_effect)):
         results = asyncio.run(
-            bootstrap_trace_data(
+            collect_trace_data(
                 program=program,
                 dataset=dataset,
                 metric=exact_match_metric,
                 max_concurrency=1,
                 raise_on_error=False,
-                capture_failed_parses=True,
+                capture_parse_failures=True,
                 run=run,
             )
         )
@@ -98,7 +99,7 @@ def test_bootstrap_trace_data(make_run):
 
 
 def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch, make_run):
-    from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
+    from dspy.teleprompt.core import trace_collection as trace_collection_module
     from dspy.testing import DummyLM
 
     run = make_run(lm=DummyLM([{}]))
@@ -124,17 +125,17 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch, make_run):
     def fake_make_optimizer_evaluator(*_args, **_kwargs):
         return DummyEvaluate()
 
-    monkeypatch.setattr(bootstrap_trace_module, "make_optimizer_evaluator", fake_make_optimizer_evaluator)
+    monkeypatch.setattr(trace_collection_module, "make_optimizer_evaluator", fake_make_optimizer_evaluator)
     asyncio.run(
-        bootstrap_trace_module.bootstrap_trace_data(
+        trace_collection_module.collect_trace_data(
             program=DummyProgram(), dataset=[], callback_metadata={"disable_logging": True}, run=run
         )
     )
     assert captured_metadata["value"] == {"disable_logging": True}
 
 
-def test_bootstrap_trace_restores_forward_after_eval(monkeypatch, make_run):
-    from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
+def test_collect_trace_data_does_not_mutate_inner_forward(monkeypatch, make_run):
+    from dspy.teleprompt.core import trace_collection as trace_collection_module
     from dspy.testing import DummyLM
 
     class DummyProgram(Module):
@@ -148,16 +149,16 @@ def test_bootstrap_trace_restores_forward_after_eval(monkeypatch, make_run):
 
             return _Result()
 
-    monkeypatch.setattr(bootstrap_trace_module, "make_optimizer_evaluator", lambda *_args, **_kwargs: DummyEvaluate())
+    monkeypatch.setattr(trace_collection_module, "make_optimizer_evaluator", lambda *_args, **_kwargs: DummyEvaluate())
 
     run = make_run(lm=DummyLM([{}]))
     program = DummyProgram()
     original_impl = object.__getattribute__(program, "_aforward_impl")
     asyncio.run(
-        bootstrap_trace_data(
+        collect_trace_data(
             program=program,
             dataset=[],
-            capture_failed_parses=False,
+            capture_parse_failures=False,
             run=run,
         )
     )
