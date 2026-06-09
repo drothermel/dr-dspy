@@ -64,6 +64,15 @@ class InferRules(BootstrapFewShot):
         original_program = self.student.deepcopy()
         all_predictors = [p for p in original_program.predictors() if hasattr(p, "task_spec")]
         instructions_list = [get_task_spec(p).instructions for p in all_predictors]
+        evaluator = make_optimizer_evaluator(
+            run,
+            devset=valset,
+            metric=self.metric,
+            max_concurrency=self.max_concurrency,
+            max_errors=self.max_errors,
+            display_table=False,
+            display_progress=True,
+        )
         best_score = -math.inf
         best_program = None
         for candidate_idx in range(self.num_candidates):
@@ -79,7 +88,7 @@ class InferRules(BootstrapFewShot):
                     predictor=predictor, task_spec=get_task_spec(predictor).with_instructions(instructions_list[i])
                 )
                 self.update_program_instructions(predictor=predictor, natural_language_rules=rules)
-            score = await self.evaluate_program(program=candidate_program, dataset=valset, run=run)
+            score = await self.evaluate_program(program=candidate_program, evaluator=evaluator, run=run)
             if score > best_score:
                 best_score = score
                 best_program = candidate_program
@@ -138,17 +147,8 @@ class InferRules(BootstrapFewShot):
             for example in trainset
         ]
 
-    async def evaluate_program(self, program, dataset, *, run: RunContext):
-        evaluate = make_optimizer_evaluator(
-            run,
-            devset=dataset,
-            metric=self.metric,
-            max_concurrency=self.max_concurrency,
-            max_errors=self.max_errors,
-            display_table=False,
-            display_progress=True,
-        )
-        return (await evaluate(program, run=run, metric=self.metric)).score
+    async def evaluate_program(self, program, *, evaluator, run: RunContext):
+        return (await evaluator(program, run=run, metric=self.metric)).score
 
 
 class RulesInductionProgram(Module):

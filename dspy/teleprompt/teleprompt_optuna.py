@@ -35,17 +35,8 @@ class BootstrapFewShotWithOptuna:
         self.num_candidate_sets = num_random_candidates
         self.max_labeled_demos = max_labeled_demos
 
-    async def _evaluate_program(self, program, *, run: RunContext):
-        evaluate = make_optimizer_evaluator(
-            run,
-            devset=self.valset,
-            metric=self.metric,
-            max_concurrency=self.max_concurrency,
-            max_errors=None,
-            display_table=False,
-            display_progress=True,
-        )
-        return await evaluate(program, run=run)
+    async def _evaluate_program(self, program, *, evaluator, run: RunContext):
+        return await evaluator(program, run=run)
 
     async def _run_trial(self, trial) -> float:
         program2 = self.student.reset_copy()
@@ -56,7 +47,7 @@ class BootstrapFewShotWithOptuna:
             demo_index = trial.suggest_int(f"demo_index_for_{name}", 0, len(all_demos) - 1)
             selected_demo = dict(all_demos[demo_index])
             program2_predictor.demos = [selected_demo]
-        result = await self._evaluate_program(program2, run=self.run)
+        result = await self._evaluate_program(program2, evaluator=self.evaluator, run=self.run)
         trial.set_user_attr("program", program2)
         return cast("Any", result).score
 
@@ -89,6 +80,15 @@ class BootstrapFewShotWithOptuna:
             run=run,
         )
         self.compiled_teleprompter = bootstrap_result.program
+        self.evaluator = make_optimizer_evaluator(
+            run,
+            devset=self.valset,
+            metric=self.metric,
+            max_concurrency=self.max_concurrency,
+            max_errors=None,
+            display_table=False,
+            display_progress=True,
+        )
         study = create_maximize_study(feature="BootstrapFewShotWithOptuna")
         await run_ask_tell_loop(study, self.num_candidate_sets, self._run_trial)
         best_program = study.trials[study.best_trial.number].user_attrs["program"]

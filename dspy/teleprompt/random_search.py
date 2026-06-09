@@ -44,12 +44,21 @@ class BootstrapFewShotWithRandomSearch:
 
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = RandomSearchCompileParams.model_validate(params)
-        self.trainset = params.trainset
-        self.valset = params.valset or params.trainset
+        trainset = params.trainset
+        valset = params.valset or params.trainset
         teacher = params.teacher
         restrict = params.restrict
         labeled_sample = params.labeled_sample
         effective_max_errors = resolve_max_errors(self.max_errors, run)
+        evaluate = make_optimizer_evaluator(
+            run,
+            devset=valset,
+            metric=self.metric,
+            max_concurrency=self.max_concurrency,
+            max_errors=self.max_errors,
+            display_table=False,
+            display_progress=True,
+        )
         ladder_config = CandidateLadderConfig(
             num_random=self.num_random_candidates,
             include_baseline=params.include_baselines,
@@ -66,7 +75,7 @@ class BootstrapFewShotWithRandomSearch:
             program = await compile_candidate_program(
                 seed=seed,
                 student=student,
-                trainset=self.trainset,
+                trainset=trainset,
                 run=run,
                 metric=self.metric,
                 teacher=teacher,
@@ -78,15 +87,6 @@ class BootstrapFewShotWithRandomSearch:
                 max_errors=effective_max_errors,
                 metric_threshold=self.metric_threshold,
                 labeled_sample=labeled_sample,
-            )
-            evaluate = make_optimizer_evaluator(
-                run,
-                devset=self.valset,
-                metric=self.metric,
-                max_concurrency=self.max_concurrency,
-                max_errors=self.max_errors,
-                display_table=False,
-                display_progress=True,
             )
             result = await evaluate(program, run=run)
             score, subscores = (result.score, [output[2] for output in result.results])

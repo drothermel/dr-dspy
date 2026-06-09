@@ -250,13 +250,23 @@ class BetterTogether:
         candidates: list[ProgramCandidate] = []
         flag_lms_launched = False
         error_occurred = False
+        evaluator = None
+        if valset is not None and len(valset) > 0:
+            evaluator = make_optimizer_evaluator(
+                run,
+                devset=valset,
+                metric=self.metric,
+                max_concurrency=max_concurrency,
+                max_errors=effective_max_errors,
+                display_table=False,
+                display_progress=True,
+                provide_traceback=provide_traceback,
+            )
         logger.info(f"\n{BOLD}==> BASELINE EVALUATION <=={ENDC}")
         logger.info("Evaluating original program (no optimization applied)")
         launch_lms(student)
         flag_lms_launched = True
-        score = await self._evaluate_on_valset(
-            student, valset, rng, max_concurrency, effective_max_errors, provide_traceback, run
-        )
+        score = await self._evaluate_on_valset(student, valset, rng, evaluator, run)
         self._add_candidate(candidates=candidates, student=student, strategy_label="", score=score)
         logger.info(f"{YELLOW}Baseline score:{ENDC} {score}")
         for ind, step_code in enumerate(parsed_strategy):
@@ -284,9 +294,7 @@ class BetterTogether:
                     candidates,
                     current_strategy,
                     rng,
-                    max_concurrency,
-                    effective_max_errors,
-                    provide_traceback,
+                    evaluator,
                     run,
                 )
                 if lms_relaunched:
@@ -336,9 +344,7 @@ class BetterTogether:
         candidates: list[ProgramCandidate],
         current_strategy: str,
         rng: random.Random,
-        max_concurrency: int | None,
-        effective_max_errors: int | None,
-        provide_traceback: bool | None,
+        evaluator,
         run: RunContext,
     ) -> tuple[Module, float | None, bool, bool]:
         pred_lms_before = [pred.lm for pred in student.predictors()]
@@ -356,9 +362,7 @@ class BetterTogether:
         if self._models_changed(student=student, pred_lms_before=pred_lms_before):
             launch_lms(student)
             lms_relaunched = True
-        score = await self._evaluate_on_valset(
-            student, valset, rng, max_concurrency, effective_max_errors, provide_traceback, run
-        )
+        score = await self._evaluate_on_valset(student, valset, rng, evaluator, run)
         self._add_candidate(candidates=candidates, student=student, strategy_label=current_strategy, score=score)
         valid_scores = [candidate.score for candidate in candidates if candidate.score is not None]
         best_score_so_far = max(valid_scores) if valid_scores else float("-inf")
@@ -385,26 +389,14 @@ class BetterTogether:
         program: Module,
         valset: list[Example] | None,
         rng: random.Random,
-        max_concurrency: int | None,
-        effective_max_errors: int | None,
-        provide_traceback: bool | None,
+        evaluator,
         run: RunContext,
     ) -> float | None:
         if valset is None or len(valset) == 0:
             logger.info(f"{YELLOW}No validation set provided. Skipping evaluation.{ENDC}")
             return None
         logger.info(f"{BLUE}Evaluating on {len(valset)} validation examples...{ENDC}")
-        evaluate = make_optimizer_evaluator(
-            run,
-            devset=valset,
-            metric=self.metric,
-            max_concurrency=max_concurrency,
-            max_errors=effective_max_errors,
-            display_table=False,
-            display_progress=True,
-            provide_traceback=provide_traceback,
-        )
         eval_result = await eval_candidate_program(
-            batch_size=len(valset), trainset=valset, candidate_program=program, evaluate=evaluate, run=run, rng=rng
+            batch_size=len(valset), trainset=valset, candidate_program=program, evaluate=evaluator, run=run, rng=rng
         )
         return eval_result.score
