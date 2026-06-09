@@ -32,6 +32,12 @@ dependencies = [
     "cloudpickle>=3.1.2,<4.0.0",
     "dr-llm==4.3.0",
     "srsly>=2.5.3,<3.0.0",
+    "mcp>=1.9.4",
+    "optuna>=4.8.0",
+    "langchain-core>=1.0.4",
+    "gepa>=0.1.1",
+    "weaviate>=0.1.2",
+    "datasets>=3.6.0",
 ]
 
 [project.optional-dependencies]
@@ -58,14 +64,6 @@ dev = [
     "litellm>=1.88.0; sys_platform != 'win32' and python_version < '3.14'",
     "pytest-xdist>=3.8.0",
     "pytest-testmon>=2.2.0",
-]
-test_extras = [
-    "mcp>=1.5.0,<2.0.0",
-    "datasets>=2.14.6",
-    "pandas>=2.1.1",
-    "optuna>=3.4.0",
-    "langchain_core>=1.0.0,<2.0.0",
-    "numpy>=1.26.0,<3.0.0",
 ]
 
 [tool.setuptools.packages.find]

@@ -848,10 +848,16 @@ version = "3.3.0b1"
 source = { editable = "." }
 dependencies = [
     { name = "cloudpickle" },
+    { name = "datasets" },
     { name = "dr-llm" },
+    { name = "gepa" },
     { name = "json-repair" },
+    { name = "langchain-core" },
     { name = "litellm" },
+    { name = "mcp", version = "1.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
+    { name = "mcp", version = "1.27.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
     { name = "openai" },
+    { name = "optuna" },
     { name = "orjson" },
     { name = "pydantic" },
     { name = "regex" },
@@ -859,6 +865,7 @@ dependencies = [
     { name = "srsly" },
     { name = "tenacity" },
     { name = "tqdm" },
+    { name = "weaviate" },
 ]
 
 [package.optional-dependencies]
@@ -928,23 +935,28 @@ requires-dist = [
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.0.3" },
     { name = "cloudpickle", specifier = ">=3.1.2,<4.0.0" },
     { name = "datamodel-code-generator", marker = "extra == 'dev'", specifier = ">=0.26.3" },
+    { name = "datasets", specifier = ">=3.6.0" },
     { name = "datasets", marker = "extra == 'datasets'", specifier = ">=2.14.6" },
     { name = "datasets", marker = "extra == 'test-extras'", specifier = ">=2.14.6" },
     { name = "dr-llm", specifier = "==4.3.0" },
+    { name = "gepa", specifier = ">=0.1.1" },
     { name = "gepa", extras = ["dspy"], marker = "extra == 'gepa'", specifier = "==0.1.1" },
     { name = "jiter", marker = "extra == 'streaming'", specifier = ">=0.10.0" },
     { name = "json-repair", specifier = ">=0.54.2,<1.0.0" },
     { name = "jsonschema", marker = "extra == 'tools'", specifier = ">=4.24.0,<5.0.0" },
+    { name = "langchain-core", specifier = ">=1.0.4" },
     { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=1.0.0,<2.0.0" },
     { name = "langchain-core", marker = "extra == 'test-extras'", specifier = ">=1.0.0,<2.0.0" },
     { name = "litellm", specifier = ">=1.88.0" },
     { name = "litellm", marker = "python_full_version < '3.14' and sys_platform != 'win32' and extra == 'dev'", specifier = ">=1.88.0" },
+    { name = "mcp", specifier = ">=1.9.4" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.5.0,<2.0.0" },
     { name = "mcp", marker = "extra == 'test-extras'", specifier = ">=1.5.0,<2.0.0" },
     { name = "numpy", marker = "extra == 'dev'", specifier = ">=1.26.0,<3.0.0" },
     { name = "numpy", marker = "extra == 'numpy'", specifier = ">=1.26.0,<3.0.0" },
     { name = "numpy", marker = "extra == 'test-extras'", specifier = ">=1.26.0,<3.0.0" },
     { name = "openai", specifier = ">=2.20.0,<3.0.0" },
+    { name = "optuna", specifier = ">=4.8.0" },
     { name = "optuna", marker = "extra == 'optuna'", specifier = ">=3.4.0" },
     { name = "optuna", marker = "extra == 'test-extras'", specifier = ">=3.4.0" },
     { name = "orjson", specifier = ">=3.9.0,<4.0.0" },
@@ -963,6 +975,7 @@ requires-dist = [
     { name = "srsly", specifier = ">=2.5.3,<3.0.0" },
     { name = "tenacity", specifier = ">=9.1.2" },
     { name = "tqdm", specifier = ">=4.66.1,<5.0.0" },
+    { name = "weaviate", specifier = ">=0.1.2" },
     { name = "weaviate-client", marker = "extra == 'weaviate'", specifier = ">=4.5.4,<4.22.0" },
 ]
 provides-extras = ["anthropic", "gepa", "weaviate", "mcp", "langchain", "optuna", "datasets", "numpy", "streaming", "tools", "dev", "test-extras"]
@@ -4018,6 +4031,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/49/b4/51fe890511f0f242d07cb1ebe6a5b6db417262b9d2568b460347c57d95cc/wcwidth-0.8.1.tar.gz", hash = "sha256:faf5b4a5366a72dc49cad48cdf21f52bdf63bdda995178e483ba247ff79089b9", size = 1466072 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bd/6e/95b0e537de1f4d4301f76f944642c6da50d1511cc7b3d64dc418a66c7509/wcwidth-0.8.1-py3-none-any.whl", hash = "sha256:f453740b1e4a4f3291faa37944c555d71056c4da08d59809b307ef4feba695c8", size = 323092 },
+]
+
+[[package]]
+name = "weaviate"
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/61/6b/5d363c593d223f1772944f29b128ec3998c5485d3f36999936e1b3cc8ffa/weaviate-0.1.2.tar.gz", hash = "sha256:a381b8bb0eb236bd10256def8612953ed9024e6738b8a259e7ec11e626ae0665", size = 4110 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/33/35/745561b577a0bf0ead3f53d24c01390e8bc9547b385f26cfcaccbe474e7e/weaviate-0.1.2-py3-none-any.whl", hash = "sha256:40f1c1cf0b769036315d2b6026c8cd823a3a6e951c90d4e70a001a770ba8a444", size = 2568 },
 ]
 
 [[package]]
