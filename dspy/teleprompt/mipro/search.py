@@ -8,15 +8,15 @@ from dspy.integrations.optimizers.optuna.import_ import import_optuna
 from dspy.integrations.optimizers.optuna.study import add_observed_trial, create_maximize_study
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
+from dspy.teleprompt.console_styles import ENDC, GREEN
 from dspy.teleprompt.eval_batch import eval_candidate_program
-from dspy.teleprompt.log_utils import print_full_program, save_candidate_program
+from dspy.teleprompt.log_utils import save_candidate_program
 from dspy.teleprompt.mipro.evaluate import (
     log_minibatch_eval,
     log_normal_eval,
     perform_full_evaluation,
     select_and_insert_instructions_and_demos,
 )
-from dspy.teleprompt.mipro.settings import ENDC, GREEN
 
 if TYPE_CHECKING:
     import optuna
@@ -61,8 +61,9 @@ async def run_trial(
         candidate_program, instruction_candidates, demo_candidates, trial, trial_logs, trial_num
     )
     if optimizer.verbose:
-        logger.info("Evaluating the following candidate program...\n")
-        print_full_program(candidate_program)
+        logger.info("Evaluating the following candidate program...")
+        for name, _ in candidate_program.named_predictors():
+            logger.info("Evaluating candidate predictor: %s", name)
     batch_size = minibatch_size if minibatch else len(valset)
     score = (
         await eval_candidate_program(

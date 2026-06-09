@@ -255,15 +255,16 @@ class SIMBA:
         assert len(scores) == len(candidate_programs)
         candidate_entries = [
             ProgramCandidate(score=score, program=program)
-            for score, program in zip(scores, candidate_programs, strict=False)
+            for score, program in zip(scores, candidate_programs, strict=True)
         ]
         candidate_entries.sort(
             key=lambda entry: entry.score if entry.score is not None else float("-inf"), reverse=True
         )
-        best_idx = scores.index(max(scores)) if scores else 0
-        best_program = candidate_programs[best_idx].deepcopy()
+        best_program = (
+            candidate_entries[0].program.deepcopy() if candidate_entries else candidate_programs[0].deepcopy()
+        )
         logger.info(
-            f"Final trainset scores: {scores}, Best: {(max(scores) if scores else 'N/A')} (at index {(best_idx if scores else 'N/A')})\n\n\n"
+            f"Final trainset scores: {scores}, Best: {(candidate_entries[0].score if candidate_entries else 'N/A')}\n\n\n"
         )
         return CompileResult(
             program=best_program,

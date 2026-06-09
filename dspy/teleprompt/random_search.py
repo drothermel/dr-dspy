@@ -60,8 +60,6 @@ class BootstrapFewShotWithRandomSearch:
             min_bootstrapped_demos=self.min_num_samples,
         )
         candidates: list[ProgramCandidate] = []
-        best_program = student.reset_copy()
-        best_score = float("-inf")
         for seed_index, seed in enumerate(iter_candidate_seeds(ladder_config)):
             if restrict is not None and seed_index not in restrict:
                 continue
@@ -92,9 +90,6 @@ class BootstrapFewShotWithRandomSearch:
             )
             result = await evaluate(program, run=run)
             score, subscores = (result.score, [output[2] for output in result.results])
-            if score > best_score:
-                best_score = score
-                best_program = program
             candidates.append(
                 ProgramCandidate(score=score, program=program, subscores=subscores, seed=seed, label=str(seed_index))
             )
@@ -103,8 +98,10 @@ class BootstrapFewShotWithRandomSearch:
         candidates.sort(
             key=lambda candidate: candidate.score if candidate.score is not None else float("-inf"), reverse=True
         )
+        best_program = candidates[0].program if candidates else student.reset_copy()
+        best_score = candidates[0].score if candidates else None
         return CompileResult(
             program=best_program,
             candidates=candidates,
-            stats=CompileStats(best_score=best_score if candidates else None),
+            stats=CompileStats(best_score=best_score),
         )

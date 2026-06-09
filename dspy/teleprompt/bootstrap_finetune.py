@@ -197,7 +197,7 @@ def assert_structural_equivalency(*, program1: object, program2: object) -> None
     num2 = len(program2.predictors())
     err = f"Structurally equivalent programs must have the same number of predictors. The number of predictors for the two modules do not match: {num1} != {num2}"
     assert num1 == num2, err
-    pzip = zip(program1.named_predictors(), program2.named_predictors(), strict=False)
+    pzip = zip(program1.named_predictors(), program2.named_predictors(), strict=True)
     for ind, ((name1, pred1), (name2, pred2)) in enumerate(pzip):
         err = f"Program predictor names must match at  corresponding indices for structural equivalency. The predictor names for the programs do not match at index {ind}: '{name1}' != '{name2}'"
         assert name1 == name2, err

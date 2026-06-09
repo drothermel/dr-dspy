@@ -5,9 +5,9 @@ from dspy.evaluate.evaluator import Evaluate
 from dspy.integrations.optimizers.optuna.distributions import get_param_distributions
 from dspy.integrations.optimizers.optuna.study import add_observed_trial
 from dspy.runtime.run_context import RunContext
+from dspy.teleprompt.console_styles import ENDC, GREEN
 from dspy.teleprompt.eval_batch import eval_candidate_program, get_program_with_highest_avg_score
 from dspy.teleprompt.log_utils import save_candidate_program
-from dspy.teleprompt.mipro.settings import ENDC, GREEN
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 
 if TYPE_CHECKING:

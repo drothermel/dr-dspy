@@ -3,6 +3,7 @@ import math
 import random
 from typing import TYPE_CHECKING, Any
 
+from dspy.teleprompt.console_styles import BLUE, BOLD, ENDC, YELLOW
 from dspy.teleprompt.eval_batch import create_minibatch
 
 if TYPE_CHECKING:
@@ -16,11 +17,6 @@ AUTO_RUN_SETTINGS = {
     "medium": {"n": 12, "val_size": 300},
     "heavy": {"n": 18, "val_size": 1000},
 }
-YELLOW = "\x1b[93m"
-GREEN = "\x1b[92m"
-BLUE = "\x1b[94m"
-BOLD = "\x1b[1m"
-ENDC = "\x1b[0m"
 
 
 def set_random_seeds(optimizer: "MIPROv2", seed: int) -> None:

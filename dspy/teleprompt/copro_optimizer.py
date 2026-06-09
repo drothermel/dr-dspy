@@ -75,7 +75,7 @@ class COPRO:
         self.track_stats = track_stats
 
     def _check_candidates_equal(self, candidate1, candidate2) -> bool:
-        for p1, p2 in zip(candidate1["program"].predictors(), candidate2["program"].predictors(), strict=False):
+        for p1, p2 in zip(candidate1["program"].predictors(), candidate2["program"].predictors(), strict=True):
             if get_task_spec(p1).instructions != get_task_spec(p2).instructions:
                 return False
             *_, p1_last_field = get_task_spec(p1).fields.values()
@@ -175,7 +175,7 @@ class COPRO:
         for d in range(self.depth):
             logger.info(f"Iteration Depth: {d + 1}/{self.depth}.")
             latest_scores = []
-            for p_i, (p_old, p_new) in enumerate(zip(module.predictors(), module_clone.predictors(), strict=False)):
+            for p_i, (p_old, p_new) in enumerate(zip(module.predictors(), module_clone.predictors(), strict=True)):
                 candidates_ = latest_candidates[id(p_old)]
                 if len(module.predictors()) > 1:
                     candidates_ = all_candidates[id(p_old)]

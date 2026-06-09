@@ -73,7 +73,7 @@ class BootstrapFewShot:
             "Student and teacher must have the same number of predictors."
         )
         for (name1, predictor1), (name2, predictor2) in zip(
-            student.named_predictors(), teacher.named_predictors(), strict=False
+            student.named_predictors(), teacher.named_predictors(), strict=True
         ):
             assert name1 == name2, "Student and teacher must have the same program structure."
             assert get_task_spec(predictor1) == get_task_spec(predictor2), (
@@ -88,20 +88,17 @@ class BootstrapFewShot:
 
     async def _bootstrap(self, *, run: RunContext, max_bootstraps=None) -> None:
         max_bootstraps = max_bootstraps or self.max_bootstrapped_demos
-        bootstrap_attempts = 0
         bootstrapped = {}
         self.name2traces = {name: [] for name in self.name2predictor}
         for example_idx, example in enumerate(tqdm.tqdm(self.trainset)):
             if len(bootstrapped) >= max_bootstraps:
                 break
             for round_idx in range(self.max_rounds):
-                bootstrap_attempts += 1
                 if await self._bootstrap_one_example(example=example, round_idx=round_idx, run=run):
                     bootstrapped[example_idx] = True
                     break
         self.validation = [x for idx, x in enumerate(self.trainset) if idx not in bootstrapped]
         random.Random(0).shuffle(self.validation)
-        self.validation = self.validation
 
     async def _bootstrap_one_example(self, example, round_idx=0, *, run: RunContext):
         name2traces = {}

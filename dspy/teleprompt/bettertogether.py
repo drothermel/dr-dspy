@@ -23,6 +23,7 @@ from dspy.teleprompt.compile_params import (
     GEPACompileParams,
     RandomSearchCompileParams,
 )
+from dspy.teleprompt.console_styles import BLUE, BOLD, ENDC, GREEN, YELLOW
 from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.protocol import Teleprompter
@@ -31,11 +32,6 @@ from dspy.teleprompt.registry import compile_params_type, register_teleprompter,
 from dspy.teleprompt.utils import make_optimizer_evaluator
 
 logger = logging.getLogger(__name__)
-YELLOW = "\x1b[93m"
-GREEN = "\x1b[92m"
-BLUE = "\x1b[94m"
-BOLD = "\x1b[1m"
-ENDC = "\x1b[0m"
 STRATEGY_LABEL_SEP = " -> "
 
 
@@ -83,8 +79,9 @@ def _default_compile_params(
 
 @register_teleprompter(params=BetterTogetherCompileParams)
 class BetterTogether:
-    def __init__(self, metric: OptimizerMetric, **optimizers: Teleprompter) -> None:
+    def __init__(self, metric: OptimizerMetric, *, verbose: bool = False, **optimizers: Teleprompter) -> None:
         self.metric = metric
+        self.verbose = verbose
         if not optimizers:
             logger.info(
                 "No optimizers provided. Using defaults: BootstrapFewShotWithRandomSearch (p) and BootstrapFinetune (w). "
@@ -100,13 +97,27 @@ class BetterTogether:
             compile_params_type(optimizer)
         self.optimizers: dict[str, Teleprompter] = optimizers
 
+    def _log_info(self, plain: str, styled: str | None = None) -> None:
+        logger.info(styled if self.verbose and styled is not None else plain)
+
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = BetterTogetherCompileParams.model_validate(params)
-        logger.info(f"\n{BOLD}==> BETTERTOGETHER COMPILATION STARTED <=={ENDC}")
-        logger.info(f"{BLUE}Strategy:{ENDC} {STRATEGY_LABEL_SEP.join(params.strategy)}")
-        logger.info(f"{BLUE}Trainset size:{ENDC} {len(params.trainset)}")
-        logger.info(
-            f"{BLUE}Validation ratio:{ENDC} {(params.valset_ratio if params.valset is None else 'using provided valset')}"
+        self._log_info(
+            "BetterTogether compilation started",
+            f"\n{BOLD}==> BETTERTOGETHER COMPILATION STARTED <=={ENDC}",
+        )
+        self._log_info(
+            f"Strategy: {STRATEGY_LABEL_SEP.join(params.strategy)}",
+            f"{BLUE}Strategy:{ENDC} {STRATEGY_LABEL_SEP.join(params.strategy)}",
+        )
+        self._log_info(
+            f"Trainset size: {len(params.trainset)}",
+            f"{BLUE}Trainset size:{ENDC} {len(params.trainset)}",
+        )
+        validation_note = params.valset_ratio if params.valset is None else "using provided valset"
+        self._log_info(
+            f"Validation ratio: {validation_note}",
+            f"{BLUE}Validation ratio:{ENDC} {validation_note}",
         )
         student, teacher = self._prepare_student_and_teacher(student=student, teacher=params.teacher)
         trainset, valset = self._prepare_trainset_and_valset(
@@ -129,10 +140,19 @@ class BetterTogether:
             optimizer_compile_args,
             run,
         )
-        logger.info(f"\n{BOLD}{GREEN}==> BETTERTOGETHER COMPILATION COMPLETE <=={ENDC}")
+        self._log_info(
+            "BetterTogether compilation complete",
+            f"\n{BOLD}{GREEN}==> BETTERTOGETHER COMPILATION COMPLETE <=={ENDC}",
+        )
         if result.candidates:
-            logger.info(f"{GREEN}Best score achieved:{ENDC} {result.candidates[0].score}")
-            logger.info(f"{GREEN}Best strategy:{ENDC} {result.candidates[0].label or 'original (no optimization)'}")
+            self._log_info(
+                f"Best score achieved: {result.candidates[0].score}",
+                f"{GREEN}Best score achieved:{ENDC} {result.candidates[0].score}",
+            )
+            self._log_info(
+                f"Best strategy: {result.candidates[0].label or 'original (no optimization)'}",
+                f"{GREEN}Best strategy:{ENDC} {result.candidates[0].label or 'original (no optimization)'}",
+            )
         return CompileResult.with_compiled_program(
             result.program,
             candidates=result.candidates,
@@ -264,15 +284,14 @@ class BetterTogether:
                     logger.info(f"{GREEN}New best score!{ENDC} {score} (strategy: '{current_strategy}')")
                 else:
                     logger.info(f"{YELLOW}Score after optimization:{ENDC} {score}")
-            except Exception as e:
+            except Exception:
                 error_occurred = True
                 logger.exception(
-                    f"{YELLOW}Step {ind + 1}/{len(parsed_strategy)} failed with error: {type(e).__name__}: {e}{ENDC}"
+                    "Step %s/%s failed; stopping early with %s candidate(s)",
+                    ind + 1,
+                    len(parsed_strategy),
+                    len(candidates),
                 )
-                logger.exception(
-                    f"{YELLOW}Stopping optimization early. Returning best program found so far from {len(candidates)} candidate(s).{ENDC}"
-                )
-                logger.error(f"{YELLOW}Traceback:{ENDC}", exc_info=True)
                 break
         if flag_lms_launched:
             kill_lms(student)
@@ -320,7 +339,7 @@ class BetterTogether:
             logger.warning(
                 f"{YELLOW}Warning: {optimizer.__class__.__name__} incorrectly reset predictor LMs. Restoring to original LMs.{ENDC}"
             )
-            for pred, lm in zip(student.predictors(), pred_lms_before, strict=False):
+            for pred, lm in zip(student.predictors(), pred_lms_before, strict=True):
                 pred.lm = lm
         lms_relaunched = False
         if self._models_changed(student=student, pred_lms_before=pred_lms_before):

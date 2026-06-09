@@ -2,14 +2,7 @@ import logging
 import os
 import shutil
 
-from dspy.teleprompt.task_spec_context import get_task_spec
-
 logger = logging.getLogger(__name__)
-
-
-def print_full_program(program) -> None:
-    for predictor in program.predictors():
-        _ = get_task_spec(predictor)
 
 
 def save_candidate_program(*, program, log_dir, trial_num, note=None):
@@ -32,23 +25,6 @@ def save_file_to_log_dir(*, source_file_path, log_dir) -> None:
         os.makedirs(log_dir)
     destination_file_path = os.path.join(log_dir, os.path.basename(source_file_path))
     shutil.copy(source_file_path, destination_file_path)
-
-
-def setup_logging(log_dir) -> None:
-    if log_dir is None:
-        return
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.WARNING)
-    file_handler = logging.FileHandler(f"{log_dir}/logs.txt")
-    file_handler.setLevel(logging.WARNING)
-    file_formatter = logging.Formatter("%(asctime)s - %(message)s")
-    file_handler.setFormatter(file_formatter)
-    root_logger.addHandler(file_handler)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.WARNING)
-    console_formatter = logging.Formatter("%(message)s")
-    console_handler.setFormatter(console_formatter)
-    root_logger.addHandler(console_handler)
 
 
 def get_token_usage(model) -> tuple[int, int]:

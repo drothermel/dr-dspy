@@ -22,8 +22,7 @@ def prepare_models_for_resampling(*, program: Module, n: int, run: RunContext, t
     lm = program.optional_lm() or run.lm
     models = []
     if teacher_run:
-        teacher_lm = teacher_run.lm or lm
-        teacher_lm.kwargs["temperature"] = 1.0
+        teacher_lm = (teacher_run.lm or lm).copy(temperature=1.0)
         models.append(teacher_lm)
         remaining = n - 1
     else:

@@ -11,6 +11,7 @@ from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compilation import CompileResult, CompileStats
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, InferRulesCompileParams
+from dspy.teleprompt.errors import is_demo_shrinkable_error
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
@@ -98,11 +99,8 @@ class InferRules(BootstrapFewShot):
             try:
                 return await self.rules_induction_program(examples_text, run=run)
             except Exception as e:
-                assert (
-                    isinstance(e, ValueError)
-                    or e.__class__.__name__ == "BadRequestError"
-                    or "ContextWindowExceededError" in str(e)
-                )
+                if not is_demo_shrinkable_error(e):
+                    raise
                 if len(demos) > 1:
                     demos = demos[:-1]
                 else:
