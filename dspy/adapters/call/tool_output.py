@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import json_repair
 
 from dspy.adapters.base.tool_calls import _provider_tool_call_to_tool_call_dict
 from dspy.adapters.types.tool import ToolCalls
 from dspy.core.types import LMOutput, LMToolCallPart
-from dspy.task_spec import TaskSpec
+
+if TYPE_CHECKING:
+    from dspy.task_spec import TaskSpec
 
 
 def attach_tool_calls_to_value(

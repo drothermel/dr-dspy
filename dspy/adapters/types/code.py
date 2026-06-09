@@ -61,4 +61,4 @@ def _code_class_getitem(cls: type[Code], language: str) -> type[Code]:
     return code_with_language_cls
 
 
-Code.__class_getitem__ = classmethod(_code_class_getitem)
+Code.__class_getitem__ = classmethod(_code_class_getitem)  # ty:ignore[invalid-assignment]

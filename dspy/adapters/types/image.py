@@ -30,13 +30,11 @@ class Image(Type):
             data["url"] = encode_image(data["url"], download_images=download, verify=verify)
         super().__init__(**data)
 
-    @lru_cache(maxsize=32)
     def format(self) -> list[dict[str, Any]] | str:
         try:
-            image_url = encode_image(self.url)
+            return _format_image_content(self.url)
         except Exception as e:
             raise ValueError(f"Failed to format image for DSPy: {e}") from e
-        return [{"type": "image_url", "image_url": {"url": image_url}}]
 
     @override
     def __str__(self) -> str:
@@ -135,3 +133,9 @@ def is_image(obj: object) -> bool:
     if PIL_AVAILABLE and isinstance(obj, PILImage.Image):
         return True
     return bool(isinstance(obj, str) and (obj.startswith("data:") or Path(obj).is_file() or is_url(obj)))
+
+
+@lru_cache(maxsize=32)
+def _format_image_content(url: str) -> list[dict[str, Any]]:
+    image_url = encode_image(url)
+    return [{"type": "image_url", "image_url": {"url": image_url}}]

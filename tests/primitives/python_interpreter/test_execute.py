@@ -4,6 +4,7 @@ import pytest
 
 from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
 from dspy.primitives.python_interpreter import PythonInterpreter
+from dspy.primitives.python_interpreter.tools import extract_parameters
 
 pytestmark = pytest.mark.deno
 
@@ -104,10 +105,9 @@ def test_submit_wrong_arg_count():
 def test_extract_parameters():
 
     def example_fn(required: str, optional: int = 5, untyped=None) -> str:
-        pass
+        return required
 
-    sandbox = PythonInterpreter()
-    params = sandbox._extract_parameters(example_fn)
+    params = extract_parameters(example_fn)
     assert len(params) == 3
     assert params[0] == {"name": "required", "type": "str"}
     assert params[1] == {"name": "optional", "type": "int", "default": 5}
@@ -117,10 +117,9 @@ def test_extract_parameters():
 def test_extract_parameters_complex_types():
 
     def complex_fn(items: list | None = None, data: dict[str, int] | None = None) -> list:
-        pass
+        return [] if items is None else items
 
-    sandbox = PythonInterpreter()
-    params = sandbox._extract_parameters(complex_fn)
+    params = extract_parameters(complex_fn)
     assert len(params) == 2
     assert params[0] == {"name": "items", "default": None}
     assert params[1] == {"name": "data", "default": None}

@@ -41,7 +41,7 @@ def test_max_errors_handling(make_run):
         return item
 
     data = [1, 2, 3, 4, 5]
-    with pytest.raises(RuntimeError, match="Execution cancelled due to errors or interruption."):
+    with pytest.raises(RuntimeError, match=r"Execution cancelled due to errors or interruption\."):
         asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=3, max_errors=1))
 
 
@@ -107,7 +107,7 @@ def test_sequential_max_errors_exceeded(make_run):
         return item
 
     data = [1, 2, 3, 4, 5]
-    with pytest.raises(RuntimeError, match="Execution cancelled due to errors or interruption."):
+    with pytest.raises(RuntimeError, match=r"Execution cancelled due to errors or interruption\."):
         asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=1, max_errors=1))
 
 

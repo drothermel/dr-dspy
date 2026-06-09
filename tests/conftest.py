@@ -77,5 +77,5 @@ def pytest_collection_modifyitems(config, items):
 def lm_for_test():
     model = os.environ.get("LM_FOR_TEST", None)
     if model is None:
-        pytest.skip("LM_FOR_TEST is not set in the environment variables")
+        pytest.skip("LM_FOR_TEST is not set in the environment variables")  # ty: ignore[too-many-positional-arguments]
     return model

@@ -1,5 +1,5 @@
 import re
-from enum import StrEnum
+from enum import Enum
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 _UNSET = object()
 
 
-class FieldRole(StrEnum):
+class FieldRole(str, Enum):
     INPUT = "input"
     OUTPUT = "output"
 
@@ -37,7 +37,7 @@ def input_field(
         name=name,
         type=type_,
         desc=desc if desc is not None else f"${{{name}}}",
-        role=FieldRole.INPUT,
+        role=FieldRole.INPUT.value,
         prefix=prefix if prefix is not None else infer_prefix(name) + ":",
         is_type_undefined=is_type_undefined,
         constraints=constraints,
@@ -53,7 +53,7 @@ def output_field(
         name=name,
         type=type_,
         desc=desc if desc is not None else f"${{{name}}}",
-        role=FieldRole.OUTPUT,
+        role=FieldRole.OUTPUT.value,
         prefix=prefix if prefix is not None else infer_prefix(name) + ":",
         constraints=constraints,
     )

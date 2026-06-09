@@ -138,7 +138,7 @@ def test_pkl_file_loading_requires_explicit_permission(tmp_path):
     pkl_path = tmp_path / "model.pkl"
     predict.save(pkl_path)
     new_predict = Predict(QA_TASK_SPEC)
-    with pytest.raises(ValueError, match="Loading .pkl files can run arbitrary code"):
+    with pytest.raises(ValueError, match=r"Loading \.pkl files can run arbitrary code"):
         new_predict.load(pkl_path)
     new_predict.load(pkl_path, allow_pickle=True)
     assert new_predict.dump_state() == predict.dump_state()

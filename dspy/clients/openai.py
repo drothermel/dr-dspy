@@ -1,6 +1,6 @@
 import time
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from typing_extensions import override
 
@@ -21,8 +21,8 @@ class TrainingJobOpenAI(TrainingJob):
         self.provider_job_id = None
 
     @override
-    def cancel(self) -> None:
-        if OpenAIProvider.does_job_exist(self.provider_job_id):
+    def cancel(self) -> bool:
+        if self.provider_job_id is not None and OpenAIProvider.does_job_exist(self.provider_job_id):
             status = self.status()
             if OpenAIProvider.is_terminal_training_status(status):
                 err_msg = "Jobs that are complete cannot be canceled."
@@ -34,10 +34,12 @@ class TrainingJobOpenAI(TrainingJob):
             if OpenAIProvider.does_file_exist(self.provider_file_id):
                 _openai().files.delete(self.provider_file_id)
             self.provider_file_id = None
-        super().cancel()
+        return super().cancel()
 
     @override
     def status(self) -> TrainingStatus:
+        if self.provider_job_id is None:
+            return TrainingStatus.not_started
         return OpenAIProvider.get_training_status(self.provider_job_id)
 
 
@@ -49,10 +51,8 @@ class OpenAIProvider(Provider):
 
     @staticmethod
     @override
-    def is_provider_model(model: str) -> bool:
-        if model.startswith(("openai/", "ft:")):
-            return True
-        return False
+    def is_provider_model(_model: str) -> bool:
+        return bool(_model.startswith(("openai/", "ft:")))
 
     @staticmethod
     def _remove_provider_prefix(model: str) -> str:
@@ -62,13 +62,16 @@ class OpenAIProvider(Provider):
     @staticmethod
     @override
     def finetune(
-        job: TrainingJobOpenAI,
+        job: TrainingJob,
         model: str,
         train_data: list[dict[str, Any]],
-        train_data_format: TrainDataFormat | None,
+        train_data_format: TrainDataFormat | str | None,
         train_kwargs: dict[str, Any] | None = None,
     ) -> str:
+        job = cast("TrainingJobOpenAI", job)
         model = OpenAIProvider._remove_provider_prefix(model)
+        if not isinstance(train_data_format, TrainDataFormat):
+            raise TypeError(f"Expected TrainDataFormat, got {type(train_data_format).__name__}.")
         OpenAIProvider.validate_data_format(train_data_format)
         data_path = save_data(train_data)
         provider_file_id = OpenAIProvider.upload_data(data_path)
@@ -116,7 +119,7 @@ class OpenAIProvider(Provider):
         assert OpenAIProvider.does_job_exist(job_id), err_msg
         provider_job = _openai().fine_tuning.jobs.retrieve(job_id)
         provider_status = provider_job.status
-        return provider_status_to_training_status[provider_status]
+        return provider_status_to_training_status.get(provider_status, TrainingStatus.pending)
 
     @staticmethod
     def validate_data_format(data_format: TrainDataFormat) -> None:
@@ -127,7 +130,8 @@ class OpenAIProvider(Provider):
 
     @staticmethod
     def upload_data(data_path: str) -> str:
-        provider_file = _openai().files.create(file=open(data_path, "rb"), purpose="fine-tune")
+        with open(data_path, "rb") as data_file:
+            provider_file = _openai().files.create(file=data_file, purpose="fine-tune")
         return provider_file.id
 
     @staticmethod

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.call.policies.parse_fallback import NoOpParseFallbackPolicy
@@ -9,6 +8,8 @@ from dspy.core.types.config import coerce_lm_config
 from dspy.utils.exceptions import AdapterParseError, LMError
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from dspy.adapters.base.adapter import Adapter
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types.config import LMConfig
@@ -59,7 +60,7 @@ class AdapterCallPipeline:
         return await response_format_policy.execute(
             adapter=adapter,
             lm=lm,
-            config=config,
+            config=coerce_lm_config(config),
             task_spec=task_spec,
             demos=demos,
             inputs=inputs,
@@ -134,7 +135,7 @@ class AdapterCallPipeline:
             return await parse_fallback_policy.execute_fallback(
                 adapter=adapter,
                 lm=lm,
-                config=config,
+                config=coerce_lm_config(config),
                 task_spec=task_spec,
                 demos=demos,
                 inputs=inputs,

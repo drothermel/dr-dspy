@@ -54,7 +54,7 @@ def test_refine_module_default_fail_count(make_run):
 
     predict = DummyModule(ts("question -> answer"), always_raise)
     refine = Refine(module=predict, N=3, reward_fn=lambda _, __: 1.0, threshold=0.0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Deliberately failing"):
         asyncio.run(refine(question="What is the capital of Belgium?", run=run))
 
 
@@ -71,7 +71,7 @@ def test_refine_module_custom_fail_count(make_run):
 
     predict = DummyModule(ts("question -> answer"), raise_on_second_call)
     refine = Refine(module=predict, N=3, reward_fn=lambda _, __: 1.0, threshold=0.0, fail_count=1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Deliberately failing"):
         asyncio.run(refine(question="What is the capital of Belgium?", run=run))
     assert module_call_count[0] == 2, (
         "Module should have been called exactly 2 times, but was called %d times" % module_call_count[0]

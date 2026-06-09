@@ -120,9 +120,9 @@ def test_toolcalls_vague_match():
     )
     assert len(tc.tool_calls) == 1
     assert tc.tool_calls[0].args == {"query": "hello"}
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Received invalid value"):
         ToolCalls.model_validate({"foo": "bar"})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Received invalid value"):
         ToolCalls.model_validate([{"foo": "bar"}])
     with pytest.raises(ValueError, match="function value"):
         ToolCalls.from_dict_list([{"function": "bad"}])
@@ -155,7 +155,7 @@ def test_tool_call_execute():
     result3 = tool_call3.execute(functions={"get_pi": get_pi})
     assert result3 == 3.14159
     tool_call4 = ToolCalls.ToolCall(name="nonexistent", args={})
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(ValueError, match=r"not found") as exc_info:
         tool_call4.execute(functions=tools)
     assert "not found" in str(exc_info.value)
 

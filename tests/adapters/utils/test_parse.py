@@ -1,5 +1,6 @@
 from typing import Literal
 
+import pydantic
 import pytest
 from pydantic import BaseModel
 
@@ -30,7 +31,7 @@ def test_parse_value_pydantic_types():
     assert isinstance(result, Profile)
     assert result.name == "Jane"
     assert result.age == 25
-    with pytest.raises(Exception):
+    with pytest.raises(pydantic.ValidationError, match=r"age"):
         parse_value(value='{"name": "John"}', annotation=Profile)
 
 
@@ -53,7 +54,7 @@ def test_parse_value_literal():
     assert parse_value(value='"option1"', annotation=Literal["option1", "option2"]) == "option1"
     assert parse_value(value="Literal[option1]", annotation=Literal["option1", "option2"]) == "option1"
     assert parse_value(value="str[option1]", annotation=Literal["option1", "option2"]) == "option1"
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"is not one of"):
         parse_value(value="invalid", annotation=Literal["option1", "option2"])
 
 
@@ -71,5 +72,5 @@ def test_parse_value_json_repair():
     assert parse_value(value='{"key": "value"}', annotation=dict) == {"key": "value"}
     assert parse_value(value="{'key': 'value'}", annotation=dict) == {"key": "value"}
     malformed = "not json or literal"
-    with pytest.raises(Exception):
+    with pytest.raises(pydantic.ValidationError):
         parse_value(value=malformed, annotation=dict)

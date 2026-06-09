@@ -11,7 +11,7 @@ try:
     import litellm
     from litellm.utils import Choices, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from openai import RateLimitError
 
 from dspy.clients.lm import LM
@@ -57,9 +57,11 @@ def test_lm_wraps_unknown_boundary_error_as_unexpected_error(make_run):
 def test_lm_preserves_existing_lm_error_without_self_cause(make_run):
     error = LMRateLimitError("rate limited", model="openai/gpt-4o-mini")
     lm = LM("openai/gpt-4o-mini")
-    with mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error):
-        with pytest.raises(LMRateLimitError) as exc_info:
-            asyncio.run(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
+    with (
+        mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error),
+        pytest.raises(LMRateLimitError) as exc_info,
+    ):
+        asyncio.run(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
     assert exc_info.value is error
     assert exc_info.value.__cause__ is None
 
@@ -67,9 +69,11 @@ def test_lm_preserves_existing_lm_error_without_self_cause(make_run):
 async def test_lm_preserves_existing_lm_error_without_self_cause_async(make_run):
     error = LMRateLimitError("rate limited", model="openai/gpt-4o-mini")
     lm = LM("openai/gpt-4o-mini")
-    with mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error):
-        with pytest.raises(LMRateLimitError) as exc_info:
-            await lm.acall(_request(lm, prompt="question"), run=make_run(lm=lm))
+    with (
+        mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error),
+        pytest.raises(LMRateLimitError) as exc_info,
+    ):
+        await lm.acall(_request(lm, prompt="question"), run=make_run(lm=lm))
     assert exc_info.value is error
     assert exc_info.value.__cause__ is None
 
@@ -93,9 +97,11 @@ def test_retry_made_on_system_errors(make_run):
         raise RateLimitError(response=mock_response, message="message", body="error")
 
     lm = LM(model="openai/gpt-4o-mini", max_tokens=250, num_retries=3)
-    with mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create):
-        with pytest.raises(LMRateLimitError):
-            asyncio.run(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
+    with (
+        mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create),
+        pytest.raises(LMRateLimitError),
+    ):
+        asyncio.run(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
     assert retry_tracking[0] == 2
 
 
@@ -110,8 +116,10 @@ def test_exponential_backoff_retry(make_run):
         raise RateLimitError(response=mock_response, message="message", body="error")
 
     lm = LM(model="openai/gpt-3.5-turbo", max_tokens=250, num_retries=3)
-    with mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create):
-        with pytest.raises(LMRateLimitError):
-            asyncio.run(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
+    with (
+        mock.patch.object(litellm.OpenAIChatCompletion, "completion", side_effect=mock_create),
+        pytest.raises(LMRateLimitError),
+    ):
+        asyncio.run(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
     for i in range(1, len(time_counter) - 1):
         assert time_counter[i + 1] - time_counter[i] >= 2 ** (i - 1)

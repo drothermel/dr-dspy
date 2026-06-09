@@ -106,6 +106,8 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         reflective_dataset: dict[str, list[dict[str, Any]]],
         components_to_update: list[str],
     ) -> dict[str, str]:
+        if self.run is None:
+            raise ValueError("DspyAdapter requires a RunContext.")
         reflection_lm = self.reflection_lm or self.run.lm
         if self.custom_instruction_proposer:
             with optimizer_lm_context(
@@ -155,6 +157,8 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         if capture_traces:
             from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
 
+            if self.run is None:
+                raise ValueError("DspyAdapter requires a RunContext.")
             trajs = await bootstrap_trace_module.bootstrap_trace_data(
                 program=program,
                 dataset=batch,
@@ -267,6 +271,8 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 if isinstance(outputs, FailedPrediction):
                     from dspy.compile.resolve import resolve_adapter
 
+                    if self.run is None:
+                        raise ValueError("DspyAdapter requires a RunContext.")
                     adapter, _ = resolve_adapter(self.run.adapter, transparency=self.run.telemetry.transparency)
                     structure_instruction = ""
                     for message in adapter.format(task_spec=get_task_spec(module), demos=[], inputs={}):

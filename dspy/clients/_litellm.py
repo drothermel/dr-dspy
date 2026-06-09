@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from dspy.utils.lazy_import import require
 
@@ -12,11 +12,12 @@ if TYPE_CHECKING:
 
 @functools.cache
 def _configure_litellm_defaults(litellm: types.ModuleType) -> None:
-    litellm.telemetry = False
-    litellm.cache = None
+    litellm_any = cast("Any", litellm)
+    litellm_any.telemetry = False
+    litellm_any.cache = None
     if not getattr(litellm, "_dspy_logging_configured", False):
-        litellm.suppress_debug_info = True
-        litellm._dspy_logging_configured = True
+        litellm_any.suppress_debug_info = True
+        litellm_any._dspy_logging_configured = True
 
 
 def _materialize_litellm(litellm: types.ModuleType) -> None:

@@ -7,8 +7,13 @@ from typing import Any, Callable, Literal, TypeVar
 
 from dspy.runtime.run_context import RunContext
 
-ACTIVE_CALL_ID = ContextVar("active_call_id", default=None)
+ACTIVE_CALL_ID: ContextVar[str | None] = ContextVar("active_call_id", default=None)
 logger = logging.getLogger(__name__)
+
+
+def _callable_name(fn: Callable[..., Any]) -> str:
+    return getattr(fn, "__name__", type(fn).__name__)
+
 
 CallbackKind = Literal["module", "lm", "adapter", "tool", "evaluate"]
 F = TypeVar("F", bound=Callable[..., Any])
@@ -150,7 +155,10 @@ def _execute_start_callbacks(
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
 ) -> None:
-    inputs = inspect.getcallargs(fn, instance, *args, **kwargs)
+    signature = inspect.signature(fn)
+    bound_arguments = signature.bind_partial(instance, *args, **kwargs)
+    bound_arguments.apply_defaults()
+    inputs = dict(bound_arguments.arguments)
     if "self" in inputs:
         inputs.pop("self")
     elif "instance" in inputs:
@@ -180,7 +188,9 @@ def _execute_end_callbacks(
                 call_id=call_id, outputs=results, exception=exception
             )
         except Exception as e:
-            logger.warning(f"Error when applying callback {callback}'s end handler on function {fn.__name__}: {e}.")
+            logger.warning(
+                f"Error when applying callback {callback}'s end handler on function {_callable_name(fn)}: {e}."
+            )
 
 
 def _get_on_start_handler(*, callback: BaseCallback, kind: CallbackKind, fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -189,11 +199,12 @@ def _get_on_start_handler(*, callback: BaseCallback, kind: CallbackKind, fn: Cal
     if kind == "evaluate":
         return callback.on_evaluate_start
     if kind == "adapter":
-        if fn.__name__ == "format":
+        fn_name = _callable_name(fn)
+        if fn_name == "format":
             return callback.on_adapter_format_start
-        if fn.__name__ == "parse":
+        if fn_name == "parse":
             return callback.on_adapter_parse_start
-        raise ValueError(f"Unsupported adapter method for using callback: {fn.__name__}.")
+        raise ValueError(f"Unsupported adapter method for using callback: {fn_name}.")
     if kind == "tool":
         return callback.on_tool_start
     return callback.on_module_start
@@ -205,11 +216,12 @@ def _get_on_end_handler(*, callback: BaseCallback, kind: CallbackKind, fn: Calla
     if kind == "evaluate":
         return callback.on_evaluate_end
     if kind == "adapter":
-        if fn.__name__ == "format":
+        fn_name = _callable_name(fn)
+        if fn_name == "format":
             return callback.on_adapter_format_end
-        if fn.__name__ == "parse":
+        if fn_name == "parse":
             return callback.on_adapter_parse_end
-        raise ValueError(f"Unsupported adapter method for using callback: {fn.__name__}.")
+        raise ValueError(f"Unsupported adapter method for using callback: {fn_name}.")
     if kind == "tool":
         return callback.on_tool_end
     return callback.on_module_end

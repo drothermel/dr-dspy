@@ -285,8 +285,8 @@ class BetterTogether(Teleprompter):
         potential_args = {"trainset": trainset, "teacher": teacher, "valset": valset, "run": run, **compile_args}
         sig = inspect.signature(optimizer.compile)
         accepted_params = set(sig.parameters.keys())
-        filtered_compile_args = {k: v for k, v in potential_args.items() if k in accepted_params}
-        student = await optimizer.compile(student, **filtered_compile_args)
+        filtered_compile_args = {k: v for k, v in potential_args.items() if k in accepted_params and k != "run"}
+        student = await optimizer.compile(student, run=run, **filtered_compile_args)
         if not all_predictors_have_lms(student):
             logger.warning(
                 f"{YELLOW}Warning: {optimizer.__class__.__name__} incorrectly reset predictor LMs. Restoring to original LMs.{ENDC}"

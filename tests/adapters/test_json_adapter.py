@@ -1,6 +1,6 @@
 import asyncio
 import enum
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest import mock
 
 import pydantic
@@ -17,7 +17,7 @@ try:
     from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
     from litellm.utils import ChatCompletionMessageToolCall, Choices, Function, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from openai.types.responses import ResponseOutputMessage
 
 from dspy.adapters.json_adapter import JSONAdapter
@@ -1351,7 +1351,10 @@ def test_json_adapter_with_responses_api(make_run):
                 type="message",
                 role="assistant",
                 status="completed",
-                content=[{"type": "output_text", "text": '{"answer": "Washington, D.C."}', "annotations": []}],
+                content=cast(
+                    "Any",
+                    [{"type": "output_text", "text": '{"answer": "Washington, D.C."}', "annotations": []}],
+                ),
             )
         ],
         metadata={},

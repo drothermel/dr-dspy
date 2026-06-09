@@ -116,7 +116,7 @@ class REPLHistory(pydantic.BaseModel):
         return len(self.entries)
 
     @override
-    def __iter__(self) -> Iterator[REPLEntry]:
+    def __iter__(self) -> Iterator[REPLEntry]:  # ty:ignore[invalid-method-override]
         return iter(self.entries)
 
     def __bool__(self) -> bool:

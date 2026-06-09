@@ -48,7 +48,7 @@ async def run_bounded(
             if provide_traceback:
                 logger.exception("Error for %r: %s", item, exc)
             else:
-                logger.error("Error for %r: %s. Set `provide_traceback=True` for traceback.", item, exc)
+                logger.exception("Error for %r: %s. Set `provide_traceback=True` for traceback.", item, exc)
             async with lock:
                 stats.failed_indices.append(index)
                 stats.exceptions_map[index] = exc

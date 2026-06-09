@@ -77,17 +77,17 @@ def test_enable_net_flag():
 
 def test_interpreter_security_filesystem_access(tmp_path):
     secret_file = tmp_path / "secret.txt"
-    secret_content = "This is a secret content"
-    secret_file.write_text(secret_content)
+    file_content = "This is a secret content"
+    secret_file.write_text(file_content)
     secret_path_str = str(secret_file.absolute())
     malicious_code = f"""\nimport js\ntry:\n    content = js.Deno.readTextFileSync('{secret_path_str}')\n    print(content)\nexcept Exception as e:\n    print(f"Error: {{e}}")\n"""
     with PythonInterpreter() as interpreter:
         output = interpreter(malicious_code)
         assert "Requires read access" in output
-        assert secret_content not in output
+        assert file_content not in output
     with PythonInterpreter(enable_read_paths=[secret_path_str]) as interpreter:
         output = interpreter(malicious_code)
-        assert secret_content in output
+        assert file_content in output
 
 
 def test_enable_read_paths_symlink(tmp_path):
@@ -97,7 +97,7 @@ def test_enable_read_paths_symlink(tmp_path):
     try:
         link_file.symlink_to(real_file)
     except (OSError, NotImplementedError) as exc:
-        pytest.skip(f"symlink creation unavailable: {exc}")
+        pytest.skip(f"symlink creation unavailable: {exc}")  # ty: ignore[too-many-positional-arguments]
     with PythonInterpreter(enable_read_paths=[str(link_file)]) as interp:
         allow_read_arg = next(a for a in interp.deno_command if a.startswith("--allow-read="))
         allow_read = allow_read_arg[len("--allow-read=") :].split(",")

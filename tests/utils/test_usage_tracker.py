@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any, cast
 from unittest import mock
 
 from pydantic import BaseModel
@@ -121,7 +122,7 @@ def test_track_usage_with_multiple_models(make_run):
         },
     ]
     for entry in usage_entries:
-        tracker.add_usage(entry["model"], entry["usage"])
+        tracker.add_usage(cast("str", entry["model"]), cast("dict[str, Any]", entry["usage"]))
     total_usage = tracker.get_total_tokens()
     assert "gpt-4o-mini" in total_usage
     assert "gpt-3.5-turbo" in total_usage
@@ -203,7 +204,7 @@ def test_merge_usage_entries_with_none_values():
         },
     ]
     for entry in usage_entries:
-        tracker.add_usage(entry["model"], entry["usage"])
+        tracker.add_usage(cast("str", entry["model"]), cast("dict[str, Any]", entry["usage"]))
     total_usage = tracker.get_total_tokens()
     assert total_usage["gpt-4o-mini"]["prompt_tokens"] == 2817
     assert total_usage["gpt-4o-mini"]["completion_tokens"] == 346
@@ -296,7 +297,7 @@ def test_merge_usage_entries_with_pydantic_models():
         },
     ]
     for entry in usage_entries:
-        tracker.add_usage(entry["model"], entry["usage"])
+        tracker.add_usage(cast("str", entry["model"]), cast("dict[str, Any]", entry["usage"]))
     total_usage = tracker.get_total_tokens()
     assert total_usage["gpt-4o-mini"]["prompt_tokens"] == 2717
     assert total_usage["gpt-4o-mini"]["completion_tokens"] == 246
@@ -337,8 +338,8 @@ def test_parallel_executor_with_usage_tracker(make_run):
     run = run.fork(usage_tracker=parent_tracker, telemetry=TelemetryConfig(track_usage=True))
     executor = Parallel()
     results = asyncio.run(executor([(task1, {}), (task2, {})], run=run))
-    usage1 = results[0]
-    usage2 = results[1]
+    usage1 = cast("dict[str, dict[str, Any]]", results[0])
+    usage2 = cast("dict[str, dict[str, Any]]", results[1])
     assert usage1["openai/gpt-4o-mini"]["prompt_tokens"] == 50
     assert usage1["openai/gpt-4o-mini"]["completion_tokens"] == 10
     assert usage2["openai/gpt-4o-mini"]["prompt_tokens"] == 80

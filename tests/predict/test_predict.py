@@ -4,6 +4,7 @@ import enum
 import logging
 import types
 from datetime import datetime
+from typing import Any, ClassVar, cast
 from unittest.mock import AsyncMock, patch
 
 import orjson
@@ -16,7 +17,7 @@ from dspy.runtime import TelemetryConfig
 try:
     from litellm import ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from pydantic import BaseModel, HttpUrl
 
 from dspy.adapters.chat_adapter import ChatAdapter
@@ -58,8 +59,8 @@ class InventoryItem(pydantic.BaseModel):
 
 
 class CustomStateLM(BaseLM):
-    def __init__(self, model, *, deployment: str, **kwargs: object):
-        super().__init__(model=model, **kwargs)
+    def __init__(self, model: str, *, deployment: str, **kwargs: Any):
+        super().__init__(model=model, **cast("Any", kwargs))
         self.deployment = deployment
 
     @override
@@ -70,9 +71,10 @@ class CustomStateLM(BaseLM):
 
     @classmethod
     @override
-    def load_state(cls, state):
+    def load_state(cls, state: dict[str, Any], *, allow_custom_lm_class: bool = False):
         state = dict(state)
         state.pop(LM_CLASS_STATE_KEY, None)
+        _ = allow_custom_lm_class
         return cls(**state)
 
 
@@ -84,7 +86,7 @@ class OuterLMContainer:
 def test_initialization_with_string_signature():
     signature_string = "input1, input2 -> output"
     with pytest.raises(TypeError, match="TaskSpec instance, not a string"):
-        Predict(signature_string)
+        Predict(cast("Any", signature_string))
     expected_instruction = "Given the fields `input1`, `input2`, produce the fields `output`."
     predict = Predict(pspec(signature_string))
     assert predict.task_spec.instructions == expected_instruction
@@ -92,7 +94,7 @@ def test_initialization_with_string_signature():
 
 def test_reset_method(make_run):
     predict_instance = Predict(pspec("input -> output"))
-    predict_instance.lm = "modified"
+    cast("Any", predict_instance).lm = "modified"
     predict_instance.traces = ["trace"]
     predict_instance.train = ["train"]
     predict_instance.demos = ["demo"]
@@ -122,6 +124,7 @@ def test_lm_after_dump_and_load_state(make_run):
     dumped_state = predict_instance.dump_state()
     new_instance = Predict(pspec("input -> output"))
     new_instance.load_state(dumped_state)
+    assert new_instance.lm is not None
     assert new_instance.lm.dump_state() == expected_lm_state
 
 
@@ -394,7 +397,7 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
     loaded_predict.load(file_path)
 
     class FakeResp(dict):
-        usage = {}
+        usage: ClassVar[dict] = {}
 
         def __init__(self):
             super().__init__({"choices": []})
@@ -428,7 +431,7 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path, make_run):
         f.write(orjson.dumps(saved_state))
 
     class FakeResp(dict):
-        usage = {}
+        usage: ClassVar[dict] = {}
 
         def __init__(self):
             super().__init__({"choices": []})
@@ -476,7 +479,7 @@ def test_load_uses_env_api_key_without_honoring_serialized_endpoint_override(tmp
     monkeypatch.setenv("openai_API_KEY", env_api_key)
 
     class FakeResp(dict):
-        usage = {}
+        usage: ClassVar[dict] = {}
 
         def __init__(self):
             super().__init__({"choices": []})
@@ -753,7 +756,7 @@ def test_lm_usage_with_parallel(make_run):
             (program, {"question": "What is the capital of France?"}),
             (program, {"question": "What is the capital of France?"}),
         ]
-        results = asyncio.run(parallelizer(input_pairs, run=run))
+        results = cast("list[Any]", asyncio.run(parallelizer(input_pairs, run=run)))
         assert results[0].answer == "Paris"
         assert results[1].answer == "Paris"
         assert results[0].get_lm_usage()["openai/gpt-4o-mini"]["total_tokens"] == 10
@@ -771,7 +774,7 @@ async def test_lm_usage_with_async(make_run):
         await asyncio.sleep(1)
         return await original_aforward(**kwargs)
 
-    program.aforward = types.MethodType(patched_aforward, program)
+    cast("Any", program).aforward = types.MethodType(patched_aforward, program)
     run = make_run(
         lm=LM("openai/gpt-4o-mini"),
         adapter=ChatAdapter(),
@@ -802,7 +805,7 @@ async def test_lm_usage_with_async(make_run):
 def test_positional_arguments(make_run):
     program = Predict(pspec("question -> answer"))
     run = make_run(lm=DummyLM([{"answer": "Paris"}]))
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError, match=r"Positional arguments are not allowed") as e:
         asyncio.run(program("What is the capital of France?", run=run))
     assert (
         str(e.value)
@@ -815,9 +818,11 @@ def test_error_message_on_invalid_lm_setup(make_run):
         asyncio.run(Predict(pspec("question -> answer"))(question="Why did a chicken cross the kitchen?"))
 
     predictor = Predict(pspec("question -> answer"))
-    predictor.lm = "openai/gpt-4o-mini"
+    cast("Any", predictor).lm = "openai/gpt-4o-mini"
     run = make_run(lm=LM("openai/gpt-4o-mini"))
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(
+        ValueError, match=r"LM must be an instance of `dspy\.clients\.base_lm\.BaseLM`, not a string\."
+    ) as e:
         asyncio.run(predictor(question="Why did a chicken cross the kitchen?", run=run))
     assert "LM must be an instance of `dspy.clients.base_lm.BaseLM`, not a string." in str(e.value)
 
@@ -826,9 +831,11 @@ def test_error_message_on_invalid_lm_setup(make_run):
     def dummy_lm():
         pass
 
-    predictor.lm = dummy_lm
+    cast("Any", predictor).lm = dummy_lm
     run = make_run(lm=LM("openai/gpt-4o-mini"))
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(
+        ValueError, match=r"LM must be an instance of `dspy\.clients\.base_lm\.BaseLM`, not <class 'function'>\."
+    ) as e:
         asyncio.run(predictor(question="Why did a chicken cross the kitchen?", run=run))
     assert "LM must be an instance of `dspy.clients.base_lm.BaseLM`, not <class 'function'>." in str(e.value)
 
@@ -920,7 +927,7 @@ def test_dump_state_pydantic_non_primitive_types(make_run):
     )
     website_info = WebsiteInfo(
         name="Example",
-        url="https://www.example.com",
+        url=cast("HttpUrl", "https://www.example.com"),
         description="Test website",
         created_at=datetime(2021, 1, 1, 12, 0, 0),
     )

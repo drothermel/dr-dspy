@@ -10,7 +10,7 @@ from dspy.utils.exceptions import AdapterParseError
 try:
     from litellm import Choices, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.adapters.format_shared import FieldInfoWithName
 from dspy.adapters.types.code import Code
 from dspy.adapters.types.history import History
@@ -170,7 +170,7 @@ def test_xml_adapter_with_tool_like_output():
             name="tool_calls", info=task_spec_output_field_infos(TestSignature)["tool_calls"]
         ): tool_calls,
         FieldInfoWithName(
-            name="answer", info=TestSignature.output_fields["answer"]
+            name="answer", info=task_spec_output_field_infos(TestSignature)["answer"]
         ): "The weather is Sunny. Population is 125M.",
     }
     xml = adapter.format_field_with_value(fields_with_values)

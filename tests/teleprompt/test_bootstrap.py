@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any, cast
 
 import pytest
 
@@ -39,7 +40,7 @@ class SimpleModule(Module):
 def test_compile_with_predict_instances(make_run):
     student = SimpleModule(ts("input -> output"))
     teacher = SimpleModule(ts("input -> output"))
-    lm = DummyLM(["Initial thoughts", "Finish[blue]"])
+    lm = DummyLM(cast("Any", ["Initial thoughts", "Finish[blue]"]))
     run = make_run(lm=lm)
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
     compiled_student = asyncio.run(bootstrap.compile(student, teacher=teacher, trainset=trainset, run=run))

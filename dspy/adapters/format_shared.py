@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import re
 import textwrap
-from typing import Any, NamedTuple
-
-from pydantic.fields import FieldInfo
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import (
@@ -15,9 +13,13 @@ from dspy.adapters.utils import (
     translate_field_type,
 )
 from dspy.clients.openai_format import message_to_openai_chat
-from dspy.task_spec import TaskSpec
 from dspy.task_spec.formatting import get_field_spec_description_string
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
+
+if TYPE_CHECKING:
+    from pydantic.fields import FieldInfo
+
+    from dspy.task_spec import TaskSpec
 
 FIELD_HEADER_PATTERN = re.compile(r"\[\[ ## (\w+) ## \]\]")
 
@@ -141,7 +143,8 @@ class ChatFormatMixin:
         outputs: dict[str, Any],
     ) -> dict[str, list[Any]]:
         system_user_messages = [
-            message_to_openai_chat(message) for message in self.format(task_spec=task_spec, demos=demos, inputs=inputs)
+            message_to_openai_chat(message)
+            for message in cast("Any", self).format(task_spec=task_spec, demos=demos, inputs=inputs)
         ]
         assistant_message_content = self.format_assistant_message_content(task_spec=task_spec, outputs=outputs)
         assistant_message = {"role": "assistant", "content": assistant_message_content}

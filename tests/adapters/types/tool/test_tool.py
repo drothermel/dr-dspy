@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 
 import pytest
 
@@ -21,23 +22,29 @@ from tests.adapters.types.tool.conftest import (
 )
 
 
+def _tool_args(tool: Tool) -> dict[str, Any]:
+    assert tool.args is not None
+    return tool.args
+
+
 def test_basic_initialization():
     tool = Tool(lambda x: x, description="A test tool", name="test_tool", args={"param1": {"type": "string"}})
     assert tool.name == "test_tool"
     assert tool.desc == "A test tool"
-    assert tool.args == {"param1": {"type": "string"}}
+    assert _tool_args(tool) == {"param1": {"type": "string"}}
     assert callable(tool.func)
 
 
 def test_tool_from_function():
     tool = Tool(dummy_function, description="A dummy function for testing.")
     assert tool.name == "dummy_function"
+    assert tool.desc is not None
     assert "A dummy function for testing" in tool.desc
-    assert "x" in tool.args
-    assert "y" in tool.args
-    assert tool.args["x"]["type"] == "integer"
-    assert tool.args["y"]["type"] == "string"
-    assert tool.args["y"]["default"] == "hello"
+    assert "x" in _tool_args(tool)
+    assert "y" in _tool_args(tool)
+    assert _tool_args(tool)["x"]["type"] == "integer"
+    assert _tool_args(tool)["y"]["type"] == "string"
+    assert _tool_args(tool)["y"]["default"] == "hello"
 
 
 def test_tool_from_class():
@@ -52,36 +59,36 @@ def test_tool_from_class():
     tool = Tool(Foo("123"), description="Add two numbers.")
     assert tool.name == "Foo"
     assert tool.desc == "Add two numbers."
-    assert tool.args == {"a": {"type": "integer"}, "b": {"type": "integer"}}
+    assert _tool_args(tool) == {"a": {"type": "integer"}, "b": {"type": "integer"}}
 
 
 def test_tool_from_function_with_pydantic():
     tool = Tool(dummy_with_pydantic, description="A dummy function that accepts a Pydantic model.")
     assert tool.name == "dummy_with_pydantic"
-    assert "model" in tool.args
-    assert tool.args["model"]["type"] == "object"
-    assert "field1" in tool.args["model"]["properties"]
-    assert "field2" in tool.args["model"]["properties"]
-    assert tool.args["model"]["properties"]["field1"]["default"] == "hello"
+    assert "model" in _tool_args(tool)
+    assert _tool_args(tool)["model"]["type"] == "object"
+    assert "field1" in _tool_args(tool)["model"]["properties"]
+    assert "field2" in _tool_args(tool)["model"]["properties"]
+    assert _tool_args(tool)["model"]["properties"]["field1"]["default"] == "hello"
 
 
 def test_tool_from_function_with_pydantic_nesting():
     tool = Tool(complex_dummy_function, description="Process user profile with complex nested structure.")
     assert tool.name == "complex_dummy_function"
-    assert "profile" in tool.args
-    assert "priority" in tool.args
-    assert "notes" in tool.args
-    assert tool.args["profile"]["type"] == "object"
-    assert tool.args["profile"]["properties"]["user_id"]["type"] == "integer"
-    assert tool.args["profile"]["properties"]["name"]["type"] == "string"
-    assert tool.args["profile"]["properties"]["age"]["anyOf"] == [{"type": "integer"}, {"type": "null"}]
-    assert tool.args["profile"]["properties"]["contact"]["type"] == "object"
-    assert tool.args["profile"]["properties"]["contact"]["properties"]["email"]["type"] == "string"
-    assert "$defs" not in str(tool.args["notes"])
-    assert tool.args["notes"]["anyOf"][0]["type"] == "array"
-    assert tool.args["notes"]["anyOf"][0]["items"]["type"] == "object"
-    assert tool.args["notes"]["anyOf"][0]["items"]["properties"]["content"]["type"] == "string"
-    assert tool.args["notes"]["anyOf"][0]["items"]["properties"]["author"]["type"] == "string"
+    assert "profile" in _tool_args(tool)
+    assert "priority" in _tool_args(tool)
+    assert "notes" in _tool_args(tool)
+    assert _tool_args(tool)["profile"]["type"] == "object"
+    assert _tool_args(tool)["profile"]["properties"]["user_id"]["type"] == "integer"
+    assert _tool_args(tool)["profile"]["properties"]["name"]["type"] == "string"
+    assert _tool_args(tool)["profile"]["properties"]["age"]["anyOf"] == [{"type": "integer"}, {"type": "null"}]
+    assert _tool_args(tool)["profile"]["properties"]["contact"]["type"] == "object"
+    assert _tool_args(tool)["profile"]["properties"]["contact"]["properties"]["email"]["type"] == "string"
+    assert "$defs" not in str(_tool_args(tool)["notes"])
+    assert _tool_args(tool)["notes"]["anyOf"][0]["type"] == "array"
+    assert _tool_args(tool)["notes"]["anyOf"][0]["items"]["type"] == "object"
+    assert _tool_args(tool)["notes"]["anyOf"][0]["items"]["properties"]["content"]["type"] == "string"
+    assert _tool_args(tool)["notes"]["anyOf"][0]["items"]["properties"]["author"]["type"] == "string"
 
 
 @requires_jsonschema
@@ -102,13 +109,13 @@ def test_tool_with_pydantic_callable():
 @requires_jsonschema
 def test_invalid_function_call():
     tool = Tool(dummy_function, description="A dummy function for testing.")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Arg x is invalid"):
         tool(x="not an integer", y="hello")
 
 
 def test_parameter_desc():
     tool = Tool(dummy_function, description="A dummy function for testing.", arg_desc={"x": "The x parameter"})
-    assert tool.args["x"]["description"] == "The x parameter"
+    assert _tool_args(tool)["x"]["description"] == "The x parameter"
 
 
 def test_tool_with_default_args_without_type_hints():
@@ -117,8 +124,8 @@ def test_tool_with_default_args_without_type_hints():
         return x
 
     tool = Tool(foo, description="Return x.")
-    assert tool.args["x"]["default"] == 100
-    assert not hasattr(tool.args["x"], "type")
+    assert _tool_args(tool)["x"]["default"] == 100
+    assert "type" not in _tool_args(tool)["x"]
 
 
 @requires_jsonschema
@@ -168,12 +175,13 @@ def test_tool_str():
 async def test_async_tool_from_function():
     tool = Tool(async_dummy_function, description="An async dummy function for testing.")
     assert tool.name == "async_dummy_function"
+    assert tool.desc is not None
     assert "An async dummy function for testing" in tool.desc
-    assert "x" in tool.args
-    assert "y" in tool.args
-    assert tool.args["x"]["type"] == "integer"
-    assert tool.args["y"]["type"] == "string"
-    assert tool.args["y"]["default"] == "hello"
+    assert "x" in _tool_args(tool)
+    assert "y" in _tool_args(tool)
+    assert _tool_args(tool)["x"]["type"] == "integer"
+    assert _tool_args(tool)["y"]["type"] == "string"
+    assert _tool_args(tool)["y"]["default"] == "hello"
     result = await tool.acall(x=42, y="hello")
     assert result == "hello 42"
 
@@ -183,10 +191,10 @@ async def test_async_tool_from_function():
 async def test_async_tool_with_pydantic():
     tool = Tool(async_dummy_with_pydantic, description="An async dummy function that accepts a Pydantic model.")
     assert tool.name == "async_dummy_with_pydantic"
-    assert "model" in tool.args
-    assert tool.args["model"]["type"] == "object"
-    assert "field1" in tool.args["model"]["properties"]
-    assert "field2" in tool.args["model"]["properties"]
+    assert "model" in _tool_args(tool)
+    assert _tool_args(tool)["model"]["type"] == "object"
+    assert "field1" in _tool_args(tool)["model"]["properties"]
+    assert "field2" in _tool_args(tool)["model"]["properties"]
     model = DummyModel(field1="test", field2=123)
     result = await tool.acall(model=model)
     assert result == "test 123"
@@ -223,7 +231,7 @@ async def test_async_tool_with_complex_pydantic():
 @pytest.mark.asyncio
 async def test_async_tool_invalid_call():
     tool = Tool(async_dummy_function, description="An async dummy function for testing.")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Arg x is invalid"):
         await tool.acall(x="not an integer", y="hello")
 
 
@@ -257,7 +265,7 @@ def test_async_tool_call_in_sync_mode(make_run):
     tool = Tool(async_dummy_function, description="An async dummy function for testing.")
     run = make_run(lm=DummyLM([{}]))
     strict_run = run.fork(execution=ExecutionConfig(allow_tool_async_sync_conversion=False))
-    with pytest.raises(ValueError, match=".*acall.*allow_tool_async_sync_conversion.*"):
+    with pytest.raises(ValueError, match=r".*acall.*allow_tool_async_sync_conversion.*"):
         tool(x=1, y="hello", run=strict_run)
     permissive_run = run.fork(execution=ExecutionConfig(allow_tool_async_sync_conversion=True))
     result = tool(x=1, y="hello", run=permissive_run)

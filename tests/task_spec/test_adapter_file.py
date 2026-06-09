@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import os
 import tempfile
+from typing import Any, cast
 
 import pydantic
 import pytest
@@ -165,6 +166,7 @@ def test_file_str(make_run):
 def test_encode_file_to_dict_from_path(sample_text_file, make_run):
     result = encode_file_to_dict(sample_text_file)
     assert "file_data" in result
+    assert result["file_data"] is not None
     assert result["file_data"].startswith("data:text/plain;base64,")
     assert "filename" in result
 
@@ -172,6 +174,7 @@ def test_encode_file_to_dict_from_path(sample_text_file, make_run):
 def test_encode_file_to_dict_from_bytes(make_run):
     result = encode_file_to_dict(b"test content")
     assert "file_data" in result
+    assert result["file_data"] is not None
     assert result["file_data"].startswith("data:application/octet-stream;base64,")
 
 
@@ -182,7 +185,7 @@ def test_invalid_file_string(make_run):
 
 def test_invalid_dict(make_run):
     with pytest.raises(ValueError, match="must contain at least one"):
-        File(invalid="dict")
+        File(**cast("dict[str, Any]", {"invalid": "dict"}))
 
 
 def test_file_in_signature(sample_text_file, make_run):
@@ -261,11 +264,13 @@ def test_file_path_not_found():
 
 def test_file_custom_mime_type(sample_text_file):
     file_obj = File.from_path(sample_text_file, mime_type="text/custom")
+    assert file_obj.file_data is not None
     assert file_obj.file_data.startswith("data:text/custom;base64,")
 
 
 def test_file_from_bytes_custom_mime():
     file_obj = File.from_bytes(b"audio data", mime_type="audio/mp3")
+    assert file_obj.file_data is not None
     assert file_obj.file_data.startswith("data:audio/mp3;base64,")
 
 

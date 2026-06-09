@@ -2,7 +2,7 @@ import asyncio
 import json
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from unittest import mock
 from unittest.mock import patch
 
@@ -16,7 +16,7 @@ try:
     import litellm
     from litellm.utils import Choices, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm import LM
 from dspy.core.types import Assistant, LMHistoryEntry, LMRequest, LMResponse, System, ToolCall, ToolResult, User
@@ -139,7 +139,7 @@ def test_gpt_5_chat_not_reasoning_model(make_run):
 
 
 def test_base_lm_init_uses_lm_defaults_and_isolates_callback_list(make_run):
-    callbacks = [object()]
+    callbacks = cast("list[Any]", [object()])
     lm = BaseLM("custom-model", callbacks=callbacks)
     assert lm.kwargs == {"temperature": None, "max_tokens": None}
     assert lm.num_retries == 3
@@ -334,11 +334,11 @@ def test_base_lm_copy_is_shallow_runtime_copy_with_isolated_dspy_state():
     class CustomLM(BaseLM):
         pass
 
-    callback = object()
+    callback = cast("Any", object())
     client = object()
     lm = CustomLM(model="custom-model", callbacks=[callback], temperature=0.1)
-    lm.client = client
-    lm.extra_state = {"mutable": []}
+    cast("Any", lm).client = client
+    cast("Any", lm).extra_state = {"mutable": []}
     lm.history = [
         LMHistoryEntry(
             request=LMRequest.from_call(model="custom-model", prompt="original"),
@@ -349,8 +349,8 @@ def test_base_lm_copy_is_shallow_runtime_copy_with_isolated_dspy_state():
     ]
     copied_lm = lm.copy(temperature=0.2)
     assert copied_lm is not lm
-    assert copied_lm.client is client
-    assert copied_lm.extra_state is lm.extra_state
+    assert cast("Any", copied_lm).client is client
+    assert cast("Any", copied_lm).extra_state is cast("Any", lm).extra_state
     assert copied_lm.history == []
     assert copied_lm.history is not lm.history
     assert copied_lm.callbacks == [callback]
@@ -547,23 +547,25 @@ def test_call_reasoning_model_with_chat_api(make_run):
         model="anthropic/claude-3-7-sonnet-20250219",
         usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
     )
-    with mock.patch("litellm.acompletion", return_value=mock_response) as mock_completion:
-        with mock.patch("litellm.supports_reasoning", return_value=True):
-            lm = LM(
-                model="anthropic/claude-3-7-sonnet-20250219",
-                model_type="chat",
-                temperature=1.0,
-                max_tokens=16000,
-                reasoning={"effort": "low"},
-            )
-            result = asyncio.run(lm(_request(lm, prompt="What is 2 + 2?"), run=make_run(lm=lm)))
-            assert result.text == "The answer is 4"
-            assert result.reasoning_content is not None
-            assert "Step 1" in result.reasoning_content
-            mock_completion.assert_called_once()
-            call_kwargs = mock_completion.call_args.kwargs
-            assert call_kwargs["model"] == "anthropic/claude-3-7-sonnet-20250219"
-            assert call_kwargs["reasoning_effort"] == "low"
+    with (
+        mock.patch("litellm.acompletion", return_value=mock_response) as mock_completion,
+        mock.patch("litellm.supports_reasoning", return_value=True),
+    ):
+        lm = LM(
+            model="anthropic/claude-3-7-sonnet-20250219",
+            model_type="chat",
+            temperature=1.0,
+            max_tokens=16000,
+            reasoning={"effort": "low"},
+        )
+        result = asyncio.run(lm(_request(lm, prompt="What is 2 + 2?"), run=make_run(lm=lm)))
+        assert result.text == "The answer is 4"
+        assert result.reasoning_content is not None
+        assert "Step 1" in result.reasoning_content
+        mock_completion.assert_called_once()
+        call_kwargs = mock_completion.call_args.kwargs
+        assert call_kwargs["model"] == "anthropic/claude-3-7-sonnet-20250219"
+        assert call_kwargs["reasoning_effort"] == "low"
 
 
 def test_api_key_not_saved_in_json():

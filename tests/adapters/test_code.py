@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import pydantic
 import pytest
 
@@ -6,16 +8,16 @@ from dspy.utils.source_format import get_formatted_source
 
 
 def test_code_validate_input():
-    code = Code["python"](code="print('Hello, world!')")
+    code = cast("Any", Code)["python"](code="print('Hello, world!')")
     assert code.code == "print('Hello, world!')"
-    with pytest.raises(ValueError):
-        Code["python"](code=123)
+    with pytest.raises(ValueError, match=r"`code` field must be a string"):
+        cast("Any", Code)["python"](code=123)
 
     def foo(x):
         return x + 1
 
     code_source = get_formatted_source(foo)
-    code = Code["python"](code=code_source)
+    code = cast("Any", Code)["python"](code=code_source)
     assert code.code == code_source
 
 
@@ -30,11 +32,11 @@ def test_code_in_nested_type():
 
 
 def test_code_with_language():
-    java_code = Code["java"](code="System.out.println('Hello, world!');")
+    java_code = cast("Any", Code)["java"](code="System.out.println('Hello, world!');")
     assert java_code.code == "System.out.println('Hello, world!');"
     assert java_code.language == "java"
     assert "Programming language: java" in java_code.description()
-    cpp_code = Code["cpp"](code="std::cout << 'Hello, world!' << std::endl;")
+    cpp_code = cast("Any", Code)["cpp"](code="std::cout << 'Hello, world!' << std::endl;")
     assert cpp_code.code == "std::cout << 'Hello, world!' << std::endl;"
     assert cpp_code.language == "cpp"
     assert "Programming language: cpp" in cpp_code.description()

@@ -20,7 +20,7 @@ def add(a: int, b: int) -> int:
 
 
 @mcp.tool()
-def hello(names: list[str]) -> str:
+def hello(names: list[str]) -> list[str]:
     return [f"Hello, {name}!" for name in names]
 
 

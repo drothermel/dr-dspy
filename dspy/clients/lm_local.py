@@ -1,5 +1,6 @@
 import contextlib
 import datetime
+import importlib.util
 import logging
 import random
 import socket
@@ -7,7 +8,7 @@ import string
 import subprocess
 import threading
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from typing_extensions import override
 
@@ -19,6 +20,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _sglang_available() -> bool:
+    import sys
+
+    if "sglang" in sys.modules:
+        return True
+    try:
+        return importlib.util.find_spec("sglang") is not None
+    except (ImportError, ValueError, AttributeError):
+        return False
+
+
 class LocalProvider(Provider):
     def __init__(self) -> None:
         super().__init__()
@@ -28,9 +40,7 @@ class LocalProvider(Provider):
     @staticmethod
     @override
     def launch(lm: "LM", launch_kwargs: dict[str, Any] | None = None) -> None:
-        try:
-            import sglang
-        except ImportError:
+        if not _sglang_available():
             raise ImportError(
                 "For local model launching, please install sglang.Navigate to https://docs.sglang.ai/start/install.html for the latest installation instructions!"
             )
@@ -60,7 +70,7 @@ class LocalProvider(Provider):
             "--port",
             str(port),
             "--host",
-            "0.0.0.0",
+            "0.0.0.0",  # noqa: S104
         ]
         process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         logger.info(f"SGLang server process started with PID {process.pid}.")
@@ -93,9 +103,10 @@ class LocalProvider(Provider):
         logger.info(f"Server ready on random port {port}! Logs are available via lm.get_logs() method on returned lm.")
         lm.kwargs["api_base"] = f"http://localhost:{port}/v1"
         lm.kwargs["api_key"] = "local"
-        lm.get_logs = get_logs
-        lm.process = process
-        lm.thread = thread
+        lm_attrs = cast("Any", lm)
+        lm_attrs.get_logs = get_logs
+        lm_attrs.process = process
+        lm_attrs.thread = thread
 
     @staticmethod
     @override
@@ -106,10 +117,14 @@ class LocalProvider(Provider):
             logger.info("No running server to kill.")
             return
         terminate_process(lm.process)
-        lm.thread.join()
+        thread = getattr(lm, "thread", None)
+        if thread is not None:
+            thread.join()
         del lm.process
-        del lm.thread
-        del lm.get_logs
+        if hasattr(lm, "thread"):
+            del lm.thread
+        if hasattr(lm, "get_logs"):
+            del lm.get_logs
         logger.info("Server killed.")
 
     @staticmethod
@@ -118,7 +133,7 @@ class LocalProvider(Provider):
         job: TrainingJob,
         model: str,
         train_data: list[dict[str, Any]],
-        train_data_format: TrainDataFormat | None,
+        train_data_format: TrainDataFormat | str | None,
         train_kwargs: dict[str, Any] | None = None,
     ) -> str:
         if model.startswith("openai/"):
@@ -188,8 +203,8 @@ def train_sft_locally(model_name, train_data, train_kwargs):
 
     hf_dataset = Dataset.from_list(train_data)
 
-    def tokenize_function(example):
-        return encode_sft_example(example=example, tokenizer=tokenizer, max_seq_length=train_kwargs["max_seq_length"])
+    def tokenize_function(example, tok=tokenizer):
+        return encode_sft_example(example=example, tokenizer=tok, max_seq_length=train_kwargs["max_seq_length"])
 
     tokenized_dataset = hf_dataset.map(tokenize_function, batched=False)
     tokenized_dataset.set_format(type="torch")

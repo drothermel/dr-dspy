@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any, cast
 
 import pytest
 
@@ -74,7 +75,7 @@ class TestRLMInitialization:
             return "result"
 
         with pytest.raises(TypeError, match="tools must be a list, not a dict"):
-            RLM(ts("context -> answer"), tools={"my_tool": my_tool})
+            RLM(ts("context -> answer"), tools=cast("Any", {"my_tool": my_tool}))
 
     def test_optional_parameters(self, make_run):
         rlm = RLM(ts("context -> answer"))
@@ -95,7 +96,7 @@ class TestRLMInitialization:
         with pytest.raises(ValueError, match="Missing required input"):
             asyncio.run(rlm(context="some context", run=run))
         rlm = RLM(ts("a, b, c -> answer"), max_iterations=3, interpreter=mock)
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match=r"Missing required input") as exc_info:
             asyncio.run(rlm(a="only a", run=run))
         assert "b" in str(exc_info.value)
         assert "c" in str(exc_info.value)

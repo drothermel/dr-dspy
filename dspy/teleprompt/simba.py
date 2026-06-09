@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 from typing_extensions import override
 
 from dspy.predict.parallel import Parallel
-from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.simba_utils import append_a_demo, append_a_rule, prepare_models_for_resampling, wrap_program
 from dspy.teleprompt.task_spec_context import get_prompt_model
 from dspy.teleprompt.teleprompt import Teleprompter
@@ -17,6 +16,7 @@ if TYPE_CHECKING:
     from dspy.clients.lm import LM
     from dspy.primitives.example import Example
     from dspy.primitives.module import Module
+    from dspy.runtime.run_context import RunContext
 np = require("numpy")
 logger = logging.getLogger(__name__)
 

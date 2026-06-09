@@ -13,8 +13,7 @@ def _convert_chat_request_to_responses_request(request: dict[str, Any]):
             if isinstance(c, str):
                 content_blocks.append({"type": "input_text", "text": c})
             elif isinstance(c, list):
-                for item in c:
-                    content_blocks.append(_convert_content_item_to_responses_format(item))
+                content_blocks.extend(_convert_content_item_to_responses_format(item) for item in c)
             input_items.append({"role": msg.get("role", "user"), "content": content_blocks})
         request["input"] = input_items
     if "reasoning_effort" in request:

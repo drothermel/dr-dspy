@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import importlib
 import importlib.util
@@ -131,17 +132,11 @@ class Evaluate:
         if save_as_csv:
             metric_name = metric.__name__ if isinstance(metric, types.FunctionType) else metric.__class__.__name__
             data = self._prepare_results_output(results, metric_name)
-            with Path(save_as_csv).open("w", newline="") as csvfile:
-                fieldnames = data[0].keys()
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writeheader()
-                for row in data:
-                    writer.writerow(row)
+            await asyncio.to_thread(self._write_results_csv, save_as_csv, data)
         if save_as_json:
             metric_name = metric.__name__ if isinstance(metric, types.FunctionType) else metric.__class__.__name__
             data = self._prepare_results_output(results, metric_name)
-            with Path(save_as_json).open("w") as f:
-                json.dump(data, f)
+            await asyncio.to_thread(self._write_results_json, save_as_json, data)
         return EvaluationResult(score=round(100 * ncorrect / ntotal, 2), results=results)
 
     @staticmethod
@@ -152,6 +147,20 @@ class Evaluate:
             else example.to_dict() | {"prediction": prediction, metric_name: score}
             for example, prediction, score in results
         ]
+
+    @staticmethod
+    def _write_results_csv(path: str, data: list[dict[str, Any]]) -> None:
+        with Path(path).open("w", newline="") as csvfile:
+            fieldnames = data[0].keys()
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in data:
+                writer.writerow(row)
+
+    @staticmethod
+    def _write_results_json(path: str, data: list[dict[str, Any]]) -> None:
+        with Path(path).open("w") as f:
+            json.dump(data, f)
 
     def _construct_result_table(
         self, results: list[tuple["Example", "Example", Any]], metric_name: str
@@ -223,4 +232,4 @@ def display_dataframe(df: "pd.DataFrame") -> None:
     import pandas as pd
 
     with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.max_colwidth", 70):
-        print(df)
+        pass

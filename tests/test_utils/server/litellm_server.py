@@ -31,7 +31,7 @@ class DSPyTestModel(CustomLLM):
             "tool_use": None,
             "usage": {"completion_tokens": 0, "prompt_tokens": 0, "total_tokens": 0},
         }
-        return generic_streaming_chunk
+        return iter([generic_streaming_chunk])
 
     @override
     async def astreaming(self, *args: object, **kwargs: object) -> AsyncIterator[GenericStreamingChunk]:
@@ -43,7 +43,11 @@ class DSPyTestModel(CustomLLM):
             "tool_use": None,
             "usage": {"completion_tokens": 0, "prompt_tokens": 0, "total_tokens": 0},
         }
-        yield generic_streaming_chunk
+
+        async def _gen() -> AsyncIterator[GenericStreamingChunk]:
+            yield generic_streaming_chunk
+
+        return _gen()
 
 
 def _get_mock_llm_response(request_kwargs):

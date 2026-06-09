@@ -19,6 +19,7 @@ class TrainingJobDatabricks(TrainingJob):
     def __init__(self, finetuning_run=None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.finetuning_run = finetuning_run
+        self.run: Any = finetuning_run
         self.launch_started = False
         self.launch_completed = False
         self.endpoint_name = None
@@ -43,7 +44,7 @@ class DatabricksProvider(Provider):
 
     @staticmethod
     @override
-    def is_provider_model(model: str) -> bool:
+    def is_provider_model(_model: str) -> bool:
         return False
 
     @staticmethod
@@ -138,11 +139,11 @@ class DatabricksProvider(Provider):
 
     @staticmethod
     @override
-    def finetune(
-        job: TrainingJobDatabricks,
+    def finetune(  # ty:ignore[invalid-method-override]
+        job: TrainingJob,
         model: str,
         train_data: list[dict[str, Any]],
-        train_data_format: TrainDataFormat | str | None = "chat",
+        train_data_format: TrainDataFormat | str | None,
         train_kwargs: dict[str, Any] | None = None,
     ) -> str:
         train_kwargs = train_kwargs or {}
@@ -157,9 +158,12 @@ class DatabricksProvider(Provider):
                 )
         if "train_data_path" not in train_kwargs:
             raise ValueError("The `train_data_path` must be provided to finetune on Databricks.")
+        if not isinstance(train_data_format, TrainDataFormat):
+            raise TypeError(f"Expected TrainDataFormat after normalization, got {type(train_data_format).__name__}.")
         train_kwargs["train_data_path"] = DatabricksProvider.upload_data(
             train_data, train_kwargs["train_data_path"], train_data_format
         )
+        databricks_job = job
         try:
             from databricks.model_training import foundation_model as fm
         except ImportError:
@@ -174,27 +178,27 @@ class DatabricksProvider(Provider):
         deploy_timeout = train_kwargs.pop("deploy_timeout", 900)
         logger.info("Starting finetuning on Databricks... this might take a few minutes to finish.")
         finetuning_run = fm.create(model=model, **train_kwargs)
-        job.run = finetuning_run
+        databricks_job.run = finetuning_run
         while True:
-            job.run = fm.get(job.run)
-            if job.run.status.display_name == "Completed":
+            databricks_job.run = fm.get(databricks_job.run)
+            if databricks_job.run.status.display_name == "Completed":
                 logger.info("Finetuning run completed successfully!")
                 break
-            if job.run.status.display_name == "Failed":
+            if databricks_job.run.status.display_name == "Failed":
                 raise ValueError(
-                    f"Finetuning run failed with status: {job.run.status.display_name}. Please check the Databricks workspace for more details. Finetuning job's metadata: {job.run}."
+                    f"Finetuning run failed with status: {databricks_job.run.status.display_name}. Please check the Databricks workspace for more details. Finetuning job's metadata: {databricks_job.run}."
                 )
             time.sleep(60)
         if skip_deploy:
-            return None
-        job.launch_started = True
+            return ""
+        databricks_job.launch_started = True
         model_to_deploy = train_kwargs["register_to"]
-        job.endpoint_name = model_to_deploy.replace(".", "_")
+        databricks_job.endpoint_name = model_to_deploy.replace(".", "_")
         DatabricksProvider.deploy_finetuned_model(
             model_to_deploy, train_data_format, databricks_host, databricks_token, deploy_timeout
         )
-        job.launch_completed = True
-        return f"databricks/{job.endpoint_name}"
+        databricks_job.launch_completed = True
+        return f"databricks/{databricks_job.endpoint_name}"
 
     @staticmethod
     def upload_data(train_data: list[dict[str, Any]], databricks_unity_catalog_path: str, data_format: TrainDataFormat):

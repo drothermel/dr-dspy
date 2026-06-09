@@ -3,9 +3,10 @@ from __future__ import annotations
 import base64
 import mimetypes
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dspy.core.types.parts import LMBinaryPart
+if TYPE_CHECKING:
+    from dspy.core.types.parts import LMBinaryPart
 
 
 def _data_uri(media_type: str, data: str) -> str:

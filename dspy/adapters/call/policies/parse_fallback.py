@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Protocol
 
-from dspy.utils.exceptions import AdapterParseError
-
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from dspy.adapters.base.adapter import Adapter
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types.config import LMConfig
     from dspy.runtime.run_context import RunContext
     from dspy.task_spec import TaskSpec
+    from dspy.utils.exceptions import AdapterParseError
 
 
 class ParseFallbackPolicy(Protocol):

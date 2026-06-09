@@ -4,11 +4,11 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 import json_repair
 import pydantic
 from pydantic import TypeAdapter
+from pydantic.json_schema import GetJsonSchemaHandler, JsonSchemaValue
+from pydantic_core import CoreSchema
 from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
-
-from .schema import PydanticJsonSchemaHandler
 
 if TYPE_CHECKING:
     from .tool import Tool
@@ -46,8 +46,8 @@ class ToolCalls(Type):
         @classmethod
         @override
         def __get_pydantic_json_schema__(
-            cls, core_schema: object, handler: PydanticJsonSchemaHandler
-        ) -> dict[str, Any]:
+            cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler
+        ) -> JsonSchemaValue:
             schema = super().__get_pydantic_json_schema__(core_schema, handler)
             schema = handler.resolve_ref_schema(schema)
             properties = schema.get("properties")
@@ -96,7 +96,7 @@ class ToolCalls(Type):
 
     @classmethod
     @override
-    def __get_pydantic_json_schema__(cls, core_schema: object, handler: PydanticJsonSchemaHandler) -> dict[str, Any]:
+    def __get_pydantic_json_schema__(cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler) -> JsonSchemaValue:
         schema = super().__get_pydantic_json_schema__(core_schema, handler)
         schema = handler.resolve_ref_schema(schema)
         properties = schema.get("properties")

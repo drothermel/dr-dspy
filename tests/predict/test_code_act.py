@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any, cast
 
 import pytest
 
@@ -138,9 +139,9 @@ class CustomTool:
 
 def test_codeact_tool_validation_requires_tool_instances():
     with pytest.raises(TypeError, match="tools must be Tool instances"):
-        CodeAct(BasicQA, tools=[add])
+        CodeAct(BasicQA, tools=cast("Any", [add]))
 
 
 def test_codeact_tool_validation_rejects_callable_objects():
-    with pytest.raises(ValueError, match="CodeAct only accepts functions and not callable objects."):
+    with pytest.raises(ValueError, match=r"CodeAct only accepts functions and not callable objects\."):
         CodeAct(BasicQA, tools=[Tool(CustomTool(), description="Add two numbers.")])

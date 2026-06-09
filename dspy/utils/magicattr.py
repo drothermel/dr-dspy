@@ -1,5 +1,4 @@
 import ast
-import sys
 from functools import reduce
 
 _AST_TYPES = (ast.Name, ast.Attribute, ast.Subscript, ast.Call)
@@ -59,21 +58,12 @@ def _parse(attr):
 
 
 def _lookup_subscript_value(node):
-    if isinstance(node, ast.Index):
-        node = node.value
     if isinstance(node, ast.Constant):
         return node.value
-    if sys.version_info < (3, 14):
-        if hasattr(ast, "Num") and isinstance(node, ast.Num):
-            return node.n
-        if hasattr(ast, "Str") and isinstance(node, ast.Str):
-            return node.s
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
         operand = node.operand
         if isinstance(operand, ast.Constant):
             return -operand.value
-        if sys.version_info < (3, 14) and hasattr(ast, "Num") and isinstance(operand, ast.Num):
-            return -operand.n
     raise NotImplementedError("Subscript node is not supported: %s" % ast.dump(node))
 
 

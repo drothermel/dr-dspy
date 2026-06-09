@@ -13,7 +13,7 @@ from dspy.utils.dummies import DummyLM
 try:
     from litellm.utils import Choices, Message, ModelResponse
 except ImportError:
-    Choices = Message = ModelResponse = None
+    Choices = Message = ModelResponse = None  # ty: ignore[invalid-assignment]
 
 
 def default_model_response(content: str = "", *, model: str = "openai/gpt-4o-mini"):

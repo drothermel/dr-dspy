@@ -1,5 +1,6 @@
 import asyncio
 import importlib.util
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -7,9 +8,9 @@ import pytest
 try:
     import numpy as np
 except ImportError:
-    pytest.skip("numpy is not installed", allow_module_level=True)
+    pytest.skip("numpy is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 if importlib.util.find_spec("litellm") is None:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.clients.embedding import Embedder
 
 
@@ -60,8 +61,8 @@ def test_callable_embedding():
 
 
 def test_invalid_model_type():
-    with pytest.raises(ValueError):
-        embedding = Embedder(123)
+    embedding = cast("Any", Embedder)(123)
+    with pytest.raises(ValueError, match=r"must be a string or a callable"):
         asyncio.run(embedding(["test"]))
 
 

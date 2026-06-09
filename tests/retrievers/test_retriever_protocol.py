@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -60,7 +60,7 @@ def test_databricks_rm_direct_call_preserves_prediction_shape(monkeypatch: pytes
         },
     }
 
-    def fake_query_via_requests(**kwargs: object) -> dict[str, object]:
+    def fake_query_via_requests(**kwargs: object) -> dict[str, Any]:
         assert kwargs["query_text"] == "example query"
         assert kwargs["k"] == 2
         return response
@@ -76,7 +76,7 @@ def test_databricks_rm_direct_call_preserves_prediction_shape(monkeypatch: pytes
         text_column_name="text",
         k=2,
     )
-    result = retriever("example query")
+    result = cast("Any", retriever("example query"))
     assert result.docs == ["High score", "Middle score"]
     assert result.doc_ids == ["high", "mid"]
     assert result.extra_columns == [{"score": 0.9, "source": "b"}, {"score": 0.5, "source": "c"}]
@@ -118,7 +118,7 @@ def test_weaviate_rm_direct_call_preserves_long_text_shape() -> None:
             self.collections = FakeCollections(collection)
 
     collection = FakeCollection()
-    retriever = WeaviateRM("collection", weaviate_client=FakeClient(collection), k=1)
+    retriever = WeaviateRM("collection", weaviate_client=cast("Any", FakeClient(collection)), k=1)
     result = retriever("question")
     assert [passage.long_text for passage in result] == ["First passage", "Second passage"]
     assert collection.query.query_text == "question"

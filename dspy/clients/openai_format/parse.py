@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from dspy.clients.openai_format.media import get_value, model_dump, split_data_uri
@@ -18,6 +19,8 @@ from dspy.core.types import (
     LMToolCallPart,
     LMUsage,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def completion_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
@@ -50,8 +53,7 @@ def choice_to_lm_output(choice: Any) -> LMOutput:
         content = get_value(message, "content")
         if content:
             parts.extend(message_content_to_parts(content))
-        for tool_call in get_value(message, "tool_calls") or []:
-            parts.append(provider_tool_call_to_part(tool_call))
+        parts.extend(provider_tool_call_to_part(tool_call) for tool_call in (get_value(message, "tool_calls") or []))
         parts.extend(extract_citations_from_choice(choice))
     else:
         text = get_value(choice, "text")
@@ -224,9 +226,15 @@ def output_image_to_part(value: Any) -> LMImagePart:
     raise ValueError("Provider image output did not include data, url, or file_id.")
 
 
-def output_audio_to_part(value: Any) -> LMAudioPart:
+def _mapping_from_dump(value: Any) -> dict[str, Any]:
     data = model_dump(value)
-    audio = data.get("audio") if isinstance(data.get("audio"), dict) else data
+    return data if isinstance(data, dict) else {}
+
+
+def output_audio_to_part(value: Any) -> LMAudioPart:
+    data = _mapping_from_dump(value)
+    audio_val = data.get("audio")
+    audio = audio_val if isinstance(audio_val, dict) else data
     source = audio.get("url")
     b64_data = audio.get("data") or audio.get("b64_json")
     file_id = audio.get("file_id")
@@ -243,8 +251,9 @@ def output_audio_to_part(value: Any) -> LMAudioPart:
 
 
 def output_file_to_part(value: Any) -> LMBinaryPart:
-    data = model_dump(value)
-    file = data.get("file") if isinstance(data.get("file"), dict) else data
+    data = _mapping_from_dump(value)
+    file_val = data.get("file")
+    file = file_val if isinstance(file_val, dict) else data
     source = file.get("url")
     b64_data = file.get("file_data") or file.get("data")
     file_id = file.get("file_id") or file.get("id")
@@ -285,6 +294,7 @@ def usage_from_response(response: Any) -> LMUsage | None:
             try:
                 value = getattr(usage, key)
             except Exception:
+                logger.debug("Skipping usage attribute %r", key, exc_info=True)
                 continue
             if value is not None and (not callable(value)):
                 data[key] = value

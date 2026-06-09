@@ -1,6 +1,7 @@
 import pytest
 
 from dspy.primitives.python_interpreter import PythonInterpreter
+from dspy.primitives.python_interpreter.serialize import inject_variables
 
 pytestmark = pytest.mark.deno
 
@@ -92,7 +93,7 @@ def test_small_variable_not_using_filesystem():
     small_var = "small string"
     interpreter = PythonInterpreter()
     interpreter._pending_large_vars = {}
-    interpreter._inject_variables("print(x)", {"x": small_var})
+    inject_variables(interpreter=interpreter, code="print(x)", variables={"x": small_var})
     assert interpreter._pending_large_vars == {}, "Small variables should not be in _pending_large_vars"
 
 
@@ -102,9 +103,9 @@ def test_large_variable_threshold_boundary():
     at_threshold = "x" * (LARGE_VAR_THRESHOLD - 2)
     interpreter = PythonInterpreter()
     interpreter._pending_large_vars = {}
-    interpreter._inject_variables("print(x)", {"x": at_threshold})
+    inject_variables(interpreter=interpreter, code="print(x)", variables={"x": at_threshold})
     assert interpreter._pending_large_vars == {}, "Serialized size at threshold should be embedded"
     over_threshold = "x" * (LARGE_VAR_THRESHOLD - 1)
     interpreter._pending_large_vars = {}
-    interpreter._inject_variables("print(x)", {"x": over_threshold})
+    inject_variables(interpreter=interpreter, code="print(x)", variables={"x": over_threshold})
     assert "x" in interpreter._pending_large_vars, "Serialized size over threshold should use filesystem"

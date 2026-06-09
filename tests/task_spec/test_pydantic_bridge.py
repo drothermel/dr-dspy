@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from dspy.task_spec import make_task_spec
 from dspy.task_spec.pydantic_bridge import task_spec_to_pydantic_model
 from tests.task_spec.helpers import ts
@@ -16,6 +18,6 @@ def test_task_spec_to_pydantic_model_fields():
 def test_task_spec_to_pydantic_model_instance():
     spec = make_task_spec("q -> a", instructions="Test")
     model = task_spec_to_pydantic_model(spec)
-    instance = model(q="hello", a="world")
+    instance = cast("Any", model(q="hello", a="world"))
     assert instance.q == "hello"
     assert instance.a == "world"

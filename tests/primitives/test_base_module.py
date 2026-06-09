@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import threading
+from typing import cast
 from unittest.mock import patch
 
 import pytest
@@ -13,7 +14,7 @@ try:
     from litellm import Choices, Message, ModelResponse
     from litellm.types.utils import Usage
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
 from dspy.predict.chain_of_thought import ChainOfThought
@@ -210,7 +211,7 @@ def test_load_with_version_mismatch(tmp_path, make_run):
 
 @pytest.mark.llm_call
 def test_single_module_call_with_usage_tracker(lm_for_test, make_run):
-    run = make_run(lm=LM(lm_for_test, temperature=0.0), telemetry=TelemetryConfig(track_usage=True))
+    make_run(lm=LM(lm_for_test, temperature=0.0), telemetry=TelemetryConfig(track_usage=True))
     predict = ChainOfThought(ts("question -> answer"))
     output = predict(question="What is the capital of France?")
     lm_usage = output.get_lm_usage()
@@ -222,7 +223,7 @@ def test_single_module_call_with_usage_tracker(lm_for_test, make_run):
 
 @pytest.mark.llm_call
 def test_multi_module_call_with_usage_tracker(lm_for_test, make_run):
-    run = make_run(lm=LM(lm_for_test, temperature=0.0), telemetry=TelemetryConfig(track_usage=True))
+    make_run(lm=LM(lm_for_test, temperature=0.0), telemetry=TelemetryConfig(track_usage=True))
 
     class MyProgram(Module):
         def __init__(self):
@@ -270,10 +271,11 @@ def test_usage_tracker_in_parallel(make_run):
             run=run,
         )
     )
-    assert results[0].get_lm_usage() is not None
-    assert results[1].get_lm_usage() is not None
-    assert results[0].get_lm_usage().keys() == {"openai/gpt-4o-mini"}
-    assert results[1].get_lm_usage().keys() == {"openai/gpt-3.5-turbo"}
+    typed_results = cast("list[Prediction]", results)
+    assert typed_results[0].get_lm_usage() is not None
+    assert typed_results[1].get_lm_usage() is not None
+    assert typed_results[0].get_lm_usage().keys() == {"openai/gpt-4o-mini"}
+    assert typed_results[1].get_lm_usage().keys() == {"openai/gpt-3.5-turbo"}
 
 
 @pytest.mark.asyncio
@@ -335,8 +337,8 @@ def test_usage_tracker_no_side_effect(make_run):
 def test_module_history(make_run):
 
     class MyProgram(Module):
-        def __init__(self, **kwargs: object):
-            super().__init__(**kwargs)
+        def __init__(self):
+            super().__init__()
             self.cot = ChainOfThought(ts("question -> answer"))
 
         async def aforward(self, question: str, **kwargs: object) -> Prediction:
@@ -404,8 +406,8 @@ def test_module_history_with_concurrency(make_run):
 async def test_module_history_async(make_run):
 
     class MyProgram(Module):
-        def __init__(self, **kwargs: object):
-            super().__init__(**kwargs)
+        def __init__(self):
+            super().__init__()
             self.cot = ChainOfThought(ts("question -> answer"))
 
         async def aforward(self, question: str, **kwargs: object) -> Prediction:

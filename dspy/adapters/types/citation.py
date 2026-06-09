@@ -81,7 +81,7 @@ class Citations(Type):
         raise ValueError(f"Received invalid value for `Citations`: {data}")
 
     @override
-    def __iter__(self) -> Iterator[Citation]:
+    def __iter__(self) -> Iterator[Citation]:  # ty:ignore[invalid-method-override]
         return iter(self.citations)
 
     def __len__(self) -> int:

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dspy.clients.base_lm import BaseLM
-from dspy.core.types.config import LMConfig, LMToolSpec
-from dspy.task_spec import TaskSpec
+if TYPE_CHECKING:
+    from dspy.clients.base_lm import BaseLM
+    from dspy.core.types.config import LMConfig, LMToolSpec
+    from dspy.task_spec import TaskSpec
 
 
 @dataclass(frozen=True)

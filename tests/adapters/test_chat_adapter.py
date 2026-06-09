@@ -1,7 +1,7 @@
 import asyncio
 import json
 import re
-from typing import Literal
+from typing import Any, Literal, cast
 from unittest import mock
 
 import pydantic
@@ -13,7 +13,7 @@ from dspy.utils.dummies import DummyLM
 try:
     from litellm.utils import ChatCompletionMessageToolCall, Choices, Function, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types.audio import Audio
@@ -794,7 +794,7 @@ def test_chat_adapter_nonnative_strips_native_tool_kwargs():
 
 
 def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
-    python_code = Code["python"]
+    python_code = cast("Any", Code)["python"]
     CodeSignature = make_task_spec(
         {
             "question": FieldSpec.input("question"),
@@ -1612,7 +1612,7 @@ def test_chat_adapter_exception_raised_on_failure():
     signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
     adapter = ChatAdapter()
     invalid_completion = "{'output':'mismatched value'}"
-    with pytest.raises(AdapterParseError, match="Adapter ChatAdapter failed to parse.*"):
+    with pytest.raises(AdapterParseError, match=r"Adapter ChatAdapter failed to parse.*"):
         adapter.parse(task_spec=signature, completion=invalid_completion)
 
 

@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any, cast
 
 import pytest
 
@@ -9,14 +10,14 @@ pytestmark = pytest.mark.deno
 
 def test_tools_dict_is_copied():
     tools = {"my_tool": lambda: "result"}
-    sandbox = PythonInterpreter(tools=tools)
+    sandbox = PythonInterpreter(tools=cast("Any", tools))
     tools["new_tool"] = lambda: "new"
     assert "new_tool" not in sandbox.tools
 
 
 def test_deno_command_dict_raises_type_error():
     with pytest.raises(TypeError, match="deno_command must be a list"):
-        PythonInterpreter(deno_command={"invalid": "dict"})
+        PythonInterpreter(deno_command=cast("Any", {"invalid": "dict"}))
 
 
 def test_tool_with_typed_signature():
@@ -123,7 +124,7 @@ def test_tool_async_def_function():
         await asyncio.sleep(0)
         return f"answer:{query}"
 
-    with PythonInterpreter(tools={"slow_search": slow_search}) as sandbox:
+    with PythonInterpreter(tools=cast("Any", {"slow_search": slow_search})) as sandbox:
         result = sandbox.execute("slow_search(query='hello')")
         assert result == "answer:hello"
 
@@ -134,7 +135,7 @@ def test_tool_async_def_raises_propagates():
         await asyncio.sleep(0)
         raise ValueError(f"boom:{x}")
 
-    with PythonInterpreter(tools={"failing_async": failing_async}) as sandbox:
+    with PythonInterpreter(tools=cast("Any", {"failing_async": failing_async})) as sandbox:
         result = sandbox.execute(
             "try:\n    failing_async(7)\n    output = 'no error'\nexcept RuntimeError as e:\n    output = str(e)\noutput"
         )

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 class ChainOfThought(Module):
-    def __init__(self, task_spec: TaskSpec, **config: dict[str, Any]) -> None:
+    def __init__(self, task_spec: TaskSpec, **config: Any) -> None:
         super().__init__()
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"ChainOfThought requires a TaskSpec instance, got {type(task_spec).__name__}.")

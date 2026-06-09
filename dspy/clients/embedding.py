@@ -29,9 +29,7 @@ class Embedder:
         batch_size = batch_size or self.batch_size
         merged_kwargs = self.default_kwargs.copy()
         merged_kwargs.update(kwargs)
-        input_batches = []
-        for i in range(0, len(inputs), batch_size):
-            input_batches.append(inputs[i : i + batch_size])
+        input_batches = [inputs[i : i + batch_size] for i in range(0, len(inputs), batch_size)]
         return (input_batches, merged_kwargs, is_single_input)
 
     def _postprocess(self, embeddings_list, is_single_input):

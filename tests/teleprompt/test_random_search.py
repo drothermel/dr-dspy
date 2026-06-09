@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any, cast
 
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
@@ -24,7 +25,7 @@ def simple_metric(example, prediction, trace=None):
 def test_basic_workflow(make_run):
     student = SimpleModule(ts("input -> output"))
     teacher = SimpleModule(ts("input -> output"))
-    lm = DummyLM(["Initial thoughts", "Finish[blue]"])
+    lm = DummyLM(cast("Any", ["Initial thoughts", "Finish[blue]"]))
     run = make_run(lm=lm)
     optimizer = BootstrapFewShotWithRandomSearch(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
     trainset = [

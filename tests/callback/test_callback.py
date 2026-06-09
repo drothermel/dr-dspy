@@ -1,5 +1,6 @@
 import asyncio
 import time
+from typing import Any
 
 import pytest
 from typing_extensions import override
@@ -21,7 +22,7 @@ class MyCallback(BaseCallback):
         self.calls.append({"handler": "on_module_start", "instance": instance, "inputs": inputs})
 
     @override
-    def on_module_end(self, call_id, outputs, exception):
+    def on_module_end(self, call_id: str, outputs: Any | None, exception: Exception | None = None):
         self.calls.append({"handler": "on_module_end", "outputs": outputs, "exception": exception})
 
     @override
@@ -29,7 +30,7 @@ class MyCallback(BaseCallback):
         self.calls.append({"handler": "on_lm_start", "instance": instance, "inputs": inputs})
 
     @override
-    def on_lm_end(self, call_id, outputs, exception):
+    def on_lm_end(self, call_id: str, outputs: dict[str, Any] | None, exception: Exception | None = None):
         self.calls.append({"handler": "on_lm_end", "outputs": outputs, "exception": exception})
 
     @override
@@ -37,7 +38,7 @@ class MyCallback(BaseCallback):
         self.calls.append({"handler": "on_adapter_format_start", "instance": instance, "inputs": inputs})
 
     @override
-    def on_adapter_format_end(self, call_id, outputs, exception):
+    def on_adapter_format_end(self, call_id: str, outputs: dict[str, Any] | None, exception: Exception | None = None):
         self.calls.append({"handler": "on_adapter_format_end", "outputs": outputs, "exception": exception})
 
     @override
@@ -45,7 +46,7 @@ class MyCallback(BaseCallback):
         self.calls.append({"handler": "on_adapter_parse_start", "instance": instance, "inputs": inputs})
 
     @override
-    def on_adapter_parse_end(self, call_id, outputs, exception):
+    def on_adapter_parse_end(self, call_id: str, outputs: dict[str, Any] | None, exception: Exception | None = None):
         self.calls.append({"handler": "on_adapter_parse_end", "outputs": outputs, "exception": exception})
 
     @override
@@ -53,7 +54,7 @@ class MyCallback(BaseCallback):
         self.calls.append({"handler": "on_tool_start", "instance": instance, "inputs": inputs})
 
     @override
-    def on_tool_end(self, call_id, outputs, exception):
+    def on_tool_end(self, call_id: str, outputs: dict[str, Any] | None, exception: Exception | None = None):
         self.calls.append({"handler": "on_tool_end", "outputs": outputs, "exception": exception})
 
 

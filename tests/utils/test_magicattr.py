@@ -1,17 +1,19 @@
+from typing import Any, ClassVar, cast
+
 import pytest
 
 from dspy.utils import magicattr
 
 
 class Test:
-    l = [1, 2]
-    a = [0, [1, 2, [3, 4]]]
-    b = {"x": {"y": "y"}, "z": [1, 2]}
-    z = "z"
+    items_list: ClassVar[list[int]] = [1, 2]
+    a: ClassVar[list] = [0, [1, 2, [3, 4]]]
+    b: ClassVar[dict] = {"x": {"y": "y"}, "z": [1, 2]}
+    z: ClassVar[str] = "z"
 
 
 class Person:
-    settings = {"autosave": True, "style": {"height": 30, "width": 200}, "themes": ["light", "dark"]}
+    settings: ClassVar[dict] = {"autosave": True, "style": {"height": 30, "width": 200}, "themes": ["light", "dark"]}
 
     def __init__(self, name, age, friends):
         self.name = name
@@ -22,7 +24,7 @@ class Person:
 @pytest.mark.parametrize(
     ("key", "value"),
     [
-        ("l", Test.l),
+        ("l", Test.items_list),
         ("t.t.t.t.z", "z"),
         ("a[0]", 0),
         ("a[1][0]", 1),
@@ -41,7 +43,8 @@ class Person:
     ],
 )
 def test_magicattr_get(key, value):
-    obj = Test()
+    obj = cast("Any", Test())
+    obj.l = Test.items_list
     obj.t = obj
     obj.a.append(obj)
     obj.b["w"] = obj
@@ -75,9 +78,9 @@ def test_person_example():
     assert not hasattr(jack, "age")
     with pytest.raises(NotImplementedError):
         magicattr.get(bob, "friends[0+1]")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Function calls are not allowed\."):
         magicattr.get(bob, "friends.pop(0)")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Invalid expression"):
         magicattr.get(bob, "friends = []")
     with pytest.raises(SyntaxError):
         magicattr.get(bob, "friends..")
@@ -89,9 +92,9 @@ def test_person_example():
 
 def test_empty():
     obj = Test()
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Invalid expression"):
         magicattr.get(obj, "   ")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Invalid expression"):
         magicattr.get(obj, "")
     with pytest.raises(TypeError):
         magicattr.get(obj, 0)

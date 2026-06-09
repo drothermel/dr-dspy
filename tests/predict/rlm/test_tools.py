@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import pytest
 
 from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
@@ -115,7 +117,7 @@ class TestPythonInterpreter:
             items = items or []
             return [f"processed_{item}" for item in items]
 
-        with PythonInterpreter(tools={"batch_process": batch_process}) as interp:
+        with PythonInterpreter(tools=cast("Any", {"batch_process": batch_process})) as interp:
             result = interp.execute(
                 '\nresults = batch_process(items=["a", "b", "c"])\nprint(f"Type: {type(results).__name__}")\nprint(f"Length: {len(results)}")\nprint(f"First: {results[0]}")\nprint(f"All: {results}")\n'
             )
@@ -128,7 +130,7 @@ class TestPythonInterpreter:
         def get_info() -> dict:
             return {"name": "test", "count": 42}
 
-        with PythonInterpreter(tools={"get_info": get_info}) as interp:
+        with PythonInterpreter(tools=cast("Any", {"get_info": get_info})) as interp:
             result = interp.execute(
                 '\ninfo = get_info()\nprint(f"Type: {type(info).__name__}")\nprint(f"Name: {info[\'name\']}")\nprint(f"Count: {info[\'count\']}")\n'
             )

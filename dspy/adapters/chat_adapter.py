@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
@@ -10,9 +10,12 @@ from dspy.adapters.call.policies.parse_fallback import JSONParseFallbackPolicy, 
 from dspy.adapters.format_shared import FIELD_HEADER_PATTERN, ChatFormatMixin, FieldInfoWithName
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.utils import parse_value
-from dspy.task_spec import TaskSpec
-from dspy.utils.callback import BaseCallback
 from dspy.utils.exceptions import AdapterParseError
+
+if TYPE_CHECKING:
+    from dspy.adapters.types.base_type import Type
+    from dspy.task_spec import TaskSpec
+    from dspy.utils.callback import BaseCallback
 
 __all__ = ["ChatAdapter", "FieldInfoWithName"]
 
@@ -26,10 +29,10 @@ class ChatAdapter(ChatFormatMixin, Adapter):
         self,
         callbacks: list[BaseCallback] | None = None,
         use_native_function_calling: bool = False,
-        native_response_types: list[type] | None = None,
+        native_response_types: list[type[Type]] | None = None,
         parallel_tool_calls: bool | None = None,
         json_fallback: JSONAdapter | None = None,
-        parse_fallback_policy: JSONParseFallbackPolicy | NoOpParseFallbackPolicy | None = _DEFAULT_PARSE_FALLBACK,
+        parse_fallback_policy: JSONParseFallbackPolicy | NoOpParseFallbackPolicy | None = None,
     ) -> None:
         super().__init__(
             callbacks=callbacks,
@@ -38,7 +41,7 @@ class ChatAdapter(ChatFormatMixin, Adapter):
             native_response_types=native_response_types,
         )
         self._json_fallback = json_fallback
-        if parse_fallback_policy is _DEFAULT_PARSE_FALLBACK:
+        if parse_fallback_policy is None:
             self.parse_fallback_policy = JSONParseFallbackPolicy(fallback_factory=self._json_adapter_fallback)
         else:
             self.parse_fallback_policy = parse_fallback_policy

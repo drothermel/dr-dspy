@@ -97,7 +97,7 @@ def test_pot_code_generation_persistent_errors(make_run):
     )
     run = make_run(lm=lm)
     pot = ProgramOfThought(BasicQA, max_iters=max_iters)
-    with pytest.raises(RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: ZeroDivisionError:"):
+    with pytest.raises(RuntimeError, match=r"Max hops reached\. Failed to run ProgramOfThought: ZeroDivisionError:"):
         asyncio.run(pot(question="What is 1+1?", run=run))
 
 
@@ -109,7 +109,8 @@ def test_pot_code_parse_error(make_run):
     with (
         patch("dspy.predict.program_of_thought.ProgramOfThought._execute_code") as mock_execute_code,
         pytest.raises(
-            RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: Error: Code format is not correct."
+            RuntimeError,
+            match=r"Max hops reached\. Failed to run ProgramOfThought: Error: Code format is not correct\.",
         ),
     ):
         asyncio.run(pot(question="What is 1+1?", run=run))

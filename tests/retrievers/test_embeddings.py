@@ -7,7 +7,7 @@ import pytest
 try:
     import numpy as np
 except ImportError:
-    pytest.skip("numpy is not installed", allow_module_level=True)
+    pytest.skip("numpy is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.retrievers.embeddings import Embeddings, EmbeddingsWithScores
 
 

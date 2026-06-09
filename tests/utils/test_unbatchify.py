@@ -1,6 +1,6 @@
 import time
 from concurrent.futures import Future
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 from dspy.utils.unbatchify import Unbatchify
@@ -16,7 +16,7 @@ def submit(self, input_item: Any) -> Future:
     return future
 
 
-Unbatchify.submit = submit
+cast("Any", Unbatchify).submit = submit
 
 
 def test_unbatchify_batch_size_trigger():

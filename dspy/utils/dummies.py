@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
-from typing import Any, NoReturn, cast
+from typing import TYPE_CHECKING, Any, NoReturn, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from pydantic.fields import FieldInfo
 from typing_extensions import override
@@ -77,7 +80,7 @@ class DummyLM(BaseLM):
         adapter = self.adapter
         role = adapter.capabilities.field_value_role
         if role == "assistant":
-            return adapter.format_field_with_value(fields_with_values=fields_with_values, role="assistant")
+            return cast("Any", adapter).format_field_with_value(fields_with_values=fields_with_values, role="assistant")
         return adapter.format_field_with_value(fields_with_values=fields_with_values)
 
     @override
@@ -100,7 +103,13 @@ class DummyLM(BaseLM):
                     "No more responses",
                 )
             else:
-                current_output = self._format_answer_fields(next(self.answers, {"answer": "No more responses"}))
+                if isinstance(self.answers, list):
+                    answer = (
+                        cast("dict[str, Any]", self.answers.pop(0)) if self.answers else {"answer": "No more responses"}
+                    )
+                    current_output = self._format_answer_fields(answer)
+                else:
+                    current_output = self._format_answer_fields(next(self.answers, {"answer": "No more responses"}))
             outputs.append(self._to_output(current_output))
         return LMResponse(
             model="dummy", outputs=outputs, usage=dotdict(prompt_tokens=0, completion_tokens=0, total_tokens=0)
@@ -131,7 +140,7 @@ class DummyLM(BaseLM):
         return (entry.messages_as_openai, entry.outputs)
 
 
-def dummy_rm(passages=()) -> callable:
+def dummy_rm(passages=()) -> Callable[..., Any]:
     if not passages:
 
         def inner(query: str, *, k: int, **kwargs) -> NoReturn:

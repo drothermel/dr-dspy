@@ -13,10 +13,10 @@ from dspy.clients.lm import LM
 def _hide_litellm(monkeypatch):
     real_find_spec = importlib.util.find_spec
 
-    def find_spec(name, *args: object, **kwargs: object):
+    def find_spec(name: str, package: str | None = None):
         if name == "litellm" or name.startswith("litellm."):
             return None
-        return real_find_spec(name, *args, **kwargs)
+        return real_find_spec(name, package)
 
     monkeypatch.setattr(importlib.util, "find_spec", find_spec)
     monkeypatch.delitem(sys.modules, "litellm", raising=False)

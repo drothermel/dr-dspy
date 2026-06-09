@@ -144,7 +144,14 @@ class LM(BaseLM):
         if is_litellm_context_window_error(exc):
             return ContextWindowExceededError(message=message or "Context window exceeded", **metadata)
         exc_cls = _lm_error_class_from_litellm_exception(exc) or _lm_error_class_from_status(status)
-        return exc_cls(message, **metadata)
+        error_kwargs: dict[str, Any] = {}
+        for key, value in metadata.items():
+            if key in {"status", "retry_after"}:
+                if isinstance(value, int | float):
+                    error_kwargs[key] = value
+            elif isinstance(value, str | type(None)):
+                error_kwargs[key] = value
+        return exc_cls(message or "", **error_kwargs)
 
     async def aforward(self, request: LMRequest) -> LMResponse:
         import dspy.clients.lm as lm_package
@@ -272,6 +279,8 @@ class LM(BaseLM):
 
     def _run_finetune_job(self, job: TrainingJob) -> None:
         try:
+            if job.model is None or job.train_data is None:
+                raise ValueError("TrainingJob requires model and train_data before finetuning.")
             model = self.provider.finetune(
                 job=job,
                 model=job.model,

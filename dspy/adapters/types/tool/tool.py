@@ -1,7 +1,7 @@
 import asyncio
 import inspect
 from collections.abc import Coroutine
-from typing import TYPE_CHECKING, Any, Callable, get_origin, get_type_hints
+from typing import TYPE_CHECKING, Any, Callable, cast, get_origin, get_type_hints
 
 from pydantic import BaseModel, TypeAdapter, create_model
 from typing_extensions import override
@@ -96,7 +96,7 @@ class Tool(Type):
             if k in arg_types and arg_types[k] != Any:
                 pydantic_wrapper = create_model("Wrapper", value=(arg_types[k], ...))
                 parsed = pydantic_wrapper.model_validate({"value": v})
-                parsed_kwargs[k] = parsed.value
+                parsed_kwargs[k] = cast("Any", parsed).value
             else:
                 parsed_kwargs[k] = v
         return parsed_kwargs

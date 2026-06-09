@@ -1,5 +1,6 @@
 import asyncio
 import json
+from typing import Any, cast
 from unittest import mock
 
 import pydantic
@@ -8,7 +9,7 @@ import pytest
 try:
     from litellm.types.llms.openai import ResponsesAPIResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from openai.types.responses import ResponseOutputMessage, ResponseReasoningItem
 from openai.types.responses.response_reasoning_item import Summary
 
@@ -25,9 +26,10 @@ def test_responses_api(make_run):
                 type="message",
                 role="assistant",
                 status="completed",
-                content=[
-                    {"type": "output_text", "text": "This is a test answer from responses API.", "annotations": []}
-                ],
+                content=cast(
+                    "Any",
+                    [{"type": "output_text", "text": "This is a test answer from responses API.", "annotations": []}],
+                ),
             ),
             ResponseReasoningItem(
                 id="reasoning_1",
@@ -234,7 +236,10 @@ def test_responses_api_with_image_input(make_run):
                 type="message",
                 role="assistant",
                 status="completed",
-                content=[{"type": "output_text", "text": "This is a test answer with image input.", "annotations": []}],
+                content=cast(
+                    "Any",
+                    [{"type": "output_text", "text": "This is a test answer with image input.", "annotations": []}],
+                ),
             )
         ]
     )
@@ -276,13 +281,16 @@ def test_responses_api_with_pydantic_model_input(make_run):
                 type="message",
                 role="assistant",
                 status="completed",
-                content=[
-                    {
-                        "type": "output_text",
-                        "text": '{"answer" : "This is a good test answer", "number" : 42}',
-                        "annotations": [],
-                    }
-                ],
+                content=cast(
+                    "Any",
+                    [
+                        {
+                            "type": "output_text",
+                            "text": '{"answer" : "This is a good test answer", "number" : 42}',
+                            "annotations": [],
+                        }
+                    ],
+                ),
             )
         ]
     )
@@ -314,7 +322,7 @@ def test_responses_api_with_none_usage(make_run):
         id="resp_1",
         created_at=0.0,
         error=None,
-        incomplete_details={"reason": "max_output_tokens"},
+        incomplete_details=cast("Any", {"reason": "max_output_tokens"}),
         instructions=None,
         model="openai/gpt-5-mini",
         object="response",
@@ -324,7 +332,10 @@ def test_responses_api_with_none_usage(make_run):
                 type="message",
                 role="assistant",
                 status="incomplete",
-                content=[{"type": "output_text", "text": "Partial response that was truncated", "annotations": []}],
+                content=cast(
+                    "Any",
+                    [{"type": "output_text", "text": "Partial response that was truncated", "annotations": []}],
+                ),
             )
         ],
         metadata={},
@@ -358,7 +369,7 @@ async def test_responses_api_with_none_usage_async(make_run):
         id="resp_1",
         created_at=0.0,
         error=None,
-        incomplete_details={"reason": "max_output_tokens"},
+        incomplete_details=cast("Any", {"reason": "max_output_tokens"}),
         instructions=None,
         model="openai/gpt-5-mini",
         object="response",
@@ -368,7 +379,10 @@ async def test_responses_api_with_none_usage_async(make_run):
                 type="message",
                 role="assistant",
                 status="incomplete",
-                content=[{"type": "output_text", "text": "Partial async response", "annotations": []}],
+                content=cast(
+                    "Any",
+                    [{"type": "output_text", "text": "Partial async response", "annotations": []}],
+                ),
             )
         ],
         metadata={},

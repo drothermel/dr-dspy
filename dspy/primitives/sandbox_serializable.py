@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from pydantic import GetCoreSchemaHandler
     from pydantic.fields import FieldInfo
 
-    from dspy.primitives.repl_types import REPLVariable
 __all__ = ["SandboxSerializable", "build_repl_variable"]
 
 

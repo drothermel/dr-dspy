@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from dspy.adapters.base import Adapter
-from dspy.core.types.config import LMConfig
-from dspy.runtime.run_context import RunContext
 from dspy.task_spec import TaskSpec, input_field
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from dspy.clients.base_lm import BaseLM
+    from dspy.core.types.config import LMConfig
+    from dspy.runtime.run_context import RunContext
 
 
 class HintInjectingAdapter(Adapter):

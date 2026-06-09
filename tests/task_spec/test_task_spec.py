@@ -136,7 +136,7 @@ def test_make_task_spec_from_field_lists():
 
 
 def test_make_task_spec_rejects_mismatched_field_role():
-    with pytest.raises(ValueError, match="expected.*output"):
+    with pytest.raises(ValueError, match=r"expected.*output"):
         make_task_spec(outputs=[input_field("answer")], instructions="Test.")
 
 

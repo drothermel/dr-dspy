@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -16,9 +17,9 @@ LITELLM_TEST_SERVER_LOG_FILE_PATH_ENV_VAR = "LITELLM_TEST_SERVER_LOG_FILE_PATH"
 
 
 @pytest.fixture
-def litellm_test_server() -> tuple[str, str]:
+def litellm_test_server() -> Iterator[tuple[str, str]]:
     if importlib.util.find_spec("litellm") is None:
-        pytest.skip("litellm is not installed")
+        pytest.skip("litellm is not installed")  # ty: ignore[too-many-positional-arguments]
     if sys.version_info[:2] == (3, 14):
         pytest.skip("Litellm proxy server is not supported on Python 3.14.")
     with tempfile.TemporaryDirectory() as server_log_dir_path:
@@ -28,7 +29,7 @@ def litellm_test_server() -> tuple[str, str]:
         host = "127.0.0.1"
         litellm_cmd = shutil.which("litellm") or str(Path(sys.executable).with_name("litellm"))
         if not Path(litellm_cmd).exists():
-            pytest.skip("litellm CLI is not installed")
+            pytest.skip("litellm CLI is not installed")  # ty: ignore[too-many-positional-arguments]
         process = subprocess.Popen(
             [litellm_cmd, "--host", host, "--port", str(port), "--config", _get_litellm_config_path()],
             env={LITELLM_TEST_SERVER_LOG_FILE_PATH_ENV_VAR: server_log_file_path, **os.environ.copy()},
@@ -48,8 +49,7 @@ def litellm_test_server() -> tuple[str, str]:
 def read_litellm_test_server_request_logs(server_log_file_path: str) -> list[dict[str, Any]]:
     data = []
     with open(server_log_file_path) as f:
-        for line in f:
-            data.append(json.loads(line))
+        data.extend(json.loads(line) for line in f)
     return data
 
 

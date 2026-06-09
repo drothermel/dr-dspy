@@ -109,7 +109,7 @@ class ColBERTv2RetrieverLocal:
         else:
             searcher_results = self.searcher.search(query, k=k)
         results = []
-        for pid, rank, score in zip(*searcher_results, strict=False):
+        for pid, _rank, score in zip(*searcher_results, strict=False):
             results.append(dotdict({"long_text": self.searcher.collection[pid], "score": score, "pid": pid}))
         return results
 

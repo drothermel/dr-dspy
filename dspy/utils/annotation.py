@@ -1,4 +1,4 @@
-from typing import Any, Callable, ParamSpec, TypeVar, overload
+from typing import Any, Callable, ParamSpec, TypeVar, cast, overload
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -32,8 +32,9 @@ def experimental(f: type[T] | Callable[P, R] | None = None, version: str | None 
 
 
 def _experimental(api: Callable[P, R], version: str | None = None) -> Callable[P, R]:
-    api.__dspy_experimental__ = True
-    api.__dspy_experimental_version__ = version
+    api_any = cast("Any", api)
+    api_any.__dspy_experimental__ = True
+    api_any.__dspy_experimental_version__ = version
     return api
 
 

@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import pytest
 from typing_extensions import override
 
@@ -46,7 +48,7 @@ class SimpleModule(Module):
 def _test_knn_few_shot_compile(setup_knn_few_shot, make_run):
     student = SimpleModule(ts("input -> output"))
     teacher = SimpleModule(ts("input -> output"))
-    lm = DummyLM(["Madrid", "10"])
+    lm = DummyLM(cast("Any", ["Madrid", "10"]))
     run = make_run(lm=lm)
     knn_few_shot = setup_knn_few_shot
     trainset = knn_few_shot.KNN.trainset

@@ -141,7 +141,7 @@ class LMOutputBuilder:
                 raise ValueError(
                     f"Stream part indices for output {output_index} must be contiguous; missing indices: {missing_part_indices}."
                 )
-            parts = [_finalize_stream_part(part) for part in part_buffer]
+            parts = [_finalize_stream_part(part) for part in part_buffer if part is not None]
             outputs.append(
                 LMOutput(
                     parts=parts,

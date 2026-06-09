@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import pydantic
 import pytest
 
@@ -21,7 +23,7 @@ def test_citation_validate_input():
     assert citation.type == "char_location"
     assert citation.supported_text == "The Earth orbits the Sun."
     with pytest.raises(pydantic.ValidationError):
-        Citations.Citation(cited_text="text")
+        Citations.Citation(**cast("Any", {"cited_text": "text"}))
 
 
 def test_citations_in_nested_type():

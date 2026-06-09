@@ -26,6 +26,13 @@ from dspy.teleprompt.task_spec_context import get_task_spec
 logger = logging.getLogger(__name__)
 
 
+async def _wait_until(predicate: Callable[[], bool], poll_interval: float = 1.0) -> None:
+    if predicate():
+        return
+    await asyncio.sleep(poll_interval)
+    await _wait_until(predicate=predicate, poll_interval=poll_interval)
+
+
 class GRPO(FinetuneTeleprompter):
     def __init__(
         self,
@@ -353,8 +360,7 @@ class GRPO(FinetuneTeleprompter):
                         return True
                 return False
 
-            while not _any_available_for_step():
-                await asyncio.sleep(1)
+            await _wait_until(_any_available_for_step)
             logger.info("Bootstrapping data...")
             trace_data = [[[] for _ in range(len(teachers))] for _ in range(len(subsample_training_dataset))]
             for tind, teacher in enumerate(teachers):
@@ -427,9 +433,14 @@ class GRPO(FinetuneTeleprompter):
                         ]
                     elif self.variably_invoked_predictor_grouping_mode == "fill":
                         if self.variably_invoked_predictor_fill_strategy == "randint":
-                            selector = lambda l: self.rng.choice(l)
+
+                            def selector(options):
+                                return self.rng.choice(options)
                         else:
-                            selector = lambda l: l[-1]
+
+                            def selector(options):
+                                return options[-1]
+
                         predictor_example_invocations = [
                             invocation + [selector(invocation) for _ in range(max_len - len(invocation))]
                             for invocation in predictor_example_invocations

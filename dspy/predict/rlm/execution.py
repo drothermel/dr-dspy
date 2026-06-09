@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
     from dspy.predict.rlm.module import RLM
+    from dspy.runtime.run_context import RunContext
 logger = logging.getLogger(__name__)
 
 

@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import pydantic
 import pytest
 
@@ -8,7 +10,7 @@ def test_document_validate_input():
     doc = Document(data="The Earth orbits the Sun.")
     assert doc.data == "The Earth orbits the Sun."
     with pytest.raises(pydantic.ValidationError):
-        Document(data=123)
+        Document(data=cast("Any", 123))
 
 
 def test_document_in_nested_type():

@@ -2,6 +2,7 @@ import asyncio
 import json
 import tempfile
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -12,6 +13,10 @@ from dspy.primitives.module import Module, set_attribute_by_name
 from dspy.task_spec import default_task_instructions
 from dspy.utils.dummies import DummyLM
 from tests.task_spec.helpers import ts
+
+
+def _module_attrs(module: Module) -> Any:
+    return cast("Any", module)
 
 
 class HopModule(Module):
@@ -81,40 +86,50 @@ def test_empty_module():
 
 def test_single_level():
     module = Module()
-    module.sub = Module()
-    expected = [("self", module), ("self.sub", module.sub)]
+    _module_attrs(module).sub = Module()
+    expected = [("self", module), ("self.sub", _module_attrs(module).sub)]
     assert list(module.named_sub_modules()) == expected
 
 
 def test_multiple_levels():
     module = Module()
-    module.sub = Module()
-    module.sub.subsub = Module()
-    expected = [("self", module), ("self.sub", module.sub), ("self.sub.subsub", module.sub.subsub)]
+    _module_attrs(module).sub = Module()
+    _module_attrs(module).sub.subsub = Module()
+    expected = [
+        ("self", module),
+        ("self.sub", _module_attrs(module).sub),
+        ("self.sub.subsub", _module_attrs(module).sub.subsub),
+    ]
     assert list(module.named_sub_modules()) == expected
 
 
 def test_multiple_sub_modules():
     module = Module()
-    module.sub1 = Module()
-    module.sub2 = Module()
-    expected = [("self", module), ("self.sub1", module.sub1), ("self.sub2", module.sub2)]
+    _module_attrs(module).sub1 = Module()
+    _module_attrs(module).sub2 = Module()
+    expected = [
+        ("self", module),
+        ("self.sub1", _module_attrs(module).sub1),
+        ("self.sub2", _module_attrs(module).sub2),
+    ]
     assert sorted(module.named_sub_modules()) == sorted(expected)
 
 
 def test_non_base_module_attributes():
     module = Module()
-    module.sub = Module()
-    module.not_a_sub = "Not a self"
-    expected = [("self", module), ("self.sub", module.sub)]
+    _module_attrs(module).sub = Module()
+    _module_attrs(module).not_a_sub = "Not a self"
+    expected = [("self", module), ("self.sub", _module_attrs(module).sub)]
     assert list(module.named_sub_modules()) == expected
 
 
 def test_complex_module_traversal():
     root = Module()
-    root.sub_module = Module()
-    root.sub_module.nested_list = [Module(), {"key": Module()}]
-    root.sub_module.nested_tuple = (Module(), [Module(), Module()])
+    root_attrs = _module_attrs(root)
+    sub_attrs = _module_attrs(Module())
+    root_attrs.sub_module = sub_attrs
+    sub_attrs.nested_list = [Module(), {"key": Module()}]
+    sub_attrs.nested_tuple = (Module(), [Module(), Module()])
     expected_names = {
         "self",
         "self.sub_module",
@@ -132,10 +147,12 @@ def test_complex_module_traversal():
 
 def test_complex_module_traversal_with_same_module():
     root = Module()
-    root.sub_module = Module()
-    root.sub_module.nested_list = [Module(), {"key": Module()}]
+    root_attrs = _module_attrs(root)
+    sub_attrs = _module_attrs(Module())
+    root_attrs.sub_module = sub_attrs
+    sub_attrs.nested_list = [Module(), {"key": Module()}]
     same_module = Module()
-    root.sub_module.nested_tuple = (Module(), [same_module, same_module])
+    sub_attrs.nested_tuple = (Module(), [same_module, same_module])
     expected_names = {
         "self",
         "self.sub_module",
@@ -152,10 +169,12 @@ def test_complex_module_traversal_with_same_module():
 
 def test_named_parameters_traverses_nested_containers():
     root = Module()
-    root.sub_module = Module()
-    root.sub_module.nested_predict = Predict(ts("question -> answer", instructions="Answer the question."))
-    root.sub_module.nested_list = [Predict(ts("question -> answer", instructions="Answer the question."))]
-    root.sub_module.nested_dict = {"key": Predict(ts("question -> answer", instructions="Answer the question."))}
+    root_attrs = _module_attrs(root)
+    sub_attrs = _module_attrs(Module())
+    root_attrs.sub_module = sub_attrs
+    sub_attrs.nested_predict = Predict(ts("question -> answer", instructions="Answer the question."))
+    sub_attrs.nested_list = [Predict(ts("question -> answer", instructions="Answer the question."))]
+    sub_attrs.nested_dict = {"key": Predict(ts("question -> answer", instructions="Answer the question."))}
     found_names = {name for name, _ in root.named_parameters()}
     assert "self.sub_module.nested_predict" in found_names
     assert "self.sub_module.nested_list[0]" in found_names
@@ -164,23 +183,27 @@ def test_named_parameters_traverses_nested_containers():
 
 def test_complex_module_set_attribute_by_name():
     root = Module()
-    root.sub_module = Module()
-    root.sub_module.nested_list = [Module(), {"key": Module()}]
+    root_attrs = _module_attrs(root)
+    sub_attrs = _module_attrs(Module())
+    root_attrs.sub_module = sub_attrs
+    sub_attrs.nested_list = [Module(), {"key": Module()}]
     same_module = Module()
-    root.sub_module.nested_tuple = (Module(), [same_module, same_module])
+    sub_attrs.nested_tuple = (Module(), [same_module, same_module])
     set_attribute_by_name(root, "test_attrib", True)
-    assert root.test_attrib is True
+    assert _module_attrs(root).test_attrib is True
     set_attribute_by_name(root, "sub_module.test_attrib", True)
-    assert root.sub_module.test_attrib is True
+    sub_attrs = _module_attrs(root_attrs.sub_module)
+    assert sub_attrs.test_attrib is True
     set_attribute_by_name(root, "sub_module.nested_list[0].test_attrib", True)
-    assert root.sub_module.nested_list[0].test_attrib is True
+    assert _module_attrs(sub_attrs.nested_list[0]).test_attrib is True
     set_attribute_by_name(root, "sub_module.nested_list[1]['key'].test_attrib", True)
-    assert root.sub_module.nested_list[1]["key"].test_attrib is True
+    nested_key_module = cast("Module", sub_attrs.nested_list[1]["key"])
+    assert _module_attrs(nested_key_module).test_attrib is True
     set_attribute_by_name(root, "sub_module.nested_tuple[0].test_attrib", True)
-    assert root.sub_module.nested_tuple[0].test_attrib is True
+    assert _module_attrs(sub_attrs.nested_tuple[0]).test_attrib is True
     set_attribute_by_name(root, "sub_module.nested_tuple[1][0].test_attrib", True)
-    assert root.sub_module.nested_tuple[1][0].test_attrib is True
-    assert root.sub_module.nested_tuple[1][1].test_attrib is True
+    assert _module_attrs(sub_attrs.nested_tuple[1][0]).test_attrib is True
+    assert _module_attrs(sub_attrs.nested_tuple[1][1]).test_attrib is True
 
 
 class DuplicateModule(Module):

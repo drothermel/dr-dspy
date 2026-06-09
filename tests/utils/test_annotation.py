@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from dspy.utils.annotation import experimental, is_experimental
 
 
@@ -8,14 +10,15 @@ def test_experimental_decorator_on_function():
         return "test"
 
     assert is_experimental(test_function)
-    assert test_function.__dspy_experimental__ is True
-    assert test_function.__dspy_experimental_version__ is None
+    assert cast("Any", test_function).__dspy_experimental__ is True
+    assert cast("Any", test_function).__dspy_experimental_version__ is None
     assert test_function() == "test"
 
 
 def test_experimental_decorator_on_function_with_version():
+    experimental_any = cast("Any", experimental)
 
-    @experimental(version="3.1.0")
+    @experimental_any(version="3.1.0")
     def test_function():
         return "versioned"
 
@@ -31,15 +34,16 @@ def test_experimental_decorator_on_class():
         def method(self):
             return "method"
 
-    assert TestClass.__dspy_experimental__ is True
-    assert TestClass.__dspy_experimental_version__ is None
+    assert cast("Any", TestClass).__dspy_experimental__ is True
+    assert cast("Any", TestClass).__dspy_experimental_version__ is None
     instance = TestClass()
     assert instance.method() == "method"
 
 
 def test_experimental_decorator_on_class_with_version():
+    experimental_any = cast("Any", experimental)
 
-    @experimental(version="2.5.0")
+    @experimental_any(version="2.5.0")
     class TestClass:
         pass
 
@@ -53,14 +57,15 @@ def test_experimental_decorator_without_docstring():
     def test_function():
         return "no_doc"
 
-    assert test_function.__dspy_experimental__ is True
-    assert test_function.__dspy_experimental_version__ is None
+    assert cast("Any", test_function).__dspy_experimental__ is True
+    assert cast("Any", test_function).__dspy_experimental_version__ is None
     assert test_function() == "no_doc"
 
 
 def test_experimental_decorator_without_docstring_with_version():
+    experimental_any = cast("Any", experimental)
 
-    @experimental(version="1.0.0")
+    @experimental_any(version="1.0.0")
     def test_function():
         return "no_doc_version"
 
@@ -74,7 +79,7 @@ def test_experimental_decorator_with_callable_syntax():
     def test_function():
         return "callable"
 
-    decorated = experimental(test_function)
+    decorated = cast("Any", experimental)(test_function)
     assert decorated.__dspy_experimental__ is True
     assert decorated() == "callable"
 
@@ -84,7 +89,7 @@ def test_experimental_decorator_with_version_callable_syntax():
     def test_function():
         return "callable_version"
 
-    decorated = experimental(test_function, version="4.0.0")
+    decorated = cast("Any", experimental)(test_function, version="4.0.0")
     assert decorated.__dspy_experimental_version__ == "4.0.0"
     assert is_experimental(decorated)
     assert decorated() == "callable_version"

@@ -25,7 +25,7 @@ async def test_bootstrap_few_shot_smoke_strict(make_run):
     student = Predict(QATaskSpec())
     trainset = [Example(question="2+2", answer="4")]
     teleprompter = BootstrapFewShot(
-        metric=lambda example, pred, trace=None: pred.answer == example.answer,
+        metric=lambda example, pred, _trace=None: pred.answer == example.answer,
         max_bootstrapped_demos=1,
         max_labeled_demos=0,
         teacher_run=run.fork(lm=lm, adapter=json_adapter),

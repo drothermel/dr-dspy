@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
 
 from dspy.clients.openai_binary import binary_to_openai
 from dspy.core.types.parts import (
@@ -38,7 +38,9 @@ def _history_request_messages_as_openai(request: LMRequest) -> list[dict[str, An
             content_parts = [part for part in message.parts if not isinstance(part, LMToolCallPart)]
             item: dict[str, Any] = {
                 "role": "assistant",
-                "content": _history_message_parts_as_openai_content(content_parts) if content_parts else None,
+                "content": _history_message_parts_as_openai_content(cast("list[LMPart]", content_parts))
+                if content_parts
+                else None,
             }
             if tool_calls:
                 item["tool_calls"] = [_history_tool_call_as_openai(call) for call in tool_calls]
@@ -88,7 +90,7 @@ def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
     if isinstance(part, LMImagePart):
         return {"type": "image_url", "image_url": {"url": _history_part_source(part)}}
     if isinstance(part, LMAudioPart):
-        input_audio = {"format": _history_media_format(part.media_type)}
+        input_audio: dict[str, Any] = {"format": _history_media_format(part.media_type)}
         if part.data is not None:
             if part.data.startswith("data:"):
                 media_type, data = _split_data_uri(part.data)
@@ -104,7 +106,7 @@ def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
             input_audio["path"] = part.path
         return {"type": "input_audio", "input_audio": input_audio}
     if isinstance(part, LMVideoPart):
-        video = {"media_type": part.media_type}
+        video: dict[str, Any] = {"media_type": part.media_type}
         if part.data is not None:
             video["data"] = _history_part_source(part)
         elif part.url is not None:
@@ -115,7 +117,7 @@ def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
             video["path"] = part.path
         return {"type": "video", "video": video}
     if isinstance(part, LMDocumentPart):
-        data = {"type": "document"}
+        data: dict[str, Any] = {"type": "document"}
         if part.source is not None:
             data["source"] = part.source
         else:

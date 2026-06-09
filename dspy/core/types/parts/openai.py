@@ -124,17 +124,36 @@ def _binary_dict_to_part(file: dict[str, Any]) -> LMBinaryPart:
 
 
 def _document_dict_to_part(item: dict[str, Any]) -> LMDocumentPart:
-    common = {"title": item.get("title"), "context": item.get("context")}
+    title = item.get("title")
+    context = item.get("context")
+    citations = item.get("citations") or {}
     media_type = item.get("media_type") or "application/pdf"
     for source_key in ("data", "url", "file_id", "path"):
         if item.get(source_key) is not None:
-            return LMDocumentPart(**{source_key: item[source_key]}, media_type=media_type, **common)
+            return LMDocumentPart(
+                **{source_key: item[source_key]},
+                media_type=media_type,
+                title=title,
+                context=context,
+            )
     source = item.get("source")
     if isinstance(source, dict):
-        return LMDocumentPart(source=source, citations=item.get("citations") or {}, **common)
+        return LMDocumentPart(
+            source=source,
+            citations=citations if isinstance(citations, dict) else {},
+            title=title,
+            context=context,
+        )
     if isinstance(source, str):
-        kwargs = _media_source_kwargs(source, default_media_type=media_type)
-        return LMDocumentPart(**kwargs, **common)
+        source_kwargs = _media_source_kwargs(source, default_media_type=media_type)
+        return LMDocumentPart(
+            data=source_kwargs.get("data"),
+            url=source_kwargs.get("url"),
+            file_id=source_kwargs.get("file_id"),
+            media_type=source_kwargs.get("media_type", media_type),
+            title=title,
+            context=context,
+        )
     raise ValueError("Document content block requires source.")
 
 

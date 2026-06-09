@@ -10,7 +10,7 @@ try:
     from litellm.types.llms.openai import ResponseAPIUsage, ResponsesAPIResponse
     from litellm.utils import Choices, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm import LM
 from dspy.core.types import LMRequest, LMResponse
@@ -54,8 +54,23 @@ def _model_response(text: str) -> ModelResponse:
 
 
 class _TypedContractLM(BaseLM):
-    def __init__(self, *args: object, outputs: list[str], **kwargs: object):
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        model: str,
+        *,
+        outputs: list[str],
+        model_type: str = "chat",
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        num_retries: int = 3,
+    ):
+        super().__init__(
+            model=model,
+            model_type=model_type,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            num_retries=num_retries,
+        )
         self.outputs = outputs
         self.requests = []
 

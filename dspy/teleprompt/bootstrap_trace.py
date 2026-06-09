@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from types import MethodType
-from typing import Any, Callable, TypedDict
+from typing import Any, Callable, TypedDict, cast
 
 from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
@@ -94,13 +94,14 @@ async def bootstrap_trace_data(
                 )
             return (failed_pred, trace)
 
-    program.aforward = MethodType(patched_aforward, program)
+    program_any = cast("Any", program)
+    program_any.aforward = MethodType(patched_aforward, program)
     try:
         results = (
             await evaluator(program, run=run, metric=wrapped_metric, callback_metadata=callback_metadata)
         ).results
     finally:
-        program.aforward = original_aforward
+        program_any.aforward = original_aforward
     data = []
     for example_ind, (example, prediction, score) in enumerate(results):
         try:

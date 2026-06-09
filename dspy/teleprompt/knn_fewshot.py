@@ -12,9 +12,7 @@ from dspy.teleprompt.teleprompt import Teleprompter
 
 
 class KNNFewShot(Teleprompter):
-    def __init__(
-        self, k: int, trainset: list[Example], vectorizer: Embedder, **few_shot_bootstrap_args: dict[str, Any]
-    ) -> None:
+    def __init__(self, k: int, trainset: list[Example], vectorizer: Embedder, **few_shot_bootstrap_args: Any) -> None:
         self.KNN = KNN(k, trainset, vectorizer=vectorizer)
         self.few_shot_bootstrap_args = few_shot_bootstrap_args
 
@@ -25,7 +23,9 @@ class KNNFewShot(Teleprompter):
 
         async def aforward_pass(_, **kwargs):
             knn_trainset = knn_few_shot.KNN(**kwargs)
-            few_shot_bootstrap = BootstrapFewShot(**knn_few_shot.few_shot_bootstrap_args)
+            bootstrap_args = dict(knn_few_shot.few_shot_bootstrap_args)
+            bootstrap_args.pop("run", None)
+            few_shot_bootstrap = BootstrapFewShot(**bootstrap_args)
             compiled_program = await few_shot_bootstrap.compile(
                 student, teacher=teacher, trainset=knn_trainset, run=run
             )

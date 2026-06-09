@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING
 
 from dspy.adapters.types.tool import Tool
 from dspy.predict.rlm.sync_bridge import _run_sub_lm_async
-from dspy.runtime.run_context import RunContext
 from dspy.utils.transparency import reset_active_call_metadata, set_active_call_metadata
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from dspy.predict.rlm.module import RLM
+    from dspy.runtime.run_context import RunContext
 RESERVED_TOOL_NAMES = frozenset({"llm_query", "llm_query_batched", "SUBMIT", "print"})
 
 

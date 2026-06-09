@@ -1,8 +1,9 @@
 import os
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 import orjson
+from typing_extensions import NotRequired
 
 from dspy.utils.caching import DSPY_CACHEDIR
 from dspy.utils.hasher import Hasher
@@ -52,11 +53,11 @@ class GRPOGroup(TypedDict):
 
 class GRPOStatus(TypedDict):
     job_id: str
-    status: str | None = None
+    status: NotRequired[str | None]
     current_model: str
     checkpoints: dict[str, str]
-    last_checkpoint: str | None = None
-    pending_batch_ids: list[int] = []
+    last_checkpoint: NotRequired[str | None]
+    pending_batch_ids: list[int]
 
 
 def infer_data_format(adapter: "Adapter") -> str:
@@ -141,7 +142,9 @@ def find_data_error_chat(messages: dict[str, Any]) -> str | None:
     if not isinstance(messages["messages"], list):
         return f"The value of the `messages` key should be a list instance. Found: {type(messages['messages'])}"
     for ind, message in enumerate(messages["messages"]):
-        err = find_data_error_chat_message(message)
+        if not isinstance(message, dict):
+            return f"Error in message at index {ind}: expected dict, got {type(message).__name__}"
+        err = find_data_error_chat_message(cast("dict[str, Any]", message))
         if err:
             return f"Error in message at index {ind}: {err}"
     return None

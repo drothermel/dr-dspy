@@ -1,5 +1,6 @@
 import tempfile
 import uuid
+from typing import Any
 
 import pytest
 
@@ -10,18 +11,19 @@ dummy_data = 'content,question,answer\n"This is content 1","What is this?","This
 
 
 class CSVDataset(Dataset):
-    def __init__(self, file_path, input_keys=None, **kwargs: object) -> None:
+    def __init__(self, file_path, input_keys: list[str] | None = None, **kwargs: Any) -> None:
         import pandas as pd
 
         super().__init__(input_keys=input_keys, **kwargs)
+        active_input_keys = input_keys or []
         df = pd.read_csv(file_path)
         data = df.to_dict(orient="records")
         self._train = [
-            Example(**record, dspy_uuid=str(uuid.uuid4()), dspy_split="train").with_inputs(*input_keys)
+            Example(**record, dspy_uuid=str(uuid.uuid4()), dspy_split="train").with_inputs(*active_input_keys)
             for record in data[:1]
         ]
         self._dev = [
-            Example(**record, dspy_uuid=str(uuid.uuid4()), dspy_split="dev").with_inputs(*input_keys)
+            Example(**record, dspy_uuid=str(uuid.uuid4()), dspy_split="dev").with_inputs(*active_input_keys)
             for record in data[1:2]
         ]
 
@@ -43,4 +45,5 @@ def test_input_keys(csv_file):
         assert inputs is not None
         assert "content" in inputs
         assert "question" in inputs
+        assert example._input_keys is not None
         assert set(example._input_keys) == {"content", "question"}

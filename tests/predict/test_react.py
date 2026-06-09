@@ -1,5 +1,6 @@
 import asyncio
 import re
+from typing import Any, cast
 
 import pytest
 from pydantic import BaseModel
@@ -24,7 +25,7 @@ def test_react_requires_tool_instances():
         return query
 
     with pytest.raises(TypeError, match="tools must be Tool instances"):
-        ReAct(ts("question -> answer"), tools=[search])
+        ReAct(ts("question -> answer"), tools=cast("Any", [search]))
 
 
 def test_tool_observation_preserves_custom_type(make_run):
@@ -37,9 +38,13 @@ def test_tool_observation_preserves_custom_type(make_run):
 
     class SpyChatAdapter(ChatAdapter):
         @override
-        def format_user_message_content(self, task_spec, inputs, *args: object, **kwargs: object):
+        def format_user_message_content(
+            self, task_spec, inputs, prefix: str = "", suffix: str = "", main_request: bool = False
+        ) -> str | list[dict[str, Any]]:
             captured_calls.append((task_spec, dict(inputs)))
-            return super().format_user_message_content(task_spec, inputs, *args, **kwargs)
+            return super().format_user_message_content(
+                task_spec, inputs, prefix=prefix, suffix=suffix, main_request=main_request
+            )
 
     def make_images():
         return (Image("https://example.com/test.png"), Image(PILImage.new("RGB", (100, 100), "red")))
@@ -241,12 +246,12 @@ def test_trajectory_truncation(make_run):
             raise ContextWindowExceededError
         return Prediction(next_thought="Final thought", next_tool_name="finish", next_tool_args={})
 
-    react.react = mock_react
+    cast("Any", react).react = mock_react
 
     async def mock_extract(**kwargs: object):
         return Prediction(output_text="Final output")
 
-    react.extract = mock_extract
+    cast("Any", react).extract = mock_extract
     result = asyncio.run(react(input_text="test input", run=run))
     assert "thought_0" not in result.trajectory
     assert "thought_2" in result.trajectory
@@ -270,8 +275,8 @@ async def test_context_window_exceeded_after_retries(make_run):
         extract_calls.append(kwargs)
         return Prediction(output_text="Fallback output")
 
-    react.react = mock_react
-    react.extract = mock_extract
+    cast("Any", react).react = mock_react
+    cast("Any", react).extract = mock_extract
     run = make_run(lm=DummyLM([{}]))
     result = await react(input_text="test input", run=run)
     assert result.trajectory == {}

@@ -7,7 +7,7 @@ import inspect
 import sys
 import threading
 import types
-from typing import Any
+from typing import Any, NoReturn
 
 from typing_extensions import override
 
@@ -48,7 +48,7 @@ class _MissingModule(types.ModuleType):
         self._frame_data = frame_data
 
     @override
-    def __getattr__(self, attr: str):
+    def __getattr__(self, name: str) -> NoReturn:
         fd = self._frame_data
         raise ImportError(
             f"{self._message}\n\nThis error is lazily reported, having originally occurred in\n  File {fd['filename']}, line {fd['lineno']}, in {fd['function']}\n\n----> {''.join(fd['code_context'] or '').strip()}"
@@ -75,16 +75,19 @@ class _LazyModule(types.ModuleType):
             spec = self._dspy_lazy_spec
             module = importlib.util.module_from_spec(spec)
             sys.modules[module_name] = module
+            loader = spec.loader
+            if loader is None:
+                raise ImportError(f"Cannot load lazy module {module_name!r}: loader is missing.")
             try:
-                spec.loader.exec_module(module)
+                loader.exec_module(module)
             except Exception:
                 sys.modules[module_name] = self
                 raise
             return sys.modules.get(module_name, module)
 
     @override
-    def __getattr__(self, attr: str) -> Any:
-        return getattr(self._load(), attr)
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._load(), name)
 
     @override
     def __setattr__(self, attr: str, value: Any) -> None:

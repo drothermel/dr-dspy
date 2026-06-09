@@ -105,7 +105,7 @@ class Avatar(Module):
                 )
                 self._update_task_spec(idx)
                 args[f"action_{idx}"] = action
-                args[f"result_{idx}"] = tool_output
+                args[f"result_{idx}"] = tool_output if tool_output is not None else ""
             else:
                 self._update_task_spec(idx, omit_action=True)
                 args[f"action_{idx}"] = action

@@ -11,7 +11,7 @@ try:
     from litellm import Choices, Message
     from litellm.files.main import ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.adapters.baml_adapter import COMMENT_SYMBOL, INDENTATION, BAMLAdapter
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types.code import Code
@@ -189,7 +189,7 @@ def test_baml_adapter_raise_error_on_circular_references():
         instructions="Given the fields `input`, produce the fields `circular`.",
     )
     adapter = BAMLAdapter()
-    with pytest.raises(ValueError) as error:
+    with pytest.raises(ValueError, match="recursive pydantic models") as error:
         adapter.format_field_structure(TestSignature)
     assert "BAMLAdapter cannot handle recursive pydantic models" in str(error.value)
 

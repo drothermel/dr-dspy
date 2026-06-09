@@ -1,3 +1,4 @@
+from typing import Any, cast
 from unittest import mock
 
 import pytest
@@ -38,14 +39,14 @@ async def test_chat_adapter_fallback_preserves_native_function_calling_flag():
     adapter = ChatAdapter(use_native_function_calling=False)
     seen = {}
 
-    original_factory = adapter.parse_fallback_policy._fallback_factory
+    original_factory = cast("Any", adapter.parse_fallback_policy)._fallback_factory
 
     def tracking_factory():
         fallback = original_factory()
         seen["use_native_function_calling"] = fallback.use_native_function_calling
         return fallback
 
-    adapter.parse_fallback_policy._fallback_factory = tracking_factory
+    cast("Any", adapter.parse_fallback_policy)._fallback_factory = tracking_factory
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="{'answer': 'Paris'}"))],

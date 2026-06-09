@@ -89,7 +89,7 @@ class Reasoning(Type):
         return item in self.content
 
     @override
-    def __iter__(self) -> Iterator[str]:
+    def __iter__(self) -> Iterator[str]:  # ty:ignore[invalid-method-override]
         return iter(self.content)
 
     def __add__(self, other: object) -> object:

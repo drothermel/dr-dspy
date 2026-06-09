@@ -10,7 +10,7 @@ from dspy.core.types import Assistant, LMRequest, LMResponse, System, ToolCall, 
 def _require_env(*keys: str) -> None:
     missing = [key for key in keys if not os.getenv(key)]
     if missing:
-        pytest.skip(f"Missing live LM credentials: {', '.join(missing)}")
+        pytest.skip(f"Missing live LM credentials: {', '.join(missing)}")  # ty: ignore[too-many-positional-arguments]
 
 
 def _text(response: LMResponse) -> str:

@@ -6,6 +6,7 @@ from dspy.clients.databricks import (
     _create_directory_in_databricks_unity_catalog,
 )
 from dspy.clients.lm import LM
+from dspy.clients.utils_finetune import TrainDataFormat
 from dspy.core.types import LMRequest
 
 try:
@@ -22,7 +23,7 @@ def test_create_directory_in_databricks_unity_catalog():
     w = WorkspaceClient()
     with pytest.raises(
         ValueError,
-        match="Databricks Unity Catalog path must be in the format '/Volumes/<catalog>/<schema>/<volume>/...', but received: /badstring/whatever",
+        match=r"Databricks Unity Catalog path must be in the format '/Volumes/<catalog>/<schema>/<volume>/\.\.\.', but received: /badstring/whatever",
     ):
         _create_directory_in_databricks_unity_catalog(w, "/badstring/whatever")
     _create_directory_in_databricks_unity_catalog(w, "/Volumes/main/chenmoney/testing/dspy_testing")
@@ -55,7 +56,7 @@ def test_create_finetuning_job():
         job=job,
         model="meta-llama/Llama-3.2-1B",
         train_data=fake_training_data,
-        data_format="chat",
+        train_data_format="chat",
         train_kwargs={
             "train_data_path": "/Volumes/main/chenmoney/testing/dspy_testing",
             "register_to": "main.chenmoney.finetuned_model",
@@ -63,11 +64,12 @@ def test_create_finetuning_job():
             "skip_deploy": True,
         },
     )
+    assert job.finetuning_run is not None
     assert job.finetuning_run.status.display_name is not None
 
 
 def test_deploy_finetuned_model():
     model_to_deploy = "main.chenmoney.finetuned_model"
-    DatabricksProvider.deploy_finetuned_model(model=model_to_deploy, data_format="chat")
+    DatabricksProvider.deploy_finetuned_model(model=model_to_deploy, data_format=TrainDataFormat.CHAT)
     lm = LM(model="databricks/main_chenmoney_finetuned_model")
     lm(LMRequest.from_call(model=lm.model, prompt="what is 2 + 2?"))

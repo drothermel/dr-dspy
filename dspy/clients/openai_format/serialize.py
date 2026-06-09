@@ -132,7 +132,7 @@ def tool_choice_to_openai(choice: LMToolChoice) -> dict[str, Any]:
             )
         data: dict[str, Any] = {"tool_choice": {"type": "function", "function": {"name": choice.allowed[0]}}}
     else:
-        data = {"tool_choice": choice.mode}
+        data: dict[str, Any] = {"tool_choice": choice.mode}
     if choice.parallel is not None:
         data["parallel_tool_calls"] = choice.parallel
     return data

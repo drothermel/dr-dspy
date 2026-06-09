@@ -7,7 +7,7 @@ import pytest
 try:
     from litellm import Choices, Message, ModelResponse
 except ImportError:
-    pytest.skip("litellm is not installed", allow_module_level=True)
+    pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
 from dspy.predict.predict import Predict
@@ -51,16 +51,17 @@ def test_bootstrap_trace_data(make_run):
         ),
     ]
 
+    call_state = {"count": 0}
+
     def completion_side_effect(*args: object, **kwargs: object):
-        call_count = completion_side_effect.call_count
-        completion_side_effect.call_count += 1
+        call_count = call_state["count"]
+        call_state["count"] += 1
         if call_count in (2, 3):
             return ModelResponse(
                 choices=[Choices(message=Message(content="This is an invalid JSON!"))], model="openai/gpt-4o-mini"
             )
         return successful_responses[call_count if call_count < 2 else call_count - 2]
 
-    completion_side_effect.call_count = 0
     with mock.patch("litellm.acompletion", new=mock.AsyncMock(side_effect=completion_side_effect)):
         results = asyncio.run(
             bootstrap_trace_data(

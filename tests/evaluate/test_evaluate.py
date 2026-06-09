@@ -64,9 +64,9 @@ def test_construct_result_df(make_run):
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4"), new_example("What is 3+3?", "-1")]
     ev = Evaluate(devset=devset, metric=answer_exact_match)
     results = [
-        (devset[0], {"answer": "2"}, 100.0),
-        (devset[1], {"answer": "4"}, 100.0),
-        (devset[2], {"answer": "-1"}, 0.0),
+        (devset[0], Example(answer="2"), 100.0),
+        (devset[1], Example(answer="4"), 100.0),
+        (devset[2], Example(answer="-1"), 0.0),
     ]
     result_df = ev._construct_result_table(results, answer_exact_match.__name__)
     pd.testing.assert_frame_equal(
@@ -117,8 +117,8 @@ def test_multi_thread_evaluate_call_cancelled(monkeypatch, make_run):
 
     input_thread = threading.Thread(target=sleep_then_interrupt)
     input_thread.start()
+    ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False, num_threads=2)
     with pytest.raises(KeyboardInterrupt):
-        ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False, num_threads=2)
         asyncio.run(ev(program, run=run))
 
 
@@ -156,7 +156,9 @@ def test_evaluate_display_table(program_with_example, display_table, capfd, make
     example_input = next(iter(example.inputs().values()))
     example_output = {key: value for key, value in example.to_dict().items() if key not in example.inputs()}
     run = make_run(lm=DummyLM({example_input: example_output}))
-    ev = Evaluate(devset=[example], metric=lambda example, pred, **kwargs: example == pred, display_table=display_table)
+    ev = Evaluate(
+        devset=[example], metric=lambda example, pred, **_kwargs: example == pred, display_table=display_table
+    )
     assert ev.display_table == display_table
     asyncio.run(ev(program, run=run))
     out, _ = capfd.readouterr()
@@ -192,14 +194,16 @@ def test_evaluate_callback(make_run):
     ev = Evaluate(devset=devset, metric=answer_exact_match, display_progress=False)
     result = asyncio.run(ev(program, run=run))
     assert result.score == 100.0
+    assert callback.start_call_inputs is not None
     assert callback.start_call_inputs["program"] == program
     assert callback.start_call_count == 1
+    assert callback.end_call_outputs is not None
     assert callback.end_call_outputs.score == 100.0
     assert callback.end_call_count == 1
 
 
 def test_evaluation_result_repr(make_run):
-    result = EvaluationResult(score=100.0, results=[(new_example("What is 1+1?", "2"), {"answer": "2"}, 100.0)])
+    result = EvaluationResult(score=100.0, results=[(new_example("What is 1+1?", "2"), Example(answer="2"), 100.0)])
     assert repr(result) == "EvaluationResult(score=100.0, results=<list of 1 results>)"
 
 

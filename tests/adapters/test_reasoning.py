@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any, cast
 
 import pytest
 
@@ -42,19 +43,20 @@ def test_reasoning_concatenation(make_run):
 
 def test_reasoning_string_methods(make_run):
     reasoning = Reasoning(content="  Hello World  ")
-    assert reasoning.strip() == "Hello World"
-    assert reasoning.lower() == "  hello world  "
-    assert reasoning.upper() == "  HELLO WORLD  "
-    assert reasoning.strip().split() == ["Hello", "World"]
-    assert reasoning.strip().split(" ") == ["Hello", "World"]
-    assert reasoning.replace("World", "Python") == "  Hello Python  "
-    assert reasoning.strip().startswith("Hello")
-    assert reasoning.strip().endswith("World")
-    assert not reasoning.strip().startswith("World")
-    assert reasoning.find("World") == 8
-    assert reasoning.find("xyz") == -1
-    assert reasoning.count("l") == 3
-    assert reasoning.strip().join(["a", "b", "c"]) == "aHello WorldbHello Worldc"
+    text_ops = cast("Any", reasoning)
+    assert text_ops.strip() == "Hello World"
+    assert text_ops.lower() == "  hello world  "
+    assert text_ops.upper() == "  HELLO WORLD  "
+    assert text_ops.strip().split() == ["Hello", "World"]
+    assert text_ops.strip().split(" ") == ["Hello", "World"]
+    assert text_ops.replace("World", "Python") == "  Hello Python  "
+    assert text_ops.strip().startswith("Hello")
+    assert text_ops.strip().endswith("World")
+    assert not text_ops.strip().startswith("World")
+    assert text_ops.find("World") == 8
+    assert text_ops.find("xyz") == -1
+    assert text_ops.count("l") == 3
+    assert text_ops.strip().join(["a", "b", "c"]) == "aHello WorldbHello Worldc"
 
 
 def test_reasoning_with_chain_of_thought(make_run):
@@ -73,5 +75,9 @@ def test_reasoning_with_chain_of_thought(make_run):
 
 def test_reasoning_error_message():
     reasoning = Reasoning(content="Hello")
+
+    def access_missing_method() -> None:
+        reasoning.nonexistent_method  # noqa: B018
+
     with pytest.raises(AttributeError, match="`Reasoning` object has no attribute 'nonexistent_method'"):
-        reasoning.nonexistent_method
+        access_missing_method()

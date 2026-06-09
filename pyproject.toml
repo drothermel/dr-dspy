@@ -241,6 +241,7 @@ ban-relative-imports = "all"
 ]
 "dspy/utils/transparency.py" = [
     "TC001",  # TaskSpec validation inspects field metadata at runtime.
+    "N818",  # Legacy TransparencyViolation exception name
 ]
 "dspy/adapters/base/**/*.py" = [
     "TC001",  # Mixin modules use cross-module types at runtime in adapter call/format paths.
@@ -262,6 +263,39 @@ ban-relative-imports = "all"
     "F405",  # Allow undefined names from wildcard imports (common in __init__ files)
 ]
 "scripts/*.py" = ["T201"]  # CLI scripts may print status to stdout/stderr
+"dspy/core/types/builders.py" = ["N802"]  # Legacy message builder API (System, User, ...)
+"dspy/dsp/utils/dpr.py" = ["N802"]  # Legacy DPR_* tokenizer helpers
+"dspy/dsp/utils/utils.py" = ["N801"]  # Legacy dotdict / dotdict_lax types
+"dspy/evaluate/metrics.py" = ["N802"]  # Legacy metric names (EM, F1, HotPotF1)
+"dspy/predict/best_of_n.py" = ["N803"]  # Legacy N parameter name
+"dspy/predict/multi_chain_comparison.py" = ["N803"]  # Legacy M parameter name
+"dspy/predict/refine.py" = ["N803"]  # Legacy N parameter name
+"dspy/runtime/run_context.py" = ["TC001"]  # TransparencyMode required at runtime for Pydantic
+
+[tool.ty.src]
+include = ["dspy", "tests"]
+
+[tool.ty.analysis]
+allowed-unresolved-imports = [
+    "custom_module.**",
+    "databricks.**",
+    "faiss.**",
+    "langchain.tools.**",
+    "mlflow.**",
+    "peft.**",
+    "sglang.**",
+    "soundfile",
+    "tomli",
+    "tomllib",
+    "torch.**",
+    "transformers.**",
+    "trl.**",
+]
+
+[[tool.ty.overrides]]
+include = ["dspy/adapters/types/tool/tool.py"]
+[tool.ty.overrides.rules]
+unknown-argument = "ignore"
 
 [tool.ty.environment]
 python-version = "3.10"

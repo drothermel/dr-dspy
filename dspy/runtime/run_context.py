@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from dspy.utils.transparency import TransparencyMode
+
+if TYPE_CHECKING:
+    from dspy.utils.usage_tracker import UsageTracker
 
 
 class ExecutionConfig(BaseModel):

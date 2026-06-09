@@ -29,7 +29,7 @@ class TrainingJob(Future):
 
     @override
     def cancel(self) -> bool:
-        super().cancel()
+        return super().cancel()
 
     @abstractmethod
     def status(self) -> Any:
@@ -74,7 +74,7 @@ class Provider:
         self.ReinforceJob = ReinforceJob
 
     @staticmethod
-    def is_provider_model(model: str) -> bool:
+    def is_provider_model(_model: str) -> bool:
         return False
 
     @staticmethod

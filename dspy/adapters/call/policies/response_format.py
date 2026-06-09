@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, Protocol
 
 from dspy.core.types.config import LMConfig, coerce_lm_config
 from dspy.utils.exceptions import LMError
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from dspy.adapters.base.adapter import Adapter
     from dspy.clients.base_lm import BaseLM
     from dspy.task_spec import TaskSpec

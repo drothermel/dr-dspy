@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 from dspy.predict.predict import Predict
@@ -84,7 +85,7 @@ def test_eval_candidate_program_failure(make_run):
 
 def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled(make_run):
     student = DummyModule()
-    student.predictor = Predict(ts("input -> output"))
+    cast("Any", student).predictor = Predict(ts("input -> output"))
     trainset = [Example(input="test", output="test").with_inputs("input")]
     lm = DummyLM([{"output": "test"}])
     run = make_run(lm=lm)
@@ -99,7 +100,7 @@ def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled(make_
                 trainset=trainset,
                 max_labeled_demos=1,
                 max_bootstrapped_demos=1,
-                metric=lambda ex, pred, trace=None: 1.0,
+                metric=lambda _ex, _pred, _trace=None: 1.0,
                 run=run,
                 metric_threshold=0.9,
             )

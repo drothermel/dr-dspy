@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 from typing_extensions import override
 
 from dspy.primitives.prediction import Prediction
-from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.annotation import experimental
 
@@ -22,6 +21,7 @@ if TYPE_CHECKING:
     from dspy.clients.lm import LM
     from dspy.primitives.example import Example
     from dspy.primitives.module import Module
+    from dspy.runtime.run_context import RunContext
     from dspy.teleprompt.gepa.gepa_utils import DspyAdapter, DSPyTrace, PredictorFeedbackFn, ScoreWithFeedback
 logger = logging.getLogger(__name__)
 AUTO_RUN_SETTINGS = {"light": {"n": 6}, "medium": {"n": 12}, "heavy": {"n": 18}}

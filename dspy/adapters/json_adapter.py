@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-from typing import Any, get_origin
+from typing import TYPE_CHECKING, Any, cast, get_origin
 
 import json_repair
 import pydantic
 import regex
-from pydantic.fields import FieldInfo
 from typing_extensions import override
 
 from dspy.adapters.base import Adapter
@@ -21,10 +20,15 @@ from dspy.adapters.utils import (
     serialize_for_json,
     translate_field_type,
 )
-from dspy.task_spec import TaskSpec
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
-from dspy.utils.callback import BaseCallback
 from dspy.utils.exceptions import AdapterParseError
+
+if TYPE_CHECKING:
+    from pydantic.fields import FieldInfo
+
+    from dspy.adapters.types.base_type import Type
+    from dspy.task_spec import TaskSpec
+    from dspy.utils.callback import BaseCallback
 
 
 def _has_open_ended_mapping(task_spec: TaskSpec) -> bool:
@@ -39,7 +43,7 @@ class JSONAdapter(ChatFormatMixin, Adapter):
         callbacks: list[BaseCallback] | None = None,
         use_native_function_calling: bool = True,
         parallel_tool_calls: bool | None = None,
-        native_response_types: list[type] | None = None,
+        native_response_types: list[type[Type]] | None = None,
     ) -> None:
         super().__init__(
             callbacks=callbacks,
@@ -153,7 +157,9 @@ def _get_structured_outputs_response_format(
             continue
         fields[name] = (field_type, ...)
     pydantic_model = pydantic.create_model(
-        "DSPyProgramOutputs", __config__=pydantic.ConfigDict(extra="forbid"), **fields
+        "DSPyProgramOutputs",
+        __config__=pydantic.ConfigDict(extra="forbid"),
+        **cast("dict[str, Any]", fields),
     )
     schema = pydantic_model.model_json_schema()
     for prop in schema.get("properties", {}).values():

@@ -122,7 +122,7 @@ def test_inspect_history_with_n(capsys, make_run):
 
 def test_inspect_empty_history(capsys, make_run):
     lm = DummyLM([])
-    run = make_run(lm=lm)
+    make_run(lm=lm)
     inspect_history()
     history = GLOBAL_HISTORY
     assert len(history) == 0

@@ -7,7 +7,6 @@ from dspy.compile.resolve import resolve_call, resolve_lm_config
 from dspy.core.types import LMRequest
 from dspy.core.types.config import coerce_lm_config, merge_lm_request_config
 from dspy.core.types.history import _history_request_messages_as_openai
-from dspy.runtime.run_context import RunContext
 from dspy.utils.exceptions import AdapterParseError, LMError
 from dspy.utils.transparency import (
     ACTIVE_COMPILED_CALL,
@@ -20,6 +19,7 @@ if TYPE_CHECKING:
     from dspy.adapters.two_step_adapter import TwoStepAdapter
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types.config import LMConfig
+    from dspy.runtime.run_context import RunContext
     from dspy.task_spec import TaskSpec
 
 

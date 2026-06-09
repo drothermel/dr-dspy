@@ -33,6 +33,9 @@ def test_lm_config_accepts_canonical_nested_fields():
         prompt_cache=LMPromptCacheConfig(enabled=True, key="prompt-cache"),
         extensions={"provider_flag": True},
     )
+    assert config.reasoning is not None
+    assert config.tool_choice is not None
+    assert config.prompt_cache is not None
     assert config.reasoning.effort == "high"
     assert config.reasoning.summary == "auto"
     assert config.tool_choice.mode == "auto"

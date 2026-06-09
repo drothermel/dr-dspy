@@ -42,7 +42,7 @@ def dummy_lm_context(responses: list[dict], make_run):
     from dspy.utils.dummies import DummyLM
 
     lm = DummyLM(responses)
-    run = make_run(lm=lm)
+    make_run(lm=lm)
     yield lm
 
 
