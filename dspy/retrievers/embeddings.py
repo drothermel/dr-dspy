@@ -9,7 +9,10 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, Self, cast
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 import srsly
 from typing_extensions import override
@@ -49,8 +52,8 @@ def _search_result_to_passages(
 class Embeddings:
     """Embedding retriever with optional FAISS index.
 
-    Call ``close()`` when the retriever is no longer needed to stop the
-    background ``Unbatchify`` worker thread.
+    Prefer ``with Embeddings(...) as retriever:`` or call ``close()`` when the
+    retriever is no longer needed to stop the background ``Unbatchify`` worker thread.
     """
 
     def __init__(
@@ -79,6 +82,17 @@ class Embeddings:
 
     def close(self) -> None:
         self.search_fn.close()
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.close()
 
     def _batch_forward(self, queries: list[str]) -> list[SearchResult]:
         q_embeds = self.embedder(queries)
@@ -137,12 +151,17 @@ class Embeddings:
         if self.index is not None:
             try:
                 import faiss
-
-                faiss.write_index(self.index, str(save_path / "faiss_index.bin"))
-            except ImportError:
-                pass
+            except ImportError as exc:
+                raise ImportError(
+                    "FAISS index is configured but `faiss-cpu` is not installed. "
+                    "Install faiss-cpu or rebuild without a FAISS index."
+                ) from exc
+            faiss.write_index(self.index, str(save_path / "faiss_index.bin"))
 
     def load(self, path: str, embedder: Embedder) -> Embeddings:
+        if hasattr(self, "search_fn"):
+            self.search_fn.close()
+
         save_path = Path(path)
         if not save_path.exists():
             raise FileNotFoundError(f"Save directory not found: {path}")
@@ -163,15 +182,20 @@ class Embeddings:
         self.embedder = embedder
         self.corpus_embeddings = np.load(embeddings_path)
         faiss_index_path = save_path / "faiss_index.bin"
-        if config["has_faiss_index"] and faiss_index_path.exists():
+        if config["has_faiss_index"]:
+            if not faiss_index_path.exists():
+                raise FileNotFoundError(f"Saved config expects a FAISS index but file not found: {faiss_index_path}")
             try:
                 import faiss
-
-                self.index = faiss.read_index(str(faiss_index_path))
-            except ImportError:
-                self.index = None
+            except ImportError as exc:
+                raise ImportError(
+                    "Saved embeddings require FAISS but `faiss-cpu` is not installed. "
+                    "Install faiss-cpu to load this index."
+                ) from exc
+            self.index = faiss.read_index(str(faiss_index_path))
         else:
             self.index = None
+        self.search_fn = Unbatchify(self._batch_forward)
         return self
 
     @classmethod
