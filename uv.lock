@@ -865,6 +865,9 @@ dependencies = [
 anthropic = [
     { name = "anthropic" },
 ]
+datasets = [
+    { name = "datasets" },
+]
 dev = [
     { name = "build" },
     { name = "datamodel-code-generator" },
@@ -925,6 +928,7 @@ requires-dist = [
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.0.3" },
     { name = "cloudpickle", specifier = ">=3.1.2,<4.0.0" },
     { name = "datamodel-code-generator", marker = "extra == 'dev'", specifier = ">=0.26.3" },
+    { name = "datasets", marker = "extra == 'datasets'", specifier = ">=2.14.6" },
     { name = "datasets", marker = "extra == 'test-extras'", specifier = ">=2.14.6" },
     { name = "dr-llm", specifier = "==4.3.0" },
     { name = "gepa", extras = ["dspy"], marker = "extra == 'gepa'", specifier = "==0.1.1" },
@@ -961,7 +965,7 @@ requires-dist = [
     { name = "tqdm", specifier = ">=4.66.1,<5.0.0" },
     { name = "weaviate-client", marker = "extra == 'weaviate'", specifier = ">=4.5.4,<4.22.0" },
 ]
-provides-extras = ["anthropic", "gepa", "weaviate", "mcp", "langchain", "optuna", "numpy", "streaming", "tools", "dev", "test-extras"]
+provides-extras = ["anthropic", "gepa", "weaviate", "mcp", "langchain", "optuna", "datasets", "numpy", "streaming", "tools", "dev", "test-extras"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "ty", specifier = ">=0.0.44" }]
