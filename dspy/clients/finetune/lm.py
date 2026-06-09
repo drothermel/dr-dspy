@@ -5,8 +5,8 @@ import threading
 from typing import TYPE_CHECKING, Any
 
 from dspy.clients.finetune.provider import DefaultFinetuneProvider, TrainingJob
-from dspy.clients.openai import OpenAIProvider
 from dspy.errors import LMUnsupportedFeatureError
+from dspy.integrations.finetune.openai import OpenAIProvider
 
 if TYPE_CHECKING:
     from dspy.clients.finetune.protocol import FinetuneProvider, ReinforceJob
@@ -38,7 +38,7 @@ def finetune(
 ) -> TrainingJob:
     if not lm.provider.finetunable:
         raise LMUnsupportedFeatureError(
-            f"Provider {lm.provider} does not support fine-tuning, please specify your provider by explicitly setting `provider` when creating the `dspy.clients.lm.LM` instance. For example, `from dspy.clients.lm import LM; from dspy.clients.openai import OpenAIProvider; LM('openai/gpt-4.1-mini-2025-04-14', provider=OpenAIProvider())`.",
+            f"Provider {lm.provider} does not support fine-tuning, please specify your provider by explicitly setting `provider` when creating the `dspy.clients.lm.LM` instance. For example, `from dspy.clients.lm import LM; from dspy.integrations.finetune import OpenAIProvider; LM('openai/gpt-4.1-mini-2025-04-14', provider=OpenAIProvider())`.",
             model=lm.model,
             provider=lm._provider_name,
             features=["finetuning"],

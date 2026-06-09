@@ -1,13 +1,13 @@
 import pytest
 
-from dspy.clients.databricks import (
+from dspy.clients.finetune import TrainDataFormat
+from dspy.clients.lm import LM
+from dspy.core.types import LMRequest
+from dspy.integrations.finetune.databricks import (
     DatabricksProvider,
     TrainingJobDatabricks,
     _create_directory_in_databricks_unity_catalog,
 )
-from dspy.clients.finetune import TrainDataFormat
-from dspy.clients.lm import LM
-from dspy.core.types import LMRequest
 
 try:
     from databricks.sdk import WorkspaceClient
