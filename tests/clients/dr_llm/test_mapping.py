@@ -148,32 +148,60 @@ def test_lm_request_maps_reasoning_effort() -> None:
 
 
 @pytest.mark.parametrize(
-    ("model", "controls", "expected_reasoning"),
+    ("model", "controls", "expected_reasoning", "expected_sampling"),
     [
         (
             "openrouter/xiaomi/mimo-v2-flash",
             {"reasoning": {"kind": "openrouter", "enabled": False}, "sampling": {"temperature": 0.7, "top_p": 0.95}},
             {"kind": "openrouter", "enabled": False, "effort": None},
+            (0.7, 0.95),
+        ),
+        (
+            "openrouter/nvidia/llama-3.3-nemotron-super-49b-v1.5",
+            {"reasoning": {"kind": "openrouter", "enabled": False}, "sampling": {"temperature": 0.7, "top_p": 0.95}},
+            {"kind": "openrouter", "enabled": False, "effort": None},
+            (0.7, 0.95),
+        ),
+        (
+            "openrouter/openai/gpt-oss-20b",
+            {
+                "reasoning": {"kind": "openrouter", "effort": "low"},
+                "sampling": {"temperature": None, "top_p": None},
+            },
+            {"kind": "openrouter", "enabled": None, "effort": "low"},
+            (None, None),
         ),
         (
             "openrouter/openai/gpt-5-nano",
-            {"reasoning": {"kind": "openrouter", "effort": "low"}},
+            {
+                "reasoning": {"kind": "openrouter", "effort": "low"},
+                "sampling": {"temperature": None, "top_p": None},
+            },
             {"kind": "openrouter", "enabled": None, "effort": "low"},
+            (None, None),
         ),
         (
             "openai/gpt-5-nano",
-            {"reasoning": {"kind": "openai", "thinking_level": "minimal"}},
+            {
+                "reasoning": {"kind": "openai", "thinking_level": "minimal"},
+                "sampling": {"temperature": None, "top_p": None},
+            },
             {"kind": "openai", "thinking_level": "minimal"},
+            (None, None),
         ),
         (
             "google/gemini-2.5-flash-lite",
-            {"reasoning": {"kind": "google", "thinking_level": "off"}},
+            {"reasoning": {"kind": "google", "thinking_level": "off"}, "sampling": {"temperature": 0.7, "top_p": 0.95}},
             {"kind": "google", "thinking_level": "off", "budget_tokens": None, "include_thoughts": None},
+            (0.7, 0.95),
         ),
     ],
 )
 def test_lm_request_maps_dr_llm_provider_reasoning_controls(
-    model: str, controls: dict, expected_reasoning: dict
+    model: str,
+    controls: dict,
+    expected_reasoning: dict,
+    expected_sampling: tuple[float | None, float | None] | None,
 ) -> None:
     lm = DummyLM([{"answer": "x"}])
     request = LMRequest(
@@ -184,6 +212,12 @@ def test_lm_request_maps_dr_llm_provider_reasoning_controls(
     backend_request = lm_request_to_backend_request(request, lm=lm)
     assert backend_request.reasoning is not None
     assert backend_request.reasoning.model_dump(mode="json") == expected_reasoning
+    if expected_sampling is None:
+        assert backend_request.sampling is None
+    else:
+        assert backend_request.sampling is not None
+        assert backend_request.sampling.temperature == expected_sampling[0]
+        assert backend_request.sampling.top_p == expected_sampling[1]
 
 
 def test_lm_request_maps_dr_llm_provider_effort_max() -> None:

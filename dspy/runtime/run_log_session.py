@@ -85,6 +85,6 @@ def ensure_log_session(run: RunContext, *, explicit_log_session: bool) -> None:
     if run.log_session is None:
         init_log_session(run)
         return
-    expected_root = resolve_log_root(run.telemetry.call_log_dir)
-    if run.log_session.run_dir.parent.parent != expected_root / resolve_run_bucket():
+    expected_bucket = resolve_log_root(run.telemetry.call_log_dir) / resolve_run_bucket()
+    if run.log_session.run_dir.parent != expected_bucket:
         init_log_session(run)

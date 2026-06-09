@@ -139,6 +139,17 @@ def test_fork_enables_disk_logging_session(tmp_path, monkeypatch):
     assert (forked.log_session.run_dir / "run.json").exists()
 
 
+def test_fork_preserves_disk_logging_session_when_telemetry_unchanged(tmp_path, monkeypatch):
+    monkeypatch.setenv("DSPY_LOG_DIR", str(tmp_path))
+    run = RunContext.create(
+        lm=DummyLM([{"answer": "ok"}]),
+        adapter=JSONAdapter(),
+        telemetry=TelemetryConfig(call_log=CallLogMode.disk),
+    )
+    forked = run.fork()
+    assert forked.log_session is run.log_session
+
+
 def test_read_call_log_rejects_non_call_record():
     lm = DummyLM([{"answer": "ok"}])
     adapter = JSONAdapter()

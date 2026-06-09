@@ -207,3 +207,36 @@ def test_collect_trace_data_supports_async_metric(make_run):
 
     assert metric_called is True
     assert data[0]["score"] == 0.5
+
+
+def test_collect_trace_data_metric_receives_captured_program_trace(make_run):
+    from tests.test_utils import DummyLM
+
+    run = make_run(lm=DummyLM([{}]))
+    example = Example.from_record({"question": "q"}, input_keys=("question",))
+    dataset = [example]
+    evaluator = make_trace_collection_evaluator(run, dataset=dataset, max_concurrency=1, max_errors=1)
+    seen_traces: list[list[Any] | None] = []
+
+    class TraceWritingProgram(Module):
+        async def _aforward_impl(self, *, run, options=None, **inputs):
+            prediction = Prediction(answer="a")
+            run.optimization_trace.append(("inner", inputs, prediction))
+            return prediction
+
+    def trace_metric(_example, _prediction, trace=None):
+        seen_traces.append(trace)
+        return 1.0
+
+    data = asyncio.run(
+        collect_trace_data(
+            program=TraceWritingProgram(),
+            dataset=dataset,
+            run=run,
+            evaluator=evaluator,
+            metric=trace_metric,
+        )
+    )
+
+    assert seen_traces == [data[0]["trace"]]
+    assert seen_traces[0][0][0] == "inner"

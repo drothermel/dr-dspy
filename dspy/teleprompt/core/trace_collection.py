@@ -50,7 +50,7 @@ async def collect_trace_data(
     callback_metadata: dict[str, Any] | None = None,
 ) -> list[TraceData]:
     async def wrapped_metric(example, prediction, trace=None):
-        prediction, _ = prediction
+        prediction, captured_trace = prediction
         if isinstance(prediction, FailedPrediction):
             reward = prediction.format_reward if prediction.format_reward is not None else format_failure_score
             if reward < 0.0 or reward > 1.0:
@@ -62,7 +62,7 @@ async def collect_trace_data(
             metric,
             example=example,
             prediction=prediction,
-            trace=trace,
+            trace=captured_trace,
             run=run,
         )
 
