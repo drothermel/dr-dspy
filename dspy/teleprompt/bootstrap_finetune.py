@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from typing import Any, Callable, cast
+from typing import Any, Callable
 
 from pydantic import BaseModel
 
@@ -54,7 +54,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
         logger.info("Bootstrapping data...")
         trace_data = []
         teachers = teacher if isinstance(teacher, list) else [teacher]
-        teachers = [prepare_teacher(student=student, teacher=cast("Module | None", t)) for t in teachers]
+        teachers = [prepare_teacher(student=student, teacher=t) for t in teachers]
         max_concurrency = self.max_concurrency or run.execution.max_concurrency
         for t in teachers:
             trace_data += await bootstrap_trace_data(

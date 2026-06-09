@@ -92,12 +92,12 @@ class SIMBA:
             nonlocal next_program_idx
             next_program_idx += 1
             new_idx = next_program_idx
-            cast("Any", prog).simba_idx = new_idx
+            prog.simba_idx = new_idx
             programs.append(prog)
             program_scores[new_idx] = score_list
 
         student = student.deepcopy()
-        cast("Any", student).simba_idx = 0
+        student.simba_idx = 0
         programs.append(student)
         program_scores[0] = []
         winning_programs = [student]

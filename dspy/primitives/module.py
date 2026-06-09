@@ -35,6 +35,14 @@ class Module(BaseModule):
         self._compiled = False
         self.call_log = []
 
+    @property
+    def run(self) -> RunContext | None:
+        return vars(self).get("run")
+
+    @run.setter
+    def run(self, value: RunContext | None) -> None:
+        vars(self)["run"] = value
+
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
         state.pop("call_log", None)
@@ -100,29 +108,35 @@ class Module(BaseModule):
         raise NotImplementedError(f"{type(self).__name__} must implement _aforward_impl().")
 
     def set_lm(self, lm: LMForward | None) -> None:
-        for _, param in self.named_predictors():
-            param.lm = lm
+        for _, predictor in self.named_predictors():
+            predictor.lm = lm
 
     def get_lm(self) -> LMForward:
-        all_used_lms = [param.lm for _, param in self.named_predictors()]
-        if len(set(all_used_lms)) == 1:
-            lm = all_used_lms[0]
-            if lm is None:
-                raise ValueError("No LM is configured on this module's predictors.")
-            return lm
-        raise ValueError(
-            "Multiple LMs are configured on this module. Inspect per-predictor LMs via "
-            "named_predictors() and read param.lm on each predictor."
-        )
+        lm = self.optional_lm()
+        if lm is None:
+            raise ValueError("No LM is configured on this module's predictors.")
+        return lm
+
+    def optional_lm(self) -> LMForward | None:
+        """Return the module's LM when all predictors share one; otherwise ``None`` or raise."""
+        all_used_lms = [predictor.lm for _, predictor in self.named_predictors()]
+        if not all_used_lms:
+            return None
+        if len(set(all_used_lms)) != 1:
+            raise ValueError(
+                "Multiple LMs are configured on this module. Inspect per-predictor LMs via "
+                "named_predictors() and read predictor.lm on each predictor."
+            )
+        return all_used_lms[0]
 
     @override
     def __repr__(self) -> str:
         s = []
-        for name, param in self.named_predictors():
-            s.append(f"{name} = {param}")
+        for name, predictor in self.named_predictors():
+            s.append(f"{name} = {predictor}")
         return "\n".join(s)
 
-    def inspect_call_log(self, n: int = 1, file: "TextIO | None" = None) -> None:
+    def inspect_call_log(self, n: int = 1, file: TextIO | None = None) -> None:
         pretty_print_call_log(call_log=self.call_log, n=n, file=file)
 
     async def batch(

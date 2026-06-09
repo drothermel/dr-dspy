@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from dspy.primitives.record_store import RecordStore, _RecordBacked, _RecordStoreFacade
+from dspy.primitives._record_mixins import RecordBacked, RecordStoreFacade
+from dspy.primitives.record_store import RecordStore
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
     from dspy.task_spec import TaskSpec
 
 
-class Prediction(_RecordStoreFacade):
+class Prediction(RecordStoreFacade):
     """Model output container backed by a field store.
 
     Equality compares store fields and attached completions, not numeric scores.
@@ -115,7 +116,7 @@ def _coerce_score_operand(other: object, *, operation: str) -> float:
     raise TypeError(f"Unsupported type for {operation}: {type(other)}")
 
 
-class Completions(_RecordBacked):
+class Completions(RecordBacked):
     _RECORD_ATTR = "_completions"
     _RECORD_RESERVED = frozenset({"_completions", "task_spec"})
 
@@ -124,7 +125,7 @@ class Completions(_RecordBacked):
         list_or_dict: list[dict[str, Any]] | dict[str, list[Any]],
         task_spec: TaskSpec | None = None,
     ) -> None:
-        self.task_spec = task_spec
+        object.__setattr__(self, "task_spec", task_spec)
         if isinstance(list_or_dict, list):
             kwargs: dict[str, list[Any]] = {}
             for arg in list_or_dict:

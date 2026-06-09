@@ -16,6 +16,8 @@ SIMPLE_TYPES = (str, int, float, bool, list, dict, type(None))
 
 
 def annotation_to_sandbox_type(annotation: Any) -> str | None:
+    if annotation is type(None):
+        return "None"
     if annotation in SIMPLE_TYPES:
         return annotation.__name__
     origin = get_origin(annotation)

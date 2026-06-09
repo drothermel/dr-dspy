@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 
 import pydantic
 
-from dspy.core.types import parts_from_openai_content
 from dspy.core.types.parts import LMTextPart
+from dspy.core.types.parts.openai import parts_from_openai_content
 
 if TYPE_CHECKING:
     from litellm import ModelResponseStream

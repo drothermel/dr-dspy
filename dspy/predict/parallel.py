@@ -93,4 +93,4 @@ class Parallel:
                 exception = stats.exceptions_map.get(failed_idx)
                 if exception is not None:
                     failures.append(BatchFailure(input=original_example, exception=exception))
-        return BatchResult(results=results, failures=tuple(failures))
+        return BatchResult(results=tuple(results), failures=tuple(failures))

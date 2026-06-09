@@ -1,6 +1,6 @@
 import logging
 import random
-from typing import Callable, cast
+from typing import Callable
 
 from pydantic import BaseModel, ConfigDict
 
@@ -139,7 +139,7 @@ class BetterTogether:
         if not teacher:
             return (student, None)
         teacher = [teacher] if not isinstance(teacher, list) else teacher
-        teacher = [prepare_teacher(student=student, teacher=cast("Module", t)) for t in teacher]
+        teacher = [prepare_teacher(student=student, teacher=t) for t in teacher]
         return (student, teacher)
 
     def _prepare_trainset_and_valset(

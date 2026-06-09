@@ -1,5 +1,5 @@
 import logging
-from typing import Any, cast
+from typing import Any
 
 from dspy.adapters.types.tool import Tool
 from dspy.core.types.call_options import ModuleCallOptions
@@ -86,7 +86,7 @@ class ReAct(Module):
                 break
             try:
                 tool = self.tools[pred.next_tool_name]
-                observation = await cast("Any", tool).acall(**pred.next_tool_args)
+                observation = await tool.acall(**pred.next_tool_args)
             except Exception as err:
                 observation = f"Execution error in {pred.next_tool_name}: {_fmt_exc(err)}"
             turn_log = turn_log.append_turn(

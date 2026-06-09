@@ -66,7 +66,7 @@ class BootstrapFewShotWithOptuna:
         if teacher is None:
             self.teacher = student.reset_copy()
         elif isinstance(teacher, list):
-            self.teacher = cast("Module", teacher[0]).deepcopy()
+            self.teacher = (teacher[0]).deepcopy()
         else:
             self.teacher = teacher.deepcopy()
         max_demos = params.max_demos

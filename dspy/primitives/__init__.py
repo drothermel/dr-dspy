@@ -1,4 +1,5 @@
 import importlib
+from typing import Any
 
 from dspy.primitives.base_module import BaseModule
 from dspy.primitives.batch_result import BatchFailure, BatchResult
@@ -35,7 +36,7 @@ _LAZY_EXPORTS = {
 }
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     if name in _LAZY_EXPORTS:
         module_name, attr_name = _LAZY_EXPORTS[name]
         obj = getattr(importlib.import_module(module_name), attr_name)

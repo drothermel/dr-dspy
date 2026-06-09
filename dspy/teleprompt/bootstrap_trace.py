@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from types import MethodType
-from typing import Any, Callable, TypedDict, cast
+from typing import Any, Callable, TypedDict
 
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.errors import AdapterParseError
@@ -103,7 +103,7 @@ async def bootstrap_trace_data(
                 )
             return (failed_pred, trace)
 
-    program_any = cast("Any", program)
+    program_any = program
     program_any._aforward_impl = MethodType(patched_aforward_impl, program)
     try:
         results = (

@@ -2,7 +2,7 @@ import asyncio
 import json
 import tempfile
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import pytest
 
@@ -15,7 +15,7 @@ from tests.task_spec.helpers import ts
 
 
 def _module_attrs(module: Module) -> Any:
-    return cast("Any", module)
+    return module
 
 
 class HopModule(Module):
@@ -53,7 +53,7 @@ def test_predictors(make_run):
     module = HopModule()
     preds = module.predictors()
     assert len(preds) == 2, "Should return correct number of Predict instances"
-    assert all(isinstance(p, Predict) for p in preds), "All returned items should be instances of PredictMock"
+    assert all(isinstance(p, Predict) for p in preds), "All returned items should be instances of Predict"
 
 
 def test_forward(make_run):
@@ -233,10 +233,10 @@ def test_compiled_subgraph_is_opaque():
     root_attrs.compiled_child = compiled_child
     root_attrs.top_predict = Predict(ts("question -> answer", instructions="Answer the question."))
 
-    param_names = {name for name, _ in root.named_predictors()}
+    predictor_names = {name for name, _ in root.named_predictors()}
     submodule_names = {name for name, _ in root.named_sub_modules()}
 
-    assert "self.top_predict" in param_names
-    assert "self.compiled_child.inner" not in param_names
+    assert "self.top_predict" in predictor_names
+    assert "self.compiled_child.inner" not in predictor_names
     assert "self.compiled_child" in submodule_names
     assert "self.compiled_child.inner" not in submodule_names

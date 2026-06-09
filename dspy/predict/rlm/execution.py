@@ -103,9 +103,13 @@ def prepare_execution_tools(rlm: RLM, run: RunContext | None = None) -> dict[str
 
 
 def inject_execution_context(rlm: RLM, interpreter: CodeInterpreter, execution_tools: dict[str, Callable]) -> None:
-    if not isinstance(interpreter, PythonInterpreter):
-        raise TypeError(f"Expected PythonInterpreter, got {type(interpreter).__name__}")
-    interpreter._tools.update(execution_tools)
+    if isinstance(interpreter, PythonInterpreter):
+        interpreter._tools.update(execution_tools)
+    else:
+        tools = getattr(interpreter, "tools", None)
+        if not isinstance(tools, dict):
+            raise TypeError(f"Unsupported interpreter for tool injection: {type(interpreter).__name__}")
+        tools.update(execution_tools)
     if hasattr(interpreter, "output_fields"):
         cast("Any", interpreter).output_fields = get_output_fields_info(rlm)
     if hasattr(interpreter, "_tools_registered"):

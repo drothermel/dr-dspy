@@ -1,12 +1,17 @@
-from collections.abc import Mapping
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from dspy.primitives.record_store import RecordStore, _RecordStoreFacade
+from dspy.primitives._record_mixins import RecordStoreFacade
+from dspy.primitives.record_store import RecordStore
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
-class Example(_RecordStoreFacade):
+class Example(RecordStoreFacade):
     _RECORD_ATTR = "_store"
     _RECORD_RESERVED = frozenset({"_store", "_input_keys"})
 
@@ -28,7 +33,7 @@ class Example(_RecordStoreFacade):
         object.__setattr__(self, "_input_keys", _input_keys)
 
     @classmethod
-    def from_record(cls, record: Mapping[str, Any], *, input_keys: tuple[str, ...] = ()) -> "Example":
+    def from_record(cls, record: Mapping[str, Any], *, input_keys: tuple[str, ...] = ()) -> Example:
         return cls(_store=RecordStore(record), _input_keys=frozenset(input_keys))
 
     @property
@@ -37,11 +42,8 @@ class Example(_RecordStoreFacade):
             return frozenset()
         return self._input_keys
 
-    def __delitem__(self, key: str) -> None:
-        del self._store[key]
-
     def __len__(self) -> int:
-        return len([k for k in self._store if not k.startswith("dspy_")])
+        return len(self.keys())
 
     @override
     def __repr__(self) -> str:
@@ -56,33 +58,33 @@ class Example(_RecordStoreFacade):
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Example) and self._store == other._store and self.input_keys == other.input_keys
 
-    def with_input_keys(self, *keys: str) -> "Example":
+    def with_input_keys(self, *keys: str) -> Example:
         return self.fork(_input_keys=frozenset(keys))
 
     def as_inputs(self) -> dict[str, Any]:
-        if not self._input_keys:
+        if not self.input_keys:
             raise ValueError(
                 "Input keys have not been set for this example. Use Example.from_record(..., input_keys=(...))."
             )
-        return {key: self._store[key] for key in self._store if key in self._input_keys}
+        return {key: self._store[key] for key in self._store if key in self.input_keys}
 
     def as_labels(self) -> dict[str, Any]:
         input_keys = self.input_keys
         return {key: self._store[key] for key in self._store if key not in input_keys and not key.startswith("dspy_")}
 
-    def fork(self, **updates: Any) -> "Example":
+    def fork(self, **updates: Any) -> Example:
         store = self._store.copy()
         input_keys = self._input_keys
         for key, value in updates.items():
             if key == "_input_keys":
                 input_keys = value
             elif key == "_store":
-                store = value.copy() if isinstance(value, RecordStore) else RecordStore(value).copy()
+                store = value.copy() if isinstance(value, RecordStore) else RecordStore(value)
             else:
                 store[key] = value
         return Example(_store=store, _input_keys=input_keys)
 
-    def without(self, *keys: str) -> "Example":
+    def without(self, *keys: str) -> Example:
         copied = self.fork()
         for key in keys:
             del copied[key]

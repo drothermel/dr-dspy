@@ -183,7 +183,7 @@ def test_batch_with_failed_examples(make_run):
         Example.from_record({"value": 3}, input_keys=("value",)),
     ]
     batch_result = asyncio.run(module.batch(examples, provide_traceback=True, run=run))
-    assert batch_result.results == ["success-1", None, "success-3"]
+    assert batch_result.results == ("success-1", None, "success-3")
     assert len(batch_result.failures) == 1
     assert batch_result.failures[0].input["value"] == 42
     assert isinstance(batch_result.failures[0].exception, ValueError)
@@ -214,4 +214,4 @@ def test_batch_timeout_and_straggler_limit_params(make_run):
         Example.from_record({"value": 3}, input_keys=("value",)),
     ]
     results = asyncio.run(module.batch(examples, timeout=0, straggler_limit=5, run=run)).results
-    assert results == [2, 4, 6]
+    assert results == (2, 4, 6)

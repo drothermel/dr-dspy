@@ -1,5 +1,4 @@
 import random
-from typing import Any, cast
 
 from pydantic import BaseModel
 
@@ -119,7 +118,7 @@ class BootstrapFewShotWithRandomSearch:
             score_data.append({"score": score, "subscores": subscores, "seed": seed, "program": program})
             if self.stop_at_score is not None and score >= self.stop_at_score:
                 break
-        compiled = cast("Any", best_program)
+        compiled = best_program
         compiled.candidate_programs = score_data
         compiled.candidate_programs = sorted(compiled.candidate_programs, key=lambda x: x["score"], reverse=True)
         return best_program

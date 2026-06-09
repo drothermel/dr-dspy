@@ -61,7 +61,11 @@ class BaseModule:
             self._enqueue_graph_children(name=name, item=item, queue=queue, seen=seen)
 
     def named_predictors(self) -> list[tuple[str, Predictor]]:
-        """Return ``(name, Predictor)`` pairs. Skips predictors inside compiled subgraphs."""
+        """Return ``(name, Predictor)`` pairs. Skips predictors inside compiled subgraphs.
+
+        When the same ``Predictor`` instance is reachable via multiple paths, only the
+        first name encountered during breadth-first traversal is returned.
+        """
         named_predictors: list[tuple[str, Predictor]] = []
         visited_predictors: set[int] = set()
         for name, item in self._walk_module_graph():
@@ -86,7 +90,7 @@ class BaseModule:
                 yield name, cast("BaseModule", item)
 
     def predictors(self) -> list[Predictor]:
-        return [param for _, param in self.named_predictors()]
+        return [predictor for _, predictor in self.named_predictors()]
 
     def deepcopy(self) -> Self:
         try:
@@ -118,17 +122,17 @@ class BaseModule:
 
     def reset_copy(self) -> Self:
         new_instance = self.deepcopy()
-        for param in new_instance.predictors():
-            param.reset()
+        for predictor in new_instance.predictors():
+            predictor.reset()
         return new_instance
 
     def dump_state(self, json_mode: bool = True) -> dict[str, Any]:
-        return {name: param.dump_state(json_mode=json_mode) for name, param in self.named_predictors()}
+        return {name: predictor.dump_state(json_mode=json_mode) for name, predictor in self.named_predictors()}
 
     def load_state(self, state: dict[str, Any], *, allow_unsafe_lm_state: bool = False) -> Self:
         def _apply(module: BaseModule) -> None:
-            for name, param in module.named_predictors():
-                param.load_state(state[name], allow_unsafe_lm_state=allow_unsafe_lm_state)
+            for name, predictor in module.named_predictors():
+                predictor.load_state(state[name], allow_unsafe_lm_state=allow_unsafe_lm_state)
 
         _apply(self.deepcopy())
         _apply(self)

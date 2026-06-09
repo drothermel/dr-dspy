@@ -72,7 +72,7 @@ class Refine(Module):
         **inputs,
     ):
         run = resolve_run(run=run, bound_run=self.run)
-        lm = self.module.get_lm() or run.lm
+        lm = self.module.optional_lm() or run.lm
         best_pred, best_trace, best_reward = (None, None, -float("inf"))
         advice = None
         adapter, _ = resolve_adapter(run.adapter)

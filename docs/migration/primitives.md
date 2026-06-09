@@ -33,7 +33,7 @@ Call modules with `await module(..., run=run)`. Direct `await module.aforward(..
 
 - `PythonInterpreter`, `CodeInterpreterError`, and `FinalOutput` are exported from `dspy.primitives`.
 - `PythonInterpreter.tools` is a read-only mapping view; mutate tools via the constructor or internal `_tools` during runtime injection (for example RLM execution setup).
-- Sandbox tool registration advertises scalar types and homogeneous `list` / `dict` containers. Parameterized annotations such as `list[str]` map to their container origin.
+- Sandbox tool registration advertises scalar types (`str`, `int`, `float`, `bool`, `None`) and homogeneous `list` / `dict` containers. Parameterized annotations such as `list[str]` map to their container origin; optional unions like `str | None` map to the non-``None`` member.
 - JSON-RPC application error codes are generated from `dspy/primitives/jsonrpc_app_errors.json` via `scripts/generate_jsonrpc_errors.py`.
 - Import interpreter internals from `dspy.primitives.python_interpreter` when needed.
 
@@ -43,4 +43,5 @@ Call modules with `await module(..., run=run)`. Direct `await module.aforward(..
 - Use `Example.from_record(record, input_keys=(...))` for labeled training rows; use `Prediction.from_record(record)` for model outputs.
 - `Prediction` equality compares store fields and attached `Completions` objects (identity), not numeric scores.
 - `Prediction` rich comparisons and arithmetic (`+`, `/`, `<`, etc.) coerce through `float(prediction["score"])`. Missing `score` raises `ValueError`.
-- `Module.batch` and `Parallel(...)(pairs)` return `BatchResult` with `.results` and `.failures`. Failures are always populated for indices that raised an exception (`BatchFailure` entries with `.input` and `.exception`).
+- `Module.batch` and `Parallel(...)(pairs)` return `BatchResult` with `.results` and `.failures`. Both fields are immutable sequences (tuples). Failures are populated for indices that raised an exception (`BatchFailure` entries with `.input` and `.exception`).
+- `named_predictors()` deduplicates by predictor object identity; when the same predictor is aliased on multiple attributes, only the first name from breadth-first traversal is returned.

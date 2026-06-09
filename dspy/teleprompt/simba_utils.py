@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def prepare_models_for_resampling(*, program: Module, n: int, run: RunContext, teacher_run: RunContext | None = None):
-    lm = program.get_lm() or run.lm
+    lm = program.optional_lm() or run.lm
     models = []
     if teacher_run:
         teacher_lm = teacher_run.lm or lm
