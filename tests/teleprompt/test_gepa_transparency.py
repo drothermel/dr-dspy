@@ -12,7 +12,9 @@ def test_gepa_reflection_uses_predict_path(make_run):
     json_adapter = JSONAdapter()
     reflection_lm = DummyLM([{"new_instruction": "Better instruction."}], adapter=json_adapter)
     run = make_run(
-        lm=reflection_lm, adapter=json_adapter, telemetry=TelemetryConfig(transparency="strict", call_log=CallLogMode.memory)
+        lm=reflection_lm,
+        adapter=json_adapter,
+        telemetry=TelemetryConfig(transparency="strict", call_log=CallLogMode.memory),
     )
     adapter = DspyAdapter(
         student_module=student,

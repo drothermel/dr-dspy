@@ -67,7 +67,9 @@ def test_predict_lm_call_appends_jsonl(tmp_path, monkeypatch, make_run):
     monkeypatch.setenv("DSPY_LOG_DIR", str(tmp_path))
     json_adapter = JSONAdapter()
     lm = DummyLM([{"answer": "42"}], adapter=json_adapter)
-    run = make_run(lm=lm, adapter=json_adapter, telemetry=TelemetryConfig(transparency="strict", call_log=CallLogMode.both))
+    run = make_run(
+        lm=lm, adapter=json_adapter, telemetry=TelemetryConfig(transparency="strict", call_log=CallLogMode.both)
+    )
     predict = Predict(SampleTaskSpec())
     asyncio.run(predict(question="2+2", run=run))
     calls_files = list(Path(tmp_path).rglob("calls.jsonl"))

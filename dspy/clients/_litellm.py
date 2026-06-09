@@ -26,7 +26,7 @@ def _materialize_litellm(litellm: types.ModuleType) -> None:
 
 @functools.cache
 def get_litellm(*, feature: str) -> Any:
-    litellm = require("litellm", extra="litellm", feature=feature)
+    litellm = require("litellm", feature=feature)
     _materialize_litellm(litellm)
     _configure_litellm_defaults(litellm)
     return litellm

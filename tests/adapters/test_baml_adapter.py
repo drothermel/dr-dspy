@@ -395,10 +395,12 @@ def test_baml_adapter_with_conversation_history():
         },
         instructions="Given the fields `history`, `question`, produce the fields `answer`.",
     )
-    history = TurnLog(turns=(
+    history = TurnLog(
+        turns=(
             {"question": "What is the patient's age?", "answer": "45 years old"},
             {"question": "Any allergies?", "answer": "Penicillin allergy"},
-        ))
+        )
+    )
     adapter = BAMLAdapter()
     messages = adapter_format_as_openai(
         adapter=adapter,

@@ -102,7 +102,7 @@ def test_retry_made_on_system_errors(make_run):
         pytest.raises(LMRateLimitError),
     ):
         asyncio.run(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
-    assert retry_tracking[0] == 2
+    assert retry_tracking[0] == 4
 
 
 def test_exponential_backoff_retry(make_run):

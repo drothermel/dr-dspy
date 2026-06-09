@@ -37,7 +37,7 @@ def test_lm_litellm_use_raises_helpful_error_without_litellm(monkeypatch, make_r
     with pytest.raises(ImportError) as exc_info:
         _ = LM("openai/gpt-4o-mini").supports_function_calling
     msg = str(exc_info.value)
-    assert "[litellm]" in msg
+    assert "pip install litellm" in msg
     assert "dspy.clients.lm.LM" in msg
 
 
@@ -46,7 +46,7 @@ def test_embedder_litellm_use_raises_helpful_error_without_litellm(monkeypatch, 
     with pytest.raises(ImportError) as exc_info:
         asyncio.run(Embedder("openai/text-embedding-3-small")(["hello"]))
     msg = str(exc_info.value)
-    assert "[litellm]" in msg
+    assert "pip install litellm" in msg
     assert "dspy.clients.embedding.Embedder" in msg
 
 

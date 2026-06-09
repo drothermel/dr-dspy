@@ -47,9 +47,7 @@ def test_codeact_code_generation(make_run):
     program = CodeAct(BasicQA, tools=[ADD_TOOL])
     res = asyncio.run(program(question="What is 1+1?", run=run))
     assert res.answer == "2"
-    assert res.turn_log.turns == (
-        {"generated_code": "result = add(1,1)\nprint(result)", "code_output": '"2\\n"'},
-    )
+    assert res.turn_log.turns == ({"generated_code": "result = add(1,1)\nprint(result)", "code_output": '"2\\n"'},)
     assert program.interpreter.deno_process is None
 
 
@@ -103,7 +101,10 @@ def test_codeact_code_parse_failure(make_run):
     res = asyncio.run(program(question="What is 1+1?", run=run))
     assert res.answer == "2"
     assert res.turn_log.turns == (
-        {"generated_code": "parse(error", "observation": "Failed to execute the generated code: Invalid Python syntax. message: "},
+        {
+            "generated_code": "parse(error",
+            "observation": "Failed to execute the generated code: Invalid Python syntax. message: ",
+        },
         {"generated_code": "result = add(1,1)\nprint(result)", "code_output": '"2\\n"'},
     )
     assert program.interpreter.deno_process is None

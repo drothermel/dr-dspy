@@ -34,7 +34,6 @@ def _turns_from_flat(flat: dict) -> tuple:
     return tuple(turns)
 
 
-
 @pytest.mark.extra
 def test_react_requires_tool_instances():
 

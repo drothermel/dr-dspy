@@ -93,7 +93,9 @@ class BaseLM:
         return kwargs
 
     @with_callbacks(kind="lm")
-    async def __call__(self, request: LMRequest, *, run: RunContext, compiled: CompiledCall | None = None) -> LMResponse:
+    async def __call__(
+        self, request: LMRequest, *, run: RunContext, compiled: CompiledCall | None = None
+    ) -> LMResponse:
         if not isinstance(request, LMRequest):
             raise TypeError(
                 f"{type(self).__name__}.__call__ expects dspy.core.types.LMRequest, not {type(request).__name__}."
@@ -105,9 +107,7 @@ class BaseLM:
             )
         return self._finalize_lm_response(request=request, response=response, run=run, compiled=compiled)
 
-    async def acall(
-        self, request: LMRequest, *, run: RunContext, compiled: CompiledCall | None = None
-    ) -> LMResponse:
+    async def acall(self, request: LMRequest, *, run: RunContext, compiled: CompiledCall | None = None) -> LMResponse:
         return await self.__call__(request, run=run, compiled=compiled)
 
     @property

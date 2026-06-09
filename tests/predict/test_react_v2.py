@@ -165,9 +165,7 @@ def test_react_v2_accepts_serialized_history_input(make_run):
         ]
     )
     run = make_run(lm=lm, adapter=ChatAdapter())
-    pred = asyncio.run(
-        ReActV2(ts("question -> answer"), tools=[])(turn_log={"turns": [{"question": "old"}]}, run=run)
-    )
+    pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(turn_log={"turns": [{"question": "old"}]}, run=run))
     assert pred.answer == "done"
     assert pred.turn_log.turns[0] == {"question": "old"}
     assert all(event for event in pred.turn_log.turns)
@@ -317,9 +315,10 @@ def test_react_v2_native_parallel_tool_calls_are_requested_and_replayed(make_run
         "call_provider_1",
         "call_provider_2",
     ]
-    assert [
-        result.call_id for result in pred.turn_log.turns[0]["tool_calls"].tool_call_results.tool_call_results
-    ] == ["call_provider_1", "call_provider_2"]
+    assert [result.call_id for result in pred.turn_log.turns[0]["tool_calls"].tool_call_results.tool_call_results] == [
+        "call_provider_1",
+        "call_provider_2",
+    ]
     assert [
         message["tool_call_id"]
         for message in (message_to_openai_chat(item) for item in lm.calls[1]["messages"])

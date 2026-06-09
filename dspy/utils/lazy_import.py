@@ -30,7 +30,6 @@ _INSTALL_HINTS: dict[str, str] = {
     "anthropic": "anthropic",
     "gepa": "gepa",
     "numpy": "numpy",
-    "litellm": "litellm",
 }
 _lazy_module_locks: dict[str, threading.RLock] = {}
 _lazy_module_locks_lock = threading.Lock()

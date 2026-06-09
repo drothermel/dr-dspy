@@ -126,10 +126,12 @@ def test_example_to_dict():
 
 
 def test_example_to_dict_with_history():
-    history = TurnLog(turns=(
+    history = TurnLog(
+        turns=(
             {"question": "What is the capital of France?", "answer": "Paris"},
             {"question": "What is the capital of Germany?", "answer": "Berlin"},
-        ))
+        )
+    )
     example = Example.from_record({"question": "Test question", "history": history, "answer": "Test answer"})
     result = example.to_dict()
     assert isinstance(result, dict)

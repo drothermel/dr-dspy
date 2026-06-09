@@ -22,7 +22,9 @@ class QATaskSpec(TaskSpec):
 async def test_bootstrap_few_shot_smoke_strict(make_run):
     json_adapter = JSONAdapter()
     lm = DummyLM([{"answer": "4"}] * 5, adapter=json_adapter)
-    run = make_run(lm=lm, adapter=json_adapter, telemetry=TelemetryConfig(transparency="strict", call_log=CallLogMode.memory))
+    run = make_run(
+        lm=lm, adapter=json_adapter, telemetry=TelemetryConfig(transparency="strict", call_log=CallLogMode.memory)
+    )
     student = Predict(QATaskSpec())
     trainset = [Example.from_record({"question": "2+2", "answer": "4"}, input_keys=("question",))]
     teleprompter = BootstrapFewShot(
@@ -41,7 +43,9 @@ async def test_copro_smoke_strict(make_run):
     json_adapter = JSONAdapter()
     copro_answer = {"proposed_instruction": "Answer carefully.", "proposed_prefix_for_output_field": "Answer:"}
     lm = DummyLM([copro_answer, copro_answer, copro_answer], adapter=json_adapter)
-    run = make_run(lm=lm, adapter=json_adapter, telemetry=TelemetryConfig(transparency="strict", call_log=CallLogMode.memory))
+    run = make_run(
+        lm=lm, adapter=json_adapter, telemetry=TelemetryConfig(transparency="strict", call_log=CallLogMode.memory)
+    )
     student = Predict(QATaskSpec())
     teleprompter = COPRO(
         metric=lambda _example, _pred, _trace=None: 1.0, prompt_model=lm, breadth=2, depth=1, init_temperature=1.0

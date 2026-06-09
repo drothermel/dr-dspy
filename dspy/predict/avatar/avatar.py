@@ -26,9 +26,7 @@ class Avatar(Module):
             "turn_log": input_field("turn_log", TurnLog, desc="Previous actions and tool results."),
         }
         for field_name, field in self.input_fields.items():
-            actor_fields[field_name] = input_field(
-                field_name, field.type_, desc=field.desc, prefix=field.prefix
-            )
+            actor_fields[field_name] = input_field(field_name, field.type_, desc=field.desc, prefix=field.prefix)
         actor_fields["action"] = output_field("action", Action, desc="Next action to take.")
         actor_instructions = (
             "You will be given `Tools` which will be a list of tools to use to accomplish the `Goal`. "
@@ -42,9 +40,7 @@ class Avatar(Module):
         finish_fields = dict(actor_fields)
         finish_fields.pop("action")
         for field_name, field in self.output_fields.items():
-            finish_fields[field_name] = output_field(
-                field_name, field.type_, desc=field.desc, prefix=field.prefix
-            )
+            finish_fields[field_name] = output_field(field_name, field.type_, desc=field.desc, prefix=field.prefix)
         self.finish = Predict(
             make_task_spec(
                 finish_fields,
@@ -66,7 +62,11 @@ class Avatar(Module):
         options: ModuleCallOptions | None = None,
         **inputs,
     ):
-        args = {"goal": self.task_spec.instructions, "tools": [tool.name for tool in self.tools], "turn_log": TurnLog.empty()}
+        args = {
+            "goal": self.task_spec.instructions,
+            "tools": [tool.name for tool in self.tools],
+            "turn_log": TurnLog.empty(),
+        }
         for key in self.input_fields:
             if key in inputs:
                 args[key] = inputs[key]
@@ -88,7 +88,9 @@ class Avatar(Module):
             action_results.append(
                 ActionOutput(tool_name=tool_name, tool_input_query=tool_input_query, tool_output=tool_output)
             )
-            turn_log = turn_log.append_turn({"action": action, "result": tool_output if tool_output is not None else ""})
+            turn_log = turn_log.append_turn(
+                {"action": action, "result": tool_output if tool_output is not None else ""}
+            )
             remaining -= 1
         final_answer = await self.finish(**args, turn_log=turn_log, run=run, options=options)
         return Prediction(
