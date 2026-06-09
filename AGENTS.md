@@ -89,10 +89,10 @@ See `docs/migration/history.md` for turn logs vs call logs vs optimization trace
 
 Field descriptions must be explicit under strict transparency (placeholder `${field}` descs are rejected).
 
-Adapters read `FieldSpec` directly — there is no Pydantic `FieldInfo` bridge. Use `dspy.task_spec.fields` for spine work:
+Adapters read `FieldSpec` directly — there is no Pydantic `FieldInfo` bridge. Use `dspy.task_spec` for spine work:
 
 ```python
-from dspy.task_spec.fields import FieldBinding, field_bindings, format_field_value, validate_task_inputs_from_spec
+from dspy.task_spec import FieldBinding, field_bindings, format_field_value, validate_task_inputs_from_spec
 from dspy.task_spec.field_spec import FieldRole
 
 bindings = field_bindings(task_spec, role=FieldRole.INPUT)
@@ -108,6 +108,14 @@ for binding in bindings:
 - `LMMessageRole` — `StrEnum` on `LMMessage.role` (`user`, `assistant`, `system`, `tool`, …).
 - `ReasoningEffort` — `StrEnum` on `LMReasoningConfig.effort` (`low`, `medium`, `high`).
 - OpenAI-compat helpers live in `dspy.core.types.openai_compat` (`request_prompt`, `request_messages_as_openai`, `request_kwargs`). Import private part helpers from `dspy.core.types.parts.models` / `parts.openai` / `parts.serialize`, not the public `parts` barrel.
+
+## Public `core/types` spine API
+
+Cross-package code imports spine helpers from `dspy.core.types` only (not submodule paths). Symbols with a leading `_` under `dspy/core/types/` are internal.
+
+- Config merge/coercion: `merge_lm_config`, `merge_lm_request_config`, `coerce_lm_config`, `merge_provider_options`
+- Message/tool coercion: `coerce_tool_spec`
+- OpenAI part parsing: `parts_from_openai_content`
 
 ## Strict transparency and audit logging
 

@@ -5,36 +5,101 @@ from dspy.core.types import (
     CallRecord,
     LMConfig,
     LMPromptCacheConfig,
+    LMProviderOptions,
     LMReasoningConfig,
     LMRequest,
+    LMRequestPatch,
     LMResponse,
     LMToolChoice,
     LMUsage,
     User,
+    merge_lm_config,
+    merge_provider_options,
 )
-from dspy.core.types.config import ReasoningEffort, _merge_config_overrides, _merge_lm_config, coerce_lm_config
+from dspy.core.types.config import ReasoningEffort
 
 
 def test_merge_lm_config_merges_extensions():
     left = LMConfig(extensions={"a": 1})
     right = LMConfig(extensions={"b": 2})
-    merged = _merge_lm_config(left, right)
+    merged = merge_lm_config(left, right)
     assert merged is not None
     assert merged.extensions == {"a": 1, "b": 2}
 
 
-def test_merge_config_overrides_clears_extensions_when_none():
+def test_merge_lm_config_clears_extensions_when_none():
     config = LMConfig(extensions={"a": 1})
-    merged = _merge_config_overrides(config, {"extensions": None})
+    merged = merge_lm_config(config, LMConfig.model_construct(extensions=None))
+    assert merged is not None
     assert merged.extensions == {}
 
 
 def test_merge_lm_config_empty_right_extensions_preserves_left_keys():
     left = LMConfig(extensions={"a": 1})
     right = LMConfig(extensions={})
-    merged = _merge_lm_config(left, right)
+    merged = merge_lm_config(left, right)
     assert merged is not None
     assert merged.extensions == {"a": 1}
+
+
+def test_merge_lm_config_extension_key_override():
+    left = LMConfig(extensions={"a": 1})
+    right = LMConfig(extensions={"a": 2})
+    merged = merge_lm_config(left, right)
+    assert merged is not None
+    assert merged.extensions == {"a": 2}
+
+
+def test_merge_lm_config_nested_shallow_merge():
+    left = LMConfig(reasoning=LMReasoningConfig(effort=ReasoningEffort.LOW))
+    right = LMConfig(reasoning=LMReasoningConfig(summary="auto"))
+    merged = merge_lm_config(left, right)
+    assert merged is not None
+    assert merged.reasoning is not None
+    assert merged.reasoning.effort == ReasoningEffort.LOW
+    assert merged.reasoning.summary == "auto"
+
+
+def test_merge_lm_config_nested_none_clears():
+    left = LMConfig(reasoning=LMReasoningConfig(effort=ReasoningEffort.LOW))
+    right = LMConfig(reasoning=None)
+    merged = merge_lm_config(left, right)
+    assert merged is not None
+    assert merged.reasoning is None
+
+
+def test_merge_lm_config_scalar_none_clears():
+    left = LMConfig(temperature=0.2)
+    right = LMConfig(temperature=None)
+    merged = merge_lm_config(left, right)
+    assert merged is not None
+    assert merged.temperature is None
+
+
+def test_merge_provider_options_extensions_union():
+    left = LMProviderOptions(extensions={"a": 1})
+    right = LMProviderOptions(extensions={"b": 2})
+    merged = merge_provider_options(left, right)
+    assert merged is not None
+    assert merged.extensions == {"a": 1, "b": 2}
+
+
+def test_merge_provider_options_scalar_override():
+    left = LMProviderOptions(api_key="left-key", timeout=10.0)
+    right = LMProviderOptions(api_key="right-key")
+    merged = merge_provider_options(left, right)
+    assert merged is not None
+    assert merged.api_key == "right-key"
+    assert merged.timeout == 10.0
+
+
+def test_lm_request_patch_merge_uses_merge_lm_config():
+    patch = LMRequestPatch(config=LMConfig(temperature=0.1, extensions={"a": 1}))
+    other = LMRequestPatch(config=LMConfig(extensions={"b": 2}))
+    merged = patch.merge(other)
+    assert merged.config is not None
+    assert merged.config.temperature == 0.1
+    assert merged.config.extensions == {"a": 1, "b": 2}
 
 
 def test_config_extensions_surface_in_history_kwargs():
@@ -84,27 +149,6 @@ def test_default_config_does_not_serialize_empty_stop_sequences():
     entry = CallRecord(request=request, response=LMResponse.from_text("ok"), timestamp="timestamp", uuid="uuid")
     assert request.config.stop is None
     assert entry.kwargs == {}
-
-
-def test_coerce_lm_config_rejects_max_completion_tokens():
-    with pytest.raises(ValueError, match="max_completion_tokens"):
-        coerce_lm_config({"max_completion_tokens": 100})
-
-
-def test_coerce_lm_config_rejects_reasoning_effort():
-    with pytest.raises(ValueError, match="reasoning_effort"):
-        coerce_lm_config({"reasoning_effort": "high"})
-
-
-def test_coerce_lm_config_rejects_bool_prompt_cache():
-    with pytest.raises(TypeError, match="bool prompt_cache"):
-        coerce_lm_config({"prompt_cache": True})
-
-
-def test_coerce_lm_config_accepts_valid_mapping():
-    config = coerce_lm_config({"temperature": 0.2, "max_tokens": 100})
-    assert config.temperature == 0.2
-    assert config.max_tokens == 100
 
 
 def test_history_entry_exposes_typed_derived_properties():

@@ -1,4 +1,4 @@
-from dspy.task_spec.fields import format_field_value, get_annotation_name, translate_field_type
+from dspy.task_spec import format_field_value, get_annotation_name, translate_field_type
 from dspy.task_spec.formatting import get_field_spec_description_string as get_field_description_string
 
 from .json import serialize_for_json

@@ -13,8 +13,7 @@ except ImportError:
     pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm import LM
-from dspy.core.types import LMConfig, LMRequest, LMResponse
-from dspy.core.types.config import _lm_config_data_from_kwargs
+from dspy.core.types import LMConfig, LMRequest, LMResponse, coerce_lm_config, merge_lm_config
 
 
 def make_response(output_blocks):
@@ -52,11 +51,10 @@ def _request(
     config: LMConfig | None = None,
     **kwargs: Any,
 ) -> LMRequest:
-    config_overrides = _lm_config_data_from_kwargs(kwargs)
+    override = coerce_lm_config(kwargs) if kwargs else None
     merged_config = config
-    if config_overrides:
-        base = config or LMConfig()
-        merged_config = base.model_copy(update=config_overrides)
+    if override is not None and override.model_fields_set:
+        merged_config = merge_lm_config(config or LMConfig(), override) or (config or LMConfig())
     return LMRequest.from_call(
         model=lm.model,
         items=items,

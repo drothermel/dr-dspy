@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 
 import pydantic
 
+from dspy.core.types import parts_from_openai_content
 from dspy.core.types.parts import LMTextPart
-from dspy.core.types.parts.openai import _parts_from_openai_content
 
 if TYPE_CHECKING:
     from litellm import ModelResponseStream
@@ -49,9 +49,9 @@ class Type(pydantic.BaseModel):
         if isinstance(formatted, str):
             return [LMTextPart(text=formatted)]
         if isinstance(formatted, list):
-            return _parts_from_openai_content(formatted)
+            return parts_from_openai_content(formatted)
         if isinstance(formatted, dict):
-            return _parts_from_openai_content([formatted])
+            return parts_from_openai_content([formatted])
         return [LMTextPart(text=str(formatted))]
 
     def to_content_blocks(self) -> list[dict[str, Any]]:

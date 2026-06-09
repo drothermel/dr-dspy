@@ -6,7 +6,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from dspy.core.types.parts.models import LMPart, LMTextPart, LMToolResultPart, _coerce_part
-from dspy.core.types.parts.openai import _parts_from_openai_content, _tool_calls_from_openai
+from dspy.core.types.parts.openai import _tool_calls_from_openai, parts_from_openai_content
 
 
 class LMMessageRole(StrEnum):
@@ -36,10 +36,10 @@ class LMMessage(BaseModel):
                 call_id = data.pop("tool_call_id", None)
                 name = data.pop("name", None)
                 data["parts"] = [
-                    LMToolResultPart(call_id=call_id, name=name, content=_parts_from_openai_content(content))
+                    LMToolResultPart(call_id=call_id, name=name, content=parts_from_openai_content(content))
                 ]
             elif "parts" not in data:
-                parts = _parts_from_openai_content(data.pop("content", None)) if "content" in data else []
+                parts = parts_from_openai_content(data.pop("content", None)) if "content" in data else []
                 if "tool_calls" in data:
                     parts.extend(_tool_calls_from_openai(data.pop("tool_calls") or []))
                 data["parts"] = parts

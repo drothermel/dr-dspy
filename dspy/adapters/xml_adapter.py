@@ -12,9 +12,8 @@ from dspy.adapters.utils import (
     translate_field_type,
     validate_parsed_fields,
 )
-from dspy.task_spec import TaskSpec
+from dspy.task_spec import FieldBinding, TaskSpec, field_bindings
 from dspy.task_spec.field_spec import FieldRole
-from dspy.task_spec.fields import FieldBinding, field_bindings
 
 
 class XMLAdapter(ChatAdapter):

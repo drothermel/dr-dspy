@@ -6,7 +6,7 @@ from typing import Any
 from dspy.adapters.base import Adapter
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm_strict import lm_kwargs_max_tokens
-from dspy.core.types.config import LMConfig, _merge_lm_config, coerce_lm_config, lm_defaults_config
+from dspy.core.types import LMConfig, coerce_lm_config, lm_defaults_config, merge_lm_config
 from dspy.task_spec import TaskSpec
 from dspy.utils.transparency import CompiledCall, TransparencyViolation
 
@@ -28,11 +28,11 @@ def resolve_lm_config(
 ) -> tuple[LMConfig, dict[str, str]]:
     base = coerce_lm_config(predict_config)
     if override:
-        merged = _merge_lm_config(base, coerce_lm_config(override))
+        merged = merge_lm_config(base, coerce_lm_config(override))
         config = merged if merged is not None else coerce_lm_config(override)
     else:
         config = base
-    merged_request = _merge_lm_config(lm_defaults_config(lm), config) or config
+    merged_request = merge_lm_config(lm_defaults_config(lm), config) or config
     provenance: dict[str, str] = {}
     for field in ("temperature", "max_tokens", "n", "top_p"):
         lm_value = getattr(lm, "kwargs", {}).get(field)

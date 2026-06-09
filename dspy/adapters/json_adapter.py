@@ -21,8 +21,8 @@ from dspy.adapters.utils import (
     translate_field_type,
     validate_parsed_fields,
 )
+from dspy.task_spec import FieldBinding, field_bindings
 from dspy.task_spec.field_spec import FieldRole
-from dspy.task_spec.fields import FieldBinding, field_bindings
 from dspy.utils.exceptions import AdapterParseError
 
 if TYPE_CHECKING:

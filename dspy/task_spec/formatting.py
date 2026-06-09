@@ -1,6 +1,6 @@
 from dspy.adapters.types.base_type import Type as DspyType
+from dspy.task_spec.annotation_format import get_annotation_name
 from dspy.task_spec.field_spec import FieldSpec
-from dspy.task_spec.fields import get_annotation_name
 
 
 def _format_field_description_lines(

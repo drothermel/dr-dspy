@@ -5,9 +5,8 @@ from typing import Any, cast
 import pydantic
 
 from dspy.adapters.types.base_type import Type as DspyType
-from dspy.task_spec import TaskSpec
+from dspy.task_spec import TaskSpec, format_field_value
 from dspy.task_spec.field_spec import FieldSpec
-from dspy.task_spec.fields import format_field_value
 
 _MULTIMODAL_BLOCK_TYPES = frozenset({"image_url", "input_image", "file", "input_audio", "input_file"})
 

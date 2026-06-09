@@ -6,8 +6,8 @@ from typing_extensions import override
 
 from dspy.clients.base_lm import BaseLM
 from dspy.compile.resolve import resolve_lm_config
+from dspy.core.types import LMConfig, coerce_lm_config, merge_lm_config
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
-from dspy.core.types.config import LMConfig, _merge_lm_config, coerce_lm_config
 from dspy.predict.call_validation import resolve_predict_options
 from dspy.predict.parameter import Parameter
 from dspy.primitives.module import Module
@@ -119,7 +119,7 @@ class Predict(Module, Parameter):
         demos = options.demos if options.demos is not None else self.demos
         base_config = self.config
         if options.config is not None:
-            config = _merge_lm_config(base_config, options.config) or options.config
+            config = merge_lm_config(base_config, options.config) or options.config
         else:
             config = base_config
         lm = options.lm or self.lm or run.lm
@@ -190,7 +190,7 @@ class Predict(Module, Parameter):
         return self._forward_postprocess(completions, task_spec, run, inputs, trace=trace)
 
     def update_config(self, config: LMConfig) -> None:
-        merged = _merge_lm_config(self.config, config)
+        merged = merge_lm_config(self.config, config)
         self.config = merged if merged is not None else config
 
     def get_config(self) -> LMConfig:

@@ -1,5 +1,4 @@
 import ast
-import importlib
 import typing
 from collections.abc import Iterator
 from typing import Any, cast
@@ -8,6 +7,7 @@ from pydantic import Field
 
 from dspy.task_spec.field_spec import FieldSpec, field_desc_from_name, input_field, output_field
 from dspy.task_spec.task_spec import validate_task_spec_field_names
+from dspy.task_spec.type_registry import resolve_type_name
 
 
 def parse_task_spec_string(
@@ -57,32 +57,6 @@ def _typing_names_for_parse(custom_types: dict[str, type] | None) -> dict[str, A
 
 
 def _parse_type_node(node, names: dict[str, Any]) -> Any:
-    dspy_type_modules = {
-        "Audio": "dspy.adapters.types.audio",
-        "Code": "dspy.adapters.types.code",
-        "File": "dspy.adapters.types.file",
-        "TurnLog": "dspy.history.turn_log",
-        "Image": "dspy.adapters.types.image",
-        "Reasoning": "dspy.adapters.types.reasoning",
-        "Tool": "dspy.adapters.types.tool",
-        "ToolCalls": "dspy.adapters.types.tool",
-        "ToolCallResults": "dspy.adapters.types.tool",
-    }
-
-    def resolve_name(type_name: str):
-        if type_name in names:
-            return names[type_name]
-        builtin_types = [int, str, float, bool, list, tuple, dict, set, frozenset, complex, bytes, bytearray]
-        for builtin_type in builtin_types:
-            if builtin_type.__name__ == type_name:
-                return builtin_type
-        if type_name in dspy_type_modules:
-            module = importlib.import_module(dspy_type_modules[type_name])
-            resolved_type = getattr(module, type_name)
-            names[type_name] = resolved_type
-            return resolved_type
-        raise ValueError(f"Unknown type name: {type_name}. Provide it via custom_types=.")
-
     if isinstance(node, ast.Module):
         if len(node.body) != 1:
             raise ValueError(f"Code is not syntactically valid: {ast.dump(node)}")
@@ -90,7 +64,7 @@ def _parse_type_node(node, names: dict[str, Any]) -> Any:
     if isinstance(node, ast.Expr):
         return _parse_type_node(node.value, names)
     if isinstance(node, ast.Name):
-        return resolve_name(node.id)
+        return resolve_type_name(node.id, names)
     if isinstance(node, ast.Attribute):
         base = _parse_type_node(node.value, names)
         attr_name = node.attr

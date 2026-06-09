@@ -9,9 +9,17 @@ from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import ToolCalls
-from dspy.core.types import LMMessage, LMRequest, LMResponse
-from dspy.core.types.coercion import _coerce_tool_spec
-from dspy.core.types.config import LMConfig, LMToolChoice, LMToolSpec, coerce_lm_config, merge_lm_request_config
+from dspy.core.types import (
+    LMConfig,
+    LMMessage,
+    LMRequest,
+    LMResponse,
+    LMToolChoice,
+    LMToolSpec,
+    coerce_lm_config,
+    coerce_tool_spec,
+    merge_lm_request_config,
+)
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import TaskSpec
 from dspy.utils.exceptions import AdapterParseError
@@ -44,7 +52,7 @@ class AdapterCallMixin(AdapterNativeMixin):
                     raise ValueError("Tool call input field is required when native function calling is enabled.")
                 input_tools = inputs[tool_call_input_field_name]
                 input_tools = input_tools if isinstance(input_tools, list) else [input_tools]
-                tools = [_coerce_tool_spec(tool) for tool in input_tools]
+                tools = [coerce_tool_spec(tool) for tool in input_tools]
                 if self.parallel_tool_calls is not None:
                     if config.tool_choice is None:
                         config = config.model_copy(

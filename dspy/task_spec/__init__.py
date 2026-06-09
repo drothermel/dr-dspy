@@ -1,5 +1,8 @@
+from dspy.task_spec.annotation_format import get_annotation_name
+from dspy.task_spec.bindings import FieldBinding, field_bindings
 from dspy.task_spec.defaults import default_task_instructions
 from dspy.task_spec.factory import make_task_spec
+from dspy.task_spec.field_format import format_field_value, translate_field_type
 from dspy.task_spec.field_spec import (
     FieldRole,
     FieldSpec,
@@ -8,14 +11,8 @@ from dspy.task_spec.field_spec import (
     input_field,
     output_field,
 )
-from dspy.task_spec.fields import (
-    FieldBinding,
-    field_bindings,
-    format_field_value,
-    translate_field_type,
-    validate_task_inputs_from_spec,
-)
 from dspy.task_spec.task_spec import TaskSpec
+from dspy.task_spec.validation import validate_task_inputs_from_spec
 
 __all__ = [
     "FieldBinding",
@@ -24,6 +21,7 @@ __all__ = [
     "field_bindings",
     "field_desc_from_name",
     "format_field_value",
+    "get_annotation_name",
     "TaskSpec",
     "default_task_instructions",
     "infer_prefix",

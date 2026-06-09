@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING, Any, cast
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import build_multimodal_user_message_content, inputs_include_multimodal_custom_type_values
 from dspy.clients.openai_format import message_to_openai_chat
-from dspy.task_spec.field_spec import FieldRole
-from dspy.task_spec.fields import (
+from dspy.task_spec import (
     FieldBinding,
     field_bindings,
     format_field_value,
     get_annotation_name,
     translate_field_type,
 )
+from dspy.task_spec.field_spec import FieldRole
 from dspy.task_spec.formatting import get_field_spec_description_string
 
 if TYPE_CHECKING:

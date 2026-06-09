@@ -107,7 +107,21 @@ class LMConfig(BaseModel):
         return cls(**kwargs)
 
 
-def _merge_lm_config(left: LMConfig | None, right: LMConfig | None) -> LMConfig | None:
+_NESTED_CONFIG_FIELDS = frozenset({"reasoning", "tool_choice", "prompt_cache"})
+
+
+def merge_lm_config(left: LMConfig | None, right: LMConfig | None) -> LMConfig | None:
+    """Merge two ``LMConfig`` values with right overriding left.
+
+    Semantics:
+    - Base state comes from ``left`` with ``exclude_none=True``.
+    - Only fields present in ``right.model_fields_set`` are applied.
+    - Scalars: right wins, including explicit ``None`` (clears the field).
+    - Nested configs (``reasoning``, ``tool_choice``, ``prompt_cache``): shallow
+      dict merge when both sides are non-``None``; explicit ``None`` on right clears.
+    - ``extensions``: union-merge; ``None`` on right clears all extensions; an empty
+      mapping on right is a no-op that preserves left keys; colliding keys use right.
+    """
     if left is None:
         return right
     if right is None:
@@ -124,40 +138,21 @@ def _merge_lm_config(left: LMConfig | None, right: LMConfig | None) -> LMConfig 
             else:
                 extensions = dict(value)
             continue
-        if key in ("reasoning", "tool_choice", "prompt_cache") and value is not None:
-            left_value = data.get(key)
-            right_value = value.model_dump(exclude_none=True)
-            if isinstance(left_value, dict) and right_value:
-                data[key] = {**left_value, **right_value}
+        if key in _NESTED_CONFIG_FIELDS:
+            if value is None:
+                data[key] = None
             else:
-                data[key] = right_value
+                left_value = data.get(key)
+                right_value = value.model_dump(exclude_none=True)
+                if isinstance(left_value, dict) and right_value:
+                    data[key] = {**left_value, **right_value}
+                else:
+                    data[key] = right_value
             continue
         if isinstance(value, BaseModel):
             data[key] = value.model_dump(exclude_none=True)
         else:
             data[key] = value
-    data["extensions"] = extensions
-    return LMConfig(**data)
-
-
-def _merge_config_overrides(config: LMConfig, kwargs: dict[str, Any]) -> LMConfig:
-    if not kwargs:
-        return config
-    data = config.model_dump()
-    extensions = dict(config.extensions)
-    field_names = set(LMConfig.model_fields)
-    for key, value in kwargs.items():
-        if key == "extensions":
-            if value is None:
-                extensions = {}
-            elif isinstance(value, Mapping):
-                extensions.update(value)
-            else:
-                raise TypeError("`extensions` override must be a mapping or None.")
-        elif key in field_names and key != "extensions":
-            data[key] = value
-        else:
-            raise ValueError(f"Unknown LM config override: {key!r}")
     data["extensions"] = extensions
     return LMConfig(**data)
 
@@ -202,4 +197,4 @@ def lm_defaults_config(lm: Any) -> LMConfig:
 
 
 def merge_lm_request_config(lm: Any, config: LMConfig | None = None) -> LMConfig:
-    return _merge_lm_config(lm_defaults_config(lm), config or LMConfig()) or LMConfig()
+    return merge_lm_config(lm_defaults_config(lm), config or LMConfig()) or LMConfig()

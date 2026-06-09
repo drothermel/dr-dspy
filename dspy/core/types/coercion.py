@@ -50,7 +50,7 @@ def _messages_from_items(items: tuple[Any, ...], *, prompt: str | None = None) -
     return [LMMessage(role="user", parts=parts)], []
 
 
-def _coerce_tool_spec(tool: Any) -> LMToolSpec:
+def coerce_tool_spec(tool: Any) -> LMToolSpec:
     if isinstance(tool, LMToolSpec):
         return tool
     if hasattr(tool, "to_lm_tool_spec"):

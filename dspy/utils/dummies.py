@@ -15,8 +15,7 @@ from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import provider_tool_call_to_part
 from dspy.core.types import LMOutput, LMPart, LMRequest, LMResponse, LMTextPart, LMThinkingPart
 from dspy.core.types.lm_provider import LMProviderOptions
-from dspy.task_spec import output_field
-from dspy.task_spec.fields import FieldBinding
+from dspy.task_spec import FieldBinding, output_field
 from dspy.utils.dotdict import dotdict
 from dspy.utils.lazy_import import require
 

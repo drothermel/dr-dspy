@@ -1,5 +1,5 @@
+from dspy.core.types import LMConfig, merge_lm_config
 from dspy.core.types.call_options import ModuleCallOptions
-from dspy.core.types.config import LMConfig, _merge_lm_config
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
@@ -40,7 +40,7 @@ class MultiChainComparison(Module):
                 prefix="Accurate Reasoning: Thank you everyone. Let's now holistically",
             )
         )
-        merged_config = _merge_lm_config(LMConfig(temperature=temperature), config) or LMConfig(temperature=temperature)
+        merged_config = merge_lm_config(LMConfig(temperature=temperature), config) or LMConfig(temperature=temperature)
         self.predict = Predict(extended_task_spec, config=merged_config)
 
     async def aforward(

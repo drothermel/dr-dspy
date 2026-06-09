@@ -6,13 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dspy.core.types.coercion import _coerce_message, _coerce_tool_spec, _messages_from_items
-from dspy.core.types.config import (
-    LMConfig,
-    LMToolSpec,
-    _merge_config_overrides,
-    _merge_lm_config,
-)
+from dspy.core.types.coercion import _coerce_message, _messages_from_items, coerce_tool_spec
+from dspy.core.types.config import LMConfig, LMToolSpec, merge_lm_config
 from dspy.core.types.messages import LMMessage
 from dspy.core.types.parts import LMPart
 
@@ -36,7 +31,7 @@ class LMRequestPatch:
             user_parts=[*self.user_parts, *other.user_parts],
             assistant_parts=[*self.assistant_parts, *other.assistant_parts],
             tools=[*self.tools, *other.tools],
-            config=_merge_lm_config(self.config, other.config),
+            config=merge_lm_config(self.config, other.config),
             delete_input_fields=(*self.delete_input_fields, *other.delete_input_fields),
             delete_output_fields=(*self.delete_output_fields, *other.delete_output_fields),
             metadata={**self.metadata, **other.metadata},
@@ -73,10 +68,6 @@ class LMRequest(BaseModel):
         return cls(
             model=model,
             messages=normalized_messages,
-            tools=[_coerce_tool_spec(tool) for tool in collected_tools],
+            tools=[coerce_tool_spec(tool) for tool in collected_tools],
             config=config or LMConfig(),
         )
-
-    def with_config_overrides(self, config: LMConfig) -> LMRequest:
-        merged = _merge_config_overrides(self.config, config.model_dump(exclude_none=True))
-        return self.model_copy(update={"config": merged}, deep=True)

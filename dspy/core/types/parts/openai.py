@@ -20,7 +20,7 @@ from dspy.core.types.parts.models import (
 from dspy.core.types.parts.serialize import _parse_json_object
 
 
-def _parts_from_openai_content(content: Any) -> list[LMPart]:
+def parts_from_openai_content(content: Any) -> list[LMPart]:
     if content is None:
         return []
     if isinstance(content, str):

@@ -1,5 +1,5 @@
 from dspy.core.types.builders import Assistant, Developer, System, ToolCall, ToolResult, User
-from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
+from dspy.core.types.coercion import coerce_tool_spec
 from dspy.core.types.config import (
     LMConfig,
     LMPromptCacheConfig,
@@ -7,10 +7,14 @@ from dspy.core.types.config import (
     LMToolChoice,
     LMToolSpec,
     ReasoningEffort,
+    coerce_lm_config,
+    lm_defaults_config,
+    merge_lm_config,
+    merge_lm_request_config,
 )
 from dspy.core.types.embedding_options import EmbedderOptions
 from dspy.core.types.lm import LMForward
-from dspy.core.types.lm_provider import LMProviderOptions
+from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
 from dspy.core.types.messages import LMMessage, LMMessageRole
 from dspy.core.types.parts import (
     LMAudioPart,
@@ -27,6 +31,7 @@ from dspy.core.types.parts import (
     LMToolResultPart,
     LMVideoPart,
 )
+from dspy.core.types.parts.openai import parts_from_openai_content
 from dspy.core.types.request import LMRequest, LMRequestPatch
 from dspy.core.types.response import CallRecord, LMOutput, LMResponse, LMUsage
 from dspy.core.types.stream import (
@@ -48,6 +53,8 @@ from dspy.core.types.stream import (
     LMToolCallDelta,
 )
 
+from dspy.core.types.call_options import ModuleCallOptions, PredictOptions  # isort: skip
+
 __all__ = [
     "Assistant",
     "AsyncLMStream",
@@ -61,6 +68,13 @@ __all__ = [
     "EmbedderOptions",
     "LMConfig",
     "LMProviderOptions",
+    "coerce_lm_config",
+    "coerce_tool_spec",
+    "lm_defaults_config",
+    "merge_lm_config",
+    "merge_lm_request_config",
+    "merge_provider_options",
+    "parts_from_openai_content",
     "ModuleCallOptions",
     "PredictOptions",
     "LMDocumentPart",
