@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 from dspy._internal.lazy_import import require
 from dspy.predict.parallel import Parallel
 from dspy.teleprompt.simba_utils import append_a_demo, append_a_rule, prepare_models_for_resampling, wrap_program
-from dspy.teleprompt.task_spec_context import get_prompt_model
+from dspy.teleprompt.task_spec_context import resolve_optimizer_lm
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -61,7 +61,7 @@ class SIMBA:
         params = SIMBACompileParams.model_validate(params)
         trainset = params.trainset
         assert len(trainset) >= self.bsize, f"Trainset too small: {len(trainset)} < {self.bsize}"
-        prompt_model = get_prompt_model(self.prompt_model, run)
+        prompt_model = resolve_optimizer_lm(self.prompt_model, run=run)
         rng = random.Random(params.seed)
         rng_np = np.random.default_rng(params.seed)
         programs = []

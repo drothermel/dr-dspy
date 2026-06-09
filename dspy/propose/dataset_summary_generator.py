@@ -11,7 +11,7 @@ from dspy.predict.predict import Predict
 from dspy.propose.utils import strip_prefix
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
-from dspy.teleprompt.task_spec_context import get_prompt_model
+from dspy.teleprompt.task_spec_context import resolve_optimizer_lm
 from dspy.teleprompt.utils import optimizer_lm_context
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ async def create_dataset_summary(
     if verbose:
         logger.info("Creating dataset summary for %s examples", len(trainset))
     upper_lim = min(len(trainset), view_data_batch_size)
-    prompt_model = get_prompt_model(prompt_model, run)
+    prompt_model = resolve_optimizer_lm(prompt_model, run=run)
     with optimizer_lm_context(run, lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model") as opt_run:
         observation = await Predict(DatasetDescriptorTaskSpec(), config=LMConfig(n=1, temperature=1.0))(
             examples=order_input_keys_in_string(trainset[0:upper_lim].__repr__()), run=opt_run

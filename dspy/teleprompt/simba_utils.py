@@ -11,7 +11,7 @@ from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.formatting import get_field_spec_description_string
 from dspy.teleprompt.metrics import OptimizerMetric
-from dspy.teleprompt.task_spec_context import get_prompt_model, get_task_spec, set_task_spec
+from dspy.teleprompt.task_spec_context import get_task_spec, resolve_optimizer_lm, set_task_spec
 from dspy.teleprompt.trace_helpers import run_program_with_trace
 from dspy.teleprompt.utils import optimizer_lm_context
 
@@ -99,7 +99,7 @@ def append_a_demo(demo_input_field_maxlen):
 async def append_a_rule(bucket, system, *, run: RunContext, **kwargs) -> bool:
     predictor2name = kwargs["predictor2name"]
     batch_10p_score, batch_90p_score = (kwargs["batch_10p_score"], kwargs["batch_90p_score"])
-    prompt_model = get_prompt_model(kwargs["prompt_model"], run)
+    prompt_model = resolve_optimizer_lm(kwargs["prompt_model"], run=run)
     module_names = [name for name, _ in system.named_predictors()]
     good, bad = (bucket[0], bucket[-1])
     example = good["example"]

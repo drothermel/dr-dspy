@@ -18,7 +18,7 @@ from dspy.teleprompt.mipro.settings import (
     set_random_seeds,
 )
 from dspy.teleprompt.registry import register_teleprompter
-from dspy.teleprompt.task_spec_context import get_prompt_model
+from dspy.teleprompt.task_spec_context import resolve_optimizer_lm
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
 if TYPE_CHECKING:
@@ -90,8 +90,8 @@ class MIPROv2:
         tip_aware_proposer = params.tip_aware_proposer
         fewshot_aware_proposer = params.fewshot_aware_proposer
         provide_traceback = params.provide_traceback
-        self.task_model = get_prompt_model(self.task_model, run)
-        self.prompt_model = get_prompt_model(self.prompt_model, run)
+        self.task_model = resolve_optimizer_lm(self.task_model, run=run)
+        self.prompt_model = resolve_optimizer_lm(self.prompt_model, run=run)
         effective_max_errors = resolve_max_errors(self.max_errors, run)
         effective_max_bootstrapped_demos = (
             max_bootstrapped_demos if max_bootstrapped_demos is not None else self.max_bootstrapped_demos

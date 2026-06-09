@@ -1,9 +1,10 @@
+from dspy.clients.base_lm import BaseLM
 from dspy.runtime.run_context import RunContext
 
 
-def get_prompt_model(prompt_model, run: RunContext):
-    if prompt_model:
-        return prompt_model
+def resolve_optimizer_lm(lm: BaseLM | None, *, run: RunContext) -> BaseLM:
+    if lm is not None:
+        return lm
     return run.lm
 
 

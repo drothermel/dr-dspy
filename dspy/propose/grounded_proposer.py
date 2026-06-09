@@ -17,7 +17,7 @@ from dspy.propose.utils import (
     strip_prefix,
 )
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
-from dspy.teleprompt.task_spec_context import get_prompt_model, get_task_spec
+from dspy.teleprompt.task_spec_context import get_task_spec, resolve_optimizer_lm
 from dspy.teleprompt.utils import optimizer_lm_context
 
 logger = logging.getLogger(__name__)
@@ -314,7 +314,7 @@ class GroundedProposer:
             self.data_summary = await create_dataset_summary(
                 trainset=self._summary_trainset,
                 view_data_batch_size=self._view_data_batch_size,
-                prompt_model=get_prompt_model(self.prompt_model, run),
+                prompt_model=resolve_optimizer_lm(self.prompt_model, run=run),
                 run=run,
             )
 
@@ -396,7 +396,7 @@ class GroundedProposer:
             use_tip=effective_use_tip,
             verbose=self.verbose,
         )
-        rollout_lm = get_prompt_model(self.prompt_model, run).copy(temperature=self.init_temperature)
+        rollout_lm = resolve_optimizer_lm(self.prompt_model, run=run).copy(temperature=self.init_temperature)
         with optimizer_lm_context(run, lm=rollout_lm, phase="propose.grounded", lm_role="prompt_model") as opt_run:
             proposed_instruction = (
                 await instruction_generator(
