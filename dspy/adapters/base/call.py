@@ -137,9 +137,7 @@ class AdapterCallMixin(AdapterNativeMixin):
             model=lm.model, messages=list(messages), tools=tools, config=merge_lm_request_config(lm=lm, config=config)
         )
 
-    async def _call_lm(
-        self, lm: BaseLM, request: LMRequest, *, run: RunContext, compiled=None
-    ) -> LMResponse:
+    async def _call_lm(self, lm: BaseLM, request: LMRequest, *, run: RunContext, compiled=None) -> LMResponse:
         return await lm(request, run=run, compiled=compiled)
 
     async def acall(
