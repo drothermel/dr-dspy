@@ -48,7 +48,7 @@ class SemanticF1(Module):
         else:
             self.module = ChainOfThought(SemanticRecallPrecisionTaskSpec())
 
-    async def _aforward_impl(self, example, pred, trace=None, *, run):
+    async def _aforward_impl(self, *, run, options=None, example, pred, trace=None):
         scores = await self.module(
             question=example.question, ground_truth=example.response, system_response=pred.response, run=run
         )
@@ -102,7 +102,7 @@ class CompleteAndGrounded(Module):
         self.completeness_module = ChainOfThought(AnswerCompletenessTaskSpec())
         self.groundedness_module = ChainOfThought(AnswerGroundednessTaskSpec())
 
-    async def _aforward_impl(self, example, pred, trace=None, *, run):
+    async def _aforward_impl(self, *, run, options=None, example, pred, trace=None):
         completeness = await self.completeness_module(
             question=example.question, ground_truth=example.response, system_response=pred.response, run=run
         )

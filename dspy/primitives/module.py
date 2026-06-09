@@ -78,10 +78,10 @@ class Module(BaseModule, metaclass=ProgramMeta):
         try:
             if run.telemetry.track_usage and run.usage_tracker is None:
                 with track_usage(run) as usage_tracker:
-                    output = await self.aforward(run=run, options=options, **inputs)
+                    output = await self._aforward_impl(run=run, options=options, **inputs)
                 tokens = usage_tracker.get_total_tokens()
             else:
-                output = await self.aforward(run=run, options=options, **inputs)
+                output = await self._aforward_impl(run=run, options=options, **inputs)
                 tokens = (
                     run.usage_tracker.get_total_tokens() if run.telemetry.track_usage and run.usage_tracker else None
                 )
