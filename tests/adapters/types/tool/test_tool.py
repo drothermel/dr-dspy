@@ -34,6 +34,29 @@ def test_basic_initialization():
     assert callable(tool.func)
 
 
+def test_to_lm_tool_spec_excludes_defaulted_params_from_required():
+    tool = Tool(dummy_function, description="A dummy function for testing.")
+    spec = tool.to_lm_tool_spec()
+    assert spec.parameters["required"] == ["x"]
+
+
+@requires_jsonschema
+def test_validate_and_parse_args_raises_on_missing_required():
+    def required_only(x: int, y: int) -> int:
+        return x + y
+
+    tool = Tool(required_only, description="Add two required integers.")
+    with pytest.raises(ValueError, match="Missing required arg\\(s\\): y"):
+        tool(x=1)
+
+
+@requires_jsonschema
+def test_validate_and_parse_args_raises_when_sole_required_missing():
+    tool = Tool(dummy_function, description="A dummy function for testing.")
+    with pytest.raises(ValueError, match="Missing required arg\\(s\\): x"):
+        tool(y="hello")
+
+
 def test_tool_from_function():
     tool = Tool(dummy_function, description="A dummy function for testing.")
     assert tool.name == "dummy_function"

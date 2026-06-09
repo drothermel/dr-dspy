@@ -25,7 +25,7 @@ def _convert_mcp_tool_result(call_tool_result: "mcp.types.CallToolResult") -> st
 
 
 def convert_mcp_tool(session: "mcp.ClientSession", tool: "mcp.types.Tool") -> Tool:
-    args, arg_types, arg_desc = convert_input_schema_to_tool_args(tool.inputSchema)
+    args, arg_types, arg_desc, required_names = convert_input_schema_to_tool_args(tool.inputSchema)
 
     async def func(*args, **kwargs):
         result = await session.call_tool(tool.name, arguments=kwargs)
@@ -38,4 +38,5 @@ def convert_mcp_tool(session: "mcp.ClientSession", tool: "mcp.types.Tool") -> To
         args=args,
         arg_types=arg_types,
         arg_desc=arg_desc,
+        required_names=required_names,
     )

@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     import mcp
     from langchain.tools import BaseTool
 
+_SKIP_PARAM_KINDS = frozenset({inspect.Parameter.VAR_KEYWORD, inspect.Parameter.VAR_POSITIONAL})
+
 
 def _validate_json_schema(instance: object, schema: dict[str, Any], arg_name: str) -> None:
     validation_error_cls = jsonschema.ValidationError
@@ -33,6 +35,7 @@ class Tool(Type):
     args: dict[str, Any] | None = None
     arg_types: dict[str, Any] | None = None
     arg_desc: dict[str, str] | None = None
+    required_names: frozenset[str] = frozenset()
     has_kwargs: bool = False
 
     def __init__(
@@ -44,24 +47,37 @@ class Tool(Type):
         args: dict[str, Any] | None = None,
         arg_types: dict[str, Any] | None = None,
         arg_desc: dict[str, str] | None = None,
+        required_names: frozenset[str] | None = None,
     ) -> None:
         if not description:
             raise ValueError("Tool description is required and must be non-empty.")
         super().__init__(func=func, name=name, desc=description, args=args, arg_types=arg_types, arg_desc=arg_desc)
+        self._required_names_override = required_names
+        self._args_pre_set = args is not None
         self._parse_function(func=func, arg_desc=arg_desc)
 
     def _parse_function(self, func: Callable, arg_desc: dict[str, str] | None = None) -> None:
         annotations_func = func if inspect.isfunction(func) or inspect.ismethod(func) else func.__call__
         name = getattr(func, "__name__", type(func).__name__)
-        args = {}
-        arg_types = {}
+        args: dict[str, Any] = {}
+        arg_types: dict[str, Any] = {}
         sig = inspect.signature(annotations_func)
         available_hints = get_type_hints(annotations_func)
         hints = {param_name: available_hints.get(param_name, Any) for param_name in sig.parameters}
         default_values = {param_name: sig.parameters[param_name].default for param_name in sig.parameters}
+        required_from_sig = frozenset(
+            param_name
+            for param_name, param in sig.parameters.items()
+            if param_name != "return"
+            and param.kind not in _SKIP_PARAM_KINDS
+            and param.default is inspect.Parameter.empty
+        )
         for k, v in hints.items():
             arg_types[k] = v
             if k == "return":
+                continue
+            param = sig.parameters[k]
+            if param.kind in _SKIP_PARAM_KINDS:
                 continue
             origin = get_origin(v) or v
             if isinstance(origin, type) and issubclass(origin, BaseModel):
@@ -77,6 +93,13 @@ class Tool(Type):
         self.args = self.args if self.args is not None else args
         self.arg_types = self.arg_types if self.arg_types is not None else arg_types
         self.has_kwargs = any(param.kind == param.VAR_KEYWORD for param in sig.parameters.values())
+        if self._required_names_override is not None:
+            self.required_names = self._required_names_override
+        elif self._args_pre_set:
+            args_schema = self.args or {}
+            self.required_names = frozenset(name for name, prop in args_schema.items() if "default" not in prop)
+        else:
+            self.required_names = required_from_sig
 
     def _validate_and_parse_args(self, **kwargs: object) -> dict[str, object]:
         args_schema = self.args or {}
@@ -98,6 +121,9 @@ class Tool(Type):
                 parsed_kwargs[k] = cast("Any", parsed).value
             else:
                 parsed_kwargs[k] = v
+        missing = self.required_names - parsed_kwargs.keys()
+        if missing:
+            raise ValueError(f"Missing required arg(s): {', '.join(sorted(missing))}")
         return parsed_kwargs
 
     @override
@@ -111,7 +137,11 @@ class Tool(Type):
         return LMToolSpec(
             name=self.name,
             description=self.desc,
-            parameters={"type": "object", "properties": args_schema, "required": list(args_schema.keys())},
+            parameters={
+                "type": "object",
+                "properties": args_schema,
+                "required": sorted(self.required_names),
+            },
         )
 
     @with_callbacks(kind="tool")

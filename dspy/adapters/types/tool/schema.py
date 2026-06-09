@@ -32,12 +32,15 @@ def _resolve_json_schema_reference(schema: dict[str, Any]) -> dict[str, Any]:
     return resolved_schema
 
 
-def convert_input_schema_to_tool_args(schema: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Type], dict[str, str]]:
+def convert_input_schema_to_tool_args(
+    schema: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Type], dict[str, str], frozenset[str]]:
     args, arg_types, arg_desc = ({}, {}, {})
     properties = schema.get("properties")
     if properties is None:
-        return (args, arg_types, arg_desc)
+        return (args, arg_types, arg_desc, frozenset())
     required = schema.get("required", [])
+    required_names = frozenset(required)
     defs = schema.get("$defs", {})
     for name, prop in properties.items():
         prop = cast("dict[str, Any]", prop)
@@ -49,4 +52,4 @@ def convert_input_schema_to_tool_args(schema: dict[str, Any]) -> tuple[dict[str,
         arg_desc[name] = prop.get("description", "No description provided.")
         if name in required:
             arg_desc[name] += " (Required)"
-    return (args, arg_types, arg_desc)
+    return (args, arg_types, arg_desc, required_names)

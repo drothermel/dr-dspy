@@ -2,14 +2,15 @@ from dspy.adapters.types.tool import convert_input_schema_to_tool_args
 
 
 def test_tool_convert_input_schema_to_tool_args_no_input_params():
-    args, arg_types, arg_desc = convert_input_schema_to_tool_args(schema={"properties": {}})
+    args, arg_types, arg_desc, required_names = convert_input_schema_to_tool_args(schema={"properties": {}})
     assert args == {}
     assert arg_types == {}
     assert arg_desc == {}
+    assert required_names == frozenset()
 
 
 def test_tool_convert_input_schema_to_tool_args_lang_chain():
-    args, arg_types, arg_desc = convert_input_schema_to_tool_args(
+    args, arg_types, arg_desc, required_names = convert_input_schema_to_tool_args(
         schema={
             "title": "fooSchema",
             "description": "The foo.",
@@ -27,3 +28,4 @@ def test_tool_convert_input_schema_to_tool_args_lang_chain():
     }
     assert arg_types == {"bar": str, "baz": int}
     assert arg_desc == {"bar": "The bar.", "baz": "No description provided. (Required)"}
+    assert required_names == frozenset({"baz"})
