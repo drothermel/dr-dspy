@@ -21,7 +21,15 @@ class DummyModule(Module):
 
 
 def test_refine_forward_success_first_attempt(make_run):
-    lm = DummyLM([{"answer": "Brussels"}, {"answer": "City of Brussels"}, {"answer": "Brussels"}])
+    lm = DummyLM(
+        [
+            {"answer": "Brussels"},
+            {"discussion": "No issues.", "advice": {"self.predictor": "N/A"}},
+            {"answer": "City of Brussels"},
+            {"discussion": "No issues.", "advice": {"self.predictor": "N/A"}},
+            {"answer": "Brussels"},
+        ]
+    )
     run = make_run(lm=lm)
     module_call_count = [0]
 

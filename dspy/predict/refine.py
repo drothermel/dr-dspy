@@ -5,16 +5,15 @@ import orjson
 
 from dspy.adapters.call.wrappers import HintInjectingAdapter
 from dspy.core.types.call_options import ModuleCallOptions
-from dspy.predict.predict import Predict, Prediction
+from dspy.predict.predict import Predict
 from dspy.predict.sampling import SamplingAttempt, sample_with_reward
+from dspy.primitives import Module, Prediction
 from dspy.propose.source_format import get_formatted_source
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.runtime.transparency import resolve_adapter
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.formatting import get_field_spec_description_string
 from dspy.teleprompt.trace_helpers import run_program_with_trace
-
-from .predict import Module
 
 
 class OfferFeedbackTaskSpec(TaskSpec):
@@ -40,7 +39,7 @@ class OfferFeedbackTaskSpec(TaskSpec):
         output_field(
             "advice",
             dict[str, str],
-            desc="For each module, describe very concretely, in this order: the specific scenarios in which it has made mistakes in the past and what each mistake was, followed by what it should do differently in that kind ofscenario in the future. If the module is not to blame, write N/A.",
+            desc="For each module, describe very concretely, in this order: the specific scenarios in which it has made mistakes in the past and what each mistake was, followed by what it should do differently in that kind of scenario in the future. If the module is not to blame, write N/A.",
         ),
     )
 
@@ -54,6 +53,7 @@ class Refine(Module):
         threshold: float,
         fail_count: int | None = None,
     ) -> None:
+        super().__init__()
         self.module = module
         self.reward_fn = lambda *args: reward_fn(*args)
         self.threshold = threshold
@@ -101,10 +101,12 @@ class Refine(Module):
             nonlocal advice
             mod = attempt.module.deepcopy()
             mod.set_lm(attempt.lm.copy(temperature=1.0))
-            predictor2name = {predictor: name for name, predictor in mod.named_predictors()}
+            task_spec2name = {predictor.task_spec: name for name, predictor in mod.named_predictors()}
             module_names = [name for name, _ in mod.named_predictors()]
             modules = {"program_code": self.module_code, "modules_defn": inspect_modules(mod)}
-            trajectory = [{"module_name": predictor2name[p], "inputs": i, "outputs": dict(o)} for p, i, o in trace]
+            trajectory = [
+                {"module_name": task_spec2name[p.task_spec], "inputs": i, "outputs": dict(o)} for p, i, o in trace
+            ]
             trajectory_payload = {
                 "program_inputs": attempt.inputs,
                 "program_trajectory": trajectory,
@@ -115,11 +117,12 @@ class Refine(Module):
                 "target_threshold": self.threshold,
                 "reward_value": reward,
             }
-            advise_kwargs = dict(**modules, **trajectory_payload, **reward_payload, module_names=module_names)
-            advise_kwargs = {
-                k: v if isinstance(v, str) else orjson.dumps(recursive_mask(v), option=orjson.OPT_INDENT_2).decode()
-                for k, v in advise_kwargs.items()
-            }
+            advise_kwargs = dict(**modules, **reward_payload, module_names=module_names)
+            for key in ("program_inputs", "program_trajectory", "program_outputs"):
+                advise_kwargs[key] = orjson.dumps(
+                    recursive_mask(trajectory_payload[key]),
+                    option=orjson.OPT_INDENT_2,
+                ).decode()
             advice = (await Predict(OfferFeedbackTaskSpec())(**advise_kwargs, run=attempt.run)).advice
 
         return await sample_with_reward(

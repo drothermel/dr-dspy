@@ -7,8 +7,8 @@ from pydantic import BaseModel, ConfigDict
 
 from dspy.clients.base_lm import BaseLM  # noqa: TC001 — runtime SamplingAttempt fields
 from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
-from dspy.errors import SamplingExhaustedError
-from dspy.predict.predict import Module, Prediction
+from dspy.errors import AdapterParseError, SamplingExhaustedError, is_retryable_lm_error
+from dspy.primitives import Module, Prediction
 from dspy.runtime.run_context import RunContext  # noqa: TC001 — runtime signature typing
 from dspy.teleprompt.trace_helpers import run_program_with_trace
 
@@ -18,6 +18,14 @@ AfterAttemptHook = Callable[
     Awaitable[None],
 ]
 ShouldStopFn = Callable[["SamplingAttempt", float, "SamplingState"], bool]
+
+_TRANSIENT_EXECUTION_ERRORS = (AdapterParseError, ValueError, RuntimeError)
+
+
+def is_transient_sampling_error(error: BaseException) -> bool:
+    if isinstance(error, _TRANSIENT_EXECUTION_ERRORS):
+        return True
+    return isinstance(error, Exception) and is_retryable_lm_error(error)
 
 
 class SamplingAttempt(BaseModel):
@@ -77,23 +85,27 @@ async def sample_with_reward(
         )
         try:
             outputs, trace = await execute(attempt)
-            reward = reward_fn(inputs, outputs)
-            if reward > state.best_reward:
-                state = state.model_copy(update={"best_reward": reward, "best_pred": outputs, "best_trace": trace})
-            stop = (
-                should_stop(attempt, reward, state)
-                if should_stop is not None
-                else threshold is not None and reward >= threshold
-            )
-            if stop:
-                break
-            if after_attempt is not None:
-                await after_attempt(attempt, state, outputs, trace, reward)
-        except Exception as err:
+        except BaseException as err:
+            if not is_transient_sampling_error(err):
+                raise
             last_exc = err
             if idx > failures_remaining:
                 raise
             failures_remaining -= 1
+            continue
+
+        reward = reward_fn(inputs, outputs)
+        if reward > state.best_reward:
+            state = state.model_copy(update={"best_reward": reward, "best_pred": outputs, "best_trace": trace})
+        stop = (
+            should_stop(attempt, reward, state)
+            if should_stop is not None
+            else threshold is not None and reward >= threshold
+        )
+        if stop:
+            break
+        if after_attempt is not None:
+            await after_attempt(attempt, state, outputs, trace, reward)
 
     if state.best_pred is None:
         raise SamplingExhaustedError(n_attempts=N) from last_exc

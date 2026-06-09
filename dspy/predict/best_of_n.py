@@ -1,8 +1,8 @@
 from collections.abc import Callable
 
 from dspy.core.types.call_options import ModuleCallOptions
-from dspy.predict.predict import Module, Prediction
 from dspy.predict.sampling import sample_with_reward
+from dspy.primitives import Module, Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
 
 
@@ -15,6 +15,7 @@ class BestOfN(Module):
         threshold: float,
         fail_count: int | None = None,
     ) -> None:
+        super().__init__()
         self.module = module
         self.reward_fn = lambda *args: reward_fn(*args)
         self.threshold = threshold
