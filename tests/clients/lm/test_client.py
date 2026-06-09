@@ -1,4 +1,3 @@
-import asyncio
 import json
 import tempfile
 from pathlib import Path
@@ -36,7 +35,7 @@ from dspy.errors import LMConfigurationError
 from dspy.predict.predict import Predict
 from dspy.runtime import CallLogMode, TelemetryConfig
 from dspy.runtime.usage_tracker import track_usage
-from tests.clients.lm.conftest import _direct_lm_case, _request
+from tests.clients.lm.conftest import _direct_lm_case, _request, run_async
 from tests.task_spec.helpers import ts
 
 
@@ -44,10 +43,10 @@ def test_chat_lms_can_be_queried(litellm_test_server, make_run):
     api_base, _ = litellm_test_server
     provider_options = LMProviderOptions(api_base=api_base, api_key="fakekey")
     openai_lm = LM(model="openai/dspy-test-model", provider_options=provider_options, model_type="chat")
-    assert asyncio.run(openai_lm(_request(openai_lm, prompt="openai query"), run=make_run(lm=openai_lm))).text == "Hi!"
+    assert run_async(openai_lm(_request(openai_lm, prompt="openai query"), run=make_run(lm=openai_lm))).text == "Hi!"
     azure_openai_lm = LM(model="azure/dspy-test-model", provider_options=provider_options, model_type="chat")
     assert (
-        asyncio.run(
+        run_async(
             azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query"), run=make_run(lm=azure_openai_lm))
         ).text
         == "Hi!"
@@ -58,10 +57,10 @@ def test_text_lms_can_be_queried(litellm_test_server, make_run):
     api_base, _ = litellm_test_server
     provider_options = LMProviderOptions(api_base=api_base, api_key="fakekey")
     openai_lm = LM(model="openai/dspy-test-model", provider_options=provider_options, model_type="text")
-    assert asyncio.run(openai_lm(_request(openai_lm, prompt="openai query"), run=make_run(lm=openai_lm))).text == "Hi!"
+    assert run_async(openai_lm(_request(openai_lm, prompt="openai query"), run=make_run(lm=openai_lm))).text == "Hi!"
     azure_openai_lm = LM(model="azure/dspy-test-model", provider_options=provider_options, model_type="text")
     assert (
-        asyncio.run(
+        run_async(
             azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query"), run=make_run(lm=azure_openai_lm))
         ).text
         == "Hi!"
@@ -83,7 +82,7 @@ def test_lm_calls_support_callables(litellm_test_server, make_run):
                 extensions={"azure_ad_token_provider": azure_ad_token_provider},
             ),
         )
-        asyncio.run(lm_with_callable(_request(lm_with_callable, prompt="Query"), run=make_run(lm=lm_with_callable)))
+        run_async(lm_with_callable(_request(lm_with_callable, prompt="Query"), run=make_run(lm=lm_with_callable)))
         spy_completion.assert_called_once()
         call_args = spy_completion.call_args.kwargs
         assert call_args["model"] == "openai/dspy-test-model"
@@ -106,7 +105,7 @@ def test_lm_calls_support_pydantic_models(litellm_test_server, make_run):
             response_format=ResponseFormat,
         ),
     )
-    asyncio.run(lm(_request(lm, prompt="Query"), run=make_run(lm=lm)))
+    run_async(lm(_request(lm, prompt="Query"), run=make_run(lm=lm)))
 
 
 def test_reasoning_model_token_parameter(make_run):
@@ -176,7 +175,7 @@ def test_base_lm_requires_lm_request(make_run):
 
     custom_lm = CustomLM("custom-model")
     with pytest.raises(TypeError, match="expects dspy\\.core\\.types\\.LMRequest"):
-        asyncio.run(custom_lm("Query", run=make_run(lm=custom_lm)))
+        run_async(custom_lm("Query", run=make_run(lm=custom_lm)))
 
 
 def test_base_lm_typed_call_returns_lm_response_and_records_history(make_run):
@@ -194,7 +193,7 @@ def test_base_lm_typed_call_returns_lm_response_and_records_history(make_run):
     run = make_run(lm=lm)
     request = _request(lm, prompt="Query")
     with track_usage(run) as usage_tracker:
-        response = asyncio.run(lm(request, run=run))
+        response = run_async(lm(request, run=run))
     assert isinstance(response, LMResponse)
     assert response.text == "Hi!"
     assert len(lm.call_log) == 1
@@ -214,7 +213,7 @@ def test_base_lm_rejects_non_lm_response(make_run):
             return ["not typed"]
 
     with pytest.raises(TypeError, match="must return dspy\\.core\\.types\\.LMResponse"):
-        asyncio.run(
+        run_async(
             CustomLM("custom-model")(
                 _request(BaseLM("custom-model"), prompt="Query"), run=make_run(lm=CustomLM("custom-model"))
             )
@@ -233,7 +232,7 @@ def test_base_lm_experimental_direct_messages_support_system_user_and_assistant_
             User("Say that in five words."),
             temperature=0.2,
         )
-        response = asyncio.run(lm(request, run=make_run(lm=lm)))
+        response = run_async(lm(request, run=make_run(lm=lm)))
     finally:
         if patcher is not None:
             patcher.stop()
@@ -260,7 +259,7 @@ def test_base_lm_experimental_direct_messages_support_tool_call_transcripts(lm_k
             ToolResult('{"temperature": "22 C"}', call_id="call_1", name="get_weather"),
             User("Summarize the result."),
         )
-        response = asyncio.run(lm(request, run=make_run(lm=lm)))
+        response = run_async(lm(request, run=make_run(lm=lm)))
     finally:
         if patcher is not None:
             patcher.stop()
@@ -291,8 +290,8 @@ def test_base_lm_experimental_direct_messages_can_reuse_lm_response_as_assistant
         lm_kind, ["DSPy programs LM pipelines.", "DSPy programs pipelines."]
     )
     try:
-        first = asyncio.run(lm(_request(lm, prompt="Explain DSPy in one sentence."), run=make_run(lm=lm)))
-        follow_up = asyncio.run(
+        first = run_async(lm(_request(lm, prompt="Explain DSPy in one sentence."), run=make_run(lm=lm)))
+        follow_up = run_async(
             lm(
                 _request(lm, User("Explain DSPy in one sentence."), first, User("Now make it even shorter.")),
                 run=make_run(lm=lm),
@@ -342,7 +341,7 @@ def test_base_lm_tracks_usage_for_custom_subclasses(make_run):
     lm = CustomLM(model="custom-model")
     run = make_run(lm=lm)
     with track_usage(run) as usage_tracker:
-        asyncio.run(lm(_request(lm, prompt="Query"), run=run))
+        run_async(lm(_request(lm, prompt="Query"), run=run))
     total_usage = usage_tracker.get_total_tokens()["custom-model"]
     assert total_usage["prompt_tokens"] == 1
     assert total_usage["completion_tokens"] == 1
@@ -536,7 +535,7 @@ def test_logprobs_included_when_requested(make_run):
             ],
             model="dspy-test-model",
         )
-        result = asyncio.run(lm(_request(lm, prompt="question", logprobs=True), run=make_run(lm=lm)))
+        result = run_async(lm(_request(lm, prompt="question", logprobs=True), run=make_run(lm=lm)))
         assert result.text == "test answer"
         assert result.outputs[0].logprobs.model_dump() == {
             "content": [
@@ -591,7 +590,7 @@ def test_disable_history(make_run):
             choices=[Choices(message=Message(content="test answer"))], model="openai/gpt-4o-mini"
         )
         for _ in range(10):
-            asyncio.run(lm(_request(lm, prompt="query"), run=run))
+            run_async(lm(_request(lm, prompt="query"), run=run))
     assert len(lm.call_log) == 0
     with mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -619,7 +618,7 @@ def test_call_reasoning_model_with_chat_api(make_run):
             max_tokens=16000,
             provider_options=LMProviderOptions(extensions={"reasoning": {"effort": "low"}}),
         )
-        result = asyncio.run(lm(_request(lm, prompt="What is 2 + 2?"), run=make_run(lm=lm)))
+        result = run_async(lm(_request(lm, prompt="What is 2 + 2?"), run=make_run(lm=lm)))
         assert result.text == "The answer is 4"
         assert result.reasoning_content is not None
         assert "Step 1" in result.reasoning_content

@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Any
+import asyncio
+from collections.abc import Coroutine
+from typing import TYPE_CHECKING, Any, TypeVar
 from unittest import mock
 
 import pytest
@@ -14,6 +16,30 @@ except ImportError:
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm import LM
 from dspy.core.types import LMConfig, LMRequest, LMResponse, coerce_lm_config, merge_lm_config
+
+_T = TypeVar("_T")
+
+
+async def _flush_litellm_logging_worker() -> None:
+    try:
+        from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
+    except ImportError:
+        return
+    worker = GLOBAL_LOGGING_WORKER
+    try:
+        await asyncio.wait_for(worker.clear_queue(), timeout=2.0)
+    except TimeoutError:
+        pass
+
+
+def run_async(coro: Coroutine[Any, Any, _T]) -> _T:
+    async def wrapped() -> _T:
+        try:
+            return await coro
+        finally:
+            await _flush_litellm_logging_worker()
+
+    return asyncio.run(wrapped())
 
 
 def make_response(output_blocks):

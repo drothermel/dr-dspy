@@ -119,6 +119,7 @@ class Tool(Type):
         parsed_kwargs = self._validate_and_parse_args(**kwargs)
         result = self.func(**parsed_kwargs)
         if asyncio.iscoroutine(result):
+            result.close()
             raise ValueError("You are calling `__call__` on an async tool. Use `await tool.acall(...)` instead.")
         return result
 

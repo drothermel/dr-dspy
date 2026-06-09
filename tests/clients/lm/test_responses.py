@@ -1,4 +1,3 @@
-import asyncio
 import json
 from typing import Any, cast
 from unittest import mock
@@ -16,7 +15,7 @@ from openai.types.responses.response_reasoning_item import Summary
 from dspy.clients.lm import LM
 from dspy.core.types import LMConfig, LMProviderOptions
 from dspy.runtime.usage_tracker import track_usage
-from tests.clients.lm.conftest import _request, make_response
+from tests.clients.lm.conftest import _request, make_response, run_async
 
 
 def test_responses_api(make_run):
@@ -41,7 +40,7 @@ def test_responses_api(make_run):
     )
     with mock.patch("litellm.aresponses", autospec=True, return_value=api_response) as dspy_responses:
         lm = LM(model="openai/gpt-5-mini", model_type="responses", temperature=1.0, max_tokens=16000)
-        lm_result = asyncio.run(lm(_request(lm, prompt="openai query"), run=make_run(lm=lm)))
+        lm_result = run_async(lm(_request(lm, prompt="openai query"), run=make_run(lm=lm)))
         assert lm_result.text == "This is a test answer from responses API."
         assert lm_result.reasoning_content == "This is a dummy reasoning."
         dspy_responses.assert_called_once()
@@ -53,7 +52,7 @@ def test_lm_replaces_system_with_developer_role(make_run):
         "dspy.clients.lm.transport.alitellm_responses_completion", return_value={"choices": []}
     ) as mock_completion:
         lm = LM("openai/gpt-4o-mini", model_type="responses", use_developer_role=True)
-        asyncio.run(lm(_request(lm, messages=[{"role": "system", "content": "hi"}]), run=make_run(lm=lm)))
+        run_async(lm(_request(lm, messages=[{"role": "system", "content": "hi"}]), run=make_run(lm=lm)))
         assert mock_completion.call_args.kwargs["request"]["input"][0]["role"] == "developer"
 
 
@@ -74,7 +73,7 @@ def test_responses_api_tool_calls(litellm_test_server, make_run):
             provider_options=LMProviderOptions(api_base=api_base, api_key="fakekey"),
             model_type="responses",
         )
-        lm_result = asyncio.run(lm(_request(lm, prompt="openai query"), run=make_run(lm=lm)))
+        lm_result = run_async(lm(_request(lm, prompt="openai query"), run=make_run(lm=lm)))
         tool_call = lm_result.outputs[0].tool_calls[0]
         assert tool_call.name == expected_tool_call["name"]
         assert tool_call.args == {"city": "Paris"}
@@ -92,7 +91,7 @@ def test_reasoning_effort_responses_api(make_run):
             temperature=1.0,
             provider_options=LMProviderOptions(extensions={"reasoning": {"effort": "low"}}),
         )
-        asyncio.run(lm(_request(lm, prompt="openai query"), run=make_run(lm=lm)))
+        run_async(lm(_request(lm, prompt="openai query"), run=make_run(lm=lm)))
         call_kwargs = mock_responses.call_args.kwargs
         assert "reasoning_effort" not in call_kwargs
         assert call_kwargs["reasoning"]["effort"] == "low"
@@ -256,7 +255,7 @@ def test_responses_api_with_image_input(make_run):
                 ],
             }
         ]
-        lm_result = asyncio.run(lm(_request(lm, messages=messages), run=make_run(lm=lm)))
+        lm_result = run_async(lm(_request(lm, messages=messages), run=make_run(lm=lm)))
         assert lm_result.text == "This is a test answer with image input."
         dspy_responses.assert_called_once()
         call_args = dspy_responses.call_args.kwargs
@@ -298,7 +297,7 @@ def test_responses_api_with_pydantic_model_input(make_run):
         number: int
 
     with mock.patch("litellm.aresponses", autospec=True, return_value=api_response) as dspy_responses:
-        lm_result = asyncio.run(
+        lm_result = run_async(
             lm(
                 _request(lm, prompt="What is a good test answer?", config=LMConfig(response_format=TestModel)),
                 run=make_run(lm=lm),
@@ -357,7 +356,7 @@ def test_responses_api_with_none_usage(make_run):
         lm = LM(model="openai/gpt-5-mini", model_type="responses", temperature=1.0, max_tokens=16000)
         run = make_run(lm=lm)
         with track_usage(run) as tracker:
-            result = asyncio.run(lm(_request(lm, prompt="test query"), run=run))
+            result = run_async(lm(_request(lm, prompt="test query"), run=run))
         assert result.text == "Partial response that was truncated"
         assert lm.call_log[-1].usage == {}
         assert tracker.get_total_tokens() == {}
