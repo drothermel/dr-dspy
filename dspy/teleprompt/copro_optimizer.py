@@ -15,6 +15,7 @@ from dspy.teleprompt.copro.task_specs import (
     BasicGenerateInstructionTaskSpec,
     GenerateInstructionGivenAttemptsTaskSpec,
 )
+from dspy.teleprompt.copro.types import CoproEvaluatedCandidate
 from dspy.teleprompt.core.evaluator import make_optimizer_evaluator, optimizer_lm_context
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
@@ -43,8 +44,8 @@ class COPRO:
         self.prompt_model = prompt_model
         self.track_stats = track_stats
 
-    def _check_candidates_equal(self, candidate1, candidate2) -> bool:
-        for p1, p2 in zip(candidate1["program"].predictors(), candidate2["program"].predictors(), strict=True):
+    def _check_candidates_equal(self, candidate1: CoproEvaluatedCandidate, candidate2: CoproEvaluatedCandidate) -> bool:
+        for p1, p2 in zip(candidate1.program.predictors(), candidate2.program.predictors(), strict=True):
             if get_task_spec(p1).instructions != get_task_spec(p2).instructions:
                 return False
             *_, p1_last_field = get_task_spec(p1).fields.values()
@@ -53,24 +54,24 @@ class COPRO:
                 return False
         return True
 
-    def _drop_duplicates(self, candidates):
-        final_candidates = []
-        last_batch = []
-        last_batch_score = -1
-        for c in candidates:
+    def _drop_duplicates(self, candidates: list[CoproEvaluatedCandidate]) -> list[CoproEvaluatedCandidate]:
+        final_candidates: list[CoproEvaluatedCandidate] = []
+        last_batch: list[CoproEvaluatedCandidate] = []
+        last_batch_score = -1.0
+        for candidate in candidates:
             repeat = False
-            if c["score"] == last_batch_score:
-                for c2 in last_batch:
-                    if self._check_candidates_equal(candidate1=c, candidate2=c2):
+            if candidate.score == last_batch_score:
+                for prior in last_batch:
+                    if self._check_candidates_equal(candidate1=candidate, candidate2=prior):
                         repeat = True
                         break
                 if not repeat:
-                    last_batch.append(c)
+                    last_batch.append(candidate)
             else:
-                last_batch = [c]
-                last_batch_score = c["score"]
+                last_batch = [candidate]
+                last_batch_score = candidate.score
             if not repeat:
-                final_candidates.append(c)
+                final_candidates.append(candidate)
         return final_candidates
 
     def _print_task_spec(self, predictor) -> None:
@@ -112,7 +113,7 @@ class COPRO:
             id(p): {"depth": [], "max": [], "average": [], "min": [], "std": []} for p in module.predictors()
         }
         candidates = {}
-        evaluated_candidates = defaultdict(dict)
+        evaluated_candidates: dict[int, dict[tuple[str, str], CoproEvaluatedCandidate]] = defaultdict(dict)
         for predictor in module.predictors():
             basic_instruction = None
             basic_prefix = None
@@ -171,16 +172,16 @@ class COPRO:
                     replace_entry = True
                     logger.debug(f"(instruction, prefix) {(instruction, prefix)}")
                     if (instruction, prefix) in evaluated_candidates[id(p_old)]:
-                        if evaluated_candidates[id(p_old)][instruction, prefix]["score"] >= score:
+                        if evaluated_candidates[id(p_old)][(instruction, prefix)].score >= score:
                             replace_entry = False
                     if replace_entry:
-                        evaluated_candidates[id(p_old)][instruction, prefix] = {
-                            "score": score,
-                            "program": module_clone.deepcopy(),
-                            "instruction": instruction,
-                            "prefix": prefix,
-                            "depth": d,
-                        }
+                        evaluated_candidates[id(p_old)][(instruction, prefix)] = CoproEvaluatedCandidate(
+                            score=score,
+                            program=module_clone.deepcopy(),
+                            instruction=instruction,
+                            prefix=prefix,
+                            depth=d,
+                        )
                     if len(candidates_) - self.breadth <= c_i:
                         latest_scores.append(score)
                 if self.track_stats:
@@ -189,16 +190,16 @@ class COPRO:
                     results_latest[id(p_old)]["average"].append(sum(latest_scores) / len(latest_scores))
                     results_latest[id(p_old)]["min"].append(min(latest_scores))
                     results_latest[id(p_old)]["std"].append(statistics.pstdev(latest_scores))
-                best_candidate = max(evaluated_candidates[id(p_old)].values(), key=lambda candidate: candidate["score"])
+                best_candidate = max(evaluated_candidates[id(p_old)].values(), key=lambda candidate: candidate.score)
                 *_, last_key = get_task_spec(p_old).fields.keys()
                 updated_task_spec = (
                     get_task_spec(p_new)
-                    .with_instructions(best_candidate["instruction"])
-                    .with_updated_field(last_key, prefix=best_candidate["prefix"])
+                    .with_instructions(best_candidate.instruction)
+                    .with_updated_field(last_key, prefix=best_candidate.prefix)
                 )
                 set_task_spec(predictor=p_new, task_spec=updated_task_spec)
                 logger.debug(
-                    f"Updating Predictor {id(p_old)} to:\ni: {best_candidate['instruction']}\np: {best_candidate['prefix']}"
+                    f"Updating Predictor {id(p_old)} to:\ni: {best_candidate.instruction}\np: {best_candidate.prefix}"
                 )
                 logger.debug("Full predictor with update: ")
                 for i, predictor in enumerate(module_clone.predictors()):
@@ -212,18 +213,18 @@ class COPRO:
                 shortest_len = self.breadth
                 shortest_len = min(len(evaluated_candidates[id(p_base)]), shortest_len)
                 best_predictors = list(evaluated_candidates[id(p_base)].values())
-                best_predictors.sort(key=lambda x: x["score"], reverse=True)
+                best_predictors.sort(key=lambda entry: entry.score, reverse=True)
                 if self.track_stats:
-                    scores = [x["score"] for x in best_predictors][:10]
+                    scores = [entry.score for entry in best_predictors][:10]
                     results_best[id(p_base)]["depth"].append(d)
                     results_best[id(p_base)]["max"].append(max(scores))
                     results_best[id(p_base)]["average"].append(sum(scores) / len(scores))
                     results_best[id(p_base)]["min"].append(min(scores))
                     results_best[id(p_base)]["std"].append(statistics.pstdev(scores))
                 for i in range(shortest_len - 1, -1, -1):
-                    attempts.append(f"Instruction #{shortest_len - i}: {best_predictors[i]['instruction']}")
-                    attempts.append(f"Prefix #{shortest_len - i}: {best_predictors[i]['prefix']}")
-                    attempts.append(f"Resulting Score #{shortest_len - i}: {best_predictors[i]['score']}")
+                    attempts.append(f"Instruction #{shortest_len - i}: {best_predictors[i].instruction}")
+                    attempts.append(f"Prefix #{shortest_len - i}: {best_predictors[i].prefix}")
+                    attempts.append(f"Resulting Score #{shortest_len - i}: {best_predictors[i].score}")
                 if self.prompt_model:
                     with optimizer_lm_context(
                         run, lm=self.prompt_model, phase="copro.refine_instruction", lm_role="prompt_model"
@@ -243,22 +244,22 @@ class COPRO:
                     instr.completions.proposed_prefix_for_output_field
                 )
             latest_candidates = new_candidates
-        candidates = []
+        candidates: list[CoproEvaluatedCandidate] = []
         for predictor in module.predictors():
             candidates.extend(list(evaluated_candidates[id(predictor)].values()))
             if self.track_stats:
                 best_predictors = list(evaluated_candidates[id(predictor)].values())
-                best_predictors.sort(key=lambda x: x["score"], reverse=True)
-                scores = [x["score"] for x in best_predictors][:10]
+                best_predictors.sort(key=lambda entry: entry.score, reverse=True)
+                scores = [entry.score for entry in best_predictors][:10]
                 results_best[id(predictor)]["depth"].append(self.depth - 1)
                 results_best[id(predictor)]["max"].append(max(scores))
                 results_best[id(predictor)]["average"].append(sum(scores) / len(scores))
                 results_best[id(predictor)]["min"].append(min(scores))
                 results_best[id(predictor)]["std"].append(statistics.pstdev(scores))
-        candidates.sort(key=lambda x: x["score"], reverse=True)
+        candidates.sort(key=lambda entry: entry.score, reverse=True)
         candidates = self._drop_duplicates(candidates)
-        best_program = candidates[0]["program"]
-        program_candidates = [ProgramCandidate(score=entry["score"], program=entry["program"]) for entry in candidates]
+        best_program = candidates[0].program
+        program_candidates = [ProgramCandidate(score=entry.score, program=entry.program) for entry in candidates]
         copro_depth_stats = None
         if self.track_stats:
             copro_depth_stats = {"results_best": results_best, "results_latest": results_latest}

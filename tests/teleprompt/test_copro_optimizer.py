@@ -3,6 +3,7 @@ import asyncio
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives import Example, Module
 from dspy.teleprompt.compile_params import COPROCompileParams, EvaluateCompileParams
+from dspy.teleprompt.copro.types import CoproEvaluatedCandidate
 from dspy.teleprompt.copro_optimizer import COPRO
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
@@ -149,3 +150,18 @@ def test_statistics_tracking_during_optimization(make_run):
     assert "results_latest" in depth_stats, "Optimizer did not track the latest results"
     assert len(depth_stats["results_best"]) > 0, "Optimizer did not properly populate the best results statistics"
     assert len(depth_stats["results_latest"]) > 0, "Optimizer did not properly populate the latest results statistics"
+
+
+def test_drop_duplicates_removes_equal_programs_at_same_score():
+    optimizer = COPRO(metric=simple_metric, breadth=2, depth=1)
+    program_a = SimpleModule(ts("input -> output"))
+    program_b = program_a.deepcopy()
+    candidates = [
+        CoproEvaluatedCandidate(score=0.9, program=program_a, instruction="same", prefix="p1", depth=0),
+        CoproEvaluatedCandidate(score=0.9, program=program_b, instruction="same", prefix="p1", depth=0),
+        CoproEvaluatedCandidate(score=0.5, program=program_a.deepcopy(), instruction="other", prefix="p2", depth=0),
+    ]
+    deduped = optimizer._drop_duplicates(candidates)
+    assert len(deduped) == 2
+    assert deduped[0].score == 0.9
+    assert deduped[1].score == 0.5
