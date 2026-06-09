@@ -39,6 +39,12 @@ class LMRequestPatch:
 
 
 class LMRequest(BaseModel):
+    """Provider request payload.
+
+    Config overrides flow through ``LMRequestPatch.merge`` and ``merge_lm_config``;
+    there is no separate ``with_config_overrides`` helper.
+    """
+
     model: str
     messages: list[LMMessage]
     tools: list[LMToolSpec] = Field(default_factory=list)

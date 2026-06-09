@@ -89,6 +89,14 @@ def _config_data(value: Any, *, str_field: str | None = None, bool_field: str | 
 
 
 class LMConfig(BaseModel):
+    """Per-call LM generation config merged over LM defaults at request time.
+
+    ``response_format`` set here (via ``PredictOptions.config`` or ``LMRequest.config``)
+    overrides ``LMProviderOptions.response_format`` from the LM's default kwargs when
+    explicitly provided on this config instance. Adapter-layer structured-output
+    policies may apply a further override at the adapter boundary.
+    """
+
     temperature: float | None = None
     max_tokens: int | None = None
     top_p: float | None = None
@@ -197,4 +205,10 @@ def lm_defaults_config(lm: Any) -> LMConfig:
 
 
 def merge_lm_request_config(lm: Any, config: LMConfig | None = None) -> LMConfig:
+    """Merge per-call ``config`` over LM default kwargs (including provider options).
+
+    Fields explicitly set on ``config`` win over LM defaults. In particular,
+    ``response_format`` on ``config`` overrides ``LMProviderOptions.response_format``
+    seeded into ``lm.kwargs``.
+    """
     return merge_lm_config(lm_defaults_config(lm), config or LMConfig()) or LMConfig()

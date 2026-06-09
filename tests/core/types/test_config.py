@@ -13,7 +13,9 @@ from dspy.core.types import (
     LMToolChoice,
     LMUsage,
     User,
+    coerce_lm_config,
     merge_lm_config,
+    merge_lm_request_config,
     merge_provider_options,
 )
 from dspy.core.types.config import ReasoningEffort
@@ -165,3 +167,24 @@ def test_history_entry_exposes_typed_derived_properties():
     assert entry.cost == 0.5
     assert entry.kwargs == {"temperature": 0.2}
     assert entry.response_model == "response-model"
+
+
+def test_coerce_lm_config_rejects_reasoning_effort():
+    with pytest.raises(ValueError, match="reasoning_effort"):
+        coerce_lm_config({"reasoning_effort": "low"})
+
+
+def test_coerce_lm_config_rejects_max_completion_tokens():
+    with pytest.raises(ValueError, match="max_completion_tokens"):
+        coerce_lm_config({"max_completion_tokens": 100})
+
+
+def test_coerce_lm_config_rejects_bool_prompt_cache():
+    with pytest.raises(TypeError, match="bool prompt_cache"):
+        coerce_lm_config({"prompt_cache": True})
+
+
+def test_merge_lm_request_config_per_call_response_format_wins():
+    lm = type("_LMDefaults", (), {"kwargs": {"response_format": {"type": "json_object"}}})()
+    merged = merge_lm_request_config(lm, LMConfig(response_format={"type": "json_schema"}))
+    assert merged.response_format == {"type": "json_schema"}

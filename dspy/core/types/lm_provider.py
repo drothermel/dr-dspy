@@ -11,6 +11,9 @@ class LMProviderOptions(BaseModel):
 
     ``api_base`` is the canonical endpoint override. ``base_url`` is accepted as an
     alias and normalized to ``api_base`` when only ``base_url`` is set.
+
+    ``response_format`` here becomes an LM default via ``to_kwargs()``. Per-call
+    ``LMConfig.response_format`` overrides it when explicitly set on the request config.
     """
 
     model_config = ConfigDict(extra="forbid")
