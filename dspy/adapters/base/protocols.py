@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 if TYPE_CHECKING:
+    from dspy.adapters.call.preprocessors.chain import CallPreprocessorChain
     from dspy.adapters.format.message_assembler import MessageAssembler
     from dspy.adapters.types.field_type import NativeResponseFieldType
     from dspy.clients.base_lm import BaseLM
@@ -73,5 +74,6 @@ class MessageAssemblerHost(ConversationFormattingAdapter, Protocol):
 
 class ComposedAdapter(FormattableAdapter, NativeAdaptableAdapter, Protocol):
     callbacks: list[Callback]
+    preprocessor_chain: CallPreprocessorChain
 
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]: ...

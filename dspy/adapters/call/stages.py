@@ -46,8 +46,12 @@ def prepare_adapter_call(
 ) -> PreparedAdapterCall:
     resolved_config = coerce_lm_config(config)
     original_field_names = set(task_spec.fields.keys())
-    processed_task_spec, tools, resolved_config = adapter._call_preprocess(
-        lm=lm, config=resolved_config, task_spec=task_spec, inputs=inputs
+    processed_task_spec, tools, resolved_config = adapter.preprocessor_chain.run(
+        adapter,
+        lm=lm,
+        config=resolved_config,
+        task_spec=task_spec,
+        inputs=inputs,
     )
     mutations = [
         f"removed field {name}" for name in sorted(original_field_names - set(processed_task_spec.fields.keys()))

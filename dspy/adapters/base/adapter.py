@@ -7,6 +7,7 @@ from dspy.adapters.base.format import AdapterFormatMixin
 from dspy.adapters.base.native import _DEFAULT_NATIVE_RESPONSE_TYPES
 from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.call.mode import AdapterCallMode
+from dspy.adapters.call.preprocessors import default_preprocessor_chain
 from dspy.adapters.format.message_assembler import MessageAssembler
 from dspy.adapters.types.field_type import NativeResponseFieldType
 from dspy.runtime.callback import with_callbacks
@@ -56,6 +57,7 @@ class Adapter(AdapterCallMixin, AdapterFormatMixin):
         self.native_response_types = native_response_types or _DEFAULT_NATIVE_RESPONSE_TYPES
         self.field_formatter: FieldFormatter | None = None
         self.message_assembler = MessageAssembler(self)
+        self.preprocessor_chain = default_preprocessor_chain()
 
     def _require_field_formatter(self) -> FieldFormatter:
         if self.field_formatter is None:

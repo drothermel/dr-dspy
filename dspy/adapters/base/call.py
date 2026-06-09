@@ -6,18 +6,12 @@ from typing import TYPE_CHECKING, Any, cast
 from dspy.adapters.base.native import AdapterNativeMixin
 from dspy.adapters.base.protocols import ComposedAdapterT
 from dspy.adapters.call.postprocess import enrich_parsed_value_from_lm_output
-from dspy.adapters.types.citation import Citations
-from dspy.adapters.types.field_type import is_field_type_class
-from dspy.adapters.types.reasoning import Reasoning
 from dspy.core.types import (
     LMConfig,
     LMMessage,
     LMRequest,
     LMResponse,
-    LMToolChoice,
     LMToolSpec,
-    coerce_lm_config,
-    coerce_tool_spec,
     merge_lm_request_config,
 )
 from dspy.errors import AdapterParseError
@@ -38,60 +32,13 @@ class AdapterCallMixin(AdapterNativeMixin):
         task_spec: TaskSpec,
         inputs: dict[str, Any],
     ) -> tuple[TaskSpec, list[LMToolSpec], LMConfig]:
-        if not isinstance(config, LMConfig):
-            config = coerce_lm_config(config)
-        tools: list[LMToolSpec] = []
-        if not self.use_native_function_calling:
-            if config.tool_choice is not None:
-                config = config.model_copy(update={"tool_choice": None})
-        else:
-            tool_call_input_field_name = self._get_tool_call_input_field_name(task_spec)
-            tool_call_output_field_name = self._get_tool_call_output_field_name(task_spec)
-            if tool_call_output_field_name:
-                if tool_call_input_field_name is None:
-                    raise ValueError(
-                        f"You provided an output field {tool_call_output_field_name} to receive the tool calls information, but did not provide any tools as the input. Please provide a list of tools as the input by adding an input field with type `list[dspy.adapters.types.tool.Tool]`."
-                    )
-                if not lm.supports_function_calling:
-                    raise ValueError(
-                        f"Adapter {type(self).__name__} has use_native_function_calling=True but "
-                        f"model {lm.model!r} does not support function calling. "
-                        "Use an LM with supports_function_calling=True or disable native function calling."
-                    )
-                input_tools = inputs[tool_call_input_field_name]
-                input_tools = input_tools if isinstance(input_tools, list) else [input_tools]
-                tools = [coerce_tool_spec(tool) for tool in input_tools]
-                if self.parallel_tool_calls is not None:
-                    if config.tool_choice is None:
-                        config = config.model_copy(
-                            update={"tool_choice": LMToolChoice(mode="auto", parallel=self.parallel_tool_calls)}
-                        )
-                    elif config.tool_choice.parallel is None:
-                        config = config.model_copy(
-                            update={
-                                "tool_choice": config.tool_choice.model_copy(
-                                    update={"parallel": self.parallel_tool_calls}
-                                )
-                            }
-                        )
-                task_spec = task_spec.delete(tool_call_output_field_name)
-                task_spec = task_spec.delete(tool_call_input_field_name)
-        for name, field in task_spec.output_fields.items():
-            field_type = field.type_
-            if not (
-                isinstance(field_type, type)
-                and field_type in self.native_response_types
-                and is_field_type_class(field_type)
-            ):
-                continue
-            self._ensure_native_response_type_parses_output(field_type)
-            if field_type is Reasoning:
-                task_spec = self._adapt_reasoning_native(task_spec=task_spec, field_name=name, lm=lm, config=config)
-            elif field_type is Citations:
-                task_spec = self._adapt_citations_native(task_spec=task_spec, field_name=name, lm=lm)
-            else:
-                task_spec = task_spec.delete(name)
-        return (task_spec, tools, config)
+        return self.preprocessor_chain.run(
+            self,
+            lm=lm,
+            config=config,
+            task_spec=task_spec,
+            inputs=inputs,
+        )
 
     def _call_postprocess(
         self: ComposedAdapterT,
