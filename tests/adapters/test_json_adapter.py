@@ -858,3 +858,30 @@ def test_json_adapter_parse_raises_on_unexpected_fields():
     adapter = JSONAdapter()
     with pytest.raises(AdapterParseError, match="unexpected field\\(s\\): \\['extra'\\]"):
         adapter.parse(task_spec=signature, completion='{"answer": "Paris", "extra": "noise"}')
+
+
+def test_json_adapter_parse_fenced_json_before_repairing_markdown():
+    signature = ts("code_spec, function_stub -> completed_code", instructions="Given the fields, produce the outputs.")
+    adapter = JSONAdapter(allow_json_repair=True)
+    completion = """```json
+{
+  "completed_code": "def how_many_times(string: str, substring: str) -> int:\\n    count = 0\\n    start = 0\\n    while True:\\n        start = string.find(substring, start)\\n        if start == -1:\\n            break\\n        count += 1\\n        start += 1\\n    return count"
+}
+```"""
+
+    result = adapter.parse(task_spec=signature, completion=completion)
+
+    assert result == {
+        "completed_code": (
+            "def how_many_times(string: str, substring: str) -> int:\n"
+            "    count = 0\n"
+            "    start = 0\n"
+            "    while True:\n"
+            "        start = string.find(substring, start)\n"
+            "        if start == -1:\n"
+            "            break\n"
+            "        count += 1\n"
+            "        start += 1\n"
+            "    return count"
+        )
+    }

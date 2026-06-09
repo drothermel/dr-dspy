@@ -120,19 +120,42 @@ class JSONAdapter(Adapter):
     @override
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
         try:
-            fields = load_json(completion, repair=self.allow_json_repair)
-        except json.JSONDecodeError as exc:
-            raise AdapterParseError(
-                adapter_name="JSONAdapter",
-                task_spec=task_spec,
-                lm_response=completion,
-                message="LM response cannot be serialized to a JSON object.",
-            ) from exc
+            fields = load_json(completion, repair=False)
+        except json.JSONDecodeError as strict_error:
+            if not self.allow_json_repair:
+                raise AdapterParseError(
+                    adapter_name="JSONAdapter",
+                    task_spec=task_spec,
+                    lm_response=completion,
+                    message="LM response cannot be serialized to a JSON object.",
+                ) from strict_error
+            fenced = _extract_fenced_json(completion)
+            if fenced is not None:
+                try:
+                    fields = load_json(fenced, repair=False)
+                    completion = fenced
+                except json.JSONDecodeError:
+                    try:
+                        fields = load_json(fenced, repair=True)
+                        completion = fenced
+                    except json.JSONDecodeError:
+                        fields = None
+            else:
+                fields = None
+            if fields is None:
+                try:
+                    fields = load_json(completion, repair=True)
+                except json.JSONDecodeError as exc:
+                    raise AdapterParseError(
+                        adapter_name="JSONAdapter",
+                        task_spec=task_spec,
+                        lm_response=completion,
+                        message="LM response cannot be serialized to a JSON object.",
+                    ) from exc
         if not isinstance(fields, dict):
-            pattern = r"\{(?:[^{}]|(?R))*\}"
-            match = regex.search(pattern, completion, regex.DOTALL)
-            if match:
-                completion = match.group(0)
+            object_match = _extract_json_object(completion)
+            if object_match:
+                completion = object_match
                 fields = load_json(completion, repair=self.allow_json_repair)
         if not isinstance(fields, dict):
             raise AdapterParseError(
@@ -168,3 +191,18 @@ class JSONAdapter(Adapter):
             adapter_name="JSONAdapter", task_spec=task_spec, lm_response=completion, fields=parsed_fields
         )
         return parsed_fields
+
+
+def _extract_fenced_json(completion: str) -> str | None:
+    match = regex.search(r"```(?:json)?\s*(.*?)\s*```", completion, regex.DOTALL | regex.IGNORECASE)
+    if not match:
+        return None
+    return match.group(1)
+
+
+def _extract_json_object(completion: str) -> str | None:
+    pattern = r"\{(?:[^{}]|(?R))*\}"
+    match = regex.search(pattern, completion, regex.DOTALL)
+    if not match:
+        return None
+    return match.group(0)
