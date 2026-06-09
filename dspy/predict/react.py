@@ -3,7 +3,7 @@ from typing import Any
 
 from dspy.adapters.types.tool import Tool
 from dspy.history import TurnEvent, TurnLog, call_with_history_truncation
-from dspy.predict.agent_loop import format_tool_exception
+from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult, format_tool_exception
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
@@ -68,10 +68,9 @@ class ReAct(Module):
         **input_args,
     ):
         run = resolve_run(run=run, bound_run=self.run)
-        turn_log = TurnLog.empty()
         max_iters = input_args.pop("max_iters", self.max_iters)
-        termination_reason = AgentTerminationReason.MAX_ITERS
-        for _idx in range(max_iters):
+
+        async def step(_turn_index: int, turn_log: TurnLog) -> AgentStepResult[TurnLog]:
             try:
                 extracted = await call_with_history_truncation(
                     self.react, turn_log=turn_log, run=run, options=options, **input_args
@@ -81,8 +80,11 @@ class ReAct(Module):
                 logger.warning(
                     f"Ending the agent loop: Agent failed to select a valid tool: {format_tool_exception(err)}"
                 )
-                termination_reason = AgentTerminationReason.PARSE_ERROR
-                break
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.PARSE_ERROR,
+                )
             try:
                 tool = self.tools[pred.next_tool_name]
                 observation = await tool.acall(**pred.next_tool_args)
@@ -97,13 +99,23 @@ class ReAct(Module):
                 )
             )
             if pred.next_tool_name == "finish":
-                termination_reason = AgentTerminationReason.SUBMIT
-                break
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.SUBMIT,
+                )
+            return AgentStepResult(history=turn_log)
+
+        loop_result = await AgentLoopRunner[TurnLog]().run(
+            max_iters=max_iters,
+            initial_history=TurnLog.empty(),
+            step=step,
+        )
         extracted = await call_with_history_truncation(
-            self.extract, turn_log=turn_log, run=run, options=options, **input_args
+            self.extract, turn_log=loop_result.history, run=run, options=options, **input_args
         )
         return Prediction(
             turn_log=extracted.turn_log,
-            termination_reason=termination_reason,
+            termination_reason=loop_result.termination_reason,
             **dict(extracted.result.items()),
         )

@@ -2,6 +2,7 @@ from typing import Any, cast
 
 from dspy.adapters.types.tool import Tool
 from dspy.history import TurnEvent, TurnLog, call_with_history_truncation
+from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.avatar.models import Action, ActionOutput
 from dspy.predict.predict import Predict
@@ -99,9 +100,8 @@ class Avatar(Module):
         actor_inputs = {key: value for key, value in args.items() if key != "turn_log"}
         action_results: list[ActionOutput] = []
         max_iters = cast("int", inputs.get("max_iters", self.max_iters))
-        remaining = max_iters
-        termination_reason = AgentTerminationReason.MAX_ITERS
-        while remaining > 0:
+
+        async def step(_turn_index: int, turn_log: TurnLog) -> AgentStepResult[TurnLog]:
             extracted = await call_with_history_truncation(
                 self.actor,
                 turn_log=turn_log,
@@ -116,23 +116,32 @@ class Avatar(Module):
             tool_name = action.tool_name
             tool_args = action.tool_args
             if tool_name == "Finish":
-                turn_log = turn_log.append_turn(
-                    TurnEvent(
-                        action=action,
-                        result="Gathered all information needed to finish the task.",
-                    )
+                return AgentStepResult(
+                    history=turn_log.append_turn(
+                        TurnEvent(
+                            action=action,
+                            result="Gathered all information needed to finish the task.",
+                        )
+                    ),
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.SUBMIT,
                 )
-                termination_reason = AgentTerminationReason.SUBMIT
-                break
             tool_output = await self._acall_tool(tool_name, tool_args)
             action_results.append(ActionOutput(tool_name=tool_name, tool_args=tool_args, tool_output=tool_output))
-            turn_log = turn_log.append_turn(
-                TurnEvent(action=action, result=tool_output if tool_output is not None else "")
+            return AgentStepResult(
+                history=turn_log.append_turn(
+                    TurnEvent(action=action, result=tool_output if tool_output is not None else "")
+                )
             )
-            remaining -= 1
+
+        loop_result = await AgentLoopRunner[TurnLog]().run(
+            max_iters=max_iters,
+            initial_history=turn_log,
+            step=step,
+        )
         extracted = await call_with_history_truncation(
             self.finish,
-            turn_log=turn_log,
+            turn_log=loop_result.history,
             run=run,
             options=options,
             max_attempts=3,
@@ -144,5 +153,5 @@ class Avatar(Module):
             **{key: getattr(final_answer, key) for key in self.output_fields},
             turn_log=turn_log,
             actions=action_results,
-            termination_reason=termination_reason,
+            termination_reason=loop_result.termination_reason,
         )

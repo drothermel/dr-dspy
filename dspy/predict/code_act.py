@@ -4,6 +4,7 @@ from typing_extensions import override
 
 from dspy.adapters.types.tool import Tool
 from dspy.history import TurnEvent, TurnLog, call_with_history_truncation
+from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.code_execution import execute_generated_code, parse_generated_code
@@ -74,8 +75,8 @@ class CodeAct(Module):
                 self.interpreter(get_formatted_source(tool.func))
             turn_log = TurnLog.empty()
             max_iters = inputs.pop("max_iters", self.max_iters)
-            loop_finished = False
-            for _idx in range(max_iters):
+
+            async def step(_turn_index: int, turn_log: TurnLog) -> AgentStepResult[TurnLog]:
                 extracted = await call_with_history_truncation(
                     self.codeact, turn_log=turn_log, run=run, options=options, **inputs
                 )
@@ -83,10 +84,11 @@ class CodeAct(Module):
                 code_data = extracted.result
                 code, error = parse_generated_code(code_data)
                 if error:
-                    turn_log = turn_log.append_turn(
-                        TurnEvent(observation=f"Failed to parse the generated code: {error}")
+                    return AgentStepResult(
+                        history=turn_log.append_turn(
+                            TurnEvent(observation=f"Failed to parse the generated code: {error}")
+                        )
                     )
-                    continue
                 output, error = execute_generated_code(code=code, interpreter=self.interpreter)
                 event = TurnEvent(generated_code=code)
                 if not error:
@@ -95,15 +97,24 @@ class CodeAct(Module):
                     event = event.model_copy(update={"observation": f"Failed to execute the generated code: {error}"})
                 turn_log = turn_log.append_turn(event)
                 if code_data.finished:
-                    loop_finished = True
-                    break
-            termination_reason = AgentTerminationReason.SUBMIT if loop_finished else AgentTerminationReason.MAX_ITERS
+                    return AgentStepResult(
+                        history=turn_log,
+                        control=AgentLoopControl.BREAK,
+                        termination_reason=AgentTerminationReason.SUBMIT,
+                    )
+                return AgentStepResult(history=turn_log)
+
+            loop_result = await AgentLoopRunner[TurnLog]().run(
+                max_iters=max_iters,
+                initial_history=turn_log,
+                step=step,
+            )
             extracted = await call_with_history_truncation(
-                self.extractor, turn_log=turn_log, run=run, options=options, **inputs
+                self.extractor, turn_log=loop_result.history, run=run, options=options, **inputs
             )
             return Prediction(
                 turn_log=extracted.turn_log,
-                termination_reason=termination_reason,
+                termination_reason=loop_result.termination_reason,
                 **dict(extracted.result.items()),
             )
         finally:

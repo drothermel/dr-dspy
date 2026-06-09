@@ -10,7 +10,7 @@ from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.core.types import LMConfig, LMToolChoice
 from dspy.errors import AdapterParseError
 from dspy.history import TruncationExhaustedError, TurnEvent, TurnLog, call_with_history_truncation
-from dspy.predict.agent_loop import format_tool_exception
+from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult, format_tool_exception
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.call_options import PredictOptions
 from dspy.predict.predict import Predict
@@ -88,8 +88,9 @@ class ReActV2(Module):
         turn_log_raw = input_args.pop("turn_log", None)
         turn_log = TurnLog.empty() if turn_log_raw is None else TurnLog.model_validate(turn_log_raw)
         pending_inputs = {name: input_args[name] for name in self.task_spec.input_fields if name in input_args}
-        break_reason = AgentTerminationReason.MAX_ITERS
-        for turn_index in range(max_iters):
+
+        async def step(turn_index: int, turn_log: TurnLog) -> AgentStepResult[TurnLog]:
+            nonlocal pending_inputs
             try:
                 extracted = await call_with_history_truncation(
                     self.react,
@@ -104,19 +105,31 @@ class ReActV2(Module):
                 tool_calls = _coerce_tool_calls(getattr(pred, "tool_calls", None))
             except TruncationExhaustedError as err:
                 logger.warning("Ending ReActV2 loop after context window exceeded: %s", err)
-                break_reason = AgentTerminationReason.CONTEXT_WINDOW_EXCEEDED
-                break
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.CONTEXT_WINDOW_EXCEEDED,
+                )
             except ValueError as err:
                 logger.warning("Ending ReActV2 loop after parse failure: %s", format_tool_exception(err))
-                break_reason = AgentTerminationReason.PARSE_ERROR
-                break
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.PARSE_ERROR,
+                )
             except AdapterParseError as err:
                 logger.warning("Ending ReActV2 loop after parse failure: %s", format_tool_exception(err))
-                break_reason = AgentTerminationReason.PARSE_ERROR
-                break
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.PARSE_ERROR,
+                )
             if not tool_calls.tool_calls:
-                break_reason = AgentTerminationReason.EMPTY_TOOL_CALLS
-                break
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.EMPTY_TOOL_CALLS,
+                )
             tool_calls = _ensure_tool_call_ids(tool_calls, turn_index)
             tool_call_results, final_outputs = await self._execute_tool_calls(tool_calls)
             event = self._history_event(pending_inputs, pred, tool_calls, tool_call_results)
@@ -125,12 +138,28 @@ class ReActV2(Module):
             turn_log = turn_log.append_turn(TurnEvent.model_validate(event))
             pending_inputs = {}
             if final_outputs is not None:
-                return Prediction(
-                    **final_outputs,
-                    turn_log=turn_log,
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.RETURN,
                     termination_reason=AgentTerminationReason.SUBMIT,
+                    return_value=Prediction(
+                        **final_outputs,
+                        turn_log=turn_log,
+                        termination_reason=AgentTerminationReason.SUBMIT,
+                    ),
                 )
-        return await self._forced_submit(turn_log, pending_inputs, break_reason, max_iters, run=run)
+            return AgentStepResult(history=turn_log)
+
+        loop_result = await AgentLoopRunner[TurnLog]().run(
+            max_iters=max_iters,
+            initial_history=turn_log,
+            step=step,
+        )
+        if loop_result.return_value is not None:
+            return loop_result.return_value
+        return await self._forced_submit(
+            loop_result.history, pending_inputs, loop_result.termination_reason, max_iters, run=run
+        )
 
     async def _execute_tool_calls(self, tool_calls: ToolCalls) -> tuple[ToolCallResults, dict[str, Any] | None]:
         values = []
