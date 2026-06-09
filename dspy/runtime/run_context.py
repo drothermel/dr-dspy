@@ -64,7 +64,7 @@ def disk_call_log_enabled(telemetry: TelemetryConfig) -> bool:
 class RunContext(BaseModel):
     """Runtime configuration passed explicitly to DSPy spine APIs via ``run=``."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     lm: BaseLM
     adapter: Adapter
@@ -131,21 +131,28 @@ class RunContext(BaseModel):
         call_log = list(overrides.pop("call_log", self.call_log))
         log_session = overrides.pop("log_session", self.log_session)
         call_site = overrides.pop("call_site", self.call_site)
+        lm = overrides.pop("lm", self.lm)
+        adapter = overrides.pop("adapter", self.adapter)
+        usage_tracker = overrides.pop("usage_tracker", self.usage_tracker)
+        retrieval = overrides.pop("retrieval", self.retrieval)
+
+        if overrides:
+            unknown = ", ".join(sorted(overrides))
+            raise TypeError(f"RunContext.fork() got unexpected keyword argument(s): {unknown}")
 
         return RunContext(
-            lm=overrides.pop("lm", self.lm),
-            adapter=overrides.pop("adapter", self.adapter),
+            lm=lm,
+            adapter=adapter,
             callbacks=callbacks,
             optimization_trace=optimization_trace,
             call_log=call_log,
-            usage_tracker=overrides.pop("usage_tracker", self.usage_tracker),
-            retrieval=overrides.pop("retrieval", self.retrieval),
+            usage_tracker=usage_tracker,
+            retrieval=retrieval,
             caller_modules=[],
             execution=execution,
             telemetry=telemetry,
             log_session=log_session,
             call_site=call_site,
-            **overrides,
         )
 
     def _init_run_session(self) -> None:

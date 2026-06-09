@@ -112,3 +112,11 @@ def test_default_execution_config():
     run = RunContext.create(lm=lm, adapter=JSONAdapter(), init_run_log=False)
     assert run.execution.max_concurrency == 8
     assert run.execution.max_errors == 10
+
+
+def test_fork_rejects_unknown_kwargs():
+    lm = DummyLM([{"answer": "ok"}])
+    adapter = JSONAdapter()
+    run = RunContext.create(lm=lm, adapter=adapter, init_run_log=False)
+    with pytest.raises(TypeError, match="telemtry"):
+        run.fork(telemtry="strict")
