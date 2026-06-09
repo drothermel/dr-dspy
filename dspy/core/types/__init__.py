@@ -1,9 +1,17 @@
 from dspy.core.types.builders import Assistant, Developer, System, ToolCall, ToolResult, User
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
-from dspy.core.types.config import LMConfig, LMPromptCacheConfig, LMReasoningConfig, LMToolChoice, LMToolSpec
+from dspy.core.types.config import (
+    LMConfig,
+    LMPromptCacheConfig,
+    LMReasoningConfig,
+    LMToolChoice,
+    LMToolSpec,
+    ReasoningEffort,
+)
 from dspy.core.types.embedding_options import EmbedderOptions
+from dspy.core.types.lm import LMForward
 from dspy.core.types.lm_provider import LMProviderOptions
-from dspy.core.types.messages import LMMessage
+from dspy.core.types.messages import LMMessage, LMMessageRole
 from dspy.core.types.parts import (
     LMAudioPart,
     LMBinaryPart,
@@ -59,13 +67,16 @@ __all__ = [
     "CallRecord",
     "LMImageDelta",
     "LMImagePart",
+    "LMForward",
     "LMMessage",
+    "LMMessageRole",
     "LMOpaquePart",
     "LMOutput",
     "LMOutputBuilder",
     "LMPart",
     "LMPromptCacheConfig",
     "LMReasoningConfig",
+    "ReasoningEffort",
     "LMRefusalPart",
     "LMRequest",
     "LMRequestPatch",

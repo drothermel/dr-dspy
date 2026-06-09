@@ -1,21 +1,24 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from dspy.core.types.parts import (
-    LMPart,
-    LMTextPart,
-    LMToolResultPart,
-    _coerce_part,
-    _parts_from_openai_content,
-    _tool_calls_from_openai,
-)
+from dspy.core.types.parts.models import LMPart, LMTextPart, LMToolResultPart, _coerce_part
+from dspy.core.types.parts.openai import _parts_from_openai_content, _tool_calls_from_openai
+
+
+class LMMessageRole(StrEnum):
+    SYSTEM = "system"
+    DEVELOPER = "developer"
+    USER = "user"
+    ASSISTANT = "assistant"
+    TOOL = "tool"
 
 
 class LMMessage(BaseModel):
-    role: str
+    role: LMMessageRole | str
     parts: list[LMPart]
     name: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)

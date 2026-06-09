@@ -12,7 +12,7 @@ from dspy.core.types import (
     LMUsage,
     User,
 )
-from dspy.core.types.config import _merge_config_overrides, _merge_lm_config
+from dspy.core.types.config import ReasoningEffort, _merge_config_overrides, _merge_lm_config
 
 
 def test_merge_lm_config_merges_extensions():
@@ -51,7 +51,7 @@ def test_lm_config_rejects_unknown_top_level_keys():
 
 def test_lm_config_accepts_canonical_nested_fields():
     config = LMConfig(
-        reasoning=LMReasoningConfig(effort="high", summary="auto"),
+        reasoning=LMReasoningConfig(effort=ReasoningEffort.HIGH, summary="auto"),
         tool_choice=LMToolChoice(mode="auto", parallel=False),
         prompt_cache=LMPromptCacheConfig(enabled=True, key="prompt-cache"),
         extensions={"provider_flag": True},

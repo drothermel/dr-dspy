@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from dspy.core.types.call_options import PredictOptions
+from dspy.core.types.call_options import PredictOptions, ensure_predict_options_built
 from dspy.task_spec.fields import validate_task_inputs_from_spec
 from dspy.task_spec.task_spec import TaskSpec  # noqa: TC001 — runtime isinstance checks
 
@@ -26,4 +26,5 @@ def validate_task_inputs(task_spec: TaskSpec, inputs: dict[str, Any]) -> dict[st
 
 
 def resolve_predict_options(options: PredictOptions | None) -> PredictOptions:
+    ensure_predict_options_built()
     return options or PredictOptions()

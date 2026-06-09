@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class ReasoningEffort(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
 
 
 class LMToolSpec(BaseModel):
@@ -17,14 +24,24 @@ class LMToolSpec(BaseModel):
 
 
 class LMReasoningConfig(BaseModel):
-    effort: str | None = None
+    effort: ReasoningEffort | None = None
     max_tokens: int | None = None
     summary: str | None = None
     model_config = ConfigDict(extra="forbid")
 
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_effort(cls, data: Any) -> Any:
+        if isinstance(data, dict) and isinstance(data.get("effort"), str):
+            data = dict(data)
+            data["effort"] = ReasoningEffort(data["effort"])
+        return data
+
     @classmethod
     def from_value(cls, value: Any = None, **overrides: Any) -> LMReasoningConfig:
         data = _config_data(value, str_field="effort")
+        if isinstance(data.get("effort"), str):
+            data["effort"] = ReasoningEffort(data["effort"])
         data.update({key: value for key, value in overrides.items() if value is not _MISSING})
         return cls(**data)
 
@@ -185,4 +202,4 @@ def lm_defaults_config(lm: Any) -> LMConfig:
 
 
 def merge_lm_request_config(lm: Any, config: LMConfig | None = None) -> LMConfig:
-    return _merge_lm_config(lm_defaults_config(lm), config or LMConfig()) or (config or LMConfig())
+    return _merge_lm_config(lm_defaults_config(lm), config or LMConfig()) or LMConfig()
