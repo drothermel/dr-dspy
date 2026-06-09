@@ -1,6 +1,5 @@
 import asyncio
 import inspect
-from collections.abc import Coroutine
 from typing import TYPE_CHECKING, Any, Callable, cast, get_origin, get_type_hints
 
 from pydantic import BaseModel, TypeAdapter, create_model
@@ -115,26 +114,12 @@ class Tool(Type):
             parameters={"type": "object", "properties": args_schema, "required": list(args_schema.keys())},
         )
 
-    def _run_async_in_sync(self, coroutine: Coroutine[object, Any, object]) -> object:
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-        if loop is None:
-            return asyncio.run(coroutine)
-        return loop.run_until_complete(coroutine)
-
     @with_callbacks(kind="tool")
     def __call__(self, *, run: RunContext | None = None, **kwargs: object) -> object:
         parsed_kwargs = self._validate_and_parse_args(**kwargs)
         result = self.func(**parsed_kwargs)
         if asyncio.iscoroutine(result):
-            allow_conversion = run.execution.allow_tool_async_sync_conversion if run is not None else False
-            if allow_conversion:
-                return self._run_async_in_sync(result)
-            raise ValueError(
-                "You are calling `__call__` on an async tool, please use `acall` instead or enable async-to-sync conversion with RunContext.execution.allow_tool_async_sync_conversion=True."
-            )
+            raise ValueError("You are calling `__call__` on an async tool. Use `await tool.acall(...)` instead.")
         return result
 
     @with_callbacks(kind="tool")
