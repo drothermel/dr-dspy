@@ -1,6 +1,7 @@
 import random
 
 from dspy.datasets.dataset import Dataset
+from dspy.integrations.datasets.import_ import import_datasets
 
 
 class HotPotQA(Dataset):
@@ -28,8 +29,7 @@ class HotPotQA(Dataset):
             raise ValueError(
                 "Care must be taken when adding support for easy examples.Dev must be all hard to match official dev, but training can be flexible."
             )
-        from datasets import load_dataset
-
+        load_dataset = import_datasets(feature="HotPotQA").load_dataset
         hf_official_train = load_dataset("hotpot_qa", "fullwiki", split="train")
         hf_official_dev = load_dataset("hotpot_qa", "fullwiki", split="validation")
         official_train = []

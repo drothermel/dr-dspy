@@ -1,18 +1,23 @@
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, cast
 
-from dspy._internal.lazy_import import _detect_dspy_dist
 from dspy.datasets.dataset import Dataset
 from dspy.datasets.rows import rows_to_examples
+from dspy.integrations.datasets.import_ import import_datasets
 from dspy.primitives.example import Example
 
-try:
-    from datasets import DatasetDict, load_dataset
-except ImportError as err:
-    raise ImportError(
-        f"The 'datasets' extra is required for Hugging Face dataset loading. "
-        f"Install it with `pip install {_detect_dspy_dist()}[datasets]`."
-    ) from err
+
+def _hf_datasets() -> Any:
+    return import_datasets(feature="HuggingFaceDataLoader")
+
+
+def _examples_from_hf_file(
+    format_name: str, file_path: str, fields: Sequence[str] | None, input_keys: tuple[str, ...]
+) -> list[Example]:
+    load_dataset = _hf_datasets().load_dataset
+    loaded_dataset: Any = load_dataset(format_name, data_files=file_path)
+    dataset = loaded_dataset["train"]
+    return rows_to_examples(rows=cast("Iterable[Mapping[str, object]]", dataset), fields=fields, input_keys=input_keys)
 
 
 class HuggingFaceDataLoader(Dataset):
@@ -32,6 +37,10 @@ class HuggingFaceDataLoader(Dataset):
         if not isinstance(input_keys, tuple):
             raise TypeError("Invalid input keys provided. Please provide a tuple of input keys.")
 
+        hf_datasets = _hf_datasets()
+        load_dataset = hf_datasets.load_dataset
+        dataset_dict = hf_datasets.DatasetDict
+
         dataset = load_dataset(dataset_name, *args, **kwargs)
         if isinstance(dataset, list) and isinstance(kwargs.get("split"), list):
             split_names = cast("list[str]", kwargs["split"])
@@ -41,7 +50,7 @@ class HuggingFaceDataLoader(Dataset):
                 )
                 for split_name, split_rows in zip(split_names, dataset, strict=False)
             }
-        if isinstance(dataset, DatasetDict):
+        if isinstance(dataset, dataset_dict):
             return {
                 split_name: rows_to_examples(rows=rows, fields=fields, input_keys=input_keys)
                 for split_name, rows in dataset.items()
@@ -53,26 +62,14 @@ class HuggingFaceDataLoader(Dataset):
     def from_csv(
         self, file_path: str, fields: Sequence[str] | None = None, input_keys: tuple[str, ...] = ()
     ) -> list[Example]:
-        loaded_dataset: Any = load_dataset("csv", data_files=file_path)
-        dataset = loaded_dataset["train"]
-        return rows_to_examples(
-            rows=cast("Iterable[Mapping[str, object]]", dataset), fields=fields, input_keys=input_keys
-        )
+        return _examples_from_hf_file("csv", file_path, fields, input_keys)
 
     def from_json(
         self, file_path: str, fields: Sequence[str] | None = None, input_keys: tuple[str, ...] = ()
     ) -> list[Example]:
-        loaded_dataset: Any = load_dataset("json", data_files=file_path)
-        dataset = loaded_dataset["train"]
-        return rows_to_examples(
-            rows=cast("Iterable[Mapping[str, object]]", dataset), fields=fields, input_keys=input_keys
-        )
+        return _examples_from_hf_file("json", file_path, fields, input_keys)
 
     def from_parquet(
         self, file_path: str, fields: Sequence[str] | None = None, input_keys: tuple[str, ...] = ()
     ) -> list[Example]:
-        loaded_dataset: Any = load_dataset("parquet", data_files=file_path)
-        dataset = loaded_dataset["train"]
-        return rows_to_examples(
-            rows=cast("Iterable[Mapping[str, object]]", dataset), fields=fields, input_keys=input_keys
-        )
+        return _examples_from_hf_file("parquet", file_path, fields, input_keys)

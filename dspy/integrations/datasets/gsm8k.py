@@ -1,8 +1,9 @@
 import random
-from typing import Protocol, cast
+from typing import Protocol
 
 import tqdm
 
+from dspy.integrations.datasets.import_ import import_datasets
 from dspy.primitives.example import Example
 
 
@@ -13,9 +14,10 @@ class HasAnswer(Protocol):
 class GSM8K:
     def __init__(self) -> None:
         self.do_shuffle = False
-        from datasets import DatasetDict, load_dataset
+        datasets = import_datasets(feature="GSM8K")
+        load_dataset = datasets.load_dataset
 
-        dataset = cast("DatasetDict", load_dataset("gsm8k", "main"))
+        dataset = load_dataset("gsm8k", "main")
         hf_official_train = dataset["train"]
         hf_official_test = dataset["test"]
         official_train = []

@@ -1,12 +1,10 @@
 import importlib
 import random
 import re
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import Protocol, cast
 
+from dspy.integrations.datasets.import_ import import_datasets
 from dspy.primitives.example import Example
-
-if TYPE_CHECKING:
-    from datasets import DatasetDict
 
 
 class HasAnswer(Protocol):
@@ -15,9 +13,9 @@ class HasAnswer(Protocol):
 
 class MATH:
     def __init__(self, subset: str) -> None:
-        from datasets import load_dataset
+        load_dataset = import_datasets(feature="MATH").load_dataset
 
-        ds = cast("DatasetDict", load_dataset("DigitalLearningGmbH/MATH-lighteval", subset))
+        ds = load_dataset("DigitalLearningGmbH/MATH-lighteval", subset)
         dataset = [
             Example.from_record(
                 {
