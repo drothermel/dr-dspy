@@ -1,6 +1,9 @@
 import asyncio
 from unittest.mock import AsyncMock
 
+import pytest
+
+from dspy.predict.predict import Predict  # noqa: F401 — initialize predict before primitives lazy import
 from dspy.primitives import Module
 from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.testing import DummyLM
@@ -66,13 +69,13 @@ def test_eval_candidate_program_failure(make_run):
     evaluate = AsyncMock(side_effect=ValueError("Error"))
     batch_size = 3
     run = make_run(lm=DummyLM([{}]))
-    result = asyncio.run(
-        eval_candidate_program(
-            batch_size=batch_size,
-            trainset=trainset,
-            candidate_program=candidate_program,
-            evaluate=evaluate,
-            run=run,
+    with pytest.raises(ValueError, match="Error"):
+        asyncio.run(
+            eval_candidate_program(
+                batch_size=batch_size,
+                trainset=trainset,
+                candidate_program=candidate_program,
+                evaluate=evaluate,
+                run=run,
+            )
         )
-    )
-    assert result.score == 0.0
