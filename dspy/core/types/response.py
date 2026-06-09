@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pprint import pformat
 from typing import Any
 
@@ -25,6 +24,7 @@ from dspy.core.types.parts.models import _coerce_part
 from dspy.core.types.parts.serialize import _part_to_value
 from dspy.core.types.request import LMRequest
 from dspy.core.types.request_views import request_kwargs, request_prompt
+from dspy.serialization.json import to_jsonable
 
 
 class LMUsage(BaseModel):
@@ -303,13 +303,7 @@ class CallRecord(BaseModel):
             "response_model": self.response_model,
         }
         if mode != "python":
-            data = json.loads(json.dumps(data, default=_json_default))
+            data = to_jsonable(data)
         if exclude_none:
             data = {key: value for key, value in data.items() if value is not None}
         return data
-
-
-def _json_default(value: Any) -> Any:
-    if hasattr(value, "model_dump"):
-        return value.model_dump(mode="json", exclude_none=True)
-    return str(value)

@@ -70,7 +70,7 @@ class Predict(Module):
             else:
                 state["demos"].append(demo)
         state["task_spec"] = self.task_spec.to_dict()
-        state["config"] = self.config.model_dump(mode="json")
+        state["config"] = to_jsonable(self.config)
         state["lm"] = self.lm.dump_state() if self.lm else None
         return state
 

@@ -1,10 +1,8 @@
-import textwrap
 from collections.abc import Callable
 
 import orjson
 
 from dspy.adapters.call.wrappers import HintInjectingAdapter
-from dspy.adapters.prompt_format import get_field_spec_description_string
 from dspy.predict.predict import Predict
 from dspy.predict.sampling import SamplingAttempt, sample_with_reward
 from dspy.primitives import Module, Prediction
@@ -13,7 +11,9 @@ from dspy.runtime import run_with_trace
 from dspy.runtime.call_options import ModuleCallOptions
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.runtime.transparency.resolve import require_adapter
+from dspy.serialization.json import to_jsonable
 from dspy.task_spec.framework.refine import OfferFeedbackTaskSpec
+from dspy.teleprompt.core.inspect_modules import inspect_modules
 
 
 class Refine(Module):
@@ -92,7 +92,7 @@ class Refine(Module):
             advise_kwargs = dict(**modules, **reward_payload, module_names=module_names)
             for key in ("program_inputs", "program_trajectory", "program_outputs"):
                 advise_kwargs[key] = orjson.dumps(
-                    recursive_mask(trajectory_payload[key]),
+                    to_jsonable(trajectory_payload[key]),
                     option=orjson.OPT_INDENT_2,
                 ).decode()
             advice = (await Predict(OfferFeedbackTaskSpec())(**advise_kwargs, run=attempt.run)).advice
@@ -112,39 +112,3 @@ class Refine(Module):
             execute_attempt=execute_with_advice,
             after_attempt=build_advice,
         )
-
-
-def inspect_modules(program):
-    separator = "-" * 80
-    output = [separator]
-    for _, (name, predictor) in enumerate(program.named_predictors()):
-        task_spec = predictor.task_spec
-        instructions = textwrap.dedent(task_spec.instructions)
-        instructions = ("\n" + "\t" * 2).join([""] + instructions.splitlines())
-        output.append(f"Module {name}")
-        output.append("\n\tInput Fields:")
-        output.append(
-            ("\n" + "\t" * 2).join([""] + get_field_spec_description_string(task_spec.input_fields).splitlines())
-        )
-        output.append("\tOutput Fields:")
-        output.append(
-            ("\n" + "\t" * 2).join([""] + get_field_spec_description_string(task_spec.output_fields).splitlines())
-        )
-        output.append(f"\tOriginal Instructions: {instructions}")
-        output.append(separator)
-    return "\n".join([o.strip("\n") for o in output])
-
-
-def recursive_mask(o):
-    try:
-        orjson.dumps(o)
-        return o
-    except TypeError:
-        pass
-    if isinstance(o, dict):
-        return {k: recursive_mask(v) for k, v in o.items()}
-    if isinstance(o, list):
-        return [recursive_mask(v) for v in o]
-    if isinstance(o, tuple):
-        return tuple(recursive_mask(v) for v in o)
-    return f"<non-serializable: {type(o).__name__}>"

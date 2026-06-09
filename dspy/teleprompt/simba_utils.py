@@ -1,17 +1,17 @@
 import logging
-import textwrap
 
 import orjson
 
-from dspy.adapters.prompt_format import get_field_spec_description_string
 from dspy.evaluate.metric_invoke import call_metric, normalize_metric_score
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module, Prediction
 from dspy.propose.source_format import get_formatted_source
 from dspy.runtime import run_with_trace
 from dspy.runtime.run_context import RunContext
+from dspy.serialization.json import to_jsonable
 from dspy.task_spec.predictor_context import get_task_spec, resolve_optimizer_lm, set_task_spec
 from dspy.teleprompt.core.evaluator import optimizer_lm_context
+from dspy.teleprompt.core.inspect_modules import inspect_modules
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.simba_specs import SimbaOfferFeedbackTaskSpec
 
@@ -138,7 +138,7 @@ async def append_a_rule(bucket, system, *, run: RunContext, **kwargs) -> bool:
         "module_names": module_names,
     }
     kwargs = {
-        k: v if isinstance(v, str) else orjson.dumps(recursive_mask(v), option=orjson.OPT_INDENT_2).decode()
+        k: v if isinstance(v, str) else orjson.dumps(to_jsonable(v), option=orjson.OPT_INDENT_2).decode()
         for k, v in kwargs.items()
     }
     with optimizer_lm_context(
@@ -153,39 +153,3 @@ async def append_a_rule(bucket, system, *, run: RunContext, **kwargs) -> bool:
             instructions = task_spec.instructions + "\n\n" + advice[name]
             set_task_spec(predictor=predictor, task_spec=task_spec.with_instructions(instructions))
     return True
-
-
-def inspect_modules(program):
-    separator = "-" * 80
-    output = [separator]
-    for name, predictor in program.named_predictors():
-        task_spec = get_task_spec(predictor)
-        instructions = textwrap.dedent(task_spec.instructions)
-        instructions = ("\n" + "\t" * 2).join([""] + instructions.splitlines())
-        output.append(f"Module {name}")
-        output.append("\n\tInput Fields:")
-        output.append(
-            ("\n" + "\t" * 2).join([""] + get_field_spec_description_string(task_spec.input_fields).splitlines())
-        )
-        output.append("\tOutput Fields:")
-        output.append(
-            ("\n" + "\t" * 2).join([""] + get_field_spec_description_string(task_spec.output_fields).splitlines())
-        )
-        output.append(f"\tOriginal Instructions: {instructions}")
-        output.append(separator)
-    return "\n".join([o.strip("\n") for o in output])
-
-
-def recursive_mask(o):
-    try:
-        orjson.dumps(o)
-        return o
-    except (TypeError, orjson.JSONEncodeError):
-        pass
-    if isinstance(o, dict):
-        return {k: recursive_mask(v) for k, v in o.items()}
-    if isinstance(o, list):
-        return [recursive_mask(v) for v in o]
-    if isinstance(o, tuple):
-        return tuple(recursive_mask(v) for v in o)
-    return f"<non-serializable: {type(o).__name__}>"

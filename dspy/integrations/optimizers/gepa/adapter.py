@@ -15,6 +15,7 @@ from dspy.primitives import Example, Prediction
 from dspy.runtime.optimization_trace import FailedPrediction, TraceData
 from dspy.runtime.run_context import RunContext
 from dspy.runtime.transparency.resolve import require_adapter
+from dspy.serialization.json import to_jsonable
 from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
 from dspy.teleprompt.core.evaluator import make_optimizer_evaluator, optimizer_lm_context
 from dspy.teleprompt.core.trace_collection import collect_trace_data
@@ -140,7 +141,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 dataset_with_feedback = reflective_dataset[name]
                 prediction = await proposer(
                     current_instruction_doc=base_instruction,
-                    dataset_with_feedback=json.dumps(dataset_with_feedback, indent=2, default=str),
+                    dataset_with_feedback=json.dumps(to_jsonable(dataset_with_feedback), indent=2),
                     run=opt_run,
                 )
                 results[name] = prediction.new_instruction
