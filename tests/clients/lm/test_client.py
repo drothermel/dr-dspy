@@ -17,7 +17,7 @@ try:
     from litellm.utils import Choices, Message, ModelResponse
 except ImportError:
     pytest.skip(reason="litellm is not installed", allow_module_level=True)
-from dspy.clients.base_lm import BaseLM
+from dspy.clients.base_lm import LM_CLASS_STATE_KEY, BaseLM
 from dspy.clients.lm import LM
 from dspy.core.types import (
     Assistant,
@@ -476,6 +476,16 @@ def test_lm_load_state_forwards_allow_custom_lm_class(monkeypatch, make_run):
     monkeypatch.setattr(BaseLM, "load_state", classmethod(spy_load_state))
     LM.load_state(LM("openai/gpt-4o-mini").dump_state(), allow_custom_lm_class=True)
     assert calls == [True]
+
+
+def test_base_lm_load_state_error_names_allow_custom_lm_class() -> None:
+    state = {
+        LM_CLASS_STATE_KEY: "tests.predict.test_predict.CustomStateLM",
+        "model": "custom-model",
+        "model_type": "chat",
+    }
+    with pytest.raises(ValueError, match="allow_custom_lm_class"):
+        BaseLM.load_state(state)
 
 
 def test_logprobs_included_when_requested(make_run):

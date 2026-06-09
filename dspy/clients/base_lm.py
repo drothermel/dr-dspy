@@ -237,7 +237,7 @@ class BaseLM:
                 )
             if class_path != BUILTIN_LM_CLASS_PATH and (not allow_custom_lm_class):
                 raise ValueError(
-                    f"Refusing to import custom serialized LM class `{class_path}`. Pass allow_unsafe_lm_state=True when loading trusted files to enable custom LM classes."
+                    f"Refusing to import custom serialized LM class `{class_path}`. Pass allow_custom_lm_class=True when loading trusted files to enable custom LM classes."
                 )
             lm_cls = _import_lm_class(class_path)
             if not issubclass(lm_cls, BaseLM):
