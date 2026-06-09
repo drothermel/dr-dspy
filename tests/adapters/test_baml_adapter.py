@@ -66,7 +66,7 @@ def test_baml_adapter_format_exact_messages_for_simple_signature_with_demo():
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\nOutput field `answer` should be of type: string\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`.",
+            "content": "Your input fields are:\n1. `question` (str): The question.\nYour output fields are:\n1. `answer` (str): The answer.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n# The answer.\nOutput field `answer` should be of type: string\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`.",
         },
         {"role": "user", "content": "[[ ## question ## ]]\nQ1"},
         {"role": "assistant", "content": '{\n  "answer": "A1"\n}'},
@@ -99,7 +99,7 @@ def test_baml_adapter_format_exact_messages_with_nested_output():
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (BamlNested):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\nOutput field `answer` should be of type: {\n  value: int,\n  tags: string[],\n}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`.",
+            "content": "Your input fields are:\n1. `question` (str): The question.\nYour output fields are:\n1. `answer` (BamlNested): The answer.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n# The answer.\nOutput field `answer` should be of type: {\n  value: int,\n  tags: string[],\n}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`.",
         },
         {
             "role": "user",

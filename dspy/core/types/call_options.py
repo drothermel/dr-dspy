@@ -36,3 +36,6 @@ def ensure_predict_options_built() -> None:
 
     PredictOptions.model_rebuild(_types_namespace={"LMForward": LMForward, "TaskSpec": TaskSpec})
     _predict_options_built = True
+
+
+ensure_predict_options_built()

@@ -60,8 +60,8 @@ from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 class QATaskSpec(TaskSpec):
     name: str = "QA"
     instructions: str = "Answer the question."
-    inputs: tuple[FieldSpec, ...] = (input_field("question"),)
-    outputs: tuple[FieldSpec, ...] = (output_field("answer"),)
+    inputs: tuple[FieldSpec, ...] = (input_field("question", desc="The user question"),)
+    outputs: tuple[FieldSpec, ...] = (output_field("answer", desc="A concise answer"),)
 
 qa = QATaskSpec()
 run = RunContext.create(lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter(), init_run_log=False)
@@ -88,6 +88,26 @@ See `docs/migration/taskspec.md` for the full Signature → TaskSpec translation
 See `docs/migration/history.md` for turn logs vs call logs vs optimization traces.
 
 Field descriptions must be explicit under strict transparency (placeholder `${field}` descs are rejected).
+
+Adapters read `FieldSpec` directly — there is no Pydantic `FieldInfo` bridge. Use `dspy.task_spec.fields` for spine work:
+
+```python
+from dspy.task_spec.fields import FieldBinding, field_bindings, format_field_value, validate_task_inputs_from_spec
+from dspy.task_spec.field_spec import FieldRole
+
+bindings = field_bindings(task_spec, role=FieldRole.INPUT)
+for binding in bindings:
+    text = format_field_value(field=binding.field, value=inputs[binding.name])
+```
+
+`TaskSpec.fingerprint()` returns a SHA-256 hex digest over `name`, `instructions`, and field specs. Compare specs with `==` (frozen Pydantic model equality).
+
+## Core LM types
+
+- `LMForward` (`dspy.core.types.lm`) — async `aforward(request) -> LMResponse` protocol for per-call `PredictOptions(lm=...)`.
+- `LMMessageRole` — `StrEnum` on `LMMessage.role` (`user`, `assistant`, `system`, `tool`, …).
+- `ReasoningEffort` — `StrEnum` on `LMReasoningConfig.effort` (`low`, `medium`, `high`).
+- OpenAI-compat helpers live in `dspy.core.types.openai_compat` (`request_prompt`, `request_messages_as_openai`, `request_kwargs`). Import private part helpers from `dspy.core.types.parts.models` / `parts.openai` / `parts.serialize`, not the public `parts` barrel.
 
 ## Strict transparency and audit logging
 

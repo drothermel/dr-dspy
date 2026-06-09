@@ -39,7 +39,7 @@ def test_two_step_adapter_format_exact_messages_for_simple_signature_with_demo(m
     expected_messages = [
         {
             "role": "system",
-            "content": "You are a helpful assistant that can solve tasks based on user input.\nAs input, you will be provided with:\n1. `question` (str):\nYour outputs must contain:\n1. `answer` (str):\nYou should lay out your outputs in detail so that your answer can be understood by another agent\nSpecific instructions: Given the fields `question`, produce the fields `answer`.",
+            "content": "You are a helpful assistant that can solve tasks based on user input.\nAs input, you will be provided with:\n1. `question` (str): The question.\nYour outputs must contain:\n1. `answer` (str): The answer.\nYou should lay out your outputs in detail so that your answer can be understood by another agent\nSpecific instructions: Given the fields `question`, produce the fields `answer`.",
         },
         {"role": "user", "content": "question: Q1"},
         {"role": "assistant", "content": "answer: A1"},
@@ -66,7 +66,7 @@ def test_two_step_adapter_format_exact_messages_with_typed_outputs(make_run):
     expected_messages = [
         {
             "role": "system",
-            "content": "You are a helpful assistant that can solve tasks based on user input.\nAs input, you will be provided with:\n1. `question` (str):\nYour outputs must contain:\n1. `count` (int): \n2. `answer` (str):\nYou should lay out your outputs in detail so that your answer can be understood by another agent\nSpecific instructions: Given the fields `question`, produce the fields `count`, `answer`.",
+            "content": "You are a helpful assistant that can solve tasks based on user input.\nAs input, you will be provided with:\n1. `question` (str): The question.\nYour outputs must contain:\n1. `count` (int): The count.\n2. `answer` (str): The answer.\nYou should lay out your outputs in detail so that your answer can be understood by another agent\nSpecific instructions: Given the fields `question`, produce the fields `count`, `answer`.",
         },
         {"role": "user", "content": "question: Q"},
     ]
