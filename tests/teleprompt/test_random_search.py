@@ -34,6 +34,8 @@ def test_basic_workflow(make_run):
             {"input": "What does the fox say?", "output": "Ring-ding-ding-ding-dingeringeding!"}, input_keys=("input",)
         ),
     ]
-    asyncio.run(
+    result = asyncio.run(
         optimizer.compile(student, params=RandomSearchCompileParams(trainset=trainset, teacher=teacher), run=run)
     )
+    assert result.program is not None
+    assert len(result.candidates) > 0

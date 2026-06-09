@@ -7,6 +7,7 @@ from dspy.integrations.optimizers.optuna.distributions import get_param_distribu
 from dspy.integrations.optimizers.optuna.import_ import import_optuna
 from dspy.integrations.optimizers.optuna.study import add_observed_trial, create_maximize_study
 from dspy.runtime.run_context import RunContext
+from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
 from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.teleprompt.log_utils import print_full_program, save_candidate_program
 from dspy.teleprompt.mipro.evaluate import (
@@ -150,7 +151,7 @@ async def optimize_prompt_parameters(
     minibatch_full_eval_steps: int,
     seed: int,
     run: RunContext,
-) -> Any | None:
+) -> CompileResult:
     optuna = import_optuna()
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     logger.info("==> STEP 3: FINDING OPTIMAL PROMPT PARAMETERS <==")
@@ -235,17 +236,27 @@ async def optimize_prompt_parameters(
     best_score = state["best_score"]
     trial_logs = state["trial_logs"]
     score_data = state["score_data"]
-    if best_program is not None and optimizer.track_stats:
-        best_program.trial_logs = trial_logs
-        best_program.score = best_score
-        best_program.prompt_model_total_calls = optimizer.prompt_model_total_calls
-        best_program.total_calls = optimizer.total_calls
-        sorted_candidate_programs = sorted(score_data, key=lambda x: x["score"], reverse=True)
-        best_program.mb_candidate_programs = [
-            score_data for score_data in sorted_candidate_programs if not score_data["full_eval"]
-        ]
-        best_program.candidate_programs = [
-            score_data for score_data in sorted_candidate_programs if score_data["full_eval"]
+    if best_program is None:
+        return CompileResult(program=program)
+    candidates: list[ProgramCandidate] = []
+    if optimizer.track_stats:
+        sorted_score_data = sorted(score_data, key=lambda entry: entry["score"], reverse=True)
+        candidates = [
+            ProgramCandidate(
+                score=entry["score"],
+                program=entry["program"],
+                full_eval=entry["full_eval"],
+            )
+            for entry in sorted_score_data
         ]
     logger.info(f"Returning best identified program with score {best_score}!")
-    return best_program
+    return CompileResult(
+        program=best_program,
+        candidates=candidates,
+        stats=CompileStats(
+            metric_calls=optimizer.total_calls,
+            prompt_model_calls=optimizer.prompt_model_total_calls,
+            best_score=best_score,
+            trial_logs=trial_logs if optimizer.track_stats else {},
+        ),
+    )

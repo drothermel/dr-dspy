@@ -15,12 +15,15 @@ if TYPE_CHECKING:
     from dspy.clients.lm import LM
     from dspy.primitives import Example, Module
     from dspy.runtime.run_context import RunContext
+from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
 from dspy.teleprompt.compile_params import SIMBACompileParams
+from dspy.teleprompt.registry import register_teleprompter
 
 np = require("numpy")
 logger = logging.getLogger(__name__)
 
 
+@register_teleprompter(params=SIMBACompileParams)
 class SIMBA:
     def __init__(
         self,
@@ -53,7 +56,7 @@ class SIMBA:
         else:
             self.strategies = [append_a_rule]
 
-    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = SIMBACompileParams.model_validate(params)
         trainset = params.trainset
         assert len(trainset) >= self.bsize, f"Trainset too small: {len(trainset)} < {self.bsize}"
@@ -71,8 +74,8 @@ class SIMBA:
             return sum(scores) / len(scores)
 
         def top_k_plus_baseline(k: int) -> list[int]:
-            scored_programs = sorted(programs, key=lambda p: calc_average_score(p.simba_idx), reverse=True)
-            top_k = [p.simba_idx for p in scored_programs[:k]]
+            scored_programs = sorted(range(len(programs)), key=lambda idx: calc_average_score(idx), reverse=True)
+            top_k = scored_programs[:k]
             if 0 not in top_k and len(top_k) > 0:
                 top_k[-1] = 0
             return list(dict.fromkeys(top_k))
@@ -91,13 +94,10 @@ class SIMBA:
         def register_new_program(prog: Module, score_list: list[float]) -> None:
             nonlocal next_program_idx
             next_program_idx += 1
-            new_idx = next_program_idx
-            prog.simba_idx = new_idx
             programs.append(prog)
-            program_scores[new_idx] = score_list
+            program_scores[next_program_idx] = score_list
 
         student = student.deepcopy()
-        student.simba_idx = 0
         programs.append(student)
         program_scores[0] = []
         winning_programs = [student]
@@ -252,13 +252,20 @@ class SIMBA:
             if idx_prog != 0:
                 trial_logs[idx_prog - 1]["train_score"] = avg_score
         assert len(scores) == len(candidate_programs)
-        candidate_data = [{"score": s, "program": p} for s, p in zip(scores, candidate_programs, strict=False)]
-        candidate_data.sort(key=lambda x: x["score"], reverse=True)
+        candidate_entries = [
+            ProgramCandidate(score=score, program=program)
+            for score, program in zip(scores, candidate_programs, strict=False)
+        ]
+        candidate_entries.sort(
+            key=lambda entry: entry.score if entry.score is not None else float("-inf"), reverse=True
+        )
         best_idx = scores.index(max(scores)) if scores else 0
         best_program = candidate_programs[best_idx].deepcopy()
         logger.info(
             f"Final trainset scores: {scores}, Best: {(max(scores) if scores else 'N/A')} (at index {(best_idx if scores else 'N/A')})\n\n\n"
         )
-        best_program.candidate_programs = candidate_data
-        best_program.trial_logs = trial_logs
-        return best_program
+        return CompileResult(
+            program=best_program,
+            candidates=candidate_entries,
+            stats=CompileStats(best_score=max(scores) if scores else None, trial_logs=trial_logs),
+        )

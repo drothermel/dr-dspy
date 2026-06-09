@@ -8,10 +8,13 @@ from dspy.teleprompt.candidate_ladder import (
     compile_candidate_program,
     iter_candidate_seeds,
 )
+from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
 from dspy.teleprompt.compile_params import RandomSearchCompileParams
+from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.utils import make_optimizer_evaluator
 
 
+@register_teleprompter(params=RandomSearchCompileParams)
 class BootstrapFewShotWithRandomSearch:
     def __init__(
         self,
@@ -20,7 +23,7 @@ class BootstrapFewShotWithRandomSearch:
         max_bootstrapped_demos=4,
         max_labeled_demos=16,
         max_rounds=1,
-        num_candidate_programs=16,
+        num_random_candidates=16,
         max_concurrency=None,
         max_errors=None,
         stop_at_score=None,
@@ -35,10 +38,10 @@ class BootstrapFewShotWithRandomSearch:
         self.min_num_samples = 1
         self.max_num_samples = max_bootstrapped_demos
         self.max_errors = max_errors
-        self.num_random_candidates = num_candidate_programs
+        self.num_random_candidates = num_random_candidates
         self.max_labeled_demos = max_labeled_demos
 
-    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = RandomSearchCompileParams.model_validate(params)
         self.trainset = params.trainset
         self.valset = params.valset or params.trainset
@@ -55,10 +58,9 @@ class BootstrapFewShotWithRandomSearch:
             max_bootstrapped_demos=self.max_num_samples,
             min_bootstrapped_demos=self.min_num_samples,
         )
-        scores = []
-        all_subscores = []
-        score_data = []
+        candidates: list[ProgramCandidate] = []
         best_program = student.reset_copy()
+        best_score = float("-inf")
         for seed_index, seed in enumerate(iter_candidate_seeds(ladder_config)):
             if restrict is not None and seed_index not in restrict:
                 continue
@@ -89,14 +91,19 @@ class BootstrapFewShotWithRandomSearch:
             )
             result = await evaluate(program, run=run)
             score, subscores = (result.score, [output[2] for output in result.results])
-            all_subscores.append(subscores)
-            if len(scores) == 0 or score > max(scores):
+            if score > best_score:
+                best_score = score
                 best_program = program
-            scores.append(score)
-            score_data.append({"score": score, "subscores": subscores, "seed": seed_index, "program": program})
+            candidates.append(
+                ProgramCandidate(score=score, program=program, subscores=subscores, seed=seed, label=str(seed_index))
+            )
             if self.stop_at_score is not None and score >= self.stop_at_score:
                 break
-        compiled = best_program
-        compiled.candidate_programs = score_data
-        compiled.candidate_programs = sorted(compiled.candidate_programs, key=lambda x: x["score"], reverse=True)
-        return best_program
+        candidates.sort(
+            key=lambda candidate: candidate.score if candidate.score is not None else float("-inf"), reverse=True
+        )
+        return CompileResult(
+            program=best_program,
+            candidates=candidates,
+            stats=CompileStats(best_score=best_score if candidates else None),
+        )

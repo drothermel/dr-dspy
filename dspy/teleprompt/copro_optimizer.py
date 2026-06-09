@@ -9,7 +9,9 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
+from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
 from dspy.teleprompt.compile_params import COPROCompileParams
+from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
@@ -50,6 +52,7 @@ class GenerateInstructionGivenAttemptsTaskSpec(TaskSpec):
     )
 
 
+@register_teleprompter(params=COPROCompileParams)
 class COPRO:
     def __init__(
         self, prompt_model=None, metric=None, breadth=10, depth=3, init_temperature=1.4, track_stats=False, **_kwargs
@@ -98,7 +101,7 @@ class COPRO:
         logger.debug(f"i: {task_spec.instructions}")
         logger.debug(f"p: {list(task_spec.fields.values())[-1].prefix}")
 
-    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = COPROCompileParams.model_validate(params)
         module = student.deepcopy()
         evaluate_kwargs = params.evaluate.model_dump(exclude_none=True)
@@ -278,9 +281,12 @@ class COPRO:
         candidates.sort(key=lambda x: x["score"], reverse=True)
         candidates = self._drop_duplicates(candidates)
         best_program = candidates[0]["program"]
-        best_program.candidate_programs = candidates
-        best_program.total_calls = total_calls
+        program_candidates = [ProgramCandidate(score=entry["score"], program=entry["program"]) for entry in candidates]
+        copro_depth_stats = None
         if self.track_stats:
-            best_program.results_best = results_best
-            best_program.results_latest = results_latest
-        return best_program
+            copro_depth_stats = {"results_best": results_best, "results_latest": results_latest}
+        return CompileResult(
+            program=best_program,
+            candidates=program_candidates,
+            stats=CompileStats(metric_calls=total_calls, copro_depth_stats=copro_depth_stats),
+        )

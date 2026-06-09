@@ -5,12 +5,15 @@ from pydantic import BaseModel
 from dspy.integrations.optimizers.optuna.study import create_maximize_study, run_ask_tell_loop
 from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
+from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, BootstrapOptunaCompileParams
+from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.utils import make_optimizer_evaluator
 
 from .bootstrap import BootstrapFewShot
 
 
+@register_teleprompter(params=BootstrapOptunaCompileParams)
 class BootstrapFewShotWithOptuna:
     def __init__(
         self,
@@ -19,7 +22,7 @@ class BootstrapFewShotWithOptuna:
         max_bootstrapped_demos=4,
         max_labeled_demos=16,
         max_rounds=1,
-        num_candidate_programs=16,
+        num_random_candidates=16,
         max_concurrency=None,
     ) -> None:
         self.metric = metric
@@ -28,7 +31,7 @@ class BootstrapFewShotWithOptuna:
         self.max_concurrency = max_concurrency
         self.min_num_samples = 1
         self.max_num_samples = max_bootstrapped_demos
-        self.num_candidate_sets = num_candidate_programs
+        self.num_candidate_sets = num_random_candidates
         self.max_labeled_demos = max_labeled_demos
 
     async def _evaluate_program(self, program, *, run: RunContext):
@@ -56,7 +59,7 @@ class BootstrapFewShotWithOptuna:
         trial.set_user_attr("program", program2)
         return cast("Any", result).score
 
-    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = BootstrapOptunaCompileParams.model_validate(params)
         self.trainset = params.trainset
         self.valset = params.valset or params.trainset
@@ -84,4 +87,5 @@ class BootstrapFewShotWithOptuna:
         )
         study = create_maximize_study(feature="BootstrapFewShotWithOptuna")
         await run_ask_tell_loop(study, self.num_candidate_sets, self._run_trial)
-        return study.trials[study.best_trial.number].user_attrs["program"]
+        best_program = study.trials[study.best_trial.number].user_attrs["program"]
+        return CompileResult.with_compiled_program(best_program)

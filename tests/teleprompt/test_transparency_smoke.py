@@ -54,7 +54,7 @@ async def test_copro_smoke_strict(make_run):
     teleprompter = COPRO(
         metric=lambda _example, _pred, _trace=None: 1.0, prompt_model=lm, breadth=2, depth=1, init_temperature=1.0
     )
-    compiled = await teleprompter.compile(
+    compile_result = await teleprompter.compile(
         student,
         params=COPROCompileParams(
             trainset=[Example.from_record({"question": "2+2", "answer": "4"}, input_keys=("question",))],
@@ -62,4 +62,4 @@ async def test_copro_smoke_strict(make_run):
         ),
         run=run,
     )
-    assert compiled is not None
+    assert compile_result.program is not None

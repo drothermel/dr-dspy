@@ -23,7 +23,7 @@ class CompileStats(BaseModel):
     prompt_model_calls: int = 0
     error_occurred: bool = False
     best_score: float | None = None
-    trial_logs: dict[str, Any] = Field(default_factory=dict)
+    trial_logs: dict[Any, Any] = Field(default_factory=dict)
     copro_depth_stats: dict[str, Any] | None = None
 
 
