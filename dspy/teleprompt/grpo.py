@@ -136,7 +136,9 @@ class GRPO(FinetuneTeleprompter):
                     for t in sample["trace"]:
                         assert get_task_spec(t[0]).fingerprint() in pred_signature_hash_to_ind
 
-    async def report_validation_metrics(self, student, trainset, valset, logger, step_idx=-1) -> None:
+    async def report_validation_metrics(
+        self, student, trainset, valset, logger, step_idx=-1, *, run: RunContext
+    ) -> None:
         if step_idx == -1 or step_idx == self.num_train_steps - 1 or (step_idx + 1) % self.num_steps_for_val == 0:
             pass
         else:
@@ -165,7 +167,7 @@ class GRPO(FinetuneTeleprompter):
                     logger.info(
                         f"Evaluating the student program on the validation set after training step {step_idx + 1}/{self.num_train_steps}"
                     )
-                valset_evaluation = await valset_evaluator(student, metric=self.metric)
+                valset_evaluation = await valset_evaluator(student, run=run, metric=self.metric)
                 trainset_scores = [r[-1] for r in valset_evaluation.results[len(valset) :]]
                 valset_scores = [r[-1] for r in valset_evaluation.results[: len(valset)]]
                 trainset_agg = sum(trainset_scores) / len(trainset_scores)
@@ -197,7 +199,7 @@ class GRPO(FinetuneTeleprompter):
                     logger.info(
                         f"Evaluating the student program on the validation set after training step {step_idx + 1}/{self.num_train_steps}"
                     )
-                valset_evaluation = await valset_evaluator(student, metric=self.metric)
+                valset_evaluation = await valset_evaluator(student, run=run, metric=self.metric)
                 if step_idx == -1:
                     logger.info(f"Student program validation set score before training loop: {valset_evaluation.score}")
                 else:
@@ -227,7 +229,7 @@ class GRPO(FinetuneTeleprompter):
                 logger.info(
                     f"Evaluating the student program on the validation set after training step {step_idx + 1}/{self.num_train_steps}"
                 )
-            valset_evaluation = await valset_evaluator(student, metric=self.metric)
+            valset_evaluation = await valset_evaluator(student, run=run, metric=self.metric)
             if step_idx == -1:
                 logger.info(f"Student program training set score before training loop: {valset_evaluation.score}")
             else:
@@ -343,7 +345,7 @@ class GRPO(FinetuneTeleprompter):
                 job = pred.lm.reinforce(train_kwargs=train_kwargs)
                 grpo_training_jobs[job_key] = job
         await self.report_validation_metrics(
-            student=student, trainset=trainset, valset=valset, logger=logger, step_idx=-1
+            student=student, trainset=trainset, valset=valset, logger=logger, step_idx=-1, run=run
         )
         group_queues = {}
         logger.info("Starting the GRPO training loop...")
@@ -585,7 +587,7 @@ class GRPO(FinetuneTeleprompter):
                 job.step(train_data=final_train_data, train_data_format=TrainDataFormat.GRPO_CHAT)
             logger.info(f"GRPO training step {train_step_idx + 1}/{self.num_train_steps} completed.")
             await self.report_validation_metrics(
-                student=student, trainset=trainset, valset=valset, logger=logger, step_idx=train_step_idx
+                student=student, trainset=trainset, valset=valset, logger=logger, step_idx=train_step_idx, run=run
             )
         logger.info("Done with the iterations! Retrieving the final model(s)...")
         for job in grpo_training_jobs.values():

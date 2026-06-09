@@ -7,6 +7,7 @@ import threading
 import pytest
 from typing_extensions import override
 
+from dspy.evaluate.auto_evaluation import SemanticF1
 from dspy.evaluate.evaluator import Evaluate, EvaluationResult
 from dspy.evaluate.metrics import answer_exact_match
 from dspy.history import TurnLog
@@ -28,6 +29,29 @@ def test_evaluate_initialization(make_run):
     assert ev.metric == answer_exact_match
     assert ev.max_concurrency is None
     assert not ev.display_progress
+
+
+def test_evaluate_with_semantic_f1_module(make_run):
+    run = make_run(
+        lm=DummyLM(
+            [
+                {"response": "2"},
+                {"reasoning": "Comparing the responses", "precision": 1.0, "recall": 1.0},
+                {"response": "4"},
+                {"reasoning": "Comparing the responses", "precision": 1.0, "recall": 1.0},
+            ]
+        )
+    )
+    devset = [
+        new_example("What is 1+1?", "2"),
+        new_example("What is 2+2?", "4"),
+    ]
+    for example in devset:
+        example.response = example.answer
+    program = Predict(ts("question -> response"))
+    ev = Evaluate(devset=devset, metric=SemanticF1(), display_progress=False)
+    result = asyncio.run(ev(program, run=run))
+    assert result.score == 100.0
 
 
 def test_evaluate_call(make_run):

@@ -6,6 +6,7 @@ import tqdm
 from pydantic import BaseModel
 
 from dspy.core.hashing import Hasher
+from dspy.evaluate.metric_invoke import invoke_metric
 from dspy.primitives import Module
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
@@ -116,7 +117,13 @@ class BootstrapFewShot:
             for name, predictor in teacher.named_predictors():
                 predictor.demos = predictor_cache[name]
             if self.metric:
-                metric_val = self.metric(example, prediction, trace)
+                metric_val = await invoke_metric(
+                    self.metric,
+                    example=example,
+                    prediction=prediction,
+                    trace=trace,
+                    run=run,
+                )
                 success = metric_val >= self.metric_threshold if self.metric_threshold else metric_val
             else:
                 success = True

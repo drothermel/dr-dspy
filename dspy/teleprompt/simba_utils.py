@@ -4,6 +4,7 @@ from typing import Callable
 
 import orjson
 
+from dspy.evaluate.metric_invoke import call_metric, normalize_metric_score
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module, Prediction
 from dspy.propose.source_format import get_formatted_source
@@ -44,15 +45,15 @@ def wrap_program(*, program: Module, metric: Callable, run: RunContext):
         score = 0.0
         output_metadata = {}
         try:
-            output = metric(example, prediction, trace)
-            if isinstance(output, (int, float)):
-                score = output
-            elif isinstance(output, Prediction):
-                if not hasattr(output, "score"):
-                    raise ValueError(
-                        "When `metric` returns a `dspy.primitives.prediction.Prediction`, it must contain a `score` field."
-                    )
-                score = output.score
+            output = await call_metric(
+                metric,
+                example=example,
+                prediction=prediction,
+                trace=trace,
+                run=run,
+            )
+            score = normalize_metric_score(output)
+            if isinstance(output, Prediction):
                 output_metadata = {k: v for k, v in output.items() if k != "score"}
         except Exception as e:
             logger.warning(e)

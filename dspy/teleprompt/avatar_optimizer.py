@@ -5,6 +5,7 @@ from typing import Any, Callable, cast
 from pydantic import BaseModel
 
 from dspy.core.types.call_options import ModuleCallOptions
+from dspy.evaluate.metric_invoke import invoke_metric
 from dspy.predict.avatar.models import ActionOutput
 from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
@@ -104,7 +105,13 @@ class AvatarOptimizer:
         actor = deepcopy(actor)
         try:
             prediction, trace = await run_program_with_trace(actor, example, run)
-            score = self.metric(example, prediction, trace)
+            score = await invoke_metric(
+                self.metric,
+                example=example,
+                prediction=prediction,
+                trace=trace,
+                run=run,
+            )
             if return_outputs:
                 return (example, prediction, score)
             return score

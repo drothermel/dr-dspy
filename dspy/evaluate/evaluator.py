@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from dspy.primitives import Example, Module
 import tqdm
 
+from dspy.evaluate.metric_invoke import invoke_metric
 from dspy.primitives import Prediction
 from dspy.runtime.async_parallel import resolve_max_concurrency, resolve_max_errors, run_bounded
 from dspy.runtime.callback import with_callbacks
@@ -94,7 +95,13 @@ class Evaluate:
 
         async def process_item(example):
             prediction, trace = await run_program_with_trace(program, example, run)
-            score = metric(example, prediction, trace)
+            score = await invoke_metric(
+                metric,
+                example=example,
+                prediction=prediction,
+                trace=trace,
+                run=run,
+            )
             return (prediction, score)
 
         def evaluation_progress(results: list, total: int) -> str:
