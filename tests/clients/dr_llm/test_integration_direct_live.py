@@ -7,15 +7,10 @@ import pytest
 
 from dspy.clients.dr_llm import DrLlmDirectLM
 from tests.clients.dr_llm._helpers import make_lm_request
+from tests.test_utils import require_env
 
 if TYPE_CHECKING:
     from dspy.core.types import LMResponse
-
-
-def _require_env(*keys: str) -> None:
-    missing = [key for key in keys if not os.getenv(key)]
-    if missing:
-        pytest.skip(f"Missing live LM credentials: {', '.join(missing)}")
 
 
 def _text(response: LMResponse) -> str:
@@ -25,7 +20,7 @@ def _text(response: LMResponse) -> str:
 
 @pytest.mark.llm_call
 async def test_live_dr_llm_direct_openai_exact_reply() -> None:
-    _require_env("OPENAI_API_KEY")
+    require_env("OPENAI_API_KEY")
     model = os.getenv("LM_FOR_TEST_DIRECT_DR_LLM", "openai/gpt-4.1-mini")
     lm = DrLlmDirectLM(model, temperature=0.0, max_tokens=32)
     response = await lm.aforward(make_lm_request(content="Reply with exactly: beta"))

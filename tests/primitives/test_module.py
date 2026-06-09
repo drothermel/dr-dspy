@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import threading
 from typing import Any, cast
 from unittest.mock import patch
@@ -22,7 +21,7 @@ from dspy.primitives import Module, Prediction
 from dspy.runtime.batch import Parallel
 from dspy.task_spec import default_task_instructions
 from tests.task_spec.helpers import ts
-from tests.test_utils import DummyLM
+from tests.test_utils import DummyLM, require_env
 
 QUESTION_ANSWER_TASK_SPEC = ts(
     "question -> answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",))
@@ -317,8 +316,9 @@ def test_multi_module_call_with_usage_tracker(lm_for_test, make_run):
     assert lm_usage[lm_for_test]["total_tokens"] > 0
 
 
-@pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="Skip the test if OPENAI_API_KEY is not set.")
+@pytest.mark.llm_call
 def test_usage_tracker_in_parallel(make_run):
+    require_env("OPENAI_API_KEY")
 
     class MyProgram(Module):
         def __init__(self, lm):

@@ -8,6 +8,7 @@ from tests.test_utils.lm import (
     SequentialTextLM,
     SpyLM,
 )
+from tests.test_utils.require_env import require_env
 from tests.test_utils.retrieval.dummy_vectorizer import DummyVectorizer
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "NativeToolCallLM",
     "SequentialTextLM",
     "SpyLM",
+    "require_env",
 ]

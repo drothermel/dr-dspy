@@ -5,12 +5,7 @@ import pytest
 
 from dspy.clients.lm import LM
 from dspy.core.types import Assistant, LMRequest, LMResponse, System, ToolCall, ToolResult, User
-
-
-def _require_env(*keys: str) -> None:
-    missing = [key for key in keys if not os.getenv(key)]
-    if missing:
-        pytest.skip(f"Missing live LM credentials: {', '.join(missing)}")
+from tests.test_utils import require_env
 
 
 def _text(response: LMResponse) -> str:
@@ -25,7 +20,7 @@ def _request(lm: LM, *items: object, prompt: str | None = None, **kwargs: Any) -
 
 @pytest.mark.llm_call
 def test_live_openai_chat_direct_system_user_assistant_multiturn():
-    _require_env("OPENAI_API_KEY")
+    require_env("OPENAI_API_KEY")
     lm = LM(os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-5.5"), model_type="chat", max_tokens=64)
     response = lm(
         _request(
@@ -42,7 +37,7 @@ def test_live_openai_chat_direct_system_user_assistant_multiturn():
 
 @pytest.mark.llm_call
 def test_live_openai_chat_direct_tool_call_transcript():
-    _require_env("OPENAI_API_KEY")
+    require_env("OPENAI_API_KEY")
     lm = LM(os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-4o-mini"), model_type="chat", max_tokens=64)
     response = lm(
         _request(
@@ -61,7 +56,7 @@ def test_live_openai_chat_direct_tool_call_transcript():
 
 @pytest.mark.llm_call
 def test_live_openai_chat_direct_reuse_lm_response_as_assistant_turn():
-    _require_env("OPENAI_API_KEY")
+    require_env("OPENAI_API_KEY")
     lm = LM(os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-4o-mini"), model_type="chat", max_tokens=64)
     first = lm(_request(lm, User("Reply with exactly: DSPy")))
     follow_up = lm(
@@ -73,7 +68,7 @@ def test_live_openai_chat_direct_reuse_lm_response_as_assistant_turn():
 
 @pytest.mark.llm_call
 def test_live_openai_responses_direct_system_user_assistant_multiturn():
-    _require_env("OPENAI_API_KEY")
+    require_env("OPENAI_API_KEY")
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_OPENAI_RESPONSES", "openai/gpt-4.1-mini"),
         model_type="responses",
@@ -94,7 +89,7 @@ def test_live_openai_responses_direct_system_user_assistant_multiturn():
 
 @pytest.mark.llm_call
 def test_live_openai_responses_direct_tool_call_transcript():
-    _require_env("OPENAI_API_KEY")
+    require_env("OPENAI_API_KEY")
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_OPENAI_RESPONSES", "openai/gpt-4.1-mini"),
         model_type="responses",
@@ -118,7 +113,7 @@ def test_live_openai_responses_direct_tool_call_transcript():
 
 @pytest.mark.llm_call
 def test_live_openai_responses_direct_reuse_lm_response_as_assistant_turn():
-    _require_env("OPENAI_API_KEY")
+    require_env("OPENAI_API_KEY")
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_OPENAI_RESPONSES", "openai/gpt-4.1-mini"),
         model_type="responses",
@@ -135,7 +130,7 @@ def test_live_openai_responses_direct_reuse_lm_response_as_assistant_turn():
 
 @pytest.mark.llm_call
 def test_live_anthropic_chat_direct_system_user_assistant_multiturn():
-    _require_env("ANTHROPIC_API_KEY")
+    require_env("ANTHROPIC_API_KEY")
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_ANTHROPIC", "anthropic/claude-3-5-haiku-latest"), model_type="chat", max_tokens=64
     )
@@ -153,7 +148,7 @@ def test_live_anthropic_chat_direct_system_user_assistant_multiturn():
 
 @pytest.mark.llm_call
 def test_live_anthropic_chat_direct_tool_call_transcript():
-    _require_env("ANTHROPIC_API_KEY")
+    require_env("ANTHROPIC_API_KEY")
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_ANTHROPIC", "anthropic/claude-3-5-haiku-latest"), model_type="chat", max_tokens=64
     )
@@ -174,7 +169,7 @@ def test_live_anthropic_chat_direct_tool_call_transcript():
 
 @pytest.mark.llm_call
 def test_live_anthropic_chat_direct_reuse_lm_response_as_assistant_turn():
-    _require_env("ANTHROPIC_API_KEY")
+    require_env("ANTHROPIC_API_KEY")
     lm = LM(
         os.getenv("LM_FOR_TEST_DIRECT_ANTHROPIC", "anthropic/claude-3-5-haiku-latest"), model_type="chat", max_tokens=64
     )
@@ -188,7 +183,7 @@ def test_live_anthropic_chat_direct_reuse_lm_response_as_assistant_turn():
 
 @pytest.mark.llm_call
 def test_live_gemini_chat_direct_system_user_assistant_multiturn():
-    _require_env("GEMINI_API_KEY")
+    require_env("GEMINI_API_KEY")
     lm = LM(os.getenv("LM_FOR_TEST_DIRECT_GEMINI", "gemini/gemini-2.0-flash"), model_type="chat", max_tokens=64)
     response = lm(
         _request(
@@ -204,7 +199,7 @@ def test_live_gemini_chat_direct_system_user_assistant_multiturn():
 
 @pytest.mark.llm_call
 def test_live_gemini_chat_direct_tool_call_transcript():
-    _require_env("GEMINI_API_KEY")
+    require_env("GEMINI_API_KEY")
     lm = LM(os.getenv("LM_FOR_TEST_DIRECT_GEMINI", "gemini/gemini-2.0-flash"), model_type="chat", max_tokens=64)
     response = lm(
         _request(
@@ -223,7 +218,7 @@ def test_live_gemini_chat_direct_tool_call_transcript():
 
 @pytest.mark.llm_call
 def test_live_gemini_chat_direct_reuse_lm_response_as_assistant_turn():
-    _require_env("GEMINI_API_KEY")
+    require_env("GEMINI_API_KEY")
     lm = LM(os.getenv("LM_FOR_TEST_DIRECT_GEMINI", "gemini/gemini-2.0-flash"), model_type="chat", max_tokens=64)
     first = lm(_request(lm, User("Reply with exactly: DSPy")))
     follow_up = lm(
