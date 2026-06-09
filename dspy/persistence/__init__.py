@@ -1,5 +1,6 @@
 """Persistence helpers for saving and loading DSPy modules and retriever artifacts."""
 
+from dspy.persistence.embeddings import load_embeddings, load_embeddings_into, save_embeddings
 from dspy.persistence.metadata import (
     DEPENDENCY_VERSIONS_KEY,
     METADATA_KEY,
@@ -21,9 +22,12 @@ __all__ = [
     "build_metadata",
     "dump_module_state",
     "get_dependency_versions",
+    "load_embeddings",
+    "load_embeddings_into",
     "load_program",
     "load_state",
     "logger",
+    "save_embeddings",
     "save_program",
     "save_state",
     "warn_dependency_version_drift",

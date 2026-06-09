@@ -11,6 +11,7 @@ try:
     import numpy as np
 except ImportError:
     pytest.skip(reason="numpy is not installed", allow_module_level=True)
+from dspy.persistence import load_embeddings
 from dspy.retrievers.embeddings import Embeddings, EmbeddingsWithScores
 from dspy.retrievers.types import RetrievedPassage
 
@@ -108,7 +109,7 @@ def test_embeddings_from_saved():
     ):
         save_path = os.path.join(temp_dir, "test_embeddings")
         original_retriever.save(save_path)
-        with Embeddings.from_saved(save_path, embedder) as loaded_retriever:
+        with load_embeddings(save_path, embedder=embedder) as loaded_retriever:
             assert loaded_retriever.k == original_retriever.k
             assert loaded_retriever.normalize == original_retriever.normalize
             assert loaded_retriever.corpus == original_retriever.corpus
@@ -116,7 +117,7 @@ def test_embeddings_from_saved():
 
 def test_embeddings_load_nonexistent_path():
     with pytest.raises((FileNotFoundError, OSError)):
-        Embeddings.from_saved("/nonexistent/path", dummy_embedder)
+        load_embeddings("/nonexistent/path", embedder=dummy_embedder)
 
 
 def test_embeddings_with_scores_basic_search():
@@ -138,7 +139,9 @@ def test_embeddings_with_scores_save_load():
     ):
         save_path = os.path.join(temp_dir, "test_embeddings_with_scores")
         original_retriever.save(save_path)
-        with EmbeddingsWithScores.from_saved(save_path, dummy_embedder) as loaded_retriever:
+        with load_embeddings(
+            save_path, embedder=dummy_embedder, retriever_cls=EmbeddingsWithScores
+        ) as loaded_retriever:
             original_result = asyncio.run(original_retriever("cat sitting"))
             loaded_result = asyncio.run(loaded_retriever("cat sitting"))
             assert [p.long_text for p in loaded_result] == [p.long_text for p in original_result]
@@ -170,7 +173,7 @@ def test_embeddings_load_raises_when_faiss_index_file_missing(tmp_path):
     srsly.write_json(save_path / "config.json", config)
     np.save(save_path / "corpus_embeddings.npy", dummy_embedder(corpus))
     with pytest.raises(FileNotFoundError, match="FAISS index"):
-        Embeddings.from_saved(str(save_path), dummy_embedder)
+        load_embeddings(str(save_path), embedder=dummy_embedder)
 
 
 def test_embeddings_load_raises_when_faiss_not_installed(tmp_path, monkeypatch):
@@ -198,4 +201,4 @@ def test_embeddings_load_raises_when_faiss_not_installed(tmp_path, monkeypatch):
 
     monkeypatch.setattr(builtins, "__import__", _raise_import_error)
     with pytest.raises(ImportError, match="faiss-cpu"):
-        Embeddings.from_saved(str(save_path), dummy_embedder)
+        load_embeddings(str(save_path), embedder=dummy_embedder)

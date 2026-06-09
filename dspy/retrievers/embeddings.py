@@ -8,17 +8,16 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, Self, cast
+from typing import TYPE_CHECKING, Protocol, Self
 
 if TYPE_CHECKING:
     from types import TracebackType
 
-import srsly
 from typing_extensions import override
 
 from dspy._internal.lazy_import import require
 from dspy._internal.unbatchify import Unbatchify
+from dspy.persistence.embeddings import load_embeddings_into, save_embeddings
 from dspy.retrievers.types import RetrievedPassage
 
 np = require("numpy")
@@ -138,72 +137,10 @@ class Embeddings:
         return embeddings / np.maximum(norms, 1e-10)
 
     def save(self, path: str) -> None:
-        save_path = Path(path)
-        save_path.mkdir(parents=True, exist_ok=True)
-        config = {
-            "k": self.k,
-            "normalize": self.normalize,
-            "corpus": self.corpus,
-            "has_faiss_index": self.index is not None,
-        }
-        srsly.write_json(save_path / "config.json", config)
-        np.save(save_path / "corpus_embeddings.npy", self.corpus_embeddings)
-        if self.index is not None:
-            try:
-                import faiss
-            except ImportError as exc:
-                raise ImportError(
-                    "FAISS index is configured but `faiss-cpu` is not installed. "
-                    "Install faiss-cpu or rebuild without a FAISS index."
-                ) from exc
-            faiss.write_index(self.index, str(save_path / "faiss_index.bin"))
+        save_embeddings(self, path)
 
     def load(self, path: str, embedder: Embedder) -> Embeddings:
-        if hasattr(self, "search_fn"):
-            self.search_fn.close()
-
-        save_path = Path(path)
-        if not save_path.exists():
-            raise FileNotFoundError(f"Save directory not found: {path}")
-        config_path = save_path / "config.json"
-        embeddings_path = save_path / "corpus_embeddings.npy"
-        if not config_path.exists():
-            raise FileNotFoundError(f"Config file not found: {config_path}")
-        if not embeddings_path.exists():
-            raise FileNotFoundError(f"Embeddings file not found: {embeddings_path}")
-        config = cast("dict[str, Any]", srsly.read_json(config_path))
-        required_fields = ["k", "normalize", "corpus", "has_faiss_index"]
-        for field in required_fields:
-            if field not in config:
-                raise ValueError(f"Invalid config: missing required field '{field}'")
-        self.k = config["k"]
-        self.normalize = config["normalize"]
-        self.corpus = config["corpus"]
-        self.embedder = embedder
-        self.corpus_embeddings = np.load(embeddings_path)
-        faiss_index_path = save_path / "faiss_index.bin"
-        if config["has_faiss_index"]:
-            if not faiss_index_path.exists():
-                raise FileNotFoundError(f"Saved config expects a FAISS index but file not found: {faiss_index_path}")
-            try:
-                import faiss
-            except ImportError as exc:
-                raise ImportError(
-                    "Saved embeddings require FAISS but `faiss-cpu` is not installed. "
-                    "Install faiss-cpu to load this index."
-                ) from exc
-            self.index = faiss.read_index(str(faiss_index_path))
-        else:
-            self.index = None
-        self.search_fn = Unbatchify(self._batch_forward)
-        return self
-
-    @classmethod
-    def from_saved(cls, path: str, embedder: Embedder) -> Embeddings:
-        instance = cls.__new__(cls)
-        instance.search_fn = Unbatchify(instance._batch_forward)
-        instance.load(path=path, embedder=embedder)
-        return instance
+        return load_embeddings_into(self, path, embedder=embedder)
 
 
 class EmbeddingsWithScores(Embeddings):

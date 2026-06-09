@@ -31,6 +31,8 @@ ALLOWLIST_SUFFIXES = (
     "runtime/batch.py",
     # breaks persistence.program ↔ primitives.module import cycle
     "persistence/program.py",
+    # breaks persistence.embeddings ↔ retrievers.embeddings import cycle
+    "persistence/embeddings.py",
     "evaluate/metrics.py",
 )
 
