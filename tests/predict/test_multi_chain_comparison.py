@@ -1,5 +1,7 @@
 import asyncio
 
+import pytest
+
 from dspy.predict.multi_chain_comparison import MultiChainComparison
 from dspy.primitives import Prediction
 from dspy.task_spec import input_field, make_task_spec, output_field
@@ -40,3 +42,10 @@ def test_basic_example(make_run):
     final_pred = asyncio.run(compare_answers(completions=completions, question=question, run=run))
     assert final_pred.rationale == "my rationale"
     assert final_pred.answer == "blue"
+
+
+def test_rejects_wrong_completion_count(make_run):
+    compare_answers = MultiChainComparison(BasicQA, M=2)
+    run = make_run(lm=DummyLM([{"rationale": "my rationale", "answer": "blue"}]))
+    with pytest.raises(ValueError, match="doesn't match the expected number M"):
+        asyncio.run(compare_answers(completions=completions, question="What is the color of the sky?", run=run))

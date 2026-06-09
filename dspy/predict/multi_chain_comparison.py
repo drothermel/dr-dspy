@@ -56,9 +56,10 @@ class MultiChainComparison(Module):
             rationale = c.get("rationale", c.get("reasoning")).strip().split("\n")[0].strip()
             answer = str(c[self.last_key]).strip().split("\n")[0].strip()
             attempts.append(f"«I'm trying to {rationale} I'm not sure but my prediction is {answer}»")
-        assert len(attempts) == self.M, (
-            f"The number of attempts ({len(attempts)}) doesn't match the expected number M ({self.M}). Please set the correct value for M when initializing MultiChainComparison."
-        )
+        if len(attempts) != self.M:
+            raise ValueError(
+                f"The number of attempts ({len(attempts)}) doesn't match the expected number M ({self.M}). Please set the correct value for M when initializing MultiChainComparison."
+            )
         merged_inputs = {
             **{f"reasoning_attempt_{idx + 1}": attempt for idx, attempt in enumerate(attempts)},
             **inputs,
