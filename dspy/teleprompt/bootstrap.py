@@ -129,7 +129,7 @@ class BootstrapFewShot:
                     trace=trace,
                     run=run,
                 )
-                success = metric_val >= self.metric_threshold if self.metric_threshold else metric_val
+                success = metric_val >= self.metric_threshold if self.metric_threshold is not None else metric_val
             else:
                 success = True
         except Exception as e:

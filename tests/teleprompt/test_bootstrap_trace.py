@@ -164,3 +164,46 @@ def test_collect_trace_data_does_not_mutate_inner_forward(monkeypatch, make_run)
     restored_impl = object.__getattribute__(program, "_aforward_impl")
     assert restored_impl.__func__ is original_impl.__func__
     assert restored_impl.__self__ is original_impl.__self__
+
+
+def test_collect_trace_data_supports_async_metric(make_run):
+    from tests.test_utils import DummyLM
+
+    run = make_run(lm=DummyLM([{}]))
+    example = Example.from_record({"question": "q"}, input_keys=("question",))
+    prediction = Prediction(answer="a")
+    trace = []
+    metric_called = False
+
+    async def async_metric(example, prediction, trace=None):
+        nonlocal metric_called
+        metric_called = True
+        assert example.question == "q"
+        assert prediction.answer == "a"
+        assert trace == []
+        return 0.5
+
+    class DummyProgram(Module):
+        pass
+
+    class DummyEvaluate:
+        async def __call__(self, _program, *, metric, **_kwargs):
+            score = await metric(example, (prediction, trace), trace)
+
+            class _Result:
+                results: ClassVar[list[Any]] = [(example, (prediction, trace), score)]
+
+            return _Result()
+
+    data = asyncio.run(
+        collect_trace_data(
+            program=DummyProgram(),
+            dataset=[example],
+            run=run,
+            evaluator=cast("Any", DummyEvaluate()),
+            metric=async_metric,
+        )
+    )
+
+    assert metric_called is True
+    assert data[0]["score"] == 0.5

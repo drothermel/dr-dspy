@@ -16,6 +16,13 @@ def test_create_run_log_session_creates_timestamped_dir(tmp_path, monkeypatch):
     assert (session.run_dir / "run.json").exists()
 
 
+def test_create_run_log_session_is_unique_within_same_second(tmp_path, monkeypatch):
+    monkeypatch.setenv("DSPY_LOG_DIR", str(tmp_path))
+    sessions = [create_run_log_session(call_log_dir=None, settings_snapshot={}) for _ in range(3)]
+    assert len({session.run_dir for session in sessions}) == 3
+    assert len({session.timestamp for session in sessions}) == 3
+
+
 def test_create_run_log_session_uses_dspy_run_id(tmp_path, monkeypatch):
     monkeypatch.setenv("DSPY_LOG_DIR", str(tmp_path))
     monkeypatch.setenv("DSPY_RUN_ID", "experiment_a")

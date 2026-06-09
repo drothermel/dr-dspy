@@ -41,41 +41,41 @@ Do not claim exact reproduction of existing `nl_latents` pool curves through `Pr
 
 | ID | Area | Status | Notes |
 | --- | --- | --- | --- |
-| P0-1 | Public import cycles | Not started | |
-| P0-2 | SIMBA / `Parallel(access_examples=False)` | Not started | |
-| P0-3 | Legacy agent truncation handling | Not started | |
-| P0-4 | Bootstrap threshold semantics | Not started | |
-| P0-5 | `collect_trace_data` async/module metrics | Not started | |
-| P0-6 | GEPA multimodal/custom proposer `run=` threading | Not started | |
-| P0-7 | Unique disk call-log sessions | Not started | |
-| P0-8 | dr-llm safe state loading | Not started | |
-| P0-9 | dr-llm pool session identity | Not started | |
-| P0-10 | dr-llm provider-specific reasoning/config bridge | Not started | |
-| P0-11 | dr-llm pool lifecycle | Not started | |
-| P1-1 | OpenAI reasoning-model validation | Not started | |
-| P1-2 | LiteLLM provider options behavior | Not started | |
-| P1-3 | Strict transparency first-run ergonomics | Not started | |
-| P1-4 | Generated-code execution timeout | Not started | |
-| P1-5 | Finetuning poll and HTTP timeouts | Not started | |
-| P1-6 | `run_with_trace` module spine observability | Not started | |
-| P1-7 | `run_bounded` abort accounting | Not started | |
+| P0-1 | Public import cycles | Done | 2026-06-09: clean-process import regression added. |
+| P0-2 | SIMBA / `Parallel(access_examples=False)` | Done | 2026-06-09: plain callables no longer receive `run=`; modules still use task kwargs. |
+| P0-3 | Legacy agent truncation handling | Done | 2026-06-09: exhaustion no longer subclasses `ValueError`; legacy agents preserve truncated logs. |
+| P0-4 | Bootstrap threshold semantics | Done | 2026-06-09: `metric_threshold=0.0` covered. |
+| P0-5 | `collect_trace_data` async/module metrics | Done | 2026-06-09: metric dispatch now uses normal async/module path. |
+| P0-6 | GEPA multimodal/custom proposer `run=` threading | Done | 2026-06-09: custom and multimodal proposer paths receive optimizer run. |
+| P0-7 | Unique disk call-log sessions | Done | 2026-06-09: same-second sessions get unique timestamp IDs. |
+| P0-8 | dr-llm safe state loading | Done | 2026-06-09: builtin dr-llm LMs safe-load via registry. |
+| P0-9 | dr-llm pool session identity | Done | 2026-06-09: unique log sessions plus docs for explicit acquisition session IDs. |
+| P0-10 | dr-llm provider-specific reasoning/config bridge | Done | 2026-06-09: `DrLlmProviderControls` maps provider-native reasoning/sampling. |
+| P0-11 | dr-llm pool lifecycle | Done | 2026-06-09: use-after-close and copy/backends covered. |
+| P1-1 | OpenAI reasoning-model validation | Done | 2026-06-09: constructor/copy validation uses explicit `None` checks. |
+| P1-2 | LiteLLM provider options behavior | Done | 2026-06-09: misleading cache/max_retries options reject early. |
+| P1-3 | Strict transparency first-run ergonomics | Done | 2026-06-09: dr-llm cache strictness aligned with wrapper surface. |
+| P1-4 | Generated-code execution timeout | Done | 2026-06-09: sandbox response reads are bounded by interpreter timeout. |
+| P1-5 | Finetuning poll and HTTP timeouts | Done | 2026-06-09: Databricks/OpenAI waits bounded; Databricks HTTP calls set timeouts. |
+| P1-6 | `run_with_trace` module spine observability | Done | 2026-06-09: trace capture calls normal module spine. |
+| P1-7 | `run_bounded` abort accounting | Done | 2026-06-09: aborted items recorded distinctly and in failure stats. |
 | P1-8 | Parallel and optimizer call-log isolation | Not started | |
-| P1-9 | `Evaluate` empty devsets | Not started | |
-| P1-10 | Empty answer-list metrics | Not started | |
+| P1-9 | `Evaluate` empty devsets | Done | 2026-06-09: empty devsets raise clear validation error. |
+| P1-10 | Empty answer-list metrics | Done | 2026-06-09: max-answer metrics reject empty answer lists. |
 | P1-11 | Sampling threshold miss metadata | Not started | |
 | P1-12 | Sampling trace mutation | Not started | |
 | P1-13 | JSON parsing strictness | Not started | |
 | P1-14 | MCP mixed tool-result conversion | Not started | |
 | P1-15 | Persistence failure modes | Not started | |
-| P2-1 | Pool aggregate provenance | Not started | |
-| P2-2 | Pool fingerprint and metadata docs | Not started | |
-| P2-3 | dr-llm `n=1` contract | Not started | |
-| P2-4 | dr-llm v1 scope docs/tests | Not started | |
-| P2-5 | `nl-code` TaskSpec experiment scaffold | Not started | |
-| P2-6 | Advanced provider option gaps | Not started | |
+| P2-1 | Pool aggregate provenance | Done | 2026-06-09: `acquire_samples_result` exposes aggregate counts. |
+| P2-2 | Pool fingerprint and metadata docs | Done | 2026-06-09: documented metadata non-isolation in `docs/migration/dr_llm_text_pilot.md`. |
+| P2-3 | dr-llm `n=1` contract | Done | 2026-06-09: `n=1` allowed; `n>1` remains rejected. |
+| P2-4 | dr-llm v1 scope docs/tests | Done | 2026-06-09: support matrix documented. |
+| P2-5 | `nl-code` TaskSpec experiment scaffold | Done | 2026-06-09: minimal TaskSpec pilot path documented. |
+| P2-6 | Advanced provider option gaps | Done | 2026-06-09: provider-native controls and `EffortSpec.MAX` bridge added; registry serialization remains default-registry only. |
 | P2-7 | Smaller DSPy footguns | Not started | |
-| V-1 | Final verification matrix | Not started | |
-| V-2 | Live OpenRouter `gpt-5-nano` endpoint test | Not started | Required before the plan is considered fully tested. |
+| V-1 | Final verification matrix | Done | 2026-06-09: focused changed-area tests passed; required gates passed (`ruff check --fix`, `ty check --fix`, `ruff format`, lazy imports). |
+| V-2 | Live OpenRouter `gpt-5-nano` endpoint test | Done | 2026-06-09: `uv run pytest --llm_call -n0 tests/clients/dr_llm/test_integration_direct_live.py::test_live_dr_llm_direct_openrouter_gpt_5_nano -q` passed. |
 
 ## Cross-Repo Context from `docs/final_review_drllm.md`
 

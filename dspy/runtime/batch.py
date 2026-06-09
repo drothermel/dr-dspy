@@ -40,20 +40,28 @@ class Parallel:
 
     async def _run_pair(self, pair: tuple[Any, Any]) -> Any:
         from dspy.primitives.example import Example
+        from dspy.primitives.module_graph import is_module_instance
 
         module, example = pair
         run = self._active_run
         assert run is not None
         item_run = fork_worker_run(run)
+        module_accepts_run = is_module_instance(module)
         if isinstance(example, Example):
-            if self.access_examples:
+            if module_accepts_run:
                 return await module(**example.as_inputs(), run=item_run)
-            return await module(example, run=item_run)
+            if self.access_examples:
+                return await module(**example.as_inputs())
+            return await module(example)
         if isinstance(example, dict):
+            if not module_accepts_run:
+                return await module(**example)
             return await module(**example, run=item_run)
         if isinstance(example, list) and isinstance(module, Parallel):
             return await module(example, run=item_run)
         if isinstance(example, tuple):
+            if not module_accepts_run:
+                return await module(*example)
             return await module(*example, run=item_run)
         raise ValueError(
             f"Invalid example type: {type(example)}, only supported types are Example, dict, list and tuple"

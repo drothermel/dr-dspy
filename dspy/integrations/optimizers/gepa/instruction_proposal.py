@@ -9,6 +9,8 @@ from dspy.integrations.optimizers.gepa.adapter import AsyncProposalFn, Reflectiv
 from dspy.integrations.optimizers.gepa.task_specs import GenerateEnhancedMultimodalInstructionTaskSpec
 from dspy.predict.predict import Predict
 from dspy.primitives import Module
+from dspy.runtime.call_options import ModuleCallOptions
+from dspy.runtime.run_context import RunContext
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +20,20 @@ class SingleComponentMultiModalProposer(Module):
         super().__init__()
         self.propose_instruction = Predict(GenerateEnhancedMultimodalInstructionTaskSpec())
 
-    async def _aforward_impl(self, current_instruction: str, reflective_dataset: list[ReflectiveExample]) -> str:
+    async def _aforward_impl(
+        self,
+        *,
+        current_instruction: str,
+        reflective_dataset: list[ReflectiveExample],
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+    ) -> str:
         formatted_examples, image_map = self._format_examples_with_pattern_analysis(reflective_dataset)
         predict_kwargs = {"current_instruction": current_instruction, "examples_with_feedback": formatted_examples}
         predict_kwargs["examples_with_feedback"] = self._create_multimodal_examples(
             formatted_text=formatted_examples, image_map=image_map
         )
-        result = await self.propose_instruction(**predict_kwargs)
+        result = await self.propose_instruction(**predict_kwargs, run=run, options=options)
         return result.improved_instruction
 
     def _format_examples_with_pattern_analysis(
@@ -158,6 +167,7 @@ class MultiModalInstructionProposer(AsyncProposalFn):
         candidate: dict[str, str],
         reflective_dataset: Mapping[str, Sequence[Mapping[str, Any]]],
         components_to_update: list[str],
+        run: RunContext,
     ) -> dict[str, str]:
         updated_components = {}
         for component_name in components_to_update:
@@ -165,7 +175,9 @@ class MultiModalInstructionProposer(AsyncProposalFn):
                 current_instruction = candidate[component_name]
                 component_reflective_data = cast("list[ReflectiveExample]", reflective_dataset[component_name])
                 new_instruction = await self.single_proposer(
-                    current_instruction=current_instruction, reflective_dataset=component_reflective_data
+                    current_instruction=current_instruction,
+                    reflective_dataset=component_reflective_data,
+                    run=run,
                 )
                 updated_components[component_name] = new_instruction
         return updated_components

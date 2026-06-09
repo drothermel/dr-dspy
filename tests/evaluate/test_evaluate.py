@@ -31,6 +31,13 @@ def test_evaluate_initialization(make_run):
     assert not ev.display_progress
 
 
+def test_evaluate_empty_devset_raises(make_run):
+    run = make_run(lm=DummyLM([]))
+    ev = Evaluate(devset=[], metric=answer_exact_match, display_progress=False)
+    with pytest.raises(ValueError, match="non-empty devset"):
+        asyncio.run(ev(Predict(ts("question -> answer")), run=run))
+
+
 def test_evaluate_with_semantic_f1_module(make_run):
     run = make_run(
         lm=DummyLM(

@@ -7,6 +7,7 @@ from dspy.history import (
     ReActTurnEvent,
     REPLEntry,
     REPLHistory,
+    TruncationExhaustedError,
     TurnLog,
     call_with_history_truncation,
 )
@@ -107,7 +108,7 @@ async def test_call_with_history_truncation_raises_after_max_attempts(history_fa
         raise ContextWindowExceededError
 
     run = make_run()
-    with pytest.raises(ValueError, match="even after 2 attempts"):
+    with pytest.raises(TruncationExhaustedError, match="even after 2 attempts"):
         await call_with_history_truncation(module, turn_log=history, run=run, max_attempts=2)
 
 

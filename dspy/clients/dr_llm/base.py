@@ -22,6 +22,7 @@ from dspy.clients.dr_llm.contract import (
     provider_options_from_serialized_state,
     validate_dr_llm_ctor,
 )
+from dspy.clients.dr_llm.controls import DrLlmProviderControls, parse_dr_llm_controls
 from dspy.clients.dr_llm.errors import wrap_backend_exception
 from dspy.clients.dr_llm.mapping import (
     backend_response_to_lm_response,
@@ -60,6 +61,7 @@ class DrLlmLM(BaseLM):
         *,
         mode: CallMode = CallMode.api,
         registry: ProviderRegistry | None = None,
+        dr_llm_controls: DrLlmProviderControls | dict[str, Any] | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
         callbacks: list[Callback] | None = None,
@@ -76,6 +78,7 @@ class DrLlmLM(BaseLM):
         )
         self._mode = mode
         self._registry = registry or build_default_registry()
+        self._dr_llm_controls = parse_dr_llm_controls(dr_llm_controls)
         self._capabilities_cache = None
 
     @property
@@ -85,6 +88,11 @@ class DrLlmLM(BaseLM):
     @property
     def _capabilities_backend(self) -> _CapabilitiesBackend:
         raise NotImplementedError
+
+    @property
+    @override
+    def cache(self) -> bool | None:
+        return False
 
     @property
     @override
@@ -126,6 +134,9 @@ class DrLlmLM(BaseLM):
     def dump_state(self) -> dict[str, Any]:
         state = super().dump_state()
         state["dr_llm_mode"] = self._mode.value if hasattr(self._mode, "value") else str(self._mode)
+        controls = self._dr_llm_controls.to_json_dict()
+        if controls:
+            state["dr_llm_provider_controls"] = controls
         return state
 
     @classmethod
@@ -133,6 +144,7 @@ class DrLlmLM(BaseLM):
         state = validate_lm_state(dict(state))
         state.pop(LM_CLASS_STATE_KEY, None)
         mode_raw = state.pop("dr_llm_mode", CallMode.api)
+        dr_llm_controls = parse_dr_llm_controls(state.pop("dr_llm_provider_controls", None))
         mode = CallMode(mode_raw) if isinstance(mode_raw, str) else mode_raw
         model = state.pop("model")
         state.pop("model_type", "chat")
@@ -145,6 +157,7 @@ class DrLlmLM(BaseLM):
         return {
             "model": model,
             "mode": mode,
+            "dr_llm_controls": dr_llm_controls,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }

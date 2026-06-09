@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Callable
 
+from dspy.evaluate.metric_invoke import call_metric
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.optimization_trace import FailedPrediction, TraceCapturingModule, TraceData
 from dspy.teleprompt.core.evaluator import make_optimizer_evaluator
@@ -48,14 +49,22 @@ async def collect_trace_data(
     log_format_failures: bool = False,
     callback_metadata: dict[str, Any] | None = None,
 ) -> list[TraceData]:
-    def wrapped_metric(example, prediction, trace=None):
+    async def wrapped_metric(example, prediction, trace=None):
         prediction, _ = prediction
         if isinstance(prediction, FailedPrediction):
             reward = prediction.format_reward if prediction.format_reward is not None else format_failure_score
             if reward < 0.0 or reward > 1.0:
                 return failure_score
             return reward
-        return metric(example, prediction, trace) if metric else True
+        if metric is None:
+            return True
+        return await call_metric(
+            metric,
+            example=example,
+            prediction=prediction,
+            trace=trace,
+            run=run,
+        )
 
     capturing_program = TraceCapturingModule(
         program,

@@ -151,6 +151,29 @@ def test_reasoning_model_requirements(model_name, make_run):
     assert lm.kwargs.get("max_tokens") is None
 
 
+def test_reasoning_model_copy_revalidates_overrides():
+    lm = LM(model="openai/gpt-5-nano", temperature=1.0, max_tokens=16000)
+    with pytest.raises(LMConfigurationError, match="reasoning models require"):
+        lm.copy(temperature=0.0)
+
+
+@pytest.mark.parametrize(
+    "provider_options",
+    [
+        LMProviderOptions(cache=True),
+        LMProviderOptions(max_retries=2),
+    ],
+)
+def test_lm_rejects_misleading_provider_options(provider_options):
+    with pytest.raises(LMConfigurationError):
+        LM(model="openai/gpt-4o-mini", provider_options=provider_options)
+
+
+def test_lm_accepts_explicit_no_cache_provider_option():
+    lm = LM(model="openai/gpt-4o-mini", provider_options=LMProviderOptions(cache=False))
+    assert lm.cache is False
+
+
 def test_gpt_5_chat_not_reasoning_model(make_run):
     lm = LM(model="openai/gpt-5-chat", temperature=0.7, max_tokens=1000)
     assert "max_completion_tokens" not in lm.kwargs

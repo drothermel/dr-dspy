@@ -1,14 +1,36 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import TYPE_CHECKING, cast
-
-from dspy.predict.protocol import Predictor
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+    from dspy.predict.protocol import Predictor
     from dspy.primitives.module import Module
+else:
+    Predictor = Any
+
+
+@runtime_checkable
+class _PredictorLike(Protocol):
+    task_spec: Any
+    demos: list[Any]
+    lm: Any
+    run: Any
+
+    def dump_state(self, json_mode: bool = True) -> dict[str, Any]: ...
+
+    def load_state(
+        self,
+        state: dict[str, Any],
+        *,
+        allow_unsafe_lm_state: bool = False,
+        custom_types: dict[str, type] | None = None,
+    ) -> Any: ...
+
+    def reset(self) -> None: ...
+
 
 _MODULE_CLASS_ID = ("dspy.primitives.module", "Module")
 
@@ -67,7 +89,7 @@ def named_predictors(module: Module) -> list[tuple[str, Predictor]]:
     named: list[tuple[str, Predictor]] = []
     visited_predictors: set[int] = set()
     for name, item in walk_module_graph(module):
-        if not isinstance(item, Predictor):
+        if not isinstance(item, _PredictorLike):
             continue
         predictor_id = id(item)
         if predictor_id in visited_predictors:

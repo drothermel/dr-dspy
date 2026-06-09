@@ -7,7 +7,7 @@ import inspect
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
+from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class, is_builtin_lm_class_path
 from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.core.types import CallRecord, LMRequest, LMResponse, NativeAdaptationMode
 from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
@@ -193,7 +193,9 @@ class BaseLM:
                 return get_lm_class(BUILTIN_LM_CLASS_PATH).load_state(
                     state, allow_custom_lm_class=allow_custom_lm_class
                 )
-            if class_path != BUILTIN_LM_CLASS_PATH and (not allow_custom_lm_class):
+            if is_builtin_lm_class_path(class_path):
+                return get_lm_class(class_path).load_state(state, allow_custom_lm_class=allow_custom_lm_class)
+            if not allow_custom_lm_class:
                 raise ValueError(
                     f"Refusing to import custom serialized LM class `{class_path}`. Pass allow_custom_lm_class=True when loading trusted files to enable custom LM classes."
                 )

@@ -7,6 +7,21 @@ from tests.task_spec.helpers import ts
 from tests.test_utils import DummyLM
 
 
+def test_parallel_access_examples_false_plain_callable(make_run):
+    run = make_run(lm=DummyLM([{}]))
+    seen = []
+
+    async def plain_callable(example):
+        seen.append(example)
+        return example.value * 2
+
+    example = Example.from_record({"value": 21}, input_keys=("value",))
+    result = asyncio.run(Parallel(access_examples=False)([(plain_callable, example)], run=run))
+
+    assert result.results == (42,)
+    assert seen == [example]
+
+
 def test_parallel_module(make_run):
     lm = DummyLM(
         [

@@ -89,18 +89,24 @@ def hotpot_f1_score(*, prediction: str, ground_truth: str) -> float:
 def max_em_score(*, prediction: str, answers_list: list[str]) -> bool:
     if not isinstance(answers_list, list):
         raise ValueError(f"`answers_list` must be a list, got {type(answers_list)}")
+    if not answers_list:
+        raise ValueError("`answers_list` must not be empty.")
     return max(em_score(prediction=prediction, ground_truth=ans) for ans in answers_list)
 
 
 def max_token_f1_score(*, prediction: str, answers_list: list[str]) -> float:
     if not isinstance(answers_list, list):
         raise ValueError(f"`answers_list` must be a list, got {type(answers_list)}")
+    if not answers_list:
+        raise ValueError("`answers_list` must not be empty.")
     return max(token_f1_score(prediction=prediction, ground_truth=ans) for ans in answers_list)
 
 
 def max_hotpot_f1_score(*, prediction: str, answers_list: list[str]) -> float:
     if not isinstance(answers_list, list):
         raise ValueError(f"`answers_list` must be a list, got {type(answers_list)}")
+    if not answers_list:
+        raise ValueError("`answers_list` must not be empty.")
     return max(hotpot_f1_score(prediction=prediction, ground_truth=ans) for ans in answers_list)
 
 

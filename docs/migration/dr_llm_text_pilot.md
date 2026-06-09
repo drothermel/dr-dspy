@@ -1,0 +1,92 @@
+# dr-llm Text-Only DSPy Pilot
+
+This note describes the supported `dr-dspy` path for post-review experiments
+that use `DrLlmDirectLM` or `DrLlmPoolLM`.
+
+## Supported v1 Scope
+
+Use dr-llm backends for text-only DSPy programs:
+
+- `Predict` and `ChainOfThought` with `TaskSpec` inputs/outputs.
+- `Evaluate` over non-empty text-only devsets.
+- Optimizer task calls that use single completions, including `LMConfig(n=1)`.
+- `DrLlmDirectLM.aforward` for direct provider calls.
+- `DrLlmPoolLM.aforward` for cache-first single completions.
+- `DrLlmPoolLM.acquire_samples_result` for explicit-session no-replacement pool acquisition.
+
+Unsupported v1 features fail early: tools and tool-call history, ReAct-style
+tool agents, multimodal parts, native structured `response_format`, stop
+sequences, logprobs, prompt-cache controls, unsupported roles, arbitrary
+`LMConfig.extensions`, and reasoning fields not represented by the dr-llm
+provider-control bridge.
+
+## Provider Controls
+
+Generic DSPy `LMConfig(reasoning={"effort": ...})` maps to generic
+`BackendRequest.effort`. Do not use it for provider-native OpenRouter/OpenAI/
+Google controls.
+
+Use `DrLlmProviderControls` or `LMConfig.extensions["dr_llm"]` for provider
+controls that must affect dr-llm request fingerprints:
+
+```python
+from dspy.clients.dr_llm import DR_LLM_EXTENSION_KEY, DrLlmDirectLM
+from dspy.core.types import LMConfig
+from dspy.predict.call_options import PredictOptions
+
+lm = DrLlmDirectLM("openrouter/openai/gpt-5-nano", max_tokens=512)
+
+options = PredictOptions(
+    config=LMConfig(
+        extensions={
+            DR_LLM_EXTENSION_KEY: {
+                "reasoning": {"kind": "openrouter", "effort": "low"},
+                "sampling": {"temperature": None, "top_p": None},
+            }
+        }
+    )
+)
+```
+
+Default T1 controls:
+
+- OpenRouter reasoning off: `{"reasoning": {"kind": "openrouter", "enabled": false}}`.
+- OpenRouter provider effort: `{"reasoning": {"kind": "openrouter", "effort": "low"}}`.
+- OpenAI minimal thinking: `{"reasoning": {"kind": "openai", "thinking_level": "minimal"}}`.
+- Google thinking off: `{"reasoning": {"kind": "google", "thinking_level": "off"}}`.
+- Explicit sampling: `{"sampling": {"temperature": 0.7, "top_p": 0.95}}`.
+- No sampling override: `{"sampling": {"temperature": null, "top_p": null}}`.
+
+`metadata` is forwarded to `BackendRequest.metadata`, but dr-llm fingerprints
+exclude metadata and extensions. Use generation-relevant fields, a pool
+namespace/config change, or an acquisition `session_id` for isolation.
+
+## Pool Sessions
+
+`DrLlmPoolLM.aforward` is cache-first single-completion behavior and does not
+claim no-replacement samples. Use acquisition only when no-replacement sampling
+is intentional:
+
+```python
+result = await pool.acquire_samples_result(request, n=8, run=run, session_id="exp:split:seed")
+responses = result.responses
+print(result.claimed_from_cache, result.generated)
+```
+
+Pass a stable explicit `session_id` such as `experiment-name:split:seed`.
+Do not derive acquisition sessions from low-resolution timestamps. Metadata
+does not isolate claims.
+
+## Minimal `nl-code` TaskSpec Pilot
+
+The fastest post-review DSPy pilot should use direct dr-llm calls, not pools:
+
+- Define encoder and decoder `TaskSpec` classes with explicit field descriptions.
+- Create `RunContext.create(lm=DrLlmDirectLM(...), adapter=JSONAdapter())`.
+- Run one manual AE/minify policy and one optimized policy over the same task IDs.
+- Use `MIPROv2` first with no demos and a small train/val split.
+- Keep the decoder task, adapter, budgets, lossless layer, and evaluator fixed.
+
+This is a new DSPy prompt condition. Exact `nl_latents` compression-curve
+replay remains on the raw `nl_latents`/`dr-llm` pool harness unless a raw
+single-message DSPy adapter path is added and verified.

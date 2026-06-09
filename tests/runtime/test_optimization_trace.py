@@ -39,6 +39,19 @@ def test_run_with_trace_isolates_parent_trace(make_run):
     assert run.optimization_trace == [("parent",)]
 
 
+def test_run_with_trace_uses_module_call_spine(make_run):
+    class DirectAforwardFails(Module):
+        async def aforward(self, *, run, options=None, **inputs):
+            raise AssertionError("run_with_trace should not call aforward directly")
+
+        async def _aforward_impl(self, *, run, options=None, **inputs):
+            return Prediction(output="ok")
+
+    run = make_run(lm=DummyLM([]))
+    prediction, _trace = asyncio.run(run_with_trace(DirectAforwardFails(), {"input": "x"}, run))
+    assert prediction.output == "ok"
+
+
 def test_trace_capturing_module_delegates_predictors(make_run):
     predictor = Predict(ts("input -> output"))
     inner = _TraceProgram(predictor)
@@ -83,7 +96,7 @@ def test_run_with_trace_capture_parse_failures(make_run, monkeypatch):
             task_spec=string_to_int_task_spec,
         )
 
-    monkeypatch.setattr(program, "aforward", _raise_parse)
+    monkeypatch.setattr(program, "_aforward_impl", _raise_parse)
 
     async def _run():
         return await run_with_trace(

@@ -4,8 +4,10 @@ from typing import Any, Literal, cast
 
 from dr_llm.backends.models import BackendRequest, BackendResponse
 from dr_llm.llm import CallMode, EffortSpec, Message, SamplingControls
+from pydantic import ValidationError
 
 from dspy.clients.dr_llm.contract import reject_unsupported_merged_config
+from dspy.clients.dr_llm.controls import DR_LLM_EXTENSION_KEY, DrLlmProviderControls, parse_dr_llm_controls
 from dspy.clients.dr_llm.provider_name import parse_dr_llm_provider
 from dspy.clients.model_id import split_provider_model
 from dspy.core.types import LMConfig, LMOutput, LMRequest, LMResponse, LMUsage, merge_lm_request_config
@@ -40,14 +42,16 @@ def probe_backend_request(lm: Any, *, mode: CallMode = CallMode.api) -> BackendR
     provider = parse_dr_llm_provider(provider_name, model=lm.model)
     merged = merge_lm_request_config(lm, LMConfig())
     reject_unsupported_merged_config(merged, model=lm.model)
+    controls = _dr_llm_controls_from_config(merged, lm=lm, model=lm.model)
     return BackendRequest(
         provider=provider,
         model=model_name,
         mode=mode,
         messages=[Message(role="user", content="")],
         max_tokens=merged.max_tokens,
-        effort=_effort_from_config(merged, model=lm.model),
-        sampling=_sampling_from_config(merged),
+        effort=controls.effort or _effort_from_config(merged, model=lm.model),
+        reasoning=controls.reasoning,
+        sampling=_sampling_from_merged_config(merged, controls=controls, model=lm.model),
     )
 
 
@@ -103,6 +107,34 @@ def _sampling_from_config(config: LMConfig) -> SamplingControls | None:
     return SamplingControls(temperature=temperature, top_p=top_p)
 
 
+def _dr_llm_controls_from_config(config: LMConfig, *, lm: Any, model: str) -> DrLlmProviderControls:
+    default_controls = getattr(lm, "_dr_llm_controls", None)
+    data = (
+        default_controls.model_dump(mode="json", exclude_none=True)
+        if isinstance(default_controls, DrLlmProviderControls)
+        else {}
+    )
+    if DR_LLM_EXTENSION_KEY in config.extensions:
+        override = parse_dr_llm_controls(config.extensions[DR_LLM_EXTENSION_KEY])
+        data.update(override.model_dump(mode="json", exclude_unset=True))
+    try:
+        return parse_dr_llm_controls(data)
+    except ValidationError as exc:
+        raise LMConfigurationError("Invalid dr_llm provider controls.", model=model) from exc
+
+
+def _sampling_from_merged_config(
+    config: LMConfig,
+    *,
+    controls: DrLlmProviderControls,
+    model: str,
+) -> SamplingControls | None:
+    del model
+    if controls.sampling is not None:
+        return controls.sampling
+    return _sampling_from_config(config)
+
+
 def _effort_from_config(config: LMConfig, *, model: str) -> EffortSpec:
     reasoning = config.reasoning
     if reasoning is not None and reasoning.effort is not None:
@@ -125,6 +157,7 @@ def lm_request_to_backend_request(
     _reject_unsupported_request(request)
     merged = merge_lm_request_config(lm, request.config)
     reject_unsupported_merged_config(merged, model=request.model)
+    controls = _dr_llm_controls_from_config(merged, lm=lm, model=request.model)
     provider_name, model_name = split_provider_model(request.model)
     provider = parse_dr_llm_provider(provider_name, model=request.model)
     messages = [
@@ -140,12 +173,9 @@ def lm_request_to_backend_request(
         mode=mode,
         messages=messages,
         max_tokens=merged.max_tokens,
-        effort=_effort_from_config(merged, model=request.model),
-        # v1 maps only LMReasoningConfig.effort → BackendRequest.effort; provider-specific
-        # BackendRequest.reasoning objects are not wired. Extra reasoning fields are rejected
-        # in reject_unsupported_merged_config before this call.
-        reasoning=None,
-        sampling=_sampling_from_config(merged),
+        effort=controls.effort or _effort_from_config(merged, model=request.model),
+        reasoning=controls.reasoning,
+        sampling=_sampling_from_merged_config(merged, controls=controls, model=request.model),
         metadata=dict(request.metadata),
     )
 

@@ -37,6 +37,7 @@ class PythonInterpreter:
         sync_files: bool = True,
         tools: dict[str, Callable[..., str]] | None = None,
         output_fields: list[dict] | None = None,
+        execution_timeout_seconds: float = 120.0,
     ) -> None:
         if isinstance(deno_command, dict):
             raise TypeError("deno_command must be a list of strings, not a dict")
@@ -47,6 +48,7 @@ class PythonInterpreter:
         self.sync_files = sync_files
         self._tools: dict[str, Callable[..., str]] = dict(tools) if tools else {}
         self.output_fields = output_fields
+        self.execution_timeout_seconds = execution_timeout_seconds
         self._tools_registered = False
         if deno_command:
             self.deno_command = list(deno_command)

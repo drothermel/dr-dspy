@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_WAIT_FOR_JOB_TIMEOUT_SECONDS = 24 * 60 * 60
+
 
 def _openai() -> Any:
     import openai
@@ -154,11 +156,20 @@ class OpenAIProvider:
         return provider_job.id
 
     @staticmethod
-    def wait_for_job(job: TrainingJobOpenAI, poll_frequency: int = 20) -> None:
+    def wait_for_job(
+        job: TrainingJobOpenAI,
+        poll_frequency: int = 20,
+        max_wait_seconds: int = DEFAULT_WAIT_FOR_JOB_TIMEOUT_SECONDS,
+    ) -> None:
         done = False
         cur_event_id = None
         reported_estimated_time = False
+        started_at = time.monotonic()
         while not done:
+            if time.monotonic() - started_at > max_wait_seconds:
+                raise TimeoutError(
+                    f"OpenAI fine-tune job {job.provider_job_id} did not finish within {max_wait_seconds} seconds."
+                )
             if not reported_estimated_time:
                 remote_job = _openai().fine_tuning.jobs.retrieve(job.provider_job_id)
                 timestamp = remote_job.estimated_finish

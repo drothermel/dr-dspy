@@ -11,6 +11,7 @@ from dspy.clients.dr_llm.base import DrLlmLM
 if TYPE_CHECKING:
     from dr_llm.llm.providers.core.registry import ProviderRegistry
 
+    from dspy.clients.dr_llm.controls import DrLlmProviderControls
     from dspy.runtime.callback import Callback
 
 
@@ -21,6 +22,7 @@ class DrLlmDirectLM(DrLlmLM):
         *,
         mode: CallMode = CallMode.api,
         registry: ProviderRegistry | None = None,
+        dr_llm_controls: DrLlmProviderControls | dict[str, Any] | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
         callbacks: list[Callback] | None = None,
@@ -29,6 +31,7 @@ class DrLlmDirectLM(DrLlmLM):
             model=model,
             mode=mode,
             registry=registry,
+            dr_llm_controls=dr_llm_controls,
             temperature=temperature,
             max_tokens=max_tokens,
             callbacks=callbacks,

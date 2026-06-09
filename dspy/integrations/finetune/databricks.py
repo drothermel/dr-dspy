@@ -19,6 +19,9 @@ if TYPE_CHECKING:
     from dspy.clients.finetune.protocol import ReinforceJob as ReinforceJobProtocol
 logger = logging.getLogger(__name__)
 
+HTTP_REQUEST_TIMEOUT_SECONDS = 30
+DEFAULT_TRAIN_TIMEOUT_SECONDS = 24 * 60 * 60
+
 
 class TrainingJobDatabricks(TrainingJob):
     def __init__(self, finetuning_run=None, *args, **kwargs) -> None:
@@ -78,6 +81,7 @@ class DatabricksProvider:
         optimizable_info = requests.get(
             url=f"{databricks_host}/api/2.0/serving-endpoints/get-model-optimization-info/{model}/{model_version}",
             headers=headers,
+            timeout=HTTP_REQUEST_TIMEOUT_SECONDS,
         ).json()
         if "optimizable" not in optimizable_info or not optimizable_info["optimizable"]:
             raise ValueError(f"Model is not eligible for provisioned throughput: {optimizable_info}")
@@ -86,7 +90,10 @@ class DatabricksProvider:
         max_provisioned_throughput = chunk_size
         model_name = model.replace(".", "_")
         get_endpoint_response = requests.get(
-            url=f"{databricks_host}/api/2.0/serving-endpoints/{model_name}", json={"name": model_name}, headers=headers
+            url=f"{databricks_host}/api/2.0/serving-endpoints/{model_name}",
+            json={"name": model_name},
+            headers=headers,
+            timeout=HTTP_REQUEST_TIMEOUT_SECONDS,
         )
         if get_endpoint_response.status_code == 200:
             logger.info(f"Serving endpoint {model_name} already exists, updating it instead of creating a new one.")
@@ -102,7 +109,10 @@ class DatabricksProvider:
                 ]
             }
             response = requests.put(
-                url=f"{databricks_host}/api/2.0/serving-endpoints/{model_name}/config", json=data, headers=headers
+                url=f"{databricks_host}/api/2.0/serving-endpoints/{model_name}/config",
+                json=data,
+                headers=headers,
+                timeout=HTTP_REQUEST_TIMEOUT_SECONDS,
             )
         else:
             logger.info(f"Creating serving endpoint {model_name} on Databricks model serving!")
@@ -120,7 +130,12 @@ class DatabricksProvider:
                     ]
                 },
             }
-            response = requests.post(url=f"{databricks_host}/api/2.0/serving-endpoints", json=data, headers=headers)
+            response = requests.post(
+                url=f"{databricks_host}/api/2.0/serving-endpoints",
+                json=data,
+                headers=headers,
+                timeout=HTTP_REQUEST_TIMEOUT_SECONDS,
+            )
         if response.status_code == 200:
             logger.info(
                 f"Successfully started creating/updating serving endpoint {model_name} on Databricks model serving!"
@@ -195,9 +210,11 @@ class DatabricksProvider:
         databricks_token = train_kwargs.pop("databricks_token", None)
         skip_deploy = train_kwargs.pop("skip_deploy", False)
         deploy_timeout = train_kwargs.pop("deploy_timeout", 900)
+        train_timeout = train_kwargs.pop("train_timeout", DEFAULT_TRAIN_TIMEOUT_SECONDS)
         logger.info("Starting finetuning on Databricks... this might take a few minutes to finish.")
         finetuning_run = fm.create(model=model, **train_kwargs)
         databricks_job.run = finetuning_run
+        started_at = time.monotonic()
         while True:
             databricks_job.run = fm.get(databricks_job.run)
             if databricks_job.run.status.display_name == "Completed":
@@ -207,6 +224,8 @@ class DatabricksProvider:
                 raise ValueError(
                     f"Finetuning run failed with status: {databricks_job.run.status.display_name}. Please check the Databricks workspace for more details. Finetuning job's metadata: {databricks_job.run}."
                 )
+            if time.monotonic() - started_at > train_timeout:
+                raise TimeoutError(f"Databricks finetuning did not complete within {train_timeout} seconds.")
             time.sleep(60)
         if skip_deploy:
             return ""

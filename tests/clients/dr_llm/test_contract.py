@@ -5,8 +5,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from dr_llm.backends.models import PoolBackendConfig
 
-from dspy.clients.base_lm import LM_CLASS_STATE_KEY, PROVIDER_OPTIONS_STATE_KEY
+from dspy.clients.base_lm import LM_CLASS_STATE_KEY, PROVIDER_OPTIONS_STATE_KEY, BaseLM
 from dspy.clients.dr_llm import DrLlmDirectLM, DrLlmPoolLM
+from dspy.clients.dr_llm.contract import reject_unsupported_merged_config
+from dspy.core.types import LMConfig
 from dspy.errors import LMConfigurationError
 
 
@@ -59,6 +61,18 @@ def test_dr_llm_direct_lm_load_state_rejects_legacy_provider_options() -> None:
     }
     with pytest.raises(LMConfigurationError, match="LMProviderOptions"):
         DrLlmDirectLM.load_state(state)
+
+
+def test_base_lm_load_state_allows_builtin_dr_llm_direct() -> None:
+    lm = DrLlmDirectLM("openai/gpt-4.1-mini", temperature=0.0, max_tokens=128)
+    loaded = BaseLM.load_state(lm.dump_state())
+    assert isinstance(loaded, DrLlmDirectLM)
+    assert loaded.model == "openai/gpt-4.1-mini"
+    assert loaded.kwargs["temperature"] == 0.0
+
+
+def test_dr_llm_contract_allows_n_one() -> None:
+    reject_unsupported_merged_config(LMConfig(n=1), model="openai/gpt-4.1-mini")
 
 
 def test_dr_llm_pool_lm_load_state_rejects_legacy_provider_options() -> None:

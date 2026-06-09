@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import logging
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from typing_extensions import override
 
@@ -23,11 +25,13 @@ from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.clients.model_id import split_provider_model
 from dspy.clients.openai_format.reasoning_models import is_openai_reasoning_model
 from dspy.core.types import LMRequest, LMResponse, NativeAdaptationMode
-from dspy.core.types.lm_provider import LMProviderOptions
+from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
 from dspy.errors import ContextWindowExceededError, LMConfigurationError, LMError
-from dspy.runtime.callback import Callback
 
 from ..base_lm import BaseLM
+
+if TYPE_CHECKING:
+    from dspy.runtime.callback import Callback
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +51,19 @@ class LM(BaseLM):
         provider_options: LMProviderOptions | None = None,
     ) -> None:
         merged_provider = provider_options or LMProviderOptions()
+        if merged_provider.max_retries is not None:
+            raise LMConfigurationError(
+                "LMProviderOptions.max_retries is not supported by `dspy.clients.lm.LM`; "
+                "use the LM(..., num_retries=...) constructor argument instead.",
+                model=model,
+            )
+        if merged_provider.cache is True:
+            raise LMConfigurationError(
+                "LMProviderOptions.cache=True is not supported by `dspy.clients.lm.LM`; "
+                "the LiteLLM transport uses explicit no-cache/no-store behavior. "
+                "Use cache=False to make that explicit.",
+                model=model,
+            )
         super().__init__(
             model=model,
             model_type=model_type,
@@ -67,7 +84,7 @@ class LM(BaseLM):
         provider_options: LMProviderOptions,
     ) -> dict[str, Any]:
         if is_openai_reasoning_model(self.model):
-            if (temperature and temperature != 1.0) or (max_tokens and max_tokens < 16000):
+            if (temperature is not None and temperature != 1.0) or (max_tokens is not None and max_tokens < 16000):
                 raise LMConfigurationError(
                     "OpenAI's reasoning models require passing temperature=1.0 or None and max_tokens >= 16000 or None to `dspy.clients.lm.LM(...)`, e.g., `from dspy.clients.lm import LM; LM('openai/gpt-5', temperature=1.0, max_tokens=16000)`",
                     model=self.model,
@@ -184,6 +201,32 @@ class LM(BaseLM):
             raise TypeError(f"Expected LM instance from load_state, got {type(instance).__name__}.")
         instance.use_developer_role = use_developer_role
         return instance
+
+    @override
+    def copy(
+        self,
+        *,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        provider_options: LMProviderOptions | None = None,
+    ) -> LM:
+        new_kwargs = dict(self.kwargs)
+        if temperature is not None:
+            new_kwargs["temperature"] = temperature
+        if max_tokens is not None:
+            new_kwargs["max_tokens"] = max_tokens
+        merged_provider = merge_provider_options(self.provider_options, provider_options) or self.provider_options
+        return type(self)(
+            model=model or self.model,
+            model_type=cast("Literal['chat', 'text', 'responses']", self.model_type),
+            temperature=new_kwargs.get("temperature"),
+            max_tokens=new_kwargs.get("max_tokens"),
+            callbacks=list(getattr(self, "callbacks", []) or []),
+            num_retries=self.num_retries,
+            use_developer_role=self.use_developer_role,
+            provider_options=merged_provider,
+        )
 
     def _check_truncation(self, results) -> None:
         if self.model_type != "responses" and any(c.finish_reason == "length" for c in results["choices"]):

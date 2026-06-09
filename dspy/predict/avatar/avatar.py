@@ -1,7 +1,8 @@
+import logging
 from typing import Any, cast
 
 from dspy.adapters.types.tool import Tool
-from dspy.history import AvatarTurnEvent, TurnLog, call_with_history_truncation
+from dspy.history import AvatarTurnEvent, TruncationExhaustedError, TurnLog, call_with_history_truncation
 from dspy.predict.agent_constants import AVATAR_TERMINAL_TOOL
 from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult
 from dspy.predict.agent_termination import AgentTerminationReason
@@ -12,6 +13,8 @@ from dspy.primitives import Module, Prediction
 from dspy.runtime.call_options import ModuleCallOptions
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
+
+logger = logging.getLogger(__name__)
 
 
 class Avatar(Module):
@@ -92,25 +95,33 @@ class Avatar(Module):
         args = {
             "goal": self.task_spec.instructions,
             "tools": [tool.name for tool in self.tools],
-            "turn_log": TurnLog.empty(),
+            "turn_log": TurnLog.model_validate(inputs.pop("turn_log", TurnLog.empty())),
         }
         for key in self.input_fields:
             if key in inputs:
                 args[key] = inputs[key]
-        turn_log = TurnLog.empty()
+        turn_log = args["turn_log"]
         actor_inputs = {key: value for key, value in args.items() if key != "turn_log"}
         action_results: list[ActionOutput] = []
         max_iters = cast("int", inputs.get("max_iters", self.max_iters))
 
         async def step(_turn_index: int, turn_log: TurnLog) -> AgentStepResult[TurnLog]:
-            extracted = await call_with_history_truncation(
-                self.actor,
-                turn_log=turn_log,
-                run=run,
-                options=options,
-                max_attempts=3,
-                **actor_inputs,
-            )
+            try:
+                extracted = await call_with_history_truncation(
+                    self.actor,
+                    turn_log=turn_log,
+                    run=run,
+                    options=options,
+                    max_attempts=3,
+                    **actor_inputs,
+                )
+            except TruncationExhaustedError as err:
+                logger.warning("Ending Avatar loop after context window exceeded: %s", err)
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.CONTEXT_WINDOW_EXCEEDED,
+                )
             turn_log = extracted.turn_log
             actor_output = extracted.result
             action = actor_output.action
@@ -140,14 +151,22 @@ class Avatar(Module):
             initial_history=turn_log,
             step=step,
         )
-        extracted = await call_with_history_truncation(
-            self.finish,
-            turn_log=loop_result.history,
-            run=run,
-            options=options,
-            max_attempts=3,
-            **actor_inputs,
-        )
+        try:
+            extracted = await call_with_history_truncation(
+                self.finish,
+                turn_log=loop_result.history,
+                run=run,
+                options=options,
+                max_attempts=3,
+                **actor_inputs,
+            )
+        except TruncationExhaustedError as err:
+            logger.warning("Avatar finish failed after context window exceeded: %s", err)
+            return Prediction(
+                turn_log=loop_result.history,
+                actions=action_results,
+                termination_reason=loop_result.termination_reason or AgentTerminationReason.CONTEXT_WINDOW_EXCEEDED,
+            )
         final_answer = extracted.result
         turn_log = extracted.turn_log
         return Prediction(

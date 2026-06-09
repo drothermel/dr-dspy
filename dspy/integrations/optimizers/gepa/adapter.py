@@ -34,6 +34,7 @@ class AsyncProposalFn(Protocol):
         candidate: dict[str, str],
         reflective_dataset: dict[str, list[dict[str, Any]]],
         components_to_update: list[str],
+        run: RunContext,
     ) -> dict[str, str]: ...
 
 
@@ -127,6 +128,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                     candidate=candidate,
                     reflective_dataset=reflective_dataset,
                     components_to_update=components_to_update,
+                    run=opt_run,
                 )
         results: dict[str, str] = {}
         proposer = Predict(FrameworkGepaInstructionProposalTaskSpec())

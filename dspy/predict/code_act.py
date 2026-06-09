@@ -3,7 +3,7 @@ import logging
 from typing_extensions import override
 
 from dspy.adapters.types.tool import Tool
-from dspy.history import CodeActTurnEvent, TurnLog, call_with_history_truncation
+from dspy.history import CodeActTurnEvent, TruncationExhaustedError, TurnLog, call_with_history_truncation
 from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.chain_of_thought import ChainOfThought
@@ -73,13 +73,21 @@ class CodeAct(Module):
         try:
             for tool in self.tools.values():
                 self.interpreter(get_formatted_source(tool.func))
-            turn_log = TurnLog.empty()
+            turn_log = TurnLog.model_validate(inputs.pop("turn_log", TurnLog.empty()))
             max_iters = inputs.pop("max_iters", self.max_iters)
 
             async def step(_turn_index: int, turn_log: TurnLog) -> AgentStepResult[TurnLog]:
-                extracted = await call_with_history_truncation(
-                    self.codeact, turn_log=turn_log, run=run, options=options, **inputs
-                )
+                try:
+                    extracted = await call_with_history_truncation(
+                        self.codeact, turn_log=turn_log, run=run, options=options, **inputs
+                    )
+                except TruncationExhaustedError as err:
+                    logger.warning("Ending CodeAct loop after context window exceeded: %s", err)
+                    return AgentStepResult(
+                        history=turn_log,
+                        control=AgentLoopControl.BREAK,
+                        termination_reason=AgentTerminationReason.CONTEXT_WINDOW_EXCEEDED,
+                    )
                 turn_log = extracted.turn_log
                 code_data = extracted.result
                 code, error = parse_generated_code(code_data)
@@ -111,9 +119,16 @@ class CodeAct(Module):
                 initial_history=turn_log,
                 step=step,
             )
-            extracted = await call_with_history_truncation(
-                self.extractor, turn_log=loop_result.history, run=run, options=options, **inputs
-            )
+            try:
+                extracted = await call_with_history_truncation(
+                    self.extractor, turn_log=loop_result.history, run=run, options=options, **inputs
+                )
+            except TruncationExhaustedError as err:
+                logger.warning("CodeAct extraction failed after context window exceeded: %s", err)
+                return Prediction(
+                    turn_log=loop_result.history,
+                    termination_reason=loop_result.termination_reason or AgentTerminationReason.CONTEXT_WINDOW_EXCEEDED,
+                )
             return Prediction(
                 turn_log=extracted.turn_log,
                 termination_reason=loop_result.termination_reason,

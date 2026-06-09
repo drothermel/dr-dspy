@@ -6,7 +6,9 @@ from dspy.evaluate.metrics import (
     answer_exact_match,
     em_score,
     hotpot_f1_score,
+    max_em_score,
     max_hotpot_f1_score,
+    max_token_f1_score,
     normalize_text,
     token_f1_score,
 )
@@ -38,6 +40,12 @@ def test_hotpot_f1_score_yes_no_mismatch():
 
 def test_max_hotpot_f1_score_over_answers():
     assert max_hotpot_f1_score(prediction="Paris", answers_list=["London", "Paris"]) == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("metric", [max_em_score, max_token_f1_score, max_hotpot_f1_score])
+def test_max_answer_metrics_reject_empty_answers(metric):
+    with pytest.raises(ValueError, match="must not be empty"):
+        metric(prediction="Paris", answers_list=[])
 
 
 def test_answer_exact_match_string():

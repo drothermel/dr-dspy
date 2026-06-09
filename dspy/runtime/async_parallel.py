@@ -43,7 +43,13 @@ R = TypeVar("R")
 class BoundedRunStats:
     def __init__(self) -> None:
         self.failed_indices: list[int] = []
+        self.aborted_indices: list[int] = []
         self.exceptions_map: dict[int, BaseException] = {}
+
+
+class BoundedRunItemAbortedError(RuntimeError):
+    def __init__(self) -> None:
+        super().__init__("Item was not started because max_errors was exceeded.")
 
 
 class BoundedRunAbortedError(RuntimeError):
@@ -151,5 +157,11 @@ async def run_bounded(
     finally:
         pbar.close()
     if cancel.is_set():
+        abort_error = BoundedRunItemAbortedError()
+        for index, result in enumerate(results):
+            if result is RUN_BOUNDED_PENDING and index not in stats.exceptions_map:
+                stats.failed_indices.append(index)
+                stats.aborted_indices.append(index)
+                stats.exceptions_map[index] = abort_error
         raise BoundedRunAbortedError(stats, reason="max_errors exceeded")
     return (_finalize_results(results), stats)

@@ -3,7 +3,12 @@ import logging
 
 import pytest
 
-from dspy.runtime.async_parallel import RUN_BOUNDED_PENDING, BoundedRunAbortedError, run_bounded
+from dspy.runtime.async_parallel import (
+    RUN_BOUNDED_PENDING,
+    BoundedRunAbortedError,
+    BoundedRunItemAbortedError,
+    run_bounded,
+)
 
 
 @pytest.mark.asyncio
@@ -57,6 +62,32 @@ async def test_run_bounded_aborted_error_includes_stats():
 
     assert exc_info.value.stats.failed_indices == [0]
     assert isinstance(exc_info.value.stats.exceptions_map[0], ValueError)
+
+
+@pytest.mark.asyncio
+async def test_run_bounded_aborted_error_accounts_for_never_started_items():
+    async def task(item: int) -> int:
+        if item == 0:
+            raise ValueError("boom")
+        await asyncio.sleep(0.01)
+        return item
+
+    with pytest.raises(BoundedRunAbortedError) as exc_info:
+        await run_bounded(
+            items=[0, 1, 2],
+            fn=task,
+            max_concurrency=1,
+            max_errors=1,
+            provide_traceback=False,
+            disable_progress_bar=True,
+        )
+
+    stats = exc_info.value.stats
+    assert stats.failed_indices == [0, 1, 2]
+    assert stats.aborted_indices == [1, 2]
+    assert isinstance(stats.exceptions_map[0], ValueError)
+    assert isinstance(stats.exceptions_map[1], BoundedRunItemAbortedError)
+    assert isinstance(stats.exceptions_map[2], BoundedRunItemAbortedError)
 
 
 @pytest.mark.asyncio

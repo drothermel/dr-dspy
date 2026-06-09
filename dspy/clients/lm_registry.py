@@ -33,3 +33,7 @@ def get_lm_class(class_path: str) -> type[BaseLM]:
         known = ", ".join(sorted(registry))
         raise LMConfigurationError(f"Unknown serialized LM class `{class_path}`. Known builtin class paths: {known}.")
     return cast("type[BaseLM]", registry[class_path])
+
+
+def is_builtin_lm_class_path(class_path: str) -> bool:
+    return class_path in _lm_class_registry()

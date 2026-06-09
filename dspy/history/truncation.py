@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class TruncationExhaustedError(ValueError):
+class TruncationExhaustedError(RuntimeError):
     """Raised when context-window truncation retries are exhausted."""
 
 

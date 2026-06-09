@@ -105,6 +105,8 @@ class Evaluate:
             logger.debug(f"Evaluate is called with callback metadata: {callback_metadata}")
         if metric is None:
             raise ValueError("A metric function is required for evaluation.")
+        if not devset:
+            raise ValueError("Evaluate requires a non-empty devset.")
 
         async def process_item(example):
             prediction, trace = await run_with_trace(program, example, run)

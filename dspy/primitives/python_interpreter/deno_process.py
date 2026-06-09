@@ -2,6 +2,7 @@ import functools
 import json
 import logging
 import os
+import select
 import subprocess
 from os import PathLike
 from pathlib import Path
@@ -149,7 +150,15 @@ def deno_stdout(interpreter: "PythonInterpreter") -> IO[str]:
 
 def read_response_line(interpreter: "PythonInterpreter", context: str) -> str:
     process = require_deno_process(interpreter)
-    response_line = deno_stdout(interpreter).readline().strip()
+    stdout = deno_stdout(interpreter)
+    timeout = getattr(interpreter, "execution_timeout_seconds", None)
+    if timeout is not None:
+        ready, _, _ = select.select([stdout], [], [], timeout)
+        if not ready:
+            process.kill()
+            process.wait()
+            raise CodeInterpreterError(f"Timed out waiting for sandbox response {context} after {timeout} seconds")
+    response_line = stdout.readline().strip()
     if response_line:
         return response_line
     exit_code = process.poll()

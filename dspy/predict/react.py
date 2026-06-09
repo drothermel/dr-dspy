@@ -2,7 +2,7 @@ import logging
 from typing import Any
 
 from dspy.adapters.types.tool import Tool
-from dspy.history import ReActTurnEvent, TurnLog, call_with_history_truncation
+from dspy.history import ReActTurnEvent, TruncationExhaustedError, TurnLog, call_with_history_truncation
 from dspy.predict.agent_constants import REACT_TERMINAL_TOOL
 from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult, format_tool_exception
 from dspy.predict.agent_termination import AgentTerminationReason
@@ -70,6 +70,7 @@ class ReAct(Module):
     ):
         run = resolve_run(run=run, bound_run=self.run)
         max_iters = input_args.pop("max_iters", self.max_iters)
+        turn_log = TurnLog.model_validate(input_args.pop("turn_log", TurnLog.empty()))
 
         async def step(_turn_index: int, turn_log: TurnLog) -> AgentStepResult[TurnLog]:
             try:
@@ -77,6 +78,14 @@ class ReAct(Module):
                     self.react, turn_log=turn_log, run=run, options=options, **input_args
                 )
                 pred = extracted.result
+                turn_log = extracted.turn_log
+            except TruncationExhaustedError as err:
+                logger.warning("Ending ReAct loop after context window exceeded: %s", err)
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.CONTEXT_WINDOW_EXCEEDED,
+                )
             except ValueError as err:
                 logger.warning(
                     f"Ending the agent loop: Agent failed to select a valid tool: {format_tool_exception(err)}"
@@ -109,12 +118,19 @@ class ReAct(Module):
 
         loop_result = await AgentLoopRunner[TurnLog]().run(
             max_iters=max_iters,
-            initial_history=TurnLog.empty(),
+            initial_history=turn_log,
             step=step,
         )
-        extracted = await call_with_history_truncation(
-            self.extract, turn_log=loop_result.history, run=run, options=options, **input_args
-        )
+        try:
+            extracted = await call_with_history_truncation(
+                self.extract, turn_log=loop_result.history, run=run, options=options, **input_args
+            )
+        except TruncationExhaustedError as err:
+            logger.warning("ReAct extraction failed after context window exceeded: %s", err)
+            return Prediction(
+                turn_log=loop_result.history,
+                termination_reason=loop_result.termination_reason or AgentTerminationReason.CONTEXT_WINDOW_EXCEEDED,
+            )
         return Prediction(
             turn_log=extracted.turn_log,
             termination_reason=loop_result.termination_reason,

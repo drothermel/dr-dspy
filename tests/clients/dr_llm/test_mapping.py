@@ -3,8 +3,9 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from dr_llm.llm import EffortSpec
+from dr_llm.llm import EffortSpec, SamplingControls
 
+from dspy.clients.dr_llm import DR_LLM_EXTENSION_KEY
 from dspy.clients.dr_llm.mapping import (
     backend_response_to_lm_response,
     lm_request_to_backend_request,
@@ -144,6 +145,68 @@ def test_lm_request_maps_reasoning_effort() -> None:
     backend_request = lm_request_to_backend_request(request, lm=lm)
     assert backend_request.effort == EffortSpec.HIGH
     assert backend_request.reasoning is None
+
+
+@pytest.mark.parametrize(
+    ("model", "controls", "expected_reasoning"),
+    [
+        (
+            "openrouter/xiaomi/mimo-v2-flash",
+            {"reasoning": {"kind": "openrouter", "enabled": False}, "sampling": {"temperature": 0.7, "top_p": 0.95}},
+            {"kind": "openrouter", "enabled": False, "effort": None},
+        ),
+        (
+            "openrouter/openai/gpt-5-nano",
+            {"reasoning": {"kind": "openrouter", "effort": "low"}},
+            {"kind": "openrouter", "enabled": None, "effort": "low"},
+        ),
+        (
+            "openai/gpt-5-nano",
+            {"reasoning": {"kind": "openai", "thinking_level": "minimal"}},
+            {"kind": "openai", "thinking_level": "minimal"},
+        ),
+        (
+            "google/gemini-2.5-flash-lite",
+            {"reasoning": {"kind": "google", "thinking_level": "off"}},
+            {"kind": "google", "thinking_level": "off", "budget_tokens": None, "include_thoughts": None},
+        ),
+    ],
+)
+def test_lm_request_maps_dr_llm_provider_reasoning_controls(
+    model: str, controls: dict, expected_reasoning: dict
+) -> None:
+    lm = DummyLM([{"answer": "x"}])
+    request = LMRequest(
+        model=model,
+        messages=[User(LMTextPart(text="hi"))],
+        config=LMConfig(extensions={DR_LLM_EXTENSION_KEY: controls}),
+    )
+    backend_request = lm_request_to_backend_request(request, lm=lm)
+    assert backend_request.reasoning is not None
+    assert backend_request.reasoning.model_dump(mode="json") == expected_reasoning
+
+
+def test_lm_request_maps_dr_llm_provider_effort_max() -> None:
+    lm = DummyLM([{"answer": "x"}])
+    request = LMRequest(
+        model="openai/gpt-4.1-mini",
+        messages=[User(LMTextPart(text="hi"))],
+        config=LMConfig(extensions={DR_LLM_EXTENSION_KEY: {"effort": "max"}}),
+    )
+    backend_request = lm_request_to_backend_request(request, lm=lm)
+    assert backend_request.effort == EffortSpec.MAX
+
+
+def test_lm_request_maps_explicit_empty_sampling_controls() -> None:
+    lm = DummyLM([{"answer": "x"}])
+    request = LMRequest(
+        model="openrouter/openai/gpt-5-nano",
+        messages=[User(LMTextPart(text="hi"))],
+        config=LMConfig(extensions={DR_LLM_EXTENSION_KEY: {"sampling": {"temperature": None, "top_p": None}}}),
+    )
+    backend_request = lm_request_to_backend_request(request, lm=lm)
+    assert isinstance(backend_request.sampling, SamplingControls)
+    assert backend_request.sampling.is_empty()
 
 
 def test_effort_from_config_raises_on_invalid_effort() -> None:

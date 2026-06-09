@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dspy.clients.dr_llm import DrLlmDirectLM
+from dspy.clients.dr_llm import DR_LLM_EXTENSION_KEY, DrLlmDirectLM
+from dspy.core.types import LMConfig
 from tests.clients.dr_llm._helpers import make_lm_request
 from tests.test_utils import require_env
 
@@ -27,3 +28,23 @@ async def test_live_dr_llm_direct_openai_exact_reply() -> None:
     assert "beta" in _text(response).lower()
     assert response.output.provider_data.get("source") == "direct"
     assert response.output.finish_reason is not None
+
+
+@pytest.mark.llm_call
+async def test_live_dr_llm_direct_openrouter_gpt_5_nano() -> None:
+    require_env("OPENROUTER_API_KEY")
+    lm = DrLlmDirectLM("openrouter/openai/gpt-5-nano", max_tokens=128)
+    request = make_lm_request(
+        model="openrouter/openai/gpt-5-nano",
+        content="Answer with only this exact text: dr-dspy openrouter ok",
+    ).model_copy(
+        update={
+            "config": LMConfig(
+                extensions={DR_LLM_EXTENSION_KEY: {"reasoning": {"kind": "openrouter", "effort": "low"}}}
+            )
+        }
+    )
+    response = await lm.aforward(request)
+    assert _text(response)
+    assert response.output.provider_data.get("source") == "direct"
+    assert getattr(response.provider_response, "provider", None) == "openrouter"

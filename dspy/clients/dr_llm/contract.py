@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from pydantic import ValidationError
+
+from dspy.clients.dr_llm.controls import DR_LLM_EXTENSION_KEY, parse_dr_llm_controls
 from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.errors import LMConfigurationError, LMUnsupportedFeatureError
 
@@ -69,7 +72,7 @@ def reject_unsupported_merged_config(config: LMConfig, *, model: str) -> None:
             model=model,
             features=["stop"],
         )
-    if config.n is not None:
+    if config.n is not None and config.n != 1:
         raise LMUnsupportedFeatureError(
             "dr-llm backends v1 do not support n>1 sampling.",
             model=model,
@@ -93,12 +96,18 @@ def reject_unsupported_merged_config(config: LMConfig, *, model: str) -> None:
             model=model,
             features=["prompt_cache"],
         )
-    if config.extensions:
+    unknown_extensions = set(config.extensions) - {DR_LLM_EXTENSION_KEY}
+    if unknown_extensions:
+        joined = ", ".join(sorted(unknown_extensions))
         raise LMUnsupportedFeatureError(
-            "dr-llm backends v1 do not support LMConfig.extensions.",
+            f"dr-llm backends v1 do not support LMConfig.extensions key(s): {joined}.",
             model=model,
             features=["extensions"],
         )
+    try:
+        controls = parse_dr_llm_controls(config.extensions.get(DR_LLM_EXTENSION_KEY))
+    except ValidationError as exc:
+        raise LMConfigurationError("Invalid dr_llm provider controls.", model=model) from exc
     reasoning = config.reasoning
     if reasoning is not None:
         unsupported_reasoning_fields: list[str] = []
@@ -113,4 +122,11 @@ def reject_unsupported_merged_config(config: LMConfig, *, model: str) -> None:
                 f"unsupported field(s): {joined}.",
                 model=model,
                 features=["reasoning"],
+            )
+        if reasoning.effort is not None and (controls.effort is not None or controls.reasoning is not None):
+            raise LMUnsupportedFeatureError(
+                "dr-llm backends v1 do not support both generic reasoning.effort and "
+                "dr_llm provider reasoning controls on the same request.",
+                model=model,
+                features=["reasoning", "extensions"],
             )

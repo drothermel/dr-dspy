@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from dspy.predict.predict import Predict
-from dspy.primitives import Example, Module
+from dspy.primitives import Example, Module, Prediction
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.bootstrap_session import BootstrapCompileSession
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
@@ -15,6 +15,10 @@ from tests.test_utils import DummyLM
 
 def simple_metric(example, prediction, trace=None):
     return example.output == prediction.output
+
+
+def zero_metric(_example, _prediction, trace=None):
+    return 0.0
 
 
 examples = [
@@ -28,6 +32,24 @@ valset = [examples[1]]
 def test_bootstrap_initialization(make_run):
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
     assert bootstrap.metric == simple_metric, "Metric not correctly initialized"
+
+
+def test_bootstrap_metric_threshold_zero_accepts_zero_score(make_run):
+    class Teacher(Module):
+        async def _aforward_impl(self, *, run, options=None, **inputs):
+            return Prediction(output="anything")
+
+    run = make_run(lm=DummyLM([]), optimization_trace=[])
+    example = Example.from_record({"input": "x", "output": "anything"}, input_keys=("input",))
+    teacher = Teacher()
+    session = BootstrapCompileSession(student=Teacher(), teacher=teacher, trainset=[example])
+    session.name2predictor = {}
+    session.predictor2name = {}
+
+    bootstrap = BootstrapFewShot(metric=zero_metric, metric_threshold=0.0)
+    success = asyncio.run(bootstrap._bootstrap_one_example(session, example=example, run=run))
+
+    assert success is True
 
 
 class SimpleModule(Module):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import json
 import threading
+import uuid
 from dataclasses import dataclass
 from pathlib import Path  # noqa: TC003 — used at runtime for session directory creation
 from typing import TYPE_CHECKING, Any
@@ -27,9 +28,15 @@ class RunLogSession:
 def create_run_log_session(
     *, call_log_dir: str | None, settings_snapshot: dict[str, Any] | None = None
 ) -> RunLogSession:
-    timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
-    run_dir = resolve_log_root(call_log_dir) / resolve_run_bucket() / timestamp
-    run_dir.mkdir(parents=True, exist_ok=True)
+    base_timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H-%M-%S.%fZ")
+    timestamp = base_timestamp
+    run_root = resolve_log_root(call_log_dir) / resolve_run_bucket()
+    with _SESSION_LOCK:
+        run_dir = run_root / timestamp
+        if run_dir.exists():
+            timestamp = f"{base_timestamp}-{uuid.uuid4().hex[:8]}"
+            run_dir = run_root / timestamp
+        run_dir.mkdir(parents=True, exist_ok=False)
     snapshot = to_jsonable(settings_snapshot or {})
     run_json = {
         "timestamp": timestamp,

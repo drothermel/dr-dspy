@@ -86,7 +86,7 @@ async def _capture_forward(
 ) -> tuple[Prediction | FailedPrediction, list[OptimizationTraceStep]]:
     item_run = fork_worker_run(run)
     try:
-        prediction = await program.aforward(run=item_run, options=options, **kwargs)
+        prediction = await program(run=item_run, options=options, **kwargs)
         return prediction, list(item_run.optimization_trace)
     except AdapterParseError as error:
         if not capture_parse_failures:
