@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.base.native import AdapterNativeMixin
-from dspy.adapters.base.protocols import ComposedAdapterT
+from dspy.adapters.base.protocols import ComposedAdapterT, is_pipeline_only_adapter
 from dspy.adapters.call.postprocess import enrich_parsed_value_from_lm_output
 from dspy.core.types import (
     LMConfig,
@@ -14,7 +14,7 @@ from dspy.core.types import (
     LMToolSpec,
     merge_lm_request_config,
 )
-from dspy.errors import AdapterParseError
+from dspy.errors import AdapterOperationError, AdapterParseError
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import TaskSpec
 
@@ -46,6 +46,11 @@ class AdapterCallMixin(AdapterNativeMixin):
         original_task_spec: TaskSpec,
         response: LMResponse,
     ) -> list[dict[str, Any]]:
+        if is_pipeline_only_adapter(self):
+            raise AdapterOperationError(
+                f"{type(self).__name__} does not support _call_postprocess parse. "
+                "Use AdapterCallPipeline.execute via the adapter call path."
+            )
         values = []
         tool_call_output_field_name = self._get_tool_call_output_field_name(original_task_spec)
         for output in response.outputs:

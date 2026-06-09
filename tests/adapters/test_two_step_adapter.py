@@ -13,7 +13,7 @@ from dspy.adapters.types.tool import ToolCalls
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format.chat_request import message_to_openai_chat, request_messages_as_openai
 from dspy.core.types import LMOutput, LMRequest, LMResponse, LMTextPart, LMThinkingPart, LMUsage
-from dspy.errors import AdapterParseError
+from dspy.errors import AdapterOperationError, AdapterParseError
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.task_spec import input_field, make_task_spec, output_field
@@ -322,3 +322,10 @@ async def test_two_step_adapter_extraction_errors(make_run):
     run = make_run(lm=extraction_lm, adapter=adapter)
     with pytest.raises(AdapterParseError):
         await adapter._run_extraction(original_task_spec=TestSignature, text=first_response, run=run)
+
+
+def test_two_step_adapter_parse_raises_adapter_operation_error():
+    adapter = TwoStepAdapter(DummyLM([{"answer": "x"}]))
+    task_spec = ts("question -> answer")
+    with pytest.raises(AdapterOperationError, match=r"TwoStepAdapter\.parse is not supported"):
+        adapter.parse(task_spec=task_spec, completion='{"answer": "x"}')

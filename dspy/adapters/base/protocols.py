@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeGuard, TypeVar
+
+from dspy.adapters.call.mode import AdapterCallMode
 
 if TYPE_CHECKING:
+    from dspy.adapters.base.adapter import Adapter
     from dspy.adapters.call.preprocessors.chain import CallPreprocessorChain
     from dspy.adapters.format.message_assembler import MessageAssembler
     from dspy.adapters.types.field_type import NativeResponseFieldType
@@ -42,7 +45,19 @@ class FormattableAdapter(Protocol):
 
 
 class ChatFormattableAdapter(FormattableAdapter, Protocol):
-    """Adapter surface required by ChatFormatMixin.format_finetune_data."""
+    """Adapter surface required for header-style finetune data formatting."""
+
+
+class DirectParseAdapter(Protocol):
+    """Adapter that supports standalone ``parse`` for LM completion text."""
+
+    def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]: ...
+
+
+class PipelineOnlyAdapter(Protocol):
+    """Adapter whose main call path does not use standalone ``parse``."""
+
+    call_mode: AdapterCallMode
 
 
 class NativeAdaptableAdapter(Protocol):
@@ -72,8 +87,17 @@ class MessageAssemblerHost(ConversationFormattingAdapter, Protocol):
     def format_demos(self, task_spec: TaskSpec, demos: list[dict[str, Any]]) -> list[LMMessage]: ...
 
 
-class ComposedAdapter(FormattableAdapter, NativeAdaptableAdapter, Protocol):
+class ComposedAdapter(FormattableAdapter, NativeAdaptableAdapter, DirectParseAdapter, Protocol):
     callbacks: list[Callback]
     preprocessor_chain: CallPreprocessorChain
+    call_mode: AdapterCallMode | None
 
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]: ...
+
+
+def is_pipeline_only_adapter(adapter: Adapter | ComposedAdapter) -> TypeGuard[PipelineOnlyAdapter]:
+    return adapter.call_mode == AdapterCallMode.TWO_STEP
+
+
+def is_direct_parse_adapter(adapter: Adapter | ComposedAdapter) -> TypeGuard[DirectParseAdapter]:
+    return not is_pipeline_only_adapter(adapter)
