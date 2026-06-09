@@ -35,14 +35,13 @@ from dspy.core.types.parts import (
     LMVideoPart,
 )
 from dspy.core.types.request import LMRequest
-from dspy.core.types.stream import (
-    AsyncLMStream,
+from dspy.core.types.stream import AsyncLMStream, LMStream
+from dspy.core.types.stream_builder import LMOutputBuilder
+from dspy.core.types.stream_events import (
     LMAnyDelta,
     LMAudioDelta,
     LMCitationDelta,
     LMImageDelta,
-    LMOutputBuilder,
-    LMStream,
     LMStreamDeltaEvent,
     LMStreamEndEvent,
     LMStreamErrorEvent,
