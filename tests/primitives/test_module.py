@@ -9,7 +9,7 @@ import pytest
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
-from dspy.primitives.module import Module, set_attribute_by_name
+from dspy.primitives.module import Module
 from dspy.task_spec import default_task_instructions
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
@@ -179,31 +179,6 @@ def test_named_parameters_traverses_nested_containers():
     assert "self.sub_module.nested_predict" in found_names
     assert "self.sub_module.nested_list[0]" in found_names
     assert "self.sub_module.nested_dict[key]" in found_names
-
-
-def test_complex_module_set_attribute_by_name():
-    root = Module()
-    root_attrs = _module_attrs(root)
-    sub_attrs = _module_attrs(Module())
-    root_attrs.sub_module = sub_attrs
-    sub_attrs.nested_list = [Module(), {"key": Module()}]
-    same_module = Module()
-    sub_attrs.nested_tuple = (Module(), [same_module, same_module])
-    set_attribute_by_name(root, "test_attrib", True)
-    assert _module_attrs(root).test_attrib is True
-    set_attribute_by_name(root, "sub_module.test_attrib", True)
-    sub_attrs = _module_attrs(root_attrs.sub_module)
-    assert sub_attrs.test_attrib is True
-    set_attribute_by_name(root, "sub_module.nested_list[0].test_attrib", True)
-    assert _module_attrs(sub_attrs.nested_list[0]).test_attrib is True
-    set_attribute_by_name(root, "sub_module.nested_list[1]['key'].test_attrib", True)
-    nested_key_module = cast("Module", sub_attrs.nested_list[1]["key"])
-    assert _module_attrs(nested_key_module).test_attrib is True
-    set_attribute_by_name(root, "sub_module.nested_tuple[0].test_attrib", True)
-    assert _module_attrs(sub_attrs.nested_tuple[0]).test_attrib is True
-    set_attribute_by_name(root, "sub_module.nested_tuple[1][0].test_attrib", True)
-    assert _module_attrs(sub_attrs.nested_tuple[1][0]).test_attrib is True
-    assert _module_attrs(sub_attrs.nested_tuple[1][1]).test_attrib is True
 
 
 class DuplicateModule(Module):

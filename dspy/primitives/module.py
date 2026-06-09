@@ -4,7 +4,6 @@ from typing import Any, TextIO
 
 from typing_extensions import override
 
-from dspy._legacy import magicattr
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.parallel import Parallel
 from dspy.predict.protocol import Predictor
@@ -111,11 +110,6 @@ class Module(BaseModule, metaclass=ProgramMeta):
             s.append(f"{name} = {param}")
         return "\n".join(s)
 
-    def map_named_predictors(self, func):
-        for name, predictor in self.named_predictors():
-            set_attribute_by_name(obj=self, name=name, value=func(predictor))
-        return self
-
     def inspect_call_log(self, n: int = 1, file: "TextIO | None" = None) -> None:
         pretty_print_call_log(call_log=self.call_log, n=n, file=file)
 
@@ -171,7 +165,3 @@ class Module(BaseModule, metaclass=ProgramMeta):
                     f"Calling module.aforward(...) on {self.__class__.__name__} directly is discouraged. Please use await module(...) instead."
                 )
         return attr
-
-
-def set_attribute_by_name(obj, name, value) -> None:
-    magicattr.set(obj=obj, attr=name, val=value)
