@@ -255,6 +255,8 @@ task-local usage tracking; `caller_modules` removed from `RunContext`;
 
 ### P1.4 Simplify callback and batch execution infrastructure
 
+**Status:** Done (2026-06).
+
 **Sources:** Manual review; External cross-package review.
 
 Problem:
@@ -278,6 +280,13 @@ Details to preserve:
 
 - Existing callback hook names and event order should remain unchanged.
 - Compatibility imports for `Parallel` may be useful during migration.
+
+**Delivered:** `dspy/runtime/callback_dispatch.py` with `_CallbackScope`,
+`CallbackKind`/`CallbackPhase` handler tables, and shared `invoke_with_callbacks` /
+`ainvoke_with_callbacks`; `Parallel` moved to `dspy/runtime/batch.py` (lazy spine
+export via `dspy.runtime.Parallel`); hard cutover from `dspy.predict.parallel`;
+`run_bounded` tracks completion with `RUN_BOUNDED_PENDING` so valid `None` results
+are distinguishable from incomplete or failed slots.
 
 ## P2: Consolidate Serialization, Persistence, and Core Data Contracts
 
