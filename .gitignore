@@ -29,6 +29,7 @@ __pycache__/
 # Other
 .vscode
 *.tsv
+.dr_llm/
 *.pt
 gpt*.txt
 *.env
