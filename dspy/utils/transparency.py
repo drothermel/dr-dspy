@@ -106,7 +106,10 @@ def validate_compiled_call(call: CompiledCall, mode: TransparencyMode) -> list[s
     violations = list(call.violations)
     if not call.adapter_class:
         violations.append("adapter not configured. Fix: RunContext.create(lm=LM(...), adapter=JSONAdapter()).")
-    for task_spec in (call.original_task_spec, call.processed_task_spec):
+    task_specs = [call.original_task_spec]
+    if call.processed_task_spec is not None and call.processed_task_spec is not call.original_task_spec:
+        task_specs.append(call.processed_task_spec)
+    for task_spec in task_specs:
         violations.extend(collect_task_spec_violations(task_spec))
     if call.lm_model:
         violations.extend(collect_config_violations(config=call.config, lm_kwargs=call.lm_kwargs, cache=call.cache))

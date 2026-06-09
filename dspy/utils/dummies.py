@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
 from pydantic.fields import FieldInfo
 from typing_extensions import override
@@ -109,13 +109,10 @@ class DummyLM(BaseLM):
                     "No more responses",
                 )
             else:
-                if isinstance(self.answers, list):
-                    answer = (
-                        cast("dict[str, Any]", self.answers.pop(0)) if self.answers else {"answer": "No more responses"}
-                    )
-                    current_output = self._format_answer_fields(answer)
-                else:
-                    current_output = self._format_answer_fields(next(self.answers, {"answer": "No more responses"}))
+                answer_iter = cast("Iterator[dict[str, Any]]", self.answers)
+                current_output = self._format_answer_fields(
+                    next(answer_iter, {"answer": "No more responses"})
+                )
             outputs.append(self._to_output(current_output))
         return LMResponse(
             model="dummy", outputs=outputs, usage=dotdict(prompt_tokens=0, completion_tokens=0, total_tokens=0)

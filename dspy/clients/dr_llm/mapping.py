@@ -45,7 +45,13 @@ def split_provider_model(model: str) -> tuple[str, str]:
 
 def probe_backend_request(lm: Any, *, mode: CallMode = CallMode.api) -> BackendRequest:
     provider_name, model_name = split_provider_model(lm.model)
-    provider = ProviderName(provider_name)
+    try:
+        provider = ProviderName(provider_name)
+    except ValueError as exc:
+        raise LMUnsupportedFeatureError(
+            f"Unsupported dr-llm provider {provider_name!r}.",
+            model=lm.model,
+        ) from exc
     merged = merge_lm_request_config(lm, LMConfig())
     return BackendRequest(
         provider=provider,
@@ -201,8 +207,11 @@ def backend_response_to_lm_response(
         provider_data["sample_id"] = response.sample_id
     if response.request_fingerprint is not None:
         provider_data["request_fingerprint"] = response.request_fingerprint
-    if response.warnings:
-        provider_data["warnings"] = [warning.model_dump(mode="json") for warning in response.warnings]
+    warnings = (
+        [warning.model_dump(mode="json") for warning in response.warnings] if response.warnings else []
+    )
+    if warnings:
+        provider_data["warnings"] = warnings
     return LMResponse(
         model=request.model,
         outputs=[
@@ -211,7 +220,6 @@ def backend_response_to_lm_response(
                 finish_reason=finish_reason,
                 truncated=finish_reason == "length",
                 provider_data=provider_data,
-                metadata={"warnings": provider_data.get("warnings", [])},
             )
         ],
         usage=_usage_to_lm_usage(response.usage),

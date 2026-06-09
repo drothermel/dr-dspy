@@ -31,6 +31,21 @@ class PlaceholderTaskSpec(TaskSpec):
     outputs: tuple = (output_field("answer"),)
 
 
+def test_validate_compiled_call_dedupes_identical_task_specs(make_run):
+    spec = PlaceholderTaskSpec()
+    call = CompiledCall(
+        call_id="1",
+        adapter_class="JSONAdapter",
+        original_task_spec=spec,
+        processed_task_spec=spec,
+        config=LMConfig(temperature=0.0, max_tokens=100),
+        lm_model="openai/gpt-4o-mini",
+        cache=False,
+    )
+    violations = validate_compiled_call(call, "warn")
+    assert len(violations) == 2
+
+
 def test_collect_task_spec_violations_detects_placeholder_desc(make_run):
     violations = collect_task_spec_violations(PlaceholderTaskSpec())
     assert len(violations) == 2

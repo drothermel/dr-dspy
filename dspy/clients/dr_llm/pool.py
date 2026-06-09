@@ -99,6 +99,9 @@ class DrLlmPoolLM(BaseLM):
         return self._capabilities_cache
 
     def close(self) -> None:
+        direct_close = getattr(self._direct_backend, "close", None)
+        if callable(direct_close):
+            direct_close()
         self._backend.close()
 
     @override

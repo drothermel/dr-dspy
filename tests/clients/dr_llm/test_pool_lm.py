@@ -73,3 +73,21 @@ def test_dr_llm_pool_lm_acquire_samples() -> None:
     await_args = pool_backend.aacquire.await_args
     assert await_args is not None
     assert await_args.args[1] == "fixed-session"
+
+
+def test_dr_llm_pool_lm_close_closes_both_backends() -> None:
+    pool_backend = MagicMock()
+    direct_backend = MagicMock()
+    direct_backend.capabilities.return_value = _capabilities()
+
+    config = PoolBackendConfig(pool_name="test_pool", database_url="postgresql://localhost/test")
+
+    with (
+        patch("dspy.clients.dr_llm.pool.PoolBackend", return_value=pool_backend),
+        patch("dspy.clients.dr_llm.pool.DirectBackend", return_value=direct_backend),
+    ):
+        lm = DrLlmPoolLM("openai/gpt-4.1-mini", pool_config=config)
+        lm.close()
+
+    direct_backend.close.assert_called_once()
+    pool_backend.close.assert_called_once()

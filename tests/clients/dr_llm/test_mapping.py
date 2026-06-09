@@ -5,6 +5,7 @@ import pytest
 from dspy.clients.dr_llm.mapping import (
     backend_response_to_lm_response,
     lm_request_to_backend_request,
+    probe_backend_request,
     split_provider_model,
 )
 from dspy.core.types import LMMessage, LMRequest, User
@@ -13,6 +14,13 @@ from dspy.core.types.parts import LMImagePart, LMTextPart
 from dspy.utils.dummies import DummyLM
 from dspy.utils.exceptions import LMUnsupportedFeatureError
 from tests.clients.dr_llm._helpers import make_backend_response, make_lm_request
+
+
+def test_probe_backend_request_rejects_unknown_provider() -> None:
+    lm = DummyLM([{"answer": "x"}])
+    lm.model = "not-a-provider/gpt-4.1-mini"
+    with pytest.raises(LMUnsupportedFeatureError, match="provider"):
+        probe_backend_request(lm)
 
 
 def test_split_provider_model() -> None:
