@@ -9,28 +9,32 @@ from dspy.integrations.finetune.databricks import (
     _create_directory_in_databricks_unity_catalog,
 )
 
-try:
-    from databricks.sdk import WorkspaceClient
 
-    WorkspaceClient()
-except (ImportError, Exception):
-    pytestmark = pytest.mark.skip(reason="Databricks SDK not configured or credentials not available")
+@pytest.fixture(scope="module")
+def databricks_workspace():
+    try:
+        from databricks.sdk import WorkspaceClient
+    except ImportError as exc:
+        pytest.skip(f"Databricks SDK is not installed: {exc}")
+    try:
+        return WorkspaceClient()
+    except Exception as exc:
+        pytest.skip(f"Databricks SDK not configured or credentials not available: {exc}")
 
 
-def test_create_directory_in_databricks_unity_catalog():
-    from databricks.sdk import WorkspaceClient
-
-    w = WorkspaceClient()
+@pytest.mark.integration
+def test_create_directory_in_databricks_unity_catalog(databricks_workspace):
     with pytest.raises(
         ValueError,
         match=r"Databricks Unity Catalog path must be in the format '/Volumes/<catalog>/<schema>/<volume>/\.\.\.', but received: /badstring/whatever",
     ):
-        _create_directory_in_databricks_unity_catalog(w, "/badstring/whatever")
-    _create_directory_in_databricks_unity_catalog(w, "/Volumes/main/chenmoney/testing/dspy_testing")
-    w.files.get_directory_metadata("/Volumes/main/chenmoney/testing/dspy_testing")
+        _create_directory_in_databricks_unity_catalog(databricks_workspace, "/badstring/whatever")
+    _create_directory_in_databricks_unity_catalog(databricks_workspace, "/Volumes/main/chenmoney/testing/dspy_testing")
+    databricks_workspace.files.get_directory_metadata("/Volumes/main/chenmoney/testing/dspy_testing")
 
 
-def test_create_finetuning_job():
+@pytest.mark.integration
+def test_create_finetuning_job(databricks_workspace):
     fake_training_data = [
         {
             "messages": [
@@ -68,7 +72,9 @@ def test_create_finetuning_job():
     assert job.finetuning_run.status.display_name is not None
 
 
-def test_deploy_finetuned_model():
+@pytest.mark.integration
+@pytest.mark.llm_call
+def test_deploy_finetuned_model(databricks_workspace):
     model_to_deploy = "main.chenmoney.finetuned_model"
     DatabricksProvider.deploy_finetuned_model(model=model_to_deploy, data_format=TrainDataFormat.CHAT)
     lm = LM(model="databricks/main_chenmoney_finetuned_model")
