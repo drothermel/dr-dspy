@@ -17,6 +17,7 @@ from dspy.primitives import Example, Module, Prediction, PythonInterpreter
 | `to_repl_variable` | removed — use `build_repl_variable` |
 | `named_sub_modules(skip_compiled=…)` | `skip_compiled` removed; compiled subgraphs are opaque by default |
 | `async def aforward` on `Module` subclasses | implement `async def _aforward_impl` instead |
+| `await module.batch(...)` / `await parallel(...)` return `list` or 3-tuple | returns `BatchResult`; use `.results` and `.failures` |
 | `sync_file` JSON-RPC notification | request/response; failures raise `CodeInterpreterError` |
 | Save-time `.pkl` warning text | describes save semantics, not load |
 

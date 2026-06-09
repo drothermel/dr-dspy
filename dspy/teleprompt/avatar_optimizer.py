@@ -122,7 +122,7 @@ class AvatarOptimizer:
         eval_module = _AvatarEvalModule(self, actor, return_outputs)
         run_parallel = Parallel(run=run, max_concurrency=max_concurrency, disable_progress_bar=False)
         exec_pairs = [(eval_module, example) for example in devset]
-        parallel_results = await run_parallel(exec_pairs)
+        parallel_results = (await run_parallel(exec_pairs)).results
         if return_outputs:
             results = []
             for result in parallel_results:

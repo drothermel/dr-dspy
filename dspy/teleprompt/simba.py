@@ -133,7 +133,7 @@ class SIMBA:
                     wrapped_candidate_system = wrap_program(program=candidate_system, metric=self.metric, run=run)
                     exec_pairs.append((wrapped_candidate_system, example))
             logger.info(f"Sampling program trajectories on {self.bsize} examples x {self.num_candidates} samples.")
-            outputs = cast("list[dict[str, Any]]", await run_parallel(exec_pairs))
+            outputs = cast("list[dict[str, Any]]", (await run_parallel(exec_pairs)).results)
             assert len(outputs) == len(exec_pairs) == self.bsize * self.num_candidates
             buckets = []
             largest_max_to_avg_gap = float("-inf")
@@ -209,7 +209,7 @@ class SIMBA:
                 for sys in system_candidates
                 for ex in batch
             ]
-            outputs = cast("list[dict[str, Any]]", await run_parallel(exec_pairs))
+            outputs = cast("list[dict[str, Any]]", (await run_parallel(exec_pairs)).results)
             assert len(outputs) == len(exec_pairs) == len(system_candidates) * self.bsize
             candidate_scores = []
             for idx_cand, _ in enumerate(system_candidates):
@@ -241,7 +241,7 @@ class SIMBA:
             for sys in candidate_programs
             for ex in trainset
         ]
-        outputs = cast("list[dict[str, Any]]", await run_parallel(exec_pairs))
+        outputs = cast("list[dict[str, Any]]", (await run_parallel(exec_pairs)).results)
         scores = []
         for idx_prog, _ in enumerate(candidate_programs):
             start = idx_prog * len(trainset)

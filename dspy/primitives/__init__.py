@@ -1,6 +1,7 @@
 import importlib
 
 from dspy.primitives.base_module import BaseModule
+from dspy.primitives.batch_result import BatchFailure, BatchResult
 from dspy.primitives.code_interpreter import (
     CodeInterpreter,
     CodeInterpreterError,
@@ -13,6 +14,8 @@ from dspy.primitives.sandbox_protocol import SandboxSerializable, build_repl_var
 
 __all__ = [
     "BaseModule",
+    "BatchFailure",
+    "BatchResult",
     "Module",
     "Example",
     "Prediction",

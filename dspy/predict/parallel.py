@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from dspy.primitives import Example
+from dspy.primitives.batch_result import BatchFailure, BatchResult
 from dspy.runtime.async_parallel import BoundedRunStats, resolve_max_concurrency, resolve_max_errors, run_bounded
 from dspy.runtime.run_context import RunContext, resolve_run
 
@@ -65,7 +66,7 @@ class Parallel:
         exec_pairs: list[tuple[Any, Any]],
         run: RunContext | None = None,
         max_concurrency: int | None = None,
-    ) -> list[Any] | tuple[list[Any], list[Any], list[BaseException]]:
+    ) -> BatchResult:
         run = resolve_run(run=run, bound_run=self.run)
         self._active_run = run
         concurrency = resolve_max_concurrency(
@@ -89,6 +90,7 @@ class Parallel:
         finally:
             self._active_run = None
         self._last_stats = stats
+        failures: list[BatchFailure] = []
         if self.return_failed_examples:
             self.failed_examples = []
             self.exceptions = []
@@ -96,7 +98,8 @@ class Parallel:
                 if failed_idx < len(exec_pairs):
                     _, original_example = exec_pairs[failed_idx]
                     self.failed_examples.append(original_example)
-                    if exception := stats.exceptions_map.get(failed_idx):
+                    exception = stats.exceptions_map.get(failed_idx)
+                    if exception is not None:
                         self.exceptions.append(exception)
-            return (results, self.failed_examples, self.exceptions)
-        return results
+                        failures.append(BatchFailure(input=original_example, exception=exception))
+        return BatchResult(results=results, failures=tuple(failures))

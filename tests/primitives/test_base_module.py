@@ -276,7 +276,7 @@ def test_usage_tracker_in_parallel(make_run):
             ],
             run=run,
         )
-    )
+    ).results
     typed_results = cast("list[Prediction]", results)
     assert typed_results[0].get_lm_usage() is not None
     assert typed_results[1].get_lm_usage() is not None

@@ -337,7 +337,7 @@ def test_parallel_executor_with_usage_tracker(make_run):
 
     run = run.fork(usage_tracker=parent_tracker, telemetry=TelemetryConfig(track_usage=True))
     executor = Parallel()
-    results = asyncio.run(executor([(task1, {}), (task2, {})], run=run))
+    results = asyncio.run(executor([(task1, {}), (task2, {})], run=run)).results
     usage1 = cast("dict[str, dict[str, Any]]", results[0])
     usage2 = cast("dict[str, dict[str, Any]]", results[1])
     assert usage1["openai/gpt-4o-mini"]["prompt_tokens"] == 50

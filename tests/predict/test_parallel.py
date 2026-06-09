@@ -28,16 +28,18 @@ def test_parallel_module(make_run):
 
         async def _aforward_impl(self, *, run, options=None, **inputs):
             example = {"input": inputs["input"]}
-            return await self.parallel(
-                [
-                    (self.predictor, example),
-                    (self.predictor2, example),
-                    (self.predictor, example),
-                    (self.predictor2, example),
-                    (self.predictor, example),
-                ],
-                run=run,
-            )
+            return (
+                await self.parallel(
+                    [
+                        (self.predictor, example),
+                        (self.predictor2, example),
+                        (self.predictor, example),
+                        (self.predictor2, example),
+                        (self.predictor, example),
+                    ],
+                    run=run,
+                )
+            ).results
 
     output = asyncio.run(MyModule()(input="test input", run=run))
     expected_outputs = {f"test output {i}" for i in range(1, 6)}
@@ -74,9 +76,9 @@ def test_batch_module(make_run):
 
         async def _aforward_impl(self, *, run, options=None, **inputs):
             examples = [Example.from_record({"input": inputs["input"]}, input_keys=("input",))] * 5
-            res1 = await self.predictor.batch(examples, run=run)
+            res1 = (await self.predictor.batch(examples, run=run)).results
             reasoning_run = make_run(lm=res_lm)
-            res2 = await self.predictor2.batch(examples, run=reasoning_run)
+            res2 = (await self.predictor2.batch(examples, run=reasoning_run)).results
             return (res1, res2)
 
     result, reason_result = asyncio.run(MyModule()(input="test input", run=run))
@@ -109,19 +111,21 @@ def test_nested_parallel_module(make_run):
 
         async def _aforward_impl(self, *, run, options=None, **inputs):
             example = {"input": inputs["input"]}
-            return await self.parallel(
-                [
-                    (self.predictor, example),
-                    (self.predictor2, example),
-                    (self.parallel, [(self.predictor2, example), (self.predictor, example)]),
-                ],
-                run=run,
-            )
+            return (
+                await self.parallel(
+                    [
+                        (self.predictor, example),
+                        (self.predictor2, example),
+                        (self.parallel, [(self.predictor2, example), (self.predictor, example)]),
+                    ],
+                    run=run,
+                )
+            ).results
 
     output = asyncio.run(MyModule()(input="test input", run=run))
     assert {output[0].output, output[1].output} <= {f"test output {i}" for i in range(1, 5)}
-    assert {output[2][0].output, output[2][1].output} <= {f"test output {i}" for i in range(1, 5)}
-    all_outputs = {output[0].output, output[1].output, output[2][0].output, output[2][1].output}
+    assert {output[2].results[0].output, output[2].results[1].output} <= {f"test output {i}" for i in range(1, 5)}
+    all_outputs = {output[0].output, output[1].output, output[2].results[0].output, output[2].results[1].output}
     assert len(all_outputs) == 4
 
 
@@ -144,14 +148,16 @@ def test_nested_batch_method(make_run):
 
         async def _aforward_impl(self, *, run, options=None, **inputs):
             input_value = inputs["input"]
-            return await self.predictor.batch(
-                [Example.from_record({"input": input_value}, input_keys=("input",))] * 2,
-                run=run,
-            )
+            return (
+                await self.predictor.batch(
+                    [Example.from_record({"input": input_value}, input_keys=("input",))] * 2,
+                    run=run,
+                )
+            ).results
 
     result = asyncio.run(
         MyModule().batch([Example.from_record({"input": "test input"}, input_keys=("input",))] * 2, run=run)
-    )
+    ).results
     assert {result[0][0].output, result[0][1].output, result[1][0].output, result[1][1].output} == {
         "test output 1",
         "test output 2",
@@ -176,15 +182,12 @@ def test_batch_with_failed_examples(make_run):
         Example.from_record({"value": 42}, input_keys=("value",)),
         Example.from_record({"value": 3}, input_keys=("value",)),
     ]
-    results, failed_examples, exceptions = asyncio.run(
-        module.batch(examples, return_failed_examples=True, provide_traceback=True, run=run)
-    )
-    assert results == ["success-1", None, "success-3"]
-    assert len(failed_examples) == 1
-    assert failed_examples[0]["value"] == 42
-    assert len(exceptions) == 1
-    assert isinstance(exceptions[0], ValueError)
-    assert str(exceptions[0]) == "test error"
+    batch_result = asyncio.run(module.batch(examples, return_failed_examples=True, provide_traceback=True, run=run))
+    assert batch_result.results == ["success-1", None, "success-3"]
+    assert len(batch_result.failures) == 1
+    assert batch_result.failures[0].input["value"] == 42
+    assert isinstance(batch_result.failures[0].exception, ValueError)
+    assert str(batch_result.failures[0].exception) == "test error"
 
 
 def test_parallel_timeout_and_straggler_limit_params(make_run):
@@ -210,5 +213,5 @@ def test_batch_timeout_and_straggler_limit_params(make_run):
         Example.from_record({"value": 2}, input_keys=("value",)),
         Example.from_record({"value": 3}, input_keys=("value",)),
     ]
-    results = asyncio.run(module.batch(examples, timeout=0, straggler_limit=5, run=run))
+    results = asyncio.run(module.batch(examples, timeout=0, straggler_limit=5, run=run)).results
     assert results == [2, 4, 6]

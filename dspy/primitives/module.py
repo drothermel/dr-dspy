@@ -7,6 +7,7 @@ from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.parallel import Parallel
 from dspy.predict.protocol import Predictor
 from dspy.primitives.base_module import BaseModule
+from dspy.primitives.batch_result import BatchResult
 from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
 from dspy.runtime import RunContext, pretty_print_call_log, resolve_run, track_usage, with_callbacks
@@ -135,7 +136,7 @@ class Module(BaseModule):
         disable_progress_bar: bool = False,
         timeout: int = 120,
         straggler_limit: int = 3,
-    ) -> list[Any] | tuple[list[Any], list[Any], list[BaseException]]:
+    ) -> BatchResult:
         exec_pairs = [(self, example.as_inputs()) for example in examples]
         parallel_executor = Parallel(
             run=run,
@@ -147,9 +148,6 @@ class Module(BaseModule):
             timeout=timeout,
             straggler_limit=straggler_limit,
         )
-        if return_failed_examples:
-            results, failed_examples, exceptions = await parallel_executor(exec_pairs)
-            return (results, failed_examples, exceptions)
         return await parallel_executor(exec_pairs)
 
     def _set_lm_usage(self, tokens: dict[str, Any], output: Any) -> None:
