@@ -9,8 +9,9 @@ class HotPotQA(Dataset):
         self,
         train_seed: int = 0,
         train_size: int | None = None,
-        eval_seed: int = 0,
+        dev_seed: int = 0,
         dev_size: int | None = None,
+        test_seed: int = 0,
         test_size: int | None = None,
         input_keys: list[str] | None = None,
         only_hard_examples: bool = True,
@@ -20,8 +21,9 @@ class HotPotQA(Dataset):
         super().__init__(
             train_seed=train_seed,
             train_size=train_size,
-            eval_seed=eval_seed,
+            dev_seed=dev_seed,
             dev_size=dev_size,
+            test_seed=test_seed,
             test_size=test_size,
             input_keys=input_keys,
         )
@@ -46,7 +48,7 @@ class HotPotQA(Dataset):
                     example["gold_titles"] = set(example["supporting_facts"]["title"])
                     del example["supporting_facts"]
                 official_train.append(example)
-        rng = random.Random(0)
+        rng = random.Random(self.train_seed)
         rng.shuffle(official_train)
         train_split = official_train[: len(official_train) * 75 // 100]
         self._train = train_split
@@ -71,4 +73,4 @@ class HotPotQA(Dataset):
 
 
 if __name__ == "__main__":
-    dataset = HotPotQA(train_seed=1, train_size=16, eval_seed=2023, dev_size=200 * 5, test_size=0)
+    dataset = HotPotQA(train_seed=1, train_size=16, dev_seed=2023, dev_size=200 * 5, test_size=0)

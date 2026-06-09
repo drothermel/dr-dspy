@@ -32,8 +32,9 @@ from dspy.integrations.datasets.gsm8k import GSM8K
 from dspy.integrations.datasets.math import MATH
 from dspy.integrations.datasets.alfworld.alfworld import AlfWorld
 
-hotpot = HotPotQA()
+hotpot = HotPotQA(train_seed=0, dev_seed=0, test_seed=0)
 train = hotpot.train
+dev = hotpot.dev
 
 alf = AlfWorld()
 alf_train = alf.train
@@ -45,3 +46,4 @@ alf_dev = alf.dev
 - `dspy.datasets.dataloader.DataLoader` — removed; use `rows_to_examples` or integration loaders.
 - `dspy.datasets.colors.Colors` — removed.
 - `Dataset.prepare_by_seed` — removed.
+- `Dataset.eval_seed` — removed; use separate `dev_seed` and `test_seed` on `Dataset` / integration loaders.

@@ -2,6 +2,13 @@
 
 Import ``Dataset`` from ``dspy.datasets.dataset``. Splits are materialized lazily on
 first access and shuffled with the configured seeds.
+
+Partitioning contract:
+- Subclasses/loaders set independent raw pools ``_train``, ``_dev``, and ``_test``.
+- ``train`` / ``dev`` / ``test`` properties shuffle and optionally subsample their pool
+  using ``train_seed``, ``dev_seed``, and ``test_seed`` respectively.
+- Changing ``train_seed`` does not alter dev/test composition; teleprompters should
+  pass explicit valset lists rather than re-splitting train data.
 """
 
 from __future__ import annotations
@@ -23,17 +30,18 @@ class Dataset:
         self,
         train_seed: int = 0,
         train_size: int | None = None,
-        eval_seed: int = 0,
+        dev_seed: int = 0,
         dev_size: int | None = None,
+        test_seed: int = 0,
         test_size: int | None = None,
         input_keys: list[str] | None = None,
     ) -> None:
         self.train_size = train_size
         self.train_seed = train_seed
         self.dev_size = dev_size
-        self.dev_seed = eval_seed
+        self.dev_seed = dev_seed
         self.test_size = test_size
-        self.test_seed = eval_seed
+        self.test_seed = test_seed
         self.input_keys = input_keys or []
         self._train: list[dict[str, object]] | list[dict[str, str]] | list[Example] | None = None
         self._dev: list[dict[str, object]] | list[dict[str, str]] | list[Example] | None = None
@@ -48,16 +56,23 @@ class Dataset:
         self,
         train_seed: int | None = None,
         train_size: int | None = None,
-        eval_seed: int | None = None,
+        dev_seed: int | None = None,
         dev_size: int | None = None,
+        test_seed: int | None = None,
         test_size: int | None = None,
     ) -> None:
-        self.train_size = train_size or self.train_size
-        self.train_seed = train_seed or self.train_seed
-        self.dev_size = dev_size or self.dev_size
-        self.dev_seed = eval_seed or self.dev_seed
-        self.test_size = test_size or self.test_size
-        self.test_seed = eval_seed or self.test_seed
+        if train_size is not None:
+            self.train_size = train_size
+        if train_seed is not None:
+            self.train_seed = train_seed
+        if dev_size is not None:
+            self.dev_size = dev_size
+        if dev_seed is not None:
+            self.dev_seed = dev_seed
+        if test_size is not None:
+            self.test_size = test_size
+        if test_seed is not None:
+            self.test_seed = test_seed
         self._train_cache = None
         self._dev_cache = None
         self._test_cache = None
