@@ -1,3 +1,4 @@
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -13,7 +14,8 @@ from tests.task_spec.helpers import ts
 @pytest.mark.asyncio
 async def test_hint_injecting_adapter_pipelines_inner_not_wrapper_format():
     inner = ChatAdapter()
-    inner.format = MagicMock(wraps=inner.format)  # type: ignore[method-assign]
+    format_mock = MagicMock(wraps=inner.format)
+    inner.format = cast("Any", format_mock)
     task_spec = ts("question -> answer", instructions="Answer the question.")
     hinted_name = "predict"
     wrapper = HintInjectingAdapter(
@@ -44,8 +46,8 @@ async def test_hint_injecting_adapter_pipelines_inner_not_wrapper_format():
     assert pipeline_args.args[0] is inner
     assert pipeline_args.kwargs["inputs"]["hint_"] == "try again"
     assert "hint_" in pipeline_args.kwargs["task_spec"].input_fields
-    inner.format.assert_called_once()
-    format_kwargs = inner.format.call_args.kwargs
+    format_mock.assert_called_once()
+    format_kwargs = format_mock.call_args.kwargs
     assert format_kwargs["inputs"]["hint_"] == "try again"
 
 

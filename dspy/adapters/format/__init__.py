@@ -1,6 +1,7 @@
 from dspy.adapters.format.field_formatter import FieldFormatter
 from dspy.adapters.format.header_formatter import HeaderFieldFormatter
 from dspy.adapters.format.json_formatter import JsonFieldFormatter
+from dspy.adapters.format.message_assembler import MESSAGE_BUILD_ORDER
 from dspy.adapters.format.prompt_sections import (
     FIELD_HEADER_PATTERN,
     format_fields_with_headers,
@@ -13,6 +14,7 @@ __all__ = [
     "FieldFormatter",
     "HeaderFieldFormatter",
     "JsonFieldFormatter",
+    "MESSAGE_BUILD_ORDER",
     "XmlFieldFormatter",
     "format_fields_with_headers",
     "output_field_type_hint",

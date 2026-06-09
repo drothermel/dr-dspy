@@ -1,9 +1,8 @@
 import pytest
 
 from dspy.adapters.baml_adapter import BAMLAdapter
-from dspy.adapters.base.format import MESSAGE_BUILD_ORDER
 from dspy.adapters.chat_adapter import ChatAdapter
-from dspy.adapters.format.message_assembler import MessageAssembler
+from dspy.adapters.format.message_assembler import MESSAGE_BUILD_ORDER, MessageAssembler
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.history import TurnLog

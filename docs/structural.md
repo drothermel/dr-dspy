@@ -603,6 +603,8 @@ Details to preserve:
 
 ### P4.2 Move adapter reuse from inheritance toward explicit composition
 
+**Status:** Done (2026-06).
+
 **Sources:** External cross-package review.
 
 Problem:
@@ -629,6 +631,16 @@ Details to preserve:
 
 - Existing adapter classes can remain as thin delegators during migration.
 - Preserve current preprocessing order until tests prove equivalent behavior.
+
+**Delivered:** `dspy/adapters/format/` (`FieldFormatter`, `HeaderFieldFormatter`,
+`JsonFieldFormatter`, `XmlFieldFormatter`, `MessageAssembler`, `prompt_sections`);
+`CallPreprocessorChain` in `dspy/adapters/call/preprocessors/`; `DirectParseAdapter`
+/ `PipelineOnlyAdapter` protocols; `JSONParseFallbackPolicy` with injected
+`PipelineExecutor`; `AdapterWrapper` / `HintInjectingAdapter`; flattened
+`XMLAdapter(Adapter)` hierarchy; consolidated `Adapter` spine in
+`dspy/adapters/base/adapter.py` with `native_adaptation.py` helpers; removed
+`ChatFormatMixin`, `AdapterCallMixin`, `AdapterFormatMixin`,
+`AdapterConversationMixin`, and `AdapterNativeMixin`.
 
 ### P4.3 Model agent events, datasets, and integration shapes consistently
 
