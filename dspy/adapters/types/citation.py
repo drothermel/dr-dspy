@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any, Self, cast
 import pydantic
 from typing_extensions import override
 
-from dspy._meta.experimental import experimental
 from dspy.adapters.types.base_type import Type
 
 if TYPE_CHECKING:
@@ -16,7 +15,6 @@ if TYPE_CHECKING:
     from dspy.core.types import LMOutput
 
 
-@experimental(version="3.0.4")
 class Citations(Type):
     class Citation(Type):
         type: str = "char_location"

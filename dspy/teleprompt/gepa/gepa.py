@@ -8,7 +8,6 @@ import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
-from dspy._meta.experimental import experimental
 from dspy.primitives.prediction import Prediction
 from dspy.teleprompt.compile_params import GEPACompileParams
 
@@ -32,7 +31,6 @@ logger = logging.getLogger(__name__)
 AUTO_RUN_SETTINGS = {"light": {"n": 6}, "medium": {"n": 12}, "heavy": {"n": 18}}
 
 
-@experimental(version="3.0.0")
 class GEPAFeedbackMetric(Protocol):
     def __call__(
         self,
@@ -44,7 +42,6 @@ class GEPAFeedbackMetric(Protocol):
     ) -> float | ScoreWithFeedback: ...
 
 
-@experimental(version="3.0.0")
 @dataclass(frozen=True)
 class DspyGEPAResult:
     candidates: list[Module]
@@ -113,7 +110,6 @@ class DspyGEPAResult:
         )
 
 
-@experimental(version="3.0.0")
 class GEPA:
     def __init__(
         self,

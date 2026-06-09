@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from dspy._meta.experimental import experimental
 from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.predict.predict import Predict
 from dspy.predict.rlm import execution as rlm_execution
@@ -23,7 +22,6 @@ if TYPE_CHECKING:
     from dspy.primitives.code_interpreter import CodeInterpreter
 
 
-@experimental
 class RLM(Module):
     def __init__(
         self,

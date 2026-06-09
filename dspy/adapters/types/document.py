@@ -3,11 +3,9 @@ from typing import Any, Literal
 import pydantic
 from typing_extensions import override
 
-from dspy._meta.experimental import experimental
 from dspy.adapters.types.base_type import Type
 
 
-@experimental(version="3.0.4")
 class Document(Type):
     data: str
     title: str | None = None

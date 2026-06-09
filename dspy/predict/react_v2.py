@@ -5,7 +5,6 @@ from typing import Any, get_args
 
 import pydantic
 
-from dspy._meta.experimental import experimental
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
@@ -21,7 +20,6 @@ from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, out
 logger = logging.getLogger(__name__)
 
 
-@experimental
 class ReActV2(Module):
     def __init__(self, task_spec: TaskSpec, tools: list[Tool], max_iters: int = 20) -> None:
         super().__init__()
