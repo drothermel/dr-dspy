@@ -1,22 +1,44 @@
+from __future__ import annotations
+
 import random
-from typing import Protocol
+from typing import TYPE_CHECKING, ClassVar
 
 import tqdm
 
+from dspy.datasets.dataset import Dataset
 from dspy.integrations.datasets.import_ import import_datasets
-from dspy.primitives import Example
+
+if TYPE_CHECKING:
+    from dspy.evaluate.metric_contract import OptimizerMetric
+
+__all__ = ["GSM8K"]
 
 
-class HasAnswer(Protocol):
-    answer: object
+class GSM8K(Dataset):
+    default_metric: ClassVar[OptimizerMetric]
+    default_input_keys: ClassVar[tuple[str, ...]] = ("question",)
 
-
-class GSM8K:
-    def __init__(self) -> None:
-        self.do_shuffle = False
+    def __init__(
+        self,
+        train_seed: int = 0,
+        train_size: int = 200,
+        dev_seed: int = 0,
+        dev_size: int = 300,
+        test_seed: int = 0,
+        test_size: int | None = None,
+        input_keys: list[str] | None = None,
+    ) -> None:
+        super().__init__(
+            train_seed=train_seed,
+            train_size=train_size,
+            dev_seed=dev_seed,
+            dev_size=dev_size,
+            test_seed=test_seed,
+            test_size=test_size,
+            input_keys=input_keys or list(self.default_input_keys),
+        )
         datasets = import_datasets(feature="GSM8K")
         load_dataset = datasets.load_dataset
-
         dataset = load_dataset("gsm8k", "main")
         hf_official_train = dataset["train"]
         hf_official_test = dataset["test"]
@@ -40,33 +62,8 @@ class GSM8K:
             official_test.append({"question": question, "gold_reasoning": gold_reasoning, "answer": answer})
         rng = random.Random(0)
         rng.shuffle(official_train)
+        self._train = official_train[:train_size]
+        self._dev = official_train[train_size : train_size + dev_size]
         rng = random.Random(0)
         rng.shuffle(official_test)
-        trainset = official_train[:200]
-        devset = official_train[200:500]
-        testset = official_test[:]
-        trainset = [Example.from_record(x, input_keys=("question",)) for x in trainset]
-        devset = [Example.from_record(x, input_keys=("question",)) for x in devset]
-        testset = [Example.from_record(x, input_keys=("question",)) for x in testset]
-        self.train = trainset
-        self.dev = devset
-        self.test = testset
-
-
-def parse_integer_answer(answer: str, only_first_line: bool = True) -> int:
-    parsed_answer = 0
-    try:
-        if only_first_line:
-            answer = answer.strip().split("\n")[0]
-        answer_token = [token for token in answer.split() if any(c.isdigit() for c in token)][-1]
-        answer_token = answer_token.split(".")[0]
-        answer_digits = "".join(c for c in answer_token if c.isdigit())
-        parsed_answer = int(answer_digits)
-    except (ValueError, IndexError):
-        parsed_answer = 0
-    return parsed_answer
-
-
-def gsm8k_metric(gold: HasAnswer, pred: HasAnswer, trace: object | None = None) -> bool:
-    _ = trace
-    return int(parse_integer_answer(str(gold.answer))) == int(parse_integer_answer(str(pred.answer)))
+        self._test = official_test

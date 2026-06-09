@@ -1,42 +1,55 @@
-import importlib
 import random
 import re
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, ClassVar
 
+from dspy.datasets.dataset import Dataset
+
+if TYPE_CHECKING:
+    from dspy.evaluate.metric_contract import OptimizerMetric
 from dspy.integrations.datasets.import_ import import_datasets
-from dspy.primitives import Example
+
+__all__ = ["MATH", "extract_answer"]
 
 
-class HasAnswer(Protocol):
-    answer: object
+class MATH(Dataset):
+    default_metric: ClassVar["OptimizerMetric"]
+    default_input_keys: ClassVar[tuple[str, ...]] = ("question",)
 
-
-class MATH:
-    def __init__(self, subset: str) -> None:
+    def __init__(
+        self,
+        subset: str,
+        train_seed: int = 0,
+        train_size: int | None = None,
+        dev_seed: int = 0,
+        dev_size: int | None = None,
+        test_seed: int = 0,
+        test_size: int | None = None,
+        input_keys: list[str] | None = None,
+    ) -> None:
         load_dataset = import_datasets(feature="MATH").load_dataset
-
         ds = load_dataset("DigitalLearningGmbH/MATH-lighteval", subset)
-        dataset = [
-            Example.from_record(
-                {
-                    "question": example["problem"],
-                    "reasoning": example["solution"],
-                    "answer": extract_answer(example["solution"]),
-                },
-                input_keys=("question",),
-            )
+        records = [
+            {
+                "question": example["problem"],
+                "reasoning": example["solution"],
+                "answer": extract_answer(example["solution"]),
+            }
             for example in ds["test"]
         ]
-        size = min(350, len(dataset) // 3)
-        random.Random(0).shuffle(dataset)
-        self.train, self.dev, self.test = (dataset[:size], dataset[size : 2 * size], dataset[2 * size :])
-
-    def metric(self, example: HasAnswer, pred: HasAnswer, _trace: object | None = None) -> bool:
-        try:
-            math_equivalence = cast("MathEquivalenceModule", importlib.import_module("math_equivalence"))
-        except ImportError as err:
-            raise ImportError("MATH's metric requires `pip install git+https://github.com/hendrycks/math.git`") from err
-        return math_equivalence.is_equiv(example.answer, pred.answer)
+        size = min(350, len(records) // 3)
+        random.Random(0).shuffle(records)
+        super().__init__(
+            train_seed=train_seed,
+            train_size=train_size or size,
+            dev_seed=dev_seed,
+            dev_size=dev_size or size,
+            test_seed=test_seed,
+            test_size=test_size,
+            input_keys=input_keys or list(self.default_input_keys),
+        )
+        self._train = records[:size]
+        self._dev = records[size : 2 * size]
+        self._test = records[2 * size :]
 
 
 def extract_answer(s: str) -> str | None:
@@ -59,7 +72,3 @@ def extract_answer(s: str) -> str | None:
     answer = re.sub("\\\\text\\{[^}]*\\}", "", answer)
     answer = re.sub("\\\\!", "", answer)
     return answer.strip()
-
-
-class MathEquivalenceModule(Protocol):
-    def is_equiv(self, left: object, right: object) -> bool: ...

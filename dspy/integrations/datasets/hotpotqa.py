@@ -1,10 +1,17 @@
 import random
+from typing import TYPE_CHECKING, ClassVar
 
 from dspy.datasets.dataset import Dataset
+
+if TYPE_CHECKING:
+    from dspy.evaluate.metric_contract import OptimizerMetric
 from dspy.integrations.datasets.import_ import import_datasets
 
 
 class HotPotQA(Dataset):
+    default_metric: ClassVar["OptimizerMetric"]
+    default_input_keys: ClassVar[tuple[str, ...]] = ("question",)
+
     def __init__(
         self,
         train_seed: int = 0,

@@ -5,9 +5,9 @@ import importlib
 import queue
 import random
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast
 
-from dspy.primitives import Example
+from dspy.datasets.dataset import Dataset
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -133,16 +133,35 @@ class _EnvSession:
         return self.outq.get()
 
 
-class AlfWorld:
-    def __init__(self, max_threads: int = 20) -> None:
+class AlfWorld(Dataset):
+    default_input_keys: ClassVar[tuple[str, ...]] = ("idx",)
+
+    def __init__(
+        self,
+        max_threads: int = 20,
+        train_seed: int = 0,
+        train_size: int = 3000,
+        dev_seed: int = 0,
+        dev_size: int = 500,
+        test_seed: int = 0,
+        test_size: int | None = None,
+        input_keys: list[str] | None = None,
+    ) -> None:
+        super().__init__(
+            train_seed=train_seed,
+            train_size=train_size,
+            dev_seed=dev_seed,
+            dev_size=dev_size,
+            test_seed=test_seed,
+            test_size=test_size,
+            input_keys=input_keys or list(self.default_input_keys),
+        )
         self.POOL = EnvPool(size=max_threads)
-        dataset = [Example.from_record({"idx": idx}, input_keys=("idx",)) for idx in range(3500)]
-        random.Random(0).shuffle(dataset)
-        train, dev = (dataset[:3000], dataset[-500:])
-        if len(train) + len(dev) > len(dataset):
-            raise ValueError("Train and dev split sizes cannot exceed dataset size.")
-        self.train = train
-        self.dev = dev
+        records: list[dict[str, object]] = [{"idx": idx} for idx in range(3500)]
+        random.Random(0).shuffle(records)
+        self._train = records[:train_size]
+        self._dev = records[-dev_size:]
+        self._test = None
 
     def __del__(self) -> None:
         self.POOL.close_all()

@@ -36,6 +36,8 @@ ALLOWLIST_SUFFIXES = (
     # breaks persistence.embeddings ↔ retrievers.embeddings import cycle
     "persistence/embeddings.py",
     "evaluate/metrics.py",
+    # binds benchmark default_metric after dataset modules finish loading
+    "integrations/datasets/metrics.py",
 )
 
 OPTIONAL_DEP_MODULES = frozenset(
