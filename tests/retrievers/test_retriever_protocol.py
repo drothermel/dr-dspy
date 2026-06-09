@@ -31,7 +31,7 @@ def test_query_retriever_protocol_documents_direct_call_shape() -> None:
 def test_query_retriever_protocol_is_explicitly_exported() -> None:
     import dspy.retrievers.types as retriever_types
 
-    assert retriever_types.__all__ == ["QueryRetriever"]
+    assert retriever_types.__all__ == ["QueryRetriever", "RetrievedPassage"]
     assert retriever_types.QueryRetriever.__name__ == "QueryRetriever"
 
 

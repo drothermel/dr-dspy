@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import random
 import uuid
-from typing import TYPE_CHECKING, cast
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, cast
 
-from dspy._legacy.dotdict import dotdict
 from dspy.primitives.example import Example
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+
+@dataclass
+class DatasetSeedSplits:
+    train_sets: list[list[Example]]
+    eval_sets: list[list[Example]]
 
 
 class Dataset:
@@ -117,9 +123,15 @@ class Dataset:
         divide_eval_per_seed: bool = True,
         eval_seed: int = 2023,
         **kwargs: object,
-    ) -> dotdict:
+    ) -> DatasetSeedSplits:
         train_seeds = train_seeds or [1, 2, 3, 4, 5]
-        data_args = dotdict(train_size=train_size, eval_seed=eval_seed, dev_size=dev_size, test_size=0, **kwargs)
+        data_args: dict[str, Any] = {
+            "train_size": train_size,
+            "eval_seed": eval_seed,
+            "dev_size": dev_size,
+            "test_size": 0,
+            **kwargs,
+        }
         dataset = cls(**data_args)
         eval_set = dataset.dev
         eval_sets: list[list[Example]] = []
@@ -127,7 +139,7 @@ class Dataset:
         examples_per_seed = dev_size // len(train_seeds) if divide_eval_per_seed else dev_size
         eval_offset = 0
         for train_seed in train_seeds:
-            data_args.train_seed = train_seed
+            data_args["train_seed"] = train_seed
             dataset.reset_seeds(**data_args)
             eval_sets.append(eval_set[eval_offset : eval_offset + examples_per_seed])
             train_sets.append(dataset.train)
@@ -137,4 +149,4 @@ class Dataset:
                 raise ValueError(len(train_sets[-1]))
             if divide_eval_per_seed:
                 eval_offset += examples_per_seed
-        return dotdict(train_sets=train_sets, eval_sets=eval_sets)
+        return DatasetSeedSplits(train_sets=train_sets, eval_sets=eval_sets)

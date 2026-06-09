@@ -10,12 +10,11 @@ if TYPE_CHECKING:
 
 from typing_extensions import override
 
-from dspy._legacy.dotdict import dotdict
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.format_shared import FIELD_HEADER_PATTERN
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import provider_tool_call_to_part
-from dspy.core.types import LMOutput, LMPart, LMRequest, LMResponse, LMTextPart, LMThinkingPart
+from dspy.core.types import LMOutput, LMPart, LMRequest, LMResponse, LMTextPart, LMThinkingPart, LMUsage
 from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.task_spec import FieldBinding, output_field
 
@@ -111,7 +110,7 @@ class DummyLM(BaseLM):
                 current_output = self._format_answer_fields(next(answer_iter, {"answer": "No more responses"}))
             outputs.append(self._to_output(current_output))
         return LMResponse(
-            model="dummy", outputs=outputs, usage=dotdict(prompt_tokens=0, completion_tokens=0, total_tokens=0)
+            model="dummy", outputs=outputs, usage=LMUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0)
         )
 
     def _to_output(self, current_output: Any) -> LMOutput:

@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any, cast
 
-from dspy._legacy.dotdict import dotdict
+from dspy.retrievers.types import RetrievedPassage
 
 try:
     from uuid import uuid4
@@ -39,19 +39,21 @@ class WeaviateRM:
 
     async def __call__(
         self, query_or_queries: str | list[str], k: int | None = None, **kwargs: object
-    ) -> list[dotdict]:
+    ) -> list[RetrievedPassage]:
         return await self.aforward(query_or_queries, k=k, **kwargs)
 
     async def aforward(
         self, query_or_queries: str | list[str], k: int | None = None, **kwargs: object
-    ) -> list[dotdict]:
+    ) -> list[RetrievedPassage]:
         return await asyncio.to_thread(self._search, query_or_queries, k, **kwargs)
 
-    def _search(self, query_or_queries: str | list[str], k: int | None = None, **kwargs: object) -> list[dotdict]:
+    def _search(
+        self, query_or_queries: str | list[str], k: int | None = None, **kwargs: object
+    ) -> list[RetrievedPassage]:
         k = k if k is not None else self.k
         queries = [query_or_queries] if isinstance(query_or_queries, str) else query_or_queries
         queries = [q for q in queries if q]
-        passages: list[dotdict] = []
+        passages: list[RetrievedPassage] = []
         parsed_results = []
         tenant = kwargs.pop("tenant_id", self._tenant_id)
         for query in queries:
@@ -71,7 +73,7 @@ class WeaviateRM:
                 results = q.with_hybrid(query=query).with_limit(k).do()
                 results = results["data"]["Get"][self._weaviate_collection_name]
                 parsed_results = [result[self._weaviate_collection_text_key] for result in results]
-            passages.extend(dotdict({"long_text": d}) for d in parsed_results)
+            passages.extend(RetrievedPassage(long_text=d) for d in parsed_results)
         return passages
 
     def get_objects(self, num_samples: int, fields: list[str]) -> list[dict[str, object]]:

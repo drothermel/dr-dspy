@@ -4,7 +4,17 @@ from typing import Any
 
 import requests
 
-from dspy._legacy.dotdict import dotdict
+from dspy.retrievers.types import RetrievedPassage
+
+
+def _to_passage(psg: dict[str, Any]) -> RetrievedPassage:
+    score = psg.get("score")
+    pid = psg.get("pid")
+    return RetrievedPassage(
+        long_text=psg["long_text"],
+        score=float(score) if score is not None else None,
+        pid=int(pid) if pid is not None else None,
+    )
 
 
 class ColBERTv2:
@@ -12,17 +22,17 @@ class ColBERTv2:
         self.post_requests = post_requests
         self.url = f"{url}:{port}" if port else url
 
-    async def __call__(self, query: str, k: int = 10, simplify: bool = False) -> list[str] | list[dotdict]:
+    async def __call__(self, query: str, k: int = 10, simplify: bool = False) -> list[str] | list[RetrievedPassage]:
         return await self.aforward(query, k=k, simplify=simplify)
 
-    async def aforward(self, query: str, k: int = 10, simplify: bool = False) -> list[str] | list[dotdict]:
+    async def aforward(self, query: str, k: int = 10, simplify: bool = False) -> list[str] | list[RetrievedPassage]:
         if self.post_requests:
             topk: list[dict[str, Any]] = await asyncio.to_thread(colbertv2_post_request, self.url, query, k)
         else:
             topk: list[dict[str, Any]] = await asyncio.to_thread(colbertv2_get_request, self.url, query, k)
         if simplify:
             return [psg["long_text"] for psg in topk]
-        return [dotdict(psg) for psg in topk]
+        return [_to_passage(psg) for psg in topk]
 
 
 def colbertv2_get_request(url: str, query: str, k: int):
@@ -92,13 +102,13 @@ class ColBERTv2RetrieverLocal:
         with Run().context(RunConfig(experiment=self.colbert_config.experiment)):
             return Searcher(index=self.colbert_config.index_name, collection=self.passages)
 
-    async def __call__(self, query: str, k: int = 7, **kwargs: Any) -> list[dotdict]:
+    async def __call__(self, query: str, k: int = 7, **kwargs: Any) -> list[RetrievedPassage]:
         return await self.aforward(query, k=k, **kwargs)
 
-    async def aforward(self, query: str, k: int = 7, **kwargs: Any) -> list[dotdict]:
+    async def aforward(self, query: str, k: int = 7, **kwargs: Any) -> list[RetrievedPassage]:
         return await asyncio.to_thread(self._search, query, k, **kwargs)
 
-    def _search(self, query: str, k: int = 7, **kwargs: Any) -> list[dotdict]:
+    def _search(self, query: str, k: int = 7, **kwargs: Any) -> list[RetrievedPassage]:
         torch = importlib.import_module("torch")
         filtered_pids: list[int] = kwargs.get("filtered_pids") or []
         if filtered_pids:
@@ -117,7 +127,7 @@ class ColBERTv2RetrieverLocal:
             searcher_results = self.searcher.search(query, k=k)
         results = []
         for pid, _rank, score in zip(*searcher_results, strict=False):
-            results.append(dotdict({"long_text": self.searcher.collection[pid], "score": score, "pid": pid}))
+            results.append(RetrievedPassage(long_text=self.searcher.collection[pid], score=score, pid=pid))
         return results
 
 

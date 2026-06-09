@@ -1,14 +1,14 @@
 import asyncio
 import json
+from typing import Any
 
 from typing_extensions import override
 
-from dspy._legacy.dotdict import dotdict
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool, ToolCalls
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import message_to_openai_chat
-from dspy.core.types import LMOutput, LMRequest, LMResponse, LMToolCallPart
+from dspy.core.types import LMOutput, LMRequest, LMResponse, LMToolCallPart, LMUsage
 from dspy.predict.react_v2 import ReActV2
 from dspy.testing import DummyLM
 from tests.adapters.conftest import captured_lm_kwargs
@@ -215,23 +215,28 @@ class NativeToolLM(BaseLM):
     async def aforward(self, request: LMRequest) -> LMResponse:
         self.calls.append({"messages": request.messages, "kwargs": captured_lm_kwargs(request)})
         if len(self.calls) == 1:
-            tool_call = dotdict(
-                id="call_provider_1", type="function", function=dotdict(name="lookup", arguments='{"query":"cats"}')
-            )
+            tool_call = {
+                "id": "call_provider_1",
+                "type": "function",
+                "function": {"name": "lookup", "arguments": '{"query":"cats"}'},
+            }
         else:
-            tool_call = dotdict(
-                id="call_submit", type="function", function=dotdict(name="submit", arguments='{"answer":"found cats"}')
-            )
-        args = json.loads(tool_call.function.arguments)
+            tool_call = {
+                "id": "call_submit",
+                "type": "function",
+                "function": {"name": "submit", "arguments": '{"answer":"found cats"}'},
+            }
+        function = tool_call["function"]
+        args = json.loads(function["arguments"])
         return LMResponse(
             model="native-tool-lm",
             outputs=[
                 LMOutput(
-                    parts=[LMToolCallPart(id=tool_call.id, name=tool_call.function.name, args=args)],
+                    parts=[LMToolCallPart(id=tool_call["id"], name=function["name"], args=args)],
                     finish_reason="tool_calls",
                 )
             ],
-            usage=dotdict(prompt_tokens=0, completion_tokens=0, total_tokens=0),
+            usage=LMUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0),
         )
 
 
@@ -248,22 +253,27 @@ class ParallelNativeToolLM(BaseLM):
     @override
     async def aforward(self, request: LMRequest) -> LMResponse:
         self.calls.append({"messages": request.messages, "kwargs": captured_lm_kwargs(request)})
+        tool_calls: list[dict[str, Any]]
         if len(self.calls) == 1:
             tool_calls = [
-                dotdict(
-                    id="call_provider_1", type="function", function=dotdict(name="lookup", arguments='{"query":"cats"}')
-                ),
-                dotdict(
-                    id="call_provider_2", type="function", function=dotdict(name="lookup", arguments='{"query":"dogs"}')
-                ),
+                {
+                    "id": "call_provider_1",
+                    "type": "function",
+                    "function": {"name": "lookup", "arguments": '{"query":"cats"}'},
+                },
+                {
+                    "id": "call_provider_2",
+                    "type": "function",
+                    "function": {"name": "lookup", "arguments": '{"query":"dogs"}'},
+                },
             ]
         else:
             tool_calls = [
-                dotdict(
-                    id="call_submit",
-                    type="function",
-                    function=dotdict(name="submit", arguments='{"answer":"found cats and found dogs"}'),
-                )
+                {
+                    "id": "call_submit",
+                    "type": "function",
+                    "function": {"name": "submit", "arguments": '{"answer":"found cats and found dogs"}'},
+                }
             ]
         return LMResponse(
             model="parallel-native-tool-lm",
@@ -271,14 +281,16 @@ class ParallelNativeToolLM(BaseLM):
                 LMOutput(
                     parts=[
                         LMToolCallPart(
-                            id=tool_call.id, name=tool_call.function.name, args=json.loads(tool_call.function.arguments)
+                            id=tool_call["id"],
+                            name=tool_call["function"]["name"],
+                            args=json.loads(tool_call["function"]["arguments"]),
                         )
                         for tool_call in tool_calls
                     ],
                     finish_reason="tool_calls",
                 )
             ],
-            usage=dotdict(prompt_tokens=0, completion_tokens=0, total_tokens=0),
+            usage=LMUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0),
         )
 
 
