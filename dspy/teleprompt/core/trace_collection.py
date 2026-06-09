@@ -3,22 +3,44 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Callable
 
+from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.optimization_trace import FailedPrediction, TraceCapturingModule, TraceData
 from dspy.teleprompt.core.evaluator import make_optimizer_evaluator
 
 if TYPE_CHECKING:
+    from dspy.evaluate.evaluator import Evaluate
     from dspy.primitives import Example, Module
     from dspy.runtime.run_context import RunContext
 
 logger = logging.getLogger(__name__)
 
 
+def make_trace_collection_evaluator(
+    run: RunContext,
+    *,
+    dataset: list[Example],
+    max_concurrency: int | None = None,
+    max_errors: int | None = None,
+    failure_score: float = 0,
+) -> Evaluate:
+    return make_optimizer_evaluator(
+        run,
+        devset=dataset,
+        metric=None,
+        max_concurrency=max_concurrency,
+        max_errors=resolve_max_errors(max_errors, run),
+        display_progress=True,
+        provide_traceback=False,
+        failure_score=failure_score,
+    )
+
+
 async def collect_trace_data(
     program: Module,
     dataset: list[Example],
     run: RunContext,
+    evaluator: Evaluate,
     metric: Callable | None = None,
-    max_concurrency: int | None = None,
     raise_on_error: bool = True,
     capture_parse_failures: bool = False,
     failure_score: float = 0,
@@ -26,17 +48,6 @@ async def collect_trace_data(
     log_format_failures: bool = False,
     callback_metadata: dict[str, Any] | None = None,
 ) -> list[TraceData]:
-    evaluator = make_optimizer_evaluator(
-        run,
-        devset=dataset,
-        metric=None,
-        max_concurrency=max_concurrency,
-        max_errors=len(dataset) * 10,
-        display_progress=True,
-        provide_traceback=False,
-        failure_score=failure_score,
-    )
-
     def wrapped_metric(example, prediction, trace=None):
         prediction, _ = prediction
         if isinstance(prediction, FailedPrediction):

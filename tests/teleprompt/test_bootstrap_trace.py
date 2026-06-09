@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 from unittest import mock
 
 import pytest
@@ -14,7 +14,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module, Prediction
 from dspy.runtime.optimization_trace import FailedPrediction
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.teleprompt.core.trace_collection import collect_trace_data
+from dspy.teleprompt.core.trace_collection import collect_trace_data, make_trace_collection_evaluator
 
 
 def test_bootstrap_trace_data(make_run):
@@ -61,16 +61,17 @@ def test_bootstrap_trace_data(make_run):
             )
         return successful_responses[call_count if call_count < 2 else call_count - 1]
 
+    trace_evaluator = make_trace_collection_evaluator(run, dataset=dataset, max_concurrency=1)
     with mock.patch("litellm.acompletion", new=mock.AsyncMock(side_effect=completion_side_effect)):
         results = asyncio.run(
             collect_trace_data(
                 program=program,
                 dataset=dataset,
+                run=run,
+                evaluator=trace_evaluator,
                 metric=exact_match_metric,
-                max_concurrency=1,
                 raise_on_error=False,
                 capture_parse_failures=True,
-                run=run,
             )
         )
     assert len(results) == 5, f"Expected 5 results, got {len(results)}"
@@ -122,20 +123,19 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch, make_run):
 
             return _Result()
 
-    def fake_make_optimizer_evaluator(*_args, **_kwargs):
-        return DummyEvaluate()
-
-    monkeypatch.setattr(trace_collection_module, "make_optimizer_evaluator", fake_make_optimizer_evaluator)
     asyncio.run(
         trace_collection_module.collect_trace_data(
-            program=DummyProgram(), dataset=[], callback_metadata={"disable_logging": True}, run=run
+            program=DummyProgram(),
+            dataset=[],
+            run=run,
+            evaluator=cast("Any", DummyEvaluate()),
+            callback_metadata={"disable_logging": True},
         )
     )
     assert captured_metadata["value"] == {"disable_logging": True}
 
 
 def test_collect_trace_data_does_not_mutate_inner_forward(monkeypatch, make_run):
-    from dspy.teleprompt.core import trace_collection as trace_collection_module
     from dspy.testing import DummyLM
 
     class DummyProgram(Module):
@@ -149,8 +149,6 @@ def test_collect_trace_data_does_not_mutate_inner_forward(monkeypatch, make_run)
 
             return _Result()
 
-    monkeypatch.setattr(trace_collection_module, "make_optimizer_evaluator", lambda *_args, **_kwargs: DummyEvaluate())
-
     run = make_run(lm=DummyLM([{}]))
     program = DummyProgram()
     original_impl = object.__getattribute__(program, "_aforward_impl")
@@ -158,8 +156,9 @@ def test_collect_trace_data_does_not_mutate_inner_forward(monkeypatch, make_run)
         collect_trace_data(
             program=program,
             dataset=[],
-            capture_parse_failures=False,
             run=run,
+            evaluator=cast("Any", DummyEvaluate()),
+            capture_parse_failures=False,
         )
     )
     restored_impl = object.__getattribute__(program, "_aforward_impl")

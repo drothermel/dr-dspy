@@ -30,6 +30,7 @@ from dspy.teleprompt.grpo.rollout_groups import (
 from dspy.teleprompt.grpo.sampling import select_training_sample
 from dspy.teleprompt.grpo.session import GRPOCompileSession
 from dspy.teleprompt.grpo.trace_grid import collect_teacher_trace_grid
+from dspy.teleprompt.grpo.validation_evaluators import build_validation_evaluators
 from dspy.teleprompt.grpo.validation_metrics import report_validation_metrics
 from dspy.teleprompt.grpo.wait import wait_until
 from dspy.teleprompt.metrics import OptimizerMetric  # noqa: TC001 — metric callback
@@ -83,6 +84,7 @@ class GRPO(FinetuneTeleprompter):
         adapter: Adapter | dict[LM, Adapter] | None = None,
         exclude_demos: bool = False,
         max_concurrency: int = 6,
+        max_errors: int | None = None,
         num_train_steps: int = 100,
         seed: int = 0,
         num_dspy_examples_per_grpo_step: int = 1,
@@ -113,6 +115,7 @@ class GRPO(FinetuneTeleprompter):
         self.adapter: dict[LM, Adapter] = self.convert_to_lm_dict(adapter)
         self.exclude_demos = exclude_demos
         self.max_concurrency = max_concurrency
+        self.max_errors = max_errors
         self.num_train_steps = num_train_steps
         self.rng = random.Random(seed)
         self.num_dspy_examples_per_grpo_step = num_dspy_examples_per_grpo_step
@@ -212,6 +215,17 @@ class GRPO(FinetuneTeleprompter):
                 job = FinetuneService(pred.lm, train_kwargs=train_kwargs).reinforce(train_kwargs=train_kwargs)
                 grpo_training_jobs[job_key] = job
 
+        validation_evaluators = build_validation_evaluators(
+            run=run,
+            trainset=trainset,
+            valset=valset,
+            use_train_as_val=self.use_train_as_val,
+            report_train_scores=self.report_train_scores,
+            metric=self.metric,
+            max_concurrency=self.max_concurrency,
+            max_errors=self.max_errors,
+            failure_score=self.failure_score,
+        )
         await report_validation_metrics(
             student=student,
             trainset=trainset,
@@ -219,12 +233,12 @@ class GRPO(FinetuneTeleprompter):
             step_idx=-1,
             num_train_steps=self.num_train_steps,
             num_steps_for_val=self.num_steps_for_val,
-            max_concurrency=self.max_concurrency,
             failure_score=self.failure_score,
             use_train_as_val=self.use_train_as_val,
             report_train_scores=self.report_train_scores,
             metric=self.metric,
             run=run,
+            evaluators=validation_evaluators,
         )
 
         logger.info("Starting the GRPO training loop...")
@@ -314,12 +328,12 @@ class GRPO(FinetuneTeleprompter):
                 step_idx=train_step_idx,
                 num_train_steps=self.num_train_steps,
                 num_steps_for_val=self.num_steps_for_val,
-                max_concurrency=self.max_concurrency,
                 failure_score=self.failure_score,
                 use_train_as_val=self.use_train_as_val,
                 report_train_scores=self.report_train_scores,
                 metric=self.metric,
                 run=run,
+                evaluators=validation_evaluators,
             )
 
         logger.info("Done with the iterations! Retrieving the final model(s)...")

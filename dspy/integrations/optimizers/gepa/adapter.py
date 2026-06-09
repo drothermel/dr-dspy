@@ -12,13 +12,14 @@ from dspy.integrations.optimizers.gepa.sync_bridge import run_gepa_sync
 from dspy.integrations.optimizers.gepa.task_specs import FrameworkGepaInstructionProposalTaskSpec
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Prediction
+from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.optimization_trace import FailedPrediction, TraceData
 from dspy.runtime.run_context import RunContext
 from dspy.runtime.transparency.resolve import require_adapter
 from dspy.serialization.json import to_jsonable
 from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
 from dspy.teleprompt.core.evaluator import make_optimizer_evaluator, optimizer_lm_context
-from dspy.teleprompt.core.trace_collection import collect_trace_data
+from dspy.teleprompt.core.trace_collection import collect_trace_data, make_trace_collection_evaluator
 
 try:
     from gepa import EvaluationBatch, GEPAAdapter
@@ -168,12 +169,18 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         if capture_traces:
             if self.run is None:
                 raise ValueError("DspyAdapter requires a RunContext.")
+            trace_evaluator = make_trace_collection_evaluator(
+                self.run,
+                dataset=batch,
+                max_concurrency=self.max_concurrency,
+                failure_score=self.failure_score,
+            )
             trajs = await collect_trace_data(
                 program=program,
                 dataset=batch,
                 run=self.run,
+                evaluator=trace_evaluator,
                 metric=self.metric_fn,
-                max_concurrency=self.max_concurrency,
                 raise_on_error=False,
                 capture_parse_failures=True,
                 failure_score=self.failure_score,
@@ -201,7 +208,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             devset=batch,
             metric=self.metric_fn,
             max_concurrency=self.max_concurrency,
-            max_errors=len(batch) * 100,
+            max_errors=resolve_max_errors(None, self.run),
             failure_score=self.failure_score,
             provide_traceback=True,
         )

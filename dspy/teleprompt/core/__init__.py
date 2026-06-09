@@ -7,11 +7,12 @@ from dspy.teleprompt.core.evaluator import (
     optimizer_run_context,
 )
 from dspy.teleprompt.core.split import split_trainset_holdout
-from dspy.teleprompt.core.trace_collection import collect_trace_data
+from dspy.teleprompt.core.trace_collection import collect_trace_data, make_trace_collection_evaluator
 
 __all__ = [
     "UnknownPredictorInTraceError",
     "collect_trace_data",
+    "make_trace_collection_evaluator",
     "make_optimizer_evaluator",
     "optimizer_lm_context",
     "optimizer_run_context",

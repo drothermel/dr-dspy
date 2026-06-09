@@ -16,7 +16,7 @@ from dspy.runtime.run_context import RunContext
 from dspy.runtime.transparency.resolve import require_adapter
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
-from dspy.teleprompt.core.trace_collection import collect_trace_data
+from dspy.teleprompt.core.trace_collection import collect_trace_data, make_trace_collection_evaluator
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 
@@ -74,9 +74,18 @@ class BootstrapFinetune(FinetuneTeleprompter):
         teachers = teacher if isinstance(teacher, list) else [teacher]
         teachers = [prepare_teacher(student=student, teacher=t) for t in teachers]
         max_concurrency = self.max_concurrency or run.execution.max_concurrency
+        trace_evaluator = make_trace_collection_evaluator(
+            run,
+            dataset=trainset,
+            max_concurrency=max_concurrency,
+        )
         for t in teachers:
             trace_data += await collect_trace_data(
-                program=t, dataset=trainset, metric=self.metric, max_concurrency=max_concurrency, run=run
+                program=t,
+                dataset=trainset,
+                run=run,
+                evaluator=trace_evaluator,
+                metric=self.metric,
             )
         logger.info("Preparing the train data...")
         key_to_data = {}

@@ -3,11 +3,10 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from dspy.teleprompt.core.evaluator import make_optimizer_evaluator
-
 if TYPE_CHECKING:
     from dspy.primitives import Example, Module
     from dspy.runtime.run_context import RunContext
+    from dspy.teleprompt.grpo.validation_evaluators import GRPOValidationEvaluators
     from dspy.teleprompt.metrics import OptimizerMetric
 
 logger = logging.getLogger(__name__)
@@ -21,12 +20,12 @@ async def report_validation_metrics(
     step_idx: int,
     num_train_steps: int,
     num_steps_for_val: int,
-    max_concurrency: int,
     failure_score: float,
     use_train_as_val: bool,
     report_train_scores: bool,
     metric: OptimizerMetric | None,
     run: RunContext,
+    evaluators: GRPOValidationEvaluators,
 ) -> None:
     if step_idx != -1 and step_idx != num_train_steps - 1 and (step_idx + 1) % num_steps_for_val != 0:
         return
@@ -41,16 +40,9 @@ async def report_validation_metrics(
                     "Using user provided validation set and reporting train scores for every validation step "
                     "in addition."
                 )
-            valset_evaluator = make_optimizer_evaluator(
-                run,
-                devset=valset + trainset,
-                metric=metric,
-                max_concurrency=max_concurrency,
-                max_errors=len(valset) * 10,
-                display_progress=True,
-                provide_traceback=False,
-                failure_score=failure_score,
-            )
+            valset_evaluator = evaluators.valset_plus_train
+            if valset_evaluator is None:
+                raise ValueError("GRPO validation requires valset_plus_train evaluator when report_train_scores=True.")
             if step_idx == -1:
                 logger.info("Evaluating the student program on the train+validation set before training loop...")
             else:
@@ -78,16 +70,9 @@ async def report_validation_metrics(
         else:
             if step_idx == -1:
                 logger.info("Using user provided validation set and not reporting train scores.")
-            valset_evaluator = make_optimizer_evaluator(
-                run,
-                devset=valset,
-                metric=metric,
-                max_concurrency=max_concurrency,
-                max_errors=len(valset) * 10,
-                display_progress=True,
-                provide_traceback=False,
-                failure_score=failure_score,
-            )
+            valset_evaluator = evaluators.valset_only
+            if valset_evaluator is None:
+                raise ValueError("GRPO validation requires valset_only evaluator when valset is provided.")
             if step_idx == -1:
                 logger.info("Evaluating the student program on the validation set before training loop...")
             else:
@@ -112,16 +97,9 @@ async def report_validation_metrics(
             raise ValueError("num_steps_for_val must be a positive integer.")
         if step_idx == -1:
             logger.info("Using trainset as validation set.")
-        valset_evaluator = make_optimizer_evaluator(
-            run,
-            devset=trainset,
-            metric=metric,
-            max_concurrency=max_concurrency,
-            max_errors=len(trainset) * 10,
-            display_progress=True,
-            provide_traceback=False,
-            failure_score=failure_score,
-        )
+        valset_evaluator = evaluators.train_as_val
+        if valset_evaluator is None:
+            raise ValueError("GRPO validation requires train_as_val evaluator when use_train_as_val=True.")
         if step_idx == -1:
             logger.info("Evaluating the student program on the validation set before training loop...")
         else:
