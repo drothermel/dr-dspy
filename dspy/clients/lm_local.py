@@ -12,12 +12,12 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any, cast
 
-from dspy.clients.provider import TrainingJob, _UnsupportedReinforceJob
-from dspy.clients.utils_finetune import TrainDataFormat, save_data
+from dspy.clients.finetune.provider import TrainingJob, _UnsupportedReinforceJob
+from dspy.clients.finetune.utils import TrainDataFormat, save_data
 
 if TYPE_CHECKING:
+    from dspy.clients.finetune.protocol import ReinforceJob as ReinforceJobProtocol
     from dspy.clients.lm import LM
-    from dspy.clients.protocol import ReinforceJob as ReinforceJobProtocol
 logger = logging.getLogger(__name__)
 
 

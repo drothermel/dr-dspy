@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import os
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import orjson
-from typing_extensions import NotRequired
+from pydantic import BaseModel, ConfigDict
 
 from dspy.clients.cache_paths import DSPY_CACHEDIR
 from dspy.core.hashing import Hasher
@@ -27,40 +29,50 @@ class TrainDataFormat(StrEnum):
     GRPO_CHAT = "grpo_chat"
 
 
-class Message(TypedDict):
-    role: Literal["user"] | Literal["assistant"] | Literal["system"]
+class FinetuneChatMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant", "system"]
     content: str
 
 
-class MessageAssistant(TypedDict):
-    role: Literal["assistant"]
+class FinetuneAssistantMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["assistant"] = "assistant"
     content: str
 
 
-class GRPOChatData(TypedDict):
-    messages: list[Message]
-    completion: MessageAssistant
+class GRPOChatData(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    messages: list[FinetuneChatMessage]
+    completion: FinetuneAssistantMessage
     reward: float
 
 
 GRPORolloutGroup = list[GRPOChatData]
 
 
-class GRPOGroup(TypedDict):
+class GRPOGroup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     batch_id: int | None
-    group: GRPORolloutGroup
+    group: list[GRPOChatData]
 
 
-class GRPOStatus(TypedDict):
+class GRPOStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     job_id: str
-    status: NotRequired[str | None]
     current_model: str
     checkpoints: dict[str, str]
-    last_checkpoint: NotRequired[str | None]
     pending_batch_ids: list[int]
+    status: str | None = None
+    last_checkpoint: str | None = None
 
 
-def infer_data_format(adapter: "Adapter") -> str:
+def infer_data_format(adapter: Adapter) -> str:
     if adapter.capabilities.supports_finetune:
         return TrainDataFormat.CHAT
     raise ValueError(f"Could not infer the data format for: {adapter}")

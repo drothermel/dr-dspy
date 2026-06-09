@@ -5,8 +5,8 @@ from dspy.clients.databricks import (
     TrainingJobDatabricks,
     _create_directory_in_databricks_unity_catalog,
 )
+from dspy.clients.finetune import TrainDataFormat
 from dspy.clients.lm import LM
-from dspy.clients.utils_finetune import TrainDataFormat
 from dspy.core.types import LMRequest
 
 try:

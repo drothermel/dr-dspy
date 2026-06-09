@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from threading import Thread
 
-    from dspy.clients.protocol import ReinforceJob as ReinforceJobProtocol
-    from dspy.clients.utils_finetune import GRPOStatus, TrainDataFormat
+    from dspy.clients.finetune.protocol import ReinforceJob as ReinforceJobProtocol
+    from dspy.clients.finetune.utils import GRPOStatus, TrainDataFormat
 
 
 class TrainingJob(Future):
@@ -42,7 +42,7 @@ class _UnsupportedReinforceJob:
 
     def step(
         self,
-        train_data: list[dict[str, Any]],
+        train_data: list[Any],
         train_data_format: TrainDataFormat | str | None = None,
     ) -> None:
         raise RuntimeError("Reinforce is not supported by this provider.")

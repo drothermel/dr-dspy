@@ -9,8 +9,16 @@ from typing import Any, Callable, Literal, cast
 from pydantic import BaseModel
 
 from dspy.adapters.base import Adapter
+from dspy.clients.finetune import (
+    FinetuneAssistantMessage,
+    FinetuneChatMessage,
+    GRPOChatData,
+    GRPOGroup,
+    GRPORolloutGroup,
+    GRPOStatus,
+    TrainDataFormat,
+)
 from dspy.clients.lm import LM
-from dspy.clients.utils_finetune import GRPOChatData, GRPOGroup, GRPORolloutGroup, GRPOStatus, TrainDataFormat
 from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
@@ -349,7 +357,7 @@ class GRPO(FinetuneTeleprompter):
             def _any_available_for_step() -> bool:
                 for job in grpo_training_jobs.values():
                     grpo_status: GRPOStatus = job.get_status()
-                    pending_batch_ids = grpo_status["pending_batch_ids"]
+                    pending_batch_ids = grpo_status.pending_batch_ids
                     available = set(pending_batch_ids) - set(self.fulfilled_batch_ids)
                     if available:
                         return True
@@ -480,16 +488,12 @@ class GRPO(FinetuneTeleprompter):
                             if isinstance(trace_instance[2], FailedPrediction):
                                 score = trace_instance[2].format_reward or self.format_failure_score
                                 example_training_data[group_idx].append(
-                                    cast(
-                                        "GRPOChatData",
-                                        {
-                                            "messages": inp_messages,
-                                            "completion": {
-                                                "role": "assistant",
-                                                "content": trace_instance[2].completion_text,
-                                            },
-                                            "reward": float(score),
-                                        },
+                                    GRPOChatData(
+                                        messages=[FinetuneChatMessage.model_validate(m) for m in inp_messages],
+                                        completion=FinetuneAssistantMessage(
+                                            content=trace_instance[2].completion_text,
+                                        ),
+                                        reward=float(score),
                                     )
                                 )
                                 logger.warning(
@@ -506,16 +510,12 @@ class GRPO(FinetuneTeleprompter):
                                     f"Input messages {inp_messages} do not match the expected messages {all_messages[:-1]}"
                                 )
                                 example_training_data[group_idx].append(
-                                    cast(
-                                        "GRPOChatData",
-                                        {
-                                            "messages": inp_messages,
-                                            "completion": {
-                                                "role": all_messages[-1]["role"],
-                                                "content": all_messages[-1]["content"],
-                                            },
-                                            "reward": float(score),
-                                        },
+                                    GRPOChatData(
+                                        messages=[FinetuneChatMessage.model_validate(m) for m in inp_messages],
+                                        completion=FinetuneAssistantMessage(
+                                            content=all_messages[-1]["content"],
+                                        ),
+                                        reward=float(score),
                                     )
                                 )
                     train_batch_per_predictor[pred_id].extend(example_training_data)
@@ -552,7 +552,7 @@ class GRPO(FinetuneTeleprompter):
                         f"Number of completions {len(group)} does not match the expected number self.num_rollouts_per_grpo_step={self.num_rollouts_per_grpo_step}"
                     )
                 grpo_status: GRPOStatus = job.get_status()
-                pending_batch_ids = grpo_status["pending_batch_ids"]
+                pending_batch_ids = grpo_status.pending_batch_ids
                 available_batch_ids = list(set(pending_batch_ids) - set(self.fulfilled_batch_ids))
                 if not available_batch_ids:
                     continue
@@ -577,10 +577,12 @@ class GRPO(FinetuneTeleprompter):
                         if len(fallback_pool) == 0:
                             continue
                         grp = self.rng.choice(fallback_pool)
-                    final_train_data.append({"batch_id": bid, "group": grp})
+                    final_train_data.append(GRPOGroup(batch_id=bid, group=grp))
                 if not final_train_data:
                     continue
-                self.fulfilled_batch_ids.extend([item["batch_id"] for item in final_train_data])
+                self.fulfilled_batch_ids.extend(
+                    [item.batch_id for item in final_train_data if item.batch_id is not None]
+                )
                 job.step(train_data=final_train_data, train_data_format=TrainDataFormat.GRPO_CHAT)
             logger.info(f"GRPO training step {train_step_idx + 1}/{self.num_train_steps} completed.")
             await self.report_validation_metrics(

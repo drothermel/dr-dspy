@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from dspy.clients.provider import TrainingJob, _UnsupportedReinforceJob
-from dspy.clients.utils_finetune import TrainDataFormat, TrainingStatus, save_data
+from dspy.clients.finetune.provider import TrainingJob, _UnsupportedReinforceJob
+from dspy.clients.finetune.utils import TrainDataFormat, TrainingStatus, save_data
 
 if TYPE_CHECKING:
-    from dspy.clients.protocol import ReinforceJob as ReinforceJobProtocol
+    from dspy.clients.finetune.protocol import ReinforceJob as ReinforceJobProtocol
 
 logger = logging.getLogger(__name__)
 

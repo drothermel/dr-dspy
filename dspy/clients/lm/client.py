@@ -5,6 +5,8 @@ from typing import Any, Literal
 from typing_extensions import override
 
 from dspy.clients._litellm import is_litellm_context_window_error
+from dspy.clients.finetune import DefaultFinetuneProvider, ReinforceJob, TrainDataFormat, TrainingJob
+from dspy.clients.finetune.protocol import FinetuneProvider
 from dspy.clients.lm.errors import (
     _exception_message,
     _exception_provider_code,
@@ -24,9 +26,6 @@ from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.clients.model_id import split_provider_model
 from dspy.clients.openai import OpenAIProvider
 from dspy.clients.openai_format.reasoning_models import is_openai_reasoning_model
-from dspy.clients.protocol import FinetuneProvider, ReinforceJob
-from dspy.clients.provider import DefaultFinetuneProvider, TrainingJob
-from dspy.clients.utils_finetune import TrainDataFormat
 from dspy.core.types import LMRequest, LMResponse
 from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.errors import ContextWindowExceededError, LMConfigurationError, LMError, LMUnsupportedFeatureError

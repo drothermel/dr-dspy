@@ -11,9 +11,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from dspy.clients.finetune.provider import TrainingJob
+    from dspy.clients.finetune.utils import GRPOGroup, GRPOStatus, TrainDataFormat
     from dspy.clients.lm import LM
-    from dspy.clients.provider import TrainingJob
-    from dspy.clients.utils_finetune import GRPOStatus, TrainDataFormat
 
 
 class FinetuneJob(Protocol):
@@ -28,7 +28,7 @@ class ReinforceJob(Protocol):
 
     def step(
         self,
-        train_data: list[dict[str, Any]],
+        train_data: list[GRPOGroup],
         train_data_format: TrainDataFormat | str | None = None,
     ) -> None: ...
 

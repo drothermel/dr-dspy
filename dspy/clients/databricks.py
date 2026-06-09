@@ -9,13 +9,13 @@ from typing import TYPE_CHECKING, Any
 import orjson
 from typing_extensions import override
 
-from dspy.clients.provider import TrainingJob, _UnsupportedReinforceJob
-from dspy.clients.utils_finetune import TrainDataFormat, get_finetune_directory
+from dspy.clients.finetune.provider import TrainingJob, _UnsupportedReinforceJob
+from dspy.clients.finetune.utils import TrainDataFormat, get_finetune_directory
 
 if TYPE_CHECKING:
     from databricks.sdk import WorkspaceClient
 
-    from dspy.clients.protocol import ReinforceJob as ReinforceJobProtocol
+    from dspy.clients.finetune.protocol import ReinforceJob as ReinforceJobProtocol
 logger = logging.getLogger(__name__)
 
 

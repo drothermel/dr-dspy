@@ -3,7 +3,7 @@ import pytest
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.xml_adapter import XMLAdapter
-from dspy.clients.utils_finetune import TrainDataFormat, infer_data_format
+from dspy.clients.finetune import TrainDataFormat, infer_data_format
 
 
 def test_chat_adapter_supports_finetune():

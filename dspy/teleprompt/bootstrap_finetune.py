@@ -5,8 +5,8 @@ from typing import Any, Callable, cast
 from pydantic import BaseModel
 
 from dspy.adapters.base import Adapter
+from dspy.clients.finetune import infer_data_format
 from dspy.clients.lm import LM
-from dspy.clients.utils_finetune import infer_data_format
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
