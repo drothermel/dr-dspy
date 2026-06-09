@@ -43,4 +43,6 @@ class Ensemble:
                     return reduce_fn(outputs)
                 return outputs
 
-        return CompileResult(program=EnsembledProgram())
+        ensembled = EnsembledProgram()
+        ensembled.run = student.run
+        return CompileResult(program=ensembled)

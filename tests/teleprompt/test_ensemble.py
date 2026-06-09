@@ -22,6 +22,18 @@ def mock_reduce_fn(outputs):
     return sum(outputs) / len(outputs)
 
 
+def test_ensemble_inherits_student_run_binding(make_run):
+    run = make_run(lm=DummyLM([{}]))
+    programs = [MockProgram(i) for i in range(2)]
+    student = Module()
+    student.run = run
+    ensemble = Ensemble()
+    result = asyncio.run(
+        ensemble.compile(student, params=EnsembleCompileParams(programs=cast("list[Module]", programs)), run=run)
+    )
+    assert result.program.run is run
+
+
 def test_ensemble_without_reduction(make_run):
     run = make_run(lm=DummyLM([{}]))
     programs = [MockProgram(i) for i in range(5)]

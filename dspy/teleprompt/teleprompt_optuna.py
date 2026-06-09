@@ -70,7 +70,9 @@ class BootstrapFewShotWithOptuna:
         if teacher is None:
             self.teacher = student.reset_copy()
         elif isinstance(teacher, list):
-            self.teacher = (teacher[0]).deepcopy()
+            raise ValueError(
+                "BootstrapFewShotWithOptuna accepts a single teacher Module, not a list. Pass one teacher or None."
+            )
         else:
             self.teacher = teacher.deepcopy()
         max_demos = params.max_demos

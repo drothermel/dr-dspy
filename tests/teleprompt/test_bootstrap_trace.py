@@ -133,7 +133,7 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch, make_run):
     assert captured_metadata["value"] == {"disable_logging": True}
 
 
-def test_bootstrap_trace_respects_capture_failed_parses_false(monkeypatch, make_run):
+def test_bootstrap_trace_restores_forward_after_eval(monkeypatch, make_run):
     from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
     from dspy.testing import DummyLM
 
