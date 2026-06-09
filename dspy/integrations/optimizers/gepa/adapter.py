@@ -1,8 +1,9 @@
 import json
 import logging
 import random
-from typing import Any, Callable, Protocol, TypedDict, cast
+from typing import Any, Callable, Generic, Protocol, TypedDict, TypeVar, cast
 
+from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy._internal.lazy_import import import_optional
@@ -21,9 +22,29 @@ from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
 from dspy.teleprompt.core.evaluator import make_optimizer_evaluator, optimizer_lm_context
 from dspy.teleprompt.core.trace_collection import collect_trace_data, make_trace_collection_evaluator
 
-_gepa = import_optional("gepa", extra="gepa", feature="GEPA integrations")
-EvaluationBatch = _gepa.EvaluationBatch
-GEPAAdapter = _gepa.GEPAAdapter
+ExampleT = TypeVar("ExampleT")
+TraceT = TypeVar("TraceT")
+PredictionT = TypeVar("PredictionT")
+
+
+class _FallbackEvaluationBatch(BaseModel):
+    outputs: list[Any]
+    scores: list[Any]
+    trajectories: Any | None = None
+
+
+class _FallbackGEPAAdapter(Generic[ExampleT, TraceT, PredictionT]):
+    pass
+
+
+try:
+    _gepa = import_optional("gepa", extra="gepa", feature="GEPA integrations")
+except ImportError:
+    EvaluationBatch = _FallbackEvaluationBatch
+    GEPAAdapter = _FallbackGEPAAdapter
+else:
+    EvaluationBatch = getattr(_gepa, "EvaluationBatch", _FallbackEvaluationBatch)
+    GEPAAdapter = getattr(_gepa, "GEPAAdapter", _FallbackGEPAAdapter)
 
 logger = logging.getLogger(__name__)
 
