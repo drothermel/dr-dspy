@@ -81,15 +81,14 @@ def test_evaluate_single_thread_runs_in_main_thread(make_run):
     assert all(t is threading.main_thread() for t in execution_threads)
 
 
-@pytest.mark.extra
 def test_construct_result_df(make_run):
     import pandas as pd
 
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4"), new_example("What is 3+3?", "-1")]
     ev = Evaluate(devset=devset, metric=answer_exact_match)
     results = [
-        (devset[0], Prediction.from_record({"answer": "2"}), 100.0),
-        (devset[1], Prediction.from_record({"answer": "4"}), 100.0),
+        (devset[0], Prediction.from_record({"answer": "2"}), 1.0),
+        (devset[1], Prediction.from_record({"answer": "4"}), 1.0),
         (devset[2], Prediction.from_record({"answer": "-1"}), 0.0),
     ]
     result_df = ev._construct_result_table(results, answer_exact_match.__name__)
@@ -100,10 +99,28 @@ def test_construct_result_df(make_run):
                 "question": ["What is 1+1?", "What is 2+2?", "What is 3+3?"],
                 "example_answer": ["2", "4", "-1"],
                 "pred_answer": ["2", "4", "-1"],
-                "answer_exact_match": [100.0, 100.0, 0.0],
+                "answer_exact_match": [1.0, 1.0, 0.0],
             }
         ),
     )
+
+
+def test_prepare_results_output_uses_metric_name():
+    devset = [new_example("What is 1+1?", "2")]
+    ev = Evaluate(devset=devset, metric=answer_exact_match)
+    results = [(devset[0], Prediction.from_record({"answer": "2"}), 1.0)]
+    rows = ev._prepare_results_output(results, "answer_exact_match")
+    assert rows[0]["answer_exact_match"] == 1.0
+    assert rows[0]["example_answer"] == "2"
+    assert rows[0]["pred_answer"] == "2"
+
+
+def test_prepare_results_output_module_metric_name():
+    devset = [Example.from_record({"question": "q", "response": "a"}, input_keys=("question",))]
+    ev = Evaluate(devset=devset, metric=SemanticF1())
+    results = [(devset[0], Prediction.from_record({"response": "a"}), 0.5)]
+    rows = ev._prepare_results_output(results, "SemanticF1")
+    assert rows[0]["SemanticF1"] == 0.5
 
 
 def test_multithread_evaluate_call(make_run):

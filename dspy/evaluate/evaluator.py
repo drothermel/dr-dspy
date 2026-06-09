@@ -1,3 +1,9 @@
+"""Async program evaluation over a devset.
+
+Import ``Evaluate`` and ``EvaluationResult`` from ``dspy.evaluate.evaluator``.
+Per-example scores are 0-1 floats; ``EvaluationResult.score`` is the percentage mean.
+"""
+
 import asyncio
 import csv
 import importlib
@@ -15,7 +21,6 @@ if TYPE_CHECKING:
     import pandas as pd
 
     from dspy.primitives import Example, Module
-import tqdm
 
 from dspy.evaluate.metric_invoke import invoke_metric
 from dspy.primitives import Prediction
@@ -93,7 +98,6 @@ class Evaluate:
             logger.debug(f"Evaluate is called with callback metadata: {callback_metadata}")
         if metric is None:
             raise ValueError("A metric function is required for evaluation.")
-        tqdm.tqdm._instances.clear()
 
         async def process_item(example):
             prediction, trace = await run_program_with_trace(program, example, run)
@@ -177,8 +181,9 @@ class Evaluate:
 
         data = self._prepare_results_output(results, metric_name)
         result_df = pd.DataFrame(data)
-        result_df = result_df.map(truncate_cell) if hasattr(result_df, "map") else result_df.applymap(truncate_cell)
-        return result_df.rename(columns={"correct": metric_name})
+        if hasattr(result_df, "map"):
+            return result_df.map(truncate_cell)
+        return result_df.applymap(truncate_cell)
 
     def _display_result_table(self, result_df: "pd.DataFrame", display_table: bool | int, metric_name: str) -> None:
         if isinstance(display_table, bool):

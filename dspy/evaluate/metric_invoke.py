@@ -1,3 +1,9 @@
+"""Metric dispatch and score normalization for evaluation and optimizers.
+
+Import ``invoke_metric``, ``call_metric``, and ``normalize_metric_score`` from
+``dspy.evaluate.metric_invoke``.
+"""
+
 from __future__ import annotations
 
 import inspect
