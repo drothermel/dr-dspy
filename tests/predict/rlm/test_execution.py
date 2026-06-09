@@ -38,6 +38,14 @@ class TestRLMCodeFenceParsing:
         with pytest.raises(SyntaxError, match="json"):
             strip_python_fences('```json\n{"a": 1}\n```')
 
+    def test_parse_generated_code_uses_strip_python_fences(self):
+        from dspy.predict.code_execution import parse_generated_code
+        from dspy.primitives import Prediction
+
+        code, error = parse_generated_code(Prediction.from_record({"generated_code": "```python\nprint(1)\n```"}))
+        assert error is None
+        assert code == "print(1)"
+
 
 class TestRLMFormatting:
     def test_format_history(self):

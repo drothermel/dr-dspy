@@ -48,17 +48,22 @@ class Refine(Module):
         adapter = require_adapter(run.adapter)
         advice: dict[str, str] | None = None
 
+        def stamp_predictor_names(module: Module) -> dict[int, str]:
+            predictor_id_to_name = {id(predictor): name for name, predictor in module.named_predictors()}
+            for name, predictor in module.named_predictors():
+                object.__setattr__(predictor, "_dspy_predictor_name", name)
+            return predictor_id_to_name
+
         async def execute_with_advice(attempt: SamplingAttempt) -> tuple[Prediction, list]:
             lm_copy = attempt.lm.copy(temperature=1.0)
             mod = attempt.module.deepcopy()
             mod.set_lm(lm_copy)
+            stamp_predictor_names(mod)
             if not advice:
                 return await run_with_trace(mod, attempt.inputs, attempt.run, options=attempt.options)
-            task_spec2name = {predictor.task_spec: name for name, predictor in mod.named_predictors()}
             hint_adapter = HintInjectingAdapter(
                 inner=adapter,
                 hint_map=advice,
-                task_spec_to_name=task_spec2name,
             )
             hint_run = attempt.run.fork(adapter=hint_adapter)
             return await run_with_trace(mod, attempt.inputs, hint_run, options=attempt.options)
@@ -73,11 +78,11 @@ class Refine(Module):
             nonlocal advice
             mod = attempt.module.deepcopy()
             mod.set_lm(attempt.lm.copy(temperature=1.0))
-            task_spec2name = {predictor.task_spec: name for name, predictor in mod.named_predictors()}
+            predictor_id_to_name = stamp_predictor_names(mod)
             module_names = [name for name, _ in mod.named_predictors()]
             modules = {"program_code": self.module_code, "modules_defn": inspect_modules(mod)}
             trajectory = [
-                {"module_name": task_spec2name[p.task_spec], "inputs": i, "outputs": dict(o)} for p, i, o in trace
+                {"module_name": predictor_id_to_name[id(p)], "inputs": i, "outputs": dict(o)} for p, i, o in trace
             ]
             trajectory_payload = {
                 "program_inputs": attempt.inputs,

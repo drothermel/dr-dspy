@@ -109,10 +109,9 @@ class AdapterWrapper(Adapter):
 class HintInjectingAdapter(AdapterWrapper):
     """Augments task inputs with ``hint_`` and delegates execution to ``_inner``."""
 
-    def __init__(self, inner: Adapter, hint_map: dict[str, str], task_spec_to_name: dict[TaskSpec, str]) -> None:
+    def __init__(self, inner: Adapter, hint_map: dict[str, str]) -> None:
         super().__init__(inner)
         self._hint_map = hint_map
-        self._task_spec_to_name = task_spec_to_name
 
     async def __call__(
         self,
@@ -126,7 +125,7 @@ class HintInjectingAdapter(AdapterWrapper):
         call_site: CallSite | None = None,
     ) -> list[dict[str, Any]]:
         self._sync_from_inner()
-        hint_name = self._task_spec_to_name.get(task_spec, "N/A")
+        hint_name = call_site.predictor_name if call_site is not None and call_site.predictor_name else "N/A"
         inputs = dict(inputs)
         inputs["hint_"] = self._hint_map.get(hint_name, "N/A")
         hinted_task_spec = task_spec.append(

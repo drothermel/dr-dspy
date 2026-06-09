@@ -27,6 +27,13 @@ ToOpenAIRequestFn = Callable[[LMRequest], dict[str, Any]]
 ToLMResponseFn = Callable[[Any, LMRequest], LMResponse]
 
 _DEFAULT_LITELLM_CACHE = {"no-cache": True, "no-store": True}
+DEFAULT_LITELLM_TIMEOUT_SECONDS = 600
+
+
+def _with_default_timeout(request: dict[str, Any]) -> dict[str, Any]:
+    if "timeout" in request:
+        return request
+    return {**request, "timeout": DEFAULT_LITELLM_TIMEOUT_SECONDS}
 
 
 class LitellmCompletionName(StrEnum):
@@ -45,7 +52,7 @@ class ModelTypeRoute(BaseModel):
 
 async def alitellm_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
     cache = cache or _DEFAULT_LITELLM_CACHE
-    request = dict(request)
+    request = _with_default_timeout(dict(request))
     headers = _add_dspy_identifier_to_headers(request.pop("headers", None))
     return await _get_litellm().acompletion(
         cache=cache, num_retries=num_retries, retry_strategy="exponential_backoff_retry", headers=headers, **request
@@ -54,7 +61,7 @@ async def alitellm_completion(request: dict[str, Any], num_retries: int, cache: 
 
 async def alitellm_text_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
     cache = cache or _DEFAULT_LITELLM_CACHE
-    request = dict(request)
+    request = _with_default_timeout(dict(request))
     model = request.pop("model")
     headers = request.pop("headers", None)
     provider, model_name = split_provider_model(model)
@@ -76,7 +83,7 @@ async def alitellm_text_completion(request: dict[str, Any], num_retries: int, ca
 
 async def alitellm_responses_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
     cache = cache or _DEFAULT_LITELLM_CACHE
-    request = dict(request)
+    request = _with_default_timeout(dict(request))
     headers = request.pop("headers", None)
     return await _get_litellm().aresponses(
         cache=cache,

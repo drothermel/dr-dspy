@@ -7,6 +7,7 @@ from dspy.adapters.call.pipeline import AdapterCallPipeline
 from dspy.adapters.call.wrappers import HintInjectingAdapter
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.clients.lm import LM
+from dspy.runtime.config import CallSite
 from tests.adapters.conftest import CapturingLM, StopAdapterCallCapture, make_adapter_run
 from tests.task_spec.helpers import ts
 
@@ -21,7 +22,6 @@ async def test_hint_injecting_adapter_pipelines_inner_not_wrapper_format():
     wrapper = HintInjectingAdapter(
         inner=inner,
         hint_map={hinted_name: "try again"},
-        task_spec_to_name={task_spec: hinted_name},
     )
 
     lm = CapturingLM()
@@ -38,6 +38,7 @@ async def test_hint_injecting_adapter_pipelines_inner_not_wrapper_format():
                 demos=[],
                 inputs={"question": "What is DSPy?"},
                 run=run,
+                call_site=CallSite(module="Predict", predictor_name=hinted_name),
             )
 
     pipeline_spy.assert_awaited_once()
@@ -54,7 +55,7 @@ async def test_hint_injecting_adapter_pipelines_inner_not_wrapper_format():
 @pytest.mark.asyncio
 async def test_hint_injecting_adapter_refreshes_policies_from_inner():
     inner = ChatAdapter()
-    wrapper = HintInjectingAdapter(inner=inner, hint_map={}, task_spec_to_name={})
+    wrapper = HintInjectingAdapter(inner=inner, hint_map={})
     from dspy.adapters.call.policies.response_format import NoOpResponseFormatPolicy
 
     new_policy = NoOpResponseFormatPolicy()
@@ -70,7 +71,6 @@ async def test_hint_injecting_adapter_injects_hint_into_user_message():
     wrapper = HintInjectingAdapter(
         inner=inner,
         hint_map={"predict": "focus on brevity"},
-        task_spec_to_name={task_spec: "predict"},
     )
     lm = CapturingLM(LM("openai/gpt-4o-mini"))
     with pytest.raises(StopAdapterCallCapture):
@@ -81,6 +81,7 @@ async def test_hint_injecting_adapter_injects_hint_into_user_message():
             demos=[],
             inputs={"question": "What is DSPy?"},
             run=make_adapter_run(lm=lm, adapter=wrapper),
+            call_site=CallSite(module="Predict", predictor_name="predict"),
         )
     user_message = lm.calls[0]["request"].messages[-1].text
     assert isinstance(user_message, str)
@@ -89,10 +90,10 @@ async def test_hint_injecting_adapter_injects_hint_into_user_message():
 
 
 @pytest.mark.asyncio
-async def test_hint_injecting_adapter_uses_na_for_unknown_task_spec():
+async def test_hint_injecting_adapter_uses_na_for_unknown_predictor_name():
     inner = ChatAdapter()
     task_spec = ts("question -> answer", instructions="Answer the question.")
-    wrapper = HintInjectingAdapter(inner=inner, hint_map={}, task_spec_to_name={})
+    wrapper = HintInjectingAdapter(inner=inner, hint_map={})
     lm = CapturingLM(LM("openai/gpt-4o-mini"))
     with pytest.raises(StopAdapterCallCapture):
         await wrapper(
@@ -113,7 +114,7 @@ async def test_hint_injecting_adapter_syncs_capabilities_on_each_call():
     from dataclasses import replace
 
     inner = ChatAdapter()
-    wrapper = HintInjectingAdapter(inner=inner, hint_map={}, task_spec_to_name={})
+    wrapper = HintInjectingAdapter(inner=inner, hint_map={})
     inner.capabilities = replace(inner.capabilities, supports_finetune=not inner.capabilities.supports_finetune)
     task_spec = ts("question -> answer", instructions="Answer.")
     lm = CapturingLM(LM("openai/gpt-4o-mini"))

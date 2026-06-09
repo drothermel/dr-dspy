@@ -10,7 +10,6 @@ from dspy.primitives.python_interpreter import PythonInterpreter  # noqa: TC001 
 
 _PYTHON_FENCE_LANGS = frozenset({"python", "py", "python3", "py3", ""})
 
-_PYTHON_FENCE_PATTERN = re.compile(r"```python[ \n](.*?)[ \n]```?", re.DOTALL)
 _LAST_LINE_ASSIGN_PATTERN = re.compile(r"^(\w+)\s*=")
 
 
@@ -22,8 +21,7 @@ def _generated_code_from_data(code_data: Prediction | Mapping[str, Any]) -> str:
 
 def parse_generated_code(code_data: Prediction | Mapping[str, Any]) -> tuple[str, str | None]:
     code = _generated_code_from_data(code_data).split("---", 1)[0].split("\n\n\n", 1)[0]
-    code_match = _PYTHON_FENCE_PATTERN.search(code)
-    code_block = code_match.group(1) if code_match else code
+    code_block = strip_python_fences(code)
     if not code_block:
         return code, "Error: Empty code after parsing."
     if "\n" not in code_block and code_block.count("=") > 1:

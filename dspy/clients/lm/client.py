@@ -187,6 +187,8 @@ class LM(BaseLM):
 
     def _check_truncation(self, results) -> None:
         if self.model_type != "responses" and any(c.finish_reason == "length" for c in results["choices"]):
+            max_tokens = self.kwargs.get("max_tokens", "unset")
+            temperature = self.kwargs.get("temperature", "unset")
             logger.warning(
-                f"LM response was truncated due to exceeding max_tokens={self.kwargs['max_tokens']}. You can inspect the latest LM interactions with `run.inspect_call_log()`. To avoid truncation, consider passing a larger max_tokens when setting up LM. You may also consider increasing the temperature (currently {self.kwargs['temperature']})  if the reason for truncation is repetition."
+                f"LM response was truncated due to exceeding max_tokens={max_tokens}. You can inspect the latest LM interactions with `run.inspect_call_log()`. To avoid truncation, consider passing a larger max_tokens when setting up LM. You may also consider increasing the temperature (currently {temperature})  if the reason for truncation is repetition."
             )

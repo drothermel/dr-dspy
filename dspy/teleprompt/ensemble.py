@@ -12,6 +12,8 @@ from dspy.teleprompt.registry import register_teleprompter
 
 @register_teleprompter(params=EnsembleCompileParams)
 class Ensemble:
+    """Compile an ensemble of programs. Sampling is intentionally nondeterministic unless ``deterministic`` is enabled."""
+
     def __init__(self, *, reduce_fn=None, size=None, deterministic=False) -> None:
         assert deterministic is False, "Deterministic ensemble is not supported; Example is intentionally unhashable."
         self.reduce_fn = reduce_fn

@@ -184,7 +184,7 @@ class COPRO:
                         )
                     if len(candidates_) - self.breadth <= c_i:
                         latest_scores.append(score)
-                if self.track_stats:
+                if self.track_stats and latest_scores:
                     results_latest[id(p_old)]["depth"].append(d)
                     results_latest[id(p_old)]["max"].append(max(latest_scores))
                     results_latest[id(p_old)]["average"].append(sum(latest_scores) / len(latest_scores))

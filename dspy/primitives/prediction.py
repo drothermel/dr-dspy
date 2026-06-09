@@ -132,7 +132,7 @@ class Completions(RecordBacked):
                 for k, v in arg.items():
                     kwargs.setdefault(k, []).append(v)
         else:
-            kwargs = list_or_dict
+            kwargs = {k: list(v) for k, v in list_or_dict.items()}
         self._validate_completion_lists(kwargs)
         object.__setattr__(self, "_completions", kwargs)
 

@@ -4,6 +4,7 @@ from dspy.runtime.run_context import RunContext
 
 
 def create_minibatch(*, trainset, batch_size=50, rng=None):
+    """Sample a minibatch. When ``rng`` is ``None``, sampling is nondeterministic."""
     batch_size = min(batch_size, len(trainset))
     rng = rng or random
     sampled_indices = rng.sample(range(len(trainset)), batch_size)
@@ -11,6 +12,7 @@ def create_minibatch(*, trainset, batch_size=50, rng=None):
 
 
 async def eval_candidate_program(*, batch_size, trainset, candidate_program, evaluate, run: RunContext, rng=None):
+    """Evaluate a candidate program. Pass ``rng`` for deterministic minibatch sampling."""
     if batch_size >= len(trainset):
         return await evaluate(
             candidate_program, run=run, devset=trainset, callback_metadata={"metric_key": "eval_full"}

@@ -20,6 +20,7 @@ class CallSite(BaseModel):
     module: str
     phase: str = "predict"
     lm_role: str = "default"
+    predictor_name: str | None = None
 
 
 class ExecutionConfig(BaseModel):

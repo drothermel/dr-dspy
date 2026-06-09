@@ -167,10 +167,16 @@ class Predict(Module):
             run=run,
         )
         config = merge_call_config(lm, config)
-        call_site = resolve_call_site(
+        base_call_site = resolve_call_site(
             run=run,
             default_module=type(self).__name__,
             default_phase="predict",
+        )
+        predictor_name = getattr(self, "_dspy_predictor_name", None)
+        call_site = (
+            base_call_site.model_copy(update={"predictor_name": predictor_name})
+            if predictor_name is not None
+            else base_call_site
         )
         completions = await run.adapter(
             lm=lm,
