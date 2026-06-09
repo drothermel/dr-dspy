@@ -4,7 +4,7 @@ import pydantic
 import pytest
 
 from dspy.adapters.types.code import Code
-from dspy.utils.source_format import get_formatted_source
+from dspy.propose.source_format import get_formatted_source
 
 
 def test_code_validate_input():

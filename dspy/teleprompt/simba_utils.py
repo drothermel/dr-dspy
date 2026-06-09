@@ -8,12 +8,12 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
+from dspy.propose.source_format import get_formatted_source
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.formatting import get_field_spec_description_string
 from dspy.teleprompt.task_spec_context import get_prompt_model, get_task_spec, set_task_spec
 from dspy.teleprompt.utils import optimizer_lm_context, run_program_with_trace
-from dspy.utils.source_format import get_formatted_source
 
 logger = logging.getLogger(__name__)
 

@@ -15,9 +15,9 @@ from dspy.primitives.code_interpreter import FinalOutput
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
+from dspy.propose.source_format import get_formatted_source
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
-from dspy.utils.source_format import get_formatted_source
 
 logger = logging.getLogger(__name__)
 

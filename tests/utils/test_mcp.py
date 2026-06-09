@@ -4,7 +4,7 @@ import importlib.util
 
 import pytest
 
-from dspy.utils.mcp import convert_mcp_tool
+from dspy.integrations.mcp import convert_mcp_tool
 
 if importlib.util.find_spec("mcp") is None:
     pytest.skip(reason="mcp is not installed", allow_module_level=True)

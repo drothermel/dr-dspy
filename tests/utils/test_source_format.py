@@ -1,4 +1,4 @@
-from dspy.utils.source_format import get_formatted_source
+from dspy.propose.source_format import get_formatted_source
 
 
 def _sample_with_docstring_and_comment(x: int) -> int:

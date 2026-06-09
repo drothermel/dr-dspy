@@ -132,13 +132,13 @@ class Tool(Type):
 
     @classmethod
     def from_mcp_tool(cls, session: "mcp.ClientSession", tool: "mcp.types.Tool") -> "Tool":
-        from dspy.utils.mcp import convert_mcp_tool
+        from dspy.integrations.mcp import convert_mcp_tool
 
         return convert_mcp_tool(session=session, tool=tool)
 
     @classmethod
     def from_langchain(cls, tool: "BaseTool") -> "Tool":
-        from dspy.utils.langchain_tool import convert_langchain_tool
+        from dspy.integrations.langchain import convert_langchain_tool
 
         return convert_langchain_tool(tool)
 
