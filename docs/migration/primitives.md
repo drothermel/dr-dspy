@@ -26,6 +26,12 @@ from dspy.primitives import BatchFailure, BatchResult, Example, Module, Predicti
 | `Parallel.failed_examples` / `Parallel.exceptions` | removed; use `BatchResult.failures` |
 | `sync_file` JSON-RPC notification | request/response; failures raise `CodeInterpreterError` |
 | Save-time `.pkl` warning text | describes save semantics, not load |
+| `dspy.persistence.load(...)` | `dspy.persistence.load_program(...) -> Module` |
+| `Embeddings.from_saved(path, embedder)` | `dspy.persistence.load_embeddings(path, embedder=embedder)` |
+| `Module.load(...)` returns `None` | returns `Self` (supports chaining) |
+| `Module.load_state` / `Module.load` without `custom_types` | both accept optional `custom_types` for `TaskSpec.from_dict` |
+
+See `docs/migration/persistence.md` for the persistence spine API.
 
 ## Module invocation
 

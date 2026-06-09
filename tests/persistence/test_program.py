@@ -1,11 +1,12 @@
 import asyncio
 import logging
+import sys
 from unittest.mock import patch
 
 import pytest
 from typing_extensions import override
 
-from dspy.persistence import load_program
+from dspy.persistence import load_program, logger
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module
@@ -93,9 +94,7 @@ def test_save_compiled_model(tmp_path, make_run):
     assert compiled_predict.task_spec == loaded_predict.task_spec
 
 
-def test_load_with_version_mismatch(tmp_path):
-    from dspy.persistence import logger
-
+def test_load_program_with_version_mismatch(tmp_path):
     save_versions = {"python": "3.9", "dspy": "2.4.0", "cloudpickle": "2.0"}
     load_versions = {"python": "3.10", "dspy": "2.5.0", "cloudpickle": "2.1"}
     predict = Predict(QA_TASK_SPEC)
@@ -137,21 +136,34 @@ def test_pickle_loading_requires_explicit_permission(tmp_path):
     assert isinstance(loaded_predict, Predict)
 
 
-def test_pkl_file_loading_requires_explicit_permission(tmp_path):
-    predict = Predict(QA_TASK_SPEC)
-    pkl_path = tmp_path / "model.pkl"
-    predict.save(pkl_path)
-    new_predict = Predict(QA_TASK_SPEC)
-    with pytest.raises(ValueError, match=r"Loading \.pkl files can run arbitrary code"):
-        new_predict.load(pkl_path)
-    new_predict.load(pkl_path, allow_pickle=True)
-    assert new_predict.dump_state() == predict.dump_state()
+def test_save_with_extra_modules(tmp_path, make_run):
+    custom_module_path = tmp_path / "custom_module.py"
+    with open(custom_module_path, "w") as f:
+        f.write(
+            '\nfrom dspy.predict.chain_of_thought import ChainOfThought\nfrom dspy.primitives import Module\nfrom dspy.task_spec import make_task_spec\n\nclass MyModule(Module):\n    def __init__(self):\n        self.cot = ChainOfThought(make_task_spec("q -> a", instructions="Answer the question."))\n\n    async def _aforward_impl(self, q):\n        return await self.cot(q=q)\n'
+        )
+    sys.path.insert(0, str(tmp_path))
+    try:
+        import custom_module
 
+        cot = custom_module.MyModule()
+        cot.save(tmp_path, save_program=True)
+        sys.modules.pop("custom_module", None)
+        sys.path.remove(str(tmp_path))
+        del custom_module
+        with pytest.raises(ModuleNotFoundError):
+            load_program(tmp_path, allow_pickle=True)
+        sys.path.insert(0, str(tmp_path))
+        import custom_module
 
-def test_json_file_loading_works_without_permission(tmp_path):
-    predict = Predict(QA_TASK_SPEC)
-    json_path = tmp_path / "model.json"
-    predict.save(json_path)
-    new_predict = Predict(QA_TASK_SPEC)
-    new_predict.load(json_path)
-    assert new_predict.dump_state() == predict.dump_state()
+        cot.save(tmp_path, modules_to_serialize=[custom_module], save_program=True)
+        sys.modules.pop("custom_module", None)
+        sys.path.remove(str(tmp_path))
+        del custom_module
+        loaded_module = load_program(tmp_path, allow_pickle=True)
+        loaded_cot = getattr(loaded_module, "cot", None)
+        assert loaded_cot is not None
+        assert loaded_cot.predict.task_spec == cot.cot.predict.task_spec
+    finally:
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))

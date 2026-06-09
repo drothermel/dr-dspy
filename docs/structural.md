@@ -411,6 +411,8 @@ removed internal wire helpers from public `dspy.task_spec` exports.
 
 ### P2.4 Centralize persistence ownership
 
+**Status:** Done (2026-06).
+
 **Sources:** External cross-package review.
 
 Problem:
@@ -433,6 +435,15 @@ Details to preserve:
 
 - Existing file formats and dependency-version warnings should remain stable.
 - Behavior-changing schema hardening belongs in `docs/behavioral.md`.
+
+**Delivered:** `dspy/persistence/{metadata,state,program,embeddings}.py` facade;
+`Module.save` / `load` / `dump_state` / `load_state` are thin delegates;
+`dspy.persistence.load_program(...) -> Module` replaces `load(...)`;
+`Embeddings.save` / `load` delegate to persistence; `Embeddings.from_saved`
+removed in favor of `dspy.persistence.load_embeddings`; unified pickle warnings
+and dependency drift logging on `dspy.persistence` logger; `custom_types`
+forwarded through `Module.load` / `load_state`; tests under
+`tests/persistence/{test_program,test_state}.py`.
 
 ## P3: Extract Shared Agent and Optimizer Control Flow
 
