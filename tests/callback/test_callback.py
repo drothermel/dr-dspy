@@ -9,12 +9,12 @@ from dspy.adapters.types.tool import Tool
 from dspy.core.types import LMConfig
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.module import Module
-from dspy.runtime.callback import ACTIVE_CALL_ID, BaseCallback, with_callbacks
+from dspy.runtime.callback import ACTIVE_CALL_ID, NoOpCallback, with_callbacks
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 
 
-class MyCallback(BaseCallback):
+class MyCallback(NoOpCallback):
     def __init__(self):
         self.calls = []
 
@@ -220,7 +220,7 @@ def test_tool_calls(make_run):
 
 def test_active_id(make_run):
 
-    class CustomCallback(BaseCallback):
+    class CustomCallback(NoOpCallback):
         def __init__(self):
             self.parent_call_ids = []
             self.call_ids = []

@@ -12,7 +12,7 @@ from dspy.evaluate.metrics import answer_exact_match
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
-from dspy.runtime.callback import BaseCallback
+from dspy.runtime.callback import NoOpCallback
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 
@@ -172,7 +172,7 @@ def test_evaluate_display_table(program_with_example, display_table, capfd, make
 
 def test_evaluate_callback(make_run):
 
-    class TestCallback(BaseCallback):
+    class TestCallback(NoOpCallback):
         def __init__(self):
             self.start_call_inputs = None
             self.start_call_count = 0

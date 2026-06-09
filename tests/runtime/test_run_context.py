@@ -5,7 +5,7 @@ import pytest
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.primitives.module import Module
 from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, TransparencyMode, resolve_run
-from dspy.runtime.callback import BaseCallback
+from dspy.runtime.callback import NoOpCallback
 from dspy.testing import DummyLM
 
 if TYPE_CHECKING:
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from dspy.core.types import CallRecord
 
 
-class _EchoCallback(BaseCallback):
+class _EchoCallback(NoOpCallback):
     pass
 
 
