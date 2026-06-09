@@ -97,28 +97,21 @@ def test_reasoning_effort_responses_api(make_run):
 
 
 def test_responses_api_converts_images_correctly():
-    from dspy.clients.openai_format.responses_compat import (
-        convert_chat_request_to_responses_request as _convert_chat_request_to_responses_request,
-    )
+    from dspy.clients.openai_format.responses_request import to_openai_responses_request
+    from dspy.core.types import LMConfig, LMImagePart, LMRequest, LMTextPart, User
 
-    request_with_base64_image = {
-        "model": "openai/gpt-5-mini",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "What's in this image?"},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-                        },
-                    },
-                ],
-            }
+    base64_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    request = LMRequest(
+        model="openai/gpt-5-mini",
+        messages=[
+            User(
+                LMTextPart(text="What's in this image?"),
+                LMImagePart(url=base64_url, media_type="image/png"),
+            )
         ],
-    }
-    result = _convert_chat_request_to_responses_request(request_with_base64_image)
+        config=LMConfig(),
+    )
+    result = to_openai_responses_request(request)
     assert "input" in result
     assert len(result["input"]) == 1
     assert result["input"][0]["role"] == "user"
@@ -127,17 +120,14 @@ def test_responses_api_converts_images_correctly():
     assert content[0]["type"] == "input_text"
     assert content[0]["text"] == "What's in this image?"
     assert content[1]["type"] == "input_image"
-    assert (
-        content[1]["image_url"]
-        == "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    assert content[1]["image_url"] == base64_url
+
+    url_request = LMRequest(
+        model="openai/gpt-5-mini",
+        messages=[User(LMImagePart(url="https://example.com/image.jpg", media_type="image/jpeg"))],
+        config=LMConfig(),
     )
-    request_with_url_image = {
-        "model": "openai/gpt-5-mini",
-        "messages": [
-            {"role": "user", "content": [{"type": "image_url", "image_url": {"url": "https://example.com/image.jpg"}}]}
-        ],
-    }
-    result = _convert_chat_request_to_responses_request(request_with_url_image)
+    result = to_openai_responses_request(url_request)
     content = result["input"][0]["content"]
     assert len(content) == 1
     assert content[0]["type"] == "input_image"
@@ -145,26 +135,24 @@ def test_responses_api_converts_images_correctly():
 
 
 def test_responses_api_converts_files_correctly():
-    from dspy.clients.openai_format.responses_compat import (
-        convert_chat_request_to_responses_request as _convert_chat_request_to_responses_request,
-    )
+    from dspy.clients.openai_format.responses_request import to_openai_responses_request
+    from dspy.core.types import LMBinaryPart, LMConfig, LMRequest, LMTextPart, User
 
-    request_with_file = {
-        "model": "openai/gpt-5-mini",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Analyze this file"},
-                    {
-                        "type": "file",
-                        "file": {"file_data": "data:text/plain;base64,SGVsbG8gV29ybGQ=", "filename": "test.txt"},
-                    },
-                ],
-            }
+    request = LMRequest(
+        model="openai/gpt-5-mini",
+        messages=[
+            User(
+                LMTextPart(text="Analyze this file"),
+                LMBinaryPart(
+                    data="SGVsbG8gV29ybGQ=",
+                    media_type="text/plain",
+                    filename="test.txt",
+                ),
+            )
         ],
-    }
-    result = _convert_chat_request_to_responses_request(request_with_file)
+        config=LMConfig(),
+    )
+    result = to_openai_responses_request(request)
     assert "input" in result
     assert len(result["input"]) == 1
     assert result["input"][0]["role"] == "user"
@@ -175,62 +163,54 @@ def test_responses_api_converts_files_correctly():
     assert content[1]["type"] == "input_file"
     assert content[1]["file_data"] == "data:text/plain;base64,SGVsbG8gV29ybGQ="
     assert content[1]["filename"] == "test.txt"
-    request_with_file_id = {
-        "model": "openai/gpt-5-mini",
-        "messages": [
-            {
-                "role": "user",
-                "content": [{"type": "file", "file": {"file_id": "file-abc123", "filename": "document.pdf"}}],
-            }
-        ],
-    }
-    result = _convert_chat_request_to_responses_request(request_with_file_id)
+
+    file_id_request = LMRequest(
+        model="openai/gpt-5-mini",
+        messages=[User(LMBinaryPart(file_id="file-abc123", filename="document.pdf", media_type="application/pdf"))],
+        config=LMConfig(),
+    )
+    result = to_openai_responses_request(file_id_request)
     content = result["input"][0]["content"]
     assert len(content) == 1
     assert content[0]["type"] == "input_file"
     assert content[0]["file_id"] == "file-abc123"
     assert content[0]["filename"] == "document.pdf"
-    request_with_all_fields = {
-        "model": "openai/gpt-5-mini",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "file",
-                        "file": {
-                            "file_data": "data:application/pdf;base64,JVBERi0xLjQ=",
-                            "file_id": "file-xyz789",
-                            "filename": "report.pdf",
-                        },
-                    }
-                ],
-            }
+
+    all_fields_request = LMRequest(
+        model="openai/gpt-5-mini",
+        messages=[
+            User(
+                LMBinaryPart(
+                    data="JVBERi0xLjQ=",
+                    filename="report.pdf",
+                    media_type="application/pdf",
+                )
+            )
         ],
-    }
-    result = _convert_chat_request_to_responses_request(request_with_all_fields)
+        config=LMConfig(),
+    )
+    result = to_openai_responses_request(all_fields_request)
     content = result["input"][0]["content"]
     assert content[0]["type"] == "input_file"
     assert content[0]["file_data"] == "data:application/pdf;base64,JVBERi0xLjQ="
-    assert content[0]["file_id"] == "file-xyz789"
     assert content[0]["filename"] == "report.pdf"
 
 
 def test_responses_api_preserves_multi_message_structure(make_run):
-    from dspy.clients.openai_format.responses_compat import (
-        convert_chat_request_to_responses_request as _convert_chat_request_to_responses_request,
-    )
+    from dspy.clients.openai_format.responses_request import to_openai_responses_request
+    from dspy.core.types import Assistant, LMConfig, LMRequest, System, User
 
-    request = {
-        "model": "openai/gpt-5-mini",
-        "messages": [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "What is 2+2?"},
-            {"role": "assistant", "content": "4"},
-            {"role": "user", "content": "And 3+3?"},
+    request = LMRequest(
+        model="openai/gpt-5-mini",
+        messages=[
+            System("You are a helpful assistant."),
+            User("What is 2+2?"),
+            Assistant("4"),
+            User("And 3+3?"),
         ],
-    }
-    result = _convert_chat_request_to_responses_request(request)
+        config=LMConfig(),
+    )
+    result = to_openai_responses_request(request)
     assert "input" in result
     assert len(result["input"]) == 4
     assert result["input"][0]["role"] == "system"

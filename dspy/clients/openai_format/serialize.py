@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
 import os
-from typing import Any
+from typing import Any, Literal
 
 import pydantic
 
@@ -15,6 +14,7 @@ from dspy.clients.openai_format.media import (
     read_path_base64,
 )
 from dspy.clients.openai_format.reasoning_models import is_openai_reasoning_model
+from dspy.clients.openai_format.tool_calls import tool_call_part_to_openai
 from dspy.core.types import (
     LMAudioPart,
     LMBinaryPart,
@@ -140,15 +140,24 @@ def tool_choice_to_openai(choice: LMToolChoice) -> dict[str, Any]:
 
 
 def assistant_tool_call_to_openai(call: LMToolCallPart) -> dict[str, Any]:
-    data = {"type": "function", "function": {"name": call.name, "arguments": json.dumps(call.args)}}
-    if call.id is not None:
-        data["id"] = call.id
-    data.update(call.provider_data)
-    return data
+    return tool_call_part_to_openai(call, include_provider_data=True)
 
 
 def tool_result_to_openai(result: LMToolResultPart) -> dict[str, Any]:
     return {"content": parts_to_openai_content(result.content)}
+
+
+def config_to_provider_kwargs(
+    config: LMConfig,
+    *,
+    model: str | None = None,
+    endpoint: Literal["chat", "responses", "text"] = "chat",
+) -> dict[str, Any]:
+    if endpoint == "text":
+        return text_config_kwargs(config)
+    if endpoint == "responses":
+        return responses_config_kwargs(config, model=model)
+    return common_config_kwargs(config, model=model, endpoint=endpoint)
 
 
 def common_config_kwargs(config: LMConfig, *, model: str | None = None, endpoint: str = "chat") -> dict[str, Any]:

@@ -28,7 +28,6 @@ from dspy.clients.openai_format import (
     usage_from_response,
 )
 from dspy.clients.openai_format.reasoning_models import is_openai_reasoning_model
-from dspy.clients.openai_format.responses_compat import convert_chat_request_to_responses_request
 from dspy.clients.provider import Provider, ReinforceJob, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat
 from dspy.core.types import LMRequest, LMResponse
@@ -366,7 +365,6 @@ async def alitellm_responses_completion(request: dict[str, Any], num_retries: in
     cache = cache or {"no-cache": True, "no-store": True}
     request = dict(request)
     headers = request.pop("headers", None)
-    request = convert_chat_request_to_responses_request(request)
     return await _get_litellm().aresponses(
         cache=cache,
         num_retries=num_retries,
