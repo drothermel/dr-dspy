@@ -103,7 +103,9 @@ def prepare_execution_tools(rlm: RLM, run: RunContext | None = None) -> dict[str
 
 
 def inject_execution_context(rlm: RLM, interpreter: CodeInterpreter, execution_tools: dict[str, Callable]) -> None:
-    interpreter.tools.update(execution_tools)
+    if not isinstance(interpreter, PythonInterpreter):
+        raise TypeError(f"Expected PythonInterpreter, got {type(interpreter).__name__}")
+    interpreter._tools.update(execution_tools)
     if hasattr(interpreter, "output_fields"):
         cast("Any", interpreter).output_fields = get_output_fields_info(rlm)
     if hasattr(interpreter, "_tools_registered"):

@@ -109,9 +109,9 @@ def test_extract_parameters():
 
     params = extract_parameters(example_fn)
     assert len(params) == 3
-    assert params[0] == {"name": "required", "type": "str"}
-    assert params[1] == {"name": "optional", "type": "int", "default": 5}
-    assert params[2] == {"name": "untyped", "default": None}
+    assert params[0].to_registration_dict() == {"name": "required", "type": "str"}
+    assert params[1].to_registration_dict() == {"name": "optional", "type": "int", "default": 5}
+    assert params[2].to_registration_dict() == {"name": "untyped", "default": None}
 
 
 def test_extract_parameters_complex_types():
@@ -121,5 +121,5 @@ def test_extract_parameters_complex_types():
 
     params = extract_parameters(complex_fn)
     assert len(params) == 2
-    assert params[0] == {"name": "items", "default": None}
-    assert params[1] == {"name": "data", "default": None}
+    assert params[0].to_registration_dict() == {"name": "items", "type": "list", "default": None}
+    assert params[1].to_registration_dict() == {"name": "data", "type": "dict", "default": None}

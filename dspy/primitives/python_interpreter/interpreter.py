@@ -1,6 +1,7 @@
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from os import PathLike
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -47,7 +48,7 @@ class PythonInterpreter:
         self.enable_env_vars = enable_env_vars or []
         self.enable_network_access = enable_network_access or []
         self.sync_files = sync_files
-        self.tools = dict(tools) if tools else {}
+        self._tools: dict[str, Callable[..., str]] = dict(tools) if tools else {}
         self.output_fields = output_fields
         self._tools_registered = False
         if deno_command:
@@ -82,6 +83,10 @@ class PythonInterpreter:
         self._request_id = 0
         self._owner_thread: int | None = None
         self._pending_large_vars = {}
+
+    @property
+    def tools(self) -> Mapping[str, Callable[..., str]]:
+        return MappingProxyType(self._tools)
 
     def _check_thread_ownership(self) -> None:
         current_thread = threading.current_thread().ident
