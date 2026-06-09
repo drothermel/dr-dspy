@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 from dspy.clients.finetune.provider import DefaultFinetuneProvider, TrainingJob
 from dspy.clients.model_id import split_provider_model
 from dspy.errors import LMUnsupportedFeatureError
+from dspy.integrations.finetune.databricks import DatabricksProvider
+from dspy.integrations.finetune.local import LocalProvider
 from dspy.integrations.finetune.openai import OpenAIProvider
 
 if TYPE_CHECKING:
@@ -19,6 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 def infer_provider(model: str) -> FinetuneProvider:
+    if DatabricksProvider.is_provider_model(model):
+        return DatabricksProvider()
+    if LocalProvider.is_provider_model(model):
+        return LocalProvider()
     if OpenAIProvider.is_provider_model(model):
         return OpenAIProvider()
     return DefaultFinetuneProvider()
@@ -40,7 +46,12 @@ def finetune(
 ) -> TrainingJob:
     if not lm.provider.finetunable:
         raise LMUnsupportedFeatureError(
-            f"Provider {lm.provider} does not support fine-tuning, please specify your provider by explicitly setting `provider` when creating the `dspy.clients.lm.LM` instance. For example, `from dspy.clients.lm import LM; from dspy.integrations.finetune.openai import OpenAIProvider; LM('openai/gpt-4.1-mini-2025-04-14', provider=OpenAIProvider())`.",
+            f"Provider {lm.provider} does not support fine-tuning. Pass `provider=` when creating "
+            f"`dspy.clients.lm.LM` for finetunable models: "
+            f"`databricks/{{endpoint}}` → `from dspy.integrations.finetune.databricks import DatabricksProvider`; "
+            f"`local:{{path}}` → `from dspy.integrations.finetune.local import LocalProvider`; "
+            f"`openai/{{model}}` or `ft:{{id}}` → `from dspy.integrations.finetune.openai import OpenAIProvider`. "
+            f"Example: `LM('openai/gpt-4.1-mini-2025-04-14', provider=OpenAIProvider())`.",
             model=lm.model,
             provider=split_provider_model(lm.model)[0],
             features=["finetuning"],

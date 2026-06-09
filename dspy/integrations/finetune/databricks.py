@@ -49,8 +49,8 @@ class DatabricksProvider:
     ReinforceJob: type[ReinforceJobProtocol] = _UnsupportedReinforceJob
 
     @staticmethod
-    def is_provider_model(_model: str) -> bool:
-        return False
+    def is_provider_model(model: str) -> bool:
+        return model.startswith("databricks/")
 
     @staticmethod
     def launch(_lm: Any, _launch_kwargs: dict[str, Any] | None = None) -> None:

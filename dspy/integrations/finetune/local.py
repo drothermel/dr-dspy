@@ -39,6 +39,10 @@ class LocalProvider:
     ReinforceJob: type[ReinforceJobProtocol] = _UnsupportedReinforceJob
 
     @staticmethod
+    def is_provider_model(model: str) -> bool:
+        return model.startswith("local:")
+
+    @staticmethod
     def launch(lm: LM, launch_kwargs: dict[str, Any] | None = None) -> None:
         if not _sglang_available():
             raise ImportError(
@@ -166,7 +170,7 @@ class LocalProvider:
         logger.info(f"Starting local training, will save to {output_dir}")
         train_sft_locally(model_name=model, train_data=train_data, train_kwargs=train_kwargs)
         logger.info("Training complete")
-        return f"openai/local:{output_dir}"
+        return f"local:{output_dir}"
 
 
 def create_output_dir(model_name, data_path):
