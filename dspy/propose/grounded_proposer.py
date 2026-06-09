@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 __all__ = ["GroundedProposer"]
 
 MAX_INSTRUCT_IN_HISTORY = 5
+PROGRAM_AWARE_INPUT_KEYS = frozenset({"program_code", "program_description", "module", "module_description"})
 TIPS = {
     "none": "",
     "creative": "Don't be afraid to be creative when creating the new instruction!",
@@ -196,12 +197,13 @@ class GenerateModuleInstruction(Module):
             )
             example_strings = gather_examples_from_sets(candidate_sets=adjacent_sets, max_examples=num_demos_in_context)
             task_demos = "\n\n".join(example_strings) + "\n\n"
-        if not task_demos.strip() or demo_set_i == 0:
+        if not task_demos.strip():
             task_demos = "No task demos provided."
         program_description = "Not available"
         module_code = "Not provided"
         module_description = "Not provided"
-        if self.program_aware:
+        program_aware = self.program_aware
+        if program_aware:
             try:
                 program_description = strip_prefix(
                     (
@@ -230,8 +232,14 @@ class GenerateModuleInstruction(Module):
                     )
                 ).module_description
             except Exception:
-                logger.debug("Program-aware instruction proposal failed; disabling program_aware.", exc_info=True)
-                self.program_aware = False
+                logger.warning(
+                    "Program-aware instruction proposal failed for this call; continuing without program context.",
+                    exc_info=True,
+                )
+                program_aware = False
+                program_description = "Not available"
+                module_code = "Not provided"
+                module_description = "Not provided"
         instruction_inputs = {
             "dataset_description": data_summary,
             "program_code": self.program_code_string,
@@ -247,7 +255,9 @@ class GenerateModuleInstruction(Module):
         filtered_inputs = {
             key: value
             for key, value in instruction_inputs.items()
-            if key in task_spec.fields and task_spec.fields[key].role == "input"
+            if key in task_spec.fields
+            and task_spec.fields[key].role == "input"
+            and (program_aware or key not in PROGRAM_AWARE_INPUT_KEYS)
         }
         instruct = await self.generate_module_instruction(**filtered_inputs, run=run)
         proposed_instruction = strip_prefix(instruct.proposed_instruction)
@@ -320,23 +330,21 @@ class GroundedProposer:
     ) -> dict[int, list[str]]:
         await self._ensure_data_summary(run=run)
         proposed_instructions = {}
+        use_instruct_history = self.use_instruct_history
         if self.set_history_randomly:
-            use_history = self.rng.random() < 0.5
-            self.use_instruct_history = use_history
-        if not demo_candidates:
-            self.use_task_demos = False
-            num_demos = num_candidates
-        else:
-            num_demos = max(len(demo_candidates[0]), 1)
+            use_instruct_history = self.rng.random() < 0.5
+        use_task_demos = self.use_task_demos and bool(demo_candidates)
+        num_demos = num_candidates if not demo_candidates else max(len(demo_candidates[0]), 1)
         for pred_i, predictor in enumerate(program.predictors()):
             for demo_set_i in range(num_demos)[: min(num_candidates, num_demos)]:
                 if pred_i not in proposed_instructions:
                     proposed_instructions[pred_i] = []
                 selected_tip = None
+                use_tip = self.use_tip
                 if self.set_tip_randomly:
                     selected_tip_key = self.rng.choice(list(TIPS.keys()))
                     selected_tip = TIPS[selected_tip_key]
-                    self.use_tip = bool(selected_tip)
+                    use_tip = bool(selected_tip)
                 proposed_instructions[pred_i].append(
                     await self.propose_instruction_for_predictor(
                         program=program,
@@ -346,6 +354,9 @@ class GroundedProposer:
                         demo_set_i=demo_set_i,
                         trial_logs=trial_logs,
                         tip=selected_tip,
+                        use_task_demos=use_task_demos,
+                        use_instruct_history=use_instruct_history,
+                        use_tip=use_tip,
                         run=run,
                     )
                 )
@@ -361,19 +372,28 @@ class GroundedProposer:
         trial_logs: TrialLogs,
         tip=None,
         *,
+        use_task_demos: bool | None = None,
+        use_instruct_history: bool | None = None,
+        use_tip: bool | None = None,
         run,
     ) -> str:
         await self._ensure_data_summary(run=run)
         instruction_history = create_predictor_level_history_string(
             base_program=program, predictor_i=pred_i, trial_logs=trial_logs, top_n=MAX_INSTRUCT_IN_HISTORY
         )
+        effective_use_task_demos = (
+            self.use_task_demos and bool(demo_candidates) if use_task_demos is None else use_task_demos
+        )
+        base_use_instruct_history = self.use_instruct_history if use_instruct_history is None else use_instruct_history
+        effective_use_instruct_history = base_use_instruct_history and bool(instruction_history)
+        effective_use_tip = self.use_tip if use_tip is None else use_tip
         instruction_generator = GenerateModuleInstruction(
             program_code_string=self.program_code_string,
             use_dataset_summary=self.use_dataset_summary,
             program_aware=self.program_aware,
-            use_task_demos=self.use_task_demos and demo_candidates,
-            use_instruct_history=self.use_instruct_history and instruction_history,
-            use_tip=self.use_tip,
+            use_task_demos=effective_use_task_demos,
+            use_instruct_history=effective_use_instruct_history,
+            use_tip=effective_use_tip,
             verbose=self.verbose,
         )
         rollout_lm = get_prompt_model(self.prompt_model, run).copy(temperature=self.init_temperature)
