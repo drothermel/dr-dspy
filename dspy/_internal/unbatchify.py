@@ -29,6 +29,8 @@ class Unbatchify(Generic[InputT, OutputT]):
         self.worker_thread.start()
 
     def __call__(self, input_item: InputT) -> OutputT:
+        if self._closed:
+            raise RuntimeError("Unbatchify is closed")
         future: Future[OutputT] = Future()
         self.input_queue.put((input_item, future))
         return future.result()
@@ -48,7 +50,9 @@ class Unbatchify(Generic[InputT, OutputT]):
             if batch:
                 try:
                     outputs = self.batch_fn(batch)
-                    for output, future in zip(outputs, futures, strict=False):
+                    if len(outputs) != len(futures):
+                        raise RuntimeError(f"batch_fn returned {len(outputs)} output(s) for {len(futures)} input(s)")
+                    for output, future in zip(outputs, futures, strict=True):
                         future.set_result(output)
                 except Exception as e:
                     for future in futures:

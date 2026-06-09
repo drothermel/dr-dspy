@@ -3,6 +3,8 @@ from concurrent.futures import Future
 from typing import Any, cast
 from unittest.mock import MagicMock
 
+import pytest
+
 from dspy._internal.unbatchify import Unbatchify
 
 
@@ -55,4 +57,24 @@ def test_unbatchify_timeout_trigger():
     assert batch_fn_mock.call_count == 1
     batch_fn_mock.assert_called_once_with([100, 200])
     assert results == [101, 201]
+    unbatcher.close()
+
+
+def test_unbatchify_rejects_calls_after_close():
+    unbatcher = Unbatchify(batch_fn=simple_batch_processor, max_batch_size=1, max_wait_time=0.01)
+    unbatcher.close()
+    with pytest.raises(RuntimeError, match="Unbatchify is closed"):
+        unbatcher(1)
+
+
+def test_unbatchify_output_count_mismatch_fails_futures():
+    def short_batch_fn(batch):
+        return [batch[0] + 1]
+
+    unbatcher: Any = Unbatchify(batch_fn=short_batch_fn, max_batch_size=2, max_wait_time=5.0)
+    futures = [unbatcher.submit(10), unbatcher.submit(20)]
+    with pytest.raises(RuntimeError, match="batch_fn returned 1 output\\(s\\) for 2 input\\(s\\)"):
+        futures[0].result(timeout=2)
+    with pytest.raises(RuntimeError, match="batch_fn returned 1 output\\(s\\) for 2 input\\(s\\)"):
+        futures[1].result(timeout=2)
     unbatcher.close()
