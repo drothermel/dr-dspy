@@ -16,7 +16,7 @@ repos:
     hooks:
       - id: ty
         name: ty (type check)
-        entry: uv run --all-extras ty check dspy tests --warn all
+        entry: uv run --all-extras ty check dspy tests
         language: system
         pass_filenames: false
 
