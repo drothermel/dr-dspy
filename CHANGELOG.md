@@ -7,6 +7,7 @@
 - Legacy cleanup (11 phases): centralized LM field normalization (`reasoning_effort` removed from `LMProviderOptions`; use `reasoning={"effort": ...}`); explicit `adapter` required on all `RunContext` modes; `num_threads` renamed to `max_concurrency`; call provenance threaded via `RunContext.call_site` and explicit `compiled=` (context vars removed); `Tool` sync `__call__` no longer runs async tools; `acall` aliases removed from `Module`, `BaseLM`, `Embedding`, `KNN`, and `Adapter`; retrievers are async-only (`await retriever(query)`); teleprompters use nested `params=` (`XCompileParams`) with `run=` top-level.
 - Adapter formatting/parsing cleanup: shared `AdapterFormatMixin` scaffolding (including `TwoStepAdapter` turn_log handling); centralized `validate_task_inputs` in `AdapterCallPipeline` (Predict no longer validates separately).
 - Teleprompt cleanup: shared helpers in `dspy.teleprompt.utils` (`resolve_max_errors`, `make_optimizer_evaluator`, `run_program_with_trace`, `trace_to_demos`); Optuna integrations use native async `study.ask()` / `study.tell()` loops (removed `run_async_from_sync` / executor bridges); GEPA runs `gepa.optimize` in a worker thread and requires async instruction proposers (`AsyncProposalFn`).
+- Teleprompt structural cutover (see `docs/migration/teleprompt.md`): `compile(...) -> CompileResult` with `.program`, `.candidates`, `.stats`; registry-backed `@register_teleprompter` params; typed candidate seed ladder; BetterTogether `strategy: list[str]`; removed module optimizer metadata attrs and deleted `TelepromptOptunaCompileParams` / `PassthroughCompileParams` / `demo_sets.py`.
 - Dataset integrations moved under `dspy.integrations.datasets` (`HotPotQA`, `GSM8K`, `MATH`, `examples_from_huggingface`, `AlfWorld`); spine keeps `dspy.datasets.dataset` and `dspy.datasets.rows`. Removed spine `DataLoader`, `Colors`, and `Dataset.prepare_by_seed`. `HuggingFaceDataLoader` replaced by module functions (`examples_from_huggingface`, `examples_from_csv`, …). `AlfWorld` uses `.train` / `.dev` instead of `.trainset` / `.devset`.
 - `Evaluate` moved to `dspy.evaluate.evaluator`; `dspy.clients.openai_format` package barrel removed (import submodules directly).
 - Python interpreter sync tool path rejects coroutine returns (`await_in_sync` removed); use synchronous tool callables.
@@ -34,7 +35,7 @@
 
 ```python
 # Teleprompter evaluation helpers
-from dspy.teleprompt.utils import make_optimizer_evaluator, resolve_max_errors, run_program_with_trace
+from dspy.teleprompt import make_optimizer_evaluator, resolve_max_errors, run_program_with_trace
 
 evaluate = make_optimizer_evaluator(
     run,
@@ -44,6 +45,16 @@ evaluate = make_optimizer_evaluator(
     max_errors=resolve_max_errors(None, run),
 )
 prediction, trace = await run_program_with_trace(program, example, run)
+
+# Teleprompter compile returns CompileResult
+from dspy.teleprompt import BootstrapFewShot, BootstrapFewShotCompileParams
+
+result = await teleprompter.compile(
+    student,
+    params=BootstrapFewShotCompileParams(trainset=trainset),
+    run=run,
+)
+program = result.program
 
 # GEPA custom instruction proposers must be async
 from dspy.integrations.optimizers.gepa.adapter import AsyncProposalFn

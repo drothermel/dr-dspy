@@ -42,13 +42,14 @@ parallel = Parallel(max_concurrency=8)
 results = await parallel([(module, example), ...])
 
 # Optimizers
-from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
+from dspy.teleprompt import BootstrapFewShot, BootstrapFewShotCompileParams
 
-compiled = await teleprompter.compile(
+result = await teleprompter.compile(
     student,
     params=BootstrapFewShotCompileParams(trainset=trainset),
     run=run,
 )
+program = result.program
 ```
 
 ## TaskSpec (not Signature)
@@ -228,11 +229,10 @@ See `docs/migration/call-options.md` for before/after examples.
 
 Optimizer/bootstrap teacher contexts must include a configured `adapter` (use `optimizer_lm_context` from `dspy.teleprompt.utils`).
 
-Teleprompter evaluation helpers live in `dspy.teleprompt.utils`; optimization trace helpers live in `dspy.teleprompt.trace_helpers`:
+Teleprompter evaluation helpers live in `dspy.teleprompt` (also `dspy.teleprompt.utils` and `dspy.teleprompt.trace_helpers`); optimization trace helpers live in `dspy.teleprompt.trace_helpers`:
 
 ```python
-from dspy.teleprompt.trace_helpers import run_program_with_trace, trace_to_demos
-from dspy.teleprompt.utils import make_optimizer_evaluator, resolve_max_errors
+from dspy.teleprompt import make_optimizer_evaluator, resolve_max_errors, run_program_with_trace, trace_to_demos
 
 evaluate = make_optimizer_evaluator(
     run,
