@@ -6,7 +6,7 @@ from dspy.adapters.call.tool_output import attach_tool_calls_to_value
 from dspy.compile.resolve import resolve_call, resolve_lm_config
 from dspy.core.types import LMRequest
 from dspy.core.types.config import coerce_lm_config, merge_lm_request_config
-from dspy.core.types.history import _history_request_messages_as_openai
+from dspy.core.types.openai_compat import request_messages_as_openai
 from dspy.utils.exceptions import AdapterParseError, LMError
 from dspy.utils.transparency import validate_compiled_call
 
@@ -45,7 +45,7 @@ class TwoStepCallExecutor:
             task_spec=task_spec,
             config=merged_config,
             config_provenance=provenance,
-            messages=_history_request_messages_as_openai(request),
+            messages=request_messages_as_openai(request),
             module="TwoStepAdapter",
             phase="two_step.main",
             lm_role="default",

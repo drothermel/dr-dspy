@@ -15,12 +15,12 @@ from dspy.core.types.parts import (
     LMToolCallPart,
     LMToolResultPart,
     LMVideoPart,
-    _split_data_uri,
 )
+from dspy.core.types.parts.openai import _split_data_uri
 from dspy.core.types.request import LMRequest
 
 
-def _history_request_prompt(request: LMRequest) -> str | None:
+def request_prompt(request: LMRequest) -> str | None:
     if len(request.messages) != 1:
         return None
     message = request.messages[0]
@@ -30,7 +30,7 @@ def _history_request_prompt(request: LMRequest) -> str | None:
     return part.text if isinstance(part, LMTextPart) else None
 
 
-def _history_request_messages_as_openai(request: LMRequest) -> list[dict[str, Any]]:
+def request_messages_as_openai(request: LMRequest) -> list[dict[str, Any]]:
     messages = []
     for message in request.messages:
         if message.role == "assistant":
@@ -145,7 +145,7 @@ def _history_media_format(media_type: str) -> str:
     return media_type.split("/", 1)[1] if "/" in media_type else media_type
 
 
-def _history_request_kwargs(request: LMRequest) -> dict[str, Any]:
+def request_kwargs(request: LMRequest) -> dict[str, Any]:
     data = request.config.model_dump(exclude_none=True)
     extensions = data.pop("extensions", {}) or {}
     return {**extensions, **data}

@@ -87,7 +87,7 @@ class AdapterCallPipeline:
         allow_parse_fallback: bool,
     ) -> list[dict[str, Any]]:
         from dspy.compile.resolve import resolve_call, resolve_lm_config
-        from dspy.core.types.history import _history_request_messages_as_openai
+        from dspy.core.types.openai_compat import request_messages_as_openai
         from dspy.utils.transparency import resolve_call_site, validate_compiled_call
 
         try:
@@ -116,7 +116,7 @@ class AdapterCallPipeline:
                 processed_task_spec=processed_task_spec,
                 config=merged_config,
                 config_provenance=provenance,
-                messages=_history_request_messages_as_openai(request),
+                messages=request_messages_as_openai(request),
                 task_spec_mutations=mutations,
                 module=site.module,
                 phase=site.phase,

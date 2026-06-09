@@ -118,7 +118,6 @@ class LMCitationPart(LMBasePart):
     text: str | None = None
     title: str | None = None
     url: str | None = None
-    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_has_content(self) -> LMCitationPart:

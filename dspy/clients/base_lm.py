@@ -8,8 +8,8 @@ from typing import Any, TextIO
 from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
 from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.core.types import CallRecord, LMRequest, LMResponse
-from dspy.core.types.history import _history_request_messages_as_openai
 from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
+from dspy.core.types.openai_compat import request_messages_as_openai
 from dspy.runtime.run_context import RunContext, disk_call_log_enabled, memory_call_log_enabled
 from dspy.utils.callback import BaseCallback, with_callbacks
 from dspy.utils.inspect_call_log import pretty_print_call_log
@@ -168,7 +168,7 @@ class BaseLM:
         compiled: CompiledCall | None = None,
     ) -> None:
         call_id = compiled.call_id if compiled is not None else call_record.uuid if call_record else str(uuid.uuid4())
-        messages = _history_request_messages_as_openai(request)
+        messages = request_messages_as_openai(request)
         outputs = [
             {
                 "text": output.text,

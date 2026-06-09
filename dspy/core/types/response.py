@@ -7,12 +7,12 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import override
 
-from dspy.core.types.history import (
-    _history_request_kwargs,
-    _history_request_messages_as_openai,
-    _history_request_prompt,
-)
 from dspy.core.types.messages import LMMessage
+from dspy.core.types.openai_compat import (
+    request_kwargs,
+    request_messages_as_openai,
+    request_prompt,
+)
 from dspy.core.types.parts import (
     LMAudioPart,
     LMBinaryPart,
@@ -25,10 +25,9 @@ from dspy.core.types.parts import (
     LMThinkingPart,
     LMToolCallPart,
     LMVideoPart,
-    _coerce_part,
-    _part_to_value,
-    _tool_call_to_provider_dict,
 )
+from dspy.core.types.parts.models import _coerce_part
+from dspy.core.types.parts.serialize import _part_to_value, _tool_call_to_provider_dict
 from dspy.core.types.request import LMRequest
 
 
@@ -179,16 +178,6 @@ class LMResponse(BaseModel):
     ) -> LMResponse:
         return cls(model=model, outputs=[LMOutput(parts=[LMTextPart(text=text)])], usage=usage, cost=cost, **kwargs)
 
-    @override
-    def __iter__(self):
-        return iter(self.to_values())
-
-    def __getitem__(self, index: int) -> Any:
-        return self.to_values()[index]
-
-    def __len__(self) -> int:
-        return len(self.outputs)
-
     @property
     def output(self) -> LMOutput:
         return self.outputs[0]
@@ -279,7 +268,7 @@ class CallRecord(BaseModel):
 
     @property
     def prompt(self) -> str | None:
-        return _history_request_prompt(self.request)
+        return request_prompt(self.request)
 
     @property
     def messages(self) -> list[LMMessage]:
@@ -287,11 +276,11 @@ class CallRecord(BaseModel):
 
     @property
     def messages_as_openai(self) -> list[dict[str, Any]]:
-        return _history_request_messages_as_openai(self.request)
+        return request_messages_as_openai(self.request)
 
     @property
     def kwargs(self) -> dict[str, Any]:
-        return _history_request_kwargs(self.request)
+        return request_kwargs(self.request)
 
     @property
     def response_model(self) -> str | None:

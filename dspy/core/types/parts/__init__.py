@@ -12,14 +12,6 @@ from dspy.core.types.parts.models import (
     LMToolCallPart,
     LMToolResultPart,
     LMVideoPart,
-    _coerce_part,
-)
-from dspy.core.types.parts.openai import _parts_from_openai_content, _split_data_uri, _tool_calls_from_openai
-from dspy.core.types.parts.serialize import (
-    _finalize_stream_part,
-    _parse_json_object,
-    _part_to_value,
-    _tool_call_to_provider_dict,
 )
 
 __all__ = [
@@ -36,12 +28,4 @@ __all__ = [
     "LMToolCallPart",
     "LMToolResultPart",
     "LMVideoPart",
-    "_coerce_part",
-    "_finalize_stream_part",
-    "_parse_json_object",
-    "_part_to_value",
-    "_parts_from_openai_content",
-    "_split_data_uri",
-    "_tool_call_to_provider_dict",
-    "_tool_calls_from_openai",
 ]

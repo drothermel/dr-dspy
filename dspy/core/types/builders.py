@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from dspy.core.types.messages import LMMessage
-from dspy.core.types.parts import LMToolCallPart, LMToolResultPart, _coerce_part
+from dspy.core.types.parts import LMToolCallPart, LMToolResultPart
+from dspy.core.types.parts.models import _coerce_part
 
 
 def System(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None = None) -> LMMessage:
