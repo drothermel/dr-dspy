@@ -1,7 +1,5 @@
-import asyncio
 import logging
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any
 
 from dspy.evaluate.evaluate import Evaluate
@@ -22,18 +20,9 @@ if TYPE_CHECKING:
 
     from dspy.teleprompt.mipro.optimizer import MIPROv2
 logger = logging.getLogger(__name__)
-_mipro_optuna_executor = ThreadPoolExecutor(max_workers=1)
 
 
-def run_async_from_sync(coro):
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-    return _mipro_optuna_executor.submit(asyncio.run, coro).result()
-
-
-def objective(
+async def run_trial(
     optimizer: "MIPROv2",
     trial: "optuna.trial.Trial",
     *,
@@ -72,8 +61,8 @@ def objective(
         logger.info("Evaluating the following candidate program...\n")
         print_full_program(candidate_program)
     batch_size = minibatch_size if minibatch else len(valset)
-    score = run_async_from_sync(
-        eval_candidate_program(
+    score = (
+        await eval_candidate_program(
             batch_size=batch_size,
             trainset=valset,
             candidate_program=candidate_program,
@@ -122,25 +111,23 @@ def objective(
     categorical_key = ",".join(map(str, chosen_params))
     param_score_dict[categorical_key].append((score, candidate_program, raw_chosen_params))
     if minibatch and (trial_num % (minibatch_full_eval_steps + 1) == 0 or trial_num == adjusted_num_trials - 1):
-        best_score, best_program, total_eval_calls = run_async_from_sync(
-            perform_full_evaluation(
-                optimizer,
-                trial_num,
-                adjusted_num_trials,
-                param_score_dict,
-                fully_evaled_param_combos,
-                evaluate,
-                valset,
-                trial_logs,
-                total_eval_calls,
-                score_data,
-                best_score,
-                best_program,
-                study,
-                instruction_candidates,
-                demo_candidates,
-                run=run,
-            )
+        best_score, best_program, total_eval_calls = await perform_full_evaluation(
+            optimizer,
+            trial_num,
+            adjusted_num_trials,
+            param_score_dict,
+            fully_evaled_param_combos,
+            evaluate,
+            valset,
+            trial_logs,
+            total_eval_calls,
+            score_data,
+            best_score,
+            best_program,
+            study,
+            instruction_candidates,
+            demo_candidates,
+            run=run,
         )
     state["best_program"] = best_program
     state["best_score"] = best_score
@@ -222,26 +209,26 @@ async def optimize_prompt_parameters(
         "param_score_dict": param_score_dict,
         "fully_evaled_param_combos": fully_evaled_param_combos,
     }
-    study.optimize(
-        lambda trial: objective(
-            optimizer,
-            trial,
-            program=program,
-            instruction_candidates=instruction_candidates,
-            demo_candidates=demo_candidates,
-            evaluate=evaluate,
-            valset=valset,
-            num_trials=num_trials,
-            minibatch=minibatch,
-            minibatch_size=minibatch_size,
-            minibatch_full_eval_steps=minibatch_full_eval_steps,
-            adjusted_num_trials=adjusted_num_trials,
-            study=study,
-            state=state,
-            run=run,
-        ),
-        n_trials=num_trials,
-    )
+    trial_kwargs = {
+        "optimizer": optimizer,
+        "program": program,
+        "instruction_candidates": instruction_candidates,
+        "demo_candidates": demo_candidates,
+        "evaluate": evaluate,
+        "valset": valset,
+        "num_trials": num_trials,
+        "minibatch": minibatch,
+        "minibatch_size": minibatch_size,
+        "minibatch_full_eval_steps": minibatch_full_eval_steps,
+        "adjusted_num_trials": adjusted_num_trials,
+        "study": study,
+        "state": state,
+        "run": run,
+    }
+    for _ in range(num_trials):
+        optuna_trial = study.ask()
+        score = await run_trial(optimizer, optuna_trial, **trial_kwargs)
+        study.tell(optuna_trial, score)
     best_program = state["best_program"]
     best_score = state["best_score"]
     trial_logs = state["trial_logs"]

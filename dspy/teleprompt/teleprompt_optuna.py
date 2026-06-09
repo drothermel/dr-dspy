@@ -1,5 +1,3 @@
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any, cast
 
 from pydantic import BaseModel
@@ -12,8 +10,6 @@ from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.utils import make_optimizer_evaluator
 
 from .bootstrap import BootstrapFewShot
-
-_optuna_executor = ThreadPoolExecutor(max_workers=1)
 
 
 def _import_optuna():
@@ -60,7 +56,7 @@ class BootstrapFewShotWithOptuna(Teleprompter):
         )
         return await evaluate(program, run=run)
 
-    def objective(self, trial):
+    async def _run_trial(self, trial) -> float:
         program2 = self.student.reset_copy()
         for (name, compiled_predictor), (_, program2_predictor) in zip(
             self.compiled_teleprompter.named_predictors(), program2.named_predictors(), strict=False
@@ -69,12 +65,7 @@ class BootstrapFewShotWithOptuna(Teleprompter):
             demo_index = trial.suggest_int(f"demo_index_for_{name}", 0, len(all_demos) - 1)
             selected_demo = dict(all_demos[demo_index])
             program2_predictor.demos = [selected_demo]
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            result = asyncio.run(self._evaluate_program(program2, run=self.run))
-        else:
-            result = _optuna_executor.submit(asyncio.run, self._evaluate_program(program2, run=self.run)).result()
+        result = await self._evaluate_program(program2, run=self.run)
         trial.set_user_attr("program", program2)
         return cast("Any", result).score
 
@@ -107,5 +98,8 @@ class BootstrapFewShotWithOptuna(Teleprompter):
             run=run,
         )
         study = optuna.create_study(direction="maximize")
-        study.optimize(self.objective, n_trials=self.num_candidate_sets)
+        for _ in range(self.num_candidate_sets):
+            trial = study.ask()
+            score = await self._run_trial(trial)
+            study.tell(trial, score)
         return study.trials[study.best_trial.number].user_attrs["program"]
