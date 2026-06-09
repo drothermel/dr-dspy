@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 if TYPE_CHECKING:
+    from dspy.adapters.format.message_assembler import MessageAssembler
     from dspy.adapters.types.field_type import NativeResponseFieldType
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types import LMConfig, LMMessage, UserMessageContent
@@ -60,6 +61,14 @@ class NativeAdaptableAdapter(Protocol):
 
 class ConversationFormattingAdapter(FormattableAdapter, NativeAdaptableAdapter, Protocol):
     """Formattable adapter surface required for turn-log conversation expansion."""
+
+
+class MessageAssemblerHost(ConversationFormattingAdapter, Protocol):
+    message_assembler: MessageAssembler
+
+    def format_system_message(self, task_spec: TaskSpec) -> str: ...
+
+    def format_demos(self, task_spec: TaskSpec, demos: list[dict[str, Any]]) -> list[LMMessage]: ...
 
 
 class ComposedAdapter(FormattableAdapter, NativeAdaptableAdapter, Protocol):

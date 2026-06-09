@@ -3,6 +3,7 @@ import pytest
 from dspy.adapters.baml_adapter import BAMLAdapter
 from dspy.adapters.base.format import MESSAGE_BUILD_ORDER
 from dspy.adapters.chat_adapter import ChatAdapter
+from dspy.adapters.format.message_assembler import MessageAssembler
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.history import TurnLog
@@ -45,21 +46,27 @@ def test_message_build_order_matches_contract():
         def __init__(self) -> None:
             super().__init__()
             self.segment_order: list[str] = []
+            self.message_assembler = _OrderCapturingMessageAssembler(self, self.segment_order)
+
+    class _OrderCapturingMessageAssembler(MessageAssembler):
+        def __init__(self, host, segment_order: list[str]) -> None:
+            super().__init__(host)
+            self._segment_order = segment_order
 
         def _append_system_message(self, *, messages, task_spec):
-            self.segment_order.append("system")
+            self._segment_order.append("system")
             super()._append_system_message(messages=messages, task_spec=task_spec)
 
         def _append_demos(self, *, messages, task_spec, demos):
-            self.segment_order.append("demos")
+            self._segment_order.append("demos")
             super()._append_demos(messages=messages, task_spec=task_spec, demos=demos)
 
         def _append_conversation_history(self, *, messages, conversation_history):
-            self.segment_order.append("conversation_history")
+            self._segment_order.append("conversation_history")
             super()._append_conversation_history(messages=messages, conversation_history=conversation_history)
 
         def _append_current_user_message(self, *, messages, task_spec, inputs):
-            self.segment_order.append("current_user")
+            self._segment_order.append("current_user")
             super()._append_current_user_message(messages=messages, task_spec=task_spec, inputs=inputs)
 
     adapter = OrderCapturingChatAdapter()
