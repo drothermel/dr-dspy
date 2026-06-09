@@ -79,34 +79,38 @@ class CodeAct(Module):
         options: ModuleCallOptions | None = None,
         **inputs,
     ):
-        for tool in self.tools.values():
-            self.interpreter(get_formatted_source(tool.func))
-        turn_log = TurnLog.empty()
-        max_iters = inputs.pop("max_iters", self.max_iters)
-        for _idx in range(max_iters):
+        try:
+            for tool in self.tools.values():
+                self.interpreter(get_formatted_source(tool.func))
+            turn_log = TurnLog.empty()
+            max_iters = inputs.pop("max_iters", self.max_iters)
+            for _idx in range(max_iters):
+                extracted = await call_with_turn_log_truncation(
+                    self.codeact, turn_log=turn_log, run=run, options=options, **inputs
+                )
+                turn_log = extracted.turn_log
+                code_data = extracted.result
+                code, error = self._parse_code(code_data)
+                if error:
+                    turn_log = turn_log.append_turn(
+                        TurnEvent(observation=f"Failed to parse the generated code: {error}")
+                    )
+                    continue
+                output, error = self._execute_code(code)
+                event = TurnEvent(generated_code=code)
+                if not error:
+                    event = event.model_copy(update={"code_output": output})
+                else:
+                    event = event.model_copy(update={"observation": f"Failed to execute the generated code: {error}"})
+                turn_log = turn_log.append_turn(event)
+                if code_data.finished:
+                    break
             extracted = await call_with_turn_log_truncation(
-                self.codeact, turn_log=turn_log, run=run, options=options, **inputs
+                self.extractor, turn_log=turn_log, run=run, options=options, **inputs
             )
-            turn_log = extracted.turn_log
-            code_data = extracted.result
-            code, error = self._parse_code(code_data)
-            if error:
-                turn_log = turn_log.append_turn(TurnEvent(observation=f"Failed to parse the generated code: {error}"))
-                continue
-            output, error = self._execute_code(code)
-            event = TurnEvent(generated_code=code)
-            if not error:
-                event = event.model_copy(update={"code_output": output})
-            else:
-                event = event.model_copy(update={"observation": f"Failed to execute the generated code: {error}"})
-            turn_log = turn_log.append_turn(event)
-            if code_data.finished:
-                break
-        extracted = await call_with_turn_log_truncation(
-            self.extractor, turn_log=turn_log, run=run, options=options, **inputs
-        )
-        self.interpreter.shutdown()
-        return Prediction(turn_log=extracted.turn_log, **dict(extracted.result.items()))
+            return Prediction(turn_log=extracted.turn_log, **dict(extracted.result.items()))
+        finally:
+            self.interpreter.shutdown()
 
     def _parse_code(self, code_data):
         code = getattr(code_data, "generated_code", "")

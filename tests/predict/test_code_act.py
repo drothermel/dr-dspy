@@ -1,5 +1,6 @@
 import asyncio
 from typing import Any, cast
+from unittest.mock import patch
 
 import pytest
 
@@ -152,3 +153,33 @@ def test_codeact_tool_validation_requires_tool_instances():
 def test_codeact_tool_validation_rejects_callable_objects():
     with pytest.raises(ValueError, match=r"CodeAct only accepts functions and not callable objects\."):
         CodeAct(BasicQA, tools=[Tool(CustomTool(), description="Add two numbers.")])
+
+
+def test_codeact_shuts_down_interpreter_when_extractor_raises(make_run):
+    from dspy.history import call_with_turn_log_truncation
+
+    lm = DummyLM(
+        [
+            {
+                "reasoning": "Reason_A",
+                "generated_code": "```python\nresult = add(1,1)\nprint(result)\n```",
+                "finished": True,
+            },
+        ]
+    )
+    run = make_run(lm=lm)
+    program = CodeAct(BasicQA, tools=[ADD_TOOL])
+
+    original = call_with_turn_log_truncation
+
+    async def failing_extractor(module, *args, **kwargs):
+        if module is program.extractor:
+            raise RuntimeError("extractor failed")
+        return await original(module, *args, **kwargs)
+
+    with (
+        patch("dspy.predict.code_act.call_with_turn_log_truncation", side_effect=failing_extractor),
+        pytest.raises(RuntimeError, match="extractor failed"),
+    ):
+        asyncio.run(program(question="What is 1+1?", run=run))
+    assert program.interpreter.deno_process is None

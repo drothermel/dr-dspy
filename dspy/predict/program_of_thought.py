@@ -114,25 +114,25 @@ class ProgramOfThought(Module):
         options: ModuleCallOptions | None = None,
         **inputs,
     ):
-        input_kwargs = {field_name: inputs[field_name] for field_name in self.input_fields if field_name in inputs}
-        code_data = await self.code_generate(**input_kwargs, run=run, options=options)
-        output = None
-        code, error = self._parse_code(code_data)
-        if not error:
-            output, error = self._execute_code(code)
-        hop = 1
-        while error is not None:
-            logger.error(f"Error in code execution: {error}")
-            if hop == self.max_iters:
-                self.interpreter.shutdown()
-                raise RuntimeError(f"Max hops reached. Failed to run ProgramOfThought: {error}")
-            input_kwargs.update({"previous_code": code, "error": error})
-            code_data = await self.code_regenerate(**input_kwargs, run=run, options=options)
+        try:
+            input_kwargs = {field_name: inputs[field_name] for field_name in self.input_fields if field_name in inputs}
+            code_data = await self.code_generate(**input_kwargs, run=run, options=options)
+            output = None
             code, error = self._parse_code(code_data)
             if not error:
                 output, error = self._execute_code(code)
-            hop += 1
-        input_kwargs.update({"final_generated_code": code, "code_output": output})
-        output_gen_result = await self.generate_output(**input_kwargs, run=run, options=options)
-        self.interpreter.shutdown()
-        return output_gen_result
+            hop = 1
+            while error is not None:
+                logger.error(f"Error in code execution: {error}")
+                if hop == self.max_iters:
+                    raise RuntimeError(f"Max hops reached. Failed to run ProgramOfThought: {error}")
+                input_kwargs.update({"previous_code": code, "error": error})
+                code_data = await self.code_regenerate(**input_kwargs, run=run, options=options)
+                code, error = self._parse_code(code_data)
+                if not error:
+                    output, error = self._execute_code(code)
+                hop += 1
+            input_kwargs.update({"final_generated_code": code, "code_output": output})
+            return await self.generate_output(**input_kwargs, run=run, options=options)
+        finally:
+            self.interpreter.shutdown()

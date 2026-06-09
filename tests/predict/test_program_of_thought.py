@@ -27,6 +27,24 @@ ExtremumFinder = make_task_spec(
 
 
 @pytest.mark.deno
+def test_pot_shuts_down_interpreter_when_generate_output_raises(make_run):
+    lm = DummyLM(
+        [
+            {"reasoning": "Reason_A", "generated_code": "```python\nresult = 1+1\nSUBMIT({'answer': result})\n```"},
+        ]
+    )
+    run = make_run(lm=lm)
+    pot = ProgramOfThought(BasicQA)
+
+    with (
+        patch.object(pot.generate_output, "_aforward_impl", side_effect=RuntimeError("output step failed")),
+        pytest.raises(RuntimeError, match="output step failed"),
+    ):
+        asyncio.run(pot(question="What is 1+1?", run=run))
+    assert pot.interpreter.deno_process is None
+
+
+@pytest.mark.deno
 def test_pot_code_generation(make_run):
     lm = DummyLM(
         [
