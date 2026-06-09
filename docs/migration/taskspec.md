@@ -121,6 +121,12 @@ tool = Tool(search, description="Search documents by query.")
 | `sig.delete("field")` | `spec.delete("field")` |
 | `sig.with_instructions("...")` | `spec.with_instructions("...")` |
 
+## Adapters and field metadata
+
+Adapters read `FieldSpec` directly via `dspy.task_spec.fields` (`FieldBinding`, `field_bindings`, `format_field_value`, `translate_field_type`, `validate_task_inputs_from_spec`). There is no Pydantic `FieldInfo` bridge layer.
+
+Field descriptions are required on `input_field` / `output_field` (no `${name}` placeholders). Use `field_desc_from_name(name)` when deriving descriptions from field names at parse time.
+
 ## Saved program state
 
 Saved programs now store `task_spec` instead of `signature`. Reload with the current DSPy version; legacy signature-only state is rejected.
