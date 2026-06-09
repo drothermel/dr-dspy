@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from dspy.core.types._merge_overlay import _merge_model_overlay
+
 
 class EmbedderOptions(BaseModel):
     """Provider options forwarded to LiteLLM embedding calls or custom embedders."""
@@ -22,10 +24,10 @@ def merge_embedder_options(
     left: EmbedderOptions | None,
     right: EmbedderOptions | None,
 ) -> EmbedderOptions:
-    if left is None:
-        return right or EmbedderOptions()
-    if right is None:
-        return left
-    merged = left.model_dump()
-    merged.update(right.model_dump(exclude_none=True))
-    return EmbedderOptions(**merged)
+    merged = _merge_model_overlay(
+        left,
+        right,
+        model=EmbedderOptions,
+        nested_fields=frozenset(),
+    )
+    return merged or EmbedderOptions()

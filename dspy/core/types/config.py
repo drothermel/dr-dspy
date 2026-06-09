@@ -6,6 +6,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from dspy.core.types._from_value import _MISSING, config_data
+from dspy.core.types._merge_overlay import _merge_model_overlay
+
 
 class ReasoningEffort(StrEnum):
     LOW = "low"
@@ -44,7 +47,7 @@ class LMReasoningConfig(BaseModel):
 
     @classmethod
     def from_value(cls, value: Any = None, **overrides: Any) -> LMReasoningConfig:
-        data = _config_data(value, str_field="effort")
+        data = config_data(value, str_field="effort")
         if isinstance(data.get("effort"), str):
             data["effort"] = ReasoningEffort(data["effort"])
         data.update({key: value for key, value in overrides.items() if value is not _MISSING})
@@ -59,7 +62,7 @@ class LMToolChoice(BaseModel):
 
     @classmethod
     def from_value(cls, value: Any = None, **overrides: Any) -> LMToolChoice:
-        data = _config_data(value, str_field="mode")
+        data = config_data(value, str_field="mode")
         data.update({key: value for key, value in overrides.items() if value is not _MISSING})
         return cls(**data)
 
@@ -71,26 +74,9 @@ class LMPromptCacheConfig(BaseModel):
 
     @classmethod
     def from_value(cls, value: Any = None, **overrides: Any) -> LMPromptCacheConfig:
-        data = _config_data(value, bool_field="enabled")
+        data = config_data(value, bool_field="enabled")
         data.update({key: value for key, value in overrides.items() if value is not _MISSING})
         return cls(**data)
-
-
-_MISSING = object()
-
-
-def _config_data(value: Any, *, str_field: str | None = None, bool_field: str | None = None) -> dict[str, Any]:
-    if value is None:
-        return {}
-    if isinstance(value, BaseModel):
-        return value.model_dump(exclude_none=True)
-    if isinstance(value, Mapping):
-        return dict(value)
-    if str_field is not None and isinstance(value, str):
-        return {str_field: value}
-    if bool_field is not None and isinstance(value, bool):
-        return {bool_field: value}
-    raise TypeError(f"Cannot convert {type(value)!r} to a config object.")
 
 
 class LMConfig(BaseModel):
@@ -135,39 +121,12 @@ def merge_lm_config(left: LMConfig | None, right: LMConfig | None) -> LMConfig |
     - ``extensions``: union-merge; ``None`` on right clears all extensions; an empty
       mapping on right is a no-op that preserves left keys; colliding keys use right.
     """
-    if left is None:
-        return right
-    if right is None:
-        return left
-    data = left.model_dump(exclude_none=True)
-    extensions = {**left.extensions}
-    for key in right.model_fields_set:
-        value = getattr(right, key)
-        if key == "extensions":
-            if value is None:
-                extensions = {}
-            elif isinstance(value, Mapping):
-                extensions.update(value)
-            else:
-                extensions = dict(value)
-            continue
-        if key in _NESTED_CONFIG_FIELDS:
-            if value is None:
-                data[key] = None
-            else:
-                left_value = data.get(key)
-                right_value = value.model_dump(exclude_none=True)
-                if isinstance(left_value, dict) and right_value:
-                    data[key] = {**left_value, **right_value}
-                else:
-                    data[key] = right_value
-            continue
-        if isinstance(value, BaseModel):
-            data[key] = value.model_dump(exclude_none=True)
-        else:
-            data[key] = value
-    data["extensions"] = extensions
-    return LMConfig(**data)
+    return _merge_model_overlay(
+        left,
+        right,
+        model=LMConfig,
+        nested_fields=_NESTED_CONFIG_FIELDS,
+    )
 
 
 def _coerce_from_call_config_kwargs(kwargs: Mapping[str, Any]) -> dict[str, Any]:

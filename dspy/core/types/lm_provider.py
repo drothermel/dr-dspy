@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from dspy.core.types._merge_overlay import _merge_model_overlay
 
 
 class LMProviderOptions(BaseModel):
@@ -50,25 +51,9 @@ def merge_provider_options(
     ``extensions`` are union-merged (right keys override left); explicit ``None`` on
     right clears all extensions; an empty mapping on right preserves left keys.
     """
-    if left is None:
-        return right
-    if right is None:
-        return left
-    data = left.model_dump(exclude_none=True)
-    extensions = {**left.extensions}
-    for key in right.model_fields_set:
-        value = getattr(right, key)
-        if key == "extensions":
-            if value is None:
-                extensions = {}
-            elif isinstance(value, Mapping):
-                extensions.update(value)
-            else:
-                extensions = dict(value)
-            continue
-        if isinstance(value, BaseModel):
-            data[key] = value.model_dump(exclude_none=True)
-        else:
-            data[key] = value
-    data["extensions"] = extensions
-    return LMProviderOptions(**data)
+    return _merge_model_overlay(
+        left,
+        right,
+        model=LMProviderOptions,
+        nested_fields=frozenset(),
+    )

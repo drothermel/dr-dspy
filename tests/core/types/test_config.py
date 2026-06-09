@@ -20,6 +20,7 @@ from dspy.core.types import (
     merge_provider_options,
 )
 from dspy.core.types.config import ReasoningEffort
+from dspy.core.types.embedding_options import EmbedderOptions, merge_embedder_options
 
 
 def test_merge_lm_config_merges_extensions():
@@ -85,6 +86,22 @@ def test_merge_provider_options_extensions_union():
     merged = merge_provider_options(left, right)
     assert merged is not None
     assert merged.extensions == {"a": 1, "b": 2}
+
+
+def test_merge_embedder_options_scalar_override():
+    left = EmbedderOptions(dimensions=1536, timeout=10.0)
+    right = EmbedderOptions(timeout=30.0)
+    merged = merge_embedder_options(left, right)
+    assert merged.dimensions == 1536
+    assert merged.timeout == 30.0
+
+
+def test_merge_embedder_options_explicit_none_clears():
+    left = EmbedderOptions(dimensions=1536, timeout=10.0)
+    right = EmbedderOptions.model_construct(timeout=None)
+    merged = merge_embedder_options(left, right)
+    assert merged.dimensions == 1536
+    assert merged.timeout is None
 
 
 def test_merge_provider_options_scalar_override():
