@@ -7,14 +7,14 @@ from dspy.evaluate.auto_evaluation import (
     DecompositionalSemanticRecallPrecisionTaskSpec,
     SemanticRecallPrecisionTaskSpec,
 )
+from dspy.integrations.optimizers.gepa.instruction_proposal import GenerateEnhancedMultimodalInstructionTaskSpec
+from dspy.integrations.optimizers.gepa.task_specs import FrameworkGepaInstructionProposalTaskSpec
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.refine import OfferFeedbackTaskSpec
 from dspy.predict.rlm import FrameworkRlmSubQueryTaskSpec
 from dspy.task_spec import TaskSpec, input_field, output_field
 from dspy.teleprompt.avatar_optimizer import ComparatorTaskSpec, FeedbackBasedInstructionTaskSpec
 from dspy.teleprompt.copro_optimizer import BasicGenerateInstructionTaskSpec, GenerateInstructionGivenAttemptsTaskSpec
-from dspy.teleprompt.gepa.instruction_proposal import GenerateEnhancedMultimodalInstructionTaskSpec
-from dspy.teleprompt.gepa.task_specs import FrameworkGepaInstructionProposalTaskSpec
 from dspy.teleprompt.simba_utils import SimbaOfferFeedbackTaskSpec
 
 FRAMEWORK_SPECS: list[type[TaskSpec]] = [

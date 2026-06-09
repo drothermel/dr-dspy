@@ -21,7 +21,7 @@ ALLOWLIST_SUFFIXES = (
     # optional-dependency entrypoints
     "clients/__init__.py",
     "teleprompt/gepa/gepa.py",
-    "teleprompt/gepa/gepa_utils.py",
+    "integrations/optimizers/gepa/adapter.py",
     "teleprompt/grpo.py",
     "teleprompt/bootstrap_finetune.py",
     "evaluate/metrics.py",

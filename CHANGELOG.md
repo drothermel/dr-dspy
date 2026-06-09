@@ -39,7 +39,7 @@ evaluate = make_optimizer_evaluator(
 prediction, trace = await run_program_with_trace(program, example, run)
 
 # GEPA custom instruction proposers must be async
-from dspy.teleprompt.gepa.gepa_utils import AsyncProposalFn
+from dspy.integrations.optimizers.gepa.adapter import AsyncProposalFn
 
 class MyProposer(AsyncProposalFn):
     async def __call__(self, candidate, reflective_dataset, components_to_update):

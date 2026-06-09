@@ -1,6 +1,6 @@
 from dspy.adapters.json_adapter import JSONAdapter
+from dspy.integrations.optimizers.gepa.adapter import DspyAdapter
 from dspy.runtime import CallLogMode, TelemetryConfig, TransparencyMode
-from dspy.teleprompt.gepa.gepa_utils import DspyAdapter
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 

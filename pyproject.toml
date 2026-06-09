@@ -304,7 +304,7 @@ too-many-positional-arguments = "ignore"
 include = [
     "dspy/evaluate/auto_evaluation.py",
     "dspy/predict/multi_chain_comparison.py",
-    "dspy/teleprompt/gepa/instruction_proposal.py",
+    "dspy/integrations/optimizers/gepa/instruction_proposal.py",
     "dspy/teleprompt/infer_rules.py",
     "dspy/teleprompt/ensemble.py",
     "dspy/teleprompt/knn_fewshot.py",

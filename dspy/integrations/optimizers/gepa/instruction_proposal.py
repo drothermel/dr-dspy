@@ -5,10 +5,10 @@ from typing import Any, cast
 from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
+from dspy.integrations.optimizers.gepa.adapter import AsyncProposalFn, ReflectiveExample
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
-from dspy.teleprompt.gepa.gepa_utils import AsyncProposalFn, ReflectiveExample
 
 logger = logging.getLogger(__name__)
 

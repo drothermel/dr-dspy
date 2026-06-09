@@ -17,16 +17,16 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from dspy.clients.lm import LM
-    from dspy.primitives.example import Example
-    from dspy.primitives.module import Module
-    from dspy.runtime.run_context import RunContext
-    from dspy.teleprompt.gepa.gepa_utils import (
+    from dspy.integrations.optimizers.gepa.adapter import (
         AsyncProposalFn,
         DspyAdapter,
         DSPyTrace,
         PredictorFeedbackFn,
         ScoreWithFeedback,
     )
+    from dspy.primitives.example import Example
+    from dspy.primitives.module import Module
+    from dspy.runtime.run_context import RunContext
 logger = logging.getLogger(__name__)
 AUTO_RUN_SETTINGS = {"light": {"n": 6}, "medium": {"n": 12}, "heavy": {"n": 18}}
 
@@ -219,7 +219,7 @@ class GEPA:
         valset = params.valset
         from gepa import optimize
 
-        from dspy.teleprompt.gepa.gepa_utils import DspyAdapter, LoggerAdapter, ScoreWithFeedback
+        from dspy.integrations.optimizers.gepa.adapter import DspyAdapter, LoggerAdapter, ScoreWithFeedback
 
         assert trainset is not None and len(trainset) > 0, "Trainset must be provided and non-empty"
         assert teacher is None, "Teacher is not supported in DspyGEPA yet."
