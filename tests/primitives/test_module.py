@@ -217,3 +217,22 @@ def test_load_state_is_transactional():
         with pytest.raises(KeyError):
             template.load(str(path))
         assert template.a.predict.demos == [], "load_state partially mutated module before failing"
+
+
+def test_compiled_subgraph_is_opaque():
+    root = Module()
+    root_attrs = _module_attrs(root)
+    compiled_child = Module()
+    compiled_child._compiled = True
+    inner_predict = Predict(ts("question -> answer", instructions="Answer the question."))
+    _module_attrs(compiled_child).inner = inner_predict
+    root_attrs.compiled_child = compiled_child
+    root_attrs.top_predict = Predict(ts("question -> answer", instructions="Answer the question."))
+
+    param_names = {name for name, _ in root.named_parameters()}
+    submodule_names = {name for name, _ in root.named_sub_modules()}
+
+    assert "self.top_predict" in param_names
+    assert "self.compiled_child.inner" not in param_names
+    assert "self.compiled_child" in submodule_names
+    assert "self.compiled_child.inner" not in submodule_names

@@ -3,6 +3,7 @@ import logging
 from collections import deque
 from collections.abc import Generator
 from pathlib import Path
+from typing import cast
 
 import cloudpickle
 import orjson
@@ -19,64 +20,69 @@ class BaseModule:
     def __init__(self) -> None:
         pass
 
-    def named_parameters(self):
-        named_parameters = []
-        visited_parameters = set()
+    def _enqueue_graph_children(
+        self,
+        name: str,
+        item: object,
+        queue: deque[tuple[str, object]],
+        seen: set[int],
+    ) -> None:
+        def enqueue(child_name: str, child: object) -> None:
+            child_id = id(child)
+            if child_id not in seen:
+                seen.add(child_id)
+                queue.append((child_name, child))
+
+        if isinstance(item, BaseModule):
+            if name == "self" or not getattr(item, "_compiled", False):
+                for sub_name, sub_item in item.__dict__.items():
+                    enqueue(f"{name}.{sub_name}", sub_item)
+            return
+        if isinstance(item, (list, tuple)):
+            for idx, sub_item in enumerate(item):
+                enqueue(f"{name}[{idx}]", sub_item)
+            return
+        if isinstance(item, dict):
+            for key, sub_item in item.items():
+                enqueue(f"{name}[{key}]", sub_item)
+
+    def _walk_module_graph(self) -> Generator[tuple[str, object], None, None]:
+        """Breadth-first traversal of module-owned object graph.
+
+        Compiled subgraphs (``_compiled=True``) are opaque: their children are not
+        enqueued. The root module is always expanded via the ``self`` entry.
+        """
         queue: deque[tuple[str, object]] = deque([("self", self)])
         seen = {id(self)}
-
-        def enqueue(name: str, item: object) -> None:
-            if id(item) not in seen:
-                seen.add(id(item))
-                queue.append((name, item))
-
         while queue:
             name, item = queue.popleft()
-            if isinstance(item, Parameter):
-                if id(item) not in visited_parameters:
-                    visited_parameters.add(id(item))
-                    named_parameters.append((name, item))
+            yield name, item
+            self._enqueue_graph_children(name=name, item=item, queue=queue, seen=seen)
+
+    def named_parameters(self):
+        """Yield ``(name, Parameter)`` pairs. Skips parameters inside compiled subgraphs."""
+        named_parameters = []
+        visited_parameters: set[int] = set()
+        for name, item in self._walk_module_graph():
+            if not isinstance(item, Parameter):
                 continue
-            if isinstance(item, BaseModule):
-                if name == "self" or not getattr(item, "_compiled", False):
-                    for sub_name, sub_item in item.__dict__.items():
-                        enqueue(name=f"{name}.{sub_name}", item=sub_item)
+            param_id = id(item)
+            if param_id in visited_parameters:
                 continue
-            if isinstance(item, (list, tuple)):
-                for idx, sub_item in enumerate(item):
-                    enqueue(name=f"{name}[{idx}]", item=sub_item)
-                continue
-            if isinstance(item, dict):
-                for key, sub_item in item.items():
-                    enqueue(name=f"{name}[{key}]", item=sub_item)
+            visited_parameters.add(param_id)
+            named_parameters.append((name, item))
         return named_parameters
 
-    def named_sub_modules(self, type_=None, skip_compiled=False) -> Generator[tuple[str, "BaseModule"], None, None]:
+    def named_sub_modules(self, type_=None) -> Generator[tuple[str, "BaseModule"], None, None]:
+        """Yield ``(name, module)`` pairs for modules of ``type_``.
+
+        Compiled subgraphs are opaque by default (same policy as ``named_parameters``).
+        """
         if type_ is None:
             type_ = BaseModule
-        queue = deque([("self", self)])
-        seen = {id(self)}
-
-        def add_to_queue(name, item) -> None:
-            if id(item) not in seen:
-                seen.add(id(item))
-                queue.append((name, item))
-
-        while queue:
-            name, item = queue.popleft()
+        for name, item in self._walk_module_graph():
             if isinstance(item, type_):
-                yield (name, item)
-            if isinstance(item, BaseModule):
-                if skip_compiled and getattr(item, "_compiled", False):
-                    continue
-                for sub_name, sub_item in item.__dict__.items():
-                    add_to_queue(name=f"{name}.{sub_name}", item=sub_item)
-            elif isinstance(item, (list, tuple)):
-                for i, sub_item in enumerate(item):
-                    add_to_queue(name=f"{name}[{i}]", item=sub_item)
-            elif isinstance(item, dict):
-                for key, sub_item in item.items():
-                    add_to_queue(name=f"{name}[{key}]", item=sub_item)
+                yield name, cast("BaseModule", item)
 
     def parameters(self):
         return [param for _, param in self.named_parameters()]
