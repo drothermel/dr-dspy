@@ -1,11 +1,11 @@
 import logging
-import threading
 from typing import Any, Literal
 
 from typing_extensions import override
 
 from dspy.clients._litellm import is_litellm_context_window_error
-from dspy.clients.finetune import DefaultFinetuneProvider, ReinforceJob, TrainDataFormat, TrainingJob
+from dspy.clients.finetune import ReinforceJob, TrainDataFormat, TrainingJob
+from dspy.clients.finetune import lm as finetune_lm
 from dspy.clients.finetune.protocol import FinetuneProvider
 from dspy.clients.lm.errors import (
     _exception_message,
@@ -24,11 +24,10 @@ from dspy.clients.lm.transport import (
 )
 from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.clients.model_id import split_provider_model
-from dspy.clients.openai import OpenAIProvider
 from dspy.clients.openai_format.reasoning_models import is_openai_reasoning_model
 from dspy.core.types import LMRequest, LMResponse
 from dspy.core.types.lm_provider import LMProviderOptions
-from dspy.errors import ContextWindowExceededError, LMConfigurationError, LMError, LMUnsupportedFeatureError
+from dspy.errors import ContextWindowExceededError, LMConfigurationError, LMError
 from dspy.runtime.callback import Callback
 
 from ..base_lm import BaseLM
@@ -64,7 +63,7 @@ class LM(BaseLM):
             callbacks=callbacks,
             provider_options=merged_provider,
         )
-        self.provider = provider or self.infer_provider()
+        self.provider = provider or finetune_lm.infer_provider(self.model)
         self.finetuning_model = finetuning_model
         self.launch_kwargs = launch_kwargs or {}
         self.train_kwargs = train_kwargs or {}
@@ -163,10 +162,10 @@ class LM(BaseLM):
         return lm_response_for_model_type(self.model_type, results, request, self)
 
     def launch(self, launch_kwargs: dict[str, Any] | None = None) -> None:
-        self.provider.launch(self, launch_kwargs)
+        finetune_lm.launch(self, launch_kwargs)
 
     def kill(self, launch_kwargs: dict[str, Any] | None = None) -> None:
-        self.provider.kill(self, launch_kwargs)
+        finetune_lm.kill(self, launch_kwargs)
 
     def finetune(
         self,
@@ -174,61 +173,13 @@ class LM(BaseLM):
         train_data_format: TrainDataFormat | None,
         train_kwargs: dict[str, Any] | None = None,
     ) -> TrainingJob:
-        if not self.provider.finetunable:
-            raise LMUnsupportedFeatureError(
-                f"Provider {self.provider} does not support fine-tuning, please specify your provider by explicitly setting `provider` when creating the `dspy.clients.lm.LM` instance. For example, `from dspy.clients.lm import LM; from dspy.clients.openai import OpenAIProvider; LM('openai/gpt-4.1-mini-2025-04-14', provider=OpenAIProvider())`.",
-                model=self.model,
-                provider=self._provider_name,
-                features=["finetuning"],
-            )
-
-        train_kwargs = train_kwargs or self.train_kwargs
-        model_to_finetune = self.finetuning_model or self.model
-        job = self.provider.TrainingJob(
-            thread=None,
-            model=model_to_finetune,
-            train_data=train_data,
-            train_data_format=train_data_format,
-            train_kwargs=train_kwargs,
-        )
-        thread = threading.Thread(target=lambda: self._run_finetune_job(job))
-        job.thread = thread
-        thread.start()
-        return job
+        return finetune_lm.finetune(self, train_data, train_data_format, train_kwargs)
 
     def reinforce(self, train_kwargs: dict[str, Any]) -> ReinforceJob:
-        if not self.provider.reinforceable:
-            raise LMUnsupportedFeatureError(
-                f"Provider {self.provider} does not implement the reinforcement learning interface.",
-                model=self.model,
-                provider=self._provider_name,
-                features=["reinforce"],
-            )
-        job = self.provider.ReinforceJob(lm=self, train_kwargs=train_kwargs)
-        job.initialize()
-        return job
-
-    def _run_finetune_job(self, job: TrainingJob) -> None:
-        try:
-            if job.model is None or job.train_data is None:
-                raise ValueError("TrainingJob requires model and train_data before finetuning.")
-            model = self.provider.finetune(
-                job=job,
-                model=job.model,
-                train_data=job.train_data,
-                train_data_format=job.train_data_format,
-                train_kwargs=job.train_kwargs,
-            )
-            lm = self.copy(model=model)
-            job.set_result(lm)
-        except Exception as err:
-            logger.exception(err)
-            job.set_result(err)
+        return finetune_lm.reinforce(self, train_kwargs)
 
     def infer_provider(self) -> FinetuneProvider:
-        if OpenAIProvider.is_provider_model(self.model):
-            return OpenAIProvider()
-        return DefaultFinetuneProvider()
+        return finetune_lm.infer_provider(self.model)
 
     @override
     def dump_state(self):
