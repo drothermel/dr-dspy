@@ -49,6 +49,7 @@ class CompiledCall(BaseModel):
     config: LMConfig = Field(default_factory=LMConfig)
     config_provenance: dict[str, str] = Field(default_factory=dict)
     lm_model: str = ""
+    lm_kwargs: dict[str, Any] = Field(default_factory=dict)
     cache: bool | None = None
     violations: list[str] = Field(default_factory=list)
 
@@ -108,7 +109,7 @@ def validate_compiled_call(call: CompiledCall, mode: TransparencyMode) -> list[s
     for task_spec in (call.original_task_spec, call.processed_task_spec):
         violations.extend(collect_task_spec_violations(task_spec))
     if call.lm_model:
-        violations.extend(collect_config_violations(config=call.config, lm_kwargs={}, cache=call.cache))
+        violations.extend(collect_config_violations(config=call.config, lm_kwargs=call.lm_kwargs, cache=call.cache))
     if mode == "strict" and violations:
         raise TransparencyViolation(
             f"Transparency strict mode violation(s) in phase={call.phase!r}, lm_role={call.lm_role!r}:",

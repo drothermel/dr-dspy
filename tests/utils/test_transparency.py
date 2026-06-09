@@ -48,6 +48,35 @@ def test_validate_compiled_call_warn_mode_does_not_raise(make_run):
     assert violations
 
 
+def test_validate_compiled_call_strict_reports_missing_max_tokens_from_lm_kwargs(make_run):
+    call = CompiledCall(
+        call_id="1",
+        adapter_class="JSONAdapter",
+        original_task_spec=SampleTaskSpec(),
+        processed_task_spec=SampleTaskSpec(),
+        config=LMConfig(temperature=0.0),
+        lm_model="openai/gpt-4o-mini",
+        lm_kwargs={},
+        cache=False,
+    )
+    with pytest.raises(TransparencyViolation, match="max_tokens"):
+        validate_compiled_call(call, "strict")
+
+
+def test_validate_compiled_call_strict_passes_when_max_tokens_in_lm_kwargs(make_run):
+    call = CompiledCall(
+        call_id="1",
+        adapter_class="JSONAdapter",
+        original_task_spec=SampleTaskSpec(),
+        processed_task_spec=SampleTaskSpec(),
+        config=LMConfig(temperature=0.0),
+        lm_model="openai/gpt-4o-mini",
+        lm_kwargs={"max_tokens": 4000},
+        cache=False,
+    )
+    validate_compiled_call(call, "strict")
+
+
 def test_validate_compiled_call_strict_passes_for_explicit_call(make_run):
     call = CompiledCall(
         call_id="1",

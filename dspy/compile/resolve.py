@@ -82,6 +82,7 @@ def resolve_call(
         config=config or LMConfig(),
         config_provenance=config_provenance or {},
         lm_model=getattr(lm, "model", ""),
+        lm_kwargs=dict(getattr(lm, "kwargs", {})),
         cache=cache,
         violations=violations or [],
     )
