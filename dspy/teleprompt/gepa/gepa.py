@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 import math
@@ -16,7 +17,6 @@ from dspy.utils.annotation import experimental
 
 if TYPE_CHECKING:
     from gepa import GEPAResult
-    from gepa.core.adapter import ProposalFn
     from gepa.proposer.reflective_mutation.base import ReflectionComponentSelector
     from pydantic import BaseModel
 
@@ -24,7 +24,13 @@ if TYPE_CHECKING:
     from dspy.primitives.example import Example
     from dspy.primitives.module import Module
     from dspy.runtime.run_context import RunContext
-    from dspy.teleprompt.gepa.gepa_utils import DspyAdapter, DSPyTrace, PredictorFeedbackFn, ScoreWithFeedback
+    from dspy.teleprompt.gepa.gepa_utils import (
+        AsyncProposalFn,
+        DspyAdapter,
+        DSPyTrace,
+        PredictorFeedbackFn,
+        ScoreWithFeedback,
+    )
 logger = logging.getLogger(__name__)
 AUTO_RUN_SETTINGS = {"light": {"n": 6}, "medium": {"n": 12}, "heavy": {"n": 18}}
 
@@ -124,7 +130,7 @@ class GEPA(Teleprompter):
         reflection_lm: LM | None = None,
         skip_perfect_score: bool = True,
         add_format_failure_as_feedback: bool = False,
-        instruction_proposer: ProposalFn | None = None,
+        instruction_proposer: AsyncProposalFn | None = None,
         component_selector: ReflectionComponentSelector | str = "round_robin",
         use_merge: bool = True,
         max_merge_invocations: int | None = 5,
@@ -179,6 +185,10 @@ class GEPA(Teleprompter):
             assert track_stats, "track_stats must be True if track_best_outputs is True."
         self.track_best_outputs = track_best_outputs
         self.seed = seed
+        if instruction_proposer is not None and not inspect.iscoroutinefunction(instruction_proposer):
+            raise TypeError(
+                "GEPA instruction_proposer must be async. Pass an AsyncProposalFn with `async def __call__(...)`."
+            )
         self.custom_instruction_proposer = instruction_proposer
         self.component_selector = component_selector
         self.gepa_kwargs = gepa_kwargs or {}
@@ -285,7 +295,8 @@ class GEPA(Teleprompter):
             run=run,
         )
         seed_candidate = {name: pred.task_spec.instructions for name, pred in student.named_predictors()}
-        gepa_result: GEPAResult = optimize(
+        gepa_result: GEPAResult = await asyncio.to_thread(
+            optimize,
             seed_candidate=seed_candidate,
             trainset=trainset,
             valset=valset,

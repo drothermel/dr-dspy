@@ -1,16 +1,14 @@
-import asyncio
 import logging
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
-from gepa.core.adapter import ProposalFn
 from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
-from dspy.teleprompt.gepa.gepa_utils import ReflectiveExample
+from dspy.teleprompt.gepa.gepa_utils import AsyncProposalFn, ReflectiveExample
 
 logger = logging.getLogger(__name__)
 
@@ -174,24 +172,12 @@ class SingleComponentMultiModalProposer(Module):
         return multimodal_content
 
 
-class MultiModalInstructionProposer(ProposalFn):
+class MultiModalInstructionProposer(AsyncProposalFn):
     def __init__(self) -> None:
         self.single_proposer = SingleComponentMultiModalProposer()
 
     @override
-    def __call__(
-        self,
-        candidate: dict[str, str],
-        reflective_dataset: Mapping[str, Sequence[Mapping[str, Any]]],
-        components_to_update: list[str],
-    ) -> dict[str, str]:
-        return asyncio.run(
-            self._propose(
-                candidate=candidate, reflective_dataset=reflective_dataset, components_to_update=components_to_update
-            )
-        )
-
-    async def _propose(
+    async def __call__(
         self,
         candidate: dict[str, str],
         reflective_dataset: Mapping[str, Sequence[Mapping[str, Any]]],

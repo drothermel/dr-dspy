@@ -1,10 +1,8 @@
 import asyncio
-import contextvars
 import json
 import logging
 import random
-from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any, Callable, Protocol, TypedDict, cast
+from typing import Any, Callable, Protocol, TypedDict, cast
 
 from gepa import EvaluationBatch, GEPAAdapter
 from typing_extensions import override
@@ -20,23 +18,16 @@ from dspy.teleprompt.gepa.task_specs import FrameworkGepaInstructionProposalTask
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
-if TYPE_CHECKING:
-    from gepa.core.adapter import ProposalFn
 logger = logging.getLogger(__name__)
-_gepa_eval_executor = ThreadPoolExecutor(max_workers=1)
 
 
-def _run_async_from_sync(coro):
-    ctx = contextvars.copy_context()
-
-    def _run_in_context() -> Any:
-        return ctx.run(asyncio.run, coro)
-
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return _run_in_context()
-    return _gepa_eval_executor.submit(_run_in_context).result()
+class AsyncProposalFn(Protocol):
+    async def __call__(
+        self,
+        candidate: dict[str, str],
+        reflective_dataset: dict[str, list[dict[str, Any]]],
+        components_to_update: list[str],
+    ) -> dict[str, str]: ...
 
 
 class LoggerAdapter:
@@ -80,7 +71,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         add_format_failure_as_feedback: bool = False,
         rng: random.Random | None = None,
         reflection_lm=None,
-        custom_instruction_proposer: "ProposalFn | None" = None,
+        custom_instruction_proposer: AsyncProposalFn | None = None,
         warn_on_score_mismatch: bool = True,
         reflection_minibatch_size: int | None = None,
         run: RunContext | None = None,
@@ -105,6 +96,20 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         reflective_dataset: dict[str, list[dict[str, Any]]],
         components_to_update: list[str],
     ) -> dict[str, str]:
+        return asyncio.run(
+            self._apropose_new_texts(
+                candidate=candidate,
+                reflective_dataset=reflective_dataset,
+                components_to_update=components_to_update,
+            )
+        )
+
+    async def _apropose_new_texts(
+        self,
+        candidate: dict[str, str],
+        reflective_dataset: dict[str, list[dict[str, Any]]],
+        components_to_update: list[str],
+    ) -> dict[str, str]:
         if self.run is None:
             raise ValueError("DspyAdapter requires a RunContext.")
         reflection_lm = self.reflection_lm or self.run.lm
@@ -112,7 +117,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             with optimizer_lm_context(
                 self.run, lm=reflection_lm, phase="gepa.reflection", lm_role="reflection_lm"
             ) as opt_run:
-                return self.custom_instruction_proposer(
+                return await self.custom_instruction_proposer(
                     candidate=candidate,
                     reflective_dataset=reflective_dataset,
                     components_to_update=components_to_update,
@@ -125,12 +130,10 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             for name in components_to_update:
                 base_instruction = candidate[name]
                 dataset_with_feedback = reflective_dataset[name]
-                prediction = _run_async_from_sync(
-                    proposer(
-                        current_instruction_doc=base_instruction,
-                        dataset_with_feedback=json.dumps(dataset_with_feedback, indent=2, default=str),
-                        run=opt_run,
-                    )
+                prediction = await proposer(
+                    current_instruction_doc=base_instruction,
+                    dataset_with_feedback=json.dumps(dataset_with_feedback, indent=2, default=str),
+                    run=opt_run,
                 )
                 results[name] = prediction.new_instruction
         return results
@@ -144,7 +147,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
 
     @override
     def evaluate(self, batch, candidate, capture_traces=False):
-        return _run_async_from_sync(self._aevaluate(batch=batch, candidate=candidate, capture_traces=capture_traces))
+        return asyncio.run(self._aevaluate(batch=batch, candidate=candidate, capture_traces=capture_traces))
 
     async def _aevaluate(self, batch, candidate, capture_traces=False):
         program = self.build_program(candidate)
