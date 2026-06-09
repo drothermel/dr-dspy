@@ -333,7 +333,6 @@ class Module:
         provide_traceback: bool | None = None,
         disable_progress_bar: bool = False,
         timeout: int = 120,
-        straggler_limit: int = 3,
     ) -> BatchResult:
         exec_pairs = [(self, example.as_inputs()) for example in examples]
         parallel_executor = Parallel(
@@ -343,7 +342,6 @@ class Module:
             provide_traceback=provide_traceback,
             disable_progress_bar=disable_progress_bar,
             timeout=timeout,
-            straggler_limit=straggler_limit,
         )
         return await parallel_executor(exec_pairs)
 

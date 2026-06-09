@@ -18,7 +18,6 @@ class Parallel:
         provide_traceback: bool | None = None,
         disable_progress_bar: bool = False,
         timeout: int = 120,
-        straggler_limit: int = 3,
     ) -> None:
         self.run = run
         exec_cfg = run.execution if run is not None else None
@@ -34,7 +33,6 @@ class Parallel:
             self.provide_traceback = provide_traceback
         self.disable_progress_bar = disable_progress_bar
         self.timeout = timeout
-        self.straggler_limit = straggler_limit
         self._last_stats = BoundedRunStats()
         self._active_run: RunContext | None = None
 
@@ -82,6 +80,7 @@ class Parallel:
                 max_errors=max_errors,
                 provide_traceback=provide_traceback,
                 disable_progress_bar=self.disable_progress_bar,
+                timeout=float(self.timeout) if self.timeout > 0 else None,
             )
         finally:
             self._active_run = None

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 import pytest
@@ -76,3 +77,21 @@ async def test_run_bounded_progress_hook():
         disable_progress_bar=True,
     )
     assert results == [(1, False), (2, True), (3, True)]
+
+
+@pytest.mark.asyncio
+async def test_run_bounded_timeout_records_failure():
+    async def slow(_item: int) -> int:
+        await asyncio.sleep(0.2)
+        return _item
+
+    results, stats = await run_bounded(
+        items=[1],
+        fn=slow,
+        max_concurrency=1,
+        timeout=0.05,
+        disable_progress_bar=True,
+    )
+    assert results == [None]
+    assert stats.failed_indices == [0]
+    assert isinstance(stats.exceptions_map[0], TimeoutError)

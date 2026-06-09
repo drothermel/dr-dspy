@@ -60,6 +60,7 @@ async def run_bounded(
     provide_traceback: bool | None = None,
     disable_progress_bar: bool = False,
     progress_hook: Callable[[list[R | None], int], str | None] | None = None,
+    timeout: float | None = None,
 ) -> tuple[list[R | None], BoundedRunStats]:
     if max_concurrency < 1:
         raise ValueError("max_concurrency must be at least 1.")
@@ -75,7 +76,27 @@ async def run_bounded(
         if cancel.is_set():
             return
         try:
-            outcome = await fn(item)
+            if timeout is not None:
+                outcome = await asyncio.wait_for(fn(item), timeout=timeout)
+            else:
+                outcome = await fn(item)
+        except TimeoutError as exc:
+            if provide_traceback:
+                logger.exception("Timeout for %r after %s seconds: %s", item, timeout, exc)
+            else:
+                logger.error(  # noqa: TRY400
+                    "Timeout for %r after %s seconds. Set `provide_traceback=True` for traceback.",
+                    item,
+                    timeout,
+                    exc_info=False,
+                )
+            async with lock:
+                stats.failed_indices.append(index)
+                stats.exceptions_map[index] = exc
+                error_count += 1
+                if max_errors is not None and error_count >= max_errors:
+                    cancel.set()
+            return
         except Exception as exc:
             if provide_traceback:
                 logger.exception("Error for %r: %s", item, exc)

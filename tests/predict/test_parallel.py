@@ -190,17 +190,14 @@ def test_batch_with_failed_examples(make_run):
     assert str(batch_result.failures[0].exception) == "test error"
 
 
-def test_parallel_timeout_and_straggler_limit_params(make_run):
+def test_parallel_timeout_disabled_when_zero(make_run):
     parallel_default = Parallel()
     assert parallel_default.timeout == 120
-    assert parallel_default.straggler_limit == 3
-    parallel_custom = Parallel(timeout=0, straggler_limit=5)
+    parallel_custom = Parallel(timeout=0)
     assert parallel_custom.timeout == 0
-    assert parallel_custom.straggler_limit == 5
 
 
-def test_batch_timeout_and_straggler_limit_params(make_run):
-
+def test_batch_timeout_disabled_when_zero(make_run):
     run = make_run(lm=DummyLM([{}]))
 
     class SimpleModule(Module):
@@ -213,5 +210,32 @@ def test_batch_timeout_and_straggler_limit_params(make_run):
         Example.from_record({"value": 2}, input_keys=("value",)),
         Example.from_record({"value": 3}, input_keys=("value",)),
     ]
-    results = asyncio.run(module.batch(examples, timeout=0, straggler_limit=5, run=run)).results
+    results = asyncio.run(module.batch(examples, timeout=0, run=run)).results
     assert results == (2, 4, 6)
+
+
+def test_parallel_timeout_records_slow_item_failure(make_run):
+    run = make_run(lm=DummyLM([{}]))
+
+    class SlowModule(Module):
+        async def _aforward_impl(self, *, run, options=None, **inputs) -> str:
+            if inputs["value"] == "slow":
+                await asyncio.sleep(2)
+            return inputs["value"]
+
+    module = SlowModule()
+    parallel = Parallel(run=run, timeout=1, max_concurrency=2)
+    batch_result = asyncio.run(
+        parallel(
+            [
+                (module, {"value": "fast"}),
+                (module, {"value": "slow"}),
+            ],
+            run=run,
+        )
+    )
+    assert batch_result.results[0] == "fast"
+    assert batch_result.results[1] is None
+    assert len(batch_result.failures) == 1
+    assert batch_result.failures[0].input == {"value": "slow"}
+    assert isinstance(batch_result.failures[0].exception, TimeoutError)
