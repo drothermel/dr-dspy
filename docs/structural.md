@@ -797,6 +797,8 @@ contributor docs in `tests/README.md` and `AGENTS.md`; regression test for
 
 ### P5.3 Make adapter tests reusable without weakening prompt contracts
 
+**Status:** Done (2026-06).
+
 **Sources:** Manual test-suite review.
 
 Problem:
@@ -819,6 +821,16 @@ Details to preserve:
   introduced deliberately.
 - Reuse should make new adapter scenarios smaller, not hide the contract being
   asserted.
+
+**Delivered:** `tests/adapters/scenarios/` (`FormatScenarioCase` builders for QA,
+history, tools, pydantic, multimodal, kitchen-sink, per-adapter cases);
+`tests/adapters/golden/` (chat, chat_extended, json, xml, baml, two_step +
+`registry.py`); `tests/adapters/assertions.py`; centralized
+`test_golden_prompts.py` (40 golden cases); structural
+`test_multimodal_contract.py` and `test_kitchen_sink_message_contract` in
+`test_format_contract.py`; removed inline `format_exact_messages_*` and
+duplicated image/document tests from adapter files; contributor docs in
+`tests/adapters/README.md`.
 
 ### P5.4 Normalize pytest marker and live integration policy
 
