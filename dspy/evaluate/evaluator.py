@@ -28,7 +28,12 @@ if TYPE_CHECKING:
 from dspy.evaluate.metric_invoke import invoke_metric
 from dspy.primitives import Prediction
 from dspy.runtime import run_with_trace
-from dspy.runtime.async_parallel import resolve_max_concurrency, resolve_max_errors, run_bounded
+from dspy.runtime.async_parallel import (
+    RUN_BOUNDED_PENDING,
+    resolve_max_concurrency,
+    resolve_max_errors,
+    run_bounded,
+)
 from dspy.runtime.callback import with_callbacks
 
 logger = logging.getLogger(__name__)
@@ -113,7 +118,7 @@ class Evaluate:
             return (prediction, score)
 
         def evaluation_progress(results: list, total: int) -> str:
-            completed = [r for r in results if r is not None]
+            completed = [r for r in results if r is not RUN_BOUNDED_PENDING]
             score_sum = sum(r[-1] for r in completed if isinstance(r, tuple))
             pct = round(100 * score_sum / total, 1) if total else 0
             return f"metric sum: {score_sum:.2f}, n={total}, mean={pct}%"

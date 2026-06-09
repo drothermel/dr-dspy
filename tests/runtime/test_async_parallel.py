@@ -3,7 +3,7 @@ import logging
 
 import pytest
 
-from dspy.runtime.async_parallel import BoundedRunAbortedError, run_bounded
+from dspy.runtime.async_parallel import RUN_BOUNDED_PENDING, BoundedRunAbortedError, run_bounded
 
 
 @pytest.mark.asyncio
@@ -65,7 +65,7 @@ async def test_run_bounded_progress_hook():
         return (item, item > 1)
 
     def metric_progress(results, total):
-        completed = [r for r in results if r is not None]
+        completed = [r for r in results if r is not RUN_BOUNDED_PENDING]
         total_score = sum(r[-1] for r in completed if isinstance(r, tuple))
         return f"score={total_score}/{total}"
 
@@ -77,6 +77,21 @@ async def test_run_bounded_progress_hook():
         disable_progress_bar=True,
     )
     assert results == [(1, False), (2, True), (3, True)]
+
+
+@pytest.mark.asyncio
+async def test_run_bounded_accepts_none_result():
+    async def return_none(_item: int) -> None:
+        return None
+
+    results, stats = await run_bounded(
+        items=[1, 2],
+        fn=return_none,
+        max_concurrency=1,
+        disable_progress_bar=True,
+    )
+    assert results == [None, None]
+    assert stats.failed_indices == []
 
 
 @pytest.mark.asyncio

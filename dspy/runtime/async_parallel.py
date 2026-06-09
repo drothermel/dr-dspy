@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import tqdm
 
@@ -12,6 +12,8 @@ if TYPE_CHECKING:
     from dspy.runtime.run_context import RunContext
 
 logger = logging.getLogger(__name__)
+
+RUN_BOUNDED_PENDING = object()
 
 
 def resolve_max_concurrency(
@@ -51,6 +53,10 @@ class BoundedRunAbortedError(RuntimeError):
         super().__init__(f"Execution cancelled: {reason}. Failed indices: {stats.failed_indices}")
 
 
+def _finalize_results(results: list[Any]) -> list[Any]:
+    return [None if slot is RUN_BOUNDED_PENDING else slot for slot in results]
+
+
 async def run_bounded(
     *,
     items: Sequence[T],
@@ -62,17 +68,23 @@ async def run_bounded(
     progress_hook: Callable[[list[R | None], int], str | None] | None = None,
     timeout: float | None = None,
 ) -> tuple[list[R | None], BoundedRunStats]:
+    """Run ``fn`` over ``items`` with bounded concurrency.
+
+    ``progress_hook`` receives the live results list. Incomplete slots use the
+    ``RUN_BOUNDED_PENDING`` sentinel; failed slots are ``None`` once recorded.
+    """
     if max_concurrency < 1:
         raise ValueError("max_concurrency must be at least 1.")
     stats = BoundedRunStats()
-    results: list[R | None] = [None] * len(items)
+    results: list[Any] = [RUN_BOUNDED_PENDING] * len(items)
+    completed_count = 0
     error_count = 0
     cancel = asyncio.Event()
     lock = asyncio.Lock()
     pbar = tqdm.tqdm(total=len(items), dynamic_ncols=True, disable=disable_progress_bar or len(items) == 0)
 
     async def run_indexed(index: int, item: T) -> None:
-        nonlocal error_count
+        nonlocal error_count, completed_count
         if cancel.is_set():
             return
         try:
@@ -91,6 +103,7 @@ async def run_bounded(
                     exc_info=False,
                 )
             async with lock:
+                results[index] = None
                 stats.failed_indices.append(index)
                 stats.exceptions_map[index] = exc
                 error_count += 1
@@ -108,6 +121,7 @@ async def run_bounded(
                     exc_info=False,
                 )
             async with lock:
+                results[index] = None
                 stats.failed_indices.append(index)
                 stats.exceptions_map[index] = exc
                 error_count += 1
@@ -115,10 +129,10 @@ async def run_bounded(
                     cancel.set()
             return
         results[index] = outcome
+        completed_count += 1
         description = progress_hook(results, len(items)) if progress_hook is not None else None
         if description is None:
-            completed = len([r for r in results if r is not None])
-            description = f"Processed {completed} / {len(items)} examples"
+            description = f"Processed {completed_count} / {len(items)} examples"
         pbar.set_description(description)
         pbar.update()
 
@@ -138,4 +152,4 @@ async def run_bounded(
         pbar.close()
     if cancel.is_set():
         raise BoundedRunAbortedError(stats, reason="max_errors exceeded")
-    return (results, stats)
+    return (_finalize_results(results), stats)
