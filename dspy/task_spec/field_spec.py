@@ -12,7 +12,8 @@ class FieldRole(StrEnum):
     OUTPUT = "output"
 
 
-FIELD_NAME_PATTERN = re.compile(r"^[\w][\w.-]*$")
+FIELD_NAME_BODY = r"[\w][\w.-]*"
+FIELD_NAME_PATTERN = re.compile(rf"^{FIELD_NAME_BODY}$")
 
 
 def validate_field_name(name: str) -> None:

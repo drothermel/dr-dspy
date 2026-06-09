@@ -3,14 +3,22 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, cast
 
-import json_repair
-
 from dspy.adapters.types.tool import ToolCalls
+from dspy.adapters.utils.json_loads import load_json
 from dspy.core.types import LMToolCallPart
 from dspy.task_spec.json_serialize import serialize_for_json
 
 if TYPE_CHECKING:
     from dspy.core.types import LMOutput
+
+
+def _load_provider_tool_arguments(arguments: str) -> dict[str, Any]:
+    """Parse provider tool-call argument strings (external wire data; repair enabled)."""
+    try:
+        parsed = load_json(arguments, repair=False)
+    except json.JSONDecodeError:
+        parsed = load_json(arguments, repair=True)
+    return parsed if isinstance(parsed, dict) else {}
 
 
 def _provider_value(value: object, key: str, default: object = None) -> object:
@@ -26,12 +34,12 @@ def _provider_tool_call_to_tool_call_dict(tool_call: object) -> dict[str, Any]:
         if not args:
             raw_arguments = tool_call.provider_data.get("raw_arguments") or tool_call.provider_data.get("arguments")
             if isinstance(raw_arguments, str):
-                args = json_repair.loads(raw_arguments)
+                args = _load_provider_tool_arguments(raw_arguments)
         return {"id": tool_call.id, "name": tool_call.name, "args": args}
     function = _provider_value(value=tool_call, key="function", default={}) or {}
     arguments = _provider_value(value=function, key="arguments", default={})
     if isinstance(arguments, str):
-        parsed_arguments = json_repair.loads(arguments)
+        parsed_arguments = _load_provider_tool_arguments(arguments)
     elif isinstance(arguments, dict):
         parsed_arguments = arguments
     else:

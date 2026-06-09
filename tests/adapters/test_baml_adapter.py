@@ -210,9 +210,9 @@ def test_baml_adapter_raise_error_on_circular_references():
         instructions="Given the fields `input`, produce the fields `circular`.",
     )
     adapter = BAMLAdapter()
-    with pytest.raises(ValueError, match="recursive pydantic models") as error:
+    with pytest.raises(ValueError, match="output field 'circular'") as error:
         adapter.format_field_structure(TestSignature)
-    assert "BAMLAdapter cannot handle recursive pydantic models" in str(error.value)
+    assert "recursive pydantic models" in str(error.value)
 
 
 def test_baml_adapter_formats_pydantic_inputs_as_clean_json():

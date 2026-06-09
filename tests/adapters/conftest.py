@@ -59,6 +59,16 @@ class CapturingLM(BaseLM):
 
     @property
     @override
+    def reasoning_adaptation_mode(self):
+        return self.source_lm.reasoning_adaptation_mode
+
+    @property
+    @override
+    def citations_adaptation_mode(self):
+        return self.source_lm.citations_adaptation_mode
+
+    @property
+    @override
     def supports_response_schema(self):
         return self.source_lm.supports_response_schema
 

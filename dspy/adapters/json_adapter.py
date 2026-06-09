@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-import json_repair
 import regex
 from typing_extensions import override
 
@@ -12,7 +11,7 @@ from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.call.policies.response_format import StructuredOutputPolicy
 from dspy.adapters.format_shared import ChatFormatMixin
 from dspy.adapters.types.tool import ToolCalls
-from dspy.adapters.utils import parse_output_field, validate_parsed_fields
+from dspy.adapters.utils import load_json, parse_output_field, validate_parsed_fields
 from dspy.errors import AdapterParseError
 from dspy.task_spec import FieldBinding, field_bindings, format_field_value, get_annotation_name, translate_field_type
 from dspy.task_spec.field_spec import FieldRole
@@ -38,12 +37,14 @@ class JSONAdapter(ChatFormatMixin, Adapter):
         use_native_function_calling: bool = True,
         parallel_tool_calls: bool | None = None,
         native_response_types: list[type[Type]] | None = None,
+        allow_json_repair: bool = True,
     ) -> None:
         super().__init__(
             callbacks=callbacks,
             use_native_function_calling=use_native_function_calling,
             parallel_tool_calls=parallel_tool_calls,
             native_response_types=native_response_types,
+            allow_json_repair=allow_json_repair,
         )
         self.response_format_policy = StructuredOutputPolicy()
 
@@ -96,13 +97,21 @@ class JSONAdapter(ChatFormatMixin, Adapter):
 
     @override
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
-        fields = json_repair.loads(completion)
+        try:
+            fields = load_json(completion, repair=self.allow_json_repair)
+        except json.JSONDecodeError as exc:
+            raise AdapterParseError(
+                adapter_name="JSONAdapter",
+                task_spec=task_spec,
+                lm_response=completion,
+                message="LM response cannot be serialized to a JSON object.",
+            ) from exc
         if not isinstance(fields, dict):
             pattern = r"\{(?:[^{}]|(?R))*\}"
             match = regex.search(pattern, completion, regex.DOTALL)
             if match:
                 completion = match.group(0)
-                fields = json_repair.loads(completion)
+                fields = load_json(completion, repair=self.allow_json_repair)
         if not isinstance(fields, dict):
             raise AdapterParseError(
                 adapter_name="JSONAdapter",
@@ -120,6 +129,7 @@ class JSONAdapter(ChatFormatMixin, Adapter):
                     raw_value=v,
                     lm_response=completion,
                     field=task_spec.output_fields[k],
+                    repair=self.allow_json_repair,
                 )
         validate_parsed_fields(adapter_name="JSONAdapter", task_spec=task_spec, lm_response=completion, fields=fields)
         return fields

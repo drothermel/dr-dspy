@@ -9,6 +9,8 @@ from dspy.adapters.types.tool import ToolCalls
 if TYPE_CHECKING:
     from dspy.task_spec import TaskSpec
 
+STRUCTURED_OUTPUT_SCHEMA_NAME = "DSPyProgramOutputs"
+
 
 def has_open_ended_mapping(task_spec: TaskSpec) -> bool:
     return any(get_origin(field.type_) is dict for field in task_spec.output_fields.values())
@@ -16,7 +18,7 @@ def has_open_ended_mapping(task_spec: TaskSpec) -> bool:
 
 def get_structured_outputs_response_format(
     task_spec: TaskSpec, use_native_function_calling: bool = True
-) -> type[pydantic.BaseModel]:
+) -> dict[str, Any]:
     for name, field in task_spec.output_fields.items():
         if get_origin(field.type_) is dict:
             raise ValueError(
@@ -29,7 +31,7 @@ def get_structured_outputs_response_format(
             continue
         fields[name] = (field_type, ...)
     pydantic_model = pydantic.create_model(
-        "DSPyProgramOutputs",
+        STRUCTURED_OUTPUT_SCHEMA_NAME,
         __config__=pydantic.ConfigDict(extra="forbid"),
         **cast("dict[str, Any]", fields),
     )
@@ -58,9 +60,11 @@ def get_structured_outputs_response_format(
                     enforce_required(def_schema)
 
     enforce_required(schema)
-
-    def model_json_schema(*_args: object, **_kwargs: object) -> dict[str, Any]:
-        return schema
-
-    pydantic_model.model_json_schema = model_json_schema
-    return pydantic_model
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": STRUCTURED_OUTPUT_SCHEMA_NAME,
+            "strict": True,
+            "schema": schema,
+        },
+    }

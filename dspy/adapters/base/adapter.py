@@ -43,6 +43,11 @@ class Adapter(AdapterCallMixin, AdapterFormatMixin):
         cls.parse = with_callbacks(kind="adapter")(cls.parse)
 
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
+        """Parse LM text into output fields.
+
+        Contract: return a dict whose keys match ``task_spec.output_fields`` exactly.
+        Missing or extra keys raise ``AdapterParseError`` via ``validate_parsed_fields``.
+        """
         raise NotImplementedError
 
     def format_finetune_data(

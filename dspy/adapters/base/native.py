@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.reasoning import Reasoning
-from dspy.core.types.config import LMConfig, LMReasoningConfig
+from dspy.core.types.config import LMConfig, LMReasoningConfig, NativeAdaptationMode
 from dspy.task_spec import TaskSpec
 
 if TYPE_CHECKING:
@@ -34,12 +34,12 @@ class AdapterNativeMixin:
             reasoning_effort = None
         if reasoning_effort is None or not lm.supports_reasoning:
             return task_spec
-        if "gpt-5" in lm.model and lm.model_type == "chat":
+        if lm.reasoning_adaptation_mode is NativeAdaptationMode.SKIP:
             return task_spec
         config.reasoning = LMReasoningConfig(effort=reasoning_effort)
         return task_spec.delete(field_name)
 
     def _adapt_citations_native(self, task_spec: TaskSpec, field_name: str, lm: BaseLM) -> TaskSpec:
-        if lm.model.startswith("anthropic/"):
+        if lm.citations_adaptation_mode is NativeAdaptationMode.SKIP:
             return task_spec.delete(field_name)
         return task_spec

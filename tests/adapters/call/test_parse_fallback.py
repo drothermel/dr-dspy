@@ -17,7 +17,7 @@ async def test_chat_adapter_fallback_to_json_adapter_on_parse_error():
     adapter = ChatAdapter()
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="{'answer': 'Paris'}"))],
+            choices=[Choices(message=Message(content='{"answer": "Paris"}'))],
             model="openai/gpt-4o-mini",
         )
         lm = LM("openai/gpt-4o-mini")
@@ -49,7 +49,7 @@ async def test_chat_adapter_fallback_preserves_native_function_calling_flag():
     cast("Any", adapter.parse_fallback_policy)._fallback_factory = tracking_factory
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
-            choices=[Choices(message=Message(content="{'answer': 'Paris'}"))],
+            choices=[Choices(message=Message(content='{"answer": "Paris"}'))],
             model="openai/gpt-4o-mini",
         )
         lm = LM("openai/gpt-4o-mini")

@@ -12,7 +12,7 @@ from dspy.adapters.utils import (
     validate_parsed_fields,
 )
 from dspy.task_spec import FieldBinding, TaskSpec, field_bindings, format_field_value, translate_field_type
-from dspy.task_spec.field_spec import FieldRole
+from dspy.task_spec.field_spec import FIELD_NAME_BODY, FieldRole
 
 
 class XMLAdapter(ChatAdapter):
@@ -22,7 +22,7 @@ class XMLAdapter(ChatAdapter):
         default_native_fc=False,
         supports_structured_output=False,
     )
-    field_pattern = re.compile("<(?P<name>\\w+)>((?P<content>.*?))</\\1>", re.DOTALL)
+    field_pattern = re.compile(rf"<(?P<name>{FIELD_NAME_BODY})>((?P<content>.*?))</\1>", re.DOTALL)
 
     @override
     def format_field_with_value(self, fields_with_values: dict[FieldBinding, Any]) -> str:

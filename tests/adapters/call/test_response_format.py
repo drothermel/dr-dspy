@@ -23,7 +23,8 @@ async def test_json_adapter_passes_structured_output_when_supported():
     request = lm.calls[0]["request"]
     response_format = request.config.response_format
     assert response_format is not None
-    assert hasattr(response_format, "model_json_schema")
+    assert response_format["type"] == "json_schema"
+    assert "schema" in response_format["json_schema"]
 
 
 @pytest.mark.asyncio

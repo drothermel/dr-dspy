@@ -1,14 +1,22 @@
+"""Adapter parse helpers.
+
+``validate_parsed_fields`` enforces a strict contract: every adapter ``parse`` call
+must return exactly the task spec's output field keys — no missing fields, no extras.
+Partial LM output always fails unless the adapter fills defaults before validation.
+"""
+
 import ast
 import enum
+import json
 import types
 from typing import Any, Literal, Union, cast, get_args, get_origin
 
-import json_repair
 import pydantic
 from pydantic import TypeAdapter
 
 from dspy.adapters.types.base_type import Type as DspyType
 from dspy.adapters.utils.fields import _annotation_is_subclass
+from dspy.adapters.utils.json_loads import load_json
 from dspy.errors import AdapterParseError
 from dspy.task_spec.field_spec import FieldSpec
 
@@ -20,13 +28,24 @@ def validate_parsed_fields(
     lm_response: str,
     fields: dict[str, Any],
 ) -> None:
-    if fields.keys() != task_spec.output_fields.keys():
-        raise AdapterParseError(
-            adapter_name=adapter_name,
-            task_spec=task_spec,
-            lm_response=lm_response,
-            parsed_result=fields,
-        )
+    expected = set(task_spec.output_fields.keys())
+    actual = set(fields.keys())
+    if actual == expected:
+        return
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    parts = []
+    if missing:
+        parts.append(f"missing field(s): {missing}")
+    if extra:
+        parts.append(f"unexpected field(s): {extra}")
+    raise AdapterParseError(
+        adapter_name=adapter_name,
+        task_spec=task_spec,
+        lm_response=lm_response,
+        parsed_result=fields,
+        message="; ".join(parts),
+    )
 
 
 def parse_output_field(
@@ -37,9 +56,10 @@ def parse_output_field(
     raw_value: object,
     lm_response: str,
     field: FieldSpec,
+    repair: bool = False,
 ) -> object:
     try:
-        return parse_value(raw_value, field.type_)
+        return parse_value(raw_value, field.type_, repair=repair)
     except Exception as exc:
         raise AdapterParseError(
             adapter_name=adapter_name,
@@ -59,7 +79,7 @@ def find_enum_member(enum_type: enum.EnumMeta, identifier: object) -> enum.Enum:
     raise ValueError(f"{identifier} is not a valid name or value for the enum {enum_type.__name__}")
 
 
-def parse_value(value: object, annotation: object) -> object:
+def parse_value(value: object, annotation: object, *, repair: bool = False) -> object:
     if annotation is str:
         return str(value)
     if isinstance(annotation, enum.EnumMeta):
@@ -82,7 +102,10 @@ def parse_value(value: object, annotation: object) -> object:
         return TypeAdapter(annotation).validate_python(value)
     if origin in (Union, types.UnionType) and type(None) in get_args(annotation) and (str in get_args(annotation)):
         return TypeAdapter(annotation).validate_python(value)
-    candidate = json_repair.loads(value)
+    try:
+        candidate = load_json(value, repair=repair)
+    except json.JSONDecodeError:
+        candidate = value
     if candidate == "" and value != "":
         try:
             candidate = ast.literal_eval(value)

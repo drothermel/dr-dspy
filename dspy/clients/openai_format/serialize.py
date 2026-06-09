@@ -269,6 +269,15 @@ def prompt_cache_to_kwargs(cache: Any) -> dict[str, Any]:
 
 
 def response_format_to_responses(value: Any) -> Any:
+    if isinstance(value, dict) and value.get("type") == "json_schema":
+        json_schema = value.get("json_schema")
+        if isinstance(json_schema, dict):
+            return {
+                "name": json_schema["name"],
+                "type": "json_schema",
+                "schema": json_schema["schema"],
+            }
+        return value
     if isinstance(value, type) and issubclass(value, pydantic.BaseModel):
         return {"name": value.__name__, "type": "json_schema", "schema": value.model_json_schema()}
     return value

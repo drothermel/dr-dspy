@@ -643,11 +643,16 @@ def test_chat_adapter_format_exact_messages_with_citations_output_demo():
 
 
 def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_citations():
+    from dspy.core.types.config import NativeAdaptationMode
 
     class AnthropicLM(DummyLM):
         def __init__(self):
             super().__init__([{}])
             self.model = "anthropic/claude-3-5-sonnet"
+
+        @property
+        def citations_adaptation_mode(self):
+            return NativeAdaptationMode.SKIP
 
     CitationSignature = make_task_spec(
         {
@@ -1974,7 +1979,7 @@ def test_chat_adapter_toolcalls_vague_match():
             choices=[
                 Choices(
                     message=Message(
-                        content="[[ ## tool_calls ## ]]\n[{'name': 'get_weather', 'args': {'city': 'Paris'}]"
+                        content='[[ ## tool_calls ## ]]\n{"tool_calls": [{"name": "get_weather", "args": {"city": "Paris"}}]}'
                     )
                 )
             ],
@@ -1998,7 +2003,7 @@ def test_chat_adapter_toolcalls_vague_match():
             choices=[
                 Choices(
                     message=Message(
-                        content="[[ ## tool_calls ## ]]\n{'name': 'get_weather', 'args': {'city': 'Paris'}}"
+                        content='[[ ## tool_calls ## ]]\n{"tool_calls": [{"name": "get_weather", "args": {"city": "Paris"}}]}'
                     )
                 )
             ],
@@ -2083,7 +2088,7 @@ def test_chat_adapter_parses_float_with_underscores(make_run):
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
-                Choices(message=Message(content="[[ ## score ## ]]\n{'score': 123_456.789}\n[[ ## completed ## ]]"))
+                Choices(message=Message(content='[[ ## score ## ]]\n{"score": 123456.789}\n[[ ## completed ## ]]'))
             ],
             model="openai/gpt-4o-mini",
         )
@@ -2373,3 +2378,36 @@ def test_native_response_type_without_parse_lm_output_raises():
                 run=make_adapter_run(lm=lm, adapter=adapter),
             )
         )
+
+
+def test_chat_adapter_parse_rejects_nonempty_preamble():
+    from dspy.errors import AdapterParseError
+    from dspy.task_spec import input_field, make_task_spec, output_field
+
+    task_spec = make_task_spec(
+        {
+            "question": input_field("question", desc="q"),
+            "answer": output_field("answer", desc="a"),
+        },
+        instructions="answer",
+    )
+    adapter = ChatAdapter()
+    completion = "intro text\n[[ ## answer ## ]]\nParis"
+    with pytest.raises(AdapterParseError, match="preamble"):
+        adapter.parse(task_spec=task_spec, completion=completion)
+
+
+def test_chat_adapter_parse_hyphenated_field_name():
+    from dspy.task_spec import input_field, make_task_spec, output_field
+
+    task_spec = make_task_spec(
+        {
+            "question": input_field("question", desc="q"),
+            "my-answer": output_field("my-answer", desc="a"),
+        },
+        instructions="answer",
+    )
+    adapter = ChatAdapter()
+    completion = "[[ ## my-answer ## ]]\nParis"
+    parsed = adapter.parse(task_spec=task_spec, completion=completion)
+    assert parsed == {"my-answer": "Paris"}

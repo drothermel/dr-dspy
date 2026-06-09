@@ -1,7 +1,6 @@
 import inspect
 from typing import TYPE_CHECKING, Any, Callable, cast
 
-import json_repair
 import pydantic
 from pydantic import TypeAdapter
 from pydantic.json_schema import GetJsonSchemaHandler, JsonSchemaValue
@@ -9,6 +8,7 @@ from pydantic_core import CoreSchema
 from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
+from dspy.adapters.utils.json_loads import load_json
 
 if TYPE_CHECKING:
     from .tool import Tool
@@ -18,7 +18,7 @@ def _is_tool_call_dict(data: dict[str, Any]) -> bool:
     return ("name" in data and ("args" in data or "arguments" in data)) or "function" in data
 
 
-def _normalize_tool_call_dict(data: dict[str, Any]) -> dict[str, Any]:
+def _normalize_tool_call_dict(data: dict[str, Any], *, repair: bool = False) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError(f"Received invalid tool call value for `dspy.adapters.types.tool.ToolCalls`: {data}")
     if "function" in data:
@@ -31,7 +31,7 @@ def _normalize_tool_call_dict(data: dict[str, Any]) -> dict[str, Any]:
         arguments = data.get("args", data.get("arguments", {}))
         name = data.get("name")
     if isinstance(arguments, str):
-        arguments = json_repair.loads(arguments)
+        arguments = load_json(arguments, repair=repair)
     elif not isinstance(arguments, dict):
         arguments = {}
     return {"id": data.get("id") or data.get("call_id"), "name": name, "args": arguments}

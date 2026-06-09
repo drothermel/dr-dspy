@@ -93,8 +93,24 @@ def _build_simplified_schema(
 
 
 class BAMLAdapter(JSONAdapter):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._validated_task_spec_fingerprints: set[str] = set()
+
+    def _validate_output_field_types(self, task_spec: TaskSpec) -> None:
+        fingerprint = task_spec.fingerprint()
+        if fingerprint in self._validated_task_spec_fingerprints:
+            return
+        for name, field in task_spec.output_fields.items():
+            try:
+                _render_type_str(annotation=field.type_, indent=0, seen_models=set())
+            except ValueError as exc:
+                raise ValueError(f"BAMLAdapter output field {name!r}: {exc}") from exc
+        self._validated_task_spec_fingerprints.add(fingerprint)
+
     @override
     def format_field_structure(self, task_spec: TaskSpec) -> str:
+        self._validate_output_field_types(task_spec)
         sections = []
         sections.append(
             "All interactions will be structured in the following way, with the appropriate values filled in.\n"

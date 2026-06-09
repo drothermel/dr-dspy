@@ -14,14 +14,14 @@ from dspy.task_spec import (
     get_annotation_name,
     translate_field_type,
 )
-from dspy.task_spec.field_spec import FieldRole
+from dspy.task_spec.field_spec import FIELD_NAME_BODY, FieldRole
 from dspy.task_spec.formatting import get_field_spec_description_string
 
 if TYPE_CHECKING:
     from dspy.adapters.base.protocols import ChatFormattableAdapter
     from dspy.task_spec import TaskSpec
 
-FIELD_HEADER_PATTERN = re.compile(r"\[\[ ## (\w+) ## \]\]")
+FIELD_HEADER_PATTERN = re.compile(rf"\[\[ ## ({FIELD_NAME_BODY}) ## \]\]")
 
 
 def format_fields_with_headers(fields_with_values: dict[FieldBinding, Any]) -> str:

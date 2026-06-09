@@ -560,8 +560,9 @@ def test_json_adapter_passes_structured_output_when_supported_by_model(make_run)
     _, call_kwargs = mock_completion.call_args
     response_format = call_kwargs.get("response_format")
     assert response_format is not None
-    assert issubclass(response_format, pydantic.BaseModel)
-    assert response_format.model_fields.keys() == {"output1", "output2", "output3", "output4_unannotated"}
+    assert response_format["type"] == "json_schema"
+    schema_props = response_format["json_schema"]["schema"]["properties"]
+    assert set(schema_props.keys()) == {"output1", "output2", "output3", "output4_unannotated"}
 
 
 def test_json_adapter_not_using_structured_outputs_when_not_supported_by_model(make_run):
@@ -731,10 +732,7 @@ def test_json_adapter_parse_raise_error_on_mismatch_fields():
     assert e.value.task_spec == signature
     assert e.value.lm_response == "{'answer1': 'Paris'}"
     assert e.value.parsed_result == {}
-    assert (
-        str(e.value)
-        == "Adapter JSONAdapter failed to parse the LM response. \n\nLM Response: {'answer1': 'Paris'} \n\nExpected to find output fields in the LM response: [answer] \n\nActual output fields parsed from the LM response: [] \n\n"
-    )
+    assert "missing field(s): ['answer']" in str(e.value)
 
 
 def test_json_adapter_formats_image():
@@ -1101,7 +1099,7 @@ def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_lm_err
             asyncio.run(program(question="Dummy question!", run=run))
         assert mock_completion.call_count == 1
         _, first_call_kwargs = mock_completion.call_args_list[0]
-        assert issubclass(first_call_kwargs.get("response_format"), pydantic.BaseModel)
+        assert first_call_kwargs.get("response_format")["type"] == "json_schema"
 
 
 def test_json_adapter_json_mode_no_structured_outputs(make_run):
@@ -1176,7 +1174,7 @@ async def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_
             await program(question="Dummy question!", run=run)
         assert mock_acompletion.call_count == 1
         _, first_call_kwargs = mock_acompletion.call_args_list[0]
-        assert issubclass(first_call_kwargs.get("response_format"), pydantic.BaseModel)
+        assert first_call_kwargs.get("response_format")["type"] == "json_schema"
 
 
 def test_error_message_on_json_adapter_failure(make_run):

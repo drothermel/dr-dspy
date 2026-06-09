@@ -34,6 +34,20 @@ def test_xml_adapter_format_and_parse_basic():
     assert parsed == {"answer": "Paris"}
 
 
+def test_xml_adapter_parse_hyphenated_field_name():
+    task_spec = make_task_spec(
+        {
+            "question": input_field("question", desc="q"),
+            "my-answer": output_field("my-answer", desc="a"),
+        },
+        instructions="answer",
+    )
+    adapter = XMLAdapter()
+    completion = "<my-answer>Paris</my-answer>"
+    parsed = adapter.parse(task_spec=task_spec, completion=completion)
+    assert parsed == {"my-answer": "Paris"}
+
+
 def test_xml_adapter_parse_multiple_fields():
     TestSignature = ts(
         "question -> answer, explanation",

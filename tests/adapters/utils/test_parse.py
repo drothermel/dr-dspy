@@ -68,9 +68,12 @@ def test_parse_value_union():
     assert parse_value(value="text with [placeholder]", annotation=int | str | None) == "text with [placeholder]"
 
 
-def test_parse_value_json_repair():
+def test_parse_value_json_strict_by_default():
     assert parse_value(value='{"key": "value"}', annotation=dict) == {"key": "value"}
-    assert parse_value(value="{'key': 'value'}", annotation=dict) == {"key": "value"}
     malformed = "not json or literal"
     with pytest.raises(pydantic.ValidationError):
         parse_value(value=malformed, annotation=dict)
+
+
+def test_parse_value_json_repair_when_opted_in():
+    assert parse_value(value="{'key': 'value'}", annotation=dict, repair=True) == {"key": "value"}
