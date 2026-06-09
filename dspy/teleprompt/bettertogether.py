@@ -266,54 +266,56 @@ class BetterTogether:
         logger.info("Evaluating original program (no optimization applied)")
         launch_lms(student)
         flag_lms_launched = True
-        score = await self._evaluate_on_valset(student, valset, rng, evaluator, run)
-        self._add_candidate(candidates=candidates, student=student, strategy_label="", score=score)
-        logger.info(f"{YELLOW}Baseline score:{ENDC} {score}")
-        for ind, step_code in enumerate(parsed_strategy):
-            current_strategy = STRATEGY_LABEL_SEP.join(parsed_strategy[: ind + 1])
-            optimizer = self.optimizers[step_code]
-            logger.info(
-                f"\n{BOLD}==> STEP {ind + 1}/{len(parsed_strategy)}: {optimizer.__class__.__name__.upper()} <=={ENDC}"
-            )
-            logger.info(f"{BLUE}Current strategy:{ENDC} '{current_strategy}'")
-            logger.info(f"{BLUE}Optimizer:{ENDC} {optimizer.__class__.__name__}")
-            try:
-                if shuffle_trainset_between_steps:
-                    logger.info(f"{BLUE}Shuffling trainset...{ENDC}")
-                    rng.shuffle(trainset)
-                compile_params = optimizer_args.get(step_code)
-                if compile_params is None:
-                    compile_params = _default_compile_params(
-                        optimizer, trainset=trainset, teacher=teacher, valset=valset
+        try:
+            score = await self._evaluate_on_valset(student, valset, rng, evaluator, run)
+            self._add_candidate(candidates=candidates, student=student, strategy_label="", score=score)
+            logger.info(f"{YELLOW}Baseline score:{ENDC} {score}")
+            for ind, step_code in enumerate(parsed_strategy):
+                current_strategy = STRATEGY_LABEL_SEP.join(parsed_strategy[: ind + 1])
+                optimizer = self.optimizers[step_code]
+                logger.info(
+                    f"\n{BOLD}==> STEP {ind + 1}/{len(parsed_strategy)}: {optimizer.__class__.__name__.upper()} <=={ENDC}"
+                )
+                logger.info(f"{BLUE}Current strategy:{ENDC} '{current_strategy}'")
+                logger.info(f"{BLUE}Optimizer:{ENDC} {optimizer.__class__.__name__}")
+                try:
+                    if shuffle_trainset_between_steps:
+                        logger.info(f"{BLUE}Shuffling trainset...{ENDC}")
+                        rng.shuffle(trainset)
+                    compile_params = optimizer_args.get(step_code)
+                    if compile_params is None:
+                        compile_params = _default_compile_params(
+                            optimizer, trainset=trainset, teacher=teacher, valset=valset
+                        )
+                    student, score, is_new_best, lms_relaunched = await self._run_and_evaluate_step(
+                        optimizer,
+                        student,
+                        compile_params,
+                        valset,
+                        candidates,
+                        current_strategy,
+                        rng,
+                        evaluator,
+                        run,
                     )
-                student, score, is_new_best, lms_relaunched = await self._run_and_evaluate_step(
-                    optimizer,
-                    student,
-                    compile_params,
-                    valset,
-                    candidates,
-                    current_strategy,
-                    rng,
-                    evaluator,
-                    run,
-                )
-                if lms_relaunched:
-                    flag_lms_launched = True
-                if is_new_best:
-                    logger.info(f"{GREEN}New best score!{ENDC} {score} (strategy: '{current_strategy}')")
-                else:
-                    logger.info(f"{YELLOW}Score after optimization:{ENDC} {score}")
-            except Exception:
-                error_occurred = True
-                logger.exception(
-                    "Step %s/%s failed; stopping early with %s candidate(s)",
-                    ind + 1,
-                    len(parsed_strategy),
-                    len(candidates),
-                )
-                break
-        if flag_lms_launched:
-            kill_lms(student)
+                    if lms_relaunched:
+                        flag_lms_launched = True
+                    if is_new_best:
+                        logger.info(f"{GREEN}New best score!{ENDC} {score} (strategy: '{current_strategy}')")
+                    else:
+                        logger.info(f"{YELLOW}Score after optimization:{ENDC} {score}")
+                except Exception:
+                    error_occurred = True
+                    logger.exception(
+                        "Step %s/%s failed; stopping early with %s candidate(s)",
+                        ind + 1,
+                        len(parsed_strategy),
+                        len(candidates),
+                    )
+                    break
+        finally:
+            if flag_lms_launched:
+                kill_lms(student)
         candidates_with_idx = [(i, candidate) for i, candidate in enumerate(candidates)]
         candidates_with_idx.sort(
             key=lambda item: (
