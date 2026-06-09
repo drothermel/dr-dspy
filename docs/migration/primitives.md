@@ -12,6 +12,7 @@ from dspy.primitives import Example, Module, Prediction, PythonInterpreter
 | --- | --- |
 | `isinstance(pred, Example)` | `False` — `Prediction` is no longer an `Example` subclass |
 | `hash(example)` / `example in {…}` | `TypeError` — `Example` is unhashable |
+| `hash(prediction)` / `prediction in {…}` | `TypeError` — `Prediction` is unhashable |
 | `Prediction.from_record(record, input_keys=…)` | `Prediction.from_record(record)` only |
 | `to_repl_variable` | removed — use `build_repl_variable` |
 | `named_sub_modules(skip_compiled=…)` | `skip_compiled` removed; compiled subgraphs are opaque by default |

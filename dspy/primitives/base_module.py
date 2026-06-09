@@ -60,7 +60,7 @@ class BaseModule:
             self._enqueue_graph_children(name=name, item=item, queue=queue, seen=seen)
 
     def named_parameters(self):
-        """Yield ``(name, Parameter)`` pairs. Skips parameters inside compiled subgraphs."""
+        """Return ``(name, Parameter)`` pairs. Skips parameters inside compiled subgraphs."""
         named_parameters = []
         visited_parameters: set[int] = set()
         for name, item in self._walk_module_graph():
@@ -104,8 +104,10 @@ class BaseModule:
                 try:
                     setattr(new_instance, attr, copy.deepcopy(value))
                 except Exception:
-                    logging.warning(
-                        f"Failed to deep copy attribute '{attr}' of {self.__class__.__name__}, falling back to shallow copy or reference copy."
+                    logger.warning(
+                        "Failed to deep copy attribute '%s' of %s, falling back to shallow copy or reference copy.",
+                        attr,
+                        self.__class__.__name__,
                     )
                     try:
                         setattr(new_instance, attr, copy.copy(value))
