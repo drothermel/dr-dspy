@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from dspy.primitives import Example, Module  # noqa: TC001 — pydantic field types
+from dspy.teleprompt.bettertogether_types import DEFAULT_BETTER_TOGETHER_STRATEGY
 
 
 class EvaluateCompileParams(BaseModel):
@@ -121,5 +122,5 @@ class BetterTogetherCompileParams(BaseModel):
     seed: int | None = None
     valset_ratio: float = 0.1
     shuffle_trainset_between_steps: bool = True
-    strategy: list[str] = Field(default_factory=lambda: ["p", "w", "p"])
+    strategy: list[str] = Field(default_factory=lambda: list(DEFAULT_BETTER_TOGETHER_STRATEGY))
     optimizer_compile_args: dict[str, BaseModel] | None = None

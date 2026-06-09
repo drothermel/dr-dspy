@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from dspy.primitives import Example, Module
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
+from dspy.teleprompt.bettertogether_types import BetterTogetherBuiltinKey
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.bootstrap_finetune import (
     BootstrapFinetune,
@@ -89,7 +90,10 @@ class BetterTogether:
                 "No optimizers provided. Using defaults: BootstrapFewShotWithRandomSearch (p) and BootstrapFinetune (w). "
                 "Pass strategy=['p', 'w'] to run weight optimization after prompt optimization."
             )
-            optimizers = {"p": BootstrapFewShotWithRandomSearch(metric=metric), "w": BootstrapFinetune(metric=metric)}
+            optimizers = {
+                BetterTogetherBuiltinKey.PROMPT: BootstrapFewShotWithRandomSearch(metric=metric),
+                BetterTogetherBuiltinKey.WEIGHTS: BootstrapFinetune(metric=metric),
+            }
         for key, optimizer in optimizers.items():
             if not isinstance(optimizer, Teleprompter):
                 raise TypeError(f"Optimizer '{key}' must be a Teleprompter, got {type(optimizer).__name__}")
