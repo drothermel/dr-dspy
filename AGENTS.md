@@ -17,7 +17,8 @@ DSPy modules, LMs, adapters, `Evaluate`, `Parallel`, and teleprompter `compile` 
 Use `await` at call sites; in scripts use `asyncio.run(...)`.
 
 ```python
-from dspy.core.types import LMConfig, PredictOptions
+from dspy.core.types import LMConfig
+from dspy.predict.call_options import PredictOptions
 
 # Module invocation
 result = await program(question="What is DSPy?", run=run)
@@ -215,7 +216,8 @@ Override the model with `LM_FOR_TEST_DIRECT_DR_LLM=openai/gpt-4.1-mini`. Quick d
 Pass task inputs as keywords, `run=` for `RunContext`, and `options=PredictOptions(...)` for per-call overrides (`lm`, `config`, `demos`, `task_spec`, `trace`, `prediction`). Do not pass reserved names as flat task-input kwargs.
 
 ```python
-from dspy.core.types import LMConfig, PredictOptions
+from dspy.core.types import LMConfig
+from dspy.predict.call_options import PredictOptions
 
 result = await predict(
     question="What is DSPy?",

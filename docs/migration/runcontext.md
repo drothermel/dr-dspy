@@ -28,7 +28,8 @@ import asyncio
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
-from dspy.core.types import LMConfig, LMProviderOptions, PredictOptions
+from dspy.core.types import LMConfig, LMProviderOptions
+from dspy.predict.call_options import PredictOptions
 from dspy.runtime import RunContext, TelemetryConfig
 
 run = RunContext.create(
@@ -68,7 +69,7 @@ run = RunContext.create(lm=lm, adapter=adapter, telemetry=telemetry, init_run_lo
 Replace `settings.context(...)` with `run.fork(...)` and pass the forked run to the call:
 
 ```python
-from dspy.core.types import PredictOptions
+from dspy.predict.call_options import PredictOptions
 
 child = run.fork(lm=other_lm, optimization_trace=[], call_log=[])
 result = await predict(question="...", run=child)

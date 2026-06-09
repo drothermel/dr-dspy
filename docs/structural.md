@@ -143,6 +143,8 @@ LMs, evaluators, and optimizers.
 
 ### P1.1 Split transparency and call-resolution responsibilities
 
+**Status:** Done (2026-06).
+
 **Sources:** Both reviews; External review.
 
 Problem:
@@ -171,6 +173,12 @@ Details to preserve:
 - Existing strict-transparency semantics should not change.
 - De-facto public helpers imported through submodule paths need explicit export
   decisions before callers move.
+
+**Delivered:** `dspy/runtime/transparency/{types,resolve,validate,report}.py`;
+`merge_call_config` / `trace_config_provenance` replace `resolve_lm_config`;
+`require_adapter` replaces `resolve_adapter`; `enforce_compiled_call_transparency`
+replaces `validate_compiled_call`; `ModuleCallOptions` in `dspy.runtime.call_options`,
+`PredictOptions` in `dspy.predict.call_options`.
 
 ### P1.2 Centralize run logs, call logs, and inspection
 

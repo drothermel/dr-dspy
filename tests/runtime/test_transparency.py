@@ -1,5 +1,7 @@
 import json
+import logging
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -10,6 +12,7 @@ from dspy.runtime import CallLogMode, TelemetryConfig, TransparencyMode
 from dspy.runtime.transparency.report import enforce_compiled_call_transparency
 from dspy.runtime.transparency.resolve import LM_CONFIG_PROVENANCE_FIELDS
 from dspy.runtime.transparency.types import CompiledCall, TransparencyViolation
+from dspy.runtime.transparency.validate import collect_compiled_call_violations
 from dspy.task_spec import TaskSpec, input_field, output_field
 from dspy.testing import DummyLM
 
@@ -24,6 +27,24 @@ class SampleTaskSpec(TaskSpec):
 def test_provenance_fields_match_lm_config():
     expected = set(LMConfig.model_fields) - {"extensions"}
     assert set(LM_CONFIG_PROVENANCE_FIELDS) == expected
+
+
+def test_collect_compiled_call_violations_is_pure_no_raise_or_log(make_run):
+    call = CompiledCall(call_id="1", adapter_class="", lm_model="openai/gpt-4o-mini", cache=False)
+    with (
+        patch.object(logging.getLogger("dspy.runtime.transparency.report"), "warning") as warn_mock,
+        patch.object(logging.getLogger("dspy.runtime.transparency.report"), "info") as info_mock,
+    ):
+        violations = collect_compiled_call_violations(call)
+    assert violations
+    warn_mock.assert_not_called()
+    info_mock.assert_not_called()
+
+
+def test_enforce_compiled_call_transparency_strict_raises_under_strict_mode(make_run):
+    call = CompiledCall(call_id="1", adapter_class="", lm_model="openai/gpt-4o-mini", cache=False)
+    with pytest.raises(TransparencyViolation, match="adapter not configured"):
+        enforce_compiled_call_transparency(call, TransparencyMode.strict)
 
 
 def test_enforce_compiled_call_transparency_warn_reports_config_violations(make_run):

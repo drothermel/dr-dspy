@@ -17,18 +17,14 @@ ALLOWLIST_SUFFIXES = (
     "clients/finetune/registry.py",
     "adapters/types/tool/tool.py",
     "adapters/utils/multimodal.py",
-    # resolve_adapter / settings redesign — separate work
     "compile/resolve.py",
     # optional-dependency entrypoints
     "clients/__init__.py",
     "teleprompt/gepa/gepa.py",
-    "integrations/optimizers/gepa/adapter.py",
     # deferred Pydantic model_rebuild; breaks base_lm ↔ run_context import cycle
     "runtime/run_context_model.py",
     # breaks openai_format.parse ↔ core.types.coercion import cycle
     "core/types/coercion.py",
-    "teleprompt/grpo.py",
-    "teleprompt/bootstrap_finetune.py",
     "evaluate/metrics.py",
 )
 

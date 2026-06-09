@@ -13,6 +13,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Module
 from dspy.runtime.optimization_trace import TraceData
 from dspy.runtime.run_context import RunContext
+from dspy.runtime.transparency.resolve import require_adapter
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
 from dspy.teleprompt.core.trace_collection import collect_trace_data
@@ -159,8 +160,6 @@ class BootstrapFinetune(FinetuneTeleprompter):
             trace_data = filter_trace_data_for_finetune(trace_data, metric=self.metric)
             logger.info(f"After filtering with the metric, {len(trace_data)} examples remain")
         data = []
-        from dspy.runtime.transparency.resolve import require_adapter
-
         configured_adapter = self.adapter[lm] if isinstance(self.adapter, dict) else self.adapter
         adapter = require_adapter(configured_adapter or run.adapter)
         data_format = infer_data_format(adapter)

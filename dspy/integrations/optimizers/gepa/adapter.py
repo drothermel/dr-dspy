@@ -14,6 +14,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Example, Prediction
 from dspy.runtime.optimization_trace import FailedPrediction, TraceData
 from dspy.runtime.run_context import RunContext
+from dspy.runtime.transparency.resolve import require_adapter
 from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
 from dspy.teleprompt.core.evaluator import make_optimizer_evaluator, optimizer_lm_context
 from dspy.teleprompt.core.trace_collection import collect_trace_data
@@ -279,8 +280,6 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                         new_outputs[output_key] = str(output_val)
                 d = {"Inputs": new_inputs, "Generated Outputs": new_outputs}
                 if isinstance(outputs, FailedPrediction):
-                    from dspy.runtime.transparency.resolve import require_adapter
-
                     if self.run is None:
                         raise ValueError("DspyAdapter requires a RunContext.")
                     adapter = require_adapter(self.run.adapter)

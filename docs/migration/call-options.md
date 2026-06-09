@@ -54,7 +54,8 @@ result = await predict(
 After:
 
 ```python
-from dspy.core.types import LMConfig, PredictOptions
+from dspy.core.types import LMConfig
+from dspy.predict.call_options import PredictOptions
 
 result = await predict(
     question="What is DSPy?",
@@ -94,7 +95,8 @@ result = await predict(question="...", config={"temperature": 0.0}, run=run)
 After:
 
 ```python
-from dspy.core.types import LMConfig, PredictOptions
+from dspy.core.types import LMConfig
+from dspy.predict.call_options import PredictOptions
 
 predict = Predict(QATaskSpec(), config=LMConfig(temperature=0.7, max_tokens=500))
 result = await predict(

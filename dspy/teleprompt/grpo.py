@@ -20,10 +20,12 @@ from dspy.clients.finetune import (
     TrainDataFormat,
 )
 from dspy.clients.lm import LM
+from dspy.clients.openai_format.chat_request import message_to_openai_chat
 from dspy.evaluate.evaluator import Evaluate
 from dspy.primitives import Example, Module
 from dspy.runtime.optimization_trace import FailedPrediction
 from dspy.runtime.run_context import RunContext
+from dspy.runtime.transparency.resolve import require_adapter
 from dspy.task_spec.predictor_context import get_task_spec
 from dspy.teleprompt.bootstrap_finetune import (
     FinetuneTeleprompter,
@@ -473,8 +475,6 @@ class GRPO(FinetuneTeleprompter):
                             assert trace_pred_id == pred_id
                             predictor = trace_instance[0]
                             pred_lm = predictor.lm
-                            from dspy.runtime.transparency.resolve import require_adapter
-
                             configured_adapter = (
                                 self.adapter[pred_lm] if isinstance(self.adapter, dict) else self.adapter
                             )
@@ -484,8 +484,6 @@ class GRPO(FinetuneTeleprompter):
                                     f"Adapter {adapter} does not support finetune data formatting. "
                                     "GRPO training requires an adapter with capabilities.supports_finetune=True."
                                 )
-                            from dspy.clients.openai_format.chat_request import message_to_openai_chat
-
                             inp_messages = [
                                 message_to_openai_chat(message)
                                 for message in adapter.format(
