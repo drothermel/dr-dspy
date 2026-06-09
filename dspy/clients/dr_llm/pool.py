@@ -19,6 +19,7 @@ from dspy.runtime.log_paths import resolve_run_bucket
 if TYPE_CHECKING:
     from dr_llm.llm.providers.core.registry import ProviderRegistry
 
+    from dspy.clients.dr_llm.protocol import PoolSessionIdResolver
     from dspy.core.types import LMRequest, LMResponse
     from dspy.runtime.callback import Callback
     from dspy.runtime.run_context import RunContext
@@ -42,6 +43,7 @@ class DrLlmPoolLM(DrLlmLM):
         mode: CallMode = CallMode.api,
         registry: ProviderRegistry | None = None,
         session_id: str | None = None,
+        session_id_resolver: PoolSessionIdResolver | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
         callbacks: list[Callback] | None = None,
@@ -56,6 +58,7 @@ class DrLlmPoolLM(DrLlmLM):
         )
         self._pool_config = pool_config
         self._default_session_id = session_id
+        self._session_id_resolver = session_id_resolver or resolve_pool_session_id
         self._closed = False
         self._backend = PoolBackend(pool_config, registry=self._registry)
         # Capabilities probe only; DirectBackend has no lifecycle teardown.
@@ -92,7 +95,7 @@ class DrLlmPoolLM(DrLlmLM):
         session_id: str | None = None,
     ) -> list[LMResponse]:
         backend_request = lm_request_to_backend_request(request, lm=self, mode=self._mode)
-        sid = session_id or resolve_pool_session_id(run, fallback=self._default_session_id)
+        sid = session_id or self._session_id_resolver(run, fallback=self._default_session_id)
         try:
             result = await self._backend.aacquire(backend_request, sid, n)
         except Exception as exc:

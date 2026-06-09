@@ -199,14 +199,15 @@ pool = DrLlmPoolLM(
         pool_name="my_exp",
         database_url="postgresql://user:pass@localhost/dr_llm",
     ),
-    session_id="optimizer-session",  # optional override
+    session_id="optimizer-session",  # optional LM-level default
+    session_id_resolver=resolve_pool_session_id,  # optional; defaults to log-session lookup
 )
 samples = asyncio.run(pool.acquire_samples(request, n=10, run=run))
 ```
 
 - **Direct** (`aforward`): calls `DirectBackend.acomplete` — one provider response per request.
 - **Pool** (`aforward`): cache-first `PoolBackend.acomplete` (no session claims).
-- **Pool acquire** (`acquire_samples`): session-scoped no-replacement sampling via `PoolBackend.aacquire(request, session_id, n)`. Session ID defaults to `{DSPY_RUN_ID}:{log_session.timestamp}` when disk logging is enabled; pass `session_id=` on the LM or to `acquire_samples` to override.
+- **Pool acquire** (`acquire_samples`): session-scoped no-replacement sampling via `PoolBackend.aacquire(request, session_id, n)`. Session ID defaults to `{DSPY_RUN_ID}:{log_session.timestamp}` when disk logging is enabled via `resolve_pool_session_id`; pass `session_id=` per call, `session_id=` on the LM, or inject `session_id_resolver=` (`PoolSessionIdResolver` protocol) to override resolution.
 - **Auth/routing**: configure providers via the dr-llm registry and environment (for example `OPENAI_API_KEY`). `DrLlmDirectLM` / `DrLlmPoolLM` do **not** accept `provider_options`, `num_retries`, or LiteLLM-style passthrough kwargs — misconfiguration raises at construction.
 - **v1 limits**: text-only; tools, multimodal parts, `response_format`, `stop`, `n`, `logprobs`, `tool_choice`, `prompt_cache`, `LMConfig.extensions`, and unsupported `reasoning` fields (`max_tokens`, `summary`) raise typed errors. Only `reasoning.effort` maps to `BackendRequest.effort`.
 - **Lifecycle**: use `with DrLlmPoolLM(...) as pool:` (preferred) or call `pool.close()` to tear down the pool consumer when you are done with the LM.
