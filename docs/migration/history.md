@@ -10,7 +10,7 @@ DSPy separates three concepts that were previously conflated under "history":
 
 Public exports: `from dspy.history import AgentHistory, REPLHistory, TurnLog, is_agent_history_type, is_conversation_turn_log_type`.
 
-Dict-shaped `turn_log` / `REPLHistory` values passed as task inputs are normalized to typed models when inputs are validated for adapter calls (`validate_task_inputs` in the adapter pipeline). There is no separate `coerce_turn_log` helper.
+Dict-shaped `turn_log` / `REPLHistory` values passed as task inputs are normalized to typed models when inputs are validated for adapter calls (`dspy.task_spec.validate_task_inputs` in `AdapterCallPipeline.execute`). There is no separate `coerce_turn_log` helper.
 
 ## Vocabulary (breaking renames)
 

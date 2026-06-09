@@ -39,6 +39,8 @@ Details to preserve:
 
 ### P0.2 TaskSpec, adapters, and call-validation boundary
 
+**Status:** Done (2026-06).
+
 **Sources:** Both reviews; External cross-package review.
 
 Problem:

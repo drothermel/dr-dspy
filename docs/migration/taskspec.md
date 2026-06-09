@@ -123,7 +123,9 @@ tool = Tool(search, description="Search documents by query.")
 
 ## Adapters and field metadata
 
-Adapters read `FieldSpec` directly via `dspy.task_spec.fields` (`FieldBinding`, `field_bindings`, `format_field_value`, `translate_field_type`, `validate_task_inputs_from_spec`). There is no Pydantic `FieldInfo` bridge layer.
+Adapters read `FieldSpec` directly from `dspy.task_spec` (`FieldBinding`, `field_bindings`, `validate_task_inputs`, `validate_task_inputs_from_spec`). Prompt rendering helpers (`format_field_value`, `translate_field_type`, `get_field_spec_description_string`) live in `dspy.adapters.prompt_format`. There is no Pydantic `FieldInfo` bridge layer.
+
+Framework TaskSpecs are colocated under `dspy.task_spec.framework/`; optimizer-owned specs use per-package `task_specs.py` modules (for example `dspy.propose.task_specs`, `dspy.teleprompt.copro.task_specs`).
 
 Field descriptions are required on `input_field` / `output_field` (no `${name}` placeholders). Use `field_desc_from_name(name)` when deriving descriptions from field names at parse time.
 

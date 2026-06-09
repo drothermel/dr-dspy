@@ -97,16 +97,19 @@ See `docs/migration/history.md` for turn logs vs call logs vs optimization trace
 
 Field descriptions must be explicit under strict transparency (placeholder `${field}` descs are rejected).
 
-Adapters read `FieldSpec` directly — there is no Pydantic `FieldInfo` bridge. Use `dspy.task_spec` for spine work:
+Adapters read `FieldSpec` directly — there is no Pydantic `FieldInfo` bridge. Use `dspy.task_spec` for spine contracts and validation; use `dspy.adapters.prompt_format` for adapter prompt rendering:
 
 ```python
-from dspy.task_spec import FieldBinding, field_bindings, format_field_value, validate_task_inputs_from_spec
+from dspy.adapters.prompt_format import format_field_value
+from dspy.task_spec import FieldBinding, field_bindings, validate_task_inputs, validate_task_inputs_from_spec
 from dspy.task_spec.field_spec import FieldRole
 
 bindings = field_bindings(task_spec, role=FieldRole.INPUT)
 for binding in bindings:
     text = format_field_value(field=binding.field, value=inputs[binding.name])
 ```
+
+Framework TaskSpecs live under `dspy.task_spec.framework/`; optimizer-owned specs live in per-package `task_specs.py` files (for example `dspy.teleprompt.copro.task_specs`, `dspy.propose.task_specs`). Adapter boundary specs stay under `dspy.adapters`.
 
 `TaskSpec.fingerprint()` returns a SHA-256 hex digest over `name`, `instructions`, and field specs. Compare specs with `==` (frozen Pydantic model equality).
 
@@ -247,7 +250,7 @@ demos_by_predictor = trace_to_demos(trace, predictor2name)
 
 GEPA custom instruction proposers must implement `AsyncProposalFn` with `async def __call__(...)`. Sync proposers and `await_in_sync` interpreter tool bridges are removed.
 
-Task input validation runs in `AdapterCallPipeline.execute`; do not rely on duplicate validation in `Predict`.
+Task input validation runs in `AdapterCallPipeline.execute` via `dspy.task_spec.validate_task_inputs` (field contracts plus agent-history coercion). `Predict` rejects reserved flat kwargs via `dspy.predict.options.reject_reserved_predict_inputs` before calling the adapter; do not duplicate spine validation in `Predict`.
 
 ## Import tiers
 
