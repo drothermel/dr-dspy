@@ -68,7 +68,7 @@ class CapturingLM(BaseLM):
         return self.source_lm.supported_params
 
     @override
-    async def __call__(self, request: LMRequest, *, run):
+    async def __call__(self, request: LMRequest, *, run, compiled=None):
         self.calls.append({"request": request})
         raise StopAdapterCallCapture
 

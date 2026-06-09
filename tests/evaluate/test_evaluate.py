@@ -220,8 +220,8 @@ def test_evaluate_save_as_json_with_history(make_run):
             {"question": "Previous Q3", "answer": "Previous A3"},
         ))
     devset = [
-        Example.from_record({"question": "What is 1+1?", "answer": "2", "history": history1}, input_keys=("question",)),
-        Example.from_record({"question": "What is 2+2?", "answer": "4", "history": history2}, input_keys=("question",)),
+        Example.from_record({"question": "What is 1+1?", "answer": "2", "turn_log": history1}, input_keys=("question",)),
+        Example.from_record({"question": "What is 2+2?", "answer": "4", "turn_log": history2}, input_keys=("question",)),
     ]
     program = Predict(ts("question -> answer"))
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -233,17 +233,17 @@ def test_evaluate_save_as_json_with_history(make_run):
         with open(temp_json) as f:
             data = json.load(f)
         assert len(data) == 2
-        assert "history" in data[0]
-        assert isinstance(data[0]["history"], dict)
-        assert "turns" in data[0]["history"]
-        assert len(data[0]["history"]["turns"]) == 1
-        assert data[0]["history"]["turns"][0] == {"question": "Previous Q1", "answer": "Previous A1"}
-        assert "history" in data[1]
-        assert isinstance(data[1]["history"], dict)
-        assert "turns" in data[1]["history"]
-        assert len(data[1]["history"]["turns"]) == 2
-        assert data[1]["history"]["turns"][0] == {"question": "Previous Q2", "answer": "Previous A2"}
-        assert data[1]["history"]["turns"][1] == {"question": "Previous Q3", "answer": "Previous A3"}
+        assert "turn_log" in data[0]
+        assert isinstance(data[0]["turn_log"], dict)
+        assert "turns" in data[0]["turn_log"]
+        assert len(data[0]["turn_log"]["turns"]) == 1
+        assert data[0]["turn_log"]["turns"][0] == {"question": "Previous Q1", "answer": "Previous A1"}
+        assert "turn_log" in data[1]
+        assert isinstance(data[1]["turn_log"], dict)
+        assert "turns" in data[1]["turn_log"]
+        assert len(data[1]["turn_log"]["turns"]) == 2
+        assert data[1]["turn_log"]["turns"][0] == {"question": "Previous Q2", "answer": "Previous A2"}
+        assert data[1]["turn_log"]["turns"][1] == {"question": "Previous Q3", "answer": "Previous A3"}
     finally:
         import os
 
@@ -255,7 +255,7 @@ def test_evaluate_save_as_csv_with_history(make_run):
     run = make_run(lm=DummyLM({"What is 1+1?": {"answer": "2"}}))
     history = TurnLog(turns=({"question": "Previous Q", "answer": "Previous A"}))
     devset = [
-        Example.from_record({"question": "What is 1+1?", "answer": "2", "history": history}, input_keys=("question",))
+        Example.from_record({"question": "What is 1+1?", "answer": "2", "turn_log": history}, input_keys=("question",))
     ]
     program = Predict(ts("question -> answer"))
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
@@ -270,8 +270,8 @@ def test_evaluate_save_as_csv_with_history(make_run):
             reader = csv.DictReader(f)
             rows = list(reader)
         assert len(rows) == 1
-        assert "history" in rows[0]
-        assert "turns" in rows[0]["history"]
+        assert "turn_log" in rows[0]
+        assert "turns" in rows[0]["turn_log"]
     finally:
         import os
 
