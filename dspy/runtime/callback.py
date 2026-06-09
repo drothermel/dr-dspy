@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import functools
 import inspect
 import logging
 import uuid
 from contextvars import ContextVar
-from typing import Any, Callable, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, TypeVar
 
-from dspy.runtime.run_context import RunContext
+if TYPE_CHECKING:
+    from dspy.runtime.run_context import RunContext
 
 ACTIVE_CALL_ID: ContextVar[str | None] = ContextVar("active_call_id", default=None)
 logger = logging.getLogger(__name__)
@@ -19,7 +22,7 @@ CallbackKind = Literal["module", "lm", "adapter", "tool", "evaluate"]
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-class BaseCallback:
+class Callback(Protocol):
     def on_module_start(self, call_id: str, instance: Any, inputs: dict[str, Any]) -> None: ...
 
     def on_module_end(self, call_id: str, outputs: Any | None, exception: Exception | None = None) -> None: ...
@@ -49,12 +52,54 @@ class BaseCallback:
     def on_evaluate_end(self, call_id: str, outputs: Any | None, exception: Exception | None = None) -> None: ...
 
 
+class NoOpCallback:
+    def on_module_start(self, call_id: str, instance: Any, inputs: dict[str, Any]) -> None:
+        pass
+
+    def on_module_end(self, call_id: str, outputs: Any | None, exception: Exception | None = None) -> None:
+        pass
+
+    def on_lm_start(self, call_id: str, instance: Any, inputs: dict[str, Any]) -> None:
+        pass
+
+    def on_lm_end(self, call_id: str, outputs: dict[str, Any] | None, exception: Exception | None = None) -> None:
+        pass
+
+    def on_adapter_format_start(self, call_id: str, instance: Any, inputs: dict[str, Any]) -> None:
+        pass
+
+    def on_adapter_format_end(
+        self, call_id: str, outputs: dict[str, Any] | None, exception: Exception | None = None
+    ) -> None:
+        pass
+
+    def on_adapter_parse_start(self, call_id: str, instance: Any, inputs: dict[str, Any]) -> None:
+        pass
+
+    def on_adapter_parse_end(
+        self, call_id: str, outputs: dict[str, Any] | None, exception: Exception | None = None
+    ) -> None:
+        pass
+
+    def on_tool_start(self, call_id: str, instance: Any, inputs: dict[str, Any]) -> None:
+        pass
+
+    def on_tool_end(self, call_id: str, outputs: dict[str, Any] | None, exception: Exception | None = None) -> None:
+        pass
+
+    def on_evaluate_start(self, call_id: str, instance: Any, inputs: dict[str, Any]) -> None:
+        pass
+
+    def on_evaluate_end(self, call_id: str, outputs: Any | None, exception: Exception | None = None) -> None:
+        pass
+
+
 def _begin_callback_scope(
     *,
     instance: Any,
     fn: Callable[..., Any],
     kind: CallbackKind,
-    callbacks: list[BaseCallback],
+    callbacks: list[Callback],
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
 ) -> tuple[str, str | None]:
@@ -82,7 +127,7 @@ def _end_callback_scope(
     parent_call_id: str | None,
     results: Any,
     exception: Exception | None,
-    callbacks: list[BaseCallback],
+    callbacks: list[Callback],
 ) -> None:
     ACTIVE_CALL_ID.set(parent_call_id)
     _execute_end_callbacks(
@@ -179,7 +224,7 @@ def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F |
     return decorator
 
 
-def _get_active_callbacks(instance: Any, run: RunContext | None = None) -> list[BaseCallback]:
+def _get_active_callbacks(instance: Any, run: RunContext | None = None) -> list[Callback]:
     callbacks = list(run.callbacks) if run else []
     return callbacks + getattr(instance, "callbacks", [])
 
@@ -190,7 +235,7 @@ def _execute_start_callbacks(
     fn: Callable[..., Any],
     kind: CallbackKind,
     call_id: str,
-    callbacks: list[BaseCallback],
+    callbacks: list[Callback],
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
 ) -> None:
@@ -219,7 +264,7 @@ def _execute_end_callbacks(
     call_id: str,
     results: Any,
     exception: Exception | None,
-    callbacks: list[BaseCallback],
+    callbacks: list[Callback],
 ) -> None:
     for callback in callbacks:
         try:
@@ -232,7 +277,7 @@ def _execute_end_callbacks(
             )
 
 
-def _get_on_start_handler(*, callback: BaseCallback, kind: CallbackKind, fn: Callable[..., Any]) -> Callable[..., Any]:
+def _get_on_start_handler(*, callback: Callback, kind: CallbackKind, fn: Callable[..., Any]) -> Callable[..., Any]:
     if kind == "lm":
         return callback.on_lm_start
     if kind == "evaluate":
@@ -249,7 +294,7 @@ def _get_on_start_handler(*, callback: BaseCallback, kind: CallbackKind, fn: Cal
     return callback.on_module_start
 
 
-def _get_on_end_handler(*, callback: BaseCallback, kind: CallbackKind, fn: Callable[..., Any]) -> Callable[..., Any]:
+def _get_on_end_handler(*, callback: Callback, kind: CallbackKind, fn: Callable[..., Any]) -> Callable[..., Any]:
     if kind == "lm":
         return callback.on_lm_end
     if kind == "evaluate":

@@ -5,7 +5,7 @@ usage tracking, transparency validation, and call-log inspection.
 """
 
 from dspy.runtime.async_parallel import BoundedRunStats, resolve_max_concurrency, resolve_max_errors, run_bounded
-from dspy.runtime.callback import ACTIVE_CALL_ID, BaseCallback, with_callbacks
+from dspy.runtime.callback import ACTIVE_CALL_ID, Callback, NoOpCallback, with_callbacks
 from dspy.runtime.config import CallLogMode, CallSite, ExecutionConfig, TelemetryConfig, TransparencyMode
 from dspy.runtime.inspect_call_log import pretty_print_call_log
 from dspy.runtime.run_context import RunContext, resolve_run
@@ -14,7 +14,8 @@ from dspy.runtime.usage_tracker import UsageTracker, track_usage
 
 __all__ = [
     "ACTIVE_CALL_ID",
-    "BaseCallback",
+    "Callback",
+    "NoOpCallback",
     "BoundedRunStats",
     "CallLogMode",
     "CallSite",
