@@ -3,12 +3,13 @@ from typing import Any
 
 from typing_extensions import override
 
-from dspy.primitives.record_store import RecordStore
-
-_PREDICTION_RESERVED = frozenset({"_store", "_completions", "_lm_usage"})
+from dspy.primitives.record_store import RecordStore, _RecordBacked
 
 
-class Prediction:
+class Prediction(_RecordBacked):
+    _RECORD_ATTR = "_store"
+    _RECORD_RESERVED = frozenset({"_store", "_completions", "_lm_usage"})
+
     def __init__(self, **kwargs: Any) -> None:
         object.__setattr__(self, "_store", RecordStore(kwargs))
         object.__setattr__(self, "_completions", None)
@@ -30,22 +31,6 @@ class Prediction:
         obj._completions = Completions(list_or_dict, task_spec=task_spec)
         object.__setattr__(obj, "_store", RecordStore({k: v[0] for k, v in obj._completions.items()}))
         return obj
-
-    @override
-    def __getattribute__(self, key: str) -> Any:
-        if key in _PREDICTION_RESERVED or key.startswith("_"):
-            return super().__getattribute__(key)
-        store = super().__getattribute__("_store")
-        if key in store:
-            return store[key]
-        return super().__getattribute__(key)
-
-    @override
-    def __setattr__(self, key: str, value: Any) -> None:
-        if key in _PREDICTION_RESERVED or key.startswith("_"):
-            super().__setattr__(key, value)
-        else:
-            super().__getattribute__("_store")[key] = value
 
     def __getitem__(self, key: str) -> Any:
         return self._store[key]
@@ -149,7 +134,10 @@ class Prediction:
         return self._completions
 
 
-class Completions:
+class Completions(_RecordBacked):
+    _RECORD_ATTR = "_completions"
+    _RECORD_RESERVED = frozenset({"_completions", "task_spec"})
+
     def __init__(self, list_or_dict, task_spec=None) -> None:
         self.task_spec = task_spec
         if isinstance(list_or_dict, list):
@@ -160,7 +148,7 @@ class Completions:
         else:
             kwargs = list_or_dict
         self._validate_completion_lists(kwargs)
-        self._completions = kwargs
+        object.__setattr__(self, "_completions", kwargs)
 
     @staticmethod
     def _validate_completion_lists(kwargs: dict[str, object]) -> None:
@@ -182,13 +170,6 @@ class Completions:
                 raise IndexError("Index out of range")
             return Prediction.from_record({k: v[key] for k, v in self._completions.items()})
         return self._completions[key]
-
-    def __getattr__(self, name):
-        if name == "_completions":
-            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
-        if name in self._completions:
-            return self._completions[name]
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
     def __len__(self) -> int:
         if not self._completions:

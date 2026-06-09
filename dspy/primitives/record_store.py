@@ -1,36 +1,51 @@
 from collections.abc import Iterator, Mapping
-from typing import Any
+from typing import Any, ClassVar
 
 from typing_extensions import override
 
 from dspy.serialization.json import to_jsonable
 
-_RESERVED_INSTANCE_ATTRS = frozenset({"_data"})
+
+class _RecordBacked:
+    """Internal mixin: attribute access for string keys in a backing mapping store."""
+
+    _RECORD_ATTR: ClassVar[str]
+    _RECORD_RESERVED: ClassVar[frozenset[str]]
+
+    @override
+    def __getattribute__(self, key: str) -> Any:
+        cls = type(self)
+        reserved = object.__getattribute__(cls, "_RECORD_RESERVED")
+        store_attr = object.__getattribute__(cls, "_RECORD_ATTR")
+        if key in reserved or key.startswith("_"):
+            return object.__getattribute__(self, key)
+        store = object.__getattribute__(self, store_attr)
+        if key in store:
+            return store[key]
+        return object.__getattribute__(self, key)
+
+    @override
+    def __setattr__(self, key: str, value: Any) -> None:
+        cls = type(self)
+        reserved = object.__getattribute__(cls, "_RECORD_RESERVED")
+        store_attr = object.__getattribute__(cls, "_RECORD_ATTR")
+        if key in reserved or key.startswith("_"):
+            object.__setattr__(self, key, value)
+        else:
+            store = object.__getattribute__(self, store_attr)
+            store[key] = value
 
 
-class RecordStore:
+class RecordStore(_RecordBacked):
     """String-keyed record bag with consistent attribute and mapping access."""
+
+    _RECORD_ATTR = "_data"
+    _RECORD_RESERVED = frozenset({"_data"})
 
     __hash__ = None
 
     def __init__(self, data: Mapping[str, Any] | None = None) -> None:
         object.__setattr__(self, "_data", dict(data) if data else {})
-
-    @override
-    def __getattribute__(self, key: str) -> Any:
-        if key in _RESERVED_INSTANCE_ATTRS or key.startswith("_"):
-            return super().__getattribute__(key)
-        data = super().__getattribute__("_data")
-        if key in data:
-            return data[key]
-        return super().__getattribute__(key)
-
-    @override
-    def __setattr__(self, key: str, value: Any) -> None:
-        if key in _RESERVED_INSTANCE_ATTRS or key.startswith("_"):
-            super().__setattr__(key, value)
-        else:
-            super().__getattribute__("_data")[key] = value
 
     def __getitem__(self, key: str) -> Any:
         return self._data[key]

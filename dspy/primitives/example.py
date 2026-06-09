@@ -3,12 +3,13 @@ from typing import Any
 
 from typing_extensions import override
 
-from dspy.primitives.record_store import RecordStore
-
-_EXAMPLE_RESERVED = frozenset({"_store", "_demos", "_input_keys"})
+from dspy.primitives.record_store import RecordStore, _RecordBacked
 
 
-class Example:
+class Example(_RecordBacked):
+    _RECORD_ATTR = "_store"
+    _RECORD_RESERVED = frozenset({"_store", "_input_keys"})
+
     __hash__ = None
 
     def __init__(
@@ -36,22 +37,6 @@ class Example:
         if self._input_keys is None:
             return frozenset()
         return self._input_keys
-
-    @override
-    def __getattribute__(self, key: str) -> Any:
-        if key in _EXAMPLE_RESERVED or key.startswith("_"):
-            return super().__getattribute__(key)
-        store = super().__getattribute__("_store")
-        if key in store:
-            return store[key]
-        return super().__getattribute__(key)
-
-    @override
-    def __setattr__(self, key: str, value: Any) -> None:
-        if key in _EXAMPLE_RESERVED or key.startswith("_"):
-            super().__setattr__(key, value)
-        else:
-            super().__getattribute__("_store")[key] = value
 
     def __getitem__(self, key: str) -> Any:
         return self._store[key]
