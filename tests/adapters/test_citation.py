@@ -167,3 +167,22 @@ def test_citations_postprocessing():
     assert isinstance(result[0]["citations"], Citations)
     assert len(result[0]["citations"]) == 1
     assert result[0]["citations"][0].cited_text == "The sky is blue"
+
+
+def test_citation_url_round_trip_from_lm_output():
+    class _CitationPart:
+        def __init__(self) -> None:
+            self.text = "quoted"
+            self.title = "Doc"
+            self.url = "https://example.com/doc"
+            self.metadata = {
+                "type": "char_location",
+                "document_index": 0,
+                "start_char_index": 0,
+                "end_char_index": 6,
+            }
+
+    data = Citations._citation_part_to_dict(_CitationPart())
+    citation = Citations.Citation(**data)
+    assert citation.url == "https://example.com/doc"
+    assert citation.format()["url"] == "https://example.com/doc"

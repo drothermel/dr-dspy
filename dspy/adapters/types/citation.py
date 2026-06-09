@@ -22,6 +22,7 @@ class Citations(FieldTypeMixin):
         start_char_index: int
         end_char_index: int
         supported_text: str | None = None
+        url: str | None = None
 
         @override
         def format(self) -> dict[str, Any]:
@@ -36,6 +37,8 @@ class Citations(FieldTypeMixin):
                 citation_dict["document_title"] = self.document_title
             if self.supported_text:
                 citation_dict["supported_text"] = self.supported_text
+            if self.url:
+                citation_dict["url"] = self.url
             return citation_dict
 
     citations: list[Citation]
