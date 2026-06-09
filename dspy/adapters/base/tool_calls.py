@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import json_repair
 
 from dspy.adapters.types.tool import ToolCalls
 from dspy.core.types import LMToolCallPart
 from dspy.task_spec.json_serialize import serialize_for_json
+
+if TYPE_CHECKING:
+    from dspy.core.types import LMOutput
 
 
 def _provider_value(value: object, key: str, default: object = None) -> object:
@@ -62,3 +65,17 @@ def _tool_call_as_openai_message_tool_call(tool_call: ToolCalls.ToolCall) -> dic
             "arguments": json.dumps(serialize_for_json(tool_call.args), ensure_ascii=False),
         },
     }
+
+
+def attach_tool_calls_to_parsed_value(
+    *,
+    value: dict[str, Any],
+    output: LMOutput,
+    tool_call_output_field_name: str | None,
+) -> dict[str, Any]:
+    tool_calls = output.tool_calls
+    if not tool_calls or not tool_call_output_field_name:
+        return value
+    normalized = [_provider_tool_call_to_tool_call_dict(tool_call) for tool_call in tool_calls]
+    value[tool_call_output_field_name] = ToolCalls.from_dict_list(normalized)
+    return value

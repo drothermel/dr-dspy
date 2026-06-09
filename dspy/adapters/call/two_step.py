@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from dspy.adapters.call.tool_output import attach_tool_calls_to_value
+from dspy.adapters.base.tool_calls import attach_tool_calls_to_parsed_value
 from dspy.core.types import LMRequest
 from dspy.core.types.config import coerce_lm_config, merge_lm_request_config
 from dspy.core.types.openai_compat import request_messages_as_openai
@@ -69,7 +69,7 @@ class TwoStepCallExecutor:
                     message=f"Failed to parse response from the original completion: {e}",
                 ) from e
 
-            value = attach_tool_calls_to_value(
+            value = attach_tool_calls_to_parsed_value(
                 value=value,
                 output=output,
                 tool_call_output_field_name=adapter._get_tool_call_output_field_name(task_spec),

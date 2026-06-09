@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.base.native import AdapterNativeMixin
-from dspy.adapters.call.tool_output import attach_tool_calls_to_value
+from dspy.adapters.base.tool_calls import attach_tool_calls_to_parsed_value
 from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.reasoning import Reasoning
@@ -122,7 +122,7 @@ class AdapterCallMixin(AdapterNativeMixin):
             for field_name in original_task_spec.output_fields:
                 value.setdefault(field_name, None)
             if tool_calls and tool_call_output_field_name:
-                value = attach_tool_calls_to_value(
+                value = attach_tool_calls_to_parsed_value(
                     value=value,
                     output=output,
                     tool_call_output_field_name=tool_call_output_field_name,

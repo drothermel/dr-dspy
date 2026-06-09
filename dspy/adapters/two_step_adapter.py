@@ -9,19 +9,8 @@ from dspy.core.types.config import LMConfig
 from dspy.runtime.config import CallSite
 from dspy.runtime.run_context import RunContext
 from dspy.runtime.transparency import resolve_adapter, resolve_lm_config
-from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec
+from dspy.task_spec import TaskSpec, input_field, make_task_spec
 from dspy.task_spec.formatting import get_field_spec_description_string
-
-
-class FrameworkTwoStepExtractorTaskSpec(TaskSpec):
-    name: str = "framework.two_step.extractor"
-    instructions: str = "The input is text that should contain all information needed to produce the requested output fields. Extract each output field verbatim from the text."
-    inputs: tuple[FieldSpec, ...] = (
-        input_field(
-            "text", str, desc="Raw completion text from the main language model to extract structured fields from."
-        ),
-    )
-    outputs: tuple[FieldSpec, ...] = ()
 
 
 class TwoStepAdapter(Adapter):

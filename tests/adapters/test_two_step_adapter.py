@@ -5,7 +5,7 @@ from typing import cast
 import pytest
 from typing_extensions import override
 
-from dspy.adapters.call.tool_output import attach_tool_calls_to_value
+from dspy.adapters.base.tool_calls import attach_tool_calls_to_parsed_value
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.two_step_adapter import TwoStepAdapter
 from dspy.adapters.types.tool import ToolCalls
@@ -221,7 +221,7 @@ def test_attach_tool_calls_preserves_call_id_from_provider_dict():
         ]
     )
 
-    value = attach_tool_calls_to_value(
+    value = attach_tool_calls_to_parsed_value(
         value={},
         output=cast("LMOutput", output),
         tool_call_output_field_name=adapter._get_tool_call_output_field_name(task_spec),
