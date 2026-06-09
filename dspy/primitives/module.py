@@ -11,10 +11,7 @@ from dspy.predict.protocol import Predictor
 from dspy.primitives.base_module import BaseModule
 from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
-from dspy.runtime.callback import with_callbacks
-from dspy.runtime.inspect_call_log import pretty_print_call_log
-from dspy.runtime.run_context import RunContext, resolve_run
-from dspy.runtime.usage_tracker import track_usage
+from dspy.runtime import RunContext, pretty_print_call_log, resolve_run, track_usage, with_callbacks
 
 logger = logging.getLogger(__name__)
 

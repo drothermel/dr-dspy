@@ -246,6 +246,12 @@ Task input validation runs in `AdapterCallPipeline.execute`; do not rely on dupl
 2. **Integrations:** `dspy.integrations.*` (optional extras: `mcp`, `langchain`)
 3. **Internal / legacy / test-only:** `dspy._internal.*`, `dspy._legacy.*`, `dspy.testing.*`
 
+## Do not import from (internal/legacy)
+
+- `dspy._internal.*` — lazy import machinery
+- `dspy._legacy.*` — dotdict, magicattr, unbatchify; no new code
+- `dspy.testing.*` — test doubles only
+
 ## Internal call-site conventions
 
 - Use keyword arguments for multi-arg calls to DSPy-internal functions when meaning is not obvious from position.

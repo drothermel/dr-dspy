@@ -16,7 +16,9 @@ async def test_convert_mcp_tool():
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
 
-    server_params = StdioServerParameters(command="python", args=["tests/utils/resources/mcp_server.py"], env=None)
+    server_params = StdioServerParameters(
+        command="python", args=["tests/integrations/resources/mcp_server.py"], env=None
+    )
     async with stdio_client(server_params) as (read, write), ClientSession(read, write) as session:
         await asyncio.wait_for(session.initialize(), timeout=5)
         response = await session.list_tools()
