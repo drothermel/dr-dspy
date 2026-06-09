@@ -27,9 +27,9 @@ if TYPE_CHECKING:
 
 from dspy.evaluate.metric_invoke import invoke_metric
 from dspy.primitives import Prediction
+from dspy.runtime import run_with_trace
 from dspy.runtime.async_parallel import resolve_max_concurrency, resolve_max_errors, run_bounded
 from dspy.runtime.callback import with_callbacks
-from dspy.teleprompt.trace_helpers import run_program_with_trace
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ class Evaluate:
             raise ValueError("A metric function is required for evaluation.")
 
         async def process_item(example):
-            prediction, trace = await run_program_with_trace(program, example, run)
+            prediction, trace = await run_with_trace(program, example, run)
             score = await invoke_metric(
                 metric,
                 example=example,

@@ -2,7 +2,7 @@ import pytest
 
 from dspy.predict.predict import Predict  # noqa: F401 — initialize predict before primitives lazy import
 from dspy.primitives import Example
-from dspy.teleprompt.utils import split_trainset_holdout
+from dspy.teleprompt.core.split import split_trainset_holdout
 
 
 def _examples(count: int) -> list[Example]:

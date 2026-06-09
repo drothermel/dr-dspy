@@ -11,10 +11,11 @@ from dspy.clients.finetune import infer_data_format
 from dspy.clients.lm import LM
 from dspy.predict.predict import Predict
 from dspy.primitives import Module
+from dspy.runtime.optimization_trace import TraceData
 from dspy.runtime.run_context import RunContext
-from dspy.teleprompt.bootstrap_trace import TraceData, bootstrap_trace_data
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
+from dspy.teleprompt.core.trace_collection import collect_trace_data
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 
@@ -73,7 +74,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
         teachers = [prepare_teacher(student=student, teacher=t) for t in teachers]
         max_concurrency = self.max_concurrency or run.execution.max_concurrency
         for t in teachers:
-            trace_data += await bootstrap_trace_data(
+            trace_data += await collect_trace_data(
                 program=t, dataset=trainset, metric=self.metric, max_concurrency=max_concurrency, run=run
             )
         logger.info("Preparing the train data...")

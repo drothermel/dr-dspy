@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import random
@@ -9,13 +8,15 @@ from typing_extensions import override
 from dspy._internal.lazy_import import _detect_dspy_dist
 from dspy.adapters.types.field_type import is_field_type
 from dspy.history import TurnLog
+from dspy.integrations.optimizers.gepa.sync_bridge import run_gepa_sync
 from dspy.integrations.optimizers.gepa.task_specs import FrameworkGepaInstructionProposalTaskSpec
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Prediction
+from dspy.runtime.optimization_trace import FailedPrediction, TraceData
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
-from dspy.teleprompt.bootstrap_trace import FailedPrediction, TraceData
-from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
+from dspy.teleprompt.core.evaluator import make_optimizer_evaluator, optimizer_lm_context
+from dspy.teleprompt.core.trace_collection import collect_trace_data
 
 try:
     from gepa import EvaluationBatch, GEPAAdapter
@@ -102,7 +103,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         reflective_dataset: dict[str, list[dict[str, Any]]],
         components_to_update: list[str],
     ) -> dict[str, str]:
-        return asyncio.run(
+        return run_gepa_sync(
             self._apropose_new_texts(
                 candidate=candidate,
                 reflective_dataset=reflective_dataset,
@@ -153,7 +154,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
 
     @override
     def evaluate(self, batch, candidate, capture_traces=False):
-        return asyncio.run(self._aevaluate(batch=batch, candidate=candidate, capture_traces=capture_traces))
+        return run_gepa_sync(self._aevaluate(batch=batch, candidate=candidate, capture_traces=capture_traces))
 
     async def _aevaluate(self, batch, candidate, capture_traces=False):
         program = self.build_program(candidate)
@@ -163,18 +164,16 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             else {"disable_logging": True}
         )
         if capture_traces:
-            from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
-
             if self.run is None:
                 raise ValueError("DspyAdapter requires a RunContext.")
-            trajs = await bootstrap_trace_module.bootstrap_trace_data(
+            trajs = await collect_trace_data(
                 program=program,
                 dataset=batch,
                 run=self.run,
                 metric=self.metric_fn,
                 max_concurrency=self.max_concurrency,
                 raise_on_error=False,
-                capture_failed_parses=True,
+                capture_parse_failures=True,
                 failure_score=self.failure_score,
                 format_failure_score=self.failure_score,
                 callback_metadata=callback_metadata,
@@ -183,7 +182,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             outputs = []
             for t in trajs:
                 outputs.append(t["prediction"])
-                if hasattr(t["prediction"], "__class__") and t.get("score") is None:
+                if isinstance(t["prediction"], FailedPrediction) or t.get("score") is None:
                     scores.append(self.failure_score)
                 else:
                     score = t["score"]

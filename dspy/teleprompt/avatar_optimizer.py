@@ -9,6 +9,7 @@ from dspy.evaluate.metric_invoke import invoke_metric
 from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module
+from dspy.runtime import run_with_trace
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
 from dspy.teleprompt.avatar.task_specs import (
@@ -20,7 +21,6 @@ from dspy.teleprompt.compilation import CompileResult, CompileStats
 from dspy.teleprompt.compile_params import AvatarOptimizerCompileParams
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
-from dspy.teleprompt.trace_helpers import run_program_with_trace
 
 DEFAULT_MAX_EXAMPLES = 10
 
@@ -71,7 +71,7 @@ class AvatarOptimizer:
     async def process_example(self, actor, example, return_outputs, *, run: RunContext):
         actor = deepcopy(actor)
         try:
-            prediction, trace = await run_program_with_trace(actor, example, run)
+            prediction, trace = await run_with_trace(actor, example, run)
             score = await invoke_metric(
                 self.metric,
                 example=example,

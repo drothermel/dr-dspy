@@ -24,12 +24,13 @@ from dspy.teleprompt.compile_params import (
     RandomSearchCompileParams,
 )
 from dspy.teleprompt.console_styles import BLUE, BOLD, ENDC, GREEN, YELLOW
+from dspy.teleprompt.core.evaluator import make_optimizer_evaluator
+from dspy.teleprompt.core.split import split_trainset_holdout
 from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.protocol import Teleprompter
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.teleprompt.registry import compile_params_type, register_teleprompter, validate_compile_params
-from dspy.teleprompt.utils import make_optimizer_evaluator, split_trainset_holdout
 
 logger = logging.getLogger(__name__)
 STRATEGY_LABEL_SEP = " -> "

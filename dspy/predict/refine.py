@@ -10,10 +10,10 @@ from dspy.predict.predict import Predict
 from dspy.predict.sampling import SamplingAttempt, sample_with_reward
 from dspy.primitives import Module, Prediction
 from dspy.propose.source_format import get_formatted_source
+from dspy.runtime import run_with_trace
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.runtime.transparency import resolve_adapter
 from dspy.task_spec.framework.refine import OfferFeedbackTaskSpec
-from dspy.teleprompt.trace_helpers import run_program_with_trace
 
 
 class Refine(Module):
@@ -53,7 +53,7 @@ class Refine(Module):
             mod = attempt.module.deepcopy()
             mod.set_lm(lm_copy)
             if not advice:
-                return await run_program_with_trace(mod, attempt.inputs, attempt.run, options=attempt.options)
+                return await run_with_trace(mod, attempt.inputs, attempt.run, options=attempt.options)
             task_spec2name = {predictor.task_spec: name for name, predictor in mod.named_predictors()}
             hint_adapter = HintInjectingAdapter(
                 inner=adapter,
@@ -61,7 +61,7 @@ class Refine(Module):
                 task_spec_to_name=task_spec2name,
             )
             hint_run = attempt.run.fork(adapter=hint_adapter)
-            return await run_program_with_trace(mod, attempt.inputs, hint_run, options=attempt.options)
+            return await run_with_trace(mod, attempt.inputs, hint_run, options=attempt.options)
 
         async def build_advice(
             attempt: SamplingAttempt,

@@ -8,6 +8,7 @@ from dspy.runtime.run_context import RunContext
 from dspy.task_spec.predictor_context import resolve_optimizer_lm
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import MIPROv2CompileParams
+from dspy.teleprompt.core.evaluator import make_optimizer_evaluator, optimizer_lm_context
 from dspy.teleprompt.mipro.bootstrap import bootstrap_fewshot_examples
 from dspy.teleprompt.mipro.propose import propose_instructions
 from dspy.teleprompt.mipro.search import optimize_prompt_parameters
@@ -19,7 +20,6 @@ from dspy.teleprompt.mipro.settings import (
     set_random_seeds,
 )
 from dspy.teleprompt.registry import register_teleprompter
-from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
 if TYPE_CHECKING:
     from dspy.primitives import Module

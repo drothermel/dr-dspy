@@ -15,9 +15,9 @@ from dspy.teleprompt.copro.task_specs import (
     BasicGenerateInstructionTaskSpec,
     GenerateInstructionGivenAttemptsTaskSpec,
 )
+from dspy.teleprompt.core.evaluator import make_optimizer_evaluator, optimizer_lm_context
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
-from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
 logger = logging.getLogger(__name__)
 

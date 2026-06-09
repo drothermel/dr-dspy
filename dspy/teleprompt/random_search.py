@@ -10,9 +10,9 @@ from dspy.teleprompt.candidate_ladder import (
 )
 from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
 from dspy.teleprompt.compile_params import RandomSearchCompileParams
+from dspy.teleprompt.core.evaluator import make_optimizer_evaluator
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
-from dspy.teleprompt.utils import make_optimizer_evaluator
 
 
 @register_teleprompter(params=RandomSearchCompileParams)

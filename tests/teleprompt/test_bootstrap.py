@@ -105,7 +105,7 @@ def test_teacher_demos_restored_on_trace_failure(make_run):
     bootstrap.name2traces = {"predictor": []}
     bootstrap._prepare_predictor_mappings()
 
-    with patch("dspy.teleprompt.bootstrap.run_program_with_trace", new_callable=AsyncMock) as mock_trace:
+    with patch("dspy.teleprompt.bootstrap.run_with_trace", new_callable=AsyncMock) as mock_trace:
         mock_trace.side_effect = RuntimeError("trace failed")
         asyncio.run(bootstrap._bootstrap_one_example(example=examples[0], run=run))
 

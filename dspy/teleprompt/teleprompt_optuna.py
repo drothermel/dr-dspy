@@ -7,9 +7,9 @@ from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, BootstrapOptunaCompileParams
+from dspy.teleprompt.core.evaluator import make_optimizer_evaluator
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
-from dspy.teleprompt.utils import make_optimizer_evaluator
 
 from .bootstrap import BootstrapFewShot
 

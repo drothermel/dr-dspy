@@ -8,12 +8,12 @@ from dspy.evaluate.metric_invoke import call_metric, normalize_metric_score
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module, Prediction
 from dspy.propose.source_format import get_formatted_source
+from dspy.runtime import run_with_trace
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec.predictor_context import get_task_spec, resolve_optimizer_lm, set_task_spec
+from dspy.teleprompt.core.evaluator import optimizer_lm_context
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.simba_specs import SimbaOfferFeedbackTaskSpec
-from dspy.teleprompt.trace_helpers import run_program_with_trace
-from dspy.teleprompt.utils import optimizer_lm_context
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def wrap_program(*, program: Module, metric: OptimizerMetric, run: RunContext):
     async def wrapped_program(example):
         prediction, trace, score = (None, None, 0.0)
         try:
-            prediction, trace = await run_program_with_trace(program, example, run)
+            prediction, trace = await run_with_trace(program, example, run)
         except Exception as e:
             logger.warning(e)
             trace = []

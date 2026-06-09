@@ -21,6 +21,7 @@ from dspy.clients.finetune import (
 from dspy.clients.lm import LM
 from dspy.evaluate.evaluator import Evaluate
 from dspy.primitives import Example, Module
+from dspy.runtime.optimization_trace import FailedPrediction
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec.predictor_context import get_task_spec
 from dspy.teleprompt.bootstrap_finetune import (
@@ -28,9 +29,9 @@ from dspy.teleprompt.bootstrap_finetune import (
     all_predictors_have_lms,
     assert_structural_equivalency,
 )
-from dspy.teleprompt.bootstrap_trace import FailedPrediction, bootstrap_trace_data
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import GRPOCompileParams
+from dspy.teleprompt.core.trace_collection import collect_trace_data
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 
@@ -375,14 +376,14 @@ class GRPO(FinetuneTeleprompter):
                 subsample_training_dataset_repeated = [
                     example for _ in range(num_samples_per_input) for example in subsample_training_dataset
                 ]
-                round_data = await bootstrap_trace_data(
+                round_data = await collect_trace_data(
                     program=teacher,
                     dataset=subsample_training_dataset_repeated,
                     run=run,
                     metric=self.metric,
                     max_concurrency=self.max_concurrency,
                     raise_on_error=False,
-                    capture_failed_parses=True,
+                    capture_parse_failures=True,
                     failure_score=self.failure_score,
                     format_failure_score=self.format_failure_score,
                     log_format_failures=True,

@@ -16,7 +16,7 @@ from dspy.propose.task_specs import (
 from dspy.propose.utils import strip_prefix
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec.predictor_context import resolve_optimizer_lm
-from dspy.teleprompt.utils import optimizer_lm_context
+from dspy.teleprompt.core.evaluator import optimizer_lm_context
 
 logger = logging.getLogger(__name__)
 

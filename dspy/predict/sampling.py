@@ -9,8 +9,8 @@ from dspy.clients.base_lm import BaseLM  # noqa: TC001 — runtime SamplingAttem
 from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.errors import AdapterParseError, SamplingExhaustedError, is_retryable_lm_error
 from dspy.primitives import Module, Prediction
+from dspy.runtime import run_with_trace
 from dspy.runtime.run_context import RunContext  # noqa: TC001 — runtime signature typing
-from dspy.teleprompt.trace_helpers import run_program_with_trace
 
 AttemptExecutor = Callable[["SamplingAttempt"], Awaitable[tuple[Prediction, list]]]
 AfterAttemptHook = Callable[
@@ -51,7 +51,7 @@ async def default_execute_attempt(attempt: SamplingAttempt) -> tuple[Prediction,
     lm_copy = attempt.lm.copy(temperature=1.0)
     mod = attempt.module.deepcopy()
     mod.set_lm(lm_copy)
-    return await run_program_with_trace(mod, attempt.inputs, attempt.run, options=attempt.options)
+    return await run_with_trace(mod, attempt.inputs, attempt.run, options=attempt.options)
 
 
 async def sample_with_reward(

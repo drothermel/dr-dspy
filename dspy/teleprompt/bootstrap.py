@@ -8,14 +8,15 @@ from pydantic import BaseModel
 from dspy.core.hashing import Hasher
 from dspy.evaluate.metric_invoke import invoke_metric
 from dspy.primitives import Module
+from dspy.runtime import run_with_trace
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec.predictor_context import get_task_spec
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, LabeledFewShotCompileParams
+from dspy.teleprompt.core.demos import trace_to_demos
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
-from dspy.teleprompt.trace_helpers import run_program_with_trace, trace_to_demos
 
 from .vanilla import LabeledFewShot
 
@@ -115,7 +116,7 @@ class BootstrapFewShot:
             predictor_cache[name] = predictor.demos
             predictor.demos = [x for x in predictor.demos if x != example]
         try:
-            prediction, trace = await run_program_with_trace(teacher, example, teacher_run)
+            prediction, trace = await run_with_trace(teacher, example, teacher_run)
             if self.metric:
                 metric_val = await invoke_metric(
                     self.metric,

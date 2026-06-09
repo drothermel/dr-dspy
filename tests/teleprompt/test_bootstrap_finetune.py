@@ -11,7 +11,7 @@ from tests.task_spec.helpers import ts
 
 if TYPE_CHECKING:
     from dspy.clients.lm import LM
-    from dspy.teleprompt.bootstrap_trace import TraceData
+    from dspy.runtime.optimization_trace import TraceData
 
 
 def simple_metric(example, prediction, trace=None):

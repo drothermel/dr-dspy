@@ -11,11 +11,12 @@ from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compilation import CompileResult, CompileStats
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, InferRulesCompileParams
+from dspy.teleprompt.core.evaluator import make_optimizer_evaluator, optimizer_lm_context
+from dspy.teleprompt.core.split import split_trainset_holdout
 from dspy.teleprompt.errors import is_demo_shrinkable_error
 from dspy.teleprompt.infer_rules_specs import rules_induction_task_spec
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
-from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context, split_trainset_holdout
 
 logger = logging.getLogger(__name__)
 
