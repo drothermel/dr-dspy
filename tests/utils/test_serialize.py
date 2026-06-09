@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from dspy.utils.serialize import to_jsonable
+from dspy.serialization.json import to_jsonable
 
 
 class _ModelWithBothPaths(BaseModel):

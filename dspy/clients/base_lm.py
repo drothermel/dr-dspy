@@ -10,12 +10,12 @@ from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.core.types import CallRecord, LMRequest, LMResponse
 from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
 from dspy.core.types.openai_compat import request_messages_as_openai
+from dspy.runtime.callback import BaseCallback, with_callbacks
 from dspy.runtime.config import disk_call_log_enabled, memory_call_log_enabled
 from dspy.runtime.inspect_call_log import pretty_print_call_log
 from dspy.runtime.run_context import RunContext
 from dspy.runtime.run_log import RunLogSession, append_call_record, redact_config, redact_messages
 from dspy.runtime.transparency import CompiledCall
-from dspy.utils.callback import BaseCallback, with_callbacks
 
 LM_CLASS_STATE_KEY = "_dspy_lm_class"
 PROVIDER_OPTIONS_STATE_KEY = "_dspy_provider_options"

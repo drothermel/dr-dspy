@@ -3,7 +3,7 @@ from typing import Any
 
 from typing_extensions import override
 
-from dspy.utils.serialize import to_jsonable
+from dspy.serialization.json import to_jsonable
 
 
 class Example:

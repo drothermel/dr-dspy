@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from dspy.utils.serialize import to_jsonable
+from dspy.serialization.json import to_jsonable
 
 logger = logging.getLogger(__name__)
 _SESSION_LOCK = threading.Lock()

@@ -18,9 +18,9 @@ if TYPE_CHECKING:
     from dspy.adapters.base import Adapter
     from dspy.clients.base_lm import BaseLM
     from dspy.primitives.module import Module
+    from dspy.runtime.callback import BaseCallback
     from dspy.runtime.run_log import RunLogSession
     from dspy.runtime.usage_tracker import UsageTracker
-    from dspy.utils.callback import BaseCallback
 
 
 class RetrievalModule(Protocol):
@@ -196,9 +196,9 @@ def _ensure_run_context_model() -> None:
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types import CallRecord
     from dspy.primitives.module import Module
+    from dspy.runtime.callback import BaseCallback
     from dspy.runtime.run_log import RunLogSession
     from dspy.runtime.usage_tracker import UsageTracker
-    from dspy.utils.callback import BaseCallback
 
     RunContext.model_rebuild(
         _types_namespace={

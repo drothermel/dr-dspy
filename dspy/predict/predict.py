@@ -11,11 +11,11 @@ from dspy.predict.call_validation import resolve_predict_options
 from dspy.predict.parameter import Parameter
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
+from dspy.runtime.callback import BaseCallback
 from dspy.runtime.run_context import RunContext
 from dspy.runtime.transparency import resolve_call_site, resolve_lm_config
+from dspy.serialization.json import to_jsonable
 from dspy.task_spec.task_spec import TaskSpec
-from dspy.utils.callback import BaseCallback
-from dspy.utils.serialize import to_jsonable
 
 logger = logging.getLogger(__name__)
 UNSAFE_LM_STATE_KEYS = {"api_base", "base_url", "model_list"}

@@ -13,8 +13,8 @@ from dspy.adapters.utils import parse_output_field, validate_parsed_fields
 
 if TYPE_CHECKING:
     from dspy.adapters.types.base_type import Type
+    from dspy.runtime.callback import BaseCallback
     from dspy.task_spec import TaskSpec
-    from dspy.utils.callback import BaseCallback
 
 __all__ = ["ChatAdapter"]
 

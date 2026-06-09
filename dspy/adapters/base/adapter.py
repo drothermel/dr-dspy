@@ -8,8 +8,8 @@ from dspy.adapters.base.format import AdapterFormatMixin
 from dspy.adapters.base.native import _DEFAULT_NATIVE_RESPONSE_TYPES
 from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.types.base_type import Type
+from dspy.runtime.callback import BaseCallback, with_callbacks
 from dspy.task_spec import TaskSpec
-from dspy.utils.callback import BaseCallback, with_callbacks
 
 if TYPE_CHECKING:
     from dspy.adapters.call.policies.parse_fallback import ParseFallbackPolicy

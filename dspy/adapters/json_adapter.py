@@ -27,8 +27,8 @@ from dspy.utils.exceptions import AdapterParseError
 
 if TYPE_CHECKING:
     from dspy.adapters.types.base_type import Type
+    from dspy.runtime.callback import BaseCallback
     from dspy.task_spec import TaskSpec
-    from dspy.utils.callback import BaseCallback
 
 
 def _has_open_ended_mapping(task_spec: TaskSpec) -> bool:

@@ -12,7 +12,7 @@ from dspy.task_spec import TaskSpec
 if TYPE_CHECKING:
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types import LMMessage
-    from dspy.utils.callback import BaseCallback
+    from dspy.runtime.callback import BaseCallback
 _DEFAULT_NATIVE_RESPONSE_TYPES = [Citations, Reasoning]
 
 

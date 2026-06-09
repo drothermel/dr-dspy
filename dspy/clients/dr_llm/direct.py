@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from dr_llm.llm.providers.core.registry import ProviderRegistry
 
     from dspy.core.types import LMRequest, LMResponse
-    from dspy.utils.callback import BaseCallback
+    from dspy.runtime.callback import BaseCallback
 
 
 class DrLlmDirectLM(BaseLM):

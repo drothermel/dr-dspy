@@ -26,8 +26,8 @@ if TYPE_CHECKING:
     from dr_llm.llm.providers.core.registry import ProviderRegistry
 
     from dspy.core.types import LMRequest, LMResponse
+    from dspy.runtime.callback import BaseCallback
     from dspy.runtime.run_context import RunContext
-    from dspy.utils.callback import BaseCallback
 
 
 def resolve_pool_session_id(run: RunContext, *, fallback: str | None = None) -> str:

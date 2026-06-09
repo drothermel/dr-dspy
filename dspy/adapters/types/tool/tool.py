@@ -7,8 +7,8 @@ from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
 from dspy.core.types import LMToolSpec
+from dspy.runtime.callback import with_callbacks
 from dspy.runtime.run_context import RunContext
-from dspy.utils.callback import with_callbacks
 
 from .schema import _resolve_json_schema_reference, jsonschema
 
