@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, cast
 
 from dspy.utils.dotdict import dotdict
@@ -36,10 +37,17 @@ class WeaviateRM:
             raise ValueError("Unsupported Weaviate client type")
         self.k = k
 
-    def __call__(self, query_or_queries: str | list[str], k: int | None = None, **kwargs: object) -> list[dotdict]:
-        return self.forward(query_or_queries=query_or_queries, k=k, **kwargs)
+    async def __call__(
+        self, query_or_queries: str | list[str], k: int | None = None, **kwargs: object
+    ) -> list[dotdict]:
+        return await self.aforward(query_or_queries, k=k, **kwargs)
 
-    def forward(self, query_or_queries: str | list[str], k: int | None = None, **kwargs: object) -> list[dotdict]:
+    async def aforward(
+        self, query_or_queries: str | list[str], k: int | None = None, **kwargs: object
+    ) -> list[dotdict]:
+        return await asyncio.to_thread(self._search, query_or_queries, k, **kwargs)
+
+    def _search(self, query_or_queries: str | list[str], k: int | None = None, **kwargs: object) -> list[dotdict]:
         k = k if k is not None else self.k
         queries = [query_or_queries] if isinstance(query_or_queries, str) else query_or_queries
         queries = [q for q in queries if q]

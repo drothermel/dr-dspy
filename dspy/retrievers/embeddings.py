@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -42,11 +43,11 @@ class Embeddings:
         self.index = self._build_faiss() if len(corpus) >= brute_force_threshold else None
         self.search_fn = Unbatchify(self._batch_forward)
 
-    def __call__(self, query: str) -> Prediction:
-        return self.forward(query)
+    async def __call__(self, query: str) -> Prediction:
+        return await self.aforward(query)
 
-    def forward(self, query: str) -> Prediction:
-        passages, indices, _scores = self.search_fn(query)
+    async def aforward(self, query: str) -> Prediction:
+        passages, indices, _scores = await asyncio.to_thread(self.search_fn, query)
         return Prediction(passages=passages, indices=indices)
 
     def _batch_forward(self, queries: list[str]) -> list[SearchResult]:
@@ -153,6 +154,6 @@ class Embeddings:
 
 class EmbeddingsWithScores(Embeddings):
     @override
-    def forward(self, query: str) -> Prediction:
-        passages, indices, scores = self.search_fn(query)
+    async def aforward(self, query: str) -> Prediction:
+        passages, indices, scores = await asyncio.to_thread(self.search_fn, query)
         return Prediction(passages=passages, indices=indices, scores=scores)

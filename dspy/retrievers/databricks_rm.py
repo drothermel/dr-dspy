@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from dataclasses import dataclass
@@ -81,10 +82,15 @@ class DatabricksRM:
                     "To use the `DatabricksRM` retriever module with the Databricks Mosaic Agent Framework, you must install the mlflow Python library. Please install mlflow via `pip install mlflow`."
                 )
 
-    def __call__(
+    async def __call__(
         self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
     ) -> Prediction | list[dict[str, Any]]:
-        return self.forward(query=query, query_type=query_type, filters_json=filters_json)
+        return await self.aforward(query=query, query_type=query_type, filters_json=filters_json)
+
+    async def aforward(
+        self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
+    ) -> Prediction | list[dict[str, Any]]:
+        return await asyncio.to_thread(self._query, query=query, query_type=query_type, filters_json=filters_json)
 
     def _extract_doc_ids(self, item: dict[str, Any]) -> str:
         if self.docs_id_column_name == "metadata":
@@ -105,7 +111,7 @@ class DatabricksRM:
             }
         return extra_columns
 
-    def forward(
+    def _query(
         self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
     ) -> Prediction | list[dict[str, Any]]:
         if isinstance(query, str):

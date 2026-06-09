@@ -1,3 +1,4 @@
+import asyncio
 import importlib
 from typing import Any
 
@@ -11,11 +12,14 @@ class ColBERTv2:
         self.post_requests = post_requests
         self.url = f"{url}:{port}" if port else url
 
-    def __call__(self, query: str, k: int = 10, simplify: bool = False) -> list[str] | list[dotdict]:
+    async def __call__(self, query: str, k: int = 10, simplify: bool = False) -> list[str] | list[dotdict]:
+        return await self.aforward(query, k=k, simplify=simplify)
+
+    async def aforward(self, query: str, k: int = 10, simplify: bool = False) -> list[str] | list[dotdict]:
         if self.post_requests:
-            topk: list[dict[str, Any]] = colbertv2_post_request(url=self.url, query=query, k=k)
+            topk: list[dict[str, Any]] = await asyncio.to_thread(colbertv2_post_request, self.url, query, k)
         else:
-            topk: list[dict[str, Any]] = colbertv2_get_request(url=self.url, query=query, k=k)
+            topk: list[dict[str, Any]] = await asyncio.to_thread(colbertv2_get_request, self.url, query, k)
         if simplify:
             return [psg["long_text"] for psg in topk]
         return [dotdict(psg) for psg in topk]
@@ -88,10 +92,13 @@ class ColBERTv2RetrieverLocal:
         with Run().context(RunConfig(experiment=self.colbert_config.experiment)):
             return Searcher(index=self.colbert_config.index_name, collection=self.passages)
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self.forward(*args, **kwargs)
+    async def __call__(self, query: str, k: int = 7, **kwargs: Any) -> list[dotdict]:
+        return await self.aforward(query, k=k, **kwargs)
 
-    def forward(self, query: str, k: int = 7, **kwargs):
+    async def aforward(self, query: str, k: int = 7, **kwargs: Any) -> list[dotdict]:
+        return await asyncio.to_thread(self._search, query, k, **kwargs)
+
+    def _search(self, query: str, k: int = 7, **kwargs: Any) -> list[dotdict]:
         torch = importlib.import_module("torch")
         filtered_pids: list[int] = kwargs.get("filtered_pids") or []
         if filtered_pids:
@@ -120,10 +127,13 @@ class ColBERTv2RerankerLocal:
         self.checkpoint = checkpoint
         self.colbert_config.checkpoint = checkpoint
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self.forward(*args, **kwargs)
+    async def __call__(self, query: str, passages: list[str] | None = None) -> Any:
+        return await self.aforward(query, passages=passages)
 
-    def forward(self, query: str, passages: list[str] | None = None):
+    async def aforward(self, query: str, passages: list[str] | None = None) -> Any:
+        return await asyncio.to_thread(self._rerank, query, passages)
+
+    def _rerank(self, query: str, passages: list[str] | None = None):
         passages = passages or []
         assert len(passages) > 0, "Passages should not be empty"
         import numpy as np

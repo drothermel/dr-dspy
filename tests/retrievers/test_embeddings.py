@@ -1,3 +1,4 @@
+import asyncio
 import os
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
@@ -32,7 +33,7 @@ def test_embeddings_basic_search():
     embedder = dummy_embedder
     retriever = Embeddings(corpus=corpus, embedder=embedder, k=1)
     query = "I saw a dog running."
-    result = retriever(query)
+    result = asyncio.run(retriever(query))
     assert hasattr(result, "passages")
     assert hasattr(result, "indices")
     assert isinstance(result.passages, list)
@@ -53,7 +54,7 @@ def test_embeddings_multithreaded_search():
     ] * 10
 
     def worker(query_text, expected_passage):
-        result = retriever(query_text)
+        result = asyncio.run(retriever(query_text))
         assert result.passages[0] == expected_passage
         return result.passages[0]
 
@@ -83,8 +84,8 @@ def test_embeddings_save_load():
         assert new_retriever.embedder == embedder
         assert new_retriever.index is None
         query = "cat sitting"
-        original_result = original_retriever(query)
-        loaded_result = new_retriever(query)
+        original_result = asyncio.run(original_retriever(query))
+        loaded_result = asyncio.run(new_retriever(query))
         assert loaded_result.passages == original_result.passages
         assert loaded_result.indices == original_result.indices
 
@@ -110,7 +111,7 @@ def test_embeddings_load_nonexistent_path():
 def test_embeddings_with_scores_basic_search():
     corpus = dummy_corpus()
     retriever = EmbeddingsWithScores(corpus=corpus, embedder=dummy_embedder, k=2)
-    result = retriever("A dog is barking.")
+    result = asyncio.run(retriever("A dog is barking."))
     assert result.passages == ["The dog barked at the mailman.", "The cat sat on the mat."]
     assert result.indices == [1, 0]
     assert result.scores == pytest.approx([1.0, 0.0])
@@ -125,8 +126,8 @@ def test_embeddings_with_scores_save_load():
         save_path = os.path.join(temp_dir, "test_embeddings_with_scores")
         original_retriever.save(save_path)
         loaded_retriever = EmbeddingsWithScores.from_saved(save_path, dummy_embedder)
-        original_result = original_retriever("cat sitting")
-        loaded_result = loaded_retriever("cat sitting")
+        original_result = asyncio.run(original_retriever("cat sitting"))
+        loaded_result = asyncio.run(loaded_retriever("cat sitting"))
         assert loaded_result.passages == original_result.passages
         assert loaded_result.indices == original_result.indices
         assert loaded_result.scores == pytest.approx(original_result.scores)
