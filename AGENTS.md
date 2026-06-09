@@ -244,12 +244,11 @@ Task input validation runs in `AdapterCallPipeline.execute`; do not rely on dupl
 
 1. **Public spine:** `dspy.runtime`, `dspy.core.types`, `dspy.task_spec`, `dspy.errors`, `dspy.persistence`, `dspy.serialization`
 2. **Integrations:** `dspy.integrations.*` (optional extras: `mcp`, `langchain`)
-3. **Internal / legacy / test-only:** `dspy._internal.*`, `dspy._legacy.*`, `dspy.testing.*`
+3. **Internal / test-only:** `dspy._internal.*`, `dspy.testing.*`
 
 ## Do not import from (internal/legacy)
 
-- `dspy._internal.*` — lazy import machinery
-- `dspy._legacy.*` — dotdict, magicattr, unbatchify; no new code
+- `dspy._internal.*` — lazy import machinery, unbatchify batching helper
 - `dspy.testing.*` — test doubles only
 
 ## Internal call-site conventions

@@ -263,7 +263,6 @@ ban-relative-imports = "all"
 "scripts/*.py" = ["T201"]  # CLI scripts may print status to stdout/stderr
 "dspy/core/types/builders.py" = ["N802"]  # Legacy message builder API (System, User, ...)
 "dspy/evaluate/dpr.py" = ["N802"]  # Legacy DPR_* tokenizer helpers
-"dspy/utils/dotdict.py" = ["N801"]  # Legacy dotdict type name
 "dspy/evaluate/metrics.py" = ["N802"]  # Legacy metric names (EM, F1, HotPotF1)
 "dspy/predict/best_of_n.py" = ["N803"]  # Legacy N parameter name
 "dspy/predict/multi_chain_comparison.py" = ["N803"]  # Legacy M parameter name
