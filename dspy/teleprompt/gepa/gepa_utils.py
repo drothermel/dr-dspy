@@ -225,7 +225,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 module_score = data["score"]
                 if isinstance(module_score, ScoreWithFeedback):
                     module_score = module_score.score
-                trace_instances = [t for t in trace if get_task_spec(t[0]).equals(get_task_spec(module))]
+                trace_instances = [t for t in trace if get_task_spec(t[0]) == get_task_spec(module)]
                 if not self.add_format_failure_as_feedback:
                     trace_instances = [t for t in trace_instances if not isinstance(t[2], FailedPrediction)]
                 if len(trace_instances) == 0:

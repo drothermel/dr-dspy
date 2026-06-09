@@ -601,7 +601,7 @@ def test_json_adapter_with_structured_outputs_does_not_mutate_original_signature
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = _structured_output_model_response()
         asyncio.run(program(input1="Test input", run=run))
-    assert program.task_spec.equals(TestSignature)
+    assert program.task_spec == TestSignature
 
 
 def test_json_adapter_sync_call():

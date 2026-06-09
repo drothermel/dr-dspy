@@ -75,14 +75,31 @@ def test_append_prepend_delete():
     assert list(trimmed.input_fields) == ["q"]
 
 
-def test_equals_and_fingerprint():
+def test_equality_and_fingerprint():
     spec1 = ts("q -> a", instructions="Same")
     spec2 = ts("q -> a", instructions="Same")
     spec3 = ts("q -> a", instructions="Different")
-    assert spec1.equals(spec2)
-    assert not spec1.equals(spec3)
+    assert spec1 == spec2
+    assert spec1 != spec3
     assert spec1.fingerprint() == spec2.fingerprint()
     assert spec1.fingerprint() != spec3.fingerprint()
+
+
+def test_name_is_part_of_identity():
+    spec_a = make_task_spec(
+        inputs=[input_field("q", desc="The question")],
+        outputs=[output_field("a", desc="The answer")],
+        instructions="Same",
+        name="SpecA",
+    )
+    spec_b = make_task_spec(
+        inputs=[input_field("q", desc="The question")],
+        outputs=[output_field("a", desc="The answer")],
+        instructions="Same",
+        name="SpecB",
+    )
+    assert spec_a != spec_b
+    assert spec_a.fingerprint() != spec_b.fingerprint()
 
 
 def test_serialize_round_trip():
@@ -90,7 +107,7 @@ def test_serialize_round_trip():
         "question: int, context: list[str] -> answer", instructions="Answer using context.", name="RAG"
     )
     restored = TaskSpec.from_dict(original.to_dict())
-    assert original.equals(restored)
+    assert original == restored
     assert restored.name == "RAG"
     assert restored.input_fields["question"].type_ is int
 

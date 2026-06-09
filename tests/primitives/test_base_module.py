@@ -101,7 +101,7 @@ def test_save_and_load_with_json(tmp_path, make_run):
     model.save(save_path)
     new_model = ChainOfThought(ts("q -> a"))
     new_model.load(save_path)
-    assert new_model.predict.task_spec.equals(model.predict.task_spec)
+    assert new_model.predict.task_spec == model.predict.task_spec
     assert new_model.predict.demos[0] == model.predict.demos[0].to_dict()
     assert new_model.predict.demos[1] == model.predict.demos[1].to_dict()
 
@@ -212,7 +212,7 @@ def test_load_with_version_mismatch(tmp_path, make_run):
         for msg in handler.messages[1:]:
             assert "There is a mismatch of" in msg
         assert isinstance(loaded_predict, Predict)
-        assert predict.task_spec.equals(loaded_predict.task_spec)
+        assert predict.task_spec == loaded_predict.task_spec
     finally:
         logger.setLevel(original_level)
         logger.removeHandler(handler)

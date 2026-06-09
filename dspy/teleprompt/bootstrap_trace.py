@@ -81,7 +81,7 @@ async def bootstrap_trace_data(
             expected = list(failed_task_spec.output_fields.keys())
             found_pred = None
             for pred in program_to_use.predictors():
-                if get_task_spec(pred).equals(failed_task_spec):
+                if get_task_spec(pred) == failed_task_spec:
                     found_pred = pred
                     break
             if found_pred is None:

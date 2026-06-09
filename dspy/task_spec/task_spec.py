@@ -88,21 +88,14 @@ class TaskSpec(BaseModel):
             return self.model_copy(update={"inputs": tuple(f for f in self.inputs if f.name != name)})
         return self.model_copy(update={"outputs": tuple(f for f in self.outputs if f.name != name)})
 
-    def equals(self, other: object) -> bool:
-        if not isinstance(other, TaskSpec):
-            return False
-        return (
-            self.instructions == other.instructions and self.inputs == other.inputs and (self.outputs == other.outputs)
-        )
-
-    def fingerprint(self) -> int:
+    def fingerprint(self) -> str:
         payload = {
+            "name": self.name,
             "instructions": self.instructions,
             "inputs": [field_spec_to_dict(field) for field in self.inputs],
             "outputs": [field_spec_to_dict(field) for field in self.outputs],
         }
-        digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
-        return int(digest[:16], 16)
+        return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
     def to_dict(self) -> dict:
         return {

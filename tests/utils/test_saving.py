@@ -26,7 +26,7 @@ def test_save_predict(tmp_path, make_run):
     assert (tmp_path / "program.pkl").exists()
     loaded_predict = load(tmp_path, allow_pickle=True)
     assert isinstance(loaded_predict, Predict)
-    assert predict.task_spec.equals(loaded_predict.task_spec)
+    assert predict.task_spec == loaded_predict.task_spec
 
 
 def test_save_custom_model(tmp_path, make_run):
@@ -42,7 +42,7 @@ def test_save_custom_model(tmp_path, make_run):
     assert isinstance(loaded_model, CustomModel)
     assert len(model.predictors()) == len(loaded_model.predictors())
     for predictor, loaded_predictor in zip(model.predictors(), loaded_model.predictors(), strict=False):
-        assert predictor.task_spec.equals(loaded_predictor.task_spec)
+        assert predictor.task_spec == loaded_predictor.task_spec
 
 
 def test_save_model_with_custom_signature(tmp_path, make_run):
@@ -64,7 +64,7 @@ def test_save_model_with_custom_signature(tmp_path, make_run):
     predict.save(tmp_path, save_program=True)
     loaded_predict = load(tmp_path, allow_pickle=True)
     assert isinstance(loaded_predict, Predict)
-    assert predict.task_spec.equals(loaded_predict.task_spec)
+    assert predict.task_spec == loaded_predict.task_spec
 
 
 @pytest.mark.extra
@@ -89,7 +89,7 @@ def test_save_compiled_model(tmp_path, make_run):
     compiled_predict.save(tmp_path, save_program=True)
     loaded_predict = load(tmp_path, allow_pickle=True)
     assert compiled_predict.demos == loaded_predict.demos
-    assert compiled_predict.task_spec.equals(loaded_predict.task_spec)
+    assert compiled_predict.task_spec == loaded_predict.task_spec
 
 
 def test_load_with_version_mismatch(tmp_path):
@@ -121,7 +121,7 @@ def test_load_with_version_mismatch(tmp_path):
         for msg in handler.messages:
             assert "There is a mismatch of" in msg
         assert isinstance(loaded_predict, Predict)
-        assert predict.task_spec.equals(loaded_predict.task_spec)
+        assert predict.task_spec == loaded_predict.task_spec
     finally:
         logger.setLevel(original_level)
         logger.removeHandler(handler)

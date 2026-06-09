@@ -73,7 +73,7 @@ class BootstrapFewShot(Teleprompter):
             student.named_predictors(), teacher.named_predictors(), strict=False
         ):
             assert name1 == name2, "Student and teacher must have the same program structure."
-            assert get_task_spec(predictor1).equals(get_task_spec(predictor2)), (
+            assert get_task_spec(predictor1) == get_task_spec(predictor2), (
                 "Student and teacher must have the same task specs."
             )
             assert id(predictor1) != id(predictor2), "Student and teacher must be different objects."
