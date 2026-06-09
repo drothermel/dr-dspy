@@ -82,7 +82,6 @@ class OpenAIProvider:
         train_data_format: TrainDataFormat | str | None,
         train_kwargs: dict[str, Any] | None = None,
     ) -> str:
-        job = job
         model = OpenAIProvider._remove_provider_prefix(model)
         if not isinstance(train_data_format, TrainDataFormat):
             raise TypeError(f"Expected TrainDataFormat, got {type(train_data_format).__name__}.")

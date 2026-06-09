@@ -88,29 +88,28 @@ async def alitellm_responses_completion(request: dict[str, Any], num_retries: in
     )
 
 
-def _completion_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
-    return completion_to_lm_response(response=response, request=request)
+def _transport_module():
+    # Resolve completion fns at call time so tests can patch dspy.clients.lm.transport.alitellm_*.
+    import dspy.clients.lm.transport as transport_module
 
-
-def _responses_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
-    return responses_to_lm_response(response=response, request=request)
+    return transport_module
 
 
 _MODEL_TYPE_ROUTES: dict[str, ModelTypeRoute] = {
     "chat": ModelTypeRoute(
         completion_fn_name=LitellmCompletionName.CHAT,
         to_openai_request=to_openai_chat_request,
-        to_lm_response=_completion_to_lm_response,
+        to_lm_response=completion_to_lm_response,
     ),
     "text": ModelTypeRoute(
         completion_fn_name=LitellmCompletionName.TEXT,
         to_openai_request=to_openai_text_request,
-        to_lm_response=_completion_to_lm_response,
+        to_lm_response=completion_to_lm_response,
     ),
     "responses": ModelTypeRoute(
         completion_fn_name=LitellmCompletionName.RESPONSES,
         to_openai_request=to_openai_responses_request,
-        to_lm_response=_responses_to_lm_response,
+        to_lm_response=responses_to_lm_response,
     ),
 }
 
@@ -134,12 +133,6 @@ def _route_for_model_type(model_type: str, *, lm: Any) -> ModelTypeRoute:
 def completion_fn_for_model_type(model_type: str, *, lm: Any) -> LitellmCompletionFn:
     route = _route_for_model_type(model_type, lm=lm)
     return getattr(_transport_module(), route.completion_fn_name.value)
-
-
-def _transport_module():
-    import dspy.clients.lm.transport as transport_module
-
-    return transport_module
 
 
 def provider_request_for_model_type(model_type: str, request: LMRequest, lm: Any) -> dict[str, Any]:

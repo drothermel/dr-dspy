@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 import threading
+from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from dspy.clients.finetune.provider import DefaultFinetuneProvider, TrainingJob
+from dspy.clients.model_id import split_provider_model
 from dspy.errors import LMUnsupportedFeatureError
 from dspy.integrations.finetune.openai import OpenAIProvider
 
@@ -40,7 +42,7 @@ def finetune(
         raise LMUnsupportedFeatureError(
             f"Provider {lm.provider} does not support fine-tuning, please specify your provider by explicitly setting `provider` when creating the `dspy.clients.lm.LM` instance. For example, `from dspy.clients.lm import LM; from dspy.integrations.finetune import OpenAIProvider; LM('openai/gpt-4.1-mini-2025-04-14', provider=OpenAIProvider())`.",
             model=lm.model,
-            provider=lm._provider_name,
+            provider=split_provider_model(lm.model)[0],
             features=["finetuning"],
         )
 
@@ -53,7 +55,7 @@ def finetune(
         train_data_format=train_data_format,
         train_kwargs=train_kwargs,
     )
-    thread = threading.Thread(target=lambda: _run_finetune_job(lm, job))
+    thread = threading.Thread(target=partial(_run_finetune_job, lm, job))
     job.thread = thread
     thread.start()
     return job
@@ -64,7 +66,7 @@ def reinforce(lm: LM, train_kwargs: dict[str, Any]) -> ReinforceJob:
         raise LMUnsupportedFeatureError(
             f"Provider {lm.provider} does not implement the reinforcement learning interface.",
             model=lm.model,
-            provider=lm._provider_name,
+            provider=split_provider_model(lm.model)[0],
             features=["reinforce"],
         )
     job = lm.provider.ReinforceJob(lm=lm, train_kwargs=train_kwargs)
@@ -86,5 +88,5 @@ def _run_finetune_job(lm: LM, job: TrainingJob) -> None:
         result_lm = lm.copy(model=model)
         job.set_result(result_lm)
     except Exception as err:
-        logger.exception(err)
+        logger.exception("Finetune job failed")
         job.set_result(err)

@@ -72,7 +72,7 @@ class GRPOStatus(BaseModel):
     last_checkpoint: str | None = None
 
 
-def infer_data_format(adapter: Adapter) -> str:
+def infer_data_format(adapter: Adapter) -> TrainDataFormat:
     if adapter.capabilities.supports_finetune:
         return TrainDataFormat.CHAT
     raise ValueError(f"Could not infer the data format for: {adapter}")
