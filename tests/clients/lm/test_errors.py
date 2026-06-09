@@ -15,7 +15,16 @@ except ImportError:
 from openai import RateLimitError
 
 from dspy.clients.lm import LM
-from dspy.errors import ContextWindowExceededError, LMError, LMRateLimitError, LMUnexpectedError
+from dspy.clients.lm.errors import _lm_error_class_from_litellm_exception
+from dspy.errors import (
+    ContextWindowExceededError,
+    LMError,
+    LMNotConfiguredError,
+    LMRateLimitError,
+    LMTimeoutError,
+    LMTransportError,
+    LMUnexpectedError,
+)
 from tests.clients.lm.conftest import _request
 
 
@@ -44,6 +53,21 @@ def test_lm_wraps_litellm_context_window_error(make_run):
     assert isinstance(wrapped, LMError)
     assert wrapped.model == "gpt-4o"
     assert wrapped.provider == "openai"
+
+
+def test_lm_error_class_from_litellm_api_key_message_without_status() -> None:
+    error = RuntimeError("OpenAI API key not configured in environment variable")
+    assert _lm_error_class_from_litellm_exception(error) is LMNotConfiguredError
+
+
+def test_lm_error_class_from_litellm_timeout_heuristic() -> None:
+    error = RuntimeError("request timed out after 30s")
+    assert _lm_error_class_from_litellm_exception(error) is LMTimeoutError
+
+
+def test_lm_error_class_from_litellm_connection_heuristic() -> None:
+    error = RuntimeError("network connection failed")
+    assert _lm_error_class_from_litellm_exception(error) is LMTransportError
 
 
 def test_lm_wraps_unknown_boundary_error_as_unexpected_error(make_run):
