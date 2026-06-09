@@ -7,6 +7,8 @@ if TYPE_CHECKING:
 
 
 class DSPyError(Exception):
+    """Base exception for DSPy runtime and adapter failures."""
+
     default_code: str | None = None
 
     def __init__(
@@ -34,22 +36,32 @@ class DSPyError(Exception):
 
 
 class LMError(DSPyError):
+    """Raised when an LM call fails before a successful response is returned."""
+
     default_code = "lm_error"
 
 
 class LMTransportError(LMError):
+    """Raised for network or client transport failures reaching the provider."""
+
     default_code = "transport"
 
 
 class LMConfigurationError(LMError):
+    """Raised when LM configuration is invalid or incomplete."""
+
     default_code = "configuration"
 
 
 class LMNotConfiguredError(LMConfigurationError):
+    """Raised when no LM is configured on the active run context."""
+
     default_code = "not_configured"
 
 
 class LMUnsupportedFeatureError(LMError):
+    """Raised when a request uses features unsupported by the active LM backend."""
+
     default_code = "unsupported_feature"
 
     def __init__(
@@ -61,30 +73,44 @@ class LMUnsupportedFeatureError(LMError):
 
 
 class LMProviderError(LMError):
+    """Raised when the upstream provider returns an error response."""
+
     default_code = "provider"
 
 
 class LMUnexpectedError(LMError):
+    """Raised for unexpected LM failures that do not match a known provider category."""
+
     default_code = "unexpected"
 
 
 class LMAuthError(LMProviderError):
+    """Raised for authentication or authorization failures from the provider."""
+
     default_code = "auth"
 
 
 class LMBillingError(LMProviderError):
+    """Raised when the provider rejects a request due to billing or quota limits."""
+
     default_code = "billing"
 
 
 class LMRateLimitError(LMProviderError):
+    """Raised when the provider rate-limits the request."""
+
     default_code = "rate_limit"
 
 
 class LMInvalidRequestError(LMProviderError):
+    """Raised when the provider rejects the request as malformed or invalid."""
+
     default_code = "invalid_request"
 
 
 class ContextWindowExceededError(LMInvalidRequestError):
+    """Raised when the provider reports the prompt exceeds the model context window."""
+
     default_code = "context_window_exceeded"
 
     def __init__(self, *, model: str | None = None, message: str = "Context window exceeded", **kwargs: Any) -> None:
@@ -92,14 +118,20 @@ class ContextWindowExceededError(LMInvalidRequestError):
 
 
 class LMUnsupportedModelError(LMInvalidRequestError):
+    """Raised when the requested model is unknown or unsupported by the provider."""
+
     default_code = "unsupported_model"
 
 
 class LMTimeoutError(LMProviderError):
+    """Raised when the provider or client times out waiting for a response."""
+
     default_code = "timeout"
 
 
 class LMServerError(LMProviderError):
+    """Raised for transient upstream server errors from the provider."""
+
     default_code = "server"
 
 
@@ -136,6 +168,8 @@ def _format_adapter_parse_message(
 
 
 class AdapterParseError(DSPyError):
+    """Raised when an adapter cannot parse structured fields from an LM response."""
+
     default_code = "adapter_parse_error"
 
     def __init__(

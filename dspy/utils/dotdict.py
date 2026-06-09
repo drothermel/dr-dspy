@@ -1,3 +1,5 @@
+"""Legacy dict subclass with attribute access. Prefer typed models for new code."""
+
 import copy
 
 from typing_extensions import override

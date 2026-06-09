@@ -6,7 +6,7 @@ import pytest
 from dspy.primitives.module import Module
 from dspy.teleprompt.compile_params import EnsembleCompileParams
 from dspy.teleprompt.ensemble import Ensemble
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 
 
 class MockProgram(Module):

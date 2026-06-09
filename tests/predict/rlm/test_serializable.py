@@ -8,7 +8,7 @@ from dspy.predict.rlm import RLM
 from dspy.primitives.code_interpreter import FinalOutput
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.primitives.sandbox_serializable import SandboxSerializable
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from tests.mock_interpreter import MockInterpreter
 from tests.predict.rlm.conftest import _BinarySerializable, _StubSerializable, make_mock_predictor
 from tests.task_spec.helpers import ts

@@ -12,8 +12,8 @@ from dspy.evaluate.metrics import answer_exact_match
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
+from dspy.testing import DummyLM
 from dspy.utils.callback import BaseCallback
-from dspy.utils.dummies import DummyLM
 from tests.task_spec.helpers import ts
 
 

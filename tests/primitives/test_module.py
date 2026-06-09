@@ -11,7 +11,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module, set_attribute_by_name
 from dspy.task_spec import default_task_instructions
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 
 

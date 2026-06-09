@@ -3,7 +3,7 @@ import pytest
 from dspy.clients.embedding import Embedder
 from dspy.predict.knn import KNN
 from dspy.primitives.example import Example
-from dspy.utils.dummies import DummyVectorizer
+from dspy.testing import DummyVectorizer
 
 pytestmark = [pytest.mark.extra, pytest.mark.asyncio]
 

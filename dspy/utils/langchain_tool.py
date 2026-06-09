@@ -12,7 +12,7 @@ def convert_langchain_tool(tool: "BaseTool") -> Tool:
         try:
             return await tool.ainvoke(kwargs)
         except Exception as e:
-            raise RuntimeError(f"Failed to call LangChain tool {tool.name}: {e!s}")
+            raise RuntimeError(f"Failed to call LangChain tool '{tool.name}': {e!s}") from e
 
     args_schema = tool.args_schema
     args, _, arg_desc = convert_input_schema_to_tool_args(args_schema.model_json_schema())

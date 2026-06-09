@@ -9,8 +9,8 @@ from dspy.adapters.types.tool import Tool
 from dspy.core.types import LMConfig
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.module import Module
+from dspy.testing import DummyLM
 from dspy.utils.callback import ACTIVE_CALL_ID, BaseCallback, with_callbacks
-from dspy.utils.dummies import DummyLM
 from tests.task_spec.helpers import ts
 
 

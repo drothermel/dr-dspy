@@ -60,7 +60,7 @@ def test_reasoning_string_methods(make_run):
 
 
 def test_reasoning_with_chain_of_thought(make_run):
-    from dspy.utils.dummies import DummyLM
+    from dspy.testing import DummyLM
 
     lm = DummyLM([{"reasoning": "Let me think step by step", "answer": "42"}])
     run = make_run(lm=lm)

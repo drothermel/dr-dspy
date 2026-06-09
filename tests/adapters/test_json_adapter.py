@@ -8,7 +8,7 @@ import pytest
 from typing_extensions import override
 
 from dspy.adapters.types.document import Document
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from dspy.utils.exceptions import AdapterParseError
 
 if TYPE_CHECKING:

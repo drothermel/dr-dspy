@@ -32,7 +32,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.task_spec import TaskSpec, default_task_instructions, input_field, make_task_spec, output_field
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from dspy.utils.serialize import to_jsonable
 from tests.test_utils.spy_lm import SpyLM
 

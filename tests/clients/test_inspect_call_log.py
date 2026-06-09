@@ -14,7 +14,7 @@ from dspy.core.types import (
 )
 from dspy.predict.predict import Predict
 from dspy.runtime.inspect_call_log import pretty_print_call_log
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 
 

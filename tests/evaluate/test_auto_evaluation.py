@@ -3,7 +3,7 @@ import asyncio
 from dspy.evaluate.auto_evaluation import CompleteAndGrounded, SemanticF1
 from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 
 
 def test_semantic_f1_returns_prediction_without_trace(make_run):

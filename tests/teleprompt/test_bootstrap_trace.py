@@ -101,7 +101,7 @@ def test_bootstrap_trace_data(make_run):
 
 def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch, make_run):
     from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
-    from dspy.utils.dummies import DummyLM
+    from dspy.testing import DummyLM
 
     run = make_run(lm=DummyLM([{}]))
 

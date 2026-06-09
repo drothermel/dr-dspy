@@ -14,7 +14,7 @@ from dspy.history import TurnEvent
 from dspy.predict.react import ReAct
 from dspy.primitives.prediction import Prediction
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from dspy.utils.exceptions import ContextWindowExceededError
 from tests.task_spec.helpers import ts
 

@@ -40,7 +40,7 @@ async def test_convert_mcp_tool():
         error_tool = convert_mcp_tool(session, response.tools[2])
         assert error_tool.name == "wrong_tool"
         assert error_tool.desc == "This tool raises an error"
-        with pytest.raises(RuntimeError, match="Failed to call a MCP tool: Error executing tool wrong_tool: error!"):
+        with pytest.raises(RuntimeError, match="Failed to call MCP tool: Error executing tool wrong_tool: error!"):
             await error_tool.acall()
         nested_pydantic_tool = convert_mcp_tool(session, response.tools[3])
         assert nested_pydantic_tool.name == "get_account_name"

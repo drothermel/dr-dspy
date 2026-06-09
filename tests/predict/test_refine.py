@@ -6,7 +6,7 @@ from dspy.predict.predict import Predict
 from dspy.predict.refine import Refine
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 
 

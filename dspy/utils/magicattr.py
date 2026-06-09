@@ -1,3 +1,5 @@
+"""Legacy attribute path helpers. Prefer typed models for new code."""
+
 import ast
 from functools import reduce
 

@@ -17,7 +17,7 @@ def json_adapter():
 
 @pytest.fixture
 def run(make_run):
-    from dspy.utils.dummies import DummyLM
+    from dspy.testing import DummyLM
 
     return make_run(lm=DummyLM([{}]))
 

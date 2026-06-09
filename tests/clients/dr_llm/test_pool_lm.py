@@ -8,7 +8,7 @@ from dr_llm.llm import CallMode
 
 from dspy.clients.dr_llm import DrLlmPoolLM, resolve_pool_session_id
 from dspy.runtime.run_context import RunContext
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from tests.clients.dr_llm._helpers import make_backend_response, make_lm_request
 
 

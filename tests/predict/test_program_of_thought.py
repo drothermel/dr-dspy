@@ -5,7 +5,7 @@ import pytest
 
 from dspy.predict.program_of_thought import ProgramOfThought
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 
 BasicQA = make_task_spec(
     {

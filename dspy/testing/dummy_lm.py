@@ -1,11 +1,12 @@
+"""Test-only LM double for unit and integration tests."""
+
 from __future__ import annotations
 
-import random
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, NoReturn, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Iterator
 
 from typing_extensions import override
 
@@ -17,9 +18,6 @@ from dspy.core.types import LMOutput, LMPart, LMRequest, LMResponse, LMTextPart,
 from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.task_spec import FieldBinding, output_field
 from dspy.utils.dotdict import dotdict
-from dspy.utils.lazy_import import require
-
-np = require("numpy")
 
 
 class DummyLM(BaseLM):
@@ -139,53 +137,3 @@ class DummyLM(BaseLM):
     def get_convo(self, index):
         entry = self.call_log[index]
         return (entry.messages_as_openai, entry.outputs)
-
-
-def dummy_rm(passages=()) -> Callable[..., Any]:
-    if not passages:
-
-        def inner(query: str, *, k: int, **kwargs) -> NoReturn:
-            raise ValueError("No passages defined")
-
-        return inner
-    max_length = max(map(len, passages)) + 100
-    vectorizer = DummyVectorizer(max_length)
-    passage_vecs = vectorizer(passages)
-
-    def inner(query: str, *, k: int, **kwargs):
-        assert k <= len(passages)
-        query_vec = vectorizer([query])[0]
-        scores = passage_vecs @ query_vec
-        largest_idx = (-scores).argsort()[:k]
-        return [dotdict(long_text=passages[i]) for i in largest_idx]
-
-    return inner
-
-
-class DummyVectorizer:
-    def __init__(self, max_length=100, n_gram=2) -> None:
-        self.max_length = max_length
-        self.n_gram = n_gram
-        self.P = 10**9 + 7
-        random.seed(123)
-        self.coeffs = [random.randrange(1, self.P) for _ in range(n_gram)]
-
-    def _hash(self, gram):
-        h = 1
-        for coeff, c in zip(self.coeffs, gram, strict=False):
-            h = h * coeff + ord(c)
-            h %= self.P
-        return h % self.max_length
-
-    def __call__(self, texts: list[str]) -> np.ndarray:
-        vecs = []
-        for text in texts:
-            grams = [text[i : i + self.n_gram] for i in range(len(text) - self.n_gram + 1)]
-            vec = [0] * self.max_length
-            for gram in grams:
-                vec[self._hash(gram)] += 1
-            vecs.append(vec)
-        vecs = np.array(vecs, dtype=np.float32)
-        vecs -= np.mean(vecs, axis=1, keepdims=True)
-        vecs /= np.linalg.norm(vecs, axis=1, keepdims=True) + 1e-10
-        return vecs

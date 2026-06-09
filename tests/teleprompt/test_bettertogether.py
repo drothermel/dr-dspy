@@ -15,7 +15,7 @@ from dspy.teleprompt.bootstrap_finetune import BootstrapFinetune
 from dspy.teleprompt.compile_params import BetterTogetherCompileParams, RandomSearchCompileParams
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.teleprompt.teleprompt import Teleprompter
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 
 

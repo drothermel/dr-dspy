@@ -8,7 +8,7 @@ import pydantic
 import pytest
 from typing_extensions import override
 
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 
 try:
     from litellm.utils import ChatCompletionMessageToolCall, Choices, Function, Message, ModelResponse

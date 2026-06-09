@@ -11,7 +11,7 @@ from dspy.clients.dr_llm.mapping import (
 from dspy.core.types import LMMessage, LMMessageRole, LMRequest, User
 from dspy.core.types.config import LMConfig
 from dspy.core.types.parts import LMImagePart, LMTextPart
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from dspy.utils.exceptions import LMUnsupportedFeatureError
 from tests.clients.dr_llm._helpers import make_backend_response, make_lm_request
 

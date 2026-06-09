@@ -27,7 +27,7 @@ from dspy.primitives.prediction import Prediction
 from dspy.task_spec import default_task_instructions, input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 
 QA_TASK_SPEC = ts("question->answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",)))

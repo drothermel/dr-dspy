@@ -10,7 +10,7 @@ from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.teleprompt.compile_params import KNNFewShotCompileParams
 from dspy.teleprompt.knn_fewshot import KNNFewShot
-from dspy.utils.dummies import DummyLM, DummyVectorizer
+from dspy.testing import DummyLM, DummyVectorizer
 from tests.task_spec.helpers import ts
 
 

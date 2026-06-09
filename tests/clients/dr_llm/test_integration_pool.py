@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from dspy.runtime.run_context import RunContext
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from tests.clients.dr_llm._helpers import make_lm_request
 from tests.clients.dr_llm.conftest import backend_request_for_lm, seed_complete_samples
 

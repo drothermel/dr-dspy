@@ -2,7 +2,7 @@ from dspy.core.types.lm import LMForward
 from dspy.history import ConversationTurnLog, TurnEvent, TurnLog
 from dspy.predict.predict import Predict
 from dspy.predict.protocol import Predictor
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 
 

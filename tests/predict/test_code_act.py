@@ -6,7 +6,7 @@ import pytest
 from dspy.adapters.types.tool import Tool
 from dspy.predict.code_act import CodeAct
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 
 pytestmark = pytest.mark.deno
 BasicQA = make_task_spec(

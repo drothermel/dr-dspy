@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 
 from dspy.adapters.types.tool import Tool
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from tests.adapters.types.tool.conftest import (
     Address,
     ContactInfo,

@@ -7,7 +7,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool
 from dspy.clients.lm import LM
 from dspy.predict.rlm import RLM
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from tests.mock_interpreter import MockInterpreter
 from tests.predict.rlm.conftest import FailingSubLM
 from tests.task_spec.helpers import ts

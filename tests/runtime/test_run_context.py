@@ -5,8 +5,8 @@ import pytest
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.primitives.module import Module
 from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, TransparencyMode, resolve_run
+from dspy.testing import DummyLM
 from dspy.utils.callback import BaseCallback
-from dspy.utils.dummies import DummyLM
 
 if TYPE_CHECKING:
     from dspy.adapters.base import Adapter

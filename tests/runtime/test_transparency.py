@@ -9,7 +9,7 @@ from dspy.predict.predict import Predict
 from dspy.runtime import CallLogMode, TelemetryConfig, TransparencyMode
 from dspy.runtime.transparency import CompiledCall, TransparencyViolation, validate_compiled_call
 from dspy.task_spec import TaskSpec, input_field, output_field
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 
 
 class SampleTaskSpec(TaskSpec):

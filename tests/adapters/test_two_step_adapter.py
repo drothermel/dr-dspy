@@ -11,7 +11,7 @@ from dspy.core.types import LMRequest, LMResponse
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.utils.dummies import DummyLM
+from dspy.testing import DummyLM
 from dspy.utils.exceptions import AdapterParseError
 from tests.adapters.conftest import format_messages_and_lm_kwargs
 from tests.task_spec.helpers import ts
