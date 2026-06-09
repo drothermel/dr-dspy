@@ -4,12 +4,11 @@ from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.call.policies.parse_fallback import NoOpParseFallbackPolicy
 from dspy.adapters.call.policies.response_format import NoOpResponseFormatPolicy
-from dspy.adapters.call.two_step import TwoStepCallExecutor
+from dspy.adapters.call.stages import invoke_adapter_lm, prepare_adapter_call
+from dspy.adapters.call.two_step import TWO_STEP_MAIN_CALL_SITE, finalize_two_step_main_response
 from dspy.core.types.config import coerce_lm_config
-from dspy.core.types.openai_compat import request_messages_as_openai
 from dspy.errors import AdapterParseError, LMError
 from dspy.predict.call_validation import validate_task_inputs
-from dspy.runtime.transparency import resolve_call, resolve_call_site, resolve_lm_config, validate_compiled_call
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -38,14 +37,15 @@ class AdapterCallPipeline:
     ) -> list[dict[str, Any]]:
         inputs = validate_task_inputs(task_spec, inputs)
         if getattr(adapter, "call_mode", None) == "two_step":
-            return await TwoStepCallExecutor.execute(
-                cast("Any", adapter),
+            return await AdapterCallPipeline._run_two_step_call(
+                adapter,
                 lm=lm,
-                config=coerce_lm_config(config),
+                config=config,
                 task_spec=task_spec,
                 demos=demos,
                 inputs=inputs,
                 run=run,
+                call_site=call_site,
             )
 
         response_format_policy = adapter.response_format_policy or NoOpResponseFormatPolicy()
@@ -74,6 +74,55 @@ class AdapterCallPipeline:
         )
 
     @staticmethod
+    async def _run_two_step_call(
+        adapter: Adapter,
+        *,
+        lm: BaseLM,
+        config: LMConfig | Mapping[str, Any] | None,
+        task_spec: TaskSpec,
+        demos: list[dict[str, Any]],
+        inputs: dict[str, Any],
+        run: RunContext,
+        call_site: CallSite | None,
+    ) -> list[dict[str, Any]]:
+        response_format_policy = adapter.response_format_policy or NoOpResponseFormatPolicy()
+
+        async def run_once(effective_config: LMConfig | None) -> list[dict[str, Any]]:
+            prepared = prepare_adapter_call(
+                adapter,
+                lm=lm,
+                config=effective_config,
+                task_spec=task_spec,
+                demos=demos,
+                inputs=inputs,
+            )
+            response = await invoke_adapter_lm(
+                adapter,
+                prepared,
+                lm=lm,
+                run=run,
+                call_site=call_site or TWO_STEP_MAIN_CALL_SITE,
+                default_module="TwoStepAdapter",
+                default_phase="two_step.main",
+            )
+            return await finalize_two_step_main_response(
+                cast("Any", adapter),
+                response=response,
+                original_task_spec=task_spec,
+                run=run,
+            )
+
+        return await response_format_policy.execute(
+            adapter=adapter,
+            lm=lm,
+            config=coerce_lm_config(config),
+            task_spec=task_spec,
+            demos=demos,
+            inputs=inputs,
+            run_once=run_once,
+        )
+
+    @staticmethod
     async def _run_single_call(
         adapter: Adapter,
         *,
@@ -87,46 +136,27 @@ class AdapterCallPipeline:
         allow_parse_fallback: bool,
     ) -> list[dict[str, Any]]:
         try:
-            resolved_config = coerce_lm_config(config)
-            original_field_names = set(task_spec.fields.keys())
-            processed_task_spec, tools, resolved_config = adapter._call_preprocess(
-                lm=lm, config=resolved_config, task_spec=task_spec, inputs=inputs
+            prepared = prepare_adapter_call(
+                adapter,
+                lm=lm,
+                config=config,
+                task_spec=task_spec,
+                demos=demos,
+                inputs=inputs,
             )
-            mutations = [
-                f"removed field {name}"
-                for name in sorted(original_field_names - set(processed_task_spec.fields.keys()))
-            ]
-            messages = adapter.format(task_spec=processed_task_spec, demos=demos, inputs=inputs)
-            request = adapter._render_request(lm=lm, config=resolved_config, tools=tools, messages=messages)
-            merged_config, provenance = resolve_lm_config(lm, resolved_config)
-            site = resolve_call_site(
+            response = await invoke_adapter_lm(
+                adapter,
+                prepared,
+                lm=lm,
                 run=run,
                 call_site=call_site,
-                default_module=type(adapter).__name__,
-                default_phase="adapter",
             )
-            compiled = resolve_call(
-                lm=lm,
-                adapter=adapter,
-                task_spec=task_spec,
-                processed_task_spec=processed_task_spec,
-                config=merged_config,
-                config_provenance=provenance,
-                messages=request_messages_as_openai(request),
-                task_spec_mutations=mutations,
-                module=site.module,
-                phase=site.phase,
-                lm_role=site.lm_role,
-            )
-            transparency = run.telemetry.transparency
-            validate_compiled_call(compiled, transparency)
-            response = await adapter._call_lm(lm=lm, request=request, run=run, compiled=compiled)
             return adapter._call_postprocess(
-                processed_task_spec=processed_task_spec,
+                processed_task_spec=prepared.processed_task_spec,
                 original_task_spec=task_spec,
                 response=response,
                 _lm=lm,
-                _config=resolved_config,
+                _config=prepared.config,
             )
         except TypeError:
             raise
