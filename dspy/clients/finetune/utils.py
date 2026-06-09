@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import orjson
 from pydantic import BaseModel, ConfigDict
 
+from dspy._internal.hashing import hash_pickle
 from dspy.clients.cache_paths import DSPY_CACHEDIR
-from dspy.core.hashing import Hasher
 
 if TYPE_CHECKING:
     from dspy.adapters.base import Adapter
@@ -93,7 +93,7 @@ def write_lines(file_path, data) -> None:
 
 
 def save_data(data: list[dict[str, Any]]) -> str:
-    hash = Hasher.hash(data)
+    hash = hash_pickle(data)
     file_name = f"{hash}.jsonl"
     finetune_dir = get_finetune_directory()
     file_path = os.path.join(finetune_dir, file_name)

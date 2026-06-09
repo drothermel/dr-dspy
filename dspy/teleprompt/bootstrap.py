@@ -5,7 +5,7 @@ import threading
 import tqdm
 from pydantic import BaseModel
 
-from dspy.core.hashing import Hasher
+from dspy._internal.hashing import hash_pickle
 from dspy.evaluate.metric_invoke import invoke_metric
 from dspy.primitives import Module
 from dspy.runtime import run_with_trace
@@ -144,7 +144,7 @@ class BootstrapFewShot:
             name2traces = trace_to_demos(trace, self.predictor2name)
             for name, demos in name2traces.items():
                 if len(demos) > 1:
-                    rng = random.Random(Hasher.hash(tuple(demos)))
+                    rng = random.Random(hash_pickle(tuple(demos)))
                     demos = [rng.choice(demos[:-1]) if rng.random() < 0.5 else demos[-1]]
                 self.name2traces[name].extend(demos)
         return success
