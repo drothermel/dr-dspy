@@ -313,7 +313,7 @@ Fix direction:
 
 **Source:** External cross-package review.
 
-`clients/finetune/lm.py` reportedly stores exceptions with `Future.set_result`
+`clients/finetune/service.py` reportedly stores exceptions with `Future.set_result`
 instead of `Future.set_exception`, forcing every caller to manually check for an
 exception result.
 

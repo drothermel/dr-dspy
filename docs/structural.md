@@ -104,6 +104,8 @@ Details to preserve:
 
 ### P0.4 Clients, integrations, and finetune provider ownership
 
+**Status:** Done (2026-06).
+
 **Sources:** External cross-package review; Manual review.
 
 Problem:
@@ -129,6 +131,10 @@ Details to preserve:
 - Provider registration should preserve current provider names and inference.
 - Existing public finetune methods can be kept as thin delegates only if
   compatibility is required.
+
+**Delivered:** Generic LM error helpers in `dspy/clients/errors.py`; lazy finetune
+provider registry in `dspy/clients/finetune/registry.py`; finetune lifecycle on
+`FinetuneService` with inference-only `LM`.
 
 ## P1: Stabilize Runtime, Logging, and Execution Infrastructure
 

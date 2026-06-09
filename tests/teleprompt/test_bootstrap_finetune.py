@@ -146,7 +146,8 @@ def test_finetune_lms_uses_asyncio_to_thread():
     finetuned_lm = MagicMock()
     job.result.return_value = finetuned_lm
     job.thread = MagicMock()
-    lm.finetune.return_value = job
+    service = MagicMock()
+    service.finetune.return_value = job
     key = (lm, 0)
     finetune_dict = {
         key: {
@@ -160,10 +161,15 @@ def test_finetune_lms_uses_asyncio_to_thread():
     async def fake_to_thread(fn, /, *args, **kwargs):
         return fn(*args, **kwargs)
 
-    with patch("dspy.teleprompt.bootstrap_finetune.asyncio.to_thread", side_effect=fake_to_thread) as mock_to_thread:
+    with (
+        patch("dspy.teleprompt.bootstrap_finetune.FinetuneService", return_value=service),
+        patch("dspy.teleprompt.bootstrap_finetune.asyncio.to_thread", side_effect=fake_to_thread) as mock_to_thread,
+    ):
         result = asyncio.run(BootstrapFinetune.finetune_lms(finetune_dict))
 
     assert result[key] is finetuned_lm
     assert mock_to_thread.await_count == 2
+    service.kill.assert_called_once()
+    service.finetune.assert_called_once()
     job.result.assert_called_once()
     job.thread.join.assert_called_once()
