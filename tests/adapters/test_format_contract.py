@@ -7,7 +7,9 @@ from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.history import TurnLog
 from dspy.task_spec import input_field, make_task_spec, output_field
+from tests.adapters.assertions import assert_content_contains, assert_message_roles, assert_multimodal_blocks
 from tests.adapters.conftest import format_messages_and_lm_kwargs
+from tests.adapters.scenarios.kitchen_sink import kitchen_sink_case
 from tests.adapters.scenarios.qa import SIMPLE_QA_CONTRACT_INPUTS, SIMPLE_QA_CONTRACT_SIGNATURE
 
 
@@ -87,3 +89,77 @@ def test_message_build_order_matches_contract():
         inputs={"turn_log": history, "question": "live q"},
     )
     assert adapter.segment_order == list(MESSAGE_BUILD_ORDER)
+
+
+INCOMPLETE_DEMO_PREAMBLE = "This is an example of the task, though some input or output fields are not supplied."
+
+KITCHEN_SINK_SYSTEM_FIELDS = (
+    "turn_log",
+    "image",
+    "audio",
+    "file",
+    "document",
+    "event",
+    "tools",
+    "profile",
+    "context",
+    "question",
+    "answer",
+    "verdict",
+    "confidence",
+)
+
+
+@pytest.mark.parametrize("adapter_factory", [ChatAdapter, JSONAdapter, XMLAdapter])
+def test_kitchen_sink_message_contract(adapter_factory):
+    scenario = kitchen_sink_case()
+    messages, _lm_kwargs = format_messages_and_lm_kwargs(
+        adapter=adapter_factory(),
+        task_spec=scenario.task_spec,
+        demos=list(scenario.demos),
+        inputs=scenario.inputs,
+    )
+    system_content = messages[0]["content"]
+    assert isinstance(system_content, str)
+    for field_name in KITCHEN_SINK_SYSTEM_FIELDS:
+        assert field_name in system_content
+
+    assert_message_roles(
+        messages=messages,
+        roles=["system", "user", "assistant", "user", "assistant", "user", "assistant", "user"],
+    )
+    assert INCOMPLETE_DEMO_PREAMBLE in _message_text(messages[1])
+    assert INCOMPLETE_DEMO_PREAMBLE in _message_text(messages[3])
+
+    assert_content_contains(content=_message_text(messages[5]), fragments=["Who is Ada?", "old note", "older note"])
+    assert_content_contains(
+        content=_message_text(messages[-1]),
+        fragments=["What should the answer include?", "current context one", "Grace"],
+    )
+
+    if adapter_factory is ChatAdapter:
+        assert_multimodal_blocks(
+            message=messages[1],
+            expected_blocks=[
+                {"type": "image_url", "image_url": {"url": "https://example.com/demo.png"}},
+                {"type": "input_audio", "input_audio": {"data": "REVNTw==", "format": "wav"}},
+                {"type": "event", "event": {"label": "demo-event"}},
+            ],
+        )
+        assert_multimodal_blocks(
+            message=messages[-1],
+            expected_blocks=[
+                {"type": "image_url", "image_url": {"url": "https://example.com/current.png"}},
+                {"type": "input_audio", "input_audio": {"data": "Q1VSUkVOVA==", "format": "wav"}},
+                {"type": "event", "event": {"label": "current-event"}},
+            ],
+        )
+
+
+def _message_text(message: dict) -> str:
+    content = message.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(block.get("text", "") for block in content if isinstance(block, dict))
+    return ""
