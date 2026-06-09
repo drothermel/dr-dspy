@@ -120,11 +120,19 @@ class Completions:
                     kwargs.setdefault(k, []).append(v)
         else:
             kwargs = list_or_dict
-        assert all(isinstance(v, list) for v in kwargs.values()), "All values must be lists"
-        if kwargs:
-            length = len(next(iter(kwargs.values())))
-            assert all(len(v) == length for v in kwargs.values()), "All lists must have the same length"
+        self._validate_completion_lists(kwargs)
         self._completions = kwargs
+
+    @staticmethod
+    def _validate_completion_lists(kwargs: dict[str, object]) -> None:
+        if not all(isinstance(v, list) for v in kwargs.values()):
+            raise ValueError("All Completions values must be lists")
+        if not kwargs:
+            return
+        lists = [v for v in kwargs.values() if isinstance(v, list)]
+        length = len(lists[0])
+        if not all(len(v) == length for v in lists):
+            raise ValueError("All Completions lists must have the same length")
 
     def items(self):
         return self._completions.items()

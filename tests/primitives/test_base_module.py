@@ -208,7 +208,7 @@ def test_load_with_version_mismatch(tmp_path, make_run):
             loaded_predict = Predict(QA_TASK_SPEC)
             loaded_predict.load(save_path, allow_pickle=True)
         assert len(handler.messages) == 4
-        assert ".pkl" in handler.messages[0]
+        assert "Saving state to .pkl" in handler.messages[0]
         for msg in handler.messages[1:]:
             assert "There is a mismatch of" in msg
         assert isinstance(loaded_predict, Predict)

@@ -85,7 +85,11 @@ class BaseModule:
         try:
             return copy.deepcopy(self)
         except Exception:
-            pass
+            logger.debug(
+                "copy.deepcopy failed for %s; falling back to manual deepcopy",
+                self.__class__.__name__,
+                exc_info=True,
+            )
         new_instance = self.__class__.__new__(self.__class__)
         for attr, value in self.__dict__.items():
             if isinstance(value, BaseModule):
@@ -143,7 +147,7 @@ class BaseModule:
                 )
         elif path.suffix == ".pkl":
             logger.warning(
-                'Loading untrusted .pkl files can run arbitrary code, which may be dangerous. To avoid this, prefer saving using json format using module.save("module.json").'
+                'Saving state to .pkl uses pickle serialization, which can execute arbitrary code when loaded. Prefer module.save("module.json") for safer state-only saves.'
             )
             state = self.dump_state(json_mode=False)
             state["metadata"] = metadata

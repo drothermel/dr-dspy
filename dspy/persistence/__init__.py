@@ -46,7 +46,7 @@ def save_program(
     if not save_path.exists():
         save_path.mkdir(parents=True)
     logger.warning(
-        'Loading untrusted .pkl files can run arbitrary code, which may be dangerous. To avoid this, prefer saving using json format using module.save("module.json").'
+        'Saving the full program to program.pkl uses pickle serialization, which can execute arbitrary code when loaded. Prefer module.save("module.json") for state-only saves.'
     )
     try:
         modules_to_serialize = modules_to_serialize or []

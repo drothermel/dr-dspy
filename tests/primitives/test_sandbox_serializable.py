@@ -3,7 +3,6 @@ from dspy.primitives.sandbox_protocol import (
     SandboxSerializable,
     SandboxSerializablePydanticMixin,
     build_repl_variable,
-    to_repl_variable,
 )
 from dspy.task_spec import input_field, output_field
 
@@ -111,11 +110,3 @@ class TestBuildReplVariable:
         var = build_repl_variable(ExampleSerializable(), "data", field=field)
         assert "A data column" in var.desc
         assert "import json" in var.desc
-
-
-class TestToReplVariableFunction:
-    def test_to_repl_variable(self):
-        obj = ExampleSerializable("payload")
-        var = to_repl_variable(obj, "data")
-        assert isinstance(var, REPLVariable)
-        assert "ExampleData: payload" in var.preview

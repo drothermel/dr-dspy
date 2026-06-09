@@ -15,7 +15,6 @@ __all__ = [
     "SandboxSerializable",
     "SandboxSerializablePydanticMixin",
     "build_repl_variable",
-    "to_repl_variable",
 ]
 
 
@@ -47,7 +46,3 @@ def build_repl_variable(obj: SandboxSerializable, name: str, field: FieldSpec | 
         setup_note = f"Sandbox imports available:\n{setup}"
         desc = f"{desc}\n{setup_note}" if desc else setup_note
     return var.model_copy(update={"preview": preview, "total_length": len(preview), "desc": desc})
-
-
-def to_repl_variable(obj: SandboxSerializable, name: str, field: FieldSpec | None = None) -> REPLVariable:
-    return build_repl_variable(obj, name, field=field)
