@@ -3,6 +3,8 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 from dspy.evaluate.evaluate import Evaluate
+from dspy.integrations.optimizers.optuna.distributions import get_param_distributions
+from dspy.integrations.optimizers.optuna.import_ import import_optuna
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.teleprompt.log_utils import print_full_program, save_candidate_program
@@ -12,7 +14,6 @@ from dspy.teleprompt.mipro.evaluate import (
     perform_full_evaluation,
     select_and_insert_instructions_and_demos,
 )
-from dspy.teleprompt.mipro.optuna_helpers import get_param_distributions, import_optuna
 from dspy.teleprompt.mipro.settings import ENDC, GREEN
 
 if TYPE_CHECKING:

@@ -2,24 +2,13 @@ from typing import Any, cast
 
 from pydantic import BaseModel
 
+from dspy.integrations.optimizers.optuna.import_ import import_optuna
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, BootstrapOptunaCompileParams
 from dspy.teleprompt.utils import make_optimizer_evaluator
 
 from .bootstrap import BootstrapFewShot
-
-
-def _import_optuna():
-    try:
-        import optuna
-    except ModuleNotFoundError as exc:
-        if exc.name == "optuna":
-            raise ImportError(
-                "BootstrapFewShotWithOptuna requires optional dependency 'optuna'. Install it with `pip install dspy[optuna]`."
-            ) from exc
-        raise
-    return optuna
 
 
 class BootstrapFewShotWithOptuna:
@@ -69,7 +58,7 @@ class BootstrapFewShotWithOptuna:
 
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = BootstrapOptunaCompileParams.model_validate(params)
-        optuna = _import_optuna()
+        optuna = import_optuna(feature="BootstrapFewShotWithOptuna")
         self.trainset = params.trainset
         self.valset = params.valset or params.trainset
         self.run = run

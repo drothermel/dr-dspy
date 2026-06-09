@@ -2,10 +2,11 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from dspy.evaluate.evaluate import Evaluate
+from dspy.integrations.optimizers.optuna.distributions import get_param_distributions
+from dspy.integrations.optimizers.optuna.import_ import import_optuna
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.eval_batch import eval_candidate_program, get_program_with_highest_avg_score
 from dspy.teleprompt.log_utils import save_candidate_program
-from dspy.teleprompt.mipro.optuna_helpers import get_param_distributions, import_optuna
 from dspy.teleprompt.mipro.settings import ENDC, GREEN
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 
