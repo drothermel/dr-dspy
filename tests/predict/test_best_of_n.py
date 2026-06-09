@@ -5,6 +5,7 @@ import pytest
 from dspy.errors import AdapterParseError, SamplingExhaustedError
 from dspy.predict.best_of_n import BestOfN
 from dspy.predict.predict import Predict
+from dspy.predict.sampling import get_sampling_metadata
 from dspy.primitives import Module, Prediction
 from tests.task_spec.helpers import ts
 from tests.test_utils import DummyLM
@@ -118,3 +119,24 @@ def test_best_of_n_instance_reuse_preserves_fail_count(make_run):
         with pytest.raises(SamplingExhaustedError):
             asyncio.run(best_of_n(question="What is the capital of Belgium?", run=run))
         assert len(call_counts) == 3
+
+
+def test_best_of_n_exposes_threshold_miss_metadata(make_run):
+    run = make_run(lm=DummyLM([{"answer": "Brussels"}, {"answer": "City of Brussels"}]))
+
+    async def forward(self, *, run, options=None, **inputs):
+        return await self.predictor(run=run, options=options, **inputs)
+
+    predict = DummyModule(ts("question -> answer"), forward)
+    best_of_n = BestOfN(
+        module=predict,
+        num_samples=2,
+        reward_fn=lambda _inputs, pred: 0.5 if pred.answer == "City of Brussels" else 0.25,
+        threshold=0.9,
+    )
+    result = asyncio.run(best_of_n(question="What is the capital of Belgium?", run=run))
+    metadata = get_sampling_metadata(result)
+    assert result.answer == "City of Brussels"
+    assert metadata is not None
+    assert metadata.threshold_met is False
+    assert metadata.best_reward == 0.5

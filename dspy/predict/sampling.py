@@ -47,6 +47,30 @@ class SamplingState(BaseModel):
     best_reward: float = -float("inf")
 
 
+class SamplingMetadata(BaseModel):
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+    best_reward: float
+    attempts: int
+    failures: int
+    threshold: float | None = None
+    threshold_met: bool = False
+    best_trace: list | None = None
+
+
+def set_sampling_metadata(prediction: Prediction, metadata: SamplingMetadata) -> None:
+    object.__setattr__(prediction, "_sampling_metadata", metadata)
+
+
+def get_sampling_metadata(prediction: Prediction) -> SamplingMetadata | None:
+    metadata = getattr(prediction, "_sampling_metadata", None)
+    if metadata is None:
+        return None
+    if not isinstance(metadata, SamplingMetadata):
+        raise TypeError(f"Expected SamplingMetadata, got {type(metadata).__name__}.")
+    return metadata
+
+
 async def default_execute_attempt(attempt: SamplingAttempt) -> tuple[Prediction, list]:
     lm_copy = attempt.lm.copy(temperature=1.0)
     mod = attempt.module.deepcopy()
@@ -71,6 +95,7 @@ async def sample_with_reward(
     lm = module.optional_lm() or run.lm
     state = SamplingState()
     failures_seen = 0
+    attempts_seen = 0
     last_exc: Exception | None = None
     execute = execute_attempt or default_execute_attempt
 
@@ -83,6 +108,7 @@ async def sample_with_reward(
             options=options,
             inputs=inputs,
         )
+        attempts_seen += 1
         try:
             outputs, trace = await execute(attempt)
         except Exception as err:
@@ -109,6 +135,15 @@ async def sample_with_reward(
 
     if state.best_pred is None:
         raise SamplingExhaustedError(n_attempts=num_samples) from last_exc
-    if state.best_trace:
-        run.optimization_trace.extend(state.best_trace)
+    set_sampling_metadata(
+        state.best_pred,
+        SamplingMetadata(
+            threshold=threshold,
+            threshold_met=threshold is not None and state.best_reward >= threshold,
+            best_reward=state.best_reward,
+            attempts=attempts_seen,
+            failures=failures_seen,
+            best_trace=state.best_trace,
+        ),
+    )
     return state.best_pred

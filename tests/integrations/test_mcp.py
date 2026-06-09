@@ -4,10 +4,40 @@ import importlib.util
 
 import pytest
 
-from dspy.integrations.mcp import convert_mcp_tool
+from dspy.integrations.mcp import _convert_mcp_tool_result, convert_mcp_tool
 
 if importlib.util.find_spec("mcp") is None:
     pytest.skip(reason="mcp is not installed", allow_module_level=True)
+
+
+def test_convert_mcp_tool_result_preserves_mixed_content_order():
+    from mcp.types import CallToolResult, ImageContent, TextContent
+
+    image = ImageContent(type="image", data="abc123", mimeType="image/png")
+    result = CallToolResult(
+        content=[
+            TextContent(type="text", text="before"),
+            image,
+            TextContent(type="text", text="after"),
+        ]
+    )
+    converted = _convert_mcp_tool_result(result)
+    assert converted == ["before", image, "after"]
+
+
+def test_convert_mcp_tool_result_collapses_single_text_success():
+    from mcp.types import CallToolResult, TextContent
+
+    result = CallToolResult(content=[TextContent(type="text", text="ok")])
+    assert _convert_mcp_tool_result(result) == "ok"
+
+
+def test_convert_mcp_tool_result_error_includes_non_text_diagnostics():
+    from mcp.types import CallToolResult, ImageContent
+
+    result = CallToolResult(content=[ImageContent(type="image", data="abc123", mimeType="image/png")], isError=True)
+    with pytest.raises(RuntimeError, match="image/png"):
+        _convert_mcp_tool_result(result)
 
 
 @pytest.mark.asyncio

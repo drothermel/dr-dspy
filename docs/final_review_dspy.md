@@ -59,21 +59,21 @@ Do not claim exact reproduction of existing `nl_latents` pool curves through `Pr
 | P1-5 | Finetuning poll and HTTP timeouts | Done | 2026-06-09: Databricks/OpenAI waits bounded; Databricks HTTP calls set timeouts. |
 | P1-6 | `run_with_trace` module spine observability | Done | 2026-06-09: trace capture calls normal module spine. |
 | P1-7 | `run_bounded` abort accounting | Done | 2026-06-09: aborted items recorded distinctly and in failure stats. |
-| P1-8 | Parallel and optimizer call-log isolation | Not started | |
+| P1-8 | Parallel and optimizer call-log isolation | Done | 2026-06-09: forked worker runs keep isolated memory call logs and append to the shared disk session readable from the parent run. |
 | P1-9 | `Evaluate` empty devsets | Done | 2026-06-09: empty devsets raise clear validation error. |
 | P1-10 | Empty answer-list metrics | Done | 2026-06-09: max-answer metrics reject empty answer lists. |
-| P1-11 | Sampling threshold miss metadata | Not started | |
-| P1-12 | Sampling trace mutation | Not started | |
-| P1-13 | JSON parsing strictness | Not started | |
-| P1-14 | MCP mixed tool-result conversion | Not started | |
-| P1-15 | Persistence failure modes | Not started | |
+| P1-11 | Sampling threshold miss metadata | Done | 2026-06-09: `SamplingMetadata` exposes reward, attempt/failure counts, threshold status, and winning trace. |
+| P1-12 | Sampling trace mutation | Done | 2026-06-09: sampling no longer mutates parent optimization traces; winning trace is available through sampling metadata. |
+| P1-13 | JSON parsing strictness | Done | 2026-06-09: permissive `JSONAdapter` default retained, documented, and covered for prose/multiple-object repair plus opt-out. |
+| P1-14 | MCP mixed tool-result conversion | Done | 2026-06-09: mixed text/non-text results preserve order and error diagnostics include non-text payloads. |
+| P1-15 | Persistence failure modes | Done | 2026-06-09: predictor state keys validate before mutation; program saves use metadata preflight and temp files. |
 | P2-1 | Pool aggregate provenance | Done | 2026-06-09: `acquire_samples_result` exposes aggregate counts. |
 | P2-2 | Pool fingerprint and metadata docs | Done | 2026-06-09: documented metadata non-isolation in `docs/migration/dr_llm_text_pilot.md`. |
 | P2-3 | dr-llm `n=1` contract | Done | 2026-06-09: `n=1` allowed; `n>1` remains rejected. |
 | P2-4 | dr-llm v1 scope docs/tests | Done | 2026-06-09: support matrix documented. |
 | P2-5 | `nl-code` TaskSpec experiment scaffold | Done | 2026-06-09: minimal TaskSpec pilot path documented. |
 | P2-6 | Advanced provider option gaps | Done | 2026-06-09: provider-native controls and `EffortSpec.MAX` bridge added; registry serialization remains default-registry only. |
-| P2-7 | Smaller DSPy footguns | Not started | |
+| P2-7 | Smaller DSPy footguns | Done | 2026-06-09: experiment-facing defaults documented; sampling metadata/trace and legacy turn-log issues covered by targeted fixes. |
 | V-1 | Final verification matrix | Done | 2026-06-09: focused changed-area tests passed; required gates passed (`ruff check --fix`, `ty check --fix`, `ruff format`, lazy imports). |
 | V-2 | Live OpenRouter `gpt-5-nano` endpoint test | Done | 2026-06-09: `uv run pytest --llm_call -n0 tests/clients/dr_llm/test_integration_direct_live.py::test_live_dr_llm_direct_openrouter_gpt_5_nano -q` passed. |
 

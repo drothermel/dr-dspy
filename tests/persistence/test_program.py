@@ -136,6 +136,14 @@ def test_pickle_loading_requires_explicit_permission(tmp_path):
     assert isinstance(loaded_predict, Predict)
 
 
+def test_save_program_metadata_failure_does_not_leave_pickle(tmp_path):
+    predict = Predict(QA_TASK_SPEC)
+    save_path = tmp_path / "failed-program"
+    with patch("dspy.persistence.program.build_metadata", return_value={"bad": object()}), pytest.raises(TypeError):
+        predict.save(save_path, save_program=True)
+    assert not (save_path / "program.pkl").exists()
+
+
 def test_save_with_extra_modules(tmp_path, make_run):
     custom_module_path = tmp_path / "custom_module.py"
     with open(custom_module_path, "w") as f:

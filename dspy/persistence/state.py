@@ -35,6 +35,20 @@ def _predictor_state(state: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in state.items() if key != METADATA_KEY}
 
 
+def _validate_predictor_state_keys(module: Module, predictor_state: dict[str, Any]) -> None:
+    expected = {name for name, _ in module.named_predictors()}
+    actual = set(predictor_state)
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    if missing or extra:
+        details = []
+        if missing:
+            details.append(f"missing predictor state for: {missing}")
+        if extra:
+            details.append(f"unexpected predictor state for: {extra}")
+        raise ValueError("State predictor keys do not match module predictors: " + "; ".join(details))
+
+
 def apply_module_state(
     module: Module,
     state: dict[str, Any],
@@ -43,6 +57,7 @@ def apply_module_state(
     custom_types: dict[str, type] | None = None,
 ) -> Module:
     predictor_state = _predictor_state(state)
+    _validate_predictor_state_keys(module, predictor_state)
 
     def _apply(target: Module) -> None:
         for name, predictor in target.named_predictors():

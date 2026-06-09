@@ -239,4 +239,6 @@ def test_collect_trace_data_metric_receives_captured_program_trace(make_run):
     )
 
     assert seen_traces == [data[0]["trace"]]
-    assert seen_traces[0][0][0] == "inner"
+    captured_trace = seen_traces[0]
+    assert captured_trace is not None
+    assert captured_trace[0][0] == "inner"

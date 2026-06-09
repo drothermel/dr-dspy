@@ -1,10 +1,13 @@
+import asyncio
 from typing import TYPE_CHECKING, cast
 
 import pytest
 
 from dspy.adapters.json_adapter import JSONAdapter
+from dspy.predict import Predict
 from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, TransparencyMode, resolve_run
 from dspy.runtime.callback import NoOpCallback
+from tests.task_spec.helpers import ts
 from tests.test_utils import DummyLM
 
 if TYPE_CHECKING:
@@ -148,6 +151,24 @@ def test_fork_preserves_disk_logging_session_when_telemetry_unchanged(tmp_path, 
     )
     forked = run.fork()
     assert forked.log_session is run.log_session
+
+
+def test_forked_disk_call_is_readable_from_parent_session(tmp_path, monkeypatch):
+    monkeypatch.setenv("DSPY_LOG_DIR", str(tmp_path))
+    adapter = JSONAdapter()
+    run = RunContext.create(
+        lm=DummyLM([{"answer": "ok"}], adapter=adapter),
+        adapter=adapter,
+        telemetry=TelemetryConfig(call_log=CallLogMode.disk),
+    )
+    forked = run.fork(call_log=[])
+    prediction = asyncio.run(Predict(ts("question -> answer"))(question="q", run=forked))
+    records = run.read_call_log(n=10)
+    assert prediction.answer == "ok"
+    assert run.call_log == []
+    assert forked.call_log == []
+    assert len(records) == 1
+    assert '"answer": "ok"' in records[0]["response"]["outputs"][0]["text"]
 
 
 def test_read_call_log_rejects_non_call_record():

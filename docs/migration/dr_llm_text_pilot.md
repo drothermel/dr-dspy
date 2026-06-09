@@ -87,6 +87,32 @@ The fastest post-review DSPy pilot should use direct dr-llm calls, not pools:
 - Use `MIPROv2` first with no demos and a small train/val split.
 - Keep the decoder task, adapter, budgets, lossless layer, and evaluator fixed.
 
+`JSONAdapter` keeps its existing permissive parsing default
+(`allow_json_repair=True`) under strict transparency. Prose-wrapped JSON and
+multiple JSON objects may be repaired into a valid output object and are still
+recorded in the call log for audit. Use `JSONAdapter(allow_json_repair=False)`
+only when the experiment should reject repaired completions instead of salvaging
+them.
+
+## Experiment Footguns
+
+For optimizer and sampling experiments, keep these defaults explicit in run
+notes:
+
+- `PredictOptions.trace` defaults to enabled, so ordinary `Predict` calls append
+  to the run optimization trace unless `trace=False` is passed.
+- `BestOfN` and `Refine` return the best prediction even when no sample meets
+  `threshold`; inspect `get_sampling_metadata(prediction).threshold_met` when
+  threshold success matters.
+- `BestOfN` and `Refine` default `fail_count` to `num_samples`, so parse or LM
+  failures consume the same sampling budget unless a smaller `fail_count` is set.
+- Sampling modules are copied per attempt; if a module cannot be deep-copied,
+  DSPy warns and isolation may be weaker.
+- Callback exceptions are logged as warnings. Treat callback-dependent metrics or
+  telemetry as best-effort unless the callback path has its own assertions.
+- `collect_trace_data(..., raise_on_error=False)` may return fewer records than
+  the input set when examples fail.
+
 This is a new DSPy prompt condition. Exact `nl_latents` compression-curve
 replay remains on the raw `nl_latents`/`dr-llm` pool harness unless a raw
 single-message DSPy adapter path is added and verified.

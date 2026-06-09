@@ -51,9 +51,30 @@ def test_load_state_is_transactional():
         path.write_text(json.dumps(corrupted))
         template = Prog()
         assert template.a.predict.demos == []
-        with pytest.raises(KeyError):
+        with pytest.raises(ValueError, match="missing predictor state"):
             template.load(str(path))
         assert template.a.predict.demos == [], "load_state partially mutated module before failing"
+
+
+def test_load_state_rejects_extra_predictor_state():
+    Sig = ts("question -> answer")
+
+    class Prog(Module):
+        def __init__(self):
+            super().__init__()
+            self.a = ChainOfThought(Sig)
+
+    source = Prog()
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "state.json"
+        source.save(str(path), save_program=False)
+        raw = json.loads(path.read_text())
+        predictor_key = next(key for key in raw if not key.startswith("__"))
+        raw["extra.predict"] = raw[predictor_key]
+        path.write_text(json.dumps(raw))
+        template = Prog()
+        with pytest.raises(ValueError, match="unexpected predictor state"):
+            template.load(str(path))
 
 
 def test_save_and_load_with_json(tmp_path, make_run):

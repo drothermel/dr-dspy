@@ -255,6 +255,27 @@ def test_json_adapter_parse_raise_error_on_mismatch_fields():
     assert "unexpected field(s): ['answer1']" in str(e.value)
 
 
+def test_json_adapter_default_repair_accepts_prose_wrapped_json():
+    signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
+    adapter = JSONAdapter()
+    result = adapter.parse(signature, 'The answer is below:\n{"answer": "Paris"}')
+    assert result == {"answer": "Paris"}
+
+
+def test_json_adapter_default_repair_accepts_multiple_json_blobs():
+    signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
+    adapter = JSONAdapter()
+    result = adapter.parse(signature, '{"answer": "Lyon"}\n{"answer": "Paris"}')
+    assert result == {"answer": "Paris"}
+
+
+def test_json_adapter_repair_opt_out_rejects_prose_wrapped_json():
+    signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
+    adapter = JSONAdapter(allow_json_repair=False)
+    with pytest.raises(AdapterParseError, match="cannot be serialized"):
+        adapter.parse(signature, 'The answer is below:\n{"answer": "Paris"}')
+
+
 def test_json_adapter_with_tool():
     MySignature = make_task_spec(
         {

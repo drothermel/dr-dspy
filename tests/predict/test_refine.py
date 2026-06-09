@@ -5,6 +5,7 @@ import pytest
 from dspy.errors import AdapterParseError, SamplingExhaustedError
 from dspy.predict.predict import Predict
 from dspy.predict.refine import Refine
+from dspy.predict.sampling import get_sampling_metadata
 from dspy.primitives import Module, Prediction
 from tests.task_spec.helpers import ts
 from tests.test_utils import DummyLM
@@ -126,3 +127,34 @@ def test_refine_instance_reuse_preserves_fail_count(make_run):
         with pytest.raises(SamplingExhaustedError):
             asyncio.run(refine(question="What is the capital of Belgium?", run=run))
         assert len(call_counts) == 3
+
+
+def test_refine_exposes_threshold_miss_metadata(make_run):
+    run = make_run(
+        lm=DummyLM(
+            [
+                {"answer": "Brussels"},
+                {"discussion": "No issues.", "advice": {"self.predictor": "N/A"}},
+                {"answer": "City of Brussels"},
+                {"discussion": "No issues.", "advice": {"self.predictor": "N/A"}},
+            ]
+        )
+    )
+
+    async def forward(self, *, run, options=None, **inputs):
+        return await self.predictor(run=run, options=options, **inputs)
+
+    predict = DummyModule(ts("question -> answer"), forward)
+    refine = Refine(
+        module=predict,
+        num_samples=2,
+        reward_fn=lambda _inputs, pred: 0.5 if pred.answer == "City of Brussels" else 0.25,
+        threshold=0.9,
+    )
+    result = asyncio.run(refine(question="What is the capital of Belgium?", run=run))
+    metadata = get_sampling_metadata(result)
+    assert result.answer == "City of Brussels"
+    assert metadata is not None
+    assert metadata.threshold == 0.9
+    assert metadata.threshold_met is False
+    assert metadata.best_reward == 0.5

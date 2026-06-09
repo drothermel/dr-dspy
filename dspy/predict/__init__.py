@@ -8,6 +8,7 @@ from dspy.predict.react import ReAct
 from dspy.predict.react_v2 import ReActV2
 from dspy.predict.refine import Refine
 from dspy.predict.rlm import RLM
+from dspy.predict.sampling import SamplingMetadata, get_sampling_metadata
 
 __all__ = [
     "Avatar",
@@ -20,4 +21,6 @@ __all__ = [
     "ReActV2",
     "Refine",
     "RLM",
+    "SamplingMetadata",
+    "get_sampling_metadata",
 ]

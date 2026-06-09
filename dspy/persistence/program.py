@@ -24,6 +24,14 @@ PROGRAM_PICKLE_FILENAME = "program.pkl"
 PROGRAM_METADATA_FILENAME = "metadata.json"
 
 
+def _cleanup_temp_program_files(*paths: Path) -> None:
+    for path in paths:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            logger.warning("Failed to remove temporary save file %s.", path)
+
+
 def save_program(
     module: Module,
     path: str | Path,
@@ -38,21 +46,27 @@ def save_program(
         )
     if save_path.exists() and (not save_path.is_dir()):
         raise NotADirectoryError(f"The path '{save_path}' exists but is not a directory.")
+    metadata_bytes = orjson.dumps(metadata, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE)
     if not save_path.exists():
         save_path.mkdir(parents=True)
     warn_pickle_save(target="program")
+    pickle_tmp_path = save_path / f".{PROGRAM_PICKLE_FILENAME}.tmp"
+    metadata_tmp_path = save_path / f".{PROGRAM_METADATA_FILENAME}.tmp"
     try:
         modules_to_serialize = modules_to_serialize or []
         for extra_module in modules_to_serialize:
             cloudpickle.register_pickle_by_value(extra_module)
-        with (save_path / PROGRAM_PICKLE_FILENAME).open("wb") as f:
+        with pickle_tmp_path.open("wb") as f:
             cloudpickle.dump(module, f)
+        with metadata_tmp_path.open("wb") as f:
+            f.write(metadata_bytes)
+        metadata_tmp_path.replace(save_path / PROGRAM_METADATA_FILENAME)
+        pickle_tmp_path.replace(save_path / PROGRAM_PICKLE_FILENAME)
     except Exception as e:
+        _cleanup_temp_program_files(pickle_tmp_path, metadata_tmp_path)
         raise RuntimeError(
             f"Saving failed with error: {e}. Please remove the non-picklable attributes from your DSPy program, or consider using state-only saving by setting `save_program=False`."
         ) from e
-    with (save_path / PROGRAM_METADATA_FILENAME).open("wb") as f:
-        f.write(orjson.dumps(metadata, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE))
 
 
 def load_program(path: str | Path, allow_pickle: bool = False) -> Module:
