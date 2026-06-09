@@ -271,14 +271,25 @@ def test_evaluate_save_as_json_with_history(make_run):
     run = make_run(lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
     history1 = TurnLog.model_validate(
         {
-            "turns": [{"question": "Previous Q1", "answer": "Previous A1"}],
+            "turns": [
+                {
+                    "agent": "task_io",
+                    "fields": {"question": "Previous Q1", "answer": "Previous A1"},
+                }
+            ],
         }
     )
     history2 = TurnLog.model_validate(
         {
             "turns": [
-                {"question": "Previous Q2", "answer": "Previous A2"},
-                {"question": "Previous Q3", "answer": "Previous A3"},
+                {
+                    "agent": "task_io",
+                    "fields": {"question": "Previous Q2", "answer": "Previous A2"},
+                },
+                {
+                    "agent": "task_io",
+                    "fields": {"question": "Previous Q3", "answer": "Previous A3"},
+                },
             ],
         }
     )
@@ -304,13 +315,22 @@ def test_evaluate_save_as_json_with_history(make_run):
         assert isinstance(data[0]["turn_log"], dict)
         assert "turns" in data[0]["turn_log"]
         assert len(data[0]["turn_log"]["turns"]) == 1
-        assert data[0]["turn_log"]["turns"][0] == {"question": "Previous Q1", "answer": "Previous A1"}
+        assert data[0]["turn_log"]["turns"][0] == {
+            "agent": "task_io",
+            "fields": {"question": "Previous Q1", "answer": "Previous A1"},
+        }
         assert "turn_log" in data[1]
         assert isinstance(data[1]["turn_log"], dict)
         assert "turns" in data[1]["turn_log"]
         assert len(data[1]["turn_log"]["turns"]) == 2
-        assert data[1]["turn_log"]["turns"][0] == {"question": "Previous Q2", "answer": "Previous A2"}
-        assert data[1]["turn_log"]["turns"][1] == {"question": "Previous Q3", "answer": "Previous A3"}
+        assert data[1]["turn_log"]["turns"][0] == {
+            "agent": "task_io",
+            "fields": {"question": "Previous Q2", "answer": "Previous A2"},
+        }
+        assert data[1]["turn_log"]["turns"][1] == {
+            "agent": "task_io",
+            "fields": {"question": "Previous Q3", "answer": "Previous A3"},
+        }
     finally:
         import os
 
@@ -322,7 +342,12 @@ def test_evaluate_save_as_csv_with_history(make_run):
     run = make_run(lm=DummyLM({"What is 1+1?": {"answer": "2"}}))
     history = TurnLog.model_validate(
         {
-            "turns": [{"question": "Previous Q", "answer": "Previous A"}],
+            "turns": [
+                {
+                    "agent": "task_io",
+                    "fields": {"question": "Previous Q", "answer": "Previous A"},
+                }
+            ],
         }
     )
     devset = [

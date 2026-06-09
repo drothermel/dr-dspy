@@ -28,11 +28,30 @@ Dict-shaped `turn_log` / `REPLHistory` values passed as task inputs are normaliz
 
 ## Agent turn logs (`TurnLog`)
 
+Every serialized turn requires an `agent` discriminator. Use typed event models at construction
+sites; dict inputs must include `agent`.
+
+| `agent` value | Model | Typical fields |
+| --- | --- | --- |
+| `react` | `ReActTurnEvent` | `thought`, `tool_name`, `tool_args`, `observation` |
+| `react_v2` | `ReActV2TurnEvent` | `next_thought`, `tool_calls`, optional `pending_inputs`, `submit_outputs` |
+| `code_act` | `CodeActTurnEvent` | `generated_code`, `code_output`, `observation` (at least one) |
+| `avatar` | `AvatarTurnEvent` | `action`, `result` |
+| `rlm` | `RlmTurnEvent` | `reasoning`, `code`, `output` |
+| `task_io` | `TaskIOTurnEvent` | `fields` (task input/output replay for demos and history) |
+
 ```python
-from dspy.history import TurnLog
+from dspy.history import ReActTurnEvent, TurnLog
 
 turn_log = TurnLog.empty()
-turn_log = turn_log.append_turn({"thought": "...", "tool_name": "search", "tool_args": {"q": "cats"}, "observation": "..."})
+turn_log = turn_log.append_turn(
+    ReActTurnEvent(
+        thought="...",
+        tool_name="search",
+        tool_args={"q": "cats"},
+        observation="...",
+    )
+)
 
 # TaskSpec field
 input_field("turn_log", TurnLog)

@@ -1,6 +1,6 @@
 import pytest
 
-from dspy.history import TurnEvent, TurnLog
+from dspy.history import ReActTurnEvent, TurnLog
 from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.primitives import Prediction
@@ -12,7 +12,11 @@ async def test_agent_loop_runner_continues_until_max_iters():
 
     async def step(turn_index: int, history: TurnLog) -> AgentStepResult[TurnLog]:
         seen_indices.append(turn_index)
-        return AgentStepResult(history=history.append_turn(TurnEvent(thought=f"t{turn_index}")))
+        return AgentStepResult(
+            history=history.append_turn(
+                ReActTurnEvent(thought=f"t{turn_index}", tool_name="t", tool_args={}, observation="o")
+            )
+        )
 
     result = await AgentLoopRunner[TurnLog]().run(
         max_iters=3,
@@ -34,7 +38,11 @@ async def test_agent_loop_runner_breaks_early_with_reason():
                 control=AgentLoopControl.BREAK,
                 termination_reason=AgentTerminationReason.SUBMIT,
             )
-        return AgentStepResult(history=history.append_turn(TurnEvent(thought=f"t{turn_index}")))
+        return AgentStepResult(
+            history=history.append_turn(
+                ReActTurnEvent(thought=f"t{turn_index}", tool_name="t", tool_args={}, observation="o")
+            )
+        )
 
     result = await AgentLoopRunner[TurnLog]().run(
         max_iters=5,
@@ -52,7 +60,9 @@ async def test_agent_loop_runner_returns_early():
     async def step(turn_index: int, history: TurnLog) -> AgentStepResult[TurnLog]:
         if turn_index == 0:
             return AgentStepResult(
-                history=history.append_turn(TurnEvent(thought="done")),
+                history=history.append_turn(
+                    ReActTurnEvent(thought="done", tool_name="t", tool_args={}, observation="o")
+                ),
                 control=AgentLoopControl.RETURN,
                 termination_reason=AgentTerminationReason.SUBMIT,
                 return_value=prediction,
@@ -72,11 +82,15 @@ async def test_agent_loop_runner_returns_early():
 async def test_agent_loop_runner_threads_history_through_steps():
     async def step(turn_index: int, history: TurnLog) -> AgentStepResult[TurnLog]:
         assert len(history.turns) == turn_index
-        return AgentStepResult(history=history.append_turn(TurnEvent(thought=f"t{turn_index}")))
+        return AgentStepResult(
+            history=history.append_turn(
+                ReActTurnEvent(thought=f"t{turn_index}", tool_name="t", tool_args={}, observation="o")
+            )
+        )
 
     result = await AgentLoopRunner[TurnLog]().run(
         max_iters=2,
         initial_history=TurnLog.empty(),
         step=step,
     )
-    assert [turn.thought for turn in result.history.turns] == ["t0", "t1"]
+    assert [turn.thought for turn in result.history.turns if isinstance(turn, ReActTurnEvent)] == ["t0", "t1"]

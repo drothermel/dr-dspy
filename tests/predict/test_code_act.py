@@ -53,7 +53,13 @@ def test_codeact_code_generation(make_run):
     res = asyncio.run(program(question="What is 1+1?", run=run))
     assert res.answer == "2"
     assert res.termination_reason == AgentTerminationReason.SUBMIT
-    assert res.turn_log.turns == ({"generated_code": "result = add(1,1)\nprint(result)", "code_output": '"2\\n"'},)
+    assert tuple(t.model_dump(mode="json", exclude_none=True) for t in res.turn_log.turns) == (
+        {
+            "agent": "code_act",
+            "generated_code": "result = add(1,1)\nprint(result)",
+            "code_output": '"2\\n"',
+        },
+    )
     assert program.interpreter.deno_process is None
 
 
@@ -81,8 +87,9 @@ def test_codeact_support_multiple_fields(make_run):
     res = asyncio.run(program(input_list="2, 3, 5, 6", run=run))
     assert res.maximum == "6"
     assert res.minimum == "2"
-    assert res.turn_log.turns == (
+    assert tuple(t.model_dump(mode="json", exclude_none=True) for t in res.turn_log.turns) == (
         {
+            "agent": "code_act",
             "generated_code": "result = extract_maximum_minimum('2, 3, 5, 6')\nprint(result)",
             "code_output": "\"{'maximum': 6.0, 'minimum': 2.0}\\n\"",
         },
@@ -106,12 +113,17 @@ def test_codeact_code_parse_failure(make_run):
     program = CodeAct(BasicQA, tools=[ADD_TOOL])
     res = asyncio.run(program(question="What is 1+1?", run=run))
     assert res.answer == "2"
-    assert res.turn_log.turns == (
+    assert tuple(t.model_dump(mode="json", exclude_none=True) for t in res.turn_log.turns) == (
         {
+            "agent": "code_act",
             "generated_code": "parse(error",
             "observation": "Failed to execute the generated code: Invalid Python syntax. message: ",
         },
-        {"generated_code": "result = add(1,1)\nprint(result)", "code_output": '"2\\n"'},
+        {
+            "agent": "code_act",
+            "generated_code": "result = add(1,1)\nprint(result)",
+            "code_output": '"2\\n"',
+        },
     )
     assert program.interpreter.deno_process is None
 
@@ -132,12 +144,17 @@ def test_codeact_code_execution_failure(make_run):
     program = CodeAct(BasicQA, tools=[ADD_TOOL])
     res = asyncio.run(program(question="What is 1+1?", run=run))
     assert res.answer == "2"
-    assert res.turn_log.turns == (
+    assert tuple(t.model_dump(mode="json", exclude_none=True) for t in res.turn_log.turns) == (
         {
+            "agent": "code_act",
             "generated_code": "unknown+1",
             "observation": "Failed to execute the generated code: NameError: [\"name 'unknown' is not defined\"]",
         },
-        {"generated_code": "result = add(1,1)\nprint(result)", "code_output": '"2\\n"'},
+        {
+            "agent": "code_act",
+            "generated_code": "result = add(1,1)\nprint(result)",
+            "code_output": '"2\\n"',
+        },
     )
     assert program.interpreter.deno_process is None
 

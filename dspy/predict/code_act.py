@@ -3,7 +3,7 @@ import logging
 from typing_extensions import override
 
 from dspy.adapters.types.tool import Tool
-from dspy.history import TurnEvent, TurnLog, call_with_history_truncation
+from dspy.history import CodeActTurnEvent, TurnLog, call_with_history_truncation
 from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.chain_of_thought import ChainOfThought
@@ -86,15 +86,17 @@ class CodeAct(Module):
                 if error:
                     return AgentStepResult(
                         history=turn_log.append_turn(
-                            TurnEvent(observation=f"Failed to parse the generated code: {error}")
+                            CodeActTurnEvent(observation=f"Failed to parse the generated code: {error}")
                         )
                     )
                 output, error = execute_generated_code(code=code, interpreter=self.interpreter)
-                event = TurnEvent(generated_code=code)
                 if not error:
-                    event = event.model_copy(update={"code_output": output})
+                    event = CodeActTurnEvent(generated_code=code, code_output=output)
                 else:
-                    event = event.model_copy(update={"observation": f"Failed to execute the generated code: {error}"})
+                    event = CodeActTurnEvent(
+                        generated_code=code,
+                        observation=f"Failed to execute the generated code: {error}",
+                    )
                 turn_log = turn_log.append_turn(event)
                 if code_data.finished:
                     return AgentStepResult(

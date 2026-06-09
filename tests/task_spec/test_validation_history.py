@@ -14,7 +14,17 @@ def test_validate_task_inputs_coerces_dict_turn_log():
     validated = validate_task_inputs(
         task_spec,
         {
-            "turn_log": {"turns": [{"thought": "prior", "observation": "done"}]},
+            "turn_log": {
+                "turns": [
+                    {
+                        "agent": "react",
+                        "thought": "prior",
+                        "tool_name": "search",
+                        "tool_args": {},
+                        "observation": "done",
+                    }
+                ]
+            },
             "question": "Q?",
         },
     )

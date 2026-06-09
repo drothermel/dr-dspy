@@ -2,7 +2,14 @@ import pytest
 from pydantic import ValidationError
 
 from dspy.core.types.lm import LMForward
-from dspy.history import AgentHistory, ConversationTurnLog, REPLHistory, TurnEvent, TurnLog
+from dspy.history import (
+    AgentHistory,
+    ConversationTurnLog,
+    ReActTurnEvent,
+    ReActV2TurnEvent,
+    REPLHistory,
+    TurnLog,
+)
 from dspy.predict.predict import Predict
 from dspy.predict.protocol import Predictor
 from dspy.testing import DummyLM
@@ -40,11 +47,11 @@ def test_repl_history_satisfies_agent_history_protocol():
 
 def test_turn_log_append_turn_round_trip():
     log = TurnLog.empty().append_turn(
-        TurnEvent(thought="think", tool_name="search", tool_args={"q": "test"}, observation="found")
+        ReActTurnEvent(thought="think", tool_name="search", tool_args={"q": "test"}, observation="found")
     )
     assert len(log.turns) == 1
     turn = log.turns[0]
-    assert isinstance(turn, TurnEvent)
+    assert isinstance(turn, ReActTurnEvent)
     assert turn.thought == "think"
     assert turn.tool_name == "search"
     assert turn.tool_args == {"q": "test"}
@@ -52,21 +59,33 @@ def test_turn_log_append_turn_round_trip():
 
 
 def test_turn_log_rejects_empty_event():
-    with pytest.raises(ValueError, match="Cannot append an empty TurnEvent"):
-        TurnLog.empty().append_turn(TurnEvent())
+    with pytest.raises(ValueError, match="ReActV2TurnEvent requires"):
+        TurnLog.empty().append_turn(ReActV2TurnEvent())
 
 
 def test_turn_log_immutable_after_append():
-    event = TurnEvent(thought="original")
+    event = ReActTurnEvent(thought="original", tool_name="t", tool_args={}, observation="o")
     log = TurnLog.empty().append_turn(event)
     with pytest.raises(ValidationError):
         event.thought = "mutated"
     turn = log.turns[0]
-    assert isinstance(turn, TurnEvent)
+    assert isinstance(turn, ReActTurnEvent)
     assert turn.thought == "original"
 
 
 def test_turn_log_coerces_dict_turns_on_load():
-    log = TurnLog.model_validate({"turns": [{"thought": "legacy"}]})
-    assert isinstance(log.turns[0], TurnEvent)
+    log = TurnLog.model_validate(
+        {
+            "turns": [
+                {
+                    "agent": "react",
+                    "thought": "legacy",
+                    "tool_name": "search",
+                    "tool_args": {},
+                    "observation": "done",
+                }
+            ]
+        }
+    )
+    assert isinstance(log.turns[0], ReActTurnEvent)
     assert log.turns[0].thought == "legacy"

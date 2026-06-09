@@ -3,8 +3,9 @@ from __future__ import annotations
 import inspect
 
 from dspy.adapters.types.tool import Tool
+from dspy.predict.agent_constants import RLM_SUBMIT_TOOL
 
-RLM_RESERVED_TOOL_NAMES = frozenset({"llm_query", "llm_query_batched", "SUBMIT", "print"})
+RLM_RESERVED_TOOL_NAMES = frozenset({"llm_query", "llm_query_batched", RLM_SUBMIT_TOOL, "print"})
 
 
 def normalize_tools(

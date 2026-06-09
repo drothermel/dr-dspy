@@ -38,7 +38,19 @@ def test_message_build_order_matches_contract():
         },
         instructions="Answer the question.",
     )
-    history = TurnLog.model_validate({"turns": [{"thought": "prior", "observation": "done"}]})
+    history = TurnLog.model_validate(
+        {
+            "turns": [
+                {
+                    "agent": "react",
+                    "thought": "prior",
+                    "tool_name": "search",
+                    "tool_args": {},
+                    "observation": "done",
+                }
+            ]
+        }
+    )
     demos = [{"turn_log": history, "question": "demo q", "answer": "demo a"}]
 
     class OrderCapturingChatAdapter(ChatAdapter):

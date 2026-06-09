@@ -9,7 +9,8 @@ from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.core.types import LMConfig, LMToolChoice
 from dspy.errors import AdapterParseError
-from dspy.history import TruncationExhaustedError, TurnEvent, TurnLog, call_with_history_truncation
+from dspy.history import ReActV2TurnEvent, TruncationExhaustedError, TurnLog, call_with_history_truncation
+from dspy.predict.agent_constants import REACT_V2_TERMINAL_TOOL
 from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult, format_tool_exception
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.call_options import PredictOptions
@@ -37,9 +38,9 @@ class ReActV2(Module):
         self.task_spec = task_spec
         self.max_iters = max_iters
         self.tools = normalize_tools(tools)
-        if "submit" in self.tools:
-            raise ValueError("`submit` is reserved by ReActV2 as the final-output tool.")
-        self.tools["submit"] = self._make_submit_tool()
+        if REACT_V2_TERMINAL_TOOL in self.tools:
+            raise ValueError(f"`{REACT_V2_TERMINAL_TOOL}` is reserved by ReActV2 as the final-output tool.")
+        self.tools[REACT_V2_TERMINAL_TOOL] = self._make_submit_tool()
         self.react = Predict(self._make_react_task_spec())
 
     def _make_submit_tool(self) -> Tool:
@@ -74,7 +75,7 @@ class ReActV2(Module):
                 self.task_spec.instructions,
                 f"You are an Agent. Use the supplied tools to produce {outputs} from {inputs}.",
                 "Call tools when more information is needed.",
-                f"When the final answer is ready, call `submit` with {outputs}.",
+                f"When the final answer is ready, call `{REACT_V2_TERMINAL_TOOL}` with {outputs}.",
                 f"The available tools are: {tool_names}.",
             ]
         ).strip()
@@ -138,10 +139,15 @@ class ReActV2(Module):
                 )
             tool_calls = _ensure_tool_call_ids(tool_calls, turn_index)
             tool_call_results, final_outputs = await self._execute_tool_calls(tool_calls)
-            event = self._history_event(pending_inputs, pred, tool_calls, tool_call_results)
-            if final_outputs is not None:
-                event.update(final_outputs)
-            turn_log = turn_log.append_turn(TurnEvent.model_validate(event))
+            turn_log = turn_log.append_turn(
+                self._history_event(
+                    pending_inputs,
+                    pred,
+                    tool_calls,
+                    tool_call_results,
+                    submit_outputs=final_outputs,
+                )
+            )
             pending_inputs = {}
             if final_outputs is not None:
                 return AgentStepResult(
@@ -180,7 +186,7 @@ class ReActV2(Module):
                 value = await self.tools[tool_call.name].acall(**(tool_call.args or {}))
                 values.append(value)
                 is_errors.append(False)
-                if tool_call.name == "submit" and isinstance(value, dict):
+                if tool_call.name == REACT_V2_TERMINAL_TOOL and isinstance(value, dict):
                     final_outputs = dict(value)
             except Exception as err:
                 values.append(f"Execution error in {tool_call.name}: {format_tool_exception(err)}")
@@ -193,15 +199,18 @@ class ReActV2(Module):
         pred: Prediction,
         tool_calls: ToolCalls,
         tool_call_results: ToolCallResults,
-    ) -> dict[str, Any]:
-        event = dict(pending_inputs)
-        if hasattr(pred, "next_thought") and pred.next_thought is not None:
-            event["next_thought"] = pred.next_thought
-        if tool_calls.tool_calls:
-            if tool_call_results.tool_call_results:
-                tool_calls = tool_calls.model_copy(update={"tool_call_results": tool_call_results})
-            event["tool_calls"] = tool_calls
-        return event
+        *,
+        submit_outputs: dict[str, Any] | None = None,
+    ) -> ReActV2TurnEvent:
+        recorded_tool_calls = tool_calls
+        if tool_calls.tool_calls and tool_call_results.tool_call_results:
+            recorded_tool_calls = tool_calls.model_copy(update={"tool_call_results": tool_call_results})
+        return ReActV2TurnEvent(
+            next_thought=getattr(pred, "next_thought", None),
+            tool_calls=recorded_tool_calls if tool_calls.tool_calls else None,
+            pending_inputs=pending_inputs or None,
+            submit_outputs=submit_outputs,
+        )
 
     async def _forced_submit(
         self,
@@ -219,7 +228,7 @@ class ReActV2(Module):
                 tools=list(self.tools.values()),
                 options=PredictOptions(
                     config=LMConfig(
-                        tool_choice=LMToolChoice(mode="required", allowed=["submit"]),
+                        tool_choice=LMToolChoice(mode="required", allowed=[REACT_V2_TERMINAL_TOOL]),
                         reasoning=None,
                     )
                 ),
@@ -247,17 +256,24 @@ class ReActV2(Module):
                 turn_log=turn_log,
                 termination_reason=break_reason or AgentTerminationReason.FAILED,
             )
-        submit_calls = ToolCalls(tool_calls=[call for call in tool_calls.tool_calls if call.name == "submit"])
+        submit_calls = ToolCalls(
+            tool_calls=[call for call in tool_calls.tool_calls if call.name == REACT_V2_TERMINAL_TOOL]
+        )
         if not submit_calls.tool_calls:
             return Prediction(
                 turn_log=turn_log,
                 termination_reason=break_reason or AgentTerminationReason.FAILED,
             )
         tool_call_results, final_outputs = await self._execute_tool_calls(submit_calls)
-        event = self._history_event(pending_inputs, pred, submit_calls, tool_call_results)
-        if final_outputs is not None:
-            event.update(final_outputs)
-        turn_log = turn_log.append_turn(TurnEvent.model_validate(event))
+        turn_log = turn_log.append_turn(
+            self._history_event(
+                pending_inputs,
+                pred,
+                submit_calls,
+                tool_call_results,
+                submit_outputs=final_outputs,
+            )
+        )
         if final_outputs is not None:
             return Prediction(
                 **final_outputs,

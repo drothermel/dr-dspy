@@ -10,7 +10,7 @@ from dspy.adapters.types.tool import Tool, ToolCalls
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format.chat_request import message_to_openai_chat, request_messages_as_openai
 from dspy.core.types import LMOutput, LMRequest, LMResponse, LMToolCallPart, LMUsage
-from dspy.history import TurnLog
+from dspy.history import TurnLog, turn_to_format_dict
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.react_v2 import ReActV2
 from dspy.testing import DummyLM
@@ -19,7 +19,7 @@ from tests.task_spec.helpers import ts
 
 
 def _turn_dict(turn) -> dict:
-    return turn.model_dump(mode="json", exclude_none=True)
+    return turn_to_format_dict(turn)
 
 
 def _turn_tool_calls(turn):
@@ -209,7 +209,12 @@ def test_react_v2_accepts_serialized_history_input(make_run):
         ]
     )
     run = make_run(lm=lm, adapter=ChatAdapter())
-    pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(turn_log={"turns": [{"question": "old"}]}, run=run))
+    pred = asyncio.run(
+        ReActV2(ts("question -> answer"), tools=[])(
+            turn_log={"turns": [{"agent": "react_v2", "pending_inputs": {"question": "old"}}]},
+            run=run,
+        )
+    )
     assert pred.answer == "done"
     assert _turn_dict(pred.turn_log.turns[0]) == {"question": "old"}
     assert all(_turn_dict(event) for event in pred.turn_log.turns)

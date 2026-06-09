@@ -29,6 +29,8 @@ ALLOWLIST_SUFFIXES = (
     "core/types/message_coercion.py",
     # breaks runtime.batch ↔ primitives ↔ history import cycle
     "runtime/batch.py",
+    # breaks history.turn_events ↔ adapters.types.tool import cycle
+    "history/turn_events/models.py",
     # breaks persistence.program ↔ primitives.module import cycle
     "persistence/program.py",
     # breaks persistence.embeddings ↔ retrievers.embeddings import cycle

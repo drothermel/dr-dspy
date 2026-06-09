@@ -2,7 +2,8 @@ import logging
 from typing import Any
 
 from dspy.adapters.types.tool import Tool
-from dspy.history import TurnEvent, TurnLog, call_with_history_truncation
+from dspy.history import ReActTurnEvent, TurnLog, call_with_history_truncation
+from dspy.predict.agent_constants import REACT_TERMINAL_TOOL
 from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult, format_tool_exception
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.chain_of_thought import ChainOfThought
@@ -37,10 +38,10 @@ class ReAct(Module):
                 "When selecting the next_tool_name and its next_tool_args, the tool must be one of:\n",
             ]
         )
-        tools_by_name["finish"] = Tool(
+        tools_by_name[REACT_TERMINAL_TOOL] = Tool(
             func=lambda: "Completed.",
             description=f"Marks the task as complete. That is, signals that all information for producing the outputs, i.e. {outputs}, are now available to be extracted.",
-            name="finish",
+            name=REACT_TERMINAL_TOOL,
             args={},
         )
         for idx, tool in enumerate(tools_by_name.values()):
@@ -91,14 +92,14 @@ class ReAct(Module):
             except Exception as err:
                 observation = f"Execution error in {pred.next_tool_name}: {format_tool_exception(err)}"
             turn_log = turn_log.append_turn(
-                TurnEvent(
+                ReActTurnEvent(
                     thought=pred.next_thought,
                     tool_name=pred.next_tool_name,
                     tool_args=pred.next_tool_args,
                     observation=observation,
                 )
             )
-            if pred.next_tool_name == "finish":
+            if pred.next_tool_name == REACT_TERMINAL_TOOL:
                 return AgentStepResult(
                     history=turn_log,
                     control=AgentLoopControl.BREAK,

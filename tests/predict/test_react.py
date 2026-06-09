@@ -21,7 +21,7 @@ from tests.task_spec.helpers import ts
 
 
 def _turn_dict(turn: TurnEvent) -> dict:
-    return turn.model_dump(mode="json", exclude_none=True)
+    return turn.model_dump(mode="json", exclude={"agent"}, exclude_none=True)
 
 
 def _turns_from_flat(flat: dict) -> tuple:

@@ -1,11 +1,10 @@
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
+from dspy.history.avatar_action import Action
 
-class Action(BaseModel):
-    tool_name: Any = Field(..., description="Name of the tool to use.")
-    tool_args: dict[str, Any] = Field(..., description="JSON arguments to pass to the tool.")
+__all__ = ["Action", "ActionOutput"]
 
 
 class ActionOutput(BaseModel):

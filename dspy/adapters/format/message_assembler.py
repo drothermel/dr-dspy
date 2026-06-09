@@ -12,7 +12,10 @@ from dspy.adapters.base.tool_calls import (
 )
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.utils import build_lm_message
+from dspy.history.agent_constants import FIELD_TOOL_CALLS
 from dspy.history.discovery import is_conversation_turn_log_type
+from dspy.history.serialize import turn_to_format_dict
+from dspy.history.turn_events.models import ReActV2TurnEvent
 
 if TYPE_CHECKING:
     from dspy.adapters.base.protocols import MessageAssemblerHost
@@ -86,9 +89,9 @@ class MessageAssembler:
         messages = []
         host = self._host
         for turn in conversation_history:
-            message = turn.model_dump(mode="json", exclude_none=True)
-            if turn.tool_calls is not None:
-                tool_call_field_name, tool_calls = "tool_calls", turn.tool_calls
+            message = turn_to_format_dict(turn)
+            if isinstance(turn, ReActV2TurnEvent) and turn.tool_calls is not None:
+                tool_call_field_name, tool_calls = FIELD_TOOL_CALLS, turn.tool_calls
             else:
                 tool_call_field_name, tool_calls = _tool_calls_from_message(message)
             tool_call_results = (

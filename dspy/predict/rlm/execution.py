@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 import pydantic
 
 from dspy.adapters.utils import parse_value
-from dspy.history import REPLEntry, REPLHistory, REPLVariable, TurnEvent, call_with_history_truncation
+from dspy.history import REPLEntry, REPLHistory, REPLVariable, RlmTurnEvent, call_with_history_truncation
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.code_execution import strip_python_fences
 from dspy.predict.rlm.tools import make_llm_tools
@@ -187,13 +187,13 @@ def process_execution_result(
 ) -> Prediction | REPLHistory:
     if isinstance(result, str) and result.startswith("[Error]"):
         output = format_output(result)
-        return history.append_turn(TurnEvent(reasoning=pred.reasoning, code=code, output=output))
+        return history.append_turn(RlmTurnEvent(reasoning=pred.reasoning, code=code, output=output))
     if isinstance(result, FinalOutput):
         parsed_outputs, error = process_final_output(rlm, result, output_field_names)
         if error:
-            return history.append_turn(TurnEvent(reasoning=pred.reasoning, code=code, output=error))
+            return history.append_turn(RlmTurnEvent(reasoning=pred.reasoning, code=code, output=error))
         final_history = history.append_turn(
-            TurnEvent(reasoning=pred.reasoning, code=code, output=f"FINAL: {parsed_outputs}")
+            RlmTurnEvent(reasoning=pred.reasoning, code=code, output=f"FINAL: {parsed_outputs}")
         )
         return Prediction(
             **parsed_outputs or {},
@@ -205,7 +205,7 @@ def process_execution_result(
     output = format_output(output)
     if rlm.verbose:
         logger.info(REPLEntry.format_output(output, rlm.max_output_chars))
-    return history.append_turn(TurnEvent(reasoning=pred.reasoning, code=code, output=output))
+    return history.append_turn(RlmTurnEvent(reasoning=pred.reasoning, code=code, output=output))
 
 
 def execute_code(repl: CodeInterpreter, code: str, input_args: dict[str, Any]) -> Any:

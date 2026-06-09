@@ -90,7 +90,10 @@ def test_two_step_adapter_format_includes_turn_log_history(make_run):
         instructions="Given the fields `turn_log`, `question`, produce the fields `answer`.",
     )
     adapter = TwoStepAdapter(DummyLM([{"answer": "x"}]), extraction_adapter=ChatAdapter())
-    history = TurnLog.model_validate({"turns": [{"question": "Q1", "answer": "A1"}]})
+    from dspy.history import TaskIOTurnEvent
+
+    history = TurnLog.model_validate({"turns": [{"agent": "task_io", "fields": {"question": "Q1", "answer": "A1"}}]})
+    assert isinstance(history.turns[0], TaskIOTurnEvent)
     messages, _ = format_messages_and_lm_kwargs(
         adapter=adapter,
         task_spec=QAWithHistory,

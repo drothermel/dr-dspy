@@ -1,42 +1,33 @@
-"""Turn log event model.
+"""Turn log event models.
 
 Per-agent field contract (one turn):
 
-| Agent   | Fields written per turn |
-|---------|-------------------------|
-| ReAct   | ``thought``, ``tool_name``, ``tool_args``, ``observation`` |
-| ReActV2 | ``next_thought``, ``tool_calls`` (+ task extras in ``__pydantic_extra__``) |
-| CodeAct | ``generated_code``, ``code_output``, ``observation`` |
-| Avatar  | ``action``, ``result`` |
-| RLM     | ``reasoning``, ``code``, ``output`` (via ``REPLHistory``; formatted string replay only) |
+| Agent    | ``agent`` value | Fields |
+|----------|-----------------|--------|
+| ReAct    | ``react``       | ``thought``, ``tool_name``, ``tool_args``, ``observation`` |
+| ReActV2  | ``react_v2``    | ``next_thought``, ``tool_calls``, optional ``pending_inputs``, ``submit_outputs`` |
+| CodeAct  | ``code_act``    | ``generated_code``, ``code_output``, ``observation`` (at least one) |
+| Avatar   | ``avatar``      | ``action``, ``result`` |
+| RLM      | ``rlm``         | ``reasoning``, ``code``, ``output`` |
+| Task I/O | ``task_io``     | ``fields`` (task input/output replay for demos and history) |
 """
 
-from __future__ import annotations
+from dspy.history.turn_events.models import (
+    AvatarTurnEvent,
+    CodeActTurnEvent,
+    ReActTurnEvent,
+    ReActV2TurnEvent,
+    RlmTurnEvent,
+    TaskIOTurnEvent,
+    TurnEvent,
+)
 
-from typing import Any
-
-from pydantic import BaseModel, ConfigDict
-
-
-class TurnEvent(BaseModel):
-    """Single agent turn log entry.
-
-    Known agent fields are typed; task-specific input/output keys may appear as
-    extra fields (e.g. ReActV2 pending inputs merged into the event).
-    """
-
-    model_config = ConfigDict(frozen=True, extra="allow")
-
-    thought: Any | None = None
-    next_thought: Any | None = None
-    tool_name: str | None = None
-    tool_args: dict[str, Any] | None = None
-    tool_calls: Any | None = None
-    observation: Any | None = None
-    generated_code: str | None = None
-    code_output: str | None = None
-    action: Any | None = None
-    result: str | None = None
-    reasoning: str | None = None
-    code: str | None = None
-    output: str | None = None
+__all__ = [
+    "AvatarTurnEvent",
+    "CodeActTurnEvent",
+    "ReActTurnEvent",
+    "ReActV2TurnEvent",
+    "RlmTurnEvent",
+    "TaskIOTurnEvent",
+    "TurnEvent",
+]

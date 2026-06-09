@@ -2,9 +2,28 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
+from pydantic import BaseModel, ConfigDict, TypeAdapter, field_serializer, field_validator
 
-from dspy.history.turn_event import TurnEvent
+from dspy.history.turn_events.models import (
+    AvatarTurnEvent,
+    CodeActTurnEvent,
+    ReActTurnEvent,
+    ReActV2TurnEvent,
+    RlmTurnEvent,
+    TaskIOTurnEvent,
+    TurnEvent,
+)
+
+_TURN_EVENT_TYPES = (
+    ReActTurnEvent,
+    ReActV2TurnEvent,
+    CodeActTurnEvent,
+    AvatarTurnEvent,
+    RlmTurnEvent,
+    TaskIOTurnEvent,
+)
+
+_TURN_EVENT_ADAPTER = TypeAdapter(TurnEvent)
 
 
 class TurnLog(BaseModel):
@@ -14,21 +33,23 @@ class TurnLog(BaseModel):
     @field_validator("turns", mode="before")
     @classmethod
     def _coerce_turns(cls, value: Any) -> tuple[TurnEvent, ...]:
-        if isinstance(value, TurnEvent):
-            return (value,)
+        if isinstance(value, dict) and "agent" in value:
+            return (_TURN_EVENT_ADAPTER.validate_python(value),)
         if isinstance(value, dict):
-            return (TurnEvent.model_validate(value),)
+            raise ValueError("TurnLog turn dicts must include an 'agent' discriminator.")
         if isinstance(value, (list, tuple)):
             coerced: list[TurnEvent] = []
             for index, item in enumerate(value):
-                if isinstance(item, TurnEvent):
+                if isinstance(item, dict):
+                    if "agent" not in item:
+                        raise ValueError(f"TurnLog turns[{index}] must include an 'agent' discriminator.")
+                    coerced.append(_TURN_EVENT_ADAPTER.validate_python(item))
+                elif isinstance(item, _TURN_EVENT_TYPES):
                     coerced.append(item)
-                elif isinstance(item, dict):
-                    coerced.append(TurnEvent.model_validate(item))
                 else:
                     raise TypeError(f"TurnLog turns[{index}] must be a TurnEvent or dict, got {type(item).__name__}.")
             return tuple(coerced)
-        raise TypeError(f"TurnLog turns must be a TurnEvent, dict, list, or tuple, got {type(value).__name__}.")
+        raise TypeError(f"TurnLog turns must be a dict, list, or tuple, got {type(value).__name__}.")
 
     @field_serializer("turns")
     def _serialize_turns(self, turns: tuple[TurnEvent, ...]) -> tuple[dict[str, Any], ...]:

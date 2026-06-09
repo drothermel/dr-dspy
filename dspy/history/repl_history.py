@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, Field, model_serializer
 from typing_extensions import override
 
+from dspy.history.turn_events.models import RlmTurnEvent, TurnEvent
 from dspy.serialization.json import to_jsonable
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from dspy.history.turn_event import TurnEvent
     from dspy.task_spec.field_spec import FieldSpec
 
 __all__ = ["REPLVariable", "REPLEntry", "REPLHistory"]
@@ -107,6 +107,8 @@ class REPLHistory(BaseModel):
         return cls()
 
     def append_turn(self, event: TurnEvent) -> REPLHistory:
+        if not isinstance(event, RlmTurnEvent):
+            raise TypeError(f"REPLHistory.append_turn requires RlmTurnEvent, got {type(event).__name__}.")
         new_entry = REPLEntry(
             reasoning=str(event.reasoning or ""),
             code=str(event.code or ""),

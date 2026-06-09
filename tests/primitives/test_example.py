@@ -143,8 +143,14 @@ def test_example_to_dict_with_turn_log():
     turn_log = TurnLog.model_validate(
         {
             "turns": [
-                {"question": "What is the capital of France?", "answer": "Paris"},
-                {"question": "What is the capital of Germany?", "answer": "Berlin"},
+                {
+                    "agent": "task_io",
+                    "fields": {"question": "What is the capital of France?", "answer": "Paris"},
+                },
+                {
+                    "agent": "task_io",
+                    "fields": {"question": "What is the capital of Germany?", "answer": "Berlin"},
+                },
             ],
         }
     )
@@ -155,8 +161,14 @@ def test_example_to_dict_with_turn_log():
     assert isinstance(result["turn_log"], dict)
     assert "turns" in result["turn_log"]
     assert result["turn_log"]["turns"] == [
-        {"question": "What is the capital of France?", "answer": "Paris"},
-        {"question": "What is the capital of Germany?", "answer": "Berlin"},
+        {
+            "agent": "task_io",
+            "fields": {"question": "What is the capital of France?", "answer": "Paris"},
+        },
+        {
+            "agent": "task_io",
+            "fields": {"question": "What is the capital of Germany?", "answer": "Berlin"},
+        },
     ]
     import json
 

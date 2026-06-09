@@ -1,7 +1,8 @@
 from typing import Any, cast
 
 from dspy.adapters.types.tool import Tool
-from dspy.history import TurnEvent, TurnLog, call_with_history_truncation
+from dspy.history import AvatarTurnEvent, TurnLog, call_with_history_truncation
+from dspy.predict.agent_constants import AVATAR_TERMINAL_TOOL
 from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.avatar.models import Action, ActionOutput
@@ -29,10 +30,10 @@ class Avatar(Module):
         self.output_fields = task_spec.output_fields
         tools_by_name = normalize_tools(tools)
         outputs = ", ".join([f"`{k}`" for k in task_spec.output_fields])
-        tools_by_name["Finish"] = Tool(
+        tools_by_name[AVATAR_TERMINAL_TOOL] = Tool(
             func=lambda: "Completed.",
             description=f"Marks the task as complete when all information for producing {outputs} is available.",
-            name="Finish",
+            name=AVATAR_TERMINAL_TOOL,
             args={},
         )
         self.tools = list(tools_by_name.values())
@@ -115,10 +116,10 @@ class Avatar(Module):
             action = actor_output.action
             tool_name = action.tool_name
             tool_args = action.tool_args
-            if tool_name == "Finish":
+            if tool_name == AVATAR_TERMINAL_TOOL:
                 return AgentStepResult(
                     history=turn_log.append_turn(
-                        TurnEvent(
+                        AvatarTurnEvent(
                             action=action,
                             result="Gathered all information needed to finish the task.",
                         )
@@ -130,7 +131,7 @@ class Avatar(Module):
             action_results.append(ActionOutput(tool_name=tool_name, tool_args=tool_args, tool_output=tool_output))
             return AgentStepResult(
                 history=turn_log.append_turn(
-                    TurnEvent(action=action, result=tool_output if tool_output is not None else "")
+                    AvatarTurnEvent(action=action, result=tool_output if tool_output is not None else "")
                 )
             )
 

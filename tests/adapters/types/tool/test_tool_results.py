@@ -1,5 +1,6 @@
 from dspy.adapters.types.tool import ToolCallResults, ToolCalls
-from dspy.history import TurnEvent, TurnLog
+from dspy.history import ReActV2TurnEvent, TurnLog
+from dspy.predict.agent_constants import AgentKind
 
 
 def test_tool_call_results_from_tool_calls_and_values():
@@ -24,12 +25,13 @@ def test_tool_call_results_history_serialization_round_trip():
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "hello"})
     results = ToolCallResults.from_tool_calls_and_values([tool_call], [{"answer": "world"}])
     tool_calls = ToolCalls(tool_calls=[tool_call], tool_call_results=results)
-    history = TurnLog.model_validate({"turns": [{"tool_calls": tool_calls}]})
+    history = TurnLog.model_validate({"turns": [{"agent": AgentKind.REACT_V2, "tool_calls": tool_calls}]})
     dumped = history.model_dump(mode="json")
     restored = TurnLog.model_validate(dumped)
     assert dumped == {
         "turns": [
             {
+                "agent": AgentKind.REACT_V2,
                 "tool_calls": {
                     "tool_calls": [{"id": "call_1", "name": "search", "args": {"query": "hello"}}],
                     "tool_call_results": {
@@ -37,9 +39,9 @@ def test_tool_call_results_history_serialization_round_trip():
                             {"call_id": "call_1", "name": "search", "value": {"answer": "world"}, "is_error": False}
                         ]
                     },
-                }
+                },
             }
         ]
     }
-    assert isinstance(restored.turns[0], TurnEvent)
+    assert isinstance(restored.turns[0], ReActV2TurnEvent)
     assert restored.turns[0].tool_calls is not None

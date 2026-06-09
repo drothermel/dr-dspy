@@ -4,9 +4,9 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.core.types import LMRequest
 from dspy.errors import ContextWindowExceededError
 from dspy.history import (
+    ReActTurnEvent,
     REPLEntry,
     REPLHistory,
-    TurnEvent,
     TurnLog,
     call_with_history_truncation,
 )
@@ -32,9 +32,9 @@ def make_run():
         (
             lambda: TurnLog(
                 turns=(
-                    TurnEvent(thought="t1"),
-                    TurnEvent(thought="t2"),
-                    TurnEvent(thought="t3"),
+                    ReActTurnEvent(thought="t1", tool_name="t", tool_args={}, observation="o1"),
+                    ReActTurnEvent(thought="t2", tool_name="t", tool_args={}, observation="o2"),
+                    ReActTurnEvent(thought="t3", tool_name="t", tool_args={}, observation="o3"),
                 )
             ),
             "thought",
@@ -72,7 +72,7 @@ async def test_call_with_history_truncation_returns_truncated_history(
     if isinstance(extracted.turn_log, TurnLog):
         assert len(extracted.turn_log.turns) == 2
         first_turn = extracted.turn_log.turns[0]
-        assert isinstance(first_turn, TurnEvent)
+        assert isinstance(first_turn, ReActTurnEvent)
         assert getattr(first_turn, expected_remaining_key) == expected_remaining_value
     else:
         assert len(extracted.turn_log.entries) == 2
@@ -86,9 +86,9 @@ async def test_call_with_history_truncation_returns_truncated_history(
     [
         lambda: TurnLog(
             turns=(
-                TurnEvent(thought="t1"),
-                TurnEvent(thought="t2"),
-                TurnEvent(thought="t3"),
+                ReActTurnEvent(thought="t1", tool_name="t", tool_args={}, observation="o1"),
+                ReActTurnEvent(thought="t2", tool_name="t", tool_args={}, observation="o2"),
+                ReActTurnEvent(thought="t3", tool_name="t", tool_args={}, observation="o3"),
             )
         ),
         lambda: REPLHistory(
