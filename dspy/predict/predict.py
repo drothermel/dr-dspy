@@ -2,7 +2,6 @@ import logging
 import random
 from typing import Any
 
-from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.clients.base_lm import BaseLM
@@ -16,6 +15,7 @@ from dspy.primitives.prediction import Prediction
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec.task_spec import TaskSpec
 from dspy.utils.callback import BaseCallback
+from dspy.utils.serialize import to_jsonable
 from dspy.utils.transparency import resolve_call_site
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ class Predict(Module, Parameter):
         for demo in self.demos:
             demo = demo.fork()
             for field in demo:
-                demo[field] = serialize_object(demo[field])
+                demo[field] = to_jsonable(demo[field])
             if json_mode and (not isinstance(demo, dict)):
                 state["demos"].append(demo.to_dict())
             else:
@@ -200,15 +200,3 @@ class Predict(Module, Parameter):
     @override
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.task_spec})"
-
-
-def serialize_object(obj):
-    if isinstance(obj, BaseModel):
-        return obj.model_dump(mode="json")
-    if isinstance(obj, list):
-        return [serialize_object(item) for item in obj]
-    if isinstance(obj, tuple):
-        return tuple(serialize_object(item) for item in obj)
-    if isinstance(obj, dict):
-        return {key: serialize_object(value) for key, value in obj.items()}
-    return obj

@@ -28,11 +28,12 @@ from dspy.clients.lm import LM
 from dspy.core.types import LMConfig, LMRequest, PredictOptions
 from dspy.history import TurnLog
 from dspy.predict.parallel import Parallel
-from dspy.predict.predict import Predict, serialize_object
+from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.task_spec import FieldSpec, TaskSpec, default_task_instructions, make_task_spec
 from dspy.utils.dummies import DummyLM
+from dspy.utils.serialize import to_jsonable
 from tests.test_utils.spy_lm import SpyLM
 
 
@@ -957,7 +958,7 @@ def test_dump_state_pydantic_non_primitive_types(make_run):
         description="Test website",
         created_at=datetime(2021, 1, 1, 12, 0, 0),
     )
-    serialized = serialize_object(website_info)
+    serialized = to_jsonable(website_info)
     assert serialized["url"] == "https://www.example.com/"
     assert serialized["created_at"] == "2021-01-01T12:00:00"
     json_str = orjson.dumps(serialized).decode()

@@ -1,8 +1,9 @@
 from collections.abc import Mapping
 from typing import Any
 
-from pydantic import BaseModel
 from typing_extensions import override
+
+from dspy.utils.serialize import to_jsonable
 
 
 class Example:
@@ -115,18 +116,4 @@ class Example:
         return copied
 
     def to_dict(self) -> dict[str, Any]:
-        def convert_to_serializable(value):
-            if hasattr(value, "to_dict") and callable(value.to_dict):
-                return value.to_dict()
-            if isinstance(value, BaseModel):
-                return value.model_dump()
-            if isinstance(value, list):
-                return [convert_to_serializable(item) for item in value]
-            if isinstance(value, dict):
-                return {k: convert_to_serializable(v) for k, v in value.items()}
-            return value
-
-        serializable_store = {}
-        for k, v in self._store.items():
-            serializable_store[k] = convert_to_serializable(v)
-        return serializable_store
+        return {key: to_jsonable(value) for key, value in self._store.items()}

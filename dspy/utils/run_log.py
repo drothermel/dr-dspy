@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from dspy.utils.serialize import to_jsonable
+
 logger = logging.getLogger(__name__)
 _SESSION_LOCK = threading.Lock()
 _SECRET_KEY_PATTERN = re.compile("(api[_-]?key|authorization|token|secret)", re.IGNORECASE)
@@ -36,20 +38,6 @@ def resolve_log_root(call_log_dir: str | None) -> Path:
 
 def resolve_run_bucket() -> str:
     return slug_run_id(os.environ.get("DSPY_RUN_ID", "default_run"))
-
-
-def _serialize_for_json(value: Any) -> Any:
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return value
-    if isinstance(value, dict):
-        return {str(k): _serialize_for_json(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_serialize_for_json(item) for item in value]
-    if hasattr(value, "model_dump"):
-        return value.model_dump(exclude_none=True)
-    if hasattr(value, "to_dict"):
-        return value.to_dict()
-    return repr(value)
 
 
 def _hash_bytes(data: bytes) -> str:
@@ -104,7 +92,7 @@ def redact_config(config: dict[str, Any]) -> dict[str, Any]:
         if _SECRET_KEY_PATTERN.search(str(key)):
             cleaned[key] = "<redacted>"
         else:
-            cleaned[key] = _serialize_for_json(value)
+            cleaned[key] = to_jsonable(value)
     return cleaned
 
 
@@ -114,7 +102,7 @@ def create_run_log_session(
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     run_dir = resolve_log_root(call_log_dir) / resolve_run_bucket() / timestamp
     run_dir.mkdir(parents=True, exist_ok=True)
-    snapshot = _serialize_for_json(settings_snapshot or {})
+    snapshot = to_jsonable(settings_snapshot or {})
     run_json = {
         "timestamp": timestamp,
         "run_id": resolve_run_bucket(),
@@ -128,6 +116,6 @@ def create_run_log_session(
 def append_call_record(record: dict[str, Any], *, session: RunLogSession | None) -> None:
     if session is None:
         return
-    line = json.dumps(_serialize_for_json(record), ensure_ascii=False) + "\n"
+    line = json.dumps(to_jsonable(record), ensure_ascii=False) + "\n"
     with _SESSION_LOCK, session.calls_path.open("a", encoding="utf-8") as handle:
         handle.write(line)
