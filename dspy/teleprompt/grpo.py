@@ -460,7 +460,7 @@ class GRPO(FinetuneTeleprompter):
                             assert trace_pred_id == pred_id
                             predictor = trace_instance[0]
                             pred_lm = predictor.lm
-                            from dspy.transparency.resolve import resolve_adapter
+                            from dspy.runtime.transparency import resolve_adapter
 
                             configured_adapter = (
                                 self.adapter[pred_lm] if isinstance(self.adapter, dict) else self.adapter

@@ -7,10 +7,10 @@ from dspy.adapters.call.wrappers import HintInjectingAdapter
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.predict import Predict, Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
+from dspy.runtime.transparency import resolve_adapter
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.formatting import get_field_spec_description_string
 from dspy.teleprompt.utils import run_program_with_trace
-from dspy.transparency.resolve import resolve_adapter
 from dspy.utils.source_format import get_formatted_source
 
 from .predict import Module

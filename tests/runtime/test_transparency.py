@@ -7,9 +7,9 @@ from dspy.adapters.json_adapter import JSONAdapter
 from dspy.core.types import LMConfig
 from dspy.predict.predict import Predict
 from dspy.runtime import CallLogMode, TelemetryConfig
+from dspy.runtime.transparency import CompiledCall, TransparencyViolation, validate_compiled_call
 from dspy.task_spec import TaskSpec, input_field, output_field
 from dspy.utils.dummies import DummyLM
-from dspy.utils.transparency import CompiledCall, TransparencyViolation, validate_compiled_call
 
 
 class SampleTaskSpec(TaskSpec):

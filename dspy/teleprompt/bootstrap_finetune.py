@@ -135,7 +135,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
             trace_data = [d for d in trace_data if d["score"]]
             logger.info(f"After filtering with the metric, {len(trace_data)} examples remain")
         data = []
-        from dspy.transparency.resolve import resolve_adapter
+        from dspy.runtime.transparency import resolve_adapter
 
         configured_adapter = self.adapter[lm] if isinstance(self.adapter, dict) else self.adapter
         adapter, _ = resolve_adapter(configured_adapter or run.adapter)

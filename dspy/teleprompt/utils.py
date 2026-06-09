@@ -4,20 +4,15 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 from dspy.primitives.example import Example
-from dspy.transparency.resolve import resolve_adapter
-from dspy.utils.transparency import CallSite
+from dspy.runtime.async_parallel import resolve_max_errors
+from dspy.runtime.config import CallSite
+from dspy.runtime.transparency import resolve_adapter
 
 if TYPE_CHECKING:
     from dspy.core.types.call_options import ModuleCallOptions
     from dspy.primitives.module import Module
     from dspy.primitives.prediction import Prediction
     from dspy.runtime.run_context import RunContext
-
-
-def resolve_max_errors(optimizer_max_errors: int | None, run: RunContext) -> int:
-    from dspy.utils.async_parallel import resolve_max_errors as _resolve_max_errors
-
-    return _resolve_max_errors(optimizer_max_errors, run)
 
 
 def make_optimizer_evaluator(
@@ -30,9 +25,8 @@ def make_optimizer_evaluator(
     **kwargs: Any,
 ):
     from dspy.evaluate.evaluate import Evaluate
-    from dspy.utils.async_parallel import resolve_max_errors as _resolve_max_errors
 
-    effective_max_errors = _resolve_max_errors(max_errors, run)
+    effective_max_errors = resolve_max_errors(max_errors, run)
     return Evaluate(
         devset=devset,
         metric=metric,

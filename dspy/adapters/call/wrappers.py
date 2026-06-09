@@ -10,8 +10,8 @@ if TYPE_CHECKING:
 
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types.config import LMConfig
+    from dspy.runtime.config import CallSite
     from dspy.runtime.run_context import RunContext
-    from dspy.utils.transparency import CallSite
 
 
 class HintInjectingAdapter(Adapter):

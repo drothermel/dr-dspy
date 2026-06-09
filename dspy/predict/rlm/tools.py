@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from dspy.adapters.types.tool import Tool
 from dspy.core.types.call_options import PredictOptions
 from dspy.predict.rlm.sync_bridge import _run_sub_lm_async
-from dspy.utils.transparency import CallSite
+from dspy.runtime.config import CallSite
 
 if TYPE_CHECKING:
     from collections.abc import Callable

@@ -13,9 +13,9 @@ if TYPE_CHECKING:
     from dspy.adapters.base.adapter import Adapter
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types.config import LMConfig
+    from dspy.runtime.config import CallSite
     from dspy.runtime.run_context import RunContext
     from dspy.task_spec import TaskSpec
-    from dspy.utils.transparency import CallSite
 
 
 class AdapterCallPipeline:
@@ -87,8 +87,7 @@ class AdapterCallPipeline:
         allow_parse_fallback: bool,
     ) -> list[dict[str, Any]]:
         from dspy.core.types.openai_compat import request_messages_as_openai
-        from dspy.transparency.resolve import resolve_call, resolve_lm_config
-        from dspy.utils.transparency import resolve_call_site, validate_compiled_call
+        from dspy.runtime.transparency import resolve_call, resolve_call_site, resolve_lm_config, validate_compiled_call
 
         try:
             resolved_config = coerce_lm_config(config)

@@ -27,7 +27,7 @@ from dspy.utils.exceptions import AdapterParseError
 if TYPE_CHECKING:
     from dspy.adapters.base.adapter import Adapter
     from dspy.clients.base_lm import BaseLM
-    from dspy.utils.transparency import CallSite
+    from dspy.runtime.config import CallSite
 
 
 class AdapterCallMixin(AdapterNativeMixin):
