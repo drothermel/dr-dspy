@@ -45,7 +45,7 @@ def test_basic_example(make_run):
 
 
 def test_rejects_wrong_completion_count(make_run):
-    compare_answers = MultiChainComparison(BasicQA, M=2)
+    compare_answers = MultiChainComparison(BasicQA, num_chains=2)
     run = make_run(lm=DummyLM([{"rationale": "my rationale", "answer": "blue"}]))
     with pytest.raises(ValueError, match="doesn't match the expected number M"):
         asyncio.run(compare_answers(completions=completions, question="What is the color of the sky?", run=run))

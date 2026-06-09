@@ -10,7 +10,7 @@ class MultiChainComparison(Module):
     def __init__(
         self,
         task_spec: TaskSpec,
-        M: int = 3,
+        num_chains: int = 3,
         *,
         config: LMConfig | None = None,
         temperature: float = 0.7,
@@ -18,11 +18,11 @@ class MultiChainComparison(Module):
         super().__init__()
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"MultiChainComparison requires a TaskSpec instance, got {type(task_spec).__name__}.")
-        self.M = M
+        self.num_chains = num_chains
         self.task_spec = task_spec
         *_, self.last_key = task_spec.output_fields.keys()
         extended_task_spec = task_spec
-        for idx in range(M):
+        for idx in range(num_chains):
             field_name = f"reasoning_attempt_{idx + 1}"
             extended_task_spec = extended_task_spec.append(
                 input_field(
@@ -56,9 +56,10 @@ class MultiChainComparison(Module):
             rationale = c.get("rationale", c.get("reasoning")).strip().split("\n")[0].strip()
             answer = str(c[self.last_key]).strip().split("\n")[0].strip()
             attempts.append(f"«I'm trying to {rationale} I'm not sure but my prediction is {answer}»")
-        if len(attempts) != self.M:
+        if len(attempts) != self.num_chains:
             raise ValueError(
-                f"The number of attempts ({len(attempts)}) doesn't match the expected number M ({self.M}). Please set the correct value for M when initializing MultiChainComparison."
+                f"The number of attempts ({len(attempts)}) doesn't match num_chains ({self.num_chains}). "
+                "Set num_chains when initializing MultiChainComparison."
             )
         merged_inputs = {
             **{f"reasoning_attempt_{idx + 1}": attempt for idx, attempt in enumerate(attempts)},

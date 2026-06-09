@@ -10,7 +10,7 @@ class BestOfN(Module):
     def __init__(
         self,
         module: Module,
-        N: int,
+        num_samples: int,
         reward_fn: Callable[[dict, Prediction], float],
         threshold: float,
         fail_count: int | None = None,
@@ -19,8 +19,8 @@ class BestOfN(Module):
         self.module = module
         self.reward_fn = lambda *args: reward_fn(*args)
         self.threshold = threshold
-        self.N = N
-        self.fail_count = fail_count or N
+        self.num_samples = num_samples
+        self.fail_count = fail_count or num_samples
 
     async def _aforward_impl(
         self,
@@ -32,7 +32,7 @@ class BestOfN(Module):
         run = resolve_run(run=run, bound_run=self.run)
         return await sample_with_reward(
             module=self.module,
-            N=self.N,
+            num_samples=self.num_samples,
             fail_count=self.fail_count,
             reward_fn=self.reward_fn,
             threshold=self.threshold,

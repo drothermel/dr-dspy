@@ -57,7 +57,7 @@ async def default_execute_attempt(attempt: SamplingAttempt) -> tuple[Prediction,
 async def sample_with_reward(
     *,
     module: Module,
-    N: int,  # noqa: N803
+    num_samples: int,
     fail_count: int,
     reward_fn: Callable[[dict, Prediction], float],
     run: RunContext,
@@ -74,7 +74,7 @@ async def sample_with_reward(
     last_exc: BaseException | None = None
     execute = execute_attempt or default_execute_attempt
 
-    for idx in range(N):
+    for idx in range(num_samples):
         attempt = SamplingAttempt(
             idx=idx,
             module=module,
@@ -108,7 +108,7 @@ async def sample_with_reward(
             await after_attempt(attempt, state, outputs, trace, reward)
 
     if state.best_pred is None:
-        raise SamplingExhaustedError(n_attempts=N) from last_exc
+        raise SamplingExhaustedError(n_attempts=num_samples) from last_exc
     if state.best_trace:
         run.optimization_trace.extend(state.best_trace)
     return state.best_pred

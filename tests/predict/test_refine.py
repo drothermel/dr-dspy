@@ -44,7 +44,7 @@ def test_refine_forward_success_first_attempt(make_run):
         return 1.0 if len(pred.answer) == 1 else 0.0
 
     predict = DummyModule(ts("question -> answer"), count_calls)
-    refine = Refine(module=predict, N=3, reward_fn=reward_fn, threshold=1.0)
+    refine = Refine(module=predict, num_samples=3, reward_fn=reward_fn, threshold=1.0)
     result = asyncio.run(refine(question="What is the capital of Belgium?", run=run))
     assert result.answer == "Brussels", "Result should be `Brussels`"
     assert reward_call_count[0] > 0, "Reward function should have been called"
@@ -61,7 +61,7 @@ def test_refine_module_default_fail_count(make_run):
         raise ValueError("Deliberately failing")
 
     predict = DummyModule(ts("question -> answer"), always_raise)
-    refine = Refine(module=predict, N=3, reward_fn=lambda _, __: 1.0, threshold=0.0)
+    refine = Refine(module=predict, num_samples=3, reward_fn=lambda _, __: 1.0, threshold=0.0)
     with pytest.raises(ValueError, match=r"Deliberately failing"):
         asyncio.run(refine(question="What is the capital of Belgium?", run=run))
 
@@ -78,7 +78,7 @@ def test_refine_module_custom_fail_count(make_run):
         return await self.predictor(run=run, options=options, **inputs)
 
     predict = DummyModule(ts("question -> answer"), raise_on_second_call)
-    refine = Refine(module=predict, N=3, reward_fn=lambda _, __: 1.0, threshold=0.0, fail_count=1)
+    refine = Refine(module=predict, num_samples=3, reward_fn=lambda _, __: 1.0, threshold=0.0, fail_count=1)
     with pytest.raises(ValueError, match=r"Deliberately failing"):
         asyncio.run(refine(question="What is the capital of Belgium?", run=run))
     assert module_call_count[0] == 2, (
@@ -93,7 +93,7 @@ def test_refine_all_attempts_fail_raises_sampling_exhausted(make_run):
         raise ValueError("Deliberately failing")
 
     predict = DummyModule(ts("question -> answer"), always_raise)
-    refine = Refine(module=predict, N=3, reward_fn=lambda _, __: 1.0, threshold=0.0, fail_count=10)
+    refine = Refine(module=predict, num_samples=3, reward_fn=lambda _, __: 1.0, threshold=0.0, fail_count=10)
     with pytest.raises(SamplingExhaustedError) as exc_info:
         asyncio.run(refine(question="What is the capital of Belgium?", run=run))
     assert exc_info.value.n_attempts == 3
@@ -109,7 +109,7 @@ def test_refine_instance_reuse_preserves_fail_count(make_run):
         raise ValueError("Deliberately failing")
 
     predict = DummyModule(ts("question -> answer"), always_raise)
-    refine = Refine(module=predict, N=3, reward_fn=lambda _, __: 1.0, threshold=0.0, fail_count=10)
+    refine = Refine(module=predict, num_samples=3, reward_fn=lambda _, __: 1.0, threshold=0.0, fail_count=10)
     for _ in range(2):
         call_counts.clear()
         with pytest.raises(SamplingExhaustedError):

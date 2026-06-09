@@ -48,7 +48,7 @@ class Refine(Module):
     def __init__(
         self,
         module: Module,
-        N: int,
+        num_samples: int,
         reward_fn: Callable[[dict, Prediction], float],
         threshold: float,
         fail_count: int | None = None,
@@ -57,8 +57,8 @@ class Refine(Module):
         self.module = module
         self.reward_fn = lambda *args: reward_fn(*args)
         self.threshold = threshold
-        self.N = N
-        self.fail_count = fail_count or N
+        self.num_samples = num_samples
+        self.fail_count = fail_count or num_samples
         self.module_code = get_formatted_source(module.__class__)
         try:
             self.reward_fn_code = get_formatted_source(reward_fn)
@@ -127,7 +127,7 @@ class Refine(Module):
 
         return await sample_with_reward(
             module=self.module,
-            N=self.N,
+            num_samples=self.num_samples,
             fail_count=self.fail_count,
             reward_fn=self.reward_fn,
             threshold=self.threshold,
@@ -135,7 +135,7 @@ class Refine(Module):
             options=options,
             inputs=inputs,
             should_stop=lambda attempt, reward, _state: (
-                (self.threshold is not None and reward >= self.threshold) or attempt.idx == self.N - 1
+                (self.threshold is not None and reward >= self.threshold) or attempt.idx == self.num_samples - 1
             ),
             execute_attempt=execute_with_advice,
             after_attempt=build_advice,
