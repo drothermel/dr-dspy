@@ -15,8 +15,7 @@ def _format_field_description_lines(
         for custom_type in custom_types:
             if len(custom_type.description()) > 0:
                 desc += f"\n    Type description of {get_annotation_name(custom_type)}: {custom_type.description()}"
-        if desc:
-            field_message += f": {desc}"
+        field_message += f": {desc}"
         if constraints:
             field_message += f"\nConstraints: {constraints}"
         field_descriptions.append(field_message)
