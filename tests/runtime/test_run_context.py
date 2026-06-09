@@ -1,8 +1,23 @@
+from typing import TYPE_CHECKING, cast
+
 import pytest
 
 from dspy.adapters.json_adapter import JSONAdapter
+from dspy.primitives.module import Module
 from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, resolve_run
+from dspy.utils.callback import BaseCallback
 from dspy.utils.dummies import DummyLM
+
+if TYPE_CHECKING:
+    from dspy.adapters.base import Adapter
+
+
+class _EchoCallback(BaseCallback):
+    pass
+
+
+class _StubModule(Module):
+    pass
 
 
 def test_create_requires_lm_and_adapter():
@@ -16,7 +31,7 @@ def test_create_requires_lm_and_adapter():
 def test_create_rejects_missing_adapter():
     lm = DummyLM([{"answer": "ok"}])
     with pytest.raises(ValueError, match="adapter"):
-        RunContext.create(lm=lm, adapter=None, init_run_log=False)  # type: ignore[arg-type]
+        RunContext.create(lm=lm, adapter=cast("Adapter", None), init_run_log=False)
 
 
 def test_fork_replaces_lm_and_clears_caller_modules():
@@ -24,7 +39,7 @@ def test_fork_replaces_lm_and_clears_caller_modules():
     other_lm = DummyLM([{"answer": "other"}])
     adapter = JSONAdapter()
     run = RunContext.create(lm=lm, adapter=adapter, init_run_log=False)
-    run.caller_modules.append("parent")
+    run.caller_modules.append(_StubModule())
     forked = run.fork(lm=other_lm, optimization_trace=[])
     assert forked.lm is other_lm
     assert forked.optimization_trace == []
@@ -85,7 +100,7 @@ def test_default_telemetry_config():
 def test_fork_callbacks_and_trace():
     lm = DummyLM([{"answer": "ok"}])
     adapter = JSONAdapter()
-    run = RunContext.create(lm=lm, adapter=adapter, callbacks=[lambda x: x], init_run_log=False)
+    run = RunContext.create(lm=lm, adapter=adapter, callbacks=[_EchoCallback()], init_run_log=False)
     forked = run.fork(lm=DummyLM([{"answer": "other"}]), callbacks=[], optimization_trace=[1])
     assert len(forked.callbacks) == 0
     assert forked.optimization_trace == [1]

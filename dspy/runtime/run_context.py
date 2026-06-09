@@ -2,16 +2,25 @@
 
 from __future__ import annotations
 
-import json
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Literal, TextIO
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TextIO
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from dspy.utils.transparency import CallSite, TransparencyMode
 
 if TYPE_CHECKING:
+    from dspy.adapters.base import Adapter
+    from dspy.clients.base_lm import BaseLM
+    from dspy.core.types import CallRecord
+    from dspy.primitives.module import Module
+    from dspy.utils.callback import BaseCallback
+    from dspy.utils.run_log import RunLogSession
     from dspy.utils.usage_tracker import UsageTracker
+
+
+class RetrievalModule(Protocol):
+    def get_objects(self, num_samples: int, fields: list[str]) -> list[dict[str, object]]: ...
 
 
 class ExecutionConfig(BaseModel):
@@ -57,34 +66,35 @@ class RunContext(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    lm: Any
-    adapter: Any
-    callbacks: list[Any] = Field(default_factory=list)
+    lm: BaseLM
+    adapter: Adapter
+    callbacks: list[BaseCallback] = Field(default_factory=list)
     optimization_trace: list[Any] = Field(default_factory=list)
-    call_log: list[Any] = Field(default_factory=list)
-    usage_tracker: Any | None = None
+    call_log: list[CallRecord] = Field(default_factory=list)
+    usage_tracker: UsageTracker | None = None
     retrieval: Any | None = None
-    caller_modules: list[Any] = Field(default_factory=list)
+    caller_modules: list[Module] = Field(default_factory=list)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
     telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
-    log_session: Any | None = None
+    log_session: RunLogSession | None = None
     call_site: CallSite | None = None
 
     @classmethod
     def create(
         cls,
         *,
-        lm: Any,
-        adapter: Any,
-        callbacks: list[Any] | None = None,
+        lm: BaseLM,
+        adapter: Adapter,
+        callbacks: list[BaseCallback] | None = None,
         optimization_trace: list[Any] | None = None,
-        call_log: list[Any] | None = None,
+        call_log: list[CallRecord] | None = None,
         usage_tracker: UsageTracker | None = None,
-        retrieval: Any | None = None,
+        retrieval: RetrievalModule | None = None,
         execution: ExecutionConfig | None = None,
         telemetry: TelemetryConfig | None = None,
         init_run_log: bool = True,
     ) -> RunContext:
+        _ensure_run_context_model()
         from dspy.clients.base_lm import BaseLM as BaseLMType
 
         if not isinstance(lm, BaseLMType):
@@ -108,6 +118,7 @@ class RunContext(BaseModel):
         return run
 
     def fork(self, **overrides: Any) -> RunContext:
+        _ensure_run_context_model()
         execution = overrides.pop("execution", self.execution)
         telemetry = overrides.pop("telemetry", self.telemetry)
         if isinstance(execution, dict):
@@ -161,15 +172,7 @@ class RunContext(BaseModel):
         pretty_print_call_log(call_log=self.call_log, n=n, file=file)
 
     def read_call_log(self, n: int = 10) -> list[dict[str, Any]]:
-        from dspy.core.types import CallRecord
-
-        records: list[dict[str, Any]] = []
-        for entry in self.call_log[-n:]:
-            if isinstance(entry, CallRecord) or hasattr(entry, "to_dict"):
-                records.append(entry.to_dict())
-            else:
-                records.append(json.loads(json.dumps(entry, default=str)))
-        return records
+        return [entry.to_dict() for entry in self.call_log[-n:]]
 
 
 def resolve_run(
@@ -185,3 +188,32 @@ def resolve_run(
         "No RunContext available. Pass run=RunContext.create(lm=LM(...), adapter=...) to the call, "
         "or bind run at Module/Predict construction."
     )
+
+
+_RUN_CONTEXT_MODEL_BUILT = False
+
+
+def _ensure_run_context_model() -> None:
+    global _RUN_CONTEXT_MODEL_BUILT
+    if _RUN_CONTEXT_MODEL_BUILT:
+        return
+    from dspy.adapters.base.adapter import Adapter
+    from dspy.clients.base_lm import BaseLM
+    from dspy.core.types import CallRecord
+    from dspy.primitives.module import Module
+    from dspy.utils.callback import BaseCallback
+    from dspy.utils.run_log import RunLogSession
+    from dspy.utils.usage_tracker import UsageTracker
+
+    RunContext.model_rebuild(
+        _types_namespace={
+            "BaseLM": BaseLM,
+            "Adapter": Adapter,
+            "BaseCallback": BaseCallback,
+            "CallRecord": CallRecord,
+            "UsageTracker": UsageTracker,
+            "Module": Module,
+            "RunLogSession": RunLogSession,
+        }
+    )
+    _RUN_CONTEXT_MODEL_BUILT = True

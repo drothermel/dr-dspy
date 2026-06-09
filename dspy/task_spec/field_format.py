@@ -8,8 +8,6 @@ from typing import Any, Literal, cast
 
 import pydantic
 
-from dspy.adapters.types.code import Code
-from dspy.adapters.types.reasoning import Reasoning
 from dspy.task_spec.field_spec import FieldRole, FieldSpec
 
 
@@ -31,6 +29,9 @@ def format_field_value(field: FieldSpec, value: object, assume_text: bool = True
 
 
 def translate_field_type(field: FieldSpec) -> str:
+    from dspy.adapters.types.code import Code
+    from dspy.adapters.types.reasoning import Reasoning
+
     field_type = field.type_
     if field.role == FieldRole.INPUT or field_type is str or field_type is Reasoning:
         desc = ""
