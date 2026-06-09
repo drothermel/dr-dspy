@@ -1,10 +1,9 @@
-import json
 import logging
-import re
 
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.chain_of_thought import ChainOfThought
-from dspy.primitives import FinalOutput, Module
+from dspy.predict.code_execution import execute_generated_code, parse_generated_code
+from dspy.primitives import Module
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
@@ -81,32 +80,6 @@ class ProgramOfThought(Module):
             instr = [f"Given the final code {mode_inputs}, provide the final {mode_outputs}."]
         return "\n".join(instr)
 
-    def _parse_code(self, code_data):
-        code = code_data.get("generated_code", "").split("---", 1)[0].split("\n\n\n", 1)[0]
-        code_match = re.search("```python[ \\n](.*?)[ \\n]```?", code, re.DOTALL)
-        code_block = code_match.group(1) if code_match else code
-        if not code_block:
-            return (code, "Error: Empty code after parsing.")
-        if "\n" not in code_block and code_block.count("=") > 1:
-            return (code, "Error: Code format is not correct.")
-        lines = code_block.split("\n")
-        last_line_match = re.match("^(\\w+)\\s*=", lines[-1].strip())
-        if last_line_match and len(lines) > 1:
-            code_block += "\n" + last_line_match.group(1)
-        return (code_block, None)
-
-    def _execute_code(self, code):
-        if not code:
-            return (None, "Error: Empty code before execution.")
-        try:
-            result = self.interpreter.execute(code)
-            if isinstance(result, FinalOutput):
-                result = result.output
-            output = json.dumps(result)
-            return (output, None)
-        except Exception as e:
-            return (None, str(e))
-
     async def _aforward_impl(
         self,
         *,
@@ -118,9 +91,9 @@ class ProgramOfThought(Module):
             input_kwargs = {field_name: inputs[field_name] for field_name in self.input_fields if field_name in inputs}
             code_data = await self.code_generate(**input_kwargs, run=run, options=options)
             output = None
-            code, error = self._parse_code(code_data)
+            code, error = parse_generated_code(code_data)
             if not error:
-                output, error = self._execute_code(code)
+                output, error = execute_generated_code(code=code, interpreter=self.interpreter)
             hop = 1
             while error is not None:
                 logger.error(f"Error in code execution: {error}")
@@ -128,9 +101,9 @@ class ProgramOfThought(Module):
                     raise RuntimeError(f"Max hops reached. Failed to run ProgramOfThought: {error}")
                 input_kwargs.update({"previous_code": code, "error": error})
                 code_data = await self.code_regenerate(**input_kwargs, run=run, options=options)
-                code, error = self._parse_code(code_data)
+                code, error = parse_generated_code(code_data)
                 if not error:
-                    output, error = self._execute_code(code)
+                    output, error = execute_generated_code(code=code, interpreter=self.interpreter)
                 hop += 1
             input_kwargs.update({"final_generated_code": code, "code_output": output})
             return await self.generate_output(**input_kwargs, run=run, options=options)

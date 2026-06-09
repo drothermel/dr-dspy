@@ -1,6 +1,4 @@
-import json
 import logging
-import re
 
 from typing_extensions import override
 
@@ -8,9 +6,10 @@ from dspy.adapters.types.tool import Tool
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.predict.code_execution import execute_generated_code, parse_generated_code
 from dspy.predict.predict import Predict
 from dspy.predict.tools import normalize_tools
-from dspy.primitives import FinalOutput, Module, Prediction
+from dspy.primitives import Module, Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.propose.source_format import get_formatted_source
 from dspy.runtime.run_context import RunContext
@@ -80,13 +79,13 @@ class CodeAct(Module):
                 )
                 turn_log = extracted.turn_log
                 code_data = extracted.result
-                code, error = self._parse_code(code_data)
+                code, error = parse_generated_code(code_data)
                 if error:
                     turn_log = turn_log.append_turn(
                         TurnEvent(observation=f"Failed to parse the generated code: {error}")
                     )
                     continue
-                output, error = self._execute_code(code)
+                output, error = execute_generated_code(code=code, interpreter=self.interpreter)
                 event = TurnEvent(generated_code=code)
                 if not error:
                     event = event.model_copy(update={"code_output": output})
@@ -101,32 +100,3 @@ class CodeAct(Module):
             return Prediction(turn_log=extracted.turn_log, **dict(extracted.result.items()))
         finally:
             self.interpreter.shutdown()
-
-    def _parse_code(self, code_data):
-        code = getattr(code_data, "generated_code", "")
-        if hasattr(code_data, "get"):
-            code = code_data.get("generated_code", code)
-        code = code.split("---", 1)[0].split("\n\n\n", 1)[0]
-        code_match = re.search("```python[ \\n](.*?)[ \\n]```?", code, re.DOTALL)
-        code_block = code_match.group(1) if code_match else code
-        if not code_block:
-            return (code, "Error: Empty code after parsing.")
-        if "\n" not in code_block and code_block.count("=") > 1:
-            return (code, "Error: Code format is not correct.")
-        lines = code_block.split("\n")
-        last_line_match = re.match("^(\\w+)\\s*=", lines[-1].strip())
-        if last_line_match and len(lines) > 1:
-            code_block += "\n" + last_line_match.group(1)
-        return (code_block, None)
-
-    def _execute_code(self, code):
-        if not code:
-            return (None, "Error: Empty code before execution.")
-        try:
-            result = self.interpreter.execute(code)
-            if isinstance(result, FinalOutput):
-                result = result.output
-            output = json.dumps(result)
-            return (output, None)
-        except Exception as e:
-            return (None, str(e))

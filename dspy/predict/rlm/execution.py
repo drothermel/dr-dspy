@@ -11,7 +11,7 @@ from dspy.adapters.utils import parse_value
 from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.history import REPLEntry, REPLHistory, REPLVariable, TurnEvent
 from dspy.history.truncation import call_with_repl_history_truncation
-from dspy.predict.rlm.sync_bridge import _strip_code_fences
+from dspy.predict.code_execution import strip_python_fences
 from dspy.predict.rlm.tools import make_llm_tools
 from dspy.primitives import (
     CodeInterpreter,
@@ -237,7 +237,7 @@ async def aexecute_iteration(
             f"RLM iteration {iteration + 1}/{rlm.max_iterations}\nReasoning: {pred.reasoning}\nCode:\n{pred.code}"
         )
     try:
-        code = _strip_code_fences(pred.code)
+        code = strip_python_fences(pred.code)
     except SyntaxError as e:
         code = pred.code
         result = f"[Error] {e}"

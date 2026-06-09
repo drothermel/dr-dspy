@@ -4,9 +4,9 @@ import pytest
 
 from dspy.adapters.types.tool import Tool
 from dspy.history import REPLEntry, REPLHistory, REPLVariable, TurnEvent
+from dspy.predict.code_execution import strip_python_fences
 from dspy.predict.rlm import RLM
 from dspy.predict.rlm import execution as rlm_execution
-from dspy.predict.rlm.sync_bridge import _strip_code_fences
 from dspy.primitives import CodeInterpreterError, FinalOutput
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.testing import DummyLM
@@ -30,12 +30,12 @@ class TestRLMCodeFenceParsing:
             ("```\n```\nprint(2)\n```\n```", "print(2)"),
         ],
     )
-    def test_strip_code_fences(self, raw, expected):
-        assert _strip_code_fences(raw) == expected
+    def teststrip_python_fences(self, raw, expected):
+        assert strip_python_fences(raw) == expected
 
-    def test_strip_code_fences_rejects_non_python_lang(self):
+    def teststrip_python_fences_rejects_non_python_lang(self):
         with pytest.raises(SyntaxError, match="json"):
-            _strip_code_fences('```json\n{"a": 1}\n```')
+            strip_python_fences('```json\n{"a": 1}\n```')
 
 
 class TestRLMFormatting:
@@ -290,7 +290,7 @@ class TestRLMToolExceptions:
         assert result.answer == "recovered"
         assert result.turn_log.entries[0].output.startswith("[Error] invalid syntax")
 
-    def test_syntax_error_from_strip_code_fences_is_recoverable(self, make_run):
+    def test_syntax_error_fromstrip_python_fences_is_recoverable(self, make_run):
         mock = MockInterpreter(responses=[FinalOutput({"answer": "recovered"})])
         rlm = RLM(ts("query -> answer"), max_iterations=5, interpreter=mock)
         rlm.generate_action = make_mock_predictor(

@@ -4,6 +4,7 @@ from typing import Any
 from dspy.adapters.types.tool import Tool
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
+from dspy.predict.agent_helpers import format_tool_exception
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.predict.tools import normalize_tools
@@ -75,13 +76,15 @@ class ReAct(Module):
                 )
                 pred = extracted.result
             except ValueError as err:
-                logger.warning(f"Ending the agent loop: Agent failed to select a valid tool: {_fmt_exc(err)}")
+                logger.warning(
+                    f"Ending the agent loop: Agent failed to select a valid tool: {format_tool_exception(err)}"
+                )
                 break
             try:
                 tool = self.tools[pred.next_tool_name]
                 observation = await tool.acall(**pred.next_tool_args)
             except Exception as err:
-                observation = f"Execution error in {pred.next_tool_name}: {_fmt_exc(err)}"
+                observation = f"Execution error in {pred.next_tool_name}: {format_tool_exception(err)}"
             turn_log = turn_log.append_turn(
                 TurnEvent(
                     thought=pred.next_thought,
@@ -96,9 +99,3 @@ class ReAct(Module):
             self.extract, turn_log=turn_log, run=run, options=options, **input_args
         )
         return Prediction(turn_log=extracted.turn_log, **dict(extracted.result.items()))
-
-
-def _fmt_exc(err: BaseException, *, limit: int = 5) -> str:
-    import traceback
-
-    return "\n" + "".join(traceback.format_exception(type(err), err, err.__traceback__, limit=limit)).strip()

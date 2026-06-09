@@ -11,6 +11,7 @@ from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
 from dspy.core.types.config import LMConfig, LMToolChoice
 from dspy.errors import AdapterParseError
 from dspy.history import TruncationExhaustedError, TurnEvent, TurnLog, call_with_turn_log_truncation
+from dspy.predict.agent_helpers import format_tool_exception
 from dspy.predict.predict import Predict
 from dspy.predict.tools import normalize_tools
 from dspy.primitives import Module, Prediction
@@ -104,11 +105,11 @@ class ReActV2(Module):
                 break_reason = "context_window_exceeded"
                 break
             except ValueError as err:
-                logger.warning("Ending ReActV2 loop after parse failure: %s", _fmt_exc(err))
+                logger.warning("Ending ReActV2 loop after parse failure: %s", format_tool_exception(err))
                 break_reason = "parse_error"
                 break
             except AdapterParseError as err:
-                logger.warning("Ending ReActV2 loop after parse failure: %s", _fmt_exc(err))
+                logger.warning("Ending ReActV2 loop after parse failure: %s", format_tool_exception(err))
                 break_reason = "parse_error"
                 break
             if not tool_calls.tool_calls:
@@ -141,7 +142,7 @@ class ReActV2(Module):
                 if tool_call.name == "submit" and isinstance(value, dict):
                     final_outputs = dict(value)
             except Exception as err:
-                values.append(f"Execution error in {tool_call.name}: {_fmt_exc(err)}")
+                values.append(f"Execution error in {tool_call.name}: {format_tool_exception(err)}")
                 is_errors.append(True)
         return (ToolCallResults.from_tool_calls_and_values(tool_calls, values, is_errors), final_outputs)
 
@@ -191,10 +192,10 @@ class ReActV2(Module):
             logger.warning("Forced submit failed after context window exceeded: %s", err)
             return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
         except ValueError as err:
-            logger.warning("Forced submit failed: %s", _fmt_exc(err))
+            logger.warning("Forced submit failed: %s", format_tool_exception(err))
             return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
         except AdapterParseError as err:
-            logger.warning("Forced submit failed: %s", _fmt_exc(err))
+            logger.warning("Forced submit failed: %s", format_tool_exception(err))
             return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
         submit_calls = ToolCalls(tool_calls=[call for call in tool_calls.tool_calls if call.name == "submit"])
         if not submit_calls.tool_calls:
@@ -238,9 +239,3 @@ def _ensure_tool_call_ids(tool_calls: ToolCalls, turn_index: int) -> ToolCalls:
             tool_call = tool_call.model_copy(update={"id": f"call_{turn_index}_{call_index}"})
         ensured.append(tool_call)
     return ToolCalls(tool_calls=ensured)
-
-
-def _fmt_exc(err: BaseException, *, limit: int = 5) -> str:
-    import traceback
-
-    return "\n" + "".join(traceback.format_exception(type(err), err, err.__traceback__, limit=limit)).strip()
