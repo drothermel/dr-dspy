@@ -13,7 +13,7 @@ from dspy.primitives.prediction import Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.utils import magicattr
 from dspy.utils.callback import with_callbacks
-from dspy.utils.inspect_history import pretty_print_history
+from dspy.utils.inspect_call_log import pretty_print_call_log
 from dspy.utils.usage_tracker import track_usage
 
 logger = logging.getLogger(__name__)
@@ -34,25 +34,25 @@ class Module(BaseModule, metaclass=ProgramMeta):
     def _base_init(obj: Any) -> None:
         obj._compiled = False
         obj.callbacks = []
-        obj.history = []
+        obj.call_log = []
         obj.run = None
 
     def __init__(self, callbacks=None, run: RunContext | None = None) -> None:
         self.callbacks = callbacks or []
         self.run = run
         self._compiled = False
-        self.history = []
+        self.call_log = []
 
     def __getstate__(self):
         state = self.__dict__.copy()
-        state.pop("history", None)
+        state.pop("call_log", None)
         state.pop("callbacks", None)
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        if not hasattr(self, "history"):
-            self.history = []
+        if not hasattr(self, "call_log"):
+            self.call_log = []
         if not hasattr(self, "callbacks"):
             self.callbacks = []
 
@@ -121,8 +121,8 @@ class Module(BaseModule, metaclass=ProgramMeta):
             set_attribute_by_name(obj=self, name=name, value=func(predictor))
         return self
 
-    def inspect_history(self, n: int = 1, file: "TextIO | None" = None) -> None:
-        pretty_print_history(history=self.history, n=n, file=file)
+    def inspect_call_log(self, n: int = 1, file: "TextIO | None" = None) -> None:
+        pretty_print_call_log(call_log=self.call_log, n=n, file=file)
 
     async def batch(
         self,

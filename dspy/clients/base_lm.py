@@ -6,17 +6,15 @@ import uuid
 from typing import Any, TextIO
 
 from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
-from dspy.core.types import LMHistoryEntry, LMRequest, LMResponse
+from dspy.core.types import CallRecord, LMRequest, LMResponse
 from dspy.core.types.history import _history_request_messages_as_openai
 from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
-from dspy.runtime.run_context import RunContext
+from dspy.runtime.run_context import RunContext, disk_call_log_enabled, memory_call_log_enabled
 from dspy.utils.callback import BaseCallback, with_callbacks
-from dspy.utils.inspect_history import pretty_print_history
-from dspy.utils.run_log import append_call_record, redact_config, redact_messages
+from dspy.utils.inspect_call_log import pretty_print_call_log
+from dspy.utils.run_log import RunLogSession, append_call_record, redact_config, redact_messages
 from dspy.utils.transparency import ACTIVE_CALL_METADATA, ACTIVE_COMPILED_CALL
 
-MAX_HISTORY_SIZE = 10000
-GLOBAL_HISTORY: list[LMHistoryEntry] = []
 LM_CLASS_STATE_KEY = "_dspy_lm_class"
 PROVIDER_OPTIONS_STATE_KEY = "_dspy_provider_options"
 
@@ -51,6 +49,12 @@ def _provider_options_from_kwargs(kwargs: dict[str, Any]) -> LMProviderOptions:
     return LMProviderOptions(**data)
 
 
+def _append_bounded(entry_list: list[CallRecord], entry: CallRecord, max_entries: int) -> None:
+    if len(entry_list) >= max_entries:
+        entry_list.pop(0)
+    entry_list.append(entry)
+
+
 class BaseLM:
     def __init__(
         self,
@@ -72,7 +76,7 @@ class BaseLM:
             max_tokens=max_tokens,
             provider_options=self.provider_options,
         )
-        self.history: list[LMHistoryEntry] = []
+        self.call_log: list[CallRecord] = []
 
     def _get_initial_kwargs(
         self,
@@ -129,28 +133,39 @@ class BaseLM:
             usage = response.usage_as_dict()
             if usage:
                 run.usage_tracker.add_usage(lm=self.model, usage_entry=usage)
-        entry = None
-        if not run.telemetry.disable_history:
-            entry = LMHistoryEntry(
+        record = None
+        memory_enabled = memory_call_log_enabled(run.telemetry)
+        disk_enabled = disk_call_log_enabled(run.telemetry)
+        if memory_enabled or disk_enabled:
+            record = CallRecord(
                 request=request,
                 response=response,
-                timestamp=datetime.datetime.now().isoformat(),
+                timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 uuid=str(uuid.uuid4()),
                 model_type=getattr(self, "model_type", None),
             )
-            self.update_history(entry, run=run)
-        if run.telemetry.run_log_enabled:
-            self._append_run_log_entry(request=request, response=response, history_entry=entry)
+        if memory_enabled and record is not None:
+            self.record_call(record, run=run)
+        if disk_enabled:
+            self._append_run_log_entry(
+                request=request,
+                response=response,
+                call_record=record,
+                session=run.log_session,
+            )
         return response
 
     def _append_run_log_entry(
-        self, *, request: LMRequest, response: LMResponse, history_entry: LMHistoryEntry | None
+        self,
+        *,
+        request: LMRequest,
+        response: LMResponse,
+        call_record: CallRecord | None,
+        session: RunLogSession | None,
     ) -> None:
         compiled = ACTIVE_COMPILED_CALL.get()
         metadata = ACTIVE_CALL_METADATA.get()
-        call_id = (
-            compiled.call_id if compiled is not None else history_entry.uuid if history_entry else str(uuid.uuid4())
-        )
+        call_id = compiled.call_id if compiled is not None else call_record.uuid if call_record else str(uuid.uuid4())
         messages = _history_request_messages_as_openai(request)
         outputs = [
             {
@@ -189,7 +204,7 @@ class BaseLM:
                 "cache_hit": getattr(response, "cache_hit", False),
             },
         }
-        append_call_record(record)
+        append_call_record(record, session=session)
 
     async def aforward(self, request: LMRequest) -> LMResponse:
         raise NotImplementedError("Subclasses must implement this method.")
@@ -262,7 +277,7 @@ class BaseLM:
         provider_options: LMProviderOptions | None = None,
     ) -> "BaseLM":
         new_instance = copy_module.copy(self)
-        new_instance.history = []
+        new_instance.call_log = []
         new_instance.callbacks = list(getattr(self, "callbacks", []) or [])
         if model is not None:
             new_instance.model = model
@@ -277,26 +292,14 @@ class BaseLM:
         new_instance.kwargs = new_kwargs
         return new_instance
 
-    def inspect_history(self, n: int = 1, file: "TextIO | None" = None) -> None:
-        pretty_print_history(history=self.history, n=n, file=file)
+    def inspect_call_log(self, n: int = 1, file: "TextIO | None" = None) -> None:
+        pretty_print_call_log(call_log=self.call_log, n=n, file=file)
 
-    def update_history(self, entry: LMHistoryEntry, *, run: RunContext) -> None:
-        if run.telemetry.disable_history:
+    def record_call(self, entry: CallRecord, *, run: RunContext) -> None:
+        if not memory_call_log_enabled(run.telemetry):
             return
-        max_history_size = run.telemetry.max_history_size
-        if len(GLOBAL_HISTORY) >= MAX_HISTORY_SIZE:
-            GLOBAL_HISTORY.pop(0)
-        GLOBAL_HISTORY.append(entry)
-        if max_history_size == 0:
-            return
-        if len(self.history) >= max_history_size:
-            self.history.pop(0)
-        self.history.append(entry)
+        max_entries = run.telemetry.max_call_log_entries
+        _append_bounded(run.call_log, entry, max_entries)
+        _append_bounded(self.call_log, entry, max_entries)
         for module in run.caller_modules:
-            if len(module.history) >= max_history_size:
-                module.history.pop(0)
-            module.history.append(entry)
-
-
-def inspect_history(n: int = 1, file: "TextIO | None" = None) -> None:
-    pretty_print_history(history=GLOBAL_HISTORY, n=n, file=file)
+            _append_bounded(module.call_log, entry, max_entries)

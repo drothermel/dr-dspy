@@ -371,7 +371,7 @@ def test_responses_api_with_none_usage(make_run):
         with track_usage(run) as tracker:
             result = asyncio.run(lm(_request(lm, prompt="test query"), run=run))
         assert result.text == "Partial response that was truncated"
-        assert lm.history[-1].usage == {}
+        assert lm.call_log[-1].usage == {}
         assert tracker.get_total_tokens() == {}
 
 
@@ -418,5 +418,5 @@ async def test_responses_api_with_none_usage_async(make_run):
         with track_usage(run) as tracker:
             result = await lm.acall(_request(lm, prompt="test query"), run=run)
         assert result.text == "Partial async response"
-        assert lm.history[-1].usage == {}
+        assert lm.call_log[-1].usage == {}
         assert tracker.get_total_tokens() == {}

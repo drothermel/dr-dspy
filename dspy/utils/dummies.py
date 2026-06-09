@@ -142,7 +142,7 @@ class DummyLM(BaseLM):
         return LMOutput(parts=parts, provider_output=current_output)
 
     def get_convo(self, index):
-        entry = self.history[index]
+        entry = self.call_log[index]
         return (entry.messages_as_openai, entry.outputs)
 
 

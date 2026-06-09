@@ -387,5 +387,5 @@ class GroundedProposer(Proposer):
                 )
             ).proposed_instruction
         if self.verbose:
-            self.prompt_model.inspect_history(n=1)
+            self.prompt_model.inspect_call_log(n=1)
         return strip_prefix(proposed_instruction)

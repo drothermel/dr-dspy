@@ -20,7 +20,7 @@ from dspy.core.types.parts import (
     LMVideoPart,
 )
 from dspy.core.types.request import LMRequest, LMRequestPatch
-from dspy.core.types.response import LMHistoryEntry, LMOutput, LMResponse, LMUsage
+from dspy.core.types.response import CallRecord, LMOutput, LMResponse, LMUsage
 from dspy.core.types.stream import (
     AsyncLMStream,
     LMAnyDelta,
@@ -56,7 +56,7 @@ __all__ = [
     "ModuleCallOptions",
     "PredictOptions",
     "LMDocumentPart",
-    "LMHistoryEntry",
+    "CallRecord",
     "LMImageDelta",
     "LMImagePart",
     "LMMessage",

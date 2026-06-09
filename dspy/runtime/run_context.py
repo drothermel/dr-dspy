@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import json
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, TextIO
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -19,15 +21,35 @@ class ExecutionConfig(BaseModel):
     allow_tool_async_sync_conversion: bool = False
 
 
+class CallLogMode(StrEnum):
+    off = "off"
+    memory = "memory"
+    disk = "disk"
+    both = "both"
+
+
 class TelemetryConfig(BaseModel):
     transparency: TransparencyMode = "strict"
     track_usage: bool = False
-    disable_history: bool = False
-    max_history_size: int = 10000
+    call_log: CallLogMode = CallLogMode.both
+    max_call_log_entries: int = 10000
+    call_log_dir: str | None = None
     max_trace_size: int = 10000
     warn_on_type_mismatch: bool = True
-    run_log_enabled: bool = True
-    run_log_dir: str | None = None
+
+
+def effective_call_log_mode(telemetry: TelemetryConfig) -> CallLogMode:
+    if telemetry.max_call_log_entries == 0:
+        return CallLogMode.off
+    return telemetry.call_log
+
+
+def memory_call_log_enabled(telemetry: TelemetryConfig) -> bool:
+    return effective_call_log_mode(telemetry) in (CallLogMode.memory, CallLogMode.both)
+
+
+def disk_call_log_enabled(telemetry: TelemetryConfig) -> bool:
+    return effective_call_log_mode(telemetry) in (CallLogMode.disk, CallLogMode.both)
 
 
 class RunContext(BaseModel):
@@ -39,11 +61,13 @@ class RunContext(BaseModel):
     adapter: Any
     callbacks: list[Any] = Field(default_factory=list)
     trace: list[Any] = Field(default_factory=list)
+    call_log: list[Any] = Field(default_factory=list)
     usage_tracker: Any | None = None
     retrieval: Any | None = None
     caller_modules: list[Any] = Field(default_factory=list)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
     telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
+    log_session: Any | None = None
 
     @classmethod
     def create(
@@ -53,6 +77,7 @@ class RunContext(BaseModel):
         adapter: Any,
         callbacks: list[Any] | None = None,
         trace: list[Any] | None = None,
+        call_log: list[Any] | None = None,
         usage_tracker: UsageTracker | None = None,
         retrieval: Any | None = None,
         execution: ExecutionConfig | None = None,
@@ -71,6 +96,7 @@ class RunContext(BaseModel):
             adapter=adapter,
             callbacks=list(callbacks or []),
             trace=list(trace) if trace is not None else [],
+            call_log=list(call_log) if call_log is not None else [],
             usage_tracker=usage_tracker,
             retrieval=retrieval,
             execution=execution or ExecutionConfig(),
@@ -90,23 +116,30 @@ class RunContext(BaseModel):
 
         callbacks = list(overrides.pop("callbacks", self.callbacks))
         trace = list(overrides.pop("trace", self.trace))
+        call_log = list(overrides.pop("call_log", self.call_log))
+        log_session = overrides.pop("log_session", self.log_session)
 
         return RunContext(
             lm=overrides.pop("lm", self.lm),
             adapter=overrides.pop("adapter", self.adapter),
             callbacks=callbacks,
             trace=trace,
+            call_log=call_log,
             usage_tracker=overrides.pop("usage_tracker", self.usage_tracker),
             retrieval=overrides.pop("retrieval", self.retrieval),
             caller_modules=[],
             execution=execution,
             telemetry=telemetry,
+            log_session=log_session,
             **overrides,
         )
 
     def _init_run_session(self) -> None:
-        from dspy.utils.run_log import init_run_session
+        from dspy.utils.run_log import create_run_log_session
 
+        if not disk_call_log_enabled(self.telemetry):
+            self.log_session = None
+            return
         snapshot = {
             "lm": self.lm.model if hasattr(self.lm, "model") else repr(self.lm),
             "adapter": type(self.adapter).__name__,
@@ -114,11 +147,26 @@ class RunContext(BaseModel):
             "execution": self.execution.model_dump(),
             "telemetry": self.telemetry.model_dump(),
         }
-        init_run_session(
-            run_log_enabled=self.telemetry.run_log_enabled,
-            run_log_dir=self.telemetry.run_log_dir,
+        self.log_session = create_run_log_session(
+            call_log_dir=self.telemetry.call_log_dir,
             settings_snapshot=snapshot,
         )
+
+    def inspect_call_log(self, n: int = 1, file: TextIO | None = None) -> None:
+        from dspy.utils.inspect_call_log import pretty_print_call_log
+
+        pretty_print_call_log(call_log=self.call_log, n=n, file=file)
+
+    def read_call_log(self, n: int = 10) -> list[dict[str, Any]]:
+        from dspy.core.types import CallRecord
+
+        records: list[dict[str, Any]] = []
+        for entry in self.call_log[-n:]:
+            if isinstance(entry, CallRecord) or hasattr(entry, "to_dict"):
+                records.append(entry.to_dict())
+            else:
+                records.append(json.loads(json.dumps(entry, default=str)))
+        return records
 
 
 def resolve_run(

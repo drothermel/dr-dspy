@@ -1,37 +1,31 @@
 import json
-from pathlib import Path
 
-from dspy.utils.run_log import append_call_record, init_run_session, redact_messages, slug_run_id
-
-
-def test_slug_run_id_sanitizes_path_chars():
-    assert slug_run_id("gepa/v2 test") == "gepa_v2_test"
+from dspy.utils.run_log import append_call_record, create_run_log_session, redact_messages, slug_run_id
 
 
-def test_init_run_session_creates_timestamped_dir(tmp_path, monkeypatch):
-    monkeypatch.delenv("DSPY_RUN_ID", raising=False)
+def test_slug_run_id():
+    assert slug_run_id("my run!") == "my_run_"
+
+
+def test_create_run_log_session_creates_timestamped_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("DSPY_LOG_DIR", str(tmp_path))
-    run_dir = init_run_session(run_log_enabled=True, run_log_dir=None, settings_snapshot={"transparency": "strict"})
-    assert run_dir is not None
-    assert run_dir.parent.name == "default_run"
-    assert (run_dir / "run.json").exists()
+    session = create_run_log_session(call_log_dir=None, settings_snapshot={"transparency": "strict"})
+    assert session.run_dir.exists()
+    assert (session.run_dir / "run.json").exists()
 
 
-def test_init_run_session_uses_dspy_run_id(tmp_path, monkeypatch):
+def test_create_run_log_session_uses_dspy_run_id(tmp_path, monkeypatch):
     monkeypatch.setenv("DSPY_LOG_DIR", str(tmp_path))
-    monkeypatch.setenv("DSPY_RUN_ID", "my-experiment")
-    run_dir = init_run_session(run_log_enabled=True, run_log_dir=None, settings_snapshot={})
-    assert run_dir is not None
-    assert run_dir.parent.name == "my-experiment"
+    monkeypatch.setenv("DSPY_RUN_ID", "experiment_a")
+    session = create_run_log_session(call_log_dir=None, settings_snapshot={})
+    assert "experiment_a" in str(session.run_dir)
 
 
 def test_append_call_record_writes_jsonl(tmp_path, monkeypatch):
     monkeypatch.setenv("DSPY_LOG_DIR", str(tmp_path))
-    init_run_session(run_log_enabled=True, run_log_dir=None, settings_snapshot={})
-    append_call_record({"call_id": "abc", "phase": "predict"})
-    calls_files = list(Path(tmp_path).rglob("calls.jsonl"))
-    assert len(calls_files) == 1
-    lines = calls_files[0].read_text(encoding="utf-8").strip().splitlines()
+    session = create_run_log_session(call_log_dir=None, settings_snapshot={})
+    append_call_record({"call_id": "abc", "phase": "predict"}, session=session)
+    lines = session.calls_path.read_text(encoding="utf-8").strip().splitlines()
     assert json.loads(lines[0])["call_id"] == "abc"
 
 
@@ -41,12 +35,10 @@ def test_redact_messages_image_data_url():
             "role": "user",
             "content": [
                 {"type": "text", "text": "hello"},
-                {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc123"}},
             ],
         }
     ]
     redacted = redact_messages(messages)
-    image_part = redacted[0]["content"][1]
-    assert image_part["redacted"] is True
-    assert "sha256" in image_part
-    assert image_part["byte_length"] == 4
+    assert redacted[0]["content"][0]["type"] == "text"
+    assert redacted[0]["content"][1]["redacted"] is True

@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from typing_extensions import override
 
-from dspy.runtime import TelemetryConfig
+from dspy.runtime import CallLogMode, TelemetryConfig
 
 try:
     from litellm import Choices, Message, ModelResponse
@@ -364,19 +364,19 @@ def test_module_history(make_run):
         program = MyProgram()
         asyncio.run(program(question="What is the capital of France?", run=run))
         asyncio.run(program.cot(question="What is the capital of France?", run=run))
-        assert len(program.history) == 1
-        assert len(program.cot.history) == 2
-        assert len(program.cot.predict.history) == 2
-        assert id(program.history[0]) == id(program.cot.history[0])
-        assert program.history[0].outputs == ["{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"]
+        assert len(program.call_log) == 1
+        assert len(program.cot.call_log) == 2
+        assert len(program.cot.predict.call_log) == 2
+        assert id(program.call_log[0]) == id(program.cot.call_log[0])
+        assert program.call_log[0].outputs == ["{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"]
         asyncio.run(program(question="What is the capital of France?", run=run))
-        assert len(program.history) == 2
-        assert len(program.cot.history) == 3
-        assert len(program.cot.predict.history) == 3
+        assert len(program.call_log) == 2
+        assert len(program.cot.call_log) == 3
+        assert len(program.cot.predict.call_log) == 3
         asyncio.run(program(question="What is the capital of France?", run=run))
-        assert len(program.history) == 3
-        assert len(program.cot.history) == 4
-        assert len(program.cot.predict.history) == 4
+        assert len(program.call_log) == 3
+        assert len(program.cot.call_log) == 4
+        assert len(program.cot.predict.call_log) == 4
 
 
 def test_module_history_with_concurrency(make_run):
@@ -405,9 +405,9 @@ def test_module_history_with_concurrency(make_run):
             )
 
         asyncio.run(run_concurrent())
-        assert len(program.history) == 2
-        assert len(program.cot.history) == 2
-        assert len(program.cot.predict.history) == 2
+        assert len(program.call_log) == 2
+        assert len(program.cot.call_log) == 2
+        assert len(program.cot.predict.call_log) == 2
 
 
 @pytest.mark.asyncio
@@ -433,25 +433,29 @@ async def test_module_history_async(make_run):
         run = make_run(lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter())
         await program.acall(question="What is the capital of France?", run=run)
         await program.cot.acall(question="What is the capital of France?", run=run)
-        assert len(program.history) == 1
-        assert len(program.cot.history) == 2
-        assert len(program.cot.predict.history) == 2
-        assert id(program.history[0]) == id(program.cot.history[0])
-        assert program.history[0].outputs == ["{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"]
+        assert len(program.call_log) == 1
+        assert len(program.cot.call_log) == 2
+        assert len(program.cot.predict.call_log) == 2
+        assert id(program.call_log[0]) == id(program.cot.call_log[0])
+        assert program.call_log[0].outputs == ["{'reasoning': 'Paris is the capital of France', 'answer': 'Paris'}"]
         run = make_run(
-            lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter(), telemetry=TelemetryConfig(disable_history=True)
+            lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter(), telemetry=TelemetryConfig(call_log=CallLogMode.off)
         )
         await program.acall(question="What is the capital of France?", run=run)
-        assert len(program.history) == 1
-        assert len(program.cot.history) == 2
-        assert len(program.cot.predict.history) == 2
+        assert len(program.call_log) == 1
+        assert len(program.cot.call_log) == 2
+        assert len(program.cot.predict.call_log) == 2
         run = make_run(
-            lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter(), telemetry=TelemetryConfig(disable_history=False)
+            lm=LM("openai/gpt-4o-mini"),
+            adapter=JSONAdapter(),
+            telemetry=TelemetryConfig(call_log=CallLogMode.memory),
+            init_run_log=False,
         )
-        await program.acall(question="What is the capital of France?", run=run)
-        assert len(program.history) == 2
-        assert len(program.cot.history) == 3
-        assert len(program.cot.predict.history) == 3
+        fresh_program = MyProgram()
+        await fresh_program.acall(question="What is the capital of France?", run=run)
+        assert len(fresh_program.call_log) == 1
+        assert len(fresh_program.cot.call_log) == 1
+        assert len(fresh_program.cot.predict.call_log) == 1
 
 
 def test_forward_direct_call_warning(caplog, make_run):

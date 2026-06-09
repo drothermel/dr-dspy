@@ -195,7 +195,7 @@ def test_file_in_signature(sample_text_file, make_run):
     file_obj = File.from_path(sample_text_file)
     result = asyncio.run(predictor(document=file_obj, run=run))
     assert result.summary == "This is a summary"
-    assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 1
+    assert count_messages_with_file_pattern(lm.call_log[-1].messages_as_openai) == 1
 
 
 def test_file_list_in_signature(sample_text_file, make_run):
@@ -209,7 +209,7 @@ def test_file_list_in_signature(sample_text_file, make_run):
     files = [File.from_path(sample_text_file), File.from_file_id("file-123")]
     result = asyncio.run(predictor(documents=files, run=run))
     assert result.summary == "Multiple files"
-    assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 2
+    assert count_messages_with_file_pattern(lm.call_log[-1].messages_as_openai) == 2
 
 
 def test_optional_file_field(make_run):
@@ -221,7 +221,7 @@ def test_optional_file_field(make_run):
     predictor, lm, run = setup_predictor(OptionalFileSignature, {"output": "Hello"}, make_run)
     result = asyncio.run(predictor(document=None, run=run))
     assert result.output == "Hello"
-    assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 0
+    assert count_messages_with_file_pattern(lm.call_log[-1].messages_as_openai) == 0
 
 
 def test_save_load_file_signature(sample_text_file, make_run):
@@ -236,7 +236,7 @@ def test_save_load_file_signature(sample_text_file, make_run):
         loaded_predictor = Predict(ts("document: File -> summary: str"))
         loaded_predictor.load(temp_file.name)
     asyncio.run(loaded_predictor(document=File.from_file_id("file-test"), run=make_run(lm=lm)))
-    assert count_messages_with_file_pattern(lm.history[-1].messages_as_openai) == 2
+    assert count_messages_with_file_pattern(lm.call_log[-1].messages_as_openai) == 2
 
 
 def test_file_frozen():

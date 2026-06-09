@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, TextIO
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dspy.core.types import LMHistoryEntry
+    from dspy.core.types import CallRecord
 
 
 def _green(text: str, end: str = "\n", *, use_colors: bool = True) -> str:
@@ -29,7 +29,7 @@ def _blue(text: str, end: str = "\n", *, use_colors: bool = True) -> str:
     return str(text) + end
 
 
-def pretty_print_history(history: Sequence[LMHistoryEntry], n: int = 1, file: TextIO | None = None) -> None:
+def pretty_print_call_log(call_log: Sequence[CallRecord], n: int = 1, file: TextIO | None = None) -> None:
     out = file or sys.stdout
     use_colors = file is None
 
@@ -50,7 +50,7 @@ def pretty_print_history(history: Sequence[LMHistoryEntry], n: int = 1, file: Te
                 file=out,
             )
 
-    for item in history[-n:]:
+    for item in call_log[-n:]:
         messages = item.messages_as_openai or [{"role": "user", "content": item.prompt}]
         outputs = item.outputs
         timestamp = item.timestamp

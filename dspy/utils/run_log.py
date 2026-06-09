@@ -7,13 +7,20 @@ import logging
 import os
 import re
 import threading
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
 _SESSION_LOCK = threading.Lock()
-_SESSION: dict[str, Any] | None = None
 _SECRET_KEY_PATTERN = re.compile("(api[_-]?key|authorization|token|secret)", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class RunLogSession:
+    run_dir: Path
+    calls_path: Path
+    timestamp: str
 
 
 def slug_run_id(raw: str) -> str:
@@ -21,9 +28,9 @@ def slug_run_id(raw: str) -> str:
     return slug or "default_run"
 
 
-def resolve_log_root(run_log_dir: str | None) -> Path:
-    if run_log_dir:
-        return Path(run_log_dir)
+def resolve_log_root(call_log_dir: str | None) -> Path:
+    if call_log_dir:
+        return Path(call_log_dir)
     return Path(os.environ.get("DSPY_LOG_DIR", "logs"))
 
 
@@ -101,40 +108,26 @@ def redact_config(config: dict[str, Any]) -> dict[str, Any]:
     return cleaned
 
 
-def get_run_session() -> dict[str, Any] | None:
-    return _SESSION
-
-
-def init_run_session(
-    *, run_log_enabled: bool, run_log_dir: str | None, settings_snapshot: dict[str, Any] | None = None
-) -> Path | None:
-    global _SESSION
-    if not run_log_enabled:
-        with _SESSION_LOCK:
-            _SESSION = None
-        return None
+def create_run_log_session(
+    *, call_log_dir: str | None, settings_snapshot: dict[str, Any] | None = None
+) -> RunLogSession:
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-    run_dir = resolve_log_root(run_log_dir) / resolve_run_bucket() / timestamp
+    run_dir = resolve_log_root(call_log_dir) / resolve_run_bucket() / timestamp
     run_dir.mkdir(parents=True, exist_ok=True)
     snapshot = _serialize_for_json(settings_snapshot or {})
     run_json = {
         "timestamp": timestamp,
         "run_id": resolve_run_bucket(),
-        "log_root": str(resolve_log_root(run_log_dir)),
+        "log_root": str(resolve_log_root(call_log_dir)),
         "settings": snapshot,
     }
     (run_dir / "run.json").write_text(json.dumps(run_json, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    with _SESSION_LOCK:
-        _SESSION = {"run_dir": run_dir, "calls_path": run_dir / "calls.jsonl", "timestamp": timestamp}
-    return run_dir
+    return RunLogSession(run_dir=run_dir, calls_path=run_dir / "calls.jsonl", timestamp=timestamp)
 
 
-def append_call_record(record: dict[str, Any]) -> None:
-    with _SESSION_LOCK:
-        session = _SESSION
+def append_call_record(record: dict[str, Any], *, session: RunLogSession | None) -> None:
     if session is None:
         return
     line = json.dumps(_serialize_for_json(record), ensure_ascii=False) + "\n"
-    calls_path: Path = session["calls_path"]
-    with _SESSION_LOCK, calls_path.open("a", encoding="utf-8") as handle:
+    with _SESSION_LOCK, session.calls_path.open("a", encoding="utf-8") as handle:
         handle.write(line)

@@ -63,7 +63,7 @@ def test_tool_observation_preserves_custom_type(make_run):
     asyncio.run(react(question="Draw me something red", run=run))
     sigs_with_obs = [sig for sig, inputs in captured_calls if "observation_0" in inputs]
     assert sigs_with_obs, "Expected ReAct to format a trajectory containing observation_0"
-    observation_content = lm.history[1].messages_as_openai[1]["content"]
+    observation_content = lm.call_log[1].messages_as_openai[1]["content"]
     assert sum(1 for part in observation_content if isinstance(part, dict) and part.get("type") == "image_url") == 2
 
 

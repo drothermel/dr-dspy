@@ -52,11 +52,11 @@ def setup_logging(log_dir) -> None:
 
 
 def get_token_usage(model) -> tuple[int, int]:
-    if not hasattr(model, "history"):
+    if not hasattr(model, "call_log"):
         return (0, 0)
     input_tokens = []
     output_tokens = []
-    for interaction in model.history:
+    for interaction in model.call_log:
         usage = interaction.usage
         _input_tokens = usage.get("prompt_tokens", usage.get("input_tokens", 0))
         _output_tokens = usage.get("completion_tokens", usage.get("output_tokens", 0))

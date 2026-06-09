@@ -125,7 +125,7 @@ def test_basic_image_operations(test_case, make_run):
     result = asyncio.run(predictor(**inputs, run=run))
     output_field = next(f for f in ["probabilities", "generated_code", "bboxes", "captions"] if hasattr(result, f))
     assert getattr(result, output_field) == test_case["expected"][test_case["key_output"]]
-    assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
+    assert count_messages_with_image_url_pattern(lm.call_log[-1].messages_as_openai) == 1
 
 
 @pytest.mark.parametrize(
@@ -160,7 +160,7 @@ def test_image_input_formats(
         pytest.xfail(f"{description} not fully supported without Image coercion")  # ty: ignore[too-many-positional-arguments]
     result = asyncio.run(predictor(image=actual_input, class_labels=["dog", "cat", "bird"], run=run))
     assert result.probabilities == expected["probabilities"]
-    assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
+    assert count_messages_with_image_url_pattern(lm.call_log[-1].messages_as_openai) == 1
 
 
 def test_predictor_save_load(sample_url, sample_pil_image, make_run):
@@ -177,8 +177,8 @@ def test_predictor_save_load(sample_url, sample_pil_image, make_run):
         loaded_predictor = Predict(ts("image: Image -> caption: str"))
         loaded_predictor.load(temp_file.name)
     asyncio.run(loaded_predictor(image=Image("https://example.com/dog.jpg"), run=make_run(lm=lm)))
-    assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 2
-    assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
+    assert count_messages_with_image_url_pattern(lm.call_log[-1].messages_as_openai) == 2
+    assert "<DSPY_IMAGE_START>" not in str(lm.call_log[-1].messages_as_openai)
 
 
 def test_save_load_complex_default_types(make_run):
@@ -208,8 +208,8 @@ def test_save_load_complex_default_types(make_run):
         loaded_predictor.load(temp_file.name)
     result = asyncio.run(loaded_predictor(**examples[0].as_inputs(), run=make_run(lm=lm)))
     assert result.caption == "A list of images"
-    assert str(lm.history[-1].messages_as_openai).count("'url'") == 4
-    assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
+    assert str(lm.call_log[-1].messages_as_openai).count("'url'") == 4
+    assert "<DSPY_IMAGE_START>" not in str(lm.call_log[-1].messages_as_openai)
 
 
 BasicImageSignature = make_task_spec(
@@ -266,8 +266,8 @@ def test_save_load_complex_types(test_case, make_run):
     result = asyncio.run(loaded_predictor(**processed_input, run=run))
     for key, value in test_case["expected"].items():
         assert getattr(result, key) == value
-    assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == test_case["expected_image_urls"]
-    assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
+    assert count_messages_with_image_url_pattern(lm.call_log[-1].messages_as_openai) == test_case["expected_image_urls"]
+    assert "<DSPY_IMAGE_START>" not in str(lm.call_log[-1].messages_as_openai)
 
 
 def test_save_load_pydantic_model(make_run):
@@ -304,8 +304,8 @@ def test_save_load_pydantic_model(make_run):
         loaded_predictor.load_state(state, custom_types={model_input_type: ImageModel})
     result = asyncio.run(loaded_predictor(model_input=model_input, run=run))
     assert result.output == "Multiple photos"
-    assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 4
-    assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
+    assert count_messages_with_image_url_pattern(lm.call_log[-1].messages_as_openai) == 4
+    assert "<DSPY_IMAGE_START>" not in str(lm.call_log[-1].messages_as_openai)
 
 
 def test_optional_image_field(make_run):
@@ -317,7 +317,7 @@ def test_optional_image_field(make_run):
     predictor, lm, run = setup_predictor(OptionalImageSignature, {"output": "Hello"}, make_run)
     result = asyncio.run(predictor(image=None, run=run))
     assert result.output == "Hello"
-    assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 0
+    assert count_messages_with_image_url_pattern(lm.call_log[-1].messages_as_openai) == 0
 
 
 def test_pdf_url_support(make_run):
@@ -336,8 +336,8 @@ def test_pdf_url_support(make_run):
     predictor, lm, run = setup_predictor(PDFSignature, {"summary": "This is a dummy PDF"}, make_run)
     result = asyncio.run(predictor(document=pdf_image, run=run))
     assert result.summary == "This is a dummy PDF"
-    assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
-    messages_str = str(lm.history[-1].messages_as_openai)
+    assert count_messages_with_image_url_pattern(lm.call_log[-1].messages_as_openai) == 1
+    messages_str = str(lm.call_log[-1].messages_as_openai)
     assert "application/pdf" in messages_str
 
 
@@ -385,7 +385,7 @@ def test_pdf_from_file(make_run):
         predictor, lm, run = setup_predictor(FilePDFSignature, {"summary": "This is a PDF from file"}, make_run)
         result = asyncio.run(predictor(document=pdf_image, run=run))
         assert result.summary == "This is a PDF from file"
-        assert count_messages_with_image_url_pattern(lm.history[-1].messages_as_openai) == 1
+        assert count_messages_with_image_url_pattern(lm.call_log[-1].messages_as_openai) == 1
     finally:
         with contextlib.suppress(Exception):
             os.unlink(tmp_file_path)

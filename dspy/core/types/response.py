@@ -253,7 +253,7 @@ class LMResponse(BaseModel):
         return dict(self.usage)
 
 
-class LMHistoryEntry(BaseModel):
+class CallRecord(BaseModel):
     request: LMRequest
     response: LMResponse
     timestamp: str
@@ -300,7 +300,7 @@ class LMHistoryEntry(BaseModel):
     @override
     def __repr__(self) -> str:
         formatted = pformat(self.model_dump(mode="python", exclude_none=True), width=100, sort_dicts=False)
-        return f"LMHistoryEntry(\n{formatted}\n)"
+        return f"CallRecord(\n{formatted}\n)"
 
     @override
     def __str__(self) -> str:

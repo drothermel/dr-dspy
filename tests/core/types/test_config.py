@@ -3,7 +3,7 @@ import pytest
 
 from dspy.core.types import (
     LMConfig,
-    LMHistoryEntry,
+    CallRecord,
     LMPromptCacheConfig,
     LMReasoningConfig,
     LMRequest,
@@ -17,7 +17,7 @@ from dspy.core.types import (
 def test_config_extensions_surface_in_history_kwargs():
     config = LMConfig(temperature=0.2, extensions={"provider_flag": True})
     request = LMRequest(model="model", messages=[], config=config)
-    entry = LMHistoryEntry(request=request, response=LMResponse.from_text("ok"), timestamp="timestamp", uuid="uuid")
+    entry = CallRecord(request=request, response=LMResponse.from_text("ok"), timestamp="timestamp", uuid="uuid")
     assert entry.kwargs == {"provider_flag": True, "temperature": 0.2}
 
 
@@ -58,7 +58,7 @@ def test_usage_normalizes_existing_user_visible_token_aliases():
 
 def test_default_config_does_not_serialize_empty_stop_sequences():
     request = LMRequest.from_call(model="model", prompt="hi")
-    entry = LMHistoryEntry(request=request, response=LMResponse.from_text("ok"), timestamp="timestamp", uuid="uuid")
+    entry = CallRecord(request=request, response=LMResponse.from_text("ok"), timestamp="timestamp", uuid="uuid")
     assert request.config.stop is None
     assert entry.kwargs == {}
 
@@ -67,7 +67,7 @@ def test_history_entry_exposes_typed_derived_properties():
     message = User("hi")
     request = LMRequest.from_call(model="model", messages=[message], config=LMConfig(temperature=0.2))
     response = LMResponse.from_text("ok", model="response-model", usage={"input_tokens": 1}, cost=0.5)
-    entry = LMHistoryEntry(request=request, response=response, timestamp="timestamp", uuid="uuid")
+    entry = CallRecord(request=request, response=response, timestamp="timestamp", uuid="uuid")
     assert entry.model == "model"
     assert entry.prompt == "hi"
     assert entry.messages == [message]

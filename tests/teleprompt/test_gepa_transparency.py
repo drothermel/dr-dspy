@@ -1,5 +1,5 @@
 from dspy.adapters.json_adapter import JSONAdapter
-from dspy.runtime import TelemetryConfig
+from dspy.runtime import CallLogMode, TelemetryConfig
 from dspy.teleprompt.gepa.gepa_utils import DspyAdapter
 from dspy.utils.dummies import DummyLM
 from tests.task_spec.helpers import ts
@@ -12,7 +12,7 @@ def test_gepa_reflection_uses_predict_path(make_run):
     json_adapter = JSONAdapter()
     reflection_lm = DummyLM([{"new_instruction": "Better instruction."}], adapter=json_adapter)
     run = make_run(
-        lm=reflection_lm, adapter=json_adapter, telemetry=TelemetryConfig(transparency="strict", run_log_enabled=False)
+        lm=reflection_lm, adapter=json_adapter, telemetry=TelemetryConfig(transparency="strict", call_log=CallLogMode.memory)
     )
     adapter = DspyAdapter(
         student_module=student,

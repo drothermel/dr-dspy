@@ -21,7 +21,7 @@ from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm import LM
 from dspy.core.types import (
     Assistant,
-    LMHistoryEntry,
+    CallRecord,
     LMProviderOptions,
     LMRequest,
     LMResponse,
@@ -31,7 +31,7 @@ from dspy.core.types import (
     User,
 )
 from dspy.predict.predict import Predict
-from dspy.runtime import TelemetryConfig
+from dspy.runtime import CallLogMode, TelemetryConfig
 from dspy.utils.exceptions import LMConfigurationError
 from dspy.utils.usage_tracker import track_usage
 from tests.clients.lm.conftest import _direct_lm_case, _request
@@ -198,9 +198,9 @@ def test_base_lm_typed_call_returns_lm_response_and_records_history(make_run):
         response = asyncio.run(lm(request, run=run))
     assert isinstance(response, LMResponse)
     assert response.text == "Hi!"
-    assert len(lm.history) == 1
-    assert lm.history[0].request == request
-    assert lm.history[0].response == response
+    assert len(lm.call_log) == 1
+    assert lm.call_log[0].request == request
+    assert lm.call_log[0].response == response
     total_usage = usage_tracker.get_total_tokens()["custom-model"]
     assert total_usage["prompt_tokens"] == 1
     assert total_usage["completion_tokens"] == 2
@@ -360,8 +360,8 @@ def test_base_lm_copy_is_shallow_runtime_copy_with_isolated_dspy_state():
     lm = CustomLM(model="custom-model", callbacks=[callback], temperature=0.1)
     cast("Any", lm).client = client
     cast("Any", lm).extra_state = {"mutable": []}
-    lm.history = [
-        LMHistoryEntry(
+    lm.call_log = [
+        CallRecord(
             request=LMRequest.from_call(model="custom-model", prompt="original"),
             response=LMResponse.from_text("ok"),
             timestamp="timestamp",
@@ -372,8 +372,8 @@ def test_base_lm_copy_is_shallow_runtime_copy_with_isolated_dspy_state():
     assert copied_lm is not lm
     assert cast("Any", copied_lm).client is client
     assert cast("Any", copied_lm).extra_state is cast("Any", lm).extra_state
-    assert copied_lm.history == []
-    assert copied_lm.history is not lm.history
+    assert copied_lm.call_log == []
+    assert copied_lm.call_log is not lm.call_log
     assert copied_lm.callbacks == [callback]
     assert copied_lm.callbacks is not lm.callbacks
     assert copied_lm.kwargs == {"temperature": 0.2}
@@ -539,26 +539,26 @@ async def test_async_lm_call(make_run):
 @pytest.mark.asyncio
 async def test_lm_history_size_limit(make_run):
     lm = LM(model="openai/gpt-4o-mini")
-    run = make_run(lm=lm, telemetry=TelemetryConfig(max_history_size=5))
+    run = make_run(lm=lm, telemetry=TelemetryConfig(max_call_log_entries=5))
     with mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="test answer"))], model="openai/gpt-4o-mini"
         )
         for _ in range(10):
             await lm(_request(lm, prompt="query"), run=run)
-    assert len(lm.history) == 5
+    assert len(lm.call_log) == 5
 
 
 def test_disable_history(make_run):
     lm = LM(model="openai/gpt-4o-mini")
-    run = make_run(lm=lm, telemetry=TelemetryConfig(disable_history=True))
+    run = make_run(lm=lm, telemetry=TelemetryConfig(call_log=CallLogMode.off))
     with mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="test answer"))], model="openai/gpt-4o-mini"
         )
         for _ in range(10):
             asyncio.run(lm(_request(lm, prompt="query"), run=run))
-    assert len(lm.history) == 0
+    assert len(lm.call_log) == 0
     with mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[Choices(message=Message(content="test answer"))], model="openai/gpt-4o-mini"

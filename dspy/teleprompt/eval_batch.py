@@ -103,5 +103,5 @@ async def calculate_last_n_proposed_quality(base_program, trial_logs, evaluate, 
 
 async def get_task_model_history_for_full_example(candidate_program, task_model, devset, evaluate, run: RunContext):
     _ = await evaluate(candidate_program, run=run, devset=devset[:1])
-    _ = task_model.inspect_history(n=len(candidate_program.predictors()))
-    return task_model.inspect_history(n=len(candidate_program.predictors()))
+    _ = task_model.inspect_call_log(n=len(candidate_program.predictors()))
+    return task_model.inspect_call_log(n=len(candidate_program.predictors()))

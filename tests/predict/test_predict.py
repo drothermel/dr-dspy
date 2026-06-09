@@ -12,7 +12,7 @@ import pydantic
 import pytest
 from typing_extensions import override
 
-from dspy.runtime import TelemetryConfig
+from dspy.runtime import CallLogMode, TelemetryConfig
 
 try:
     from litellm import ModelResponse
@@ -992,18 +992,18 @@ def test_disable_trace(make_run):
 
 def test_per_module_history_size_limit(make_run):
     program = Predict(pspec("question -> answer"))
-    run = make_run(lm=DummyLM([{"answer": "Paris"}]), telemetry=TelemetryConfig(max_history_size=5))
+    run = make_run(lm=DummyLM([{"answer": "Paris"}]), telemetry=TelemetryConfig(max_call_log_entries=5))
     for _ in range(10):
         asyncio.run(program(question="What is the capital of France?", run=run))
-    assert len(program.history) == 5
+    assert len(program.call_log) == 5
 
 
 def test_per_module_history_disabled(make_run):
     program = Predict(pspec("question -> answer"))
-    run = make_run(lm=DummyLM([{"answer": "Paris"}]), telemetry=TelemetryConfig(disable_history=True))
+    run = make_run(lm=DummyLM([{"answer": "Paris"}]), telemetry=TelemetryConfig(call_log=CallLogMode.off))
     for _ in range(10):
         asyncio.run(program(question="What is the capital of France?", run=run))
-    assert len(program.history) == 0
+    assert len(program.call_log) == 0
 
 
 def test_input_field_default_value(make_run):
@@ -1026,14 +1026,14 @@ def test_input_field_default_value(make_run):
 
 def log_test_helper():
     from dspy.adapters.chat_adapter import ChatAdapter
-    from dspy.runtime import RunContext, TelemetryConfig
+    from dspy.runtime import CallLogMode, RunContext, TelemetryConfig
 
     dspy_logger = logging.getLogger("dspy")
     dspy_logger.propagate = True
     return RunContext.create(
         lm=DummyLM([{"answer": "test output"}]),
         adapter=ChatAdapter(),
-        telemetry=TelemetryConfig(transparency="off", run_log_enabled=False),
+        telemetry=TelemetryConfig(transparency="off", call_log=CallLogMode.memory),
         init_run_log=False,
     )
 

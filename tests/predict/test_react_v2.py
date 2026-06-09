@@ -83,7 +83,7 @@ def test_react_v2_continuation_omits_missing_original_inputs(make_run):
         )
     )
     assert pred.answer == "found cats"
-    second_call_messages = lm.history[1].messages_as_openai
+    second_call_messages = lm.call_log[1].messages_as_openai
     second_current_user_message = second_call_messages[-1]["content"]
     assert "[[ ## question ## ]]\nNone" not in second_current_user_message
     assert "[[ ## question ## ]]" not in second_current_user_message
@@ -188,11 +188,11 @@ def test_react_v2_forced_submit_on_empty_tool_calls(make_run):
     pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(question="cats", run=run))
     assert pred.answer == "forced"
     assert pred.termination_reason == "forced_submit"
-    reasoning = lm.history[0].request.config.reasoning
+    reasoning = lm.call_log[0].request.config.reasoning
     assert reasoning is not None
     assert reasoning.effort == "low"
-    assert lm.history[1].request.config.reasoning is None
-    assert lm.history[1].request.config.tool_choice is None
+    assert lm.call_log[1].request.config.reasoning is None
+    assert lm.call_log[1].request.config.tool_choice is None
 
 
 class NativeToolLM(BaseLM):
