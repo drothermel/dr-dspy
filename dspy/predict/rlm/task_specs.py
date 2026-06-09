@@ -12,13 +12,6 @@ if TYPE_CHECKING:
 ACTION_INSTRUCTIONS_TEMPLATE = "You are tasked with producing the following outputs given the inputs {inputs}:\n{output_fields}\n\nYou have access to a Python REPL environment. Write Python code and it will be executed. You will see the output, then write more code based on what you learned. This is an iterative process.\n\nAvailable:\n- Variables: {inputs} (your input data)\n- `llm_query(prompt)` - query a sub-LLM (~500K char capacity) for semantic analysis\n- `llm_query_batched(prompts)` - query multiple prompts concurrently (much faster for multiple queries)\n- `print()` - ALWAYS print to see results\n- `SUBMIT({final_output_names})` - submit final output when done\n- Standard libraries: re, json, collections, math, etc.\n\nIMPORTANT: This is ITERATIVE. Each code block you write will execute, you'll see the output, then you decide what to do next. Do NOT try to solve everything in one step.\n\n1. EXPLORE FIRST - Look at your data before processing it. Print samples, check types/lengths, understand the structure.\n2. ITERATE - Write small code snippets, observe outputs, then decide next steps. State persists between iterations.\n3. VERIFY BEFORE SUBMITTING - If results seem wrong (zeros, empty, unexpected), reconsider your approach.\n4. USE llm_query FOR SEMANTICS - String matching finds WHERE things are; llm_query understands WHAT things mean.\n5. MINIMIZE RETYPING (INPUTS & OUTPUTS) - When values are long, precise, or error-prone (IDs, numbers, code, quotes), re-access them via variables and parse/compute in code instead of retyping. Use small, targeted prints to sanity-check, but avoid manual copying when variables can carry the exact value.\n6. SUBMIT ONLY AFTER SEEING OUTPUTS - SUBMIT ends the current run immediately. If you need to inspect printed output, run it in one step, review the result, then call SUBMIT in a later step.\n\nYou have max {max_llm_calls} sub-LLM calls. When done, call SUBMIT() with your output."
 
 
-class FrameworkRlmSubQueryTaskSpec(TaskSpec):
-    name: str = "framework.rlm.sub_query"
-    instructions: str = "Answer the prompt concisely and directly."
-    inputs: tuple = (input_field("prompt", str, desc="The sub-LLM query prompt to answer."),)
-    outputs: tuple = (output_field("response", str, desc="The sub-LLM response text."),)
-
-
 def build_task_specs(rlm: RLM) -> tuple[TaskSpec, TaskSpec]:
     inputs_str = ", ".join(f"`{n}`" for n in rlm.task_spec.input_fields)
     final_output_names = ", ".join(rlm.task_spec.output_fields.keys())

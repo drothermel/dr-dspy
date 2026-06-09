@@ -8,11 +8,11 @@ from dspy.predict.predict import Predict
 from dspy.predict.rlm import execution as rlm_execution
 from dspy.predict.rlm import task_specs as rlm_task_specs
 from dspy.predict.rlm import tools as rlm_tools
-from dspy.predict.rlm.task_specs import FrameworkRlmSubQueryTaskSpec
 from dspy.predict.tools import normalize_tools
 from dspy.primitives import Module, Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import TaskSpec
+from dspy.task_spec.framework.rlm import FrameworkRlmSubQueryTaskSpec
 
 if TYPE_CHECKING:
     from dspy.adapters.types.tool import Tool

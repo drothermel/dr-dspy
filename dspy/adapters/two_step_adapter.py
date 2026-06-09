@@ -6,15 +6,15 @@ from dspy.adapters.base import Adapter
 from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.call.mode import AdapterCallMode
 from dspy.adapters.call.pipeline import AdapterCallPipeline
-from dspy.adapters.call.postprocess import strip_native_response_output_fields
 from dspy.adapters.prompt_format import get_field_spec_description_string
+from dspy.adapters.two_step.task_specs import build_extractor_task_spec
 from dspy.clients.base_lm import BaseLM
 from dspy.core.types.config import LMConfig
 from dspy.errors import AdapterOperationError
 from dspy.runtime.config import CallSite
 from dspy.runtime.run_context import RunContext
 from dspy.runtime.transparency import resolve_adapter, resolve_lm_config
-from dspy.task_spec import TaskSpec, input_field, make_task_spec
+from dspy.task_spec import TaskSpec
 
 
 class TwoStepAdapter(Adapter):
@@ -48,7 +48,10 @@ class TwoStepAdapter(Adapter):
 
     async def _run_extraction(self, *, original_task_spec: TaskSpec, text: str, run: RunContext) -> dict[str, Any]:
         extraction_adapter, _adapter_notes = resolve_adapter(self.extraction_adapter or run.adapter)
-        extractor_task_spec = self._create_extractor_task_spec(original_task_spec)
+        extractor_task_spec = build_extractor_task_spec(
+            original_task_spec,
+            native_response_types=self.native_response_types,
+        )
         config, _provenance = resolve_lm_config(self.extraction_model, LMConfig())
         extraction_site = CallSite(
             module="TwoStepAdapter",
@@ -115,15 +118,3 @@ class TwoStepAdapter(Adapter):
             f"{name}: {outputs.get(name, missing_field_message)}" for name in task_spec.output_fields if name in outputs
         ]
         return "\n\n".join(parts).strip()
-
-    def _create_extractor_task_spec(self, original_task_spec: TaskSpec) -> TaskSpec:
-        extractable_spec = strip_native_response_output_fields(original_task_spec, self.native_response_types)
-        new_fields = {
-            "text": input_field(
-                "text", str, desc="Raw completion text from the main language model to extract structured fields from."
-            ),
-            **dict(extractable_spec.output_fields),
-        }
-        outputs_str = ", ".join(f"`{field}`" for field in extractable_spec.output_fields)
-        instructions = f"The input is a text that should contain all the necessary information to produce the fields {outputs_str}. Your job is to extract the fields from the text verbatim. Extract precisely the appropriate value (content) for each field."
-        return make_task_spec(new_fields, instructions=instructions, name="framework.two_step.extractor")

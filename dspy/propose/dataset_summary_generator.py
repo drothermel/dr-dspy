@@ -8,59 +8,19 @@ import re
 
 from dspy.core.types.config import LMConfig
 from dspy.predict.predict import Predict
+from dspy.propose.task_specs import (
+    DatasetDescriptorTaskSpec,
+    DatasetDescriptorWithPriorObservationsTaskSpec,
+    ObservationSummarizerTaskSpec,
+)
 from dspy.propose.utils import strip_prefix
 from dspy.runtime.run_context import RunContext
-from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.task_spec_context import resolve_optimizer_lm
 from dspy.teleprompt.utils import optimizer_lm_context
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["create_dataset_summary"]
-
-
-class ObservationSummarizerTaskSpec(TaskSpec):
-    name: str = "framework.propose.observation_summarizer"
-    instructions: str = "Given a series of observations I have made about my dataset, please summarize them into a brief 2-3 sentence summary which highlights only the most important details."
-    inputs: tuple[FieldSpec, ...] = (
-        input_field("observations", str, desc="Observations I have made about my dataset"),
-    )
-    outputs: tuple[FieldSpec, ...] = (
-        output_field(
-            "summary",
-            str,
-            desc="Two-to-three sentence summary of only the most significant highlights of my observations",
-        ),
-    )
-
-
-class DatasetDescriptorTaskSpec(TaskSpec):
-    name: str = "framework.propose.dataset_descriptor"
-    instructions: str = "Given several examples from a dataset please write observations about trends that hold for most or all of the samples. Some areas you may consider in your observations: topics, content, syntax, conciseness, etc. It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative"
-    inputs: tuple[FieldSpec, ...] = (input_field("examples", str, desc="Sample data points from the dataset"),)
-    outputs: tuple[FieldSpec, ...] = (
-        output_field(
-            "observations",
-            str,
-            desc="Something that holds true for most or all of the data you observed",
-        ),
-    )
-
-
-class DatasetDescriptorWithPriorObservationsTaskSpec(TaskSpec):
-    name: str = "framework.propose.dataset_descriptor_with_prior"
-    instructions: str = "Given several examples from a dataset please write observations about trends that hold for most or all of the samples. I will also provide you with a few observations I have already made. Please add your own observations or if you feel the observations are comprehensive say 'COMPLETE'. Some areas you may consider in your observations: topics, content, syntax, conciseness, etc. It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative"
-    inputs: tuple[FieldSpec, ...] = (
-        input_field("examples", str, desc="Sample data points from the dataset"),
-        input_field("prior_observations", str, desc="Some prior observations I made about the data"),
-    )
-    outputs: tuple[FieldSpec, ...] = (
-        output_field(
-            "observations",
-            str,
-            desc="Something that holds true for most or all of the data you observed or COMPLETE if you have nothing to add",
-        ),
-    )
 
 
 def order_input_keys_in_string(unordered_repr):

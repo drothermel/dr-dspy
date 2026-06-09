@@ -7,11 +7,11 @@ from pydantic import BaseModel
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
-from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compilation import CompileResult, CompileStats
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, InferRulesCompileParams
 from dspy.teleprompt.errors import is_demo_shrinkable_error
+from dspy.teleprompt.infer_rules_specs import rules_induction_task_spec
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
@@ -150,23 +150,10 @@ class InferRules(BootstrapFewShot):
         return (await evaluate(program, run=run, metric=self.metric)).score
 
 
-def _rules_induction_task_spec(num_rules):
-    return make_task_spec(
-        {
-            "examples_text": input_field("examples_text", str, desc="Text containing examples"),
-            "natural_language_rules": output_field(
-                "natural_language_rules", str, desc="Induced natural language rules"
-            ),
-        },
-        instructions=f"Given a set of examples, extract a list of {num_rules} concise and non-redundant natural language rules that provide clear guidance for performing the task. All rules should be actionable for a well-specified scope of examples of this general kind of task.",
-        name="framework.infer_rules.induction",
-    )
-
-
 class RulesInductionProgram(Module):
     def __init__(self, num_rules, teacher_run: RunContext | None = None) -> None:
         super().__init__()
-        self.rules_induction = ChainOfThought(_rules_induction_task_spec(num_rules))
+        self.rules_induction = ChainOfThought(rules_induction_task_spec(num_rules))
         self.teacher_run = teacher_run
         self.rng = random.Random(0)
 
