@@ -1,3 +1,9 @@
+"""Public task_spec API.
+
+Import spine symbols from this package. Internal modules (``type_registry``,
+``validation`` helpers, ``annotation_format``) are not part of the public surface.
+"""
+
 from dspy.task_spec.annotation_format import get_annotation_name
 from dspy.task_spec.bindings import FieldBinding, field_bindings
 from dspy.task_spec.defaults import default_task_instructions
@@ -11,6 +17,8 @@ from dspy.task_spec.field_spec import (
     input_field,
     output_field,
 )
+from dspy.task_spec.parse import parse_task_spec_string
+from dspy.task_spec.serialize import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
 from dspy.task_spec.task_spec import TaskSpec, validate_task_spec
 from dspy.task_spec.validation import validate_task_inputs_from_spec
 
@@ -18,8 +26,11 @@ __all__ = [
     "FieldBinding",
     "FieldRole",
     "FieldSpec",
+    "TASK_SPEC_VERSION",
     "field_bindings",
     "field_desc_from_name",
+    "field_spec_from_dict",
+    "field_spec_to_dict",
     "format_field_value",
     "get_annotation_name",
     "TaskSpec",
@@ -28,6 +39,7 @@ __all__ = [
     "input_field",
     "make_task_spec",
     "output_field",
+    "parse_task_spec_string",
     "translate_field_type",
     "validate_task_inputs_from_spec",
     "validate_task_spec",

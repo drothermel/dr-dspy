@@ -231,3 +231,9 @@ def test_custom_types_in_string_spec():
         "input: CustomType -> output", instructions="Use custom type.", custom_types={"CustomType": CustomType}
     )
     assert spec.input_fields["input"].type_ is CustomType
+
+
+def test_optional_syntax_parses_equivalent_to_pep604_union():
+    optional_spec = make_task_spec("q: Optional[str] -> a", instructions="Answer.")
+    pep604_spec = make_task_spec("q: str | None -> a", instructions="Answer.")
+    assert optional_spec.input_fields["q"].type_ == pep604_spec.input_fields["q"].type_

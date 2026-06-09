@@ -7,7 +7,7 @@ from pydantic import Field
 
 from dspy.task_spec.field_spec import FieldSpec, field_desc_from_name, input_field, output_field
 from dspy.task_spec.task_spec import validate_task_spec_field_names
-from dspy.task_spec.type_registry import resolve_type_name
+from dspy.task_spec.type_registry import _union_from_args, resolve_type_name
 
 
 def parse_task_spec_string(
@@ -76,7 +76,6 @@ def _parse_type_node(node, names: dict[str, Any]) -> Any:
                 return names[full_name]
         raise ValueError(f"Unknown attribute: {attr_name} on {base}")
     if isinstance(node, ast.Subscript):
-        base_type = _parse_type_node(node.value, names)
         slice_node = node.slice
         index_type = getattr(ast, "Index", None)
         if index_type is not None and isinstance(slice_node, index_type):
@@ -85,6 +84,14 @@ def _parse_type_node(node, names: dict[str, Any]) -> Any:
             arg_types = tuple(_parse_type_node(elt, names) for elt in slice_node.elts)
         else:
             arg_types = (_parse_type_node(slice_node, names),)
+        if isinstance(node.value, ast.Name):
+            if node.value.id == "Optional":
+                if len(arg_types) != 1:
+                    raise ValueError("Optional[...] in task spec strings must have exactly one type argument.")
+                return arg_types[0] | type(None)
+            if node.value.id == "Union":
+                return _union_from_args(arg_types)
+        base_type = _parse_type_node(node.value, names)
         return base_type[arg_types]
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
         left = _parse_type_node(node.left, names)

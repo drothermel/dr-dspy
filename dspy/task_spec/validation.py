@@ -1,7 +1,15 @@
+"""Runtime task input validation.
+
+Special case preserved intentionally: ``str`` fields accept ``list[str]`` values for
+input formatting (multi-line text joined before the LM call).
+"""
+
 from __future__ import annotations
 
 import types
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, Union, get_args, get_origin
+
+from pydantic import TypeAdapter, ValidationError
 
 from dspy.task_spec.annotation_format import get_type_name
 
@@ -67,47 +75,8 @@ def _annotation_allows_none(annotation: Any) -> bool:
 def _is_value_compatible_with_type(value: Any, expected: type) -> bool:
     if expected is str and isinstance(value, list) and all(isinstance(item, str) for item in value):
         return True
-    return _check_type(value, expected)
-
-
-def _check_type(value: Any, expected: type) -> bool:
-    if expected is Any:
-        return True
-    origin = get_origin(expected)
-    args = get_args(expected)
-    if origin is Union or origin is types.UnionType:
-        return any(_check_type(value, arg) for arg in args)
-    if origin is Literal:
-        return value in args
-    if origin is list:
-        if not isinstance(value, list):
-            return False
-        if args:
-            return all(_check_type(item, args[0]) for item in value)
-        return True
-    if origin is dict:
-        if not isinstance(value, dict):
-            return False
-        if args:
-            key_type, val_type = args
-            return all(_check_type(k, key_type) and _check_type(v, val_type) for k, v in value.items())
-        return True
-    if origin is tuple:
-        if not isinstance(value, tuple):
-            return False
-        if args:
-            if len(args) == 2 and args[1] is Ellipsis:
-                return all(_check_type(item, args[0]) for item in value)
-            if len(value) != len(args):
-                return False
-            return all(_check_type(item, arg) for item, arg in zip(value, args, strict=False))
-        return True
-    if origin is set or origin is frozenset:
-        if not isinstance(value, origin):
-            return False
-        if args:
-            return all(_check_type(item, args[0]) for item in value)
-        return True
-    if isinstance(expected, type):
-        return isinstance(value, expected)
-    return False
+    try:
+        TypeAdapter(expected).validate_python(value)
+    except ValidationError:
+        return False
+    return True

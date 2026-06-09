@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from dspy.task_spec.field_spec import FieldRole, FieldSpec
+from dspy.task_spec.field_spec import _UNSET, FieldRole, FieldSpec
 from dspy.task_spec.serialize import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
 
 
@@ -83,7 +83,7 @@ class TaskSpec(BaseModel):
         desc: str | None = None,
         prefix: str | None = None,
         type_: Any = None,
-        constraints: str | None = None,
+        constraints: str | None | object = _UNSET,
     ) -> "TaskSpec":
         if name not in self.fields:
             raise KeyError(f"Unknown field: {name}")

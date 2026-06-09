@@ -81,7 +81,12 @@ class FieldSpec(BaseModel):
     default: Any = None
 
     def with_updates(
-        self, *, desc: str | None = None, prefix: str | None = None, type_: Any = None, constraints: str | None = None
+        self,
+        *,
+        desc: str | None = None,
+        prefix: str | None = None,
+        type_: Any = None,
+        constraints: str | None | object = _UNSET,
     ) -> "FieldSpec":
         updates: dict[str, Any] = {}
         if desc is not None:
@@ -90,6 +95,6 @@ class FieldSpec(BaseModel):
             updates["prefix"] = prefix
         if type_ is not None:
             updates["type"] = type_
-        if constraints is not None:
+        if constraints is not _UNSET:
             updates["constraints"] = constraints
         return self.model_copy(update=updates)
