@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import random
 
-from dspy._internal.lazy_import import require
-
-np = require("numpy", extra="numpy", feature="DummyVectorizer")
+import numpy as np
 
 
 class DummyVectorizer:
