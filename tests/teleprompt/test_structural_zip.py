@@ -3,6 +3,7 @@ import pytest
 from dspy.predict.predict import Predict
 from dspy.primitives import Module
 from dspy.teleprompt.bootstrap import BootstrapFewShot
+from dspy.teleprompt.bootstrap_session import BootstrapCompileSession
 from tests.task_spec.helpers import ts
 
 
@@ -32,7 +33,10 @@ def _always_true_metric(example, prediction, trace=None):
 
 def test_bootstrap_predictor_mapping_raises_on_structural_mismatch():
     bootstrap = BootstrapFewShot(metric=_always_true_metric)
-    bootstrap.student = OnePredictorModule()
-    bootstrap.teacher = TwoPredictorModule()
+    session = BootstrapCompileSession(
+        student=OnePredictorModule(),
+        teacher=TwoPredictorModule(),
+        trainset=[],
+    )
     with pytest.raises(AssertionError, match="same number of predictors"):
-        bootstrap._prepare_predictor_mappings()
+        bootstrap._prepare_predictor_mappings(session)

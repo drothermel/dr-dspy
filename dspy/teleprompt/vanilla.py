@@ -16,14 +16,14 @@ class LabeledFewShot:
 
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = LabeledFewShotCompileParams.model_validate(params)
-        self.student = student.reset_copy()
-        self.trainset = params.trainset
-        if len(self.trainset) == 0:
-            return CompileResult(program=self.student)
+        compiled_student = student.reset_copy()
+        trainset = params.trainset
+        if len(trainset) == 0:
+            return CompileResult(program=compiled_student)
         rng = random.Random(0)
-        for predictor in self.student.predictors():
+        for predictor in compiled_student.predictors():
             if params.sample:
-                predictor.demos = rng.sample(self.trainset, min(self.k, len(self.trainset)))
+                predictor.demos = rng.sample(trainset, min(self.k, len(trainset)))
             else:
-                predictor.demos = self.trainset[: min(self.k, len(self.trainset))]
-        return CompileResult(program=self.student)
+                predictor.demos = trainset[: min(self.k, len(trainset))]
+        return CompileResult(program=compiled_student)

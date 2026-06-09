@@ -199,11 +199,14 @@ class GRPO(FinetuneTeleprompter):
             )
         num_samples_per_input = self.num_rollouts_per_grpo_step // len(teachers)
 
+        compile_train_kwargs: dict[LM, dict[str, Any]] = {}
         for pred in student.predictors():
-            train_kwargs = self.train_kwargs[pred.lm]
-            train_kwargs = {} if train_kwargs is None else train_kwargs
+            if pred.lm in compile_train_kwargs:
+                continue
+            source_kwargs = self.train_kwargs[pred.lm]
+            train_kwargs = {} if source_kwargs is None else dict(source_kwargs)
             train_kwargs["num_generations"] = self.num_rollouts_per_grpo_step
-            self.train_kwargs[pred.lm] = train_kwargs
+            compile_train_kwargs[pred.lm] = train_kwargs
 
         logger.info("Preparing the GRPO training job(s)...")
         grpo_training_jobs: dict[tuple[LM, Any], Any] = {}
@@ -211,7 +214,7 @@ class GRPO(FinetuneTeleprompter):
             data_key = None if self.multitask else pred_ind
             job_key = (pred.lm, data_key)
             if job_key not in grpo_training_jobs:
-                train_kwargs = self.train_kwargs[pred.lm]
+                train_kwargs = compile_train_kwargs[pred.lm]
                 job = FinetuneService(pred.lm, train_kwargs=train_kwargs).reinforce(train_kwargs=train_kwargs)
                 grpo_training_jobs[job_key] = job
 

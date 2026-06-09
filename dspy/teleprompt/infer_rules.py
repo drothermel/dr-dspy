@@ -56,12 +56,12 @@ class InferRules(BootstrapFewShot):
         valset = params.valset
         if valset is None:
             trainset, valset = split_trainset_holdout(trainset, holdout_ratio=0.5, seed=params.split_seed)
-        await super().compile(
+        bootstrap_result = await super().compile(
             student,
             params=BootstrapFewShotCompileParams(trainset=trainset, teacher=params.teacher),
             run=run,
         )
-        original_program = self.student.deepcopy()
+        original_program = bootstrap_result.program.deepcopy()
         all_predictors = [p for p in original_program.predictors() if hasattr(p, "task_spec")]
         instructions_list = [get_task_spec(p).instructions for p in all_predictors]
         evaluator = make_optimizer_evaluator(

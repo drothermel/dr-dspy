@@ -12,6 +12,7 @@ from dspy.runtime import run_with_trace
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec.predictor_context import get_task_spec
+from dspy.teleprompt.bootstrap_session import BootstrapCompileSession
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, LabeledFewShotCompileParams
 from dspy.teleprompt.core.demos import trace_to_demos
@@ -42,34 +43,37 @@ class BootstrapFewShot:
         self.max_labeled_demos = max_labeled_demos
         self.max_rounds = max_rounds
         self.max_errors = max_errors
-        self.error_count = 0
         self.error_lock = threading.Lock()
 
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = BootstrapFewShotCompileParams.model_validate(params)
-        self.trainset = params.trainset
-        await self._prepare_student_and_teacher(student=student, teacher=params.teacher, run=run)
-        self._prepare_predictor_mappings()
-        await self._bootstrap(run=run)
-        self.student = self._train()
-        return CompileResult.with_compiled_program(self.student)
+        session = BootstrapCompileSession(
+            student=student.reset_copy(),
+            teacher=student.reset_copy(),
+            trainset=params.trainset,
+        )
+        await self._prepare_student_and_teacher(session, teacher=params.teacher, run=run)
+        self._prepare_predictor_mappings(session)
+        await self._bootstrap(session, run=run)
+        compiled_program = self._train(session)
+        return CompileResult.with_compiled_program(compiled_program)
 
-    async def _prepare_student_and_teacher(self, student, teacher, *, run: RunContext) -> None:
-        self.student = student.reset_copy()
-        self.teacher = teacher.deepcopy() if teacher is not None else student.deepcopy()
-        assert getattr(self.student, "_compiled", False) is False, "Student must be uncompiled."
-        if self.max_labeled_demos and getattr(self.teacher, "_compiled", False) is False:
+    async def _prepare_student_and_teacher(self, session: BootstrapCompileSession, teacher, *, run: RunContext) -> None:
+        session.student = session.student.reset_copy()
+        session.teacher = teacher.deepcopy() if teacher is not None else session.student.reset_copy()
+        assert getattr(session.student, "_compiled", False) is False, "Student must be uncompiled."
+        if self.max_labeled_demos and getattr(session.teacher, "_compiled", False) is False:
             teleprompter = LabeledFewShot(k=self.max_labeled_demos)
             teacher_result = await teleprompter.compile(
-                self.teacher.reset_copy(),
-                params=LabeledFewShotCompileParams(trainset=self.trainset),
+                session.teacher.reset_copy(),
+                params=LabeledFewShotCompileParams(trainset=session.trainset),
                 run=run,
             )
-            self.teacher = teacher_result.program
+            session.teacher = teacher_result.program
 
-    def _prepare_predictor_mappings(self) -> None:
+    def _prepare_predictor_mappings(self, session: BootstrapCompileSession) -> None:
         name2predictor, predictor2name = ({}, {})
-        student, teacher = (self.student, self.teacher)
+        student, teacher = (session.student, session.teacher)
         assert len(student.predictors()) == len(teacher.predictors()), (
             "Student and teacher must have the same number of predictors."
         )
@@ -84,26 +88,26 @@ class BootstrapFewShot:
             name2predictor[name1] = None
             predictor2name[id(predictor1)] = name1
             predictor2name[id(predictor2)] = name2
-        self.name2predictor = name2predictor
-        self.predictor2name = predictor2name
+        session.name2predictor = name2predictor
+        session.predictor2name = predictor2name
 
-    async def _bootstrap(self, *, run: RunContext, max_bootstraps=None) -> None:
+    async def _bootstrap(self, session: BootstrapCompileSession, *, run: RunContext, max_bootstraps=None) -> None:
         max_bootstraps = max_bootstraps or self.max_bootstrapped_demos
         bootstrapped = {}
-        self.name2traces = {name: [] for name in self.name2predictor}
-        for example_idx, example in enumerate(tqdm.tqdm(self.trainset)):
+        session.name2traces = {name: [] for name in session.name2predictor}
+        for example_idx, example in enumerate(tqdm.tqdm(session.trainset)):
             if len(bootstrapped) >= max_bootstraps:
                 break
             for round_idx in range(self.max_rounds):
-                if await self._bootstrap_one_example(example=example, round_idx=round_idx, run=run):
+                if await self._bootstrap_one_example(session, example=example, round_idx=round_idx, run=run):
                     bootstrapped[example_idx] = True
                     break
-        self.validation = [x for idx, x in enumerate(self.trainset) if idx not in bootstrapped]
-        random.Random(0).shuffle(self.validation)
+        session.validation = [x for idx, x in enumerate(session.trainset) if idx not in bootstrapped]
+        random.Random(0).shuffle(session.validation)
 
-    async def _bootstrap_one_example(self, example, round_idx=0, *, run: RunContext):
+    async def _bootstrap_one_example(self, session: BootstrapCompileSession, example, round_idx=0, *, run: RunContext):
         name2traces = {}
-        teacher = self.teacher
+        teacher = session.teacher
         predictor_cache = {}
         trace: list = []
         success = False
@@ -131,8 +135,8 @@ class BootstrapFewShot:
         except Exception as e:
             success = False
             with self.error_lock:
-                self.error_count += 1
-                current_error_count = self.error_count
+                session.error_count += 1
+                current_error_count = session.error_count
             effective_max_errors = resolve_max_errors(self.max_errors, run)
             if current_error_count >= effective_max_errors:
                 raise
@@ -141,21 +145,21 @@ class BootstrapFewShot:
             for name, predictor in teacher.named_predictors():
                 predictor.demos = predictor_cache[name]
         if success:
-            name2traces = trace_to_demos(trace, self.predictor2name)
+            name2traces = trace_to_demos(trace, session.predictor2name)
             for name, demos in name2traces.items():
                 if len(demos) > 1:
                     rng = random.Random(hash_pickle(tuple(demos)))
                     demos = [rng.choice(demos[:-1]) if rng.random() < 0.5 else demos[-1]]
-                self.name2traces[name].extend(demos)
+                session.name2traces[name].extend(demos)
         return success
 
-    def _train(self):
+    def _train(self, session: BootstrapCompileSession):
         rng = random.Random(0)
-        raw_demos = self.validation
-        for name, predictor in self.student.named_predictors():
-            augmented_demos = self.name2traces[name][: self.max_bootstrapped_demos]
+        raw_demos = session.validation
+        for name, predictor in session.student.named_predictors():
+            augmented_demos = session.name2traces[name][: self.max_bootstrapped_demos]
             sample_size = min(self.max_labeled_demos - len(augmented_demos), len(raw_demos))
             sample_size = max(0, sample_size)
             raw_demos = rng.sample(raw_demos, sample_size)
             predictor.demos = augmented_demos + raw_demos
-        return self.student
+        return session.student

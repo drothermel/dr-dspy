@@ -7,6 +7,7 @@ import pytest
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module
 from dspy.teleprompt.bootstrap import BootstrapFewShot
+from dspy.teleprompt.bootstrap_session import BootstrapCompileSession
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
@@ -100,14 +101,17 @@ def test_teacher_demos_restored_on_trace_failure(make_run):
     lm = DummyLM(cast("Any", ["Initial thoughts"]))
     run = make_run(lm=lm)
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1, max_errors=10)
-    bootstrap.student = student.reset_copy()
-    bootstrap.teacher = teacher
-    bootstrap.name2traces = {"predictor": []}
-    bootstrap._prepare_predictor_mappings()
+    session = BootstrapCompileSession(
+        student=student.reset_copy(),
+        teacher=teacher,
+        trainset=trainset,
+        name2traces={"predictor": []},
+    )
+    bootstrap._prepare_predictor_mappings(session)
 
     with patch("dspy.teleprompt.bootstrap.run_with_trace", new_callable=AsyncMock) as mock_trace:
         mock_trace.side_effect = RuntimeError("trace failed")
-        asyncio.run(bootstrap._bootstrap_one_example(example=examples[0], run=run))
+        asyncio.run(bootstrap._bootstrap_one_example(session, example=examples[0], run=run))
 
     assert teacher.predictor.demos == original_demos
 
