@@ -9,8 +9,8 @@ from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.call.policies.parse_fallback import JSONParseFallbackPolicy, NoOpParseFallbackPolicy
 from dspy.adapters.format_shared import FIELD_HEADER_PATTERN, ChatFormatMixin, FieldInfoWithName
 from dspy.adapters.json_adapter import JSONAdapter
-from dspy.adapters.utils import parse_value
-from dspy.utils.exceptions import AdapterParseError
+from dspy.adapters.utils import parse_output_field, validate_parsed_fields
+from dspy.task_spec.pydantic_bridge import task_spec_output_field_infos
 
 if TYPE_CHECKING:
     from dspy.adapters.types.base_type import Type
@@ -71,17 +71,13 @@ class ChatAdapter(ChatFormatMixin, Adapter):
         fields = {}
         for k, v in sections:
             if k not in fields and k in task_spec.output_fields:
-                try:
-                    fields[k] = parse_value(value=v, annotation=task_spec.output_fields[k].type_)
-                except Exception as e:
-                    raise AdapterParseError(
-                        adapter_name="ChatAdapter",
-                        task_spec=task_spec,
-                        lm_response=completion,
-                        message=f"Failed to parse field {k} with value {v} from the LM response. Error message: {e}",
-                    )
-        if fields.keys() != task_spec.output_fields.keys():
-            raise AdapterParseError(
-                adapter_name="ChatAdapter", task_spec=task_spec, lm_response=completion, parsed_result=fields
-            )
+                fields[k] = parse_output_field(
+                    adapter_name="ChatAdapter",
+                    task_spec=task_spec,
+                    field_name=k,
+                    raw_value=v,
+                    lm_response=completion,
+                    field_info=task_spec_output_field_infos(task_spec)[k],
+                )
+        validate_parsed_fields(adapter_name="ChatAdapter", task_spec=task_spec, lm_response=completion, fields=fields)
         return fields

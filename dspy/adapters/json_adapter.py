@@ -16,9 +16,10 @@ from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import (
     format_field_value,
     get_annotation_name,
-    parse_value,
+    parse_output_field,
     serialize_for_json,
     translate_field_type,
+    validate_parsed_fields,
 )
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
 from dspy.utils.exceptions import AdapterParseError
@@ -123,11 +124,15 @@ class JSONAdapter(ChatFormatMixin, Adapter):
         fields = {k: v for k, v in fields.items() if k in task_spec.output_fields}
         for k, v in fields.items():
             if k in task_spec.output_fields:
-                fields[k] = parse_value(value=v, annotation=task_spec.output_fields[k].type_)
-        if fields.keys() != task_spec.output_fields.keys():
-            raise AdapterParseError(
-                adapter_name="JSONAdapter", task_spec=task_spec, lm_response=completion, parsed_result=fields
-            )
+                fields[k] = parse_output_field(
+                    adapter_name="JSONAdapter",
+                    task_spec=task_spec,
+                    field_name=k,
+                    raw_value=v,
+                    lm_response=completion,
+                    field_info=task_spec_output_field_infos(task_spec)[k],
+                )
+        validate_parsed_fields(adapter_name="JSONAdapter", task_spec=task_spec, lm_response=completion, fields=fields)
         return fields
 
     @override

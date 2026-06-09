@@ -1,14 +1,52 @@
 import ast
 import enum
 import types
-from typing import Literal, Union, cast, get_args, get_origin
+from typing import Any, Literal, Union, cast, get_args, get_origin
 
 import json_repair
 import pydantic
 from pydantic import TypeAdapter
+from pydantic.fields import FieldInfo
 
 from dspy.adapters.types.base_type import Type as DspyType
 from dspy.adapters.utils.fields import _annotation_is_subclass
+from dspy.utils.exceptions import AdapterParseError
+
+
+def validate_parsed_fields(
+    *,
+    adapter_name: str,
+    task_spec: Any,
+    lm_response: str,
+    fields: dict[str, Any],
+) -> None:
+    if fields.keys() != task_spec.output_fields.keys():
+        raise AdapterParseError(
+            adapter_name=adapter_name,
+            task_spec=task_spec,
+            lm_response=lm_response,
+            parsed_result=fields,
+        )
+
+
+def parse_output_field(
+    *,
+    adapter_name: str,
+    task_spec: Any,
+    field_name: str,
+    raw_value: object,
+    lm_response: str,
+    field_info: FieldInfo,
+) -> object:
+    try:
+        return parse_value(raw_value, field_info.annotation)
+    except Exception as exc:
+        raise AdapterParseError(
+            adapter_name=adapter_name,
+            task_spec=task_spec,
+            lm_response=lm_response,
+            message=f"Failed to parse field {field_name!r}: {exc}",
+        ) from exc
 
 
 def find_enum_member(enum_type: enum.EnumMeta, identifier: object) -> enum.Enum:

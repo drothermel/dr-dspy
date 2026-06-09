@@ -10,12 +10,12 @@ from dspy.adapters.utils import (
     build_multimodal_user_message_content,
     format_field_value,
     inputs_include_multimodal_custom_type_values,
-    parse_value,
+    parse_output_field,
     translate_field_type,
+    validate_parsed_fields,
 )
 from dspy.task_spec import TaskSpec
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
-from dspy.utils.exceptions import AdapterParseError
 
 
 class XMLAdapter(ChatAdapter):
@@ -116,24 +116,15 @@ class XMLAdapter(ChatAdapter):
             if name in task_spec.output_fields and name not in raw_fields:
                 raw_fields[name] = content
         fields = {
-            k: self._parse_field_value(
-                field_type=task_spec.output_fields[k].type_, raw=v, completion=completion, task_spec=task_spec
+            k: parse_output_field(
+                adapter_name="XMLAdapter",
+                task_spec=task_spec,
+                field_name=k,
+                raw_value=v,
+                lm_response=completion,
+                field_info=task_spec_output_field_infos(task_spec)[k],
             )
             for k, v in raw_fields.items()
         }
-        if fields.keys() != task_spec.output_fields.keys():
-            raise AdapterParseError(
-                adapter_name="XMLAdapter", task_spec=task_spec, lm_response=completion, parsed_result=fields
-            )
+        validate_parsed_fields(adapter_name="XMLAdapter", task_spec=task_spec, lm_response=completion, fields=fields)
         return fields
-
-    def _parse_field_value(self, field_type: object, raw: str, completion: str, task_spec: TaskSpec) -> object:
-        try:
-            return parse_value(value=raw, annotation=field_type)
-        except Exception as e:
-            raise AdapterParseError(
-                adapter_name="XMLAdapter",
-                task_spec=task_spec,
-                lm_response=completion,
-                message=f"Failed to parse field {field_type} with value {raw}: {e}",
-            )
