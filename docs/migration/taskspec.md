@@ -129,6 +129,13 @@ Framework TaskSpecs are colocated under `dspy.task_spec.framework/`; optimizer-o
 
 Field descriptions are required on `input_field` / `output_field` (no `${name}` placeholders). Use `field_desc_from_name(name)` when deriving descriptions from field names at parse time.
 
+## Wire format
+
+Persisted task specs use `TaskSpec.to_dict()` and `TaskSpec.from_dict()`. Wire
+models (`FieldSpecWire`, `TaskSpecWire` in `dspy.task_spec.wire`) are internal;
+use the domain methods at save/load boundaries. Saved payloads include
+`task_spec_version: 3`; older versions are rejected.
+
 ## Saved program state
 
 Saved programs now store `task_spec` instead of `signature`. Reload with the current DSPy version; legacy signature-only state is rejected.

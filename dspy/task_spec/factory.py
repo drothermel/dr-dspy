@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 
 from dspy.task_spec.field_spec import FieldRole, FieldSpec
+from dspy.task_spec.invariants import validate_non_empty_fields
 from dspy.task_spec.parse import parse_task_spec_string
 from dspy.task_spec.task_spec import TaskSpec
 
@@ -31,8 +32,8 @@ def make_task_spec(
         output_fields = tuple(outputs or ())
         _validate_field_roles(input_fields, FieldRole.INPUT)
         _validate_field_roles(output_fields, FieldRole.OUTPUT)
-        if not input_fields and (not output_fields):
-            raise ValueError("inputs and outputs must contain at least one field.")
+        if not input_fields and not output_fields:
+            validate_non_empty_fields(input_fields, output_fields)
         resolved_name = name or (input_fields[0].name if input_fields else output_fields[0].name)
         return TaskSpec(name=resolved_name, instructions=instructions, inputs=input_fields, outputs=output_fields)
     if not isinstance(spec, dict):
@@ -46,8 +47,8 @@ def make_task_spec(
             input_fields.append(field)
         else:
             output_fields.append(field)
-    if not input_fields and (not output_fields):
-        raise ValueError("spec dict must contain at least one input or output field.")
+    if not input_fields and not output_fields:
+        validate_non_empty_fields(tuple(input_fields), tuple(output_fields))
     resolved_name = name or (input_fields[0].name if input_fields else output_fields[0].name)
     return TaskSpec(
         name=resolved_name, instructions=instructions, inputs=tuple(input_fields), outputs=tuple(output_fields)

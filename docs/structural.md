@@ -375,6 +375,8 @@ embedder merge aligned with LM-config overlay semantics; tests split into
 
 ### P2.3 Make TaskSpec serialization and formatting contracts explicit
 
+**Status:** Done (2026-06).
+
 **Sources:** External review; Manual review.
 
 Problem:
@@ -398,6 +400,14 @@ Details to preserve:
 - Field default round trips and fingerprint behavior should stay unchanged.
 - Avoid duplicating validation once ingest-model validators cover the same
   invariants.
+
+**Delivered:** Spec-shape invariants in `dspy/task_spec/invariants.py` (distinct
+from runtime input validation in `validation.py`); strict Pydantic wire models
+`FieldSpecWire` / `TaskSpecWire` in `dspy/task_spec/wire.py` with `extra="forbid"`;
+`TaskSpec.to_dict()` / `from_dict()` as the supported persistence boundary;
+unified type-annotation display in `dspy/task_spec/type_format.py` (adapters
+import for prompt rendering); deleted `serialize.py` and `annotation_format.py`;
+removed internal wire helpers from public `dspy.task_spec` exports.
 
 ### P2.4 Centralize persistence ownership
 
