@@ -75,6 +75,7 @@ Do not claim exact reproduction of existing `nl_latents` pool curves through `Pr
 | P2-6 | Advanced provider option gaps | Not started | |
 | P2-7 | Smaller DSPy footguns | Not started | |
 | V-1 | Final verification matrix | Not started | |
+| V-2 | Live OpenRouter `gpt-5-nano` endpoint test | Not started | Required before the plan is considered fully tested. |
 
 ## Cross-Repo Context from `docs/final_review_drllm.md`
 
@@ -696,6 +697,7 @@ At minimum, add or update tests for these gaps as the corresponding workstreams 
 | dr-llm mapping | Provider-specific reasoning/config cases for the default T1 controls, if implemented. |
 | dr-llm lifecycle | Pool copy/close/use-after-close behavior. |
 | dr-llm contract | `LMConfig(n=1)` behavior and optimizer proposal paths. |
+| Live OpenRouter endpoint | A live test that uses the local `OPENROUTER_API_KEY`, calls OpenRouter with `gpt-5-nano` through the dr-dspy dr-llm integration, and verifies a non-empty model result plus expected OpenRouter/provider metadata. |
 
 Useful existing focused checks from the review:
 
@@ -709,7 +711,9 @@ Useful existing focused checks from the review:
 uv run pytest tests/clients/dr_llm/test_contract.py tests/clients/dr_llm/test_mapping.py tests/clients/dr_llm/test_direct_lm.py tests/clients/dr_llm/test_pool_lm.py tests/clients/dr_llm/test_dr_llm_errors.py -q
 ```
 
-Postgres integration checks were skipped during review because no integration DSN was configured. Do not require a live provider call or Postgres integration for ordinary unit verification, but document any integration command that would strengthen confidence when credentials are available.
+Postgres integration checks were skipped during review because no integration DSN was configured. Do not require Postgres integration for ordinary unit verification, but document any integration command that would strengthen confidence when a DSN is available.
+
+The final plan must include a non-optional live provider smoke test for OpenRouter `gpt-5-nano`. The local environment is expected to provide `OPENROUTER_API_KEY`. Add a dedicated live test, mark it with the repo's live-LLM marker convention, and run it before marking `V-1` or `V-2` done. The test should actually hit the OpenRouter endpoint through `DrLlmDirectLM` or the direct dr-llm request path used by the bridge, assert that the response content is non-empty, and assert provider/provenance metadata strongly enough to catch accidental routing through a different provider.
 
 ## Experiment Readiness Checklist
 
@@ -720,6 +724,11 @@ Before marking `V-1` done, verify the repository supports or clearly rejects the
   - Create an explicit `RunContext` with `JSONAdapter` or `XMLAdapter`.
   - Run a `TaskSpec`-based `Predict` or `ChainOfThought`.
   - Run `Evaluate` over a non-empty devset.
+- Live OpenRouter endpoint run:
+  - Require `OPENROUTER_API_KEY` in the environment; do not silently skip this check when declaring the full plan tested.
+  - Call `gpt-5-nano` through OpenRouter, for example `DrLlmDirectLM("openrouter/openai/gpt-5-nano", ...)` with the provider-specific controls supported by the final bridge.
+  - Verify the call reaches OpenRouter, returns non-empty text, and records provider/provenance metadata.
+  - Record the exact live-test command and result in this document's status notes.
 - Pool backend cache-first run:
   - Create `DrLlmPoolLM(..., pool_config=...)`.
   - Use `aforward` for cache-first single completions.
@@ -743,5 +752,6 @@ When you finish the implementation:
 1. Update every relevant status row and note any intentionally deferred work.
 2. Run the required commit gates.
 3. Run focused tests for changed areas.
-4. Summarize the final supported dr-llm experiment path in docs or examples.
-5. Commit only the intended changes.
+4. Run the live OpenRouter `gpt-5-nano` test with `OPENROUTER_API_KEY` set and record the result. If the key is unavailable or the endpoint is down, mark the plan blocked rather than fully tested.
+5. Summarize the final supported dr-llm experiment path in docs or examples.
+6. Commit only the intended changes.
