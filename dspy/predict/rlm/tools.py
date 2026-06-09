@@ -4,9 +4,10 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
-from dspy.adapters.types.tool import Tool
+from dspy.adapters.types.tool import Tool  # noqa: TC001 — runtime validate_tools signature
 from dspy.core.types.call_options import PredictOptions
 from dspy.predict.rlm.sync_bridge import _run_sub_lm_async
+from dspy.predict.tools import RLM_RESERVED_TOOL_NAMES, validate_tool_names
 from dspy.runtime.config import CallSite
 
 if TYPE_CHECKING:
@@ -14,34 +15,14 @@ if TYPE_CHECKING:
 
     from dspy.predict.rlm.module import RLM
     from dspy.runtime.run_context import RunContext
-RESERVED_TOOL_NAMES = frozenset({"llm_query", "llm_query_batched", "SUBMIT", "print"})
-
-
-def normalize_tools(tools: list[Tool] | None) -> dict[str, Tool]:
-    if not tools:
-        return {}
-    if isinstance(tools, dict):
-        raise TypeError(
-            "tools must be a list, not a dict. Change tools={'name': func} to tools=[Tool(func, description='...')] (tool names are inferred from function names, or use Tool(func, name='custom_name'))"
-        )
-    tool_map: dict[str, Tool] = {}
-    for tool in tools:
-        if not isinstance(tool, Tool):
-            raise TypeError(
-                "tools must be Tool instances with an explicit description. Use Tool(func, description='...')."
-            )
-        if tool.name is None:
-            raise ValueError("Tool name could not be determined.")
-        tool_map[tool.name] = tool
-    return tool_map
 
 
 def validate_tools(tools: dict[str, Tool]) -> None:
-    for name in tools:
-        if not name.isidentifier():
-            raise ValueError(f"Invalid tool name '{name}': must be a valid Python identifier")
-        if name in RESERVED_TOOL_NAMES:
-            raise ValueError(f"Tool name '{name}' conflicts with built-in sandbox function")
+    validate_tool_names(
+        tools,
+        reserved=RLM_RESERVED_TOOL_NAMES,
+        require_identifiers=True,
+    )
 
 
 def format_tool_docs(tools: dict[str, Tool]) -> str:

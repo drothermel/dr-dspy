@@ -9,6 +9,7 @@ from dspy.predict.rlm import execution as rlm_execution
 from dspy.predict.rlm import task_specs as rlm_task_specs
 from dspy.predict.rlm import tools as rlm_tools
 from dspy.predict.rlm.task_specs import FrameworkRlmSubQueryTaskSpec
+from dspy.predict.tools import normalize_tools
 from dspy.primitives import Module, Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import TaskSpec
@@ -41,7 +42,7 @@ class RLM(Module):
         self.verbose = verbose
         self.sub_lm = sub_lm
         self._interpreter = interpreter
-        self._user_tools = rlm_tools.normalize_tools(tools)
+        self._user_tools = normalize_tools(tools)
         rlm_tools.validate_tools(self._user_tools)
         action_sig, extract_sig = rlm_task_specs.build_task_specs(self)
         self.generate_action = Predict(action_sig)

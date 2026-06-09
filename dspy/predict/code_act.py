@@ -1,4 +1,3 @@
-import inspect
 import json
 import logging
 import re
@@ -10,6 +9,7 @@ from dspy.core.types.call_options import ModuleCallOptions
 from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
+from dspy.predict.tools import normalize_tools
 from dspy.primitives import FinalOutput, Module, Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.propose.source_format import get_formatted_source
@@ -28,17 +28,7 @@ class CodeAct(Module):
             raise TypeError(f"CodeAct requires a TaskSpec instance, got {type(task_spec).__name__}.")
         self.task_spec = task_spec
         self.max_iters = max_iters
-        tools_by_name: dict[str, Tool] = {}
-        for tool in tools:
-            if not isinstance(tool, Tool):
-                raise TypeError(
-                    "tools must be Tool instances with an explicit description. Use Tool(func, description='...')."
-                )
-            if not inspect.isfunction(tool.func):
-                raise ValueError("CodeAct only accepts functions and not callable objects.")
-            if tool.name is None:
-                raise ValueError("Tool name could not be determined.")
-            tools_by_name[tool.name] = tool
+        tools_by_name = normalize_tools(tools, require_plain_function=True)
         instructions = self._build_instructions(task_spec, tools_by_name)
         codeact_task_spec = (
             make_task_spec(dict(task_spec.input_fields), instructions="\n".join(instructions))

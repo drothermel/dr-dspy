@@ -5,6 +5,7 @@ from dspy.core.types.call_options import ModuleCallOptions
 from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.avatar.models import Action, ActionOutput
 from dspy.predict.predict import Predict
+from dspy.predict.tools import normalize_tools
 from dspy.primitives import Module, Prediction
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
@@ -24,15 +25,7 @@ class Avatar(Module):
         self.task_spec = task_spec
         self.input_fields = task_spec.input_fields
         self.output_fields = task_spec.output_fields
-        tools_by_name: dict[str, Tool] = {}
-        for tool in tools:
-            if not isinstance(tool, Tool):
-                raise TypeError(
-                    "tools must be Tool instances with an explicit description. Use Tool(func, description='...')."
-                )
-            if tool.name is None:
-                raise ValueError("Tool name could not be determined.")
-            tools_by_name[tool.name] = tool
+        tools_by_name = normalize_tools(tools)
         outputs = ", ".join([f"`{k}`" for k in task_spec.output_fields])
         tools_by_name["Finish"] = Tool(
             func=lambda: "Completed.",

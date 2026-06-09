@@ -6,6 +6,7 @@ from dspy.core.types.call_options import ModuleCallOptions
 from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
+from dspy.predict.tools import normalize_tools
 from dspy.primitives import Module, Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
@@ -20,15 +21,7 @@ class ReAct(Module):
             raise TypeError(f"ReAct requires a TaskSpec instance, got {type(task_spec).__name__}.")
         self.task_spec = task_spec
         self.max_iters = max_iters
-        tools_by_name: dict[str, Tool] = {}
-        for tool in tools:
-            if not isinstance(tool, Tool):
-                raise TypeError(
-                    "tools must be Tool instances with an explicit description. Use Tool(func, description='...')."
-                )
-            if tool.name is None:
-                raise ValueError("Tool name could not be determined.")
-            tools_by_name[tool.name] = tool
+        tools_by_name = normalize_tools(tools)
         inputs = ", ".join([f"`{k}`" for k in task_spec.input_fields])
         outputs = ", ".join([f"`{k}`" for k in task_spec.output_fields])
         instr = [f"{task_spec.instructions}\n"] if task_spec.instructions else []

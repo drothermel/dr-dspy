@@ -12,6 +12,7 @@ from dspy.core.types.config import LMConfig, LMToolChoice
 from dspy.errors import AdapterParseError
 from dspy.history import TruncationExhaustedError, TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.predict import Predict
+from dspy.predict.tools import normalize_tools
 from dspy.primitives import Module, Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
@@ -26,15 +27,7 @@ class ReActV2(Module):
             raise TypeError(f"ReActV2 requires a TaskSpec instance, got {type(task_spec).__name__}.")
         self.task_spec = task_spec
         self.max_iters = max_iters
-        self.tools = {}
-        for tool in tools:
-            if not isinstance(tool, Tool):
-                raise TypeError(
-                    "tools must be Tool instances with an explicit description. Use Tool(func, description='...')."
-                )
-            if tool.name is None:
-                raise ValueError("Tool name could not be determined.")
-            self.tools[tool.name] = tool
+        self.tools = normalize_tools(tools)
         if "submit" in self.tools:
             raise ValueError("`submit` is reserved by ReActV2 as the final-output tool.")
         self.tools["submit"] = self._make_submit_tool()
