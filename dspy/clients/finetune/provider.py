@@ -30,7 +30,7 @@ class TrainingJob(Future):
         raise NotImplementedError
 
 
-class _UnsupportedReinforceJob:
+class UnsupportedReinforceJob:
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         raise RuntimeError("Reinforce is not supported by this provider.")
 
@@ -55,7 +55,7 @@ class DefaultFinetuneProvider:
     finetunable = False
     reinforceable = False
     TrainingJob: type[TrainingJob] = TrainingJob
-    ReinforceJob: type[ReinforceJobProtocol] = _UnsupportedReinforceJob
+    ReinforceJob: type[ReinforceJobProtocol] = UnsupportedReinforceJob
 
     @staticmethod
     def is_provider_model(_model: str) -> bool:

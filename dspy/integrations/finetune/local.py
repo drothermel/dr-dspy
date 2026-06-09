@@ -12,7 +12,7 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any, cast
 
-from dspy.clients.finetune.provider import TrainingJob, _UnsupportedReinforceJob
+from dspy.clients.finetune.provider import TrainingJob, UnsupportedReinforceJob
 from dspy.clients.finetune.utils import TrainDataFormat, save_data, validate_data_format
 
 if TYPE_CHECKING:
@@ -36,7 +36,7 @@ class LocalProvider:
     finetunable = True
     reinforceable = False
     TrainingJob: type[TrainingJob] = TrainingJob
-    ReinforceJob: type[ReinforceJobProtocol] = _UnsupportedReinforceJob
+    ReinforceJob: type[ReinforceJobProtocol] = UnsupportedReinforceJob
 
     @staticmethod
     def is_provider_model(model: str) -> bool:
@@ -51,7 +51,7 @@ class LocalProvider:
         if hasattr(lm, "process"):
             logger.info("Server is already launched.")
             return
-        launch_kwargs = launch_kwargs or lm.launch_kwargs
+        launch_kwargs = launch_kwargs or {}
         import os
 
         model = lm.model

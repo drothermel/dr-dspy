@@ -114,9 +114,6 @@ def test_lm_after_dump_and_load_state(make_run):
         "temperature": 1,
         "max_tokens": 100,
         "num_retries": 10,
-        "finetuning_model": None,
-        "launch_kwargs": {},
-        "train_kwargs": {},
         PROVIDER_OPTIONS_STATE_KEY: {"extensions": {}},
     }
     assert lm.dump_state() == expected_lm_state

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import orjson
 from typing_extensions import override
 
-from dspy.clients.finetune.provider import TrainingJob, _UnsupportedReinforceJob
+from dspy.clients.finetune.provider import TrainingJob, UnsupportedReinforceJob
 from dspy.clients.finetune.utils import TrainDataFormat, get_finetune_directory, validate_data_format
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ class DatabricksProvider:
     finetunable = True
     reinforceable = False
     TrainingJob: type[TrainingJob] = TrainingJobDatabricks
-    ReinforceJob: type[ReinforceJobProtocol] = _UnsupportedReinforceJob
+    ReinforceJob: type[ReinforceJobProtocol] = UnsupportedReinforceJob
 
     @staticmethod
     def is_provider_model(model: str) -> bool:

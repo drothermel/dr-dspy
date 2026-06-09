@@ -5,8 +5,8 @@ Providers are namespace classes: static methods plus nested ``TrainingJob`` and
 convenience (for example ``OpenAIProvider()``), but the protocol is satisfied
 by the class itself — do not assume providers must be instantiated to work.
 
-``is_provider_model`` on each vendor drives ``infer_provider`` in
-``dspy.clients.finetune.lm``:
+``is_provider_model`` on each vendor drives ``infer_finetune_provider`` in
+``dspy.clients.finetune.registry`` (used by ``FinetuneService``):
 
 - ``databricks/{endpoint}`` → ``DatabricksProvider``
 - ``local:{path}`` → ``LocalProvider``

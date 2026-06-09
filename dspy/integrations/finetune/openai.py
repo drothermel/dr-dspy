@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from dspy.clients.finetune.provider import TrainingJob, _UnsupportedReinforceJob
+from dspy.clients.finetune.provider import TrainingJob, UnsupportedReinforceJob
 from dspy.clients.finetune.utils import TrainDataFormat, TrainingStatus, save_data, validate_data_format
 
 if TYPE_CHECKING:
@@ -55,7 +55,7 @@ class OpenAIProvider:
     finetunable = True
     reinforceable = False
     TrainingJob: type[TrainingJob] = TrainingJobOpenAI
-    ReinforceJob: type[ReinforceJobProtocol] = _UnsupportedReinforceJob
+    ReinforceJob: type[ReinforceJobProtocol] = UnsupportedReinforceJob
 
     @staticmethod
     def is_provider_model(_model: str) -> bool:

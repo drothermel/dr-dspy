@@ -12,9 +12,6 @@ from dspy.clients.errors import (
     _exception_status,
     _lm_error_class_from_status,
 )
-from dspy.clients.finetune import ReinforceJob, TrainDataFormat, TrainingJob
-from dspy.clients.finetune import lm as finetune_lm
-from dspy.clients.finetune.protocol import FinetuneProvider
 from dspy.clients.lm.errors import _lm_error_class_from_litellm_exception
 from dspy.clients.lm.litellm_access import _get_litellm
 from dspy.clients.lm.transport import (
@@ -47,10 +44,6 @@ class LM(BaseLM):
         max_tokens: int | None = None,
         callbacks: list[Callback] | None = None,
         num_retries: int = 3,
-        provider: FinetuneProvider | None = None,
-        finetuning_model: str | None = None,
-        launch_kwargs: dict[str, Any] | None = None,
-        train_kwargs: dict[str, Any] | None = None,
         use_developer_role: bool = False,
         provider_options: LMProviderOptions | None = None,
     ) -> None:
@@ -64,10 +57,6 @@ class LM(BaseLM):
             callbacks=callbacks,
             provider_options=merged_provider,
         )
-        self.provider = provider or finetune_lm.infer_provider(self.model)
-        self.finetuning_model = finetuning_model
-        self.launch_kwargs = launch_kwargs or {}
-        self.train_kwargs = train_kwargs or {}
         self.use_developer_role = use_developer_role
 
     @override
@@ -176,36 +165,9 @@ class LM(BaseLM):
         self._check_truncation(results)
         return lm_response_for_model_type(self.model_type, results, request, self)
 
-    def launch(self, launch_kwargs: dict[str, Any] | None = None) -> None:
-        finetune_lm.launch(self, launch_kwargs)
-
-    def kill(self, launch_kwargs: dict[str, Any] | None = None) -> None:
-        finetune_lm.kill(self, launch_kwargs)
-
-    def finetune(
-        self,
-        train_data: list[dict[str, Any]],
-        train_data_format: TrainDataFormat | None,
-        train_kwargs: dict[str, Any] | None = None,
-    ) -> TrainingJob:
-        return finetune_lm.finetune(self, train_data, train_data_format, train_kwargs)
-
-    def reinforce(self, train_kwargs: dict[str, Any]) -> ReinforceJob:
-        return finetune_lm.reinforce(self, train_kwargs)
-
-    def infer_provider(self) -> FinetuneProvider:
-        return finetune_lm.infer_provider(self.model)
-
     @override
     def dump_state(self):
         state = super().dump_state()
-        state.update(
-            {
-                "finetuning_model": self.finetuning_model,
-                "launch_kwargs": self.launch_kwargs,
-                "train_kwargs": self.train_kwargs,
-            }
-        )
         if self.use_developer_role:
             state["use_developer_role"] = self.use_developer_role
         return validate_lm_state(state)
@@ -214,16 +176,13 @@ class LM(BaseLM):
     @override
     def load_state(cls, state: dict[str, Any], *, allow_custom_lm_class: bool = False):
         state = validate_lm_state(dict(state))
-        finetuning_model = state.pop("finetuning_model", None)
-        launch_kwargs = state.pop("launch_kwargs", {}) or {}
-        train_kwargs = state.pop("train_kwargs", {}) or {}
         use_developer_role = state.pop("use_developer_role", False)
+        state.pop("finetuning_model", None)
+        state.pop("launch_kwargs", None)
+        state.pop("train_kwargs", None)
         instance = super().load_state(state, allow_custom_lm_class=allow_custom_lm_class)
         if not isinstance(instance, LM):
             raise TypeError(f"Expected LM instance from load_state, got {type(instance).__name__}.")
-        instance.finetuning_model = finetuning_model
-        instance.launch_kwargs = launch_kwargs
-        instance.train_kwargs = train_kwargs
         instance.use_developer_role = use_developer_role
         return instance
 

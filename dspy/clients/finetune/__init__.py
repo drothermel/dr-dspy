@@ -1,5 +1,7 @@
 from dspy.clients.finetune.protocol import FinetuneProvider, ReinforceJob
 from dspy.clients.finetune.provider import DefaultFinetuneProvider, TrainingJob
+from dspy.clients.finetune.registry import infer_finetune_provider
+from dspy.clients.finetune.service import FinetuneService
 from dspy.clients.finetune.utils import (
     FinetuneAssistantMessage,
     FinetuneChatMessage,
@@ -18,6 +20,7 @@ __all__ = [
     "FinetuneAssistantMessage",
     "FinetuneChatMessage",
     "FinetuneProvider",
+    "FinetuneService",
     "GRPOChatData",
     "GRPOGroup",
     "GRPORolloutGroup",
@@ -27,5 +30,6 @@ __all__ = [
     "TrainingJob",
     "TrainingStatus",
     "infer_data_format",
+    "infer_finetune_provider",
     "validate_data_format",
 ]

@@ -2,6 +2,7 @@ import pytest
 
 from dspy.clients.finetune.provider import DefaultFinetuneProvider
 from dspy.clients.finetune.registry import infer_finetune_provider
+from dspy.clients.finetune.service import FinetuneService
 from dspy.clients.lm import LM
 from dspy.integrations.finetune.databricks import DatabricksProvider
 from dspy.integrations.finetune.local import LocalProvider
@@ -23,7 +24,7 @@ def test_infer_provider(model, expected_type):
     assert isinstance(provider, expected_type)
 
 
-def test_lm_infers_databricks_provider_without_explicit_provider():
-    lm = LM(model="databricks/foo")
-    assert isinstance(lm.provider, DatabricksProvider)
-    assert lm.provider.finetunable is True
+def test_finetune_service_infers_databricks_provider_without_explicit_provider():
+    service = FinetuneService(LM(model="databricks/foo"))
+    assert isinstance(service.provider, DatabricksProvider)
+    assert service.provider.finetunable is True

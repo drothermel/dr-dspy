@@ -7,7 +7,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from dspy.adapters.base import Adapter
-from dspy.clients.finetune import infer_data_format
+from dspy.clients.finetune import FinetuneService, infer_data_format
 from dspy.clients.lm import LM
 from dspy.predict.predict import Predict
 from dspy.primitives import Module
@@ -124,11 +124,13 @@ class BootstrapFinetune(FinetuneTeleprompter):
         key_to_job = {}
         for key, finetune_kwargs in finetune_dict.items():
             lm: LM = finetune_kwargs.pop("lm")
+            train_kwargs = finetune_kwargs.get("train_kwargs")
+            service = FinetuneService(lm, train_kwargs=train_kwargs)
             logger.info(
-                "Calling lm.kill() on the LM to be fine-tuned to free up resources. This won't have any effect if the LM is not running."
+                "Calling FinetuneService.kill() on the LM to be fine-tuned to free up resources. This won't have any effect if the LM is not running."
             )
-            lm.kill()
-            key_to_job[key] = lm.finetune(**finetune_kwargs)
+            service.kill()
+            key_to_job[key] = service.finetune(**finetune_kwargs)
 
         async def wait_for_job(ind: int, key: Any, job) -> tuple[Any, LM]:
             result = await asyncio.to_thread(job.result)
@@ -248,10 +250,10 @@ def get_unique_lms(program: Module) -> list[LM]:
 def launch_lms(program: Module) -> None:
     lms = get_unique_lms(program)
     for lm in lms:
-        lm.launch()
+        FinetuneService(lm).launch()
 
 
 def kill_lms(program: Module) -> None:
     lms = get_unique_lms(program)
     for lm in lms:
-        lm.kill()
+        FinetuneService(lm).kill()

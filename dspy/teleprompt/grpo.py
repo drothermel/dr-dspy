@@ -12,6 +12,7 @@ from dspy.adapters.base import Adapter
 from dspy.clients.finetune import (
     FinetuneAssistantMessage,
     FinetuneChatMessage,
+    FinetuneService,
     GRPOChatData,
     GRPOGroup,
     GRPORolloutGroup,
@@ -347,7 +348,7 @@ class GRPO(FinetuneTeleprompter):
             job_key = (pred.lm, data_key)
             if job_key not in grpo_training_jobs:
                 train_kwargs = self.train_kwargs[pred.lm]
-                job = pred.lm.reinforce(train_kwargs=train_kwargs)
+                job = FinetuneService(pred.lm, train_kwargs=train_kwargs).reinforce(train_kwargs=train_kwargs)
                 grpo_training_jobs[job_key] = job
         await self.report_validation_metrics(
             student=student, trainset=trainset, valset=valset, logger=logger, step_idx=-1, run=run

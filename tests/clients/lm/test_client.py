@@ -411,8 +411,6 @@ def test_dump_state():
         temperature=1,
         max_tokens=100,
         num_retries=10,
-        launch_kwargs={"temperature": 1},
-        train_kwargs={"temperature": 5},
     )
     assert lm.dump_state() == {
         "_dspy_lm_class": "dspy.clients.lm.LM",
@@ -422,9 +420,6 @@ def test_dump_state():
         "max_tokens": 100,
         "num_retries": 10,
         "_dspy_provider_options": {"extensions": {}},
-        "finetuning_model": None,
-        "launch_kwargs": {"temperature": 1},
-        "train_kwargs": {"temperature": 5},
     }
 
 
@@ -457,8 +452,6 @@ def test_load_state(make_run):
         temperature=1,
         max_tokens=100,
         num_retries=10,
-        launch_kwargs={"temperature": 1},
-        train_kwargs={"temperature": 5},
     )
     loaded_lm = LM.load_state(lm.dump_state())
     assert isinstance(loaded_lm, LM)
@@ -488,9 +481,6 @@ def test_reasoning_model_load_state_rejects_max_completion_tokens_alias(make_run
         "num_retries": 1,
         "temperature": 1.0,
         "max_completion_tokens": 16000,
-        "finetuning_model": None,
-        "launch_kwargs": {},
-        "train_kwargs": {},
     }
     with pytest.raises(ValueError, match="max_completion_tokens"):
         BaseLM.load_state(state)
