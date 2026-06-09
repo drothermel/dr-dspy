@@ -2,25 +2,39 @@ from __future__ import annotations
 
 from typing import Any
 
-from dspy.core.types.messages import LMMessage
+from dspy.core.types.messages import LMMessage, LMMessageRole
 from dspy.core.types.parts import LMToolCallPart, LMToolResultPart
 from dspy.core.types.parts.models import _coerce_part
 
 
 def System(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None = None) -> LMMessage:
-    return LMMessage(role="system", parts=[_coerce_part(part) for part in parts], name=name, metadata=metadata or {})
+    return LMMessage(
+        role=LMMessageRole.SYSTEM, parts=[_coerce_part(part) for part in parts], name=name, metadata=metadata or {}
+    )
 
 
 def Developer(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None = None) -> LMMessage:
-    return LMMessage(role="developer", parts=[_coerce_part(part) for part in parts], name=name, metadata=metadata or {})
+    return LMMessage(
+        role=LMMessageRole.DEVELOPER,
+        parts=[_coerce_part(part) for part in parts],
+        name=name,
+        metadata=metadata or {},
+    )
 
 
 def User(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None = None) -> LMMessage:
-    return LMMessage(role="user", parts=[_coerce_part(part) for part in parts], name=name, metadata=metadata or {})
+    return LMMessage(
+        role=LMMessageRole.USER, parts=[_coerce_part(part) for part in parts], name=name, metadata=metadata or {}
+    )
 
 
 def Assistant(*parts: Any, name: str | None = None, metadata: dict[str, Any] | None = None) -> LMMessage:
-    return LMMessage(role="assistant", parts=[_coerce_part(part) for part in parts], name=name, metadata=metadata or {})
+    return LMMessage(
+        role=LMMessageRole.ASSISTANT,
+        parts=[_coerce_part(part) for part in parts],
+        name=name,
+        metadata=metadata or {},
+    )
 
 
 ToolCall = LMToolCallPart
@@ -39,4 +53,4 @@ def ToolResult(
         result = LMToolResultPart(
             call_id=call_id, name=name, content=[_coerce_part(part) for part in parts], is_error=is_error
         )
-    return LMMessage(role="tool", parts=[result])
+    return LMMessage(role=LMMessageRole.TOOL, parts=[result])

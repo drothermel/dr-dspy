@@ -18,7 +18,7 @@ class LMMessageRole(StrEnum):
 
 
 class LMMessage(BaseModel):
-    role: LMMessageRole | str
+    role: LMMessageRole
     parts: list[LMPart]
     name: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -31,6 +31,12 @@ class LMMessage(BaseModel):
             return data
         if isinstance(data, dict):
             data = dict(data)
+            role = data.get("role")
+            if role is not None and not isinstance(role, LMMessageRole):
+                try:
+                    data["role"] = LMMessageRole(role)
+                except ValueError as err:
+                    raise ValueError(f"Invalid LMMessage role: {role!r}.") from err
             if data.get("role") == "tool" and "parts" not in data:
                 content = data.pop("content", None)
                 call_id = data.pop("tool_call_id", None)

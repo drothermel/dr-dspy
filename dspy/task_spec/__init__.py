@@ -11,7 +11,7 @@ from dspy.task_spec.field_spec import (
     input_field,
     output_field,
 )
-from dspy.task_spec.task_spec import TaskSpec
+from dspy.task_spec.task_spec import TaskSpec, validate_task_spec
 from dspy.task_spec.validation import validate_task_inputs_from_spec
 
 __all__ = [
@@ -30,4 +30,5 @@ __all__ = [
     "output_field",
     "translate_field_type",
     "validate_task_inputs_from_spec",
+    "validate_task_spec",
 ]

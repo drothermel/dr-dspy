@@ -98,3 +98,26 @@ def test_from_dict_rejects_old_task_spec_version():
     payload["task_spec_version"] = TASK_SPEC_VERSION - 1
     with pytest.raises(ValueError, match="Unsupported task_spec_version"):
         TaskSpec.from_dict(payload)
+
+
+@pytest.mark.parametrize("missing_key", ["type", "desc", "prefix", "role", "name"])
+def test_field_spec_from_dict_raises_value_error_on_missing_required_key(missing_key):
+    data = field_spec_to_dict(make_task_spec("q -> a", instructions="Answer.").input_fields["q"])
+    data.pop(missing_key)
+    with pytest.raises(ValueError, match=f"missing required key {missing_key!r}"):
+        field_spec_from_dict(data)
+
+
+def test_field_spec_from_dict_raises_value_error_when_has_default_without_default_key():
+    data = field_spec_to_dict(make_task_spec("q -> a", instructions="Answer.").input_fields["q"])
+    data["has_default"] = True
+    data.pop("default", None)
+    with pytest.raises(ValueError, match="has_default=true but missing key 'default'"):
+        field_spec_from_dict(data)
+
+
+def test_field_spec_from_dict_raises_value_error_on_invalid_role():
+    data = field_spec_to_dict(make_task_spec("q -> a", instructions="Answer.").input_fields["q"])
+    data["role"] = "sidecar"
+    with pytest.raises(ValueError, match="invalid role"):
+        field_spec_from_dict(data)

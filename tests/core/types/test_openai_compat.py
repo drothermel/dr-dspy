@@ -5,6 +5,7 @@ from dspy.core.types import (
     LMCitationPart,
     LMImagePart,
     LMMessage,
+    LMMessageRole,
     LMRefusalPart,
     LMThinkingPart,
     LMToolResultPart,
@@ -34,7 +35,7 @@ def test_tool_result_with_nested_image_matches_live_serializer():
         name="search",
         content=[LMImagePart(url="https://example.com/image.png", media_type="image/png")],
     )
-    message = LMMessage(role="tool", parts=[result])
+    message = LMMessage(role=LMMessageRole.TOOL, parts=[result])
     expected_content = parts_to_openai_content(result.content)
     assert history_entry(message).messages_as_openai == [
         {
@@ -50,7 +51,7 @@ def test_tool_result_with_nested_image_matches_live_serializer():
 
 
 def test_request_messages_as_openai_serializes_thinking_part():
-    message = LMMessage(role="assistant", parts=[LMThinkingPart(text="Reasoning trace.")])
+    message = LMMessage(role=LMMessageRole.ASSISTANT, parts=[LMThinkingPart(text="Reasoning trace.")])
     request = LMRequest(model="model", messages=[message])
     assert request_messages_as_openai(request) == [
         {"role": "assistant", "content": [{"type": "text", "text": "Reasoning trace."}]},

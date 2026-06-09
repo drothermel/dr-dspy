@@ -4,6 +4,7 @@ from io import StringIO
 from dspy.core.types import (
     CallRecord,
     LMMessage,
+    LMMessageRole,
     LMOutput,
     LMRequest,
     LMResponse,
@@ -38,7 +39,7 @@ def test_inspect_call_log_renders_message_tool_calls(make_run):
                 model="test",
                 messages=[
                     LMMessage(
-                        role="user",
+                        role=LMMessageRole.USER,
                         parts=[LMTextPart(text="Use a tool")],
                     )
                 ],

@@ -62,6 +62,42 @@ def test_duplicate_input_names_via_direct_task_spec_raise():
         TaskSpec(name="QA", instructions="Answer.", inputs=(field, field), outputs=())
 
 
+def test_duplicate_output_names_via_field_lists_raise():
+    with pytest.raises(ValueError, match="Duplicate output field name"):
+        make_task_spec(
+            inputs=[input_field("q", desc="The question.")],
+            outputs=[
+                output_field("a", desc="First answer."),
+                output_field("a", desc="Duplicate answer."),
+            ],
+            instructions="Answer.",
+        )
+
+
+def test_duplicate_output_names_via_direct_task_spec_raise():
+    field = output_field("a", desc="The answer.")
+    with pytest.raises(ValueError, match="Duplicate output field name"):
+        TaskSpec(name="QA", instructions="Answer.", inputs=(), outputs=(field, field))
+
+
+def test_task_spec_rejects_empty_fields_on_direct_construct():
+    with pytest.raises(ValueError, match="at least one input or output field"):
+        TaskSpec(name="Empty", instructions="Do nothing.", inputs=(), outputs=())
+
+
+def test_make_task_spec_rejects_empty_fields():
+    with pytest.raises(ValueError, match="at least one"):
+        make_task_spec(inputs=[], outputs=[], instructions="Test.")
+
+
+def test_from_dict_rejects_empty_fields():
+    payload = make_task_spec("q -> a", instructions="Answer.").to_dict()
+    payload["inputs"] = []
+    payload["outputs"] = []
+    with pytest.raises(ValueError, match="at least one input or output field"):
+        TaskSpec.from_dict(payload)
+
+
 def test_from_dict_rejects_duplicate_input_names():
     payload = make_task_spec("q -> a", instructions="Answer.").to_dict()
     payload["inputs"].append(payload["inputs"][0])

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from dspy.core.types.config import LMToolSpec
-from dspy.core.types.messages import LMMessage
+from dspy.core.types.messages import LMMessage, LMMessageRole
 from dspy.core.types.parts.models import _coerce_part
 
 
@@ -20,7 +20,7 @@ def _is_lm_response(value: Any) -> bool:
 
 
 def _messages_from_response(response: Any) -> list[LMMessage]:
-    return [LMMessage(role="assistant", parts=output.parts) for output in response.outputs]
+    return [LMMessage(role=LMMessageRole.ASSISTANT, parts=output.parts) for output in response.outputs]
 
 
 def _is_message_sequence(value: Any) -> bool:
@@ -47,7 +47,7 @@ def _messages_from_items(items: tuple[Any, ...], *, prompt: str | None = None) -
         return messages, []
 
     parts = [_coerce_part(item) for item in items]
-    return [LMMessage(role="user", parts=parts)], []
+    return [LMMessage(role=LMMessageRole.USER, parts=parts)], []
 
 
 def coerce_tool_spec(tool: Any) -> LMToolSpec:

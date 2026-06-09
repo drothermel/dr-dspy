@@ -8,6 +8,13 @@ from dspy.task_spec.field_spec import FieldRole, FieldSpec
 from dspy.task_spec.serialize import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
 
 
+def validate_task_spec(spec: "TaskSpec") -> None:
+    """Validate TaskSpec invariants: unique field names within/between roles and at least one field."""
+    validate_task_spec_field_names(spec.inputs, spec.outputs)
+    if not spec.inputs and not spec.outputs:
+        raise ValueError("TaskSpec must have at least one input or output field.")
+
+
 def validate_task_spec_field_names(
     inputs: tuple[FieldSpec, ...],
     outputs: tuple[FieldSpec, ...],
@@ -29,6 +36,14 @@ def validate_task_spec_field_names(
 
 
 class TaskSpec(BaseModel):
+    """Task definition for predictors.
+
+    Invariants enforced by ``validate_task_spec``:
+    - Input field names are unique within inputs; output field names are unique within outputs.
+    - Input and output field names do not overlap.
+    - At least one input or output field is present.
+    """
+
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
     name: str
     instructions: str
@@ -36,8 +51,8 @@ class TaskSpec(BaseModel):
     outputs: tuple[FieldSpec, ...] = Field(default_factory=tuple)
 
     @model_validator(mode="after")
-    def _validate_field_names(self) -> "TaskSpec":
-        validate_task_spec_field_names(self.inputs, self.outputs)
+    def _validate_invariants(self) -> "TaskSpec":
+        validate_task_spec(self)
         return self
 
     @property
@@ -131,12 +146,14 @@ class TaskSpec(BaseModel):
             raise ValueError(
                 f"Unsupported task_spec_version: {version!r}. Expected {TASK_SPEC_VERSION}. Recompile or recreate the program with the current DSPy version."
             )
-        return cls(
+        spec = cls(
             name=data["name"],
             instructions=data["instructions"],
             inputs=tuple(field_spec_from_dict(item, custom_types=custom_types) for item in data["inputs"]),
             outputs=tuple(field_spec_from_dict(item, custom_types=custom_types) for item in data["outputs"]),
         )
+        validate_task_spec(spec)
+        return spec
 
     def to_declaration(self) -> str:
         field_lines = [
