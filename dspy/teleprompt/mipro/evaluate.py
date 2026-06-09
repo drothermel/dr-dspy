@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any
 
 from dspy.evaluate.evaluate import Evaluate
 from dspy.integrations.optimizers.optuna.distributions import get_param_distributions
-from dspy.integrations.optimizers.optuna.import_ import import_optuna
+from dspy.integrations.optimizers.optuna.study import add_observed_trial
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.eval_batch import eval_candidate_program, get_program_with_highest_avg_score
 from dspy.teleprompt.log_utils import save_candidate_program
@@ -120,7 +120,6 @@ async def perform_full_evaluation(
     demo_candidates: list | None,
     run: RunContext,
 ):
-    optuna = import_optuna()
     logger.info(f"===== Trial {trial_num + 1} / {adjusted_num_trials} - Full Evaluation =====")
     highest_mean_program, mean_score, combo_key, params = get_program_with_highest_avg_score(
         param_score_dict=param_score_dict, fully_evaled_param_combos=fully_evaled_param_combos
@@ -137,14 +136,15 @@ async def perform_full_evaluation(
         )
     ).score
     score_data.append({"score": full_eval_score, "program": highest_mean_program, "full_eval": True})
-    trial = optuna.trial.create_trial(
+    add_observed_trial(
+        study,
         params=params,
         distributions=get_param_distributions(
             program=best_program, instruction_candidates=instruction_candidates, demo_candidates=demo_candidates
         ),
         value=full_eval_score,
+        feature="MIPROv2",
     )
-    study.add_trial(trial)
     fully_evaled_param_combos[combo_key] = {"program": highest_mean_program, "score": full_eval_score}
     total_eval_calls += len(valset)
     trial_logs[trial_num + 1] = {}

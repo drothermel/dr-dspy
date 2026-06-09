@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from dspy.evaluate.evaluate import Evaluate
 from dspy.integrations.optimizers.optuna.distributions import get_param_distributions
 from dspy.integrations.optimizers.optuna.import_ import import_optuna
+from dspy.integrations.optimizers.optuna.study import add_observed_trial, create_maximize_study
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.teleprompt.log_utils import print_full_program, save_candidate_program
@@ -188,19 +189,19 @@ async def optimize_prompt_parameters(
     score_data = [{"score": best_score, "program": program.deepcopy(), "full_eval": True}]
     param_score_dict = defaultdict(list)
     fully_evaled_param_combos = {}
-    sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True)
-    study = optuna.create_study(direction="maximize", sampler=sampler)
+    study = create_maximize_study(seed=seed, feature="MIPROv2")
     default_params = {f"{i}_predictor_instruction": 0 for i in range(len(program.predictors()))}
     if demo_candidates:
         default_params.update({f"{i}_predictor_demos": 0 for i in range(len(program.predictors()))})
-    trial = optuna.trial.create_trial(
+    add_observed_trial(
+        study,
         params=default_params,
         distributions=get_param_distributions(
             program=program, instruction_candidates=instruction_candidates, demo_candidates=demo_candidates
         ),
         value=default_score,
+        feature="MIPROv2",
     )
-    study.add_trial(trial)
     state = {
         "best_program": best_program,
         "best_score": best_score,

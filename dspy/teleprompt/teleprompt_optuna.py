@@ -2,7 +2,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel
 
-from dspy.integrations.optimizers.optuna.import_ import import_optuna
+from dspy.integrations.optimizers.optuna.study import create_maximize_study, run_ask_tell_loop
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, BootstrapOptunaCompileParams
@@ -58,7 +58,6 @@ class BootstrapFewShotWithOptuna:
 
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = BootstrapOptunaCompileParams.model_validate(params)
-        optuna = import_optuna(feature="BootstrapFewShotWithOptuna")
         self.trainset = params.trainset
         self.valset = params.valset or params.trainset
         self.run = run
@@ -83,9 +82,6 @@ class BootstrapFewShotWithOptuna:
             params=BootstrapFewShotCompileParams(trainset=self.trainset, teacher=self.teacher),
             run=run,
         )
-        study = optuna.create_study(direction="maximize")
-        for _ in range(self.num_candidate_sets):
-            trial = study.ask()
-            score = await self._run_trial(trial)
-            study.tell(trial, score)
+        study = create_maximize_study(feature="BootstrapFewShotWithOptuna")
+        await run_ask_tell_loop(study, self.num_candidate_sets, self._run_trial)
         return study.trials[study.best_trial.number].user_attrs["program"]
