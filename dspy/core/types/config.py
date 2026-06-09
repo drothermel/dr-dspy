@@ -117,6 +117,8 @@ class LMConfig(BaseModel):
 
 _NESTED_CONFIG_FIELDS = frozenset({"reasoning", "tool_choice", "prompt_cache"})
 
+LM_CONFIG_PROVENANCE_FIELDS: tuple[str, ...] = tuple(name for name in LMConfig.model_fields if name != "extensions")
+
 
 def merge_lm_config(left: LMConfig | None, right: LMConfig | None) -> LMConfig | None:
     """Merge two ``LMConfig`` values with right overriding left.

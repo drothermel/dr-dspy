@@ -110,6 +110,31 @@ def is_retryable_lm_error(error: Exception) -> bool:
     return isinstance(error, _RETRYABLE_LM_ERRORS)
 
 
+def _format_adapter_parse_message(
+    *,
+    adapter_name: str,
+    task_spec: TaskSpec,
+    lm_response: str,
+    message: str | None = None,
+    parsed_result: dict[str, Any] | None = None,
+    max_response_chars: int = 4096,
+) -> str:
+    prefix = f"{message}\n\n" if message else ""
+    if len(lm_response) > max_response_chars:
+        truncated = lm_response[:max_response_chars]
+        response_text = f"{truncated}… [truncated, {len(lm_response)} chars total]"
+    else:
+        response_text = lm_response
+    text = (
+        f"{prefix}Adapter {adapter_name} failed to parse the LM response. \n\n"
+        f"LM Response: {response_text} \n\n"
+        f"Expected to find output fields in the LM response: [{', '.join(task_spec.output_fields.keys())}] \n\n"
+    )
+    if parsed_result is not None:
+        text += f"Actual output fields parsed from the LM response: [{', '.join(parsed_result.keys())}] \n\n"
+    return text
+
+
 class AdapterParseError(DSPyError):
     default_code = "adapter_parse_error"
 
@@ -125,8 +150,12 @@ class AdapterParseError(DSPyError):
         self.task_spec = task_spec
         self.lm_response = lm_response
         self.parsed_result = parsed_result
-        message = f"{message}\n\n" if message else ""
-        message = f"{message}Adapter {adapter_name} failed to parse the LM response. \n\nLM Response: {lm_response} \n\nExpected to find output fields in the LM response: [{', '.join(task_spec.output_fields.keys())}] \n\n"
-        if parsed_result is not None:
-            message += f"Actual output fields parsed from the LM response: [{', '.join(parsed_result.keys())}] \n\n"
-        super().__init__(message)
+        super().__init__(
+            _format_adapter_parse_message(
+                adapter_name=adapter_name,
+                task_spec=task_spec,
+                lm_response=lm_response,
+                message=message,
+                parsed_result=parsed_result,
+            )
+        )

@@ -4,12 +4,13 @@ import pytest
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.primitives.module import Module
-from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, resolve_run
+from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, TransparencyMode, resolve_run
 from dspy.utils.callback import BaseCallback
 from dspy.utils.dummies import DummyLM
 
 if TYPE_CHECKING:
     from dspy.adapters.base import Adapter
+    from dspy.core.types import CallRecord
 
 
 class _EchoCallback(BaseCallback):
@@ -63,12 +64,12 @@ def test_fork_nested_config_updates():
     run = RunContext.create(
         lm=lm,
         adapter=adapter,
-        telemetry=TelemetryConfig(transparency="off"),
+        telemetry=TelemetryConfig(transparency=TransparencyMode.off),
         init_run_log=False,
     )
-    forked = run.fork(telemetry=TelemetryConfig(transparency="strict"))
-    assert forked.telemetry.transparency == "strict"
-    assert run.telemetry.transparency == "off"
+    forked = run.fork(telemetry=TelemetryConfig(transparency=TransparencyMode.strict))
+    assert forked.telemetry.transparency == TransparencyMode.strict
+    assert run.telemetry.transparency == TransparencyMode.off
 
 
 def test_resolve_run_prefers_call_override():
@@ -93,7 +94,7 @@ def test_resolve_run_raises_when_missing():
 
 def test_default_telemetry_config():
     run = RunContext.create(lm=DummyLM([{"answer": "ok"}]), adapter=JSONAdapter(), init_run_log=False)
-    assert run.telemetry.transparency == "strict"
+    assert run.telemetry.transparency == TransparencyMode.strict
     assert run.telemetry.call_log == CallLogMode.both
 
 
@@ -137,6 +138,15 @@ def test_fork_enables_disk_logging_session(tmp_path, monkeypatch):
     assert forked.log_session is not None
     assert forked.log_session.run_dir.exists()
     assert (forked.log_session.run_dir / "run.json").exists()
+
+
+def test_read_call_log_rejects_non_call_record():
+    lm = DummyLM([{"answer": "ok"}])
+    adapter = JSONAdapter()
+    run = RunContext.create(lm=lm, adapter=adapter, init_run_log=False)
+    run.call_log.append(cast("CallRecord", object()))
+    with pytest.raises(TypeError, match="call_log entry must be CallRecord"):
+        run.read_call_log()
 
 
 def test_fork_disables_disk_logging_session(tmp_path, monkeypatch):

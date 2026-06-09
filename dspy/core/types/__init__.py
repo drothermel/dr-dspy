@@ -1,6 +1,7 @@
 from dspy.core.types.builders import Assistant, Developer, System, ToolCall, ToolResult, User
 from dspy.core.types.coercion import coerce_tool_spec
 from dspy.core.types.config import (
+    LM_CONFIG_PROVENANCE_FIELDS,
     LMConfig,
     LMPromptCacheConfig,
     LMReasoningConfig,
@@ -66,6 +67,7 @@ __all__ = [
     "LMCitationDelta",
     "LMCitationPart",
     "EmbedderOptions",
+    "LM_CONFIG_PROVENANCE_FIELDS",
     "LMConfig",
     "LMProviderOptions",
     "coerce_lm_config",

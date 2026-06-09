@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 
 from dspy.adapters.json_adapter import JSONAdapter
-from dspy.core.types import LMConfig
+from dspy.core.types import LM_CONFIG_PROVENANCE_FIELDS, LMConfig
 from dspy.predict.predict import Predict
-from dspy.runtime import CallLogMode, TelemetryConfig
+from dspy.runtime import CallLogMode, TelemetryConfig, TransparencyMode
 from dspy.runtime.transparency import CompiledCall, TransparencyViolation, validate_compiled_call
 from dspy.task_spec import TaskSpec, input_field, output_field
 from dspy.utils.dummies import DummyLM
@@ -19,6 +19,11 @@ class SampleTaskSpec(TaskSpec):
     outputs: tuple = (output_field("answer", desc="The answer."),)
 
 
+def test_provenance_fields_match_lm_config():
+    expected = set(LMConfig.model_fields) - {"extensions"}
+    assert set(LM_CONFIG_PROVENANCE_FIELDS) == expected
+
+
 def test_validate_compiled_call_warn_reports_config_violations(make_run):
     call = CompiledCall(
         call_id="1",
@@ -29,19 +34,19 @@ def test_validate_compiled_call_warn_reports_config_violations(make_run):
         lm_model="openai/gpt-4o-mini",
         cache=False,
     )
-    violations = validate_compiled_call(call, "warn")
+    violations = validate_compiled_call(call, TransparencyMode.warn)
     assert violations == []
 
 
 def test_validate_compiled_call_strict_raises_on_missing_adapter(make_run):
     call = CompiledCall(call_id="1", adapter_class="", lm_model="openai/gpt-4o-mini", cache=False)
     with pytest.raises(TransparencyViolation, match="adapter not configured"):
-        validate_compiled_call(call, "strict")
+        validate_compiled_call(call, TransparencyMode.strict)
 
 
 def test_validate_compiled_call_warn_mode_does_not_raise(make_run):
     call = CompiledCall(call_id="1", adapter_class="", lm_model="openai/gpt-4o-mini", cache=False)
-    violations = validate_compiled_call(call, "warn")
+    violations = validate_compiled_call(call, TransparencyMode.warn)
     assert violations
 
 
@@ -57,7 +62,7 @@ def test_validate_compiled_call_strict_reports_missing_max_tokens_from_lm_kwargs
         cache=False,
     )
     with pytest.raises(TransparencyViolation, match="max_tokens"):
-        validate_compiled_call(call, "strict")
+        validate_compiled_call(call, TransparencyMode.strict)
 
 
 def test_validate_compiled_call_strict_passes_when_max_tokens_in_lm_kwargs(make_run):
@@ -71,7 +76,7 @@ def test_validate_compiled_call_strict_passes_when_max_tokens_in_lm_kwargs(make_
         lm_kwargs={"max_tokens": 4000},
         cache=False,
     )
-    validate_compiled_call(call, "strict")
+    validate_compiled_call(call, TransparencyMode.strict)
 
 
 def test_validate_compiled_call_strict_passes_for_explicit_call(make_run):
@@ -84,7 +89,7 @@ def test_validate_compiled_call_strict_passes_for_explicit_call(make_run):
         lm_model="openai/gpt-4o-mini",
         cache=False,
     )
-    validate_compiled_call(call, "strict")
+    validate_compiled_call(call, TransparencyMode.strict)
 
 
 def test_predict_lm_call_appends_jsonl(tmp_path, monkeypatch, make_run):
@@ -94,7 +99,9 @@ def test_predict_lm_call_appends_jsonl(tmp_path, monkeypatch, make_run):
     json_adapter = JSONAdapter()
     lm = DummyLM([{"answer": "42"}], adapter=json_adapter)
     run = make_run(
-        lm=lm, adapter=json_adapter, telemetry=TelemetryConfig(transparency="strict", call_log=CallLogMode.both)
+        lm=lm,
+        adapter=json_adapter,
+        telemetry=TelemetryConfig(transparency=TransparencyMode.strict, call_log=CallLogMode.both),
     )
     predict = Predict(SampleTaskSpec())
     asyncio.run(predict(question="2+2", run=run))

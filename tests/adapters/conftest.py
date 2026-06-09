@@ -74,12 +74,12 @@ class CapturingLM(BaseLM):
 
 
 def make_adapter_run(*, lm, adapter):
-    from dspy.runtime import CallLogMode, RunContext, TelemetryConfig
+    from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, TransparencyMode
 
     return RunContext.create(
         lm=lm,
         adapter=adapter,
-        telemetry=TelemetryConfig(transparency="off", call_log=CallLogMode.memory),
+        telemetry=TelemetryConfig(transparency=TransparencyMode.off, call_log=CallLogMode.memory),
         init_run_log=False,
     )
 

@@ -1034,14 +1034,14 @@ def test_input_field_default_value(make_run):
 
 def log_test_helper():
     from dspy.adapters.chat_adapter import ChatAdapter
-    from dspy.runtime import CallLogMode, RunContext, TelemetryConfig
+    from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, TransparencyMode
 
     dspy_logger = logging.getLogger("dspy")
     dspy_logger.propagate = True
     return RunContext.create(
         lm=DummyLM([{"answer": "test output"}]),
         adapter=ChatAdapter(),
-        telemetry=TelemetryConfig(transparency="off", call_log=CallLogMode.memory),
+        telemetry=TelemetryConfig(transparency=TransparencyMode.off, call_log=CallLogMode.memory),
         init_run_log=False,
     )
 

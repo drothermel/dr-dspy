@@ -84,6 +84,17 @@ def test_adapter_parse_error_with_message():
     )
 
 
+def test_adapter_parse_error_truncates_long_lm_response_in_message():
+    adapter_name = "ChatAdapter"
+    task_spec = ts("question->answer")
+    lm_response = "x" * 5000
+    error = AdapterParseError(adapter_name=adapter_name, task_spec=task_spec, lm_response=lm_response)
+    assert error.lm_response == lm_response
+    error_message = str(error)
+    assert "[truncated" in error_message
+    assert len(error_message) < len(lm_response)
+
+
 def test_adapter_parse_error_with_parsed_result():
     adapter_name = "ChatAdapter"
     task_spec = ts("question->answer1, answer2")

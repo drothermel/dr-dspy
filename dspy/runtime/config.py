@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-TransparencyMode = Literal["strict", "warn", "verbose", "off"]
+
+class TransparencyMode(StrEnum):
+    strict = "strict"
+    warn = "warn"
+    verbose = "verbose"
+    off = "off"
 
 
 class CallSite(BaseModel):
@@ -32,9 +36,9 @@ class CallLogMode(StrEnum):
 
 
 class TelemetryConfig(BaseModel):
-    transparency: TransparencyMode = "strict"
+    transparency: TransparencyMode = TransparencyMode.strict
     track_usage: bool = False
-    call_log: CallLogMode | Literal["off", "memory", "disk", "both"] = "both"
+    call_log: CallLogMode = CallLogMode.both
     max_call_log_entries: int = 10000
     call_log_dir: str | None = None
     max_optimization_trace_entries: int = 10000
@@ -44,8 +48,7 @@ class TelemetryConfig(BaseModel):
 def effective_call_log_mode(telemetry: TelemetryConfig) -> CallLogMode:
     if telemetry.max_call_log_entries == 0:
         return CallLogMode.off
-    mode = telemetry.call_log
-    return mode if isinstance(mode, CallLogMode) else CallLogMode(mode)
+    return telemetry.call_log
 
 
 def memory_call_log_enabled(telemetry: TelemetryConfig) -> bool:

@@ -3,7 +3,7 @@ import pytest
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
-from dspy.runtime import CallLogMode, TelemetryConfig
+from dspy.runtime import CallLogMode, TelemetryConfig, TransparencyMode
 from dspy.task_spec import TaskSpec, input_field, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, COPROCompileParams, EvaluateCompileParams
@@ -23,7 +23,9 @@ async def test_bootstrap_few_shot_smoke_strict(make_run):
     json_adapter = JSONAdapter()
     lm = DummyLM([{"answer": "4"}] * 5, adapter=json_adapter)
     run = make_run(
-        lm=lm, adapter=json_adapter, telemetry=TelemetryConfig(transparency="strict", call_log=CallLogMode.memory)
+        lm=lm,
+        adapter=json_adapter,
+        telemetry=TelemetryConfig(transparency=TransparencyMode.strict, call_log=CallLogMode.memory),
     )
     student = Predict(QATaskSpec())
     trainset = [Example.from_record({"question": "2+2", "answer": "4"}, input_keys=("question",))]
@@ -44,7 +46,9 @@ async def test_copro_smoke_strict(make_run):
     copro_answer = {"proposed_instruction": "Answer carefully.", "proposed_prefix_for_output_field": "Answer:"}
     lm = DummyLM([copro_answer, copro_answer, copro_answer], adapter=json_adapter)
     run = make_run(
-        lm=lm, adapter=json_adapter, telemetry=TelemetryConfig(transparency="strict", call_log=CallLogMode.memory)
+        lm=lm,
+        adapter=json_adapter,
+        telemetry=TelemetryConfig(transparency=TransparencyMode.strict, call_log=CallLogMode.memory),
     )
     student = Predict(QATaskSpec())
     teleprompter = COPRO(

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from dspy.clients.lm_strict import lm_kwargs_max_tokens
-from dspy.core.types import LMConfig, coerce_lm_config, lm_defaults_config, merge_lm_config
+from dspy.core.types import LM_CONFIG_PROVENANCE_FIELDS, LMConfig, coerce_lm_config, lm_defaults_config, merge_lm_config
 from dspy.runtime.config import CallSite, TransparencyMode
 from dspy.task_spec import TaskSpec  # noqa: TC001
 
@@ -90,15 +90,15 @@ def validate_compiled_call(call: CompiledCall, mode: TransparencyMode) -> list[s
         violations.append("adapter not configured. Fix: RunContext.create(lm=LM(...), adapter=JSONAdapter()).")
     if call.lm_model:
         violations.extend(collect_config_violations(config=call.config, lm_kwargs=call.lm_kwargs, cache=call.cache))
-    if mode == "strict" and violations:
+    if mode == TransparencyMode.strict and violations:
         raise TransparencyViolation(
             f"Transparency strict mode violation(s) in phase={call.phase!r}, lm_role={call.lm_role!r}:",
             fixes=violations,
         )
-    if mode in ("warn", "verbose") and violations:
+    if mode in (TransparencyMode.warn, TransparencyMode.verbose) and violations:
         for violation in violations:
             logger.warning("Transparency: %s", violation)
-    if mode == "verbose":
+    if mode == TransparencyMode.verbose:
         logger.info(
             "CompiledCall module=%s phase=%s adapter=%s lm=%s mutations=%s",
             call.module,
@@ -133,10 +133,11 @@ def resolve_lm_config(
         config = base
     merged_request = merge_lm_config(lm_defaults_config(lm), config) or config
     provenance: dict[str, str] = {}
-    for field in ("temperature", "max_tokens", "n", "top_p"):
-        lm_value = getattr(lm, "kwargs", {}).get(field)
+    lm_kwargs = getattr(lm, "kwargs", {})
+    for field in LM_CONFIG_PROVENANCE_FIELDS:
+        lm_value = lm_kwargs.get(field)
         if lm_value is None and field == "max_tokens":
-            lm_value = lm_kwargs_max_tokens(getattr(lm, "kwargs", {}))
+            lm_value = lm_kwargs_max_tokens(lm_kwargs)
         call_value = getattr(merged_request, field, None)
         if call_value is not None and call_value != lm_value:
             provenance[field] = "predict.config"

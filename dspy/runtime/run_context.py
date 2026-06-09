@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Protocol, TextIO
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from dspy.core.types import CallRecord
 from dspy.runtime.config import (
     CallSite,
     ExecutionConfig,
@@ -16,7 +17,6 @@ from dspy.runtime.config import (
 if TYPE_CHECKING:
     from dspy.adapters.base import Adapter
     from dspy.clients.base_lm import BaseLM
-    from dspy.core.types import CallRecord
     from dspy.primitives.module import Module
     from dspy.runtime.run_log import RunLogSession
     from dspy.runtime.usage_tracker import UsageTracker
@@ -163,7 +163,11 @@ class RunContext(BaseModel):
         pretty_print_call_log(call_log=self.call_log, n=n, file=file)
 
     def read_call_log(self, n: int = 10) -> list[dict[str, Any]]:
-        return [entry.to_dict() for entry in self.call_log[-n:]]
+        records = self.call_log[-n:]
+        for entry in records:
+            if not isinstance(entry, CallRecord):
+                raise TypeError(f"call_log entry must be CallRecord, got {type(entry)!r}")
+        return [entry.to_dict() for entry in records]
 
 
 def resolve_run(

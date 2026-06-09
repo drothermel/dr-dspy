@@ -26,10 +26,10 @@ def run(make_run):
 def make_run():
     def _make_run(lm, adapter=None, **kwargs):
         from dspy.adapters.chat_adapter import ChatAdapter
-        from dspy.runtime import CallLogMode, RunContext, TelemetryConfig
+        from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, TransparencyMode
 
         adapter = adapter or ChatAdapter()
-        base_telemetry = TelemetryConfig(transparency="off", call_log=CallLogMode.memory)
+        base_telemetry = TelemetryConfig(transparency=TransparencyMode.off, call_log=CallLogMode.memory)
         telemetry = kwargs.pop("telemetry", None)
         if telemetry is None:
             merged_telemetry = base_telemetry

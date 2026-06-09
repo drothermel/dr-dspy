@@ -241,13 +241,6 @@ ban-relative-imports = "all"
     "TC001",  # Cross-module imports are runtime-required for Pydantic models in this package.
     "TC003",  # Iterator/Callable types are referenced at runtime in stream wrappers.
 ]
-"dspy/transparency/resolve.py" = [
-    "TC001",  # Runtime resolution helpers return concrete adapter/LM types.
-]
-"dspy/utils/transparency.py" = [
-    "TC001",  # TaskSpec validation inspects field metadata at runtime.
-    "N818",  # Legacy TransparencyViolation exception name
-]
 "dspy/adapters/base/**/*.py" = [
     "TC001",  # Mixin modules use cross-module types at runtime in adapter call/format paths.
     "TC003",  # Mapping/Sequence appear in adapter preprocess/postprocess signatures and bodies.
