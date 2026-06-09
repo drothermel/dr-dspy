@@ -224,8 +224,7 @@ def test_attach_tool_calls_preserves_call_id_from_provider_dict():
     value = attach_tool_calls_to_value(
         value={},
         output=cast("LMOutput", output),
-        original_task_spec=task_spec,
-        get_tool_call_output_field_name=adapter._get_tool_call_output_field_name,
+        tool_call_output_field_name=adapter._get_tool_call_output_field_name(task_spec),
     )
     assert value["tool_calls"] == ToolCalls(
         tool_calls=[ToolCalls.ToolCall(id="call_from_two_step", name="search", args={"query": "cats"})]

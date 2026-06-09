@@ -125,8 +125,7 @@ class AdapterCallMixin(AdapterNativeMixin):
                 value = attach_tool_calls_to_value(
                     value=value,
                     output=output,
-                    original_task_spec=original_task_spec,
-                    get_tool_call_output_field_name=self._get_tool_call_output_field_name,
+                    tool_call_output_field_name=tool_call_output_field_name,
                 )
             for name, field in original_task_spec.output_fields.items():
                 field_type = field.type_

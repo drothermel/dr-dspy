@@ -72,8 +72,7 @@ class TwoStepCallExecutor:
             value = attach_tool_calls_to_value(
                 value=value,
                 output=output,
-                original_task_spec=task_spec,
-                get_tool_call_output_field_name=adapter._get_tool_call_output_field_name,
+                tool_call_output_field_name=adapter._get_tool_call_output_field_name(task_spec),
             )
             if output_logprobs is not None:
                 value["logprobs"] = output_logprobs

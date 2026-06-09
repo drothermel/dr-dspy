@@ -52,11 +52,21 @@ class Tool(Type):
         if not description:
             raise ValueError("Tool description is required and must be non-empty.")
         super().__init__(func=func, name=name, desc=description, args=args, arg_types=arg_types, arg_desc=arg_desc)
-        self._required_names_override = required_names
-        self._args_pre_set = args is not None
-        self._parse_function(func=func, arg_desc=arg_desc)
+        self._parse_function(
+            func=func,
+            arg_desc=arg_desc,
+            required_names_override=required_names,
+            args_pre_set=args is not None,
+        )
 
-    def _parse_function(self, func: Callable, arg_desc: dict[str, str] | None = None) -> None:
+    def _parse_function(
+        self,
+        func: Callable,
+        *,
+        arg_desc: dict[str, str] | None = None,
+        required_names_override: frozenset[str] | None = None,
+        args_pre_set: bool = False,
+    ) -> None:
         annotations_func = func if inspect.isfunction(func) or inspect.ismethod(func) else func.__call__
         name = getattr(func, "__name__", type(func).__name__)
         args: dict[str, Any] = {}
@@ -93,9 +103,9 @@ class Tool(Type):
         self.args = self.args if self.args is not None else args
         self.arg_types = self.arg_types if self.arg_types is not None else arg_types
         self.has_kwargs = any(param.kind == param.VAR_KEYWORD for param in sig.parameters.values())
-        if self._required_names_override is not None:
-            self.required_names = self._required_names_override
-        elif self._args_pre_set:
+        if required_names_override is not None:
+            self.required_names = required_names_override
+        elif args_pre_set:
             args_schema = self.args or {}
             self.required_names = frozenset(name for name, prop in args_schema.items() if "default" not in prop)
         else:
