@@ -3,8 +3,31 @@ import json
 import os
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from dspy._internal.lazy_import import import_optional, is_available
 from dspy.retrievers.types import RetrievedPassage
+
+_MISSING_SCORE_SORT_KEY = float("-inf")
+
+
+class DatabricksColumnManifest(BaseModel):
+    name: str
+
+
+class DatabricksManifest(BaseModel):
+    columns: list[DatabricksColumnManifest]
+
+
+class DatabricksQueryResult(BaseModel):
+    data_array: list[list[Any]] = Field(default_factory=list)
+
+
+class DatabricksQueryResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    manifest: DatabricksManifest
+    result: DatabricksQueryResult
 
 
 class DatabricksRMError(Exception):
@@ -107,6 +130,25 @@ class DatabricksRM:
             )
         return passages
 
+    def _rows_from_response(self, results: dict[str, Any]) -> list[dict[str, Any]]:
+        response = DatabricksQueryResponse.model_validate(results)
+        col_names = [column.name for column in response.manifest.columns]
+        if self.docs_id_column_name not in col_names:
+            raise DatabricksRMError(
+                f"docs_id_column_name: '{self.docs_id_column_name}' is not in the index columns: \n {col_names}"
+            )
+        if self.text_column_name not in col_names:
+            raise DatabricksRMError(
+                f"text_column_name: '{self.text_column_name}' is not in the index columns: \n {col_names}"
+            )
+        return [dict(zip(col_names, data_row, strict=False)) for data_row in response.result.data_array]
+
+    def _sort_key(self, row: dict[str, Any]) -> float:
+        score_val = row.get("score")
+        if score_val is None:
+            return _MISSING_SCORE_SORT_KEY
+        return float(score_val)
+
     def _query(
         self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
     ) -> list[RetrievedPassage]:
@@ -146,21 +188,8 @@ class DatabricksRM:
                 query_vector=query_vector,
                 filters_json=filters_json or self.filters_json,
             )
-        col_names = [column["name"] for column in results["manifest"]["columns"]]
-        if self.docs_id_column_name not in col_names:
-            raise DatabricksRMError(
-                f"docs_id_column_name: '{self.docs_id_column_name}' is not in the index columns: \n {col_names}"
-            )
-        if self.text_column_name not in col_names:
-            raise DatabricksRMError(
-                f"text_column_name: '{self.text_column_name}' is not in the index columns: \n {col_names}"
-            )
-        items = []
-        if "data_array" in results["result"]:
-            for data_row in results["result"]["data_array"]:
-                item = dict(zip(col_names, data_row, strict=False))
-                items += [item]
-        sorted_docs = sorted(items, key=lambda x: x["score"], reverse=True)[: self.k]
+        items = self._rows_from_response(results)
+        sorted_docs = sorted(items, key=self._sort_key, reverse=True)[: self.k]
         return self._to_passages(sorted_docs)
 
     @staticmethod
@@ -225,6 +254,7 @@ class DatabricksRM:
             headers=headers,
             timeout=60,
         )
+        response.raise_for_status()
         results = response.json()
         if "error_code" in results:
             raise DatabricksRMError(f"ERROR: {results['error_code']} -- {results['message']}")
