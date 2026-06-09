@@ -160,6 +160,6 @@ class BootstrapFewShot:
             augmented_demos = session.name2traces[name][: self.max_bootstrapped_demos]
             sample_size = min(self.max_labeled_demos - len(augmented_demos), len(raw_demos))
             sample_size = max(0, sample_size)
-            raw_demos = rng.sample(raw_demos, sample_size)
-            predictor.demos = augmented_demos + raw_demos
+            sampled = rng.sample(raw_demos, sample_size)
+            predictor.demos = augmented_demos + sampled
         return session.student
