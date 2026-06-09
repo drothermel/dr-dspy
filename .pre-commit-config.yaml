@@ -9,7 +9,7 @@ repos:
         name: ruff (lint)
         types_or: [python, pyi]
         files: ^(dspy|tests)/.*\.py$
-        exclude: ^(dspy/__metadata__\.py|tests/reliability/.*\.py)$
+        exclude: ^dspy/__metadata__\.py$
         args: [--fix]
 
   - repo: local

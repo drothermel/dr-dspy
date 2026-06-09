@@ -110,8 +110,6 @@ def collect_run_binding_violations(tests_root: Path | None = None) -> list[RunBi
     root = tests_root or Path(__file__).resolve().parents[1]
     violations: list[RunBindingViolation] = []
     for path in sorted(root.rglob("test_*.py")):
-        if "reliability" in path.parts:
-            continue
         source = path.read_text()
         violations.extend(find_run_binding_violations(source, path=path))
     return violations

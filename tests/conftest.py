@@ -7,7 +7,7 @@ import pytest
 from tests.test_utils.run_binding import collect_run_binding_violations
 from tests.test_utils.server import litellm_test_server, read_litellm_test_server_request_logs  # noqa: F401
 
-SKIP_DEFAULT_FLAGS = ["reliability", "extra", "llm_call", "deno"]
+OPT_IN_MARKERS = ["integration", "llm_call", "deno", "slow"]
 
 
 @pytest.fixture
@@ -55,17 +55,12 @@ def anyio_backend():
 
 
 def pytest_addoption(parser):
-    for flag in SKIP_DEFAULT_FLAGS:
+    for flag in OPT_IN_MARKERS:
         parser.addoption(f"--{flag}", action="store_true", default=False, help=f"run {flag} tests")
 
 
-def pytest_configure(config):
-    for flag in SKIP_DEFAULT_FLAGS:
-        config.addinivalue_line("markers", flag)
-
-
 def pytest_collection_modifyitems(config, items):
-    for flag in SKIP_DEFAULT_FLAGS:
+    for flag in OPT_IN_MARKERS:
         if config.getoption(f"--{flag}"):
             continue
         skip_mark = pytest.mark.skip(reason=f"need --{flag} option to run")
