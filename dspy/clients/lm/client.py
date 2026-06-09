@@ -26,6 +26,7 @@ from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.clients.model_id import split_provider_model
 from dspy.clients.openai_format.reasoning_models import is_openai_reasoning_model
 from dspy.core.types import LMRequest, LMResponse
+from dspy.core.types.config import NativeAdaptationMode
 from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.errors import ContextWindowExceededError, LMConfigurationError, LMError
 from dspy.runtime.callback import Callback
@@ -109,6 +110,20 @@ class LM(BaseLM):
     @override
     def supports_reasoning(self) -> bool:
         return _get_litellm().supports_reasoning(self.model)
+
+    @property
+    @override
+    def reasoning_adaptation_mode(self) -> NativeAdaptationMode:
+        if "gpt-5" in self.model and self.model_type == "chat":
+            return NativeAdaptationMode.SKIP
+        return NativeAdaptationMode.ADAPT
+
+    @property
+    @override
+    def citations_adaptation_mode(self) -> NativeAdaptationMode:
+        if self.model.startswith("anthropic/"):
+            return NativeAdaptationMode.SKIP
+        return NativeAdaptationMode.ADAPT
 
     @property
     @override

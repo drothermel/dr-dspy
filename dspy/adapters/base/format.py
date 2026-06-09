@@ -15,7 +15,7 @@ from typing import Any, cast
 from dspy.adapters.base.conversation import AdapterConversationMixin
 from dspy.adapters.base.protocols import ConversationFormattingAdapter
 from dspy.adapters.utils import build_lm_message
-from dspy.core.types import LMMessage
+from dspy.core.types import LMMessage, UserMessageContent
 from dspy.task_spec import TaskSpec
 
 MESSAGE_BUILD_ORDER = ("system", "demos", "conversation_history", "current_user")
@@ -86,7 +86,7 @@ class AdapterFormatMixin(AdapterConversationMixin):
         prefix: str = "",
         suffix: str = "",
         main_request: bool = False,
-    ) -> str | list[dict[str, Any]]:
+    ) -> UserMessageContent:
         raise NotImplementedError
 
     def format_assistant_message_content(

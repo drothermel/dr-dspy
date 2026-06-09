@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, TextIO
 from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
 from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.core.types import CallRecord, LMRequest, LMResponse
+from dspy.core.types.config import NativeAdaptationMode
 from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
 from dspy.core.types.openai_compat import request_messages_as_openai
 from dspy.runtime.callback import Callback, with_callbacks
@@ -120,6 +121,14 @@ class BaseLM:
     @property
     def supports_reasoning(self) -> bool:
         return False
+
+    @property
+    def reasoning_adaptation_mode(self) -> NativeAdaptationMode:
+        return NativeAdaptationMode.ADAPT
+
+    @property
+    def citations_adaptation_mode(self) -> NativeAdaptationMode:
+        return NativeAdaptationMode.ADAPT
 
     @property
     def supports_response_schema(self) -> bool:

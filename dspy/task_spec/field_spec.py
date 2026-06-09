@@ -12,6 +12,17 @@ class FieldRole(StrEnum):
     OUTPUT = "output"
 
 
+FIELD_NAME_PATTERN = re.compile(r"^[\w][\w.-]*$")
+
+
+def validate_field_name(name: str) -> None:
+    if not FIELD_NAME_PATTERN.match(name):
+        raise ValueError(
+            f"Invalid field name {name!r}. Field names must match {FIELD_NAME_PATTERN.pattern!r} "
+            "(identifier start, then word characters, hyphens, or dots)."
+        )
+
+
 def infer_prefix(attribute_name: str) -> str:
     s1 = re.sub("(.)([A-Z][a-z]+)", "\\1_\\2", attribute_name)
     intermediate_name = re.sub("([a-z0-9])([A-Z])", "\\1_\\2", s1)

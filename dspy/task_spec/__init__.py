@@ -10,12 +10,14 @@ from dspy.task_spec.defaults import default_task_instructions
 from dspy.task_spec.factory import make_task_spec
 from dspy.task_spec.field_format import format_field_value, translate_field_type
 from dspy.task_spec.field_spec import (
+    FIELD_NAME_PATTERN,
     FieldRole,
     FieldSpec,
     field_desc_from_name,
     infer_prefix,
     input_field,
     output_field,
+    validate_field_name,
 )
 from dspy.task_spec.parse import parse_task_spec_string
 from dspy.task_spec.serialize import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
@@ -23,6 +25,7 @@ from dspy.task_spec.task_spec import TaskSpec, validate_task_spec
 from dspy.task_spec.validation import validate_task_inputs_from_spec
 
 __all__ = [
+    "FIELD_NAME_PATTERN",
     "FieldBinding",
     "FieldRole",
     "FieldSpec",
@@ -41,6 +44,7 @@ __all__ = [
     "output_field",
     "parse_task_spec_string",
     "translate_field_type",
+    "validate_field_name",
     "validate_task_inputs_from_spec",
     "validate_task_spec",
 ]

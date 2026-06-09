@@ -13,6 +13,11 @@ class ReasoningEffort(StrEnum):
     HIGH = "high"
 
 
+class NativeAdaptationMode(StrEnum):
+    ADAPT = "adapt"
+    SKIP = "skip"
+
+
 class LMToolSpec(BaseModel):
     type: Literal["function"] = "function"
     name: str

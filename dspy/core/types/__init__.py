@@ -1,3 +1,5 @@
+from typing import Any
+
 from dspy.core.types.builders import Assistant, Developer, System, ToolCall, ToolResult, User
 from dspy.core.types.coercion import coerce_tool_spec
 from dspy.core.types.config import (
@@ -7,6 +9,7 @@ from dspy.core.types.config import (
     LMReasoningConfig,
     LMToolChoice,
     LMToolSpec,
+    NativeAdaptationMode,
     ReasoningEffort,
     coerce_lm_config,
     lm_defaults_config,
@@ -56,6 +59,8 @@ from dspy.core.types.stream import (
 
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions  # isort: skip
 
+UserMessageContent = str | list[dict[str, Any]]
+
 __all__ = [
     "Assistant",
     "AsyncLMStream",
@@ -92,7 +97,9 @@ __all__ = [
     "LMPart",
     "LMPromptCacheConfig",
     "LMReasoningConfig",
+    "NativeAdaptationMode",
     "ReasoningEffort",
+    "UserMessageContent",
     "LMRefusalPart",
     "LMRequest",
     "LMRequestPatch",

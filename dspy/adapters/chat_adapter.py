@@ -23,7 +23,12 @@ _DEFAULT_PARSE_FALLBACK = object()
 
 
 class ChatAdapter(ChatFormatMixin, Adapter):
-    capabilities = AdapterCapabilities(supports_finetune=True, field_value_role="none")
+    capabilities = AdapterCapabilities(
+        supports_finetune=True,
+        field_value_role="none",
+        default_native_fc=False,
+        supports_structured_output=False,
+    )
 
     def __init__(
         self,

@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from dspy.task_spec.field_spec import _UNSET, FieldRole, FieldSpec
+from dspy.task_spec.field_spec import _UNSET, FieldRole, FieldSpec, validate_field_name
 from dspy.task_spec.serialize import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
 
 
@@ -28,6 +28,8 @@ def validate_task_spec_field_names(
 
     _check_within_role_duplicates(inputs, "input")
     _check_within_role_duplicates(outputs, "output")
+    for field in (*inputs, *outputs):
+        validate_field_name(field.name)
     cross_role = sorted({field.name for field in inputs}.intersection(field.name for field in outputs))
     if cross_role:
         raise ValueError(

@@ -33,7 +33,7 @@ async def test_call_with_turn_log_truncation_returns_truncated_turn_log():
         received_turn_logs.append(turn_log)
         attempts["count"] += 1
         if attempts["count"] < 2:
-            raise ContextWindowExceededError()
+            raise ContextWindowExceededError
         return Prediction(answer="ok")
 
     run = make_run()
@@ -57,7 +57,7 @@ async def test_call_with_turn_log_truncation_raises_after_max_attempts():
     )
 
     async def module(*, turn_log: TurnLog, run, options=None, **kwargs):
-        raise ContextWindowExceededError()
+        raise ContextWindowExceededError
 
     run = make_run()
     with pytest.raises(ValueError, match="even after 2 attempts"):

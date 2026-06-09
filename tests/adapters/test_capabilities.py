@@ -25,3 +25,11 @@ def test_json_adapter_does_not_support_finetune():
 def test_field_value_role_capabilities():
     assert ChatAdapter().capabilities.field_value_role == "none"
     assert JSONAdapter().capabilities.field_value_role == "assistant"
+
+
+def test_adapter_native_fc_and_structured_output_capabilities():
+    assert ChatAdapter().capabilities.default_native_fc is False
+    assert ChatAdapter().capabilities.supports_structured_output is False
+    assert JSONAdapter().capabilities.default_native_fc is True
+    assert JSONAdapter().capabilities.supports_structured_output is True
+    assert XMLAdapter().capabilities.default_native_fc is False

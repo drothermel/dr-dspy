@@ -3,6 +3,8 @@ from typing import Any
 from typing_extensions import override
 
 from dspy.adapters.base import Adapter
+from dspy.adapters.call.capabilities import AdapterCapabilities
+from dspy.adapters.call.mode import AdapterCallMode
 from dspy.adapters.call.pipeline import AdapterCallPipeline
 from dspy.clients.base_lm import BaseLM
 from dspy.core.types.config import LMConfig
@@ -14,7 +16,13 @@ from dspy.task_spec.formatting import get_field_spec_description_string
 
 
 class TwoStepAdapter(Adapter):
-    call_mode = "two_step"
+    call_mode = AdapterCallMode.TWO_STEP
+    capabilities = AdapterCapabilities(
+        supports_finetune=False,
+        field_value_role="none",
+        default_native_fc=False,
+        supports_structured_output=False,
+    )
 
     def __init__(self, extraction_model: BaseLM, extraction_adapter: Adapter | None = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)

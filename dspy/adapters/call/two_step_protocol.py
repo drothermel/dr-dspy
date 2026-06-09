@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol, TypeGuard
 
+from dspy.adapters.call.mode import AdapterCallMode
+
 if TYPE_CHECKING:
     from dspy.adapters.base.adapter import Adapter
     from dspy.runtime.run_context import RunContext
@@ -9,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class TwoStepMainAdapter(Protocol):
-    call_mode: str
+    call_mode: AdapterCallMode
 
     def _create_extractor_task_spec(self, original_task_spec: TaskSpec) -> TaskSpec: ...
 
@@ -19,4 +21,4 @@ class TwoStepMainAdapter(Protocol):
 
 
 def is_two_step_adapter(adapter: Adapter) -> TypeGuard[TwoStepMainAdapter]:
-    return adapter.call_mode == "two_step"
+    return adapter.call_mode == AdapterCallMode.TWO_STEP

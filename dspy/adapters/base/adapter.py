@@ -6,6 +6,7 @@ from dspy.adapters.base.call import AdapterCallMixin
 from dspy.adapters.base.format import AdapterFormatMixin
 from dspy.adapters.base.native import _DEFAULT_NATIVE_RESPONSE_TYPES
 from dspy.adapters.call.capabilities import AdapterCapabilities
+from dspy.adapters.call.mode import AdapterCallMode
 from dspy.adapters.types.base_type import Type
 from dspy.runtime.callback import with_callbacks
 from dspy.task_spec import TaskSpec
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 class Adapter(AdapterCallMixin, AdapterFormatMixin):
     response_format_policy: ResponseFormatPolicy | None = None
     parse_fallback_policy: ParseFallbackPolicy | None = None
-    call_mode: str | None = None
+    call_mode: AdapterCallMode | None = None
     capabilities: AdapterCapabilities = AdapterCapabilities()
 
     def __init__(
@@ -28,10 +29,12 @@ class Adapter(AdapterCallMixin, AdapterFormatMixin):
         use_native_function_calling: bool = False,
         native_response_types: list[type[Type]] | None = None,
         parallel_tool_calls: bool | None = None,
+        allow_json_repair: bool = False,
     ) -> None:
         self.callbacks = callbacks or []
         self.use_native_function_calling = use_native_function_calling
         self.parallel_tool_calls = parallel_tool_calls
+        self.allow_json_repair = allow_json_repair
         self.native_response_types = native_response_types or cast("list[type[Type]]", _DEFAULT_NATIVE_RESPONSE_TYPES)
 
     def __init_subclass__(cls, **kwargs: object) -> None:

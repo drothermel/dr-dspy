@@ -25,7 +25,12 @@ if TYPE_CHECKING:
 
 
 class JSONAdapter(ChatFormatMixin, Adapter):
-    capabilities = AdapterCapabilities(supports_finetune=False, field_value_role="assistant")
+    capabilities = AdapterCapabilities(
+        supports_finetune=False,
+        field_value_role="assistant",
+        default_native_fc=True,
+        supports_structured_output=True,
+    )
 
     def __init__(
         self,

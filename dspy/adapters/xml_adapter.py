@@ -3,6 +3,7 @@ from typing import Any
 
 from typing_extensions import override
 
+from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.utils import (
     build_multimodal_user_message_content,
@@ -15,6 +16,12 @@ from dspy.task_spec.field_spec import FieldRole
 
 
 class XMLAdapter(ChatAdapter):
+    capabilities = AdapterCapabilities(
+        supports_finetune=True,
+        field_value_role="none",
+        default_native_fc=False,
+        supports_structured_output=False,
+    )
     field_pattern = re.compile("<(?P<name>\\w+)>((?P<content>.*?))</\\1>", re.DOTALL)
 
     @override

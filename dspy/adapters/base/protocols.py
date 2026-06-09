@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 if TYPE_CHECKING:
     from dspy.adapters.types.base_type import Type
     from dspy.clients.base_lm import BaseLM
-    from dspy.core.types import LMMessage
+    from dspy.core.types import LMMessage, UserMessageContent
     from dspy.core.types.config import LMConfig
     from dspy.runtime.callback import Callback
     from dspy.task_spec import TaskSpec
@@ -23,7 +23,7 @@ class FormattableAdapter(Protocol):
         prefix: str = "",
         suffix: str = "",
         main_request: bool = False,
-    ) -> str | list[dict[str, Any]]: ...
+    ) -> UserMessageContent: ...
 
     def format_assistant_message_content(
         self, task_spec: TaskSpec, outputs: dict[str, Any], missing_field_message: str | None = None
