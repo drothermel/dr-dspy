@@ -166,7 +166,7 @@ def test_complex_module_traversal_with_same_module():
     )
 
 
-def test_named_parameters_traverses_nested_containers():
+def test_named_predictors_traverses_nested_containers():
     root = Module()
     root_attrs = _module_attrs(root)
     sub_attrs = _module_attrs(Module())
@@ -174,7 +174,7 @@ def test_named_parameters_traverses_nested_containers():
     sub_attrs.nested_predict = Predict(ts("question -> answer", instructions="Answer the question."))
     sub_attrs.nested_list = [Predict(ts("question -> answer", instructions="Answer the question."))]
     sub_attrs.nested_dict = {"key": Predict(ts("question -> answer", instructions="Answer the question."))}
-    found_names = {name for name, _ in root.named_parameters()}
+    found_names = {name for name, _ in root.named_predictors()}
     assert "self.sub_module.nested_predict" in found_names
     assert "self.sub_module.nested_list[0]" in found_names
     assert "self.sub_module.nested_dict[key]" in found_names
@@ -187,11 +187,11 @@ class DuplicateModule(Module):
         self.p1 = self.p0
 
 
-def test_named_parameters_duplicate_references():
+def test_named_predictors_duplicate_references():
     module = DuplicateModule()
-    named = module.named_parameters()
+    named = module.named_predictors()
     assert len(named) == 1
-    assert len(module.parameters()) == 1
+    assert len(module.predictors()) == 1
     assert named[0][1] is module.p0
     assert named[0][1] is module.p1
     assert named[0][0] in {"self.p0", "self.p1"}
@@ -233,7 +233,7 @@ def test_compiled_subgraph_is_opaque():
     root_attrs.compiled_child = compiled_child
     root_attrs.top_predict = Predict(ts("question -> answer", instructions="Answer the question."))
 
-    param_names = {name for name, _ in root.named_parameters()}
+    param_names = {name for name, _ in root.named_predictors()}
     submodule_names = {name for name, _ in root.named_sub_modules()}
 
     assert "self.top_predict" in param_names

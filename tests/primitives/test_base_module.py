@@ -38,9 +38,9 @@ QUESTION_ANSWER_TASK_SPEC = ts(
 def test_deepcopy_basic():
     cot = ChainOfThought(ts("q -> a"))
     cot_copy = cot.deepcopy()
-    assert len(cot.parameters()) == len(cot_copy.parameters())
-    assert id(cot.parameters()[0]) != id(cot_copy.parameters()[0])
-    assert cot.parameters()[0].__dict__ == cot_copy.parameters()[0].__dict__
+    assert len(cot.predictors()) == len(cot_copy.predictors())
+    assert id(cot.predictors()[0]) != id(cot_copy.predictors()[0])
+    assert cot.predictors()[0].__dict__ == cot_copy.predictors()[0].__dict__
 
 
 def test_deepcopy_with_uncopyable_modules(make_run):
@@ -52,10 +52,10 @@ def test_deepcopy_with_uncopyable_modules(make_run):
 
     model = CustomClass()
     model_copy = model.deepcopy()
-    assert len(model.parameters()) == len(model_copy.parameters())
+    assert len(model.predictors()) == len(model_copy.predictors())
     assert id(model.lock) == id(model_copy.lock)
-    assert id(model.parameters()[0]) != id(model_copy.parameters()[0])
-    assert model.parameters()[0].__dict__ == model_copy.parameters()[0].__dict__
+    assert id(model.predictors()[0]) != id(model_copy.predictors()[0])
+    assert model.predictors()[0].__dict__ == model_copy.predictors()[0].__dict__
 
 
 def test_deepcopy_with_nested_modules(make_run):
@@ -71,10 +71,10 @@ def test_deepcopy_with_nested_modules(make_run):
 
     model = CustomClass2()
     model_copy = model.deepcopy()
-    assert len(model.parameters()) == len(model_copy.parameters())
+    assert len(model.predictors()) == len(model_copy.predictors())
     assert id(model.submodel.lock) == id(model_copy.submodel.lock)
-    assert id(model.parameters()[0]) != id(model_copy.parameters()[0])
-    assert model.parameters()[0].__dict__ == model_copy.parameters()[0].__dict__
+    assert id(model.predictors()[0]) != id(model_copy.predictors()[0])
+    assert model.predictors()[0].__dict__ == model_copy.predictors()[0].__dict__
 
 
 def test_save_and_load_with_json(tmp_path, make_run):

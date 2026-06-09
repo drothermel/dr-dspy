@@ -60,24 +60,24 @@ class BaseModule:
             yield name, item
             self._enqueue_graph_children(name=name, item=item, queue=queue, seen=seen)
 
-    def named_parameters(self) -> list[tuple[str, Predictor]]:
-        """Return ``(name, Parameter)`` pairs. Skips parameters inside compiled subgraphs."""
-        named_parameters: list[tuple[str, Predictor]] = []
-        visited_parameters: set[int] = set()
+    def named_predictors(self) -> list[tuple[str, Predictor]]:
+        """Return ``(name, Predictor)`` pairs. Skips predictors inside compiled subgraphs."""
+        named_predictors: list[tuple[str, Predictor]] = []
+        visited_predictors: set[int] = set()
         for name, item in self._walk_module_graph():
             if not isinstance(item, Predictor):
                 continue
-            param_id = id(item)
-            if param_id in visited_parameters:
+            predictor_id = id(item)
+            if predictor_id in visited_predictors:
                 continue
-            visited_parameters.add(param_id)
-            named_parameters.append((name, item))
-        return named_parameters
+            visited_predictors.add(predictor_id)
+            named_predictors.append((name, item))
+        return named_predictors
 
     def named_sub_modules(self, type_: type | None = None) -> Generator[tuple[str, BaseModule], None, None]:
         """Yield ``(name, module)`` pairs for modules of ``type_``.
 
-        Compiled subgraphs are opaque by default (same policy as ``named_parameters``).
+        Compiled subgraphs are opaque by default (same policy as ``named_predictors``).
         """
         if type_ is None:
             type_ = BaseModule
@@ -85,8 +85,8 @@ class BaseModule:
             if isinstance(item, type_):
                 yield name, cast("BaseModule", item)
 
-    def parameters(self) -> list[Predictor]:
-        return [param for _, param in self.named_parameters()]
+    def predictors(self) -> list[Predictor]:
+        return [param for _, param in self.named_predictors()]
 
     def deepcopy(self) -> Self:
         try:
@@ -118,16 +118,16 @@ class BaseModule:
 
     def reset_copy(self) -> Self:
         new_instance = self.deepcopy()
-        for param in new_instance.parameters():
-            param.reset()  # ty: ignore[unresolved-attribute]
+        for param in new_instance.predictors():
+            param.reset()
         return new_instance
 
     def dump_state(self, json_mode: bool = True) -> dict[str, Any]:
-        return {name: param.dump_state(json_mode=json_mode) for name, param in self.named_parameters()}
+        return {name: param.dump_state(json_mode=json_mode) for name, param in self.named_predictors()}
 
     def load_state(self, state: dict[str, Any], *, allow_unsafe_lm_state: bool = False) -> Self:
         def _apply(module: BaseModule) -> None:
-            for name, param in module.named_parameters():
+            for name, param in module.named_predictors():
                 param.load_state(state[name], allow_unsafe_lm_state=allow_unsafe_lm_state)
 
         _apply(self.deepcopy())

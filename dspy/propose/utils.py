@@ -1,7 +1,7 @@
 import json
 import re
 
-from dspy.predict.parameter import Parameter
+from dspy.predict.protocol import Predictor
 from dspy.primitives import Module
 from dspy.propose.source_format import get_formatted_source
 from dspy.teleprompt.task_spec_context import get_task_spec
@@ -118,7 +118,7 @@ def get_dspy_source_code(module):
                 hash(item)
             except TypeError:
                 continue
-            if isinstance(item, Parameter):
+            if isinstance(item, Predictor):
                 if (
                     hasattr(item, "task_spec")
                     and item.task_spec is not None

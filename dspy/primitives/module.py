@@ -6,7 +6,6 @@ from typing_extensions import override
 from dspy.core.types import LMForward
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.parallel import Parallel
-from dspy.predict.protocol import Predictor
 from dspy.primitives.base_module import BaseModule
 from dspy.primitives.batch_result import BatchResult
 from dspy.primitives.example import Example
@@ -99,12 +98,6 @@ class Module(BaseModule):
         **inputs: Any,
     ) -> Prediction:
         raise NotImplementedError(f"{type(self).__name__} must implement _aforward_impl().")
-
-    def named_predictors(self) -> list[tuple[str, Predictor]]:
-        return [(name, param) for name, param in self.named_parameters() if isinstance(param, Predictor)]
-
-    def predictors(self) -> list[Predictor]:
-        return [param for _, param in self.named_predictors()]
 
     def set_lm(self, lm: LMForward | None) -> None:
         for _, param in self.named_predictors():

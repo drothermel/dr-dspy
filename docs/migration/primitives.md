@@ -18,6 +18,8 @@ from dspy.primitives import BatchFailure, BatchResult, Example, Module, Predicti
 | `named_sub_modules(skip_compiled=…)` | `skip_compiled` removed; compiled subgraphs are opaque by default |
 | `async def aforward` on `Module` subclasses | implement `async def _aforward_impl` instead |
 | `await module.batch(...)` / `await parallel(...)` return `list` or 3-tuple | returns `BatchResult`; use `.results` and `.failures` |
+| `named_parameters()` / `parameters()` on `BaseModule` | `named_predictors()` / `predictors()` |
+| `Predict(Module, Parameter)` / `Parameter` marker | `Predict(Module)`; use `Predictor` protocol for isinstance checks |
 | `sync_file` JSON-RPC notification | request/response; failures raise `CodeInterpreterError` |
 | Save-time `.pkl` warning text | describes save semantics, not load |
 

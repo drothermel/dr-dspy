@@ -8,7 +8,6 @@ from dspy.clients.base_lm import BaseLM
 from dspy.core.types import LMConfig, coerce_lm_config, merge_lm_config
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
 from dspy.predict.call_validation import resolve_predict_options
-from dspy.predict.parameter import Parameter
 from dspy.primitives import Module, Prediction
 from dspy.runtime.callback import Callback
 from dspy.runtime.run_context import RunContext
@@ -34,7 +33,7 @@ def _sanitize_lm_state(lm_state: dict, allow_unsafe_lm_state: bool) -> dict:
     return sanitized_lm_state
 
 
-class Predict(Module, Parameter):
+class Predict(Module):
     def __init__(
         self,
         task_spec: TaskSpec,
