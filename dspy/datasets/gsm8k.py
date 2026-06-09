@@ -43,9 +43,9 @@ class GSM8K:
         trainset = official_train[:200]
         devset = official_train[200:500]
         testset = official_test[:]
-        trainset = [Example(**x).with_inputs("question") for x in trainset]
-        devset = [Example(**x).with_inputs("question") for x in devset]
-        testset = [Example(**x).with_inputs("question") for x in testset]
+        trainset = [Example.from_record(x, input_keys=("question",)) for x in trainset]
+        devset = [Example.from_record(x, input_keys=("question",)) for x in devset]
+        testset = [Example.from_record(x, input_keys=("question",)) for x in testset]
         self.train = trainset
         self.dev = devset
         self.test = testset

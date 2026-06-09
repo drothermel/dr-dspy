@@ -6,7 +6,7 @@ DSPy no longer memoizes LM, embedding, or ColBERT HTTP responses. Every call goe
 
 | Removed | Migration |
 | --- | --- |
-| `LM(..., cache=True/False)` | Remove the kwarg; every call is live |
+| `LM(..., cache=True/False)` | `LM(..., provider_options=LMProviderOptions(cache=False))` — controls provider-options state, not DSPy memoization |
 | `configure_cache()`, `DSPY_CACHE`, `Cache` | Remove calls and imports |
 | `LMCacheConfig`, `config={"cache": ...}` | Remove from `LMConfig` / call config |
 | `rollout_id` on LM / Predict / teleprompters | Remove; use `temperature > 0` (e.g. `lm.copy(temperature=1.0)`) for diversity |
@@ -48,10 +48,26 @@ After:
 
 ```python
 import dspy
+from dspy.core.types import LMConfig, LMProviderOptions
 
-lm = dspy.LM("openai/gpt-4o-mini")
-predict = dspy.Predict(QATaskSpec(), config={"temperature": 1.0})
+lm = dspy.LM("openai/gpt-4o-mini", provider_options=LMProviderOptions(cache=False))
+predict = dspy.Predict(QATaskSpec(), config=LMConfig(temperature=1.0))
 ```
+
+### LMProviderOptions.cache
+
+DSPy-local memoization is removed, but `cache` lives on `LMProviderOptions` for provider passthrough and serialized LM state:
+
+```python
+from dspy.clients.lm import LM
+from dspy.core.types import LMProviderOptions
+
+lm = LM("openai/gpt-4o-mini", provider_options=LMProviderOptions(cache=False))
+assert lm.cache is False
+patched = lm.copy(provider_options=LMProviderOptions(timeout=60.0))
+```
+
+Use `provider_options=LMProviderOptions(cache=False)` in tests and dummies that previously passed `cache=False` to `LM(...)`. This does not re-enable DSPy disk memoization — every call still goes to the provider unless the provider itself caches prompts (see `LMPromptCacheConfig` below).
 
 Before:
 
@@ -79,3 +95,5 @@ if response.cache_hit:
 After:
 
 Remove the branch; treat every response as a fresh provider result.
+
+See `docs/migration/call-options.md` for `LMProviderOptions` usage.

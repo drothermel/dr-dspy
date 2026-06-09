@@ -1,6 +1,6 @@
 import hashlib
 import json
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -36,10 +36,23 @@ class TaskSpec(BaseModel):
     def with_instructions(self, instructions: str) -> "TaskSpec":
         return self.model_copy(update={"instructions": instructions})
 
-    def with_updated_field(self, name: str, **kwargs) -> "TaskSpec":
+    def with_updated_field(
+        self,
+        name: str,
+        *,
+        desc: str | None = None,
+        prefix: str | None = None,
+        type_: Any = None,
+        constraints: str | None = None,
+    ) -> "TaskSpec":
         if name not in self.fields:
             raise KeyError(f"Unknown field: {name}")
-        field = self.fields[name].with_updates(**kwargs)
+        field = self.fields[name].with_updates(
+            desc=desc,
+            prefix=prefix,
+            type_=type_,
+            constraints=constraints,
+        )
         return self._replace_field(name, field)
 
     def append(self, field: FieldSpec) -> "TaskSpec":

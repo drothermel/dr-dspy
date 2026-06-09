@@ -202,7 +202,7 @@ def test_xml_adapter_formats_nested_images():
     image2 = Image(url="https://example.com/image2.jpg")
     image3 = Image(url="https://example.com/image3.jpg")
     image_wrapper = ImageWrapper(images=[image1, image2, image3], tag=["test", "example"])
-    demos = [Example(image=image_wrapper, text="This is a test image")]
+    demos = [Example.from_record({"image": image_wrapper, "text": "This is a test image"})]
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = XMLAdapter()
     messages = adapter_format_as_openai(

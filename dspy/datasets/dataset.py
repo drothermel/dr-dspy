@@ -101,9 +101,10 @@ class Dataset:
         data_list = data_list[:size]
         output: list[Example] = []
         for example in data_list:
-            example_obj = Example(**example, dspy_uuid=str(uuid.uuid4()), dspy_split=split)
-            if self.input_keys:
-                example_obj = example_obj.with_inputs(*self.input_keys)
+            record = dict(example)
+            record["dspy_uuid"] = str(uuid.uuid4())
+            record["dspy_split"] = split
+            example_obj = Example.from_record(record, input_keys=tuple(self.input_keys))
             output.append(example_obj)
         return output
 

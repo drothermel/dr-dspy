@@ -17,7 +17,10 @@ def _rows_to_examples(
     if not rows_list:
         return []
     resolved_fields = list(fields) if fields is not None else list(rows_list[0])
-    return [Example({field: row[field] for field in resolved_fields}).with_inputs(*input_keys) for row in rows_list]
+    return [
+        Example.from_record({field: row[field] for field in resolved_fields}, input_keys=input_keys)
+        for row in rows_list
+    ]
 
 
 class DataLoader(Dataset):
@@ -72,7 +75,10 @@ class DataLoader(Dataset):
     ) -> list[Example]:
         if fields is None:
             fields = list(df.columns)
-        return [Example({field: row[field] for field in fields}).with_inputs(*input_keys) for _, row in df.iterrows()]
+        return [
+            Example.from_record({field: row[field] for field in fields}, input_keys=input_keys)
+            for _, row in df.iterrows()
+        ]
 
     def from_json(
         self, file_path: str, fields: list[str] | None = None, input_keys: tuple[str, ...] = ()
@@ -127,7 +133,7 @@ class DataLoader(Dataset):
     ) -> Mapping[str, list[Example]]:
         if random_state is not None:
             random.seed(random_state)
-        dataset_shuffled = dataset.copy()
+        dataset_shuffled = list(dataset)
         random.shuffle(dataset_shuffled)
         if train_size is not None and isinstance(train_size, float) and (0 < train_size < 1):
             train_end = int(len(dataset_shuffled) * train_size)

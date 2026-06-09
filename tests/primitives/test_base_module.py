@@ -81,12 +81,20 @@ def test_save_and_load_with_json(tmp_path, make_run):
     model = ChainOfThought(ts("q -> a"))
     model.predict.task_spec = model.predict.task_spec.with_instructions("You are a helpful assistant.")
     model.predict.demos = [
-        Example(q="What is the capital of France?", a="Paris", reasoning="n/a").with_inputs("q"),
-        Example(
-            q=[Example(q="What is the capital of France?"), Example(q="What is actually the capital of France?")],
-            a="Paris",
-            reasoning="n/a",
-        ).with_inputs("q"),
+        Example.from_record(
+            {"q": "What is the capital of France?", "a": "Paris", "reasoning": "n/a"}, input_keys=("q")
+        ),
+        Example.from_record(
+            {
+                "q": [
+                    Example.from_record({"q": "What is the capital of France?"}),
+                    Example.from_record({"q": "What is actually the capital of France?"}),
+                ],
+                "a": "Paris",
+                "reasoning": "n/a",
+            },
+            input_keys=("q",),
+        ),
     ]
     save_path = tmp_path / "model.json"
     model.save(save_path)
@@ -119,7 +127,7 @@ def test_save_and_load_with_pkl(tmp_path, make_run):
         {"current_date": datetime.date(2024, 1, 1), "target_date": datetime.date(2024, 1, 5), "date_diff": 4},
         {"current_date": datetime.date(2024, 1, 1), "target_date": datetime.date(2024, 1, 6), "date_diff": 5},
     ]
-    trainset = [Example(**example).with_inputs("current_date", "target_date") for example in trainset]
+    trainset = [Example.from_record(example).with_input_keys("current_date", "target_date") for example in trainset]
     run = make_run(lm=DummyLM([{"date_diff": "1", "reasoning": "n/a"}, {"date_diff": "2", "reasoning": "n/a"}] * 10))
     cot = ChainOfThought(MySignature)
     asyncio.run(cot(current_date=datetime.date(2024, 1, 1), target_date=datetime.date(2024, 1, 2), run=run))

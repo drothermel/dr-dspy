@@ -8,6 +8,7 @@ from typing import Any, TextIO
 from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
 from dspy.core.types import LMHistoryEntry, LMRequest, LMResponse
 from dspy.core.types.history import _history_request_messages_as_openai
+from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
 from dspy.runtime.run_context import RunContext
 from dspy.utils.callback import BaseCallback, with_callbacks
 from dspy.utils.inspect_history import pretty_print_history
@@ -17,6 +18,7 @@ from dspy.utils.transparency import ACTIVE_CALL_METADATA, ACTIVE_COMPILED_CALL
 MAX_HISTORY_SIZE = 10000
 GLOBAL_HISTORY: list[LMHistoryEntry] = []
 LM_CLASS_STATE_KEY = "_dspy_lm_class"
+PROVIDER_OPTIONS_STATE_KEY = "_dspy_provider_options"
 
 
 def _import_lm_class(class_path: str) -> type:
@@ -43,6 +45,12 @@ def _import_lm_class(class_path: str) -> type:
     raise ImportError(f"Could not import serialized LM class `{class_path}`.") from last_error
 
 
+def _provider_options_from_kwargs(kwargs: dict[str, Any]) -> LMProviderOptions:
+    provider_fields = set(LMProviderOptions.model_fields)
+    data = {key: value for key, value in kwargs.items() if key in provider_fields}
+    return LMProviderOptions(**data)
+
+
 class BaseLM:
     def __init__(
         self,
@@ -52,19 +60,33 @@ class BaseLM:
         max_tokens: int | None = None,
         callbacks: list[BaseCallback] | None = None,
         num_retries: int = 3,
-        **kwargs: Any,
+        provider_options: LMProviderOptions | None = None,
     ) -> None:
         self.model = model
         self.model_type = model_type
         self.callbacks = list(callbacks or [])
         self.num_retries = num_retries
-        self.kwargs = self._get_initial_kwargs(temperature=temperature, max_tokens=max_tokens, **kwargs)
+        self.provider_options = provider_options or LMProviderOptions()
+        self.kwargs = self._get_initial_kwargs(
+            temperature=temperature,
+            max_tokens=max_tokens,
+            provider_options=self.provider_options,
+        )
         self.history: list[LMHistoryEntry] = []
 
     def _get_initial_kwargs(
-        self, *, temperature: float | None, max_tokens: int | None, **kwargs: Any
+        self,
+        *,
+        temperature: float | None,
+        max_tokens: int | None,
+        provider_options: LMProviderOptions,
     ) -> dict[str, Any]:
-        return dict(temperature=temperature, max_tokens=max_tokens, **kwargs)
+        kwargs = provider_options.to_kwargs()
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        return kwargs
 
     @with_callbacks(kind="lm")
     async def __call__(self, request: LMRequest, *, run: RunContext) -> LMResponse:
@@ -97,6 +119,10 @@ class BaseLM:
     @property
     def supported_params(self) -> set[str]:
         return set()
+
+    @property
+    def cache(self) -> bool | None:
+        return self.provider_options.cache
 
     def _finalize_lm_response(self, request: LMRequest, response: LMResponse, *, run: RunContext) -> LMResponse:
         if run.usage_tracker:
@@ -172,11 +198,14 @@ class BaseLM:
         filtered_kwargs = {
             key: value for key, value in self.kwargs.items() if key not in ("api_key", LM_CLASS_STATE_KEY)
         }
+        provider_data = self.provider_options.model_dump(exclude_none=True)
+        provider_data.pop("api_key", None)
         return {
             LM_CLASS_STATE_KEY: f"{type(self).__module__}.{type(self).__qualname__}",
             "model": self.model,
             "model_type": self.model_type,
             "num_retries": getattr(self, "num_retries", 3),
+            PROVIDER_OPTIONS_STATE_KEY: provider_data,
             **filtered_kwargs,
         }
 
@@ -187,7 +216,9 @@ class BaseLM:
         class_path = state.pop(LM_CLASS_STATE_KEY, None)
         if cls is BaseLM:
             if class_path is None:
-                return get_lm_class(BUILTIN_LM_CLASS_PATH)(**state)
+                return get_lm_class(BUILTIN_LM_CLASS_PATH).load_state(
+                    state, allow_custom_lm_class=allow_custom_lm_class
+                )
             if class_path != BUILTIN_LM_CLASS_PATH and (not allow_custom_lm_class):
                 raise ValueError(
                     f"Refusing to import custom serialized LM class `{class_path}`. Pass allow_unsafe_lm_state=True when loading trusted files to enable custom LM classes."
@@ -200,21 +231,50 @@ class BaseLM:
             if "allow_custom_lm_class" in inspect.signature(lm_cls.load_state).parameters:
                 return lm_cls.load_state(state, allow_custom_lm_class=allow_custom_lm_class)
             return lm_cls.load_state(state)
-        return cls(**state)
+        model = state.pop("model")
+        model_type = state.pop("model_type", "chat")
+        num_retries = state.pop("num_retries", 3)
+        provider_data = state.pop(PROVIDER_OPTIONS_STATE_KEY, None)
+        temperature = state.pop("temperature", None)
+        max_tokens = state.pop("max_tokens", None)
+        max_completion_tokens = state.pop("max_completion_tokens", None)
+        if max_tokens is None and max_completion_tokens is not None:
+            max_tokens = max_completion_tokens
+        remaining = dict(state)
+        if provider_data:
+            remaining = {**provider_data, **remaining}
+        provider_options = _provider_options_from_kwargs(remaining)
+        return cls(
+            model=model,
+            model_type=model_type,
+            num_retries=num_retries,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            provider_options=provider_options,
+        )
 
-    def copy(self, **kwargs: Any):
+    def copy(
+        self,
+        *,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        provider_options: LMProviderOptions | None = None,
+    ) -> "BaseLM":
         new_instance = copy_module.copy(self)
         new_instance.history = []
         new_instance.callbacks = list(getattr(self, "callbacks", []) or [])
-        new_instance.kwargs = dict(getattr(self, "kwargs", {}) or {})
-        for key, value in kwargs.items():
-            if hasattr(new_instance, key):
-                setattr(new_instance, key, value)
-            if key in new_instance.kwargs or not hasattr(self, key):
-                if value is None:
-                    new_instance.kwargs.pop(key, None)
-                else:
-                    new_instance.kwargs[key] = value
+        if model is not None:
+            new_instance.model = model
+        merged_provider = merge_provider_options(self.provider_options, provider_options)
+        new_instance.provider_options = merged_provider or self.provider_options
+        new_kwargs = dict(getattr(self, "kwargs", {}) or {})
+        if temperature is not None:
+            new_kwargs["temperature"] = temperature
+        if max_tokens is not None:
+            new_kwargs["max_tokens"] = max_tokens
+        new_kwargs.update(new_instance.provider_options.to_kwargs())
+        new_instance.kwargs = new_kwargs
         return new_instance
 
     def inspect_history(self, n: int = 1, file: "TextIO | None" = None) -> None:

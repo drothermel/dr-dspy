@@ -65,7 +65,7 @@ def test_default_config_does_not_serialize_empty_stop_sequences():
 
 def test_history_entry_exposes_typed_derived_properties():
     message = User("hi")
-    request = LMRequest.from_call(model="model", messages=[message], temperature=0.2)
+    request = LMRequest.from_call(model="model", messages=[message], config=LMConfig(temperature=0.2))
     response = LMResponse.from_text("ok", model="response-model", usage={"input_tokens": 1}, cost=0.5)
     entry = LMHistoryEntry(request=request, response=response, timestamp="timestamp", uuid="uuid")
     assert entry.model == "model"

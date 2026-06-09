@@ -166,8 +166,8 @@ def test_image_input_formats(
 def test_predictor_save_load(sample_url, sample_pil_image, make_run):
     signature = "image: Image -> caption: str"
     examples = [
-        Example(image=Image(sample_url), caption="Example 1"),
-        Example(image=sample_pil_image, caption="Example 2"),
+        Example.from_record({"image": Image(sample_url), "caption": "Example 1"}),
+        Example.from_record({"image": sample_pil_image, "caption": "Example 2"}),
     ]
     predictor, lm, run = setup_predictor(signature, {"caption": "A golden retriever"}, make_run)
     optimizer = LabeledFewShot(k=1)
@@ -183,9 +183,13 @@ def test_predictor_save_load(sample_url, sample_pil_image, make_run):
 
 def test_save_load_complex_default_types(make_run):
     examples = [
-        Example(
-            image_list=[Image("https://example.com/dog.jpg"), Image("https://example.com/cat.jpg")], caption="Example 1"
-        ).with_inputs("image_list")
+        Example.from_record(
+            {
+                "image_list": [Image("https://example.com/dog.jpg"), Image("https://example.com/cat.jpg")],
+                "caption": "Example 1",
+            },
+            input_keys=("image_list",),
+        )
     ]
     ComplexTypeSignature = make_task_spec(
         {
@@ -202,7 +206,7 @@ def test_save_load_complex_default_types(make_run):
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(ComplexTypeSignature)
         loaded_predictor.load(temp_file.name)
-    result = asyncio.run(loaded_predictor(**examples[0].inputs(), run=make_run(lm=lm)))
+    result = asyncio.run(loaded_predictor(**examples[0].as_inputs(), run=make_run(lm=lm)))
     assert result.caption == "A list of images"
     assert str(lm.history[-1].messages_as_openai).count("'url'") == 4
     assert "<DSPY_IMAGE_START>" not in str(lm.history[-1].messages_as_openai)
@@ -249,7 +253,9 @@ def test_save_load_complex_types(test_case, make_run):
             processed_input[key] = [Image(url) for url in value]
         else:
             processed_input[key] = value
-    examples = [Example(**processed_input, **test_case["expected"]).with_inputs(*processed_input.keys())]
+    examples = [
+        Example.from_record({**processed_input, **test_case["expected"]}, input_keys=tuple(processed_input.keys()))
+    ]
     predictor, lm, run = setup_predictor(task_spec, test_case["expected"], make_run)
     optimizer = LabeledFewShot(k=1)
     compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False, run=run))
@@ -281,7 +287,9 @@ def test_save_load_pydantic_model(make_run):
         image_list=[Image("https://example.com/cat.jpg")],
         output="Multiple photos",
     )
-    examples = [Example(model_input=model_input, output="Multiple photos").with_inputs("model_input")]
+    examples = [
+        Example.from_record({"model_input": model_input, "output": "Multiple photos"}, input_keys=("model_input"))
+    ]
     predictor, lm, run = setup_predictor(PydanticSignature, {"output": "Multiple photos"}, make_run)
     optimizer = LabeledFewShot(k=1)
     compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False, run=run))

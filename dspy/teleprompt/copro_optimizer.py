@@ -4,10 +4,12 @@ from collections import defaultdict
 
 from typing_extensions import override
 
+from dspy.core.types.config import LMConfig
 from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.predict import Predict
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
+from dspy.teleprompt.compile_params import EvaluateCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.utils import optimizer_lm_context
@@ -98,9 +100,23 @@ class COPRO(Teleprompter):
         logger.debug(f"p: {list(task_spec.fields.values())[-1].prefix}")
 
     @override
-    async def compile(self, student, *, trainset, eval_kwargs, run: RunContext):
+    async def compile(self, student, *, trainset, evaluate: EvaluateCompileParams, run: RunContext):
         module = student.deepcopy()
-        evaluate = Evaluate(devset=trainset, metric=self.metric, **eval_kwargs)
+        evaluate_kwargs = evaluate.model_dump(exclude_none=True)
+        evaluate_call_kwargs = {
+            key: value
+            for key, value in evaluate_kwargs.items()
+            if key
+            in {
+                "num_threads",
+                "max_concurrency",
+                "display_progress",
+                "display_table",
+                "save_as_csv",
+                "save_as_json",
+            }
+        }
+        evaluator = Evaluate(devset=trainset, metric=self.metric, **evaluate_kwargs)
         total_calls = 0
         results_best = {
             id(p): {"depth": [], "max": [], "average": [], "min": [], "std": []} for p in module.predictors()
@@ -121,11 +137,13 @@ class COPRO(Teleprompter):
                     run, lm=self.prompt_model, phase="copro.generate_instruction", lm_role="prompt_model"
                 ) as opt_run:
                     instruct = await Predict(
-                        BasicGenerateInstructionTaskSpec(), n=self.breadth - 1, temperature=self.init_temperature
+                        BasicGenerateInstructionTaskSpec(),
+                        config=LMConfig(n=self.breadth - 1, temperature=self.init_temperature),
                     )(basic_instruction=basic_instruction, run=opt_run)
             else:
                 instruct = await Predict(
-                    BasicGenerateInstructionTaskSpec(), n=self.breadth - 1, temperature=self.init_temperature
+                    BasicGenerateInstructionTaskSpec(),
+                    config=LMConfig(n=self.breadth - 1, temperature=self.init_temperature),
                 )(basic_instruction=basic_instruction, run=run)
             instruct.completions.proposed_instruction.append(basic_instruction)
             instruct.completions.proposed_prefix_for_output_field.append(basic_prefix)
@@ -159,7 +177,7 @@ class COPRO(Teleprompter):
                     logger.info(
                         f"At Depth {d + 1}/{self.depth}, Evaluating Prompt Candidate #{c_i + 1}/{len(candidates_)} for Predictor {p_i + 1} of {len(module.predictors())}."
                     )
-                    score = (await evaluate(module_clone, run=run, devset=trainset, **eval_kwargs)).score
+                    score = (await evaluator(module_clone, run=run, devset=trainset, **evaluate_call_kwargs)).score
                     if self.prompt_model:
                         logger.debug(f"prompt_model.inspect_history(n=1) {self.prompt_model.inspect_history(n=1)}")
                     total_calls += 1
@@ -225,12 +243,12 @@ class COPRO(Teleprompter):
                     ) as opt_run:
                         instr = await Predict(
                             GenerateInstructionGivenAttemptsTaskSpec(),
-                            n=self.breadth,
-                            temperature=self.init_temperature,
+                            config=LMConfig(n=self.breadth, temperature=self.init_temperature),
                         )(attempted_instructions=attempts, run=opt_run)
                 else:
                     instr = await Predict(
-                        GenerateInstructionGivenAttemptsTaskSpec(), n=self.breadth, temperature=self.init_temperature
+                        GenerateInstructionGivenAttemptsTaskSpec(),
+                        config=LMConfig(n=self.breadth, temperature=self.init_temperature),
                     )(attempted_instructions=attempts, run=run)
                 new_candidates[id(p_base)] = instr.completions
                 all_candidates[id(p_base)].proposed_instruction.extend(instr.completions.proposed_instruction)

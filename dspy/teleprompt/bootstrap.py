@@ -107,7 +107,7 @@ class BootstrapFewShot(Teleprompter):
             for name, predictor in teacher.named_predictors():
                 predictor_cache[name] = predictor.demos
                 predictor.demos = [x for x in predictor.demos if x != example]
-            prediction = await teacher(**example.inputs(), run=item_run)
+            prediction = await teacher(**example.as_inputs(), run=item_run)
             trace = list(item_run.trace)
             for name, predictor in teacher.named_predictors():
                 predictor.demos = predictor_cache[name]
@@ -128,7 +128,7 @@ class BootstrapFewShot(Teleprompter):
         if success:
             for step in trace:
                 predictor, inputs, outputs = step
-                demo = Example(augmented=True, **inputs, **outputs)
+                demo = Example.from_record({"augmented": True, **inputs, **outputs})
                 try:
                     predictor_name = self.predictor2name[id(predictor)]
                 except KeyError:

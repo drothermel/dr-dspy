@@ -76,7 +76,7 @@ def test_save_compiled_model(tmp_path, make_run):
         {"question": "What is the color of the milk?", "answer": "white"},
         {"question": "What is the color of the coffee?", "answer": "black"},
     ]
-    trainset = [Example(**example).with_inputs("question") for example in trainset]
+    trainset = [Example.from_record(example).with_input_keys("question") for example in trainset]
 
     def dummy_metric(example, pred, trace=None):
         return True

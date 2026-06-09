@@ -99,7 +99,7 @@ class Evaluate:
 
         async def process_item(example):
             item_run = run.fork(trace=[])
-            prediction = await program(**example.inputs(), run=item_run)
+            prediction = await program(**example.as_inputs(), run=item_run)
             trace = list(item_run.trace)
             score = metric(example, prediction, trace)
             return (prediction, score)

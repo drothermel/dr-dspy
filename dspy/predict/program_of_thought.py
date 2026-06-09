@@ -2,10 +2,12 @@ import json
 import logging
 import re
 
+from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.code_interpreter import FinalOutput
 from dspy.primitives.module import Module
 from dspy.primitives.python_interpreter import PythonInterpreter
+from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 
 logger = logging.getLogger(__name__)
@@ -106,10 +108,15 @@ class ProgramOfThought(Module):
         except Exception as e:
             return (None, str(e))
 
-    async def aforward(self, **kwargs):
-        run = kwargs.get("run")
-        input_kwargs = {field_name: kwargs[field_name] for field_name in self.input_fields}
-        code_data = await self.code_generate(**input_kwargs, run=run)
+    async def aforward(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs,
+    ):
+        input_kwargs = {field_name: inputs[field_name] for field_name in self.input_fields if field_name in inputs}
+        code_data = await self.code_generate(**input_kwargs, run=run, options=options)
         output = None
         code, error = self._parse_code(code_data)
         if not error:
@@ -121,12 +128,12 @@ class ProgramOfThought(Module):
                 self.interpreter.shutdown()
                 raise RuntimeError(f"Max hops reached. Failed to run ProgramOfThought: {error}")
             input_kwargs.update({"previous_code": code, "error": error})
-            code_data = await self.code_regenerate(**input_kwargs, run=run)
+            code_data = await self.code_regenerate(**input_kwargs, run=run, options=options)
             code, error = self._parse_code(code_data)
             if not error:
                 output, error = self._execute_code(code)
             hop += 1
         input_kwargs.update({"final_generated_code": code, "code_output": output})
-        output_gen_result = await self.generate_output(**input_kwargs, run=run)
+        output_gen_result = await self.generate_output(**input_kwargs, run=run, options=options)
         self.interpreter.shutdown()
         return output_gen_result

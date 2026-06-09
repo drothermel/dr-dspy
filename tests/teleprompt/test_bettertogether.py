@@ -21,14 +21,20 @@ def simple_metric(example, prediction, trace=None):
 
 
 examples = [
-    Example(
-        input="What is the oldest known human-made monument?",
-        output="Göbekli Tepe in southeastern Turkiye, dating back to around 9600 BCE",
-    ).with_inputs("input"),
-    Example(input="Why can't fish fall in love?", output="Because love is in the air").with_inputs("input"),
-    Example(
-        input="What would bring world peace?", output="8 billion people meeting for a tea party in my backyard"
-    ).with_inputs("input"),
+    Example.from_record(
+        {
+            "input": "What is the oldest known human-made monument?",
+            "output": "Göbekli Tepe in southeastern Turkiye, dating back to around 9600 BCE",
+        },
+        input_keys=("input",),
+    ),
+    Example.from_record(
+        {"input": "Why can't fish fall in love?", "output": "Because love is in the air"}, input_keys=("input")
+    ),
+    Example.from_record(
+        {"input": "What would bring world peace?", "output": "8 billion people meeting for a tea party in my backyard"},
+        input_keys=("input"),
+    ),
 ]
 trainset = examples[:2]
 valset = [examples[2]]
@@ -39,8 +45,8 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    async def aforward(self, **kwargs: object):
-        return await self.predictor(**kwargs)
+    async def aforward(self, *, run, options=None, **inputs):
+        return await self.predictor(run=run, options=options, **inputs)
 
 
 class SimpleOptimizer(Teleprompter):

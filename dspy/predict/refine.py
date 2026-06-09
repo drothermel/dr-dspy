@@ -6,8 +6,9 @@ import orjson
 from dspy.adapters.call.wrappers import HintInjectingAdapter
 from dspy.adapters.utils import get_field_description_string
 from dspy.compile.resolve import resolve_adapter
+from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.predict import Predict, Prediction
-from dspy.runtime.run_context import resolve_run
+from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
 from dspy.utils.source_format import get_formatted_source
@@ -63,8 +64,14 @@ class Refine(Module):
         except TypeError:
             self.reward_fn_code = get_formatted_source(reward_fn.__class__)
 
-    async def aforward(self, **kwargs):
-        run = resolve_run(run=kwargs.pop("run", None), bound_run=self.run)
+    async def aforward(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs,
+    ):
+        run = resolve_run(run=run, bound_run=self.run)
         lm = self.module.get_lm() or run.lm
         best_pred, best_trace, best_reward = (None, None, -float("inf"))
         advice = None
@@ -79,7 +86,7 @@ class Refine(Module):
             try:
                 item_run = run.fork(trace=[])
                 if not advice:
-                    outputs = await mod(**kwargs, run=item_run)
+                    outputs = await mod(**inputs, run=item_run, options=options)
                 else:
                     hint_adapter = HintInjectingAdapter(
                         inner=adapter,
@@ -87,9 +94,9 @@ class Refine(Module):
                         task_spec_to_name=task_spec2name,
                     )
                     hint_run = item_run.fork(adapter=hint_adapter)
-                    outputs = await mod(**kwargs, run=hint_run)
+                    outputs = await mod(**inputs, run=hint_run, options=options)
                 trace = list(item_run.trace)
-                reward = self.reward_fn(kwargs, outputs)
+                reward = self.reward_fn(inputs, outputs)
                 if reward > best_reward:
                     best_reward, best_pred, best_trace = (reward, outputs, trace)
                 if self.threshold is not None and reward >= self.threshold:
@@ -99,7 +106,7 @@ class Refine(Module):
                 modules = {"program_code": self.module_code, "modules_defn": inspect_modules(mod)}
                 trajectory = [{"module_name": predictor2name[p], "inputs": i, "outputs": dict(o)} for p, i, o in trace]
                 trajectory = {
-                    "program_inputs": kwargs,
+                    "program_inputs": inputs,
                     "program_trajectory": trajectory,
                     "program_outputs": dict(outputs),
                 }
@@ -113,7 +120,7 @@ class Refine(Module):
                     k: v if isinstance(v, str) else orjson.dumps(recursive_mask(v), option=orjson.OPT_INDENT_2).decode()
                     for k, v in advise_kwargs.items()
                 }
-                advice = (await Predict(OfferFeedbackTaskSpec())(**advise_kwargs)).advice
+                advice = (await Predict(OfferFeedbackTaskSpec())(**advise_kwargs, run=run)).advice
             except Exception:
                 if idx > self.fail_count:
                     raise

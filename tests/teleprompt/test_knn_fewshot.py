@@ -13,7 +13,7 @@ from tests.task_spec.helpers import ts
 
 
 def mock_example(question: str, answer: str) -> Example:
-    return Example(question=question, answer=answer).with_inputs("question")
+    return Example.from_record({"question": question, "answer": answer}, input_keys=("question",))
 
 
 @pytest.fixture
@@ -28,8 +28,8 @@ def setup_knn_few_shot() -> KNNFewShot:
 
 def test_knn_few_shot_initialization(setup_knn_few_shot, make_run):
     knn_few_shot = setup_knn_few_shot
-    assert knn_few_shot.KNN.k == 2, "Incorrect k value for KNN"
-    assert len(knn_few_shot.KNN.trainset) == 3, "Incorrect trainset size for KNN"
+    assert knn_few_shot.knn.k == 2, "Incorrect k value for KNN"
+    assert len(knn_few_shot.knn.trainset) == 3, "Incorrect trainset size for KNN"
 
 
 class SimpleModule(Module):

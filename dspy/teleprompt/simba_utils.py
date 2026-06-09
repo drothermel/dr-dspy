@@ -38,7 +38,7 @@ def wrap_program(*, program: Module, metric: Callable, run: RunContext):
         item_run = run.fork(trace=[])
         prediction, trace, score = (None, None, 0.0)
         try:
-            prediction = await program(**example.inputs(), run=item_run)
+            prediction = await program(**example.as_inputs(), run=item_run)
         except Exception as e:
             logger.warning(e)
         trace = list(item_run.trace)
@@ -85,7 +85,7 @@ def append_a_demo(demo_input_field_maxlen):
             for k, v in _inputs.items():
                 if demo_input_field_maxlen and len(str(v)) > demo_input_field_maxlen:
                     _inputs[k] = f"{str(v)[:demo_input_field_maxlen]}\n\t\t... <TRUNCATED FOR BREVITY>"
-            demo = Example(augmented=True, **_inputs, **_outputs)
+            demo = Example.from_record({"augmented": True, **_inputs, **_outputs})
             name = predictor2name[id(predictor)]
             name2demo[name] = demo
         for name, demo in name2demo.items():
@@ -127,8 +127,8 @@ async def append_a_rule(bucket, system, *, run: RunContext, **kwargs) -> bool:
     kwargs = {
         "program_code": get_formatted_source(system.__class__),
         "modules_defn": inspect_modules(system),
-        "program_inputs": {**example.inputs()},
-        "oracle_metadata": {**example.labels()},
+        "program_inputs": {**example.as_inputs()},
+        "oracle_metadata": {**example.as_labels()},
         "better_program_trajectory": better_trajectory,
         "better_program_outputs": dict(good["prediction"]),
         "worse_program_trajectory": worse_trajectory,

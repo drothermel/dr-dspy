@@ -13,7 +13,8 @@ except ImportError:
     pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm import LM
-from dspy.core.types import LMRequest, LMResponse
+from dspy.core.types import LMConfig, LMRequest, LMResponse
+from dspy.core.types.config import _lm_config_data_from_kwargs
 
 
 def make_response(output_blocks):
@@ -43,8 +44,26 @@ def make_response(output_blocks):
     )
 
 
-def _request(lm: BaseLM, *items: object, prompt: str | None = None, messages=None, **kwargs: Any) -> LMRequest:
-    return LMRequest.from_call(model=lm.model, items=items, prompt=prompt, messages=messages, **kwargs)
+def _request(
+    lm: BaseLM,
+    *items: object,
+    prompt: str | None = None,
+    messages=None,
+    config: LMConfig | None = None,
+    **kwargs: Any,
+) -> LMRequest:
+    config_overrides = _lm_config_data_from_kwargs(kwargs)
+    merged_config = config
+    if config_overrides:
+        base = config or LMConfig()
+        merged_config = base.model_copy(update=config_overrides)
+    return LMRequest.from_call(
+        model=lm.model,
+        items=items,
+        prompt=prompt,
+        messages=messages,
+        config=merged_config,
+    )
 
 
 def _model_response(text: str) -> ModelResponse:

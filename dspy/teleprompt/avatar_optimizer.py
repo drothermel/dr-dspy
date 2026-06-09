@@ -5,12 +5,13 @@ from typing import Any, Callable, cast
 from pydantic import BaseModel
 from typing_extensions import override
 
+from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.avatar.models import ActionOutput
 from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
-from dspy.runtime.run_context import RunContext, resolve_run
+from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
@@ -65,9 +66,14 @@ class _AvatarEvalModule(Module):
         self._actor = actor
         self._return_outputs = return_outputs
 
-    async def aforward(self, **kwargs):
-        example = Example(**kwargs)
-        run = resolve_run(run=kwargs.pop("run", None), bound_run=self.run)
+    async def aforward(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs,
+    ):
+        example = Example.from_record(inputs)
         return await self._optimizer.process_example(
             actor=self._actor, example=example, return_outputs=self._return_outputs, run=run
         )
@@ -99,7 +105,7 @@ class AvatarOptimizer(Teleprompter):
         actor = deepcopy(actor)
         try:
             item_run = run.fork(trace=[])
-            prediction = await actor(**example.inputs(), run=item_run)
+            prediction = await actor(**example.as_inputs(), run=item_run)
             trace = list(item_run.trace)
             score = self.metric(example, prediction, trace)
             if return_outputs:
@@ -141,7 +147,7 @@ class AvatarOptimizer(Teleprompter):
             if score >= self.upper_bound:
                 pos_inputs.append(
                     EvalResult(
-                        example=example.inputs().to_dict(),
+                        example=example.as_inputs(),
                         score=score,
                         actions=prediction.actions if prediction else None,
                     )
@@ -149,7 +155,7 @@ class AvatarOptimizer(Teleprompter):
             elif score <= self.lower_bound:
                 neg_inputs.append(
                     EvalResult(
-                        example=example.inputs().to_dict(),
+                        example=example.as_inputs(),
                         score=score,
                         actions=prediction.actions if prediction else None,
                     )

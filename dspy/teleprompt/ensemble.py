@@ -2,6 +2,7 @@ import random
 
 from typing_extensions import override
 
+from dspy.core.types.call_options import ModuleCallOptions
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.teleprompt.teleprompt import Teleprompter
@@ -24,11 +25,16 @@ class Ensemble(Teleprompter):
                 super().__init__()
                 self.programs = programs
 
-            async def aforward(self, *args, **kwargs):
-                run = resolve_run(run=kwargs.pop("run", None), bound_run=self.run)
-                kwargs["run"] = run
+            async def aforward(
+                self,
+                *,
+                run: RunContext,
+                options: ModuleCallOptions | None = None,
+                **inputs,
+            ):
+                run = resolve_run(run=run, bound_run=self.run)
                 programs = random.sample(self.programs, size) if size else self.programs
-                outputs = [await prog(*args, **kwargs) for prog in programs]
+                outputs = [await prog(run=run, options=options, **inputs) for prog in programs]
                 if reduce_fn:
                     return reduce_fn(outputs)
                 return outputs

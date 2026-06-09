@@ -25,11 +25,11 @@ def test_bootstrap_trace_data(make_run):
     )
     program = Predict(string_to_int_task_spec)
     dataset = [
-        Example(text="one", number=1).with_inputs("text"),
-        Example(text="two", number=2).with_inputs("text"),
-        Example(text="three", number=3).with_inputs("text"),
-        Example(text="four", number=4).with_inputs("text"),
-        Example(text="five", number=5).with_inputs("text"),
+        Example.from_record({"text": "one", "number": 1}, input_keys=("text",)),
+        Example.from_record({"text": "two", "number": 2}, input_keys=("text",)),
+        Example.from_record({"text": "three", "number": 3}, input_keys=("text",)),
+        Example.from_record({"text": "four", "number": 4}, input_keys=("text",)),
+        Example.from_record({"text": "five", "number": 5}, input_keys=("text",)),
     ]
 
     def exact_match_metric(example, prediction, trace=None):
@@ -106,7 +106,7 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch, make_run):
     run = make_run(lm=DummyLM([{}]))
 
     class DummyProgram(Module):
-        async def aforward(self, **kwargs: object):
+        async def aforward(self, *, run, options=None, **inputs):
             return Prediction()
 
     captured_metadata: dict[str, Any] = {}

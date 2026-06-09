@@ -136,7 +136,7 @@ class _EnvSession:
 class AlfWorld:
     def __init__(self, max_threads: int = 20) -> None:
         self.POOL = EnvPool(size=max_threads)
-        dataset = [Example(idx=idx).with_inputs("idx") for idx in range(3500)]
+        dataset = [Example.from_record({"idx": idx}, input_keys=("idx",)) for idx in range(3500)]
         random.Random(0).shuffle(dataset)
         trainset, devset = (dataset[:3000], dataset[-500:])
         if len(trainset) + len(devset) > len(dataset):

@@ -1,23 +1,21 @@
 import logging
 import random
-import types
-from typing import Annotated, Any, Literal, Union, cast, get_args, get_origin
+from typing import Any
 
 from pydantic import BaseModel
-from pydantic_core import PydanticUndefined
 from typing_extensions import override
 
 from dspy.clients.base_lm import BaseLM
 from dspy.compile.resolve import resolve_lm_config
-from dspy.core.types.config import _merge_lm_config, coerce_lm_config
+from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
+from dspy.core.types.config import LMConfig, _merge_lm_config, coerce_lm_config
+from dspy.predict.call_validation import resolve_predict_options, validate_task_inputs
 from dspy.predict.parameter import Parameter
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.runtime.run_context import RunContext, resolve_run
-from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
+from dspy.runtime.run_context import RunContext
 from dspy.task_spec.task_spec import TaskSpec
 from dspy.utils.callback import BaseCallback
-from dspy.utils.constants import IS_TYPE_UNDEFINED
 from dspy.utils.transparency import reset_active_call_metadata, set_active_call_metadata
 
 logger = logging.getLogger(__name__)
@@ -42,9 +40,10 @@ class Predict(Module, Parameter):
     def __init__(
         self,
         task_spec: TaskSpec,
+        *,
+        config: LMConfig | None = None,
         callbacks: list[BaseCallback] | None = None,
         run: RunContext | None = None,
-        **config,
     ) -> None:
         if isinstance(task_spec, str):
             raise TypeError(
@@ -55,7 +54,7 @@ class Predict(Module, Parameter):
         super().__init__(callbacks=callbacks, run=run)
         self.stage = random.randbytes(8).hex()
         self.task_spec: TaskSpec = task_spec
-        self.config = config
+        self.config = config or LMConfig()
         self.reset()
 
     def reset(self) -> None:
@@ -70,7 +69,7 @@ class Predict(Module, Parameter):
         state = {k: getattr(self, k) for k in state_keys}
         state["demos"] = []
         for demo in self.demos:
-            demo = demo.copy()
+            demo = demo.fork()
             for field in demo:
                 demo[field] = serialize_object(demo[field])
             if json_mode and (not isinstance(demo, dict)):
@@ -78,6 +77,7 @@ class Predict(Module, Parameter):
             else:
                 state["demos"].append(demo)
         state["task_spec"] = self.task_spec.to_dict()
+        state["config"] = self.config.model_dump(mode="json")
         state["lm"] = self.lm.dump_state() if self.lm else None
         return state
 
@@ -85,7 +85,7 @@ class Predict(Module, Parameter):
     def load_state(
         self, state: dict, *, allow_unsafe_lm_state: bool = False, custom_types: dict[str, type] | None = None
     ) -> "Predict":
-        excluded_keys = ["task_spec", "extended_signature", "lm"]
+        excluded_keys = ["task_spec", "extended_signature", "lm", "config"]
         for name, value in state.items():
             if name not in excluded_keys:
                 setattr(self, name, value)
@@ -96,6 +96,8 @@ class Predict(Module, Parameter):
                 )
             raise ValueError("Missing required 'task_spec' key in saved Predict state.")
         self.task_spec = TaskSpec.from_dict(state["task_spec"], custom_types=custom_types)
+        config_data = state.get("config")
+        self.config = coerce_lm_config(config_data) if config_data is not None else LMConfig()
         sanitized_lm_state = _sanitize_lm_state(state["lm"], allow_unsafe_lm_state) if state["lm"] else None
         self.lm = (
             BaseLM.load_state(sanitized_lm_state, allow_custom_lm_class=allow_unsafe_lm_state)
@@ -104,40 +106,24 @@ class Predict(Module, Parameter):
         )
         return self
 
-    def _get_positional_args_error_message(self) -> str:
-        input_fields = list(self.task_spec.input_fields.keys())
-        return f"Positional arguments are not allowed when calling `dspy.predict.predict.Predict`, must use keyword arguments that match your task spec input fields: '{', '.join(input_fields)}'. For example: `predict({input_fields[0]}=input_value, ...)`."
-
-    @override
-    def __call__(self, *args, **kwargs):
-        if args:
-            raise ValueError(self._get_positional_args_error_message())
-        return super().__call__(**kwargs)
-
-    @override
-    async def acall(self, *args, **kwargs):
-        if args:
-            raise ValueError(self._get_positional_args_error_message())
-        return await super().acall(**kwargs)
-
-    def _forward_preprocess(self, **kwargs):
-        assert "new_signature" not in kwargs, "new_signature is no longer a valid keyword argument."
-        if "signature" in kwargs:
-            raise TypeError("The 'signature' keyword argument is no longer supported. Pass 'task_spec' instead.")
-        run = resolve_run(run=kwargs.pop("run", None), bound_run=self.run)
-        task_spec = kwargs.pop("task_spec", self.task_spec)
+    def _forward_preprocess(
+        self,
+        *,
+        inputs: dict[str, Any],
+        options: PredictOptions,
+        run: RunContext,
+    ):
+        task_spec = options.task_spec or self.task_spec
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"Predict expected a TaskSpec, got {type(task_spec).__name__}.")
-        input_fields = task_spec_input_field_infos(task_spec)
-        demos = kwargs.pop("demos", self.demos)
-        base_config = coerce_lm_config(self.config)
-        override = kwargs.pop("config", {})
-        if override:
-            merged = _merge_lm_config(base_config, coerce_lm_config(override))
-            config = merged if merged is not None else coerce_lm_config(override)
+        validated_inputs = validate_task_inputs(task_spec, inputs)
+        demos = options.demos if options.demos is not None else self.demos
+        base_config = self.config
+        if options.config is not None:
+            config = _merge_lm_config(base_config, options.config) or options.config
         else:
             config = base_config
-        lm = kwargs.pop("lm", self.lm) or run.lm
+        lm = options.lm or self.lm or run.lm
         if lm is None:
             raise ValueError(
                 "No LM is loaded. Pass run=RunContext.create(lm=LM(...), adapter=...) to the call, "
@@ -152,60 +138,41 @@ class Predict(Module, Parameter):
             raise ValueError(
                 f"LM must be an instance of `dspy.clients.base_lm.BaseLM`, not {type(lm)}. Received `lm={lm}`."
             )
-        if "prediction" in kwargs and (
-            isinstance(kwargs["prediction"], dict)
-            and kwargs["prediction"].get("type") == "content"
-            and ("content" in kwargs["prediction"])
+        prediction = options.prediction
+        if (
+            prediction is not None
+            and isinstance(prediction, dict)
+            and prediction.get("type") == "content"
+            and "content" in prediction
         ):
             extensions = dict(config.extensions)
-            extensions["prediction"] = kwargs.pop("prediction")
+            extensions["prediction"] = prediction
             config = config.model_copy(update={"extensions": extensions})
-        for k, field_info in input_fields.items():
-            if k not in kwargs and field_info.default is not PydanticUndefined:
-                kwargs[k] = field_info.default
-        extra_fields = [k for k in kwargs if k not in input_fields]
-        if extra_fields:
-            logger.warning(
-                "Input contains fields not in task spec. These fields will be ignored: %s. Expected fields: %s.",
-                extra_fields,
-                list(input_fields.keys()),
-            )
-        if run.telemetry.warn_on_type_mismatch:
-            for field_name, field_info in input_fields.items():
-                if field_name in kwargs:
-                    value = kwargs[field_name]
-                    expected_type = field_info.annotation
-                    json_schema_extra = cast("dict[str, Any]", field_info.json_schema_extra or {})
-                    if value is None or json_schema_extra.get(IS_TYPE_UNDEFINED, False):
-                        continue
-                    if not _is_value_compatible_with_type(value, cast("type", expected_type)):
-                        logger.warning(
-                            "Type mismatch for field '%s': expected %s based on given task spec, but the provided value is incompatible: %s.",
-                            field_name,
-                            _get_type_name(expected_type),
-                            value,
-                        )
-        missing = [
-            k
-            for k, field_info in input_fields.items()
-            if k not in kwargs and (not _annotation_allows_none(field_info.annotation))
-        ]
-        if missing:
-            present = [k for k in input_fields if k in kwargs]
-            logger.warning("Not all input fields were provided to module. Present: %s. Missing: %s.", present, missing)
-        return (lm, config, task_spec, demos, kwargs, run)
+        return lm, config, task_spec, demos, validated_inputs, run, options.trace
 
-    def _forward_postprocess(self, completions, task_spec, run, **kwargs):
+    def _forward_postprocess(self, completions, task_spec, run, inputs, *, trace: bool):
         pred = Prediction.from_completions(completions, task_spec=task_spec)
-        if kwargs.pop("_trace", True) and run.trace is not None and (run.telemetry.max_trace_size > 0):
-            trace = run.trace
-            if len(trace) >= run.telemetry.max_trace_size:
-                trace.pop(0)
-            trace.append((self, {**kwargs}, pred))
+        if trace and run.trace is not None and run.telemetry.max_trace_size > 0:
+            trace_list = run.trace
+            if len(trace_list) >= run.telemetry.max_trace_size:
+                trace_list.pop(0)
+            trace_list.append((self, dict(inputs), pred))
         return pred
 
-    async def aforward(self, **kwargs):
-        lm, config, task_spec, demos, kwargs, run = self._forward_preprocess(**kwargs)
+    @override
+    async def aforward(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs: Any,
+    ) -> Prediction:
+        predict_options = resolve_predict_options(options if isinstance(options, PredictOptions) else None)
+        lm, config, task_spec, demos, validated_inputs, run, trace = self._forward_preprocess(
+            inputs=inputs,
+            options=predict_options,
+            run=run,
+        )
         config, _provenance = resolve_lm_config(lm, config)
         metadata_token = set_active_call_metadata(module=type(self).__name__, phase="predict", lm_role="default")
         try:
@@ -214,100 +181,23 @@ class Predict(Module, Parameter):
                 config=config,
                 task_spec=task_spec,
                 demos=demos,
-                inputs=kwargs,
+                inputs=validated_inputs,
                 run=run,
             )
         finally:
             reset_active_call_metadata(metadata_token)
-        return self._forward_postprocess(completions, task_spec, run, **kwargs)
+        return self._forward_postprocess(completions, task_spec, run, validated_inputs, trace=trace)
 
-    def update_config(self, **kwargs) -> None:
-        self.config = {**self.config, **kwargs}
+    def update_config(self, config: LMConfig) -> None:
+        merged = _merge_lm_config(self.config, config)
+        self.config = merged if merged is not None else config
 
-    def get_config(self):
+    def get_config(self) -> LMConfig:
         return self.config
 
     @override
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.task_spec})"
-
-
-def _get_type_name(type_annotation) -> str:
-    origin = get_origin(type_annotation)
-    args = get_args(type_annotation)
-    if origin is None:
-        if hasattr(type_annotation, "__name__"):
-            return type_annotation.__name__
-        return str(type_annotation)
-    if origin is Literal:
-        literal_values = ", ".join(repr(arg) for arg in args)
-        return f"Literal[{literal_values}]"
-    if args:
-        args_str = ", ".join("..." if arg is ... else _get_type_name(arg) for arg in args)
-        origin_name = getattr(origin, "__name__", str(origin))
-        return f"{origin_name}[{args_str}]"
-    return getattr(origin, "__name__", str(origin))
-
-
-def _annotation_allows_none(annotation: Any) -> bool:
-    origin = get_origin(annotation)
-    args = get_args(annotation)
-    if annotation is None or annotation is type(None):
-        return True
-    if origin is Annotated:
-        return bool(args) and _annotation_allows_none(args[0])
-    if origin is Union or origin is types.UnionType:
-        return any(_annotation_allows_none(arg) for arg in args)
-    return False
-
-
-def _is_value_compatible_with_type(value: Any, expected: type) -> bool:
-    if expected is str and isinstance(value, list) and all(isinstance(item, str) for item in value):
-        return True
-    return _check_type(value, expected)
-
-
-def _check_type(value: Any, expected: type) -> bool:
-    if expected is Any:
-        return True
-    origin = get_origin(expected)
-    args = get_args(expected)
-    if origin is Union or origin is types.UnionType:
-        return any(_check_type(value, arg) for arg in args)
-    if origin is Literal:
-        return value in args
-    if origin is list:
-        if not isinstance(value, list):
-            return False
-        if args:
-            return all(_check_type(item, args[0]) for item in value)
-        return True
-    if origin is dict:
-        if not isinstance(value, dict):
-            return False
-        if args:
-            key_type, val_type = args
-            return all((_check_type(k, key_type) and _check_type(v, val_type) for k, v in value.items()))
-        return True
-    if origin is tuple:
-        if not isinstance(value, tuple):
-            return False
-        if args:
-            if len(args) == 2 and args[1] is Ellipsis:
-                return all(_check_type(item, args[0]) for item in value)
-            if len(value) != len(args):
-                return False
-            return all((_check_type(item, arg) for item, arg in zip(value, args, strict=False)))
-        return True
-    if origin is set or origin is frozenset:
-        if not isinstance(value, origin):
-            return False
-        if args:
-            return all(_check_type(item, args[0]) for item in value)
-        return True
-    if isinstance(expected, type):
-        return isinstance(value, expected)
-    return False
 
 
 def serialize_object(obj):

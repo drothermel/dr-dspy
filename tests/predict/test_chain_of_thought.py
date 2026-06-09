@@ -9,6 +9,7 @@ except ImportError:
     pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.clients.lm import LM
+from dspy.core.types import LMProviderOptions
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.task_spec import default_task_instructions
 from dspy.utils.dummies import DummyLM
@@ -41,8 +42,7 @@ def test_chain_of_thought_with_native_reasoning(make_run):
         model="anthropic/claude-3-7-sonnet-20250219",
         temperature=0.0,
         max_tokens=4000,
-        cache=False,
-        reasoning_effort="low",
+        provider_options=LMProviderOptions(cache=False, reasoning_effort="low"),
     )
     run = make_run(lm=lm, adapter=ChatAdapter())
     with mock.patch("litellm.acompletion") as mock_completion:

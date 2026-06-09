@@ -15,7 +15,7 @@ class DummyModule(Module):
     def __init__(self):
         super().__init__()
 
-    async def aforward(self, **kwargs: object):
+    async def aforward(self, *, run, options=None, **inputs):
         pass
 
 
@@ -86,7 +86,7 @@ def test_eval_candidate_program_failure(make_run):
 def test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled(make_run):
     student = DummyModule()
     cast("Any", student).predictor = Predict(ts("input -> output"))
-    trainset = [Example(input="test", output="test").with_inputs("input")]
+    trainset = [Example.from_record({"input": "test", "output": "test"}, input_keys=("input",))]
     lm = DummyLM([{"output": "test"}])
     run = make_run(lm=lm)
     with patch("dspy.teleprompt.demo_sets.BootstrapFewShot") as MockBootstrap:

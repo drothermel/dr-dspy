@@ -1641,8 +1641,10 @@ def test_chat_adapter_formats_image_with_few_shot_examples():
     )
     adapter = ChatAdapter()
     demos = [
-        Example(image=Image(url="https://example.com/image1.jpg"), text="This is a test image"),
-        Example(image=Image(url="https://example.com/image2.jpg"), text="This is another test image"),
+        Example.from_record({"image": Image(url="https://example.com/image1.jpg"), "text": "This is a test image"}),
+        Example.from_record(
+            {"image": Image(url="https://example.com/image2.jpg"), "text": "This is another test image"}
+        ),
     ]
     messages = adapter_format_as_openai(
         adapter=adapter,
@@ -1698,7 +1700,7 @@ def test_chat_adapter_formats_image_with_few_shot_examples_with_nested_images():
     image2 = Image(url="https://example.com/image2.jpg")
     image3 = Image(url="https://example.com/image3.jpg")
     image_wrapper = ImageWrapper(images=[image1, image2, image3], tag=["test", "example"])
-    demos = [Example(image=image_wrapper, text="This is a test image")]
+    demos = [Example.from_record({"image": image_wrapper, "text": "This is a test image"})]
     image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
     adapter = ChatAdapter()
     messages = adapter_format_as_openai(
@@ -1994,7 +1996,12 @@ def test_chat_adapter_native_reasoning():
         instructions="Given the fields `question`, produce the fields `reasoning`, `answer`.",
     )
     adapter = ChatAdapter()
-    lm = LM(model="anthropic/claude-3-7-sonnet-20250219", reasoning_effort="low")
+    from dspy.core.types import LMProviderOptions
+
+    lm = LM(
+        model="anthropic/claude-3-7-sonnet-20250219",
+        provider_options=LMProviderOptions(reasoning_effort="low"),
+    )
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[

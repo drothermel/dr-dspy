@@ -227,7 +227,7 @@ def test_optional_file_field(make_run):
 def test_save_load_file_signature(sample_text_file, make_run):
     signature = "document: File -> summary: str"
     file_obj = File.from_path(sample_text_file)
-    examples = [Example(document=file_obj, summary="Test summary")]
+    examples = [Example.from_record({"document": file_obj, "summary": "Test summary"})]
     predictor, lm, run = setup_predictor(signature, {"summary": "A summary"}, make_run)
     optimizer = LabeledFewShot(k=1)
     compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False, run=run))

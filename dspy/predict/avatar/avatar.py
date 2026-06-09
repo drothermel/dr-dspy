@@ -1,9 +1,11 @@
 from copy import deepcopy
 
+from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.avatar.models import Action, ActionOutput, Tool
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
+from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 
 
@@ -80,19 +82,25 @@ class Avatar(Module):
                 return tool.tool.run(tool_input_query)
         return None
 
-    async def aforward(self, **kwargs):
+    async def aforward(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs,
+    ):
         if self.verbose:
             pass
         args = {"goal": self.task_spec.instructions, "tools": [tool.name for tool in self.tools]}
         for key in self.input_fields:
-            if key in kwargs:
-                args[key] = kwargs[key]
+            if key in inputs:
+                args[key] = inputs[key]
         idx = 1
         tool_name = None
         action_results: list[ActionOutput] = []
-        max_iters = kwargs.get("max_iters")
+        max_iters = inputs.get("max_iters")
         while tool_name != "Finish" and (max_iters > 0 if max_iters else True):
-            actor_output = await self.actor(**args)
+            actor_output = await self.actor(**args, run=run, options=options)
             action = getattr(actor_output, f"action_{idx}")
             tool_name = action.tool_name
             tool_input_query = action.tool_input_query
@@ -114,6 +122,6 @@ class Avatar(Module):
             idx += 1
             if max_iters:
                 max_iters -= 1
-        final_answer = await self.actor(**args)
+        final_answer = await self.actor(**args, run=run, options=options)
         self.actor = deepcopy(self.actor_clone)
         return Prediction(**{key: getattr(final_answer, key) for key in self.output_fields}, actions=action_results)

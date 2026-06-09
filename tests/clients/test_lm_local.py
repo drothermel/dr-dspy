@@ -2,6 +2,7 @@ from unittest import mock
 from unittest.mock import patch
 
 from dspy.clients.lm_local import LocalProvider
+from dspy.core.types import LMProviderOptions
 
 
 @patch("dspy.clients.lm_local.threading.Thread")
@@ -19,6 +20,7 @@ def test_command_with_spaces_in_path(mock_wait, mock_port, mock_popen, mock_thre
     lm.model = "/path/to/my models/llama"
     lm.launch_kwargs = {}
     lm.kwargs = {}
+    lm.provider_options = LMProviderOptions()
     with mock.patch.dict("sys.modules", {"sglang": mock.Mock(), "sglang.utils": mock.Mock()}):
         LocalProvider.launch(lm, launch_kwargs={})
         assert mock_popen.called
@@ -45,6 +47,7 @@ def test_command_construction_prevents_injection(mock_wait, mock_port, mock_pope
     lm.model = "model --trust-remote-code"
     lm.launch_kwargs = {}
     lm.kwargs = {}
+    lm.provider_options = LMProviderOptions()
     with mock.patch.dict("sys.modules", {"sglang": mock.Mock(), "sglang.utils": mock.Mock()}):
         LocalProvider.launch(lm, launch_kwargs={})
         assert mock_popen.called
@@ -71,6 +74,7 @@ def test_command_is_list_not_string(mock_wait, mock_port, mock_popen, mock_threa
     lm.model = "meta-llama/Llama-2-7b"
     lm.launch_kwargs = {}
     lm.kwargs = {}
+    lm.provider_options = LMProviderOptions()
     with mock.patch.dict("sys.modules", {"sglang": mock.Mock(), "sglang.utils": mock.Mock()}):
         LocalProvider.launch(lm, launch_kwargs={})
         assert mock_popen.called

@@ -48,7 +48,12 @@ class BootstrapFinetune(FinetuneTeleprompter):
 
     @override
     async def compile(
-        self, student: Module, trainset: list[Example], teacher: Module | list[Module] | None = None, *, run: RunContext
+        self,
+        student: Module,
+        *,
+        trainset: list[Example],
+        teacher: Module | list[Module] | None = None,
+        run: RunContext,
     ) -> Module:
         logger.info("Preparing the student and teacher programs...")
         all_predictors_have_lms(student)

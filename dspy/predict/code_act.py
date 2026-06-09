@@ -4,12 +4,14 @@ import logging
 from typing_extensions import override
 
 from dspy.adapters.types.tool import Tool
+from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.predict.program_of_thought import ProgramOfThought
 from dspy.predict.react import ReAct
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
+from dspy.runtime.run_context import RunContext
 from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
 from dspy.utils.source_format import get_formatted_source
 
@@ -69,13 +71,19 @@ class CodeAct(ReAct, ProgramOfThought):
         return instructions
 
     @override
-    async def aforward(self, **kwargs):
+    async def aforward(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs,
+    ):
         for tool in self.tools.values():
             self.interpreter(get_formatted_source(tool.func))
         trajectory = {}
-        max_iters = kwargs.pop("max_iters", self.max_iters)
+        max_iters = inputs.pop("max_iters", self.max_iters)
         for idx in range(max_iters):
-            code_data = await self.codeact(trajectory=trajectory, **kwargs)
+            code_data = await self.codeact(trajectory=trajectory, run=run, options=options, **inputs)
             output = None
             code, error = self._parse_code(code_data)
             if error:
@@ -89,6 +97,8 @@ class CodeAct(ReAct, ProgramOfThought):
                 trajectory[f"observation_{idx}"] = f"Failed to execute the generated code: {error}"
             if code_data.finished:
                 break
-        extract = await self._call_with_potential_trajectory_truncation(self.extractor, trajectory, **kwargs)
+        extract = await self._call_with_potential_trajectory_truncation(
+            self.extractor, trajectory, run, options=options, **inputs
+        )
         self.interpreter.shutdown()
         return Prediction(trajectory=trajectory, **extract)

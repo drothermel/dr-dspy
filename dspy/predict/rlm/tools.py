@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
 from dspy.adapters.types.tool import Tool
+from dspy.core.types.call_options import PredictOptions
 from dspy.predict.rlm.sync_bridge import _run_sub_lm_async
 from dspy.utils.transparency import reset_active_call_metadata, set_active_call_metadata
 
@@ -80,7 +81,11 @@ def make_llm_tools(rlm: RLM, run: RunContext | None = None, max_workers: int = 8
             )
         metadata_token = set_active_call_metadata(module="RLM", phase="rlm.sub_lm", lm_role="sub_lm")
         try:
-            prediction = await rlm._sub_query_predict(prompt=prompt, lm=target_lm, run=run)
+            prediction = await rlm._sub_query_predict(
+                prompt=prompt,
+                run=run,
+                options=PredictOptions(lm=target_lm),
+            )
         finally:
             reset_active_call_metadata(metadata_token)
         return prediction.response

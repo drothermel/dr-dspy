@@ -4,14 +4,20 @@ from typing_extensions import override
 
 from dspy.clients.base_lm import BaseLM
 from dspy.core.types import LMRequest, LMResponse
+from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.sandbox_serializable import SandboxSerializable
 
 
 class FailingSubLM(BaseLM):
     def __init__(self) -> None:
-        super().__init__("fail-lm", "chat", temperature=0.0, max_tokens=1000, cache=False)
-        self.cache = False
+        super().__init__(
+            "fail-lm",
+            "chat",
+            temperature=0.0,
+            max_tokens=1000,
+            provider_options=LMProviderOptions(cache=False),
+        )
 
     @override
     async def aforward(self, request: LMRequest) -> LMResponse:
@@ -27,7 +33,7 @@ def make_mock_predictor(responses: list[dict]):
         def _next_response(self):
             result = responses[self.idx % len(responses)]
             self.idx += 1
-            return Prediction(**result)
+            return Prediction.from_record(result)
 
         async def __call__(self, **kwargs: object):
             return self._next_response()

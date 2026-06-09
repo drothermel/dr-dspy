@@ -1,13 +1,16 @@
+from abc import ABC, abstractmethod
 from typing import Any
 
+from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 
 
-class Teleprompter:
+class Teleprompter(ABC):
     def __init__(self) -> None:
         pass
 
-    async def compile(self, *args: Any, run: RunContext, **kwargs: Any) -> Any:
+    @abstractmethod
+    async def compile(self, student: Module, *, run: RunContext) -> Module:
         raise NotImplementedError
 
     def get_params(self) -> dict[str, Any]:

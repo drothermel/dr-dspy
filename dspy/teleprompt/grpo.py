@@ -272,12 +272,11 @@ class GRPO(FinetuneTeleprompter):
     async def compile(
         self,
         student: Module,
+        *,
         trainset: list[Example],
         teacher: Module | list[Module] | None = None,
         valset: list[Example] | None = None,
-        *,
         run: RunContext,
-        **kwargs,
     ) -> Module:
         logger.info(
             "Starting the GRPO compilation process... The LM(s) for the student program will be updated in place at the end of the training."

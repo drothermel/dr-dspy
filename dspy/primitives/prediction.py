@@ -1,15 +1,22 @@
+from collections.abc import Mapping
+from typing import Any
+
 from typing_extensions import override
 
 from dspy.primitives.example import Example
 
 
 class Prediction(Example):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(_store=dict(kwargs))
         del self._demos
         del self._input_keys
         self._completions = None
         self._lm_usage = None
+
+    @classmethod
+    def from_record(cls, record: Mapping[str, Any]) -> "Prediction":
+        return cls(**dict(record))
 
     def get_lm_usage(self):
         return self._lm_usage
@@ -125,7 +132,7 @@ class Completions:
         if isinstance(key, int):
             if key < 0 or key >= len(self):
                 raise IndexError("Index out of range")
-            return Prediction(**{k: v[key] for k, v in self._completions.items()})
+            return Prediction.from_record({k: v[key] for k, v in self._completions.items()})
         return self._completions[key]
 
     def __getattr__(self, name):

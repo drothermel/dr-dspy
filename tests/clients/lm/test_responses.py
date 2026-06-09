@@ -14,6 +14,7 @@ from openai.types.responses import ResponseOutputMessage, ResponseReasoningItem
 from openai.types.responses.response_reasoning_item import Summary
 
 from dspy.clients.lm import LM
+from dspy.core.types import LMConfig, LMProviderOptions
 from dspy.utils.usage_tracker import track_usage
 from tests.clients.lm.conftest import _request, make_response
 
@@ -66,7 +67,11 @@ def test_responses_api_tool_calls(litellm_test_server, make_run):
     }
     api_response = make_response(output_blocks=[expected_tool_call])
     with mock.patch("litellm.aresponses", autospec=True, return_value=api_response) as dspy_responses:
-        lm = LM(model="openai/dspy-test-model", api_base=api_base, api_key="fakekey", model_type="responses")
+        lm = LM(
+            model="openai/dspy-test-model",
+            provider_options=LMProviderOptions(api_base=api_base, api_key="fakekey"),
+            model_type="responses",
+        )
         lm_result = asyncio.run(lm(_request(lm, prompt="openai query"), run=make_run(lm=lm)))
         tool_call = lm_result.outputs[0].tool_calls[0]
         assert tool_call.name == expected_tool_call["name"]
@@ -79,7 +84,11 @@ def test_responses_api_tool_calls(litellm_test_server, make_run):
 def test_reasoning_effort_responses_api(make_run):
     with mock.patch("litellm.aresponses", mock.AsyncMock(return_value={"choices": []})) as mock_responses:
         lm = LM(
-            model="openai/gpt-5", model_type="responses", reasoning={"effort": "low"}, max_tokens=16000, temperature=1.0
+            model="openai/gpt-5",
+            model_type="responses",
+            max_tokens=16000,
+            temperature=1.0,
+            provider_options=LMProviderOptions(extensions={"reasoning": {"effort": "low"}}),
         )
         asyncio.run(lm(_request(lm, prompt="openai query"), run=make_run(lm=lm)))
         call_kwargs = mock_responses.call_args.kwargs
@@ -302,7 +311,10 @@ def test_responses_api_with_pydantic_model_input(make_run):
 
     with mock.patch("litellm.aresponses", autospec=True, return_value=api_response) as dspy_responses:
         lm_result = asyncio.run(
-            lm(_request(lm, prompt="What is a good test answer?", response_format=TestModel), run=make_run(lm=lm))
+            lm(
+                _request(lm, prompt="What is a good test answer?", config=LMConfig(response_format=TestModel)),
+                run=make_run(lm=lm),
+            )
         )
     TestModel.model_validate_json(lm_result.text)
     dspy_responses.assert_called_once()

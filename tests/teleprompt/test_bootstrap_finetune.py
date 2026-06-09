@@ -14,8 +14,10 @@ def simple_metric(example, prediction, trace=None):
 
 
 examples = [
-    Example(input="What is the color of the sky?", output="blue").with_inputs("input"),
-    Example(input="What does the fox say?", output="Ring-ding-ding-ding-dingeringeding!").with_inputs("input"),
+    Example.from_record({"input": "What is the color of the sky?", "output": "blue"}, input_keys=("input",)),
+    Example.from_record(
+        {"input": "What does the fox say?", "output": "Ring-ding-ding-ding-dingeringeding!"}, input_keys=("input",)
+    ),
 ]
 trainset = [examples[0]]
 
@@ -31,8 +33,8 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    async def aforward(self, **kwargs: object):
-        return await self.predictor(**kwargs)
+    async def aforward(self, *, run, options=None, **inputs):
+        return await self.predictor(run=run, options=options, **inputs)
 
 
 def test_compile_with_predict_instances(make_run):

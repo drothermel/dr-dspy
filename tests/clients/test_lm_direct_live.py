@@ -26,7 +26,7 @@ def _request(lm: LM, *items: object, prompt: str | None = None, **kwargs: Any) -
 @pytest.mark.llm_call
 def test_live_openai_chat_direct_system_user_assistant_multiturn():
     _require_env("OPENAI_API_KEY")
-    lm = LM(os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-5.5"), model_type="chat", max_completion_tokens=64)
+    lm = LM(os.getenv("LM_FOR_TEST_DIRECT_OPENAI_CHAT", "openai/gpt-5.5"), model_type="chat", max_tokens=64)
     response = lm(
         _request(
             lm,

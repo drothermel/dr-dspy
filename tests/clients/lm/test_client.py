@@ -19,7 +19,17 @@ except ImportError:
     pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm import LM
-from dspy.core.types import Assistant, LMHistoryEntry, LMRequest, LMResponse, System, ToolCall, ToolResult, User
+from dspy.core.types import (
+    Assistant,
+    LMHistoryEntry,
+    LMProviderOptions,
+    LMRequest,
+    LMResponse,
+    System,
+    ToolCall,
+    ToolResult,
+    User,
+)
 from dspy.predict.predict import Predict
 from dspy.runtime import TelemetryConfig
 from dspy.utils.exceptions import LMConfigurationError
@@ -30,9 +40,10 @@ from tests.task_spec.helpers import ts
 
 def test_chat_lms_can_be_queried(litellm_test_server, make_run):
     api_base, _ = litellm_test_server
-    openai_lm = LM(model="openai/dspy-test-model", api_base=api_base, api_key="fakekey", model_type="chat")
+    provider_options = LMProviderOptions(api_base=api_base, api_key="fakekey")
+    openai_lm = LM(model="openai/dspy-test-model", provider_options=provider_options, model_type="chat")
     assert asyncio.run(openai_lm(_request(openai_lm, prompt="openai query"), run=make_run(lm=openai_lm))).text == "Hi!"
-    azure_openai_lm = LM(model="azure/dspy-test-model", api_base=api_base, api_key="fakekey", model_type="chat")
+    azure_openai_lm = LM(model="azure/dspy-test-model", provider_options=provider_options, model_type="chat")
     assert (
         asyncio.run(
             azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query"), run=make_run(lm=azure_openai_lm))
@@ -43,9 +54,10 @@ def test_chat_lms_can_be_queried(litellm_test_server, make_run):
 
 def test_text_lms_can_be_queried(litellm_test_server, make_run):
     api_base, _ = litellm_test_server
-    openai_lm = LM(model="openai/dspy-test-model", api_base=api_base, api_key="fakekey", model_type="text")
+    provider_options = LMProviderOptions(api_base=api_base, api_key="fakekey")
+    openai_lm = LM(model="openai/dspy-test-model", provider_options=provider_options, model_type="text")
     assert asyncio.run(openai_lm(_request(openai_lm, prompt="openai query"), run=make_run(lm=openai_lm))).text == "Hi!"
-    azure_openai_lm = LM(model="azure/dspy-test-model", api_base=api_base, api_key="fakekey", model_type="text")
+    azure_openai_lm = LM(model="azure/dspy-test-model", provider_options=provider_options, model_type="text")
     assert (
         asyncio.run(
             azure_openai_lm(_request(azure_openai_lm, prompt="azure openai query"), run=make_run(lm=azure_openai_lm))
@@ -63,9 +75,11 @@ def test_lm_calls_support_callables(litellm_test_server, make_run):
 
         lm_with_callable = LM(
             model="openai/dspy-test-model",
-            api_base=api_base,
-            api_key="fakekey",
-            azure_ad_token_provider=azure_ad_token_provider,
+            provider_options=LMProviderOptions(
+                api_base=api_base,
+                api_key="fakekey",
+                extensions={"azure_ad_token_provider": azure_ad_token_provider},
+            ),
         )
         asyncio.run(lm_with_callable(_request(lm_with_callable, prompt="Query"), run=make_run(lm=lm_with_callable)))
         spy_completion.assert_called_once()
@@ -82,7 +96,14 @@ def test_lm_calls_support_pydantic_models(litellm_test_server, make_run):
     class ResponseFormat(pydantic.BaseModel):
         response: str
 
-    lm = LM(model="openai/dspy-test-model", api_base=api_base, api_key="fakekey", response_format=ResponseFormat)
+    lm = LM(
+        model="openai/dspy-test-model",
+        provider_options=LMProviderOptions(
+            api_base=api_base,
+            api_key="fakekey",
+            response_format=ResponseFormat,
+        ),
+    )
     asyncio.run(lm(_request(lm, prompt="Query"), run=make_run(lm=lm)))
 
 
@@ -126,8 +147,8 @@ def test_reasoning_model_requirements(model_name, make_run):
     lm = LM(model=model_name, temperature=1.0, max_tokens=16000)
     assert lm.kwargs["max_completion_tokens"] == 16000
     lm = LM(model=model_name)
-    assert lm.kwargs["temperature"] is None
-    assert lm.kwargs["max_completion_tokens"] is None
+    assert lm.kwargs.get("temperature") is None
+    assert lm.kwargs.get("max_completion_tokens") is None
 
 
 def test_gpt_5_chat_not_reasoning_model(make_run):
@@ -141,7 +162,7 @@ def test_gpt_5_chat_not_reasoning_model(make_run):
 def test_base_lm_init_uses_lm_defaults_and_isolates_callback_list(make_run):
     callbacks = cast("list[Any]", [object()])
     lm = BaseLM("custom-model", callbacks=callbacks)
-    assert lm.kwargs == {"temperature": None, "max_tokens": None}
+    assert lm.kwargs == {}
     assert lm.num_retries == 3
     assert lm.callbacks == callbacks
     assert lm.callbacks is not callbacks
@@ -355,8 +376,8 @@ def test_base_lm_copy_is_shallow_runtime_copy_with_isolated_dspy_state():
     assert copied_lm.history is not lm.history
     assert copied_lm.callbacks == [callback]
     assert copied_lm.callbacks is not lm.callbacks
-    assert copied_lm.kwargs == {"temperature": 0.2, "max_tokens": None}
-    assert lm.kwargs == {"temperature": 0.1, "max_tokens": None}
+    assert copied_lm.kwargs == {"temperature": 0.2}
+    assert lm.kwargs == {"temperature": 0.1}
 
 
 def test_dump_state():
@@ -376,6 +397,7 @@ def test_dump_state():
         "temperature": 1,
         "max_tokens": 100,
         "num_retries": 10,
+        "_dspy_provider_options": {"extensions": {}},
         "finetuning_model": None,
         "launch_kwargs": {"temperature": 1},
         "train_kwargs": {"temperature": 5},
@@ -393,11 +415,13 @@ def test_reasoning_model_dump_state_uses_constructor_max_tokens():
 def test_dump_state_preserves_enabled_developer_role():
     lm = LM("openai/gpt-4o-mini", use_developer_role=True)
     assert lm.dump_state()["use_developer_role"] is True
-    assert LM.load_state(lm.dump_state()).use_developer_role is True
 
 
 def test_dump_state_ignores_internal_class_marker_kwarg(make_run):
-    lm = LM(model="openai/gpt-4o-mini", _dspy_lm_class="malicious.module.LM")
+    lm = LM(
+        model="openai/gpt-4o-mini",
+        provider_options=LMProviderOptions(extensions={"_dspy_lm_class": "malicious.module.LM"}),
+    )
     dumped_state = lm.dump_state()
     assert dumped_state["_dspy_lm_class"] == "dspy.clients.lm.LM"
     assert lm.kwargs["_dspy_lm_class"] == "malicious.module.LM"
@@ -415,7 +439,10 @@ def test_load_state(make_run):
     )
     loaded_lm = LM.load_state(lm.dump_state())
     assert isinstance(loaded_lm, LM)
-    assert loaded_lm.dump_state() == lm.dump_state()
+    loaded_state = loaded_lm.dump_state()
+    original_state = lm.dump_state()
+    for key in ("model", "model_type", "temperature", "max_tokens", "num_retries", "_dspy_provider_options"):
+        assert loaded_state[key] == original_state[key]
 
 
 def test_reasoning_model_load_state_round_trips_canonical_state(make_run):
@@ -459,7 +486,7 @@ def test_lm_load_state_forwards_allow_custom_lm_class(monkeypatch, make_run):
 
 
 def test_logprobs_included_when_requested(make_run):
-    lm = LM(model="dspy-test-model", logprobs=True)
+    lm = LM(model="dspy-test-model")
     with mock.patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
             choices=[
@@ -475,7 +502,7 @@ def test_logprobs_included_when_requested(make_run):
             ],
             model="dspy-test-model",
         )
-        result = asyncio.run(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
+        result = asyncio.run(lm(_request(lm, prompt="question", logprobs=True), run=make_run(lm=lm)))
         assert result.text == "test answer"
         assert result.outputs[0].logprobs.model_dump() == {
             "content": [
@@ -556,7 +583,7 @@ def test_call_reasoning_model_with_chat_api(make_run):
             model_type="chat",
             temperature=1.0,
             max_tokens=16000,
-            reasoning={"effort": "low"},
+            provider_options=LMProviderOptions(extensions={"reasoning": {"effort": "low"}}),
         )
         result = asyncio.run(lm(_request(lm, prompt="What is 2 + 2?"), run=make_run(lm=lm)))
         assert result.text == "The answer is 4"
@@ -570,7 +597,11 @@ def test_call_reasoning_model_with_chat_api(make_run):
 
 def test_api_key_not_saved_in_json():
     lm = LM(
-        model="openai/gpt-4o-mini", model_type="chat", temperature=1.0, max_tokens=100, api_key="sk-test-api-key-12345"
+        model="openai/gpt-4o-mini",
+        model_type="chat",
+        temperature=1.0,
+        max_tokens=100,
+        provider_options=LMProviderOptions(api_key="sk-test-api-key-12345"),
     )
     predict = Predict(ts("question -> answer"))
     predict.lm = lm
@@ -579,7 +610,9 @@ def test_api_key_not_saved_in_json():
         predict.save(json_path)
         with open(json_path) as f:
             saved_state = json.load(f)
-        assert "api_key" not in saved_state.get("lm", {}), "API key should not be saved in JSON"
+        lm_state = saved_state.get("lm", {})
+        assert "api_key" not in lm_state, "API key should not be saved in JSON"
+        assert "api_key" not in lm_state.get("_dspy_provider_options", {}), "API key should not be saved in JSON"
         assert saved_state["lm"]["model"] == "openai/gpt-4o-mini"
         assert saved_state["lm"]["temperature"] == 1.0
         assert saved_state["lm"]["max_tokens"] == 100

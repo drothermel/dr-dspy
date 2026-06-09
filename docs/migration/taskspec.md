@@ -57,18 +57,46 @@ qa = make_task_spec("question -> answer", instructions="Answer the question.")
 
 ## Calling predictors
 
-All module and predictor calls are async:
+All module and predictor calls are async. Pass `run=` for `RunContext` and `options=PredictOptions(...)` for per-call overrides:
 
 ```python
 import asyncio
 
 from dspy.predict import Predict
+from dspy.runtime import RunContext
 
 predict = Predict(QATaskSpec())
-result = asyncio.run(predict(question="What is DSPy?"))
+run = RunContext.create(lm=lm, adapter=adapter, init_run_log=False)
+result = asyncio.run(predict(question="What is DSPy?", run=run))
 # or inside async code:
-# result = await predict(question="What is DSPy?")
+# result = await predict(question="What is DSPy?", run=run)
 ```
+
+## Task input validation
+
+Predict validates task inputs before each call and raises `ValueError` (not warnings) for:
+
+| Condition | Error |
+| --- | --- |
+| Unknown field names | `Unknown task input field(s) [...]` |
+| Missing required fields | `Missing required task input field(s) [...]` |
+| Type mismatch vs `FieldSpec` | `Type mismatch for task input field '...'` |
+| Reserved kwargs as task inputs (`lm`, `config`, `demos`, `run`, `options`, etc.) | `Reserved keyword(s) [...] must not be passed as task inputs` |
+
+Before (extra fields were ignored or warned):
+
+```python
+await predict(question="...", extra_field="oops", run=run)  # silently accepted or logged
+```
+
+After:
+
+```python
+await predict(question="...", extra_field="oops", run=run)
+# ValueError: Unknown task input field(s) ['extra_field'] for task spec 'QA'.
+```
+
+Optional fields with defaults or `None`-able types do not need to be provided. Fields with `type_=str | None` may be omitted.
 
 ## Tools
 
@@ -96,3 +124,5 @@ tool = Tool(search, description="Search documents by query.")
 ## Saved program state
 
 Saved programs now store `task_spec` instead of `signature`. Reload with the current DSPy version; legacy signature-only state is rejected.
+
+See `docs/migration/call-options.md` for `PredictOptions`, `Example.from_record`, and other strict kwargs.

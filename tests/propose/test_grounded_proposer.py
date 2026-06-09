@@ -11,7 +11,8 @@ from tests.task_spec.helpers import ts
 
 
 @pytest.mark.parametrize(
-    "demo_candidates", [None, [[[Example(question="What is the capital of France?", answer="Paris")]]]]
+    "demo_candidates",
+    [None, [[[Example.from_record({"question": "What is the capital of France?", "answer": "Paris"})]]]],
 )
 def test_propose_instructions_for_program(demo_candidates, make_run):
     prompt_model = DummyLM([{"proposed_instruction": "instruction"}] * 10)
@@ -38,7 +39,8 @@ def test_propose_instructions_for_program(demo_candidates, make_run):
 
 
 @pytest.mark.parametrize(
-    "demo_candidates", [None, [[[Example(question="What is the capital of France?", answer="Paris")]]]]
+    "demo_candidates",
+    [None, [[[Example.from_record({"question": "What is the capital of France?", "answer": "Paris"})]]]],
 )
 def test_propose_instruction_for_predictor(demo_candidates, make_run):
 

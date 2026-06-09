@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 import pydantic
 
 from dspy.adapters.utils import parse_value
+from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.predict.rlm.sync_bridge import _strip_code_fences
 from dspy.predict.rlm.tools import make_llm_tools
 from dspy.primitives.code_interpreter import SIMPLE_TYPES, CodeInterpreter, CodeInterpreterError, FinalOutput
@@ -131,11 +132,22 @@ def extract_fallback(
 
 
 async def aextract_fallback(
-    rlm: RLM, variables: list[REPLVariable], history: REPLHistory, output_field_names: list[str]
+    rlm: RLM,
+    variables: list[REPLVariable],
+    history: REPLHistory,
+    output_field_names: list[str],
+    *,
+    run: RunContext,
+    options: ModuleCallOptions | None = None,
 ) -> Prediction:
     logger.warning("RLM reached max iterations, using extract to get final output")
     variables_info = [variable.format() for variable in variables]
-    extract_pred = await rlm.extract(variables_info=variables_info, repl_history=history)
+    extract_pred = await rlm.extract(
+        variables_info=variables_info,
+        repl_history=history,
+        run=run,
+        options=options,
+    )
     return Prediction(
         trajectory=[e.model_dump() for e in history],
         final_reasoning="Extract forced final output",
@@ -234,10 +246,17 @@ async def aexecute_iteration(
     iteration: int,
     input_args: dict[str, Any],
     output_field_names: list[str],
+    *,
+    run: RunContext,
+    options: ModuleCallOptions | None = None,
 ) -> Prediction | REPLHistory:
     variables_info = [variable.format() for variable in variables]
     pred = await rlm.generate_action(
-        variables_info=variables_info, repl_history=history, iteration=f"{iteration + 1}/{rlm.max_iterations}"
+        variables_info=variables_info,
+        repl_history=history,
+        iteration=f"{iteration + 1}/{rlm.max_iterations}",
+        run=run,
+        options=options,
     )
     if rlm.verbose:
         logger.info(

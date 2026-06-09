@@ -6,6 +6,7 @@ import pytest
 from typing_extensions import override
 
 from dspy.adapters.types.tool import Tool
+from dspy.core.types import LMConfig
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.module import Module
 from dspy.utils.callback import ACTIVE_CALL_ID, BaseCallback, with_callbacks
@@ -149,7 +150,7 @@ def test_callback_complex_module(make_run):
     run = make_run(
         lm=DummyLM({"How are you?": {"answer": "test output", "reasoning": "No more responses"}}), callbacks=[callback]
     )
-    cot = ChainOfThought(ts("question -> answer"), n=3)
+    cot = ChainOfThought(ts("question -> answer"), config=LMConfig(n=3))
     result = asyncio.run(cot(question="How are you?", run=run))
     assert result["answer"] == "test output"
     assert result["reasoning"] == "No more responses"
@@ -170,7 +171,7 @@ async def test_callback_async_module(make_run):
     run = make_run(
         lm=DummyLM({"How are you?": {"answer": "test output", "reasoning": "No more responses"}}), callbacks=[callback]
     )
-    cot = ChainOfThought(ts("question -> answer"), n=3)
+    cot = ChainOfThought(ts("question -> answer"), config=LMConfig(n=3))
     result = await cot.acall(question="How are you?", run=run)
     assert result["answer"] == "test output"
     assert result["reasoning"] == "No more responses"
@@ -199,13 +200,12 @@ def test_tool_calls(make_run):
         def __init__(self):
             self.tools = [Tool(tool_1, description="Tool one."), Tool(tool_2, description="Tool two.")]
 
-        async def aforward(self, query: str, **kwargs: object) -> str:
-            run = kwargs.get("run")
+        async def aforward(self, *, query: str, run, options=None, **kwargs: object) -> str:
             query = self.tools[0](query=query, run=run)
             return self.tools[1](query=query, run=run)
 
     module = MyModule()
-    result = asyncio.run(module("query", run=run))
+    result = asyncio.run(module(query="query", run=run))
     assert result == "result 2"
     assert len(callback.calls) == 6
     assert [call["handler"] for call in callback.calls] == [
@@ -236,12 +236,12 @@ def test_active_id(make_run):
             self.child_1 = Child()
             self.child_2 = Child()
 
-        async def aforward(self, **kwargs: object):
-            await self.child_1(**kwargs)
-            await self.child_2(**kwargs)
+        async def aforward(self, *, run, options=None, **inputs):
+            await self.child_1(run=run, options=options, **inputs)
+            await self.child_2(run=run, options=options, **inputs)
 
     class Child(Module):
-        async def aforward(self, **kwargs: object):
+        async def aforward(self, *, run, options=None, **inputs):
             pass
 
     callback = CustomCallback()

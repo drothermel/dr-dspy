@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.predict.predict import Predict
 from dspy.predict.rlm import execution as rlm_execution
 from dspy.predict.rlm import task_specs as rlm_task_specs
@@ -127,9 +128,17 @@ class RLM(Module):
         )
 
     async def _aextract_fallback(
-        self, variables: list[REPLVariable], history: REPLHistory, output_field_names: list[str]
+        self,
+        variables: list[REPLVariable],
+        history: REPLHistory,
+        output_field_names: list[str],
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
     ) -> Prediction:
-        return await rlm_execution.aextract_fallback(self, variables, history, output_field_names)
+        return await rlm_execution.aextract_fallback(
+            self, variables, history, output_field_names, run=run, options=options
+        )
 
     async def _aexecute_iteration(
         self,
@@ -139,14 +148,30 @@ class RLM(Module):
         iteration: int,
         input_args: dict[str, Any],
         output_field_names: list[str],
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
     ) -> Prediction | REPLHistory:
         return await rlm_execution.aexecute_iteration(
-            self, repl, variables, history, iteration, input_args, output_field_names
+            self,
+            repl,
+            variables,
+            history,
+            iteration,
+            input_args,
+            output_field_names,
+            run=run,
+            options=options,
         )
 
-    async def aforward(self, **input_args) -> Prediction:
-        run = resolve_run(run=input_args.pop("run", None), bound_run=self.run)
-        input_args["run"] = run
+    async def aforward(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **input_args,
+    ) -> Prediction:
+        run = resolve_run(run=run, bound_run=self.run)
         self._validate_inputs(input_args)
         output_field_names = list(self.task_spec.output_fields.keys())
         execution_tools = self._prepare_execution_tools(run=run)
@@ -156,9 +181,16 @@ class RLM(Module):
             history = REPLHistory(max_output_chars=self.max_output_chars)
             for iteration in range(self.max_iterations):
                 result = await self._aexecute_iteration(
-                    repl, variables, history, iteration, regular_args, output_field_names
+                    repl,
+                    variables,
+                    history,
+                    iteration,
+                    regular_args,
+                    output_field_names,
+                    run=run,
+                    options=options,
                 )
                 if isinstance(result, Prediction):
                     return result
                 history = result
-            return await self._aextract_fallback(variables, history, output_field_names)
+            return await self._aextract_fallback(variables, history, output_field_names, run=run, options=options)

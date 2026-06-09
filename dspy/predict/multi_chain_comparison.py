@@ -1,10 +1,20 @@
+from dspy.core.types.call_options import ModuleCallOptions
+from dspy.core.types.config import LMConfig, _merge_lm_config
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
+from dspy.runtime.run_context import RunContext
 from dspy.task_spec import TaskSpec, input_field, output_field
 
 
 class MultiChainComparison(Module):
-    def __init__(self, task_spec: TaskSpec, M=3, temperature=0.7, **config) -> None:
+    def __init__(
+        self,
+        task_spec: TaskSpec,
+        M: int = 3,
+        *,
+        config: LMConfig | None = None,
+        temperature: float = 0.7,
+    ) -> None:
         super().__init__()
         if not isinstance(task_spec, TaskSpec):
             raise TypeError(f"MultiChainComparison requires a TaskSpec instance, got {type(task_spec).__name__}.")
@@ -25,9 +35,17 @@ class MultiChainComparison(Module):
                 prefix="Accurate Reasoning: Thank you everyone. Let's now holistically",
             )
         )
-        self.predict = Predict(extended_task_spec, temperature=temperature, **config)
+        merged_config = _merge_lm_config(LMConfig(temperature=temperature), config) or LMConfig(temperature=temperature)
+        self.predict = Predict(extended_task_spec, config=merged_config)
 
-    async def aforward(self, completions, **kwargs):
+    async def aforward(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        completions: list,
+        **inputs,
+    ):
         attempts = []
         for c in completions:
             rationale = c.get("rationale", c.get("reasoning")).strip().split("\n")[0].strip()
@@ -36,5 +54,8 @@ class MultiChainComparison(Module):
         assert len(attempts) == self.M, (
             f"The number of attempts ({len(attempts)}) doesn't match the expected number M ({self.M}). Please set the correct value for M when initializing MultiChainComparison."
         )
-        kwargs = {**{f"reasoning_attempt_{idx + 1}": attempt for idx, attempt in enumerate(attempts)}, **kwargs}
-        return await self.predict(**kwargs)
+        merged_inputs = {
+            **{f"reasoning_attempt_{idx + 1}": attempt for idx, attempt in enumerate(attempts)},
+            **inputs,
+        }
+        return await self.predict(run=run, options=options, **merged_inputs)

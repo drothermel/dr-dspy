@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from types import MethodType
 from typing import Any, Callable, TypedDict, cast
 
+from dspy.core.types.call_options import ModuleCallOptions
 from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
@@ -59,11 +60,16 @@ async def bootstrap_trace_data(
 
     original_aforward = object.__getattribute__(program, "aforward")
 
-    async def patched_aforward(program_to_use: Module, **kwargs):
+    async def patched_aforward(
+        program_to_use: Module,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **kwargs,
+    ):
         item_run = run.fork(trace=[])
-        call_kwargs = {k: v for k, v in kwargs.items() if k != "run"}
         try:
-            return (await original_aforward(**call_kwargs, run=item_run), list(item_run.trace))
+            return (await original_aforward(run=item_run, options=options, **kwargs), list(item_run.trace))
         except AdapterParseError as e:
             completion_str = e.lm_response
             parsed_result = e.parsed_result

@@ -19,9 +19,14 @@ class MATH:
 
         ds = cast("DatasetDict", load_dataset("DigitalLearningGmbH/MATH-lighteval", subset))
         dataset = [
-            Example(
-                question=example["problem"], reasoning=example["solution"], answer=extract_answer(example["solution"])
-            ).with_inputs("question")
+            Example.from_record(
+                {
+                    "question": example["problem"],
+                    "reasoning": example["solution"],
+                    "answer": extract_answer(example["solution"]),
+                },
+                input_keys=("question",),
+            )
             for example in ds["test"]
         ]
         size = min(350, len(dataset) // 3)

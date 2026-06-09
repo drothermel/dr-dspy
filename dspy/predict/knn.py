@@ -1,3 +1,6 @@
+from collections.abc import Mapping
+from typing import Any
+
 from dspy.clients.embedding import Embedder
 from dspy.primitives.example import Example
 from dspy.utils.lazy_import import require
@@ -5,10 +8,9 @@ from dspy.utils.lazy_import import require
 np = require("numpy")
 
 
-def _embed_vectors(vectorizer: Embedder, texts: list[str]) -> np.ndarray:
-    import asyncio
-
-    return asyncio.run(vectorizer(texts))
+def _format_input_text(inputs: Mapping[str, Any], input_keys: frozenset[str]) -> str:
+    ordered_keys = [key for key in inputs if key in input_keys] if input_keys else list(inputs)
+    return " | ".join(f"{key}: {inputs[key]}" for key in ordered_keys)
 
 
 class KNN:
@@ -18,16 +20,23 @@ class KNN:
         self.embedding = vectorizer
         trainset_casted_to_vectorize = []
         for example in self.trainset:
-            input_keys = set(example._input_keys or [])
-            trainset_casted_to_vectorize.append(
-                " | ".join([f"{key}: {value}" for key, value in example.items() if key in input_keys])
-            )
-        self.trainset_vectors = _embed_vectors(self.embedding, trainset_casted_to_vectorize).astype(np.float32)
+            input_keys = example.input_keys
+            trainset_casted_to_vectorize.append(_format_input_text(dict(example.items()), input_keys))
+        self._train_vectors = trainset_casted_to_vectorize
 
-    def __call__(self, **kwargs) -> list:
-        input_example_vector = _embed_vectors(
-            self.embedding, [" | ".join([f"{key}: {val}" for key, val in kwargs.items()])]
+    async def _ensure_train_vectors(self) -> np.ndarray:
+        if not hasattr(self, "trainset_vectors"):
+            vectors = await self.embedding(self._train_vectors)
+            self.trainset_vectors = np.asarray(vectors, dtype=np.float32)
+        return self.trainset_vectors
+
+    async def acall(self, *, inputs: Mapping[str, Any]) -> list[Example]:
+        trainset_vectors = await self._ensure_train_vectors()
+        input_example_vector = np.asarray(
+            await self.embedding([_format_input_text(inputs, frozenset(inputs))]), dtype=np.float32
         )
-        scores = np.dot(self.trainset_vectors, input_example_vector.T).squeeze()
+        scores = np.dot(trainset_vectors, input_example_vector.T).squeeze()
         nearest_samples_idxs = scores.argsort()[-self.k :][::-1]
         return [self.trainset[cur_idx] for cur_idx in nearest_samples_idxs]
+
+    __call__ = acall

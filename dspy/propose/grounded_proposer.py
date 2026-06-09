@@ -167,6 +167,7 @@ class GenerateModuleInstruction(Module):
         tip=None,
         *,
         run,
+        options=None,
     ):
 
         def gather_examples_from_sets(candidate_sets, max_examples):
@@ -232,18 +233,24 @@ class GenerateModuleInstruction(Module):
                 self.program_aware = False
         if self.verbose:
             pass
-        instruct = await self.generate_module_instruction(
-            dataset_description=data_summary,
-            program_code=self.program_code_string,
-            module=module_code,
-            program_description=program_description,
-            module_description=module_description,
-            task_demos=task_demos,
-            tip=tip,
-            basic_instruction=basic_instruction,
-            previous_instructions=previous_instructions,
-            run=run,
-        )
+        instruction_inputs = {
+            "dataset_description": data_summary,
+            "program_code": self.program_code_string,
+            "module": module_code,
+            "program_description": program_description,
+            "module_description": module_description,
+            "task_demos": task_demos,
+            "tip": tip,
+            "basic_instruction": basic_instruction,
+            "previous_instructions": previous_instructions,
+        }
+        task_spec = get_task_spec(self.generate_module_instruction)
+        filtered_inputs = {
+            key: value
+            for key, value in instruction_inputs.items()
+            if key in task_spec.fields and task_spec.fields[key].role == "input"
+        }
+        instruct = await self.generate_module_instruction(**filtered_inputs, run=run)
         proposed_instruction = strip_prefix(instruct.proposed_instruction)
         return Prediction(proposed_instruction=proposed_instruction)
 

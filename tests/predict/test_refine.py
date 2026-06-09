@@ -16,8 +16,8 @@ class DummyModule(Module):
         self.predictor = Predict(task_spec)
         self.forward_fn = forward_fn
 
-    async def aforward(self, **kwargs: object) -> Prediction:
-        return await self.forward_fn(self, **kwargs)
+    async def aforward(self, *, run, options=None, **inputs) -> Prediction:
+        return await self.forward_fn(self, run=run, options=options, **inputs)
 
 
 def test_refine_forward_success_first_attempt(make_run):
@@ -25,9 +25,9 @@ def test_refine_forward_success_first_attempt(make_run):
     run = make_run(lm=lm)
     module_call_count = [0]
 
-    async def count_calls(self, **kwargs: object):
+    async def count_calls(self, *, run, options=None, **inputs):
         module_call_count[0] += 1
-        return await self.predictor(**kwargs)
+        return await self.predictor(run=run, options=options, **inputs)
 
     reward_call_count = [0]
 
@@ -49,7 +49,7 @@ def test_refine_module_default_fail_count(make_run):
     lm = DummyLM([{"answer": "Brussels"}, {"answer": "City of Brussels"}, {"answer": "Brussels"}])
     run = make_run(lm=lm)
 
-    async def always_raise(self, **kwargs: object):
+    async def always_raise(self, *, run, options=None, **inputs):
         raise ValueError("Deliberately failing")
 
     predict = DummyModule(ts("question -> answer"), always_raise)
@@ -63,11 +63,11 @@ def test_refine_module_custom_fail_count(make_run):
     run = make_run(lm=lm)
     module_call_count = [0]
 
-    async def raise_on_second_call(self, **kwargs: object):
+    async def raise_on_second_call(self, *, run, options=None, **inputs):
         if module_call_count[0] < 2:
             module_call_count[0] += 1
             raise ValueError("Deliberately failing")
-        return await self.predictor(**kwargs)
+        return await self.predictor(run=run, options=options, **inputs)
 
     predict = DummyModule(ts("question -> answer"), raise_on_second_call)
     refine = Refine(module=predict, N=3, reward_fn=lambda _, __: 1.0, threshold=0.0, fail_count=1)

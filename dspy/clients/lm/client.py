@@ -32,6 +32,7 @@ from dspy.clients.provider import Provider, ReinforceJob, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat
 from dspy.core.types import LMRequest, LMResponse
 from dspy.core.types.config import merge_lm_request_config
+from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.utils.callback import BaseCallback
 from dspy.utils.exceptions import ContextWindowExceededError, LMConfigurationError, LMError, LMUnsupportedFeatureError
 
@@ -68,8 +69,9 @@ class LM(BaseLM):
         launch_kwargs: dict[str, Any] | None = None,
         train_kwargs: dict[str, Any] | None = None,
         use_developer_role: bool = False,
-        **kwargs,
+        provider_options: LMProviderOptions | None = None,
     ) -> None:
+        merged_provider = provider_options or LMProviderOptions()
         super().__init__(
             model=model,
             model_type=model_type,
@@ -77,7 +79,7 @@ class LM(BaseLM):
             max_tokens=max_tokens,
             num_retries=num_retries,
             callbacks=callbacks,
-            **kwargs,
+            provider_options=merged_provider,
         )
         self.provider = provider or self.infer_provider()
         self.finetuning_model = finetuning_model
@@ -86,7 +88,13 @@ class LM(BaseLM):
         self.use_developer_role = use_developer_role
 
     @override
-    def _get_initial_kwargs(self, *, temperature, max_tokens, **kwargs) -> dict[str, Any]:
+    def _get_initial_kwargs(
+        self,
+        *,
+        temperature: float | None,
+        max_tokens: int | None,
+        provider_options: LMProviderOptions,
+    ) -> dict[str, Any]:
         if _is_openai_reasoning_model(self.model):
             if (temperature and temperature != 1.0) or (max_tokens and max_tokens < 16000):
                 raise LMConfigurationError(
@@ -94,10 +102,17 @@ class LM(BaseLM):
                     model=self.model,
                     provider=self._provider_name,
                 )
-            initial_kwargs = dict(temperature=temperature, max_completion_tokens=max_tokens, **kwargs)
-        else:
-            initial_kwargs = super()._get_initial_kwargs(temperature=temperature, max_tokens=max_tokens, **kwargs)
-        return initial_kwargs
+            initial_kwargs = provider_options.to_kwargs()
+            if temperature is not None:
+                initial_kwargs["temperature"] = temperature
+            if max_tokens is not None:
+                initial_kwargs["max_completion_tokens"] = max_tokens
+            return initial_kwargs
+        return super()._get_initial_kwargs(
+            temperature=temperature,
+            max_tokens=max_tokens,
+            provider_options=provider_options,
+        )
 
     @property
     def _provider_name(self) -> str:

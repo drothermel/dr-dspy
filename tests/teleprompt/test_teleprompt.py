@@ -1,5 +1,6 @@
 from typing_extensions import override
 
+from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.teleprompt import Teleprompter
 
 
@@ -10,7 +11,7 @@ class DummyTeleprompter(Teleprompter):
         self.param2 = param2
 
     @override
-    def compile(self, student, *, trainset, teacher=None, valset=None, **kwargs: object):
+    async def compile(self, student, *, trainset, teacher=None, valset=None, run: RunContext):
         return student
 
 

@@ -237,19 +237,23 @@ def test_trajectory_truncation(make_run):
         nonlocal call_count
         call_count += 1
         if call_count < 3:
-            return Prediction(
-                next_thought=f"Thought {call_count}",
-                next_tool_name="echo",
-                next_tool_args={"text": f"Text {call_count}"},
+            return Prediction.from_record(
+                {
+                    "next_thought": f"Thought {call_count}",
+                    "next_tool_name": "echo",
+                    "next_tool_args": {"text": f"Text {call_count}"},
+                }
             )
         if call_count == 3:
             raise ContextWindowExceededError
-        return Prediction(next_thought="Final thought", next_tool_name="finish", next_tool_args={})
+        return Prediction.from_record(
+            {"next_thought": "Final thought", "next_tool_name": "finish", "next_tool_args": {}}
+        )
 
     cast("Any", react).react = mock_react
 
     async def mock_extract(**kwargs: object):
-        return Prediction(output_text="Final output")
+        return Prediction.from_record({"output_text": "Final output"})
 
     cast("Any", react).extract = mock_extract
     result = asyncio.run(react(input_text="test input", run=run))
@@ -273,7 +277,7 @@ async def test_context_window_exceeded_after_retries(make_run):
 
     async def mock_extract(**kwargs: object):
         extract_calls.append(kwargs)
-        return Prediction(output_text="Fallback output")
+        return Prediction.from_record({"output_text": "Fallback output"})
 
     cast("Any", react).react = mock_react
     cast("Any", react).extract = mock_extract

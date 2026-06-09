@@ -19,11 +19,17 @@ class CSVDataset(Dataset):
         df = pd.read_csv(file_path)
         data = df.to_dict(orient="records")
         self._train = [
-            Example(**record, dspy_uuid=str(uuid.uuid4()), dspy_split="train").with_inputs(*active_input_keys)
+            Example.from_record(
+                {**record, "dspy_uuid": str(uuid.uuid4()), "dspy_split": "train"},
+                input_keys=tuple(active_input_keys),
+            )
             for record in data[:1]
         ]
         self._dev = [
-            Example(**record, dspy_uuid=str(uuid.uuid4()), dspy_split="dev").with_inputs(*active_input_keys)
+            Example.from_record(
+                {**record, "dspy_uuid": str(uuid.uuid4()), "dspy_split": "dev"},
+                input_keys=tuple(active_input_keys),
+            )
             for record in data[1:2]
         ]
 
@@ -41,7 +47,7 @@ def test_input_keys(csv_file):
     dataset = CSVDataset(csv_file, input_keys=["content", "question"])
     assert dataset.train is not None
     for example in dataset.train:
-        inputs = example.inputs()
+        inputs = example.as_inputs()
         assert inputs is not None
         assert "content" in inputs
         assert "question" in inputs

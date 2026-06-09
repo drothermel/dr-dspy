@@ -50,7 +50,7 @@ class Parallel:
         assert run is not None
         if isinstance(example, Example):
             if self.access_examples:
-                return await module(**example.inputs(), run=run)
+                return await module(**example.as_inputs(), run=run)
             return await module(example, run=run)
         if isinstance(example, dict):
             return await module(**example, run=run)

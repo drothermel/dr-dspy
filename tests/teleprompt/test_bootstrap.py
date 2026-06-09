@@ -16,8 +16,8 @@ def simple_metric(example, prediction, trace=None):
 
 
 examples = [
-    Example(input="What is the color of the sky?", output="blue").with_inputs("input"),
-    Example(input="What does the fox say?", output="Ring-ding-ding-ding-dingeringeding!"),
+    Example.from_record({"input": "What is the color of the sky?", "output": "blue"}, input_keys=("input")),
+    Example.from_record({"input": "What does the fox say?", "output": "Ring-ding-ding-ding-dingeringeding!"}),
 ]
 trainset = [examples[0]]
 valset = [examples[1]]
@@ -33,8 +33,8 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    async def aforward(self, **kwargs: object):
-        return await self.predictor(**kwargs)
+    async def aforward(self, *, run, options=None, **inputs):
+        return await self.predictor(run=run, options=options, **inputs)
 
 
 def test_compile_with_predict_instances(make_run):
@@ -69,7 +69,7 @@ def test_error_handling_during_bootstrap(make_run):
             super().__init__()
             self.predictor = Predict(signature)
 
-        async def aforward(self, **kwargs: object):
+        async def aforward(self, *, run, options=None, **inputs):
             raise RuntimeError("Simulated error")
 
     student = SimpleModule(ts("input -> output"))

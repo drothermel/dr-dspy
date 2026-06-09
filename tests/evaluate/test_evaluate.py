@@ -18,7 +18,7 @@ from tests.task_spec.helpers import ts
 
 
 def new_example(question, answer):
-    return Example(question=question, answer=answer).with_inputs("question")
+    return Example.from_record({"question": question, "answer": answer}, input_keys=("question",))
 
 
 def test_evaluate_initialization(make_run):
@@ -64,9 +64,9 @@ def test_construct_result_df(make_run):
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4"), new_example("What is 3+3?", "-1")]
     ev = Evaluate(devset=devset, metric=answer_exact_match)
     results = [
-        (devset[0], Example(answer="2"), 100.0),
-        (devset[1], Example(answer="4"), 100.0),
-        (devset[2], Example(answer="-1"), 0.0),
+        (devset[0], Example.from_record({"answer": "2"}), 100.0),
+        (devset[1], Example.from_record({"answer": "4"}), 100.0),
+        (devset[2], Example.from_record({"answer": "-1"}), 0.0),
     ]
     result_df = ev._construct_result_table(results, answer_exact_match.__name__)
     pd.testing.assert_frame_equal(
@@ -138,23 +138,26 @@ def test_evaluate_call_wrong_answer(make_run):
         (Predict(ts("question -> answer")), new_example("What is 1+1?", "2")),
         (
             lambda text: asyncio.run(Predict(ts("text: str -> entities: list[str]"))(text=text)).entities,
-            Example(text="United States", entities=["United States"]).with_inputs("text"),
+            Example.from_record({"text": "United States", "entities": ["United States"]}, input_keys=("text",)),
         ),
         (
             lambda text: asyncio.run(Predict(ts("text: str -> entities: list[dict[str, str]]"))(text=text)).entities,
-            Example(text="United States", entities=[{"name": "United States", "type": "location"}]).with_inputs("text"),
+            Example.from_record(
+                {"text": "United States", "entities": [{"name": "United States", "type": "location"}]},
+                input_keys=("text",),
+            ),
         ),
         (
             lambda text: asyncio.run(Predict(ts("text: str -> first_word: Tuple[str, int]"))(text=text)).words,
-            Example(text="United States", first_word=("United", 6)).with_inputs("text"),
+            Example.from_record({"text": "United States", "first_word": ("United", 6)}, input_keys=("text",)),
         ),
     ],
 )
 @pytest.mark.parametrize("display_table", [True, False, 1])
 def test_evaluate_display_table(program_with_example, display_table, capfd, make_run):
     program, example = program_with_example
-    example_input = next(iter(example.inputs().values()))
-    example_output = {key: value for key, value in example.to_dict().items() if key not in example.inputs()}
+    example_input = next(iter(example.as_inputs().values()))
+    example_output = {key: value for key, value in example.to_dict().items() if key not in example.as_inputs()}
     run = make_run(lm=DummyLM({example_input: example_output}))
     ev = Evaluate(
         devset=[example], metric=lambda example, pred, **_kwargs: example == pred, display_table=display_table
@@ -163,7 +166,7 @@ def test_evaluate_display_table(program_with_example, display_table, capfd, make
     asyncio.run(ev(program, run=run))
     out, _ = capfd.readouterr()
     if display_table:
-        example_input = next(iter(example.inputs().values()))
+        example_input = next(iter(example.as_inputs().values()))
         assert example_input in out
 
 
@@ -203,7 +206,9 @@ def test_evaluate_callback(make_run):
 
 
 def test_evaluation_result_repr(make_run):
-    result = EvaluationResult(score=100.0, results=[(new_example("What is 1+1?", "2"), Example(answer="2"), 100.0)])
+    result = EvaluationResult(
+        score=100.0, results=[(new_example("What is 1+1?", "2"), Example.from_record({"answer": "2"}), 100.0)]
+    )
     assert repr(result) == "EvaluationResult(score=100.0, results=<list of 1 results>)"
 
 
@@ -217,8 +222,8 @@ def test_evaluate_save_as_json_with_history(make_run):
         ]
     )
     devset = [
-        Example(question="What is 1+1?", answer="2", history=history1).with_inputs("question"),
-        Example(question="What is 2+2?", answer="4", history=history2).with_inputs("question"),
+        Example.from_record({"question": "What is 1+1?", "answer": "2", "history": history1}, input_keys=("question",)),
+        Example.from_record({"question": "What is 2+2?", "answer": "4", "history": history2}, input_keys=("question",)),
     ]
     program = Predict(ts("question -> answer"))
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -251,7 +256,9 @@ def test_evaluate_save_as_json_with_history(make_run):
 def test_evaluate_save_as_csv_with_history(make_run):
     run = make_run(lm=DummyLM({"What is 1+1?": {"answer": "2"}}))
     history = History(messages=[{"question": "Previous Q", "answer": "Previous A"}])
-    devset = [Example(question="What is 1+1?", answer="2", history=history).with_inputs("question")]
+    devset = [
+        Example.from_record({"question": "What is 1+1?", "answer": "2", "history": history}, input_keys=("question",))
+    ]
     program = Predict(ts("question -> answer"))
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         temp_csv = f.name

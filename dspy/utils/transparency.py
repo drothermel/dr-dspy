@@ -77,7 +77,9 @@ def collect_config_violations(*, config: LMConfig, lm_kwargs: dict[str, Any], ca
             "max_tokens is None (provider default). Fix: LM(..., max_tokens=4000) or pass config={'max_tokens': ...}."
         )
     if cache is None:
-        violations.append("cache is not explicit on the LM. Fix: LM(..., cache=False) or cache=True.")
+        violations.append(
+            "cache is not explicit on the LM. Fix: LM(..., provider_options=LMProviderOptions(cache=False)) or cache=True."
+        )
     return violations
 
 

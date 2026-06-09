@@ -1,7 +1,8 @@
 from collections.abc import Callable
 
+from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.predict import Module, Prediction
-from dspy.runtime.run_context import resolve_run
+from dspy.runtime.run_context import RunContext, resolve_run
 
 
 class BestOfN(Module):
@@ -19,8 +20,14 @@ class BestOfN(Module):
         self.N = N
         self.fail_count = fail_count or N
 
-    async def aforward(self, **kwargs):
-        run = resolve_run(run=kwargs.pop("run", None), bound_run=self.run)
+    async def aforward(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs,
+    ):
+        run = resolve_run(run=run, bound_run=self.run)
         lm = self.module.get_lm() or run.lm
         best_pred, best_trace, best_reward = (None, None, -float("inf"))
         for idx in range(self.N):
@@ -29,9 +36,9 @@ class BestOfN(Module):
             mod.set_lm(lm_)
             try:
                 item_run = run.fork(trace=[])
-                pred = await mod(**kwargs, run=item_run)
+                pred = await mod(**inputs, run=item_run, options=options)
                 trace = list(item_run.trace)
-                reward = self.reward_fn(kwargs, pred)
+                reward = self.reward_fn(inputs, pred)
                 if reward > best_reward:
                     best_reward, best_pred, best_trace = (reward, pred, trace)
                 if reward >= self.threshold:

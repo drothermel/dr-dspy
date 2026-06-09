@@ -10,7 +10,6 @@ from dspy.core.types.coercion import _coerce_message, _coerce_tool_spec, _messag
 from dspy.core.types.config import (
     LMConfig,
     LMToolSpec,
-    _lm_config_data_from_kwargs,
     _merge_config_overrides,
     _merge_lm_config,
 )
@@ -61,7 +60,7 @@ class LMRequest(BaseModel):
         prompt: str | None = None,
         messages: list[dict[str, Any] | LMMessage] | None = None,
         tools: list[Any] | None = None,
-        **kwargs: Any,
+        config: LMConfig | None = None,
     ) -> LMRequest:
         if messages is not None and (items or prompt is not None):
             raise ValueError("Pass messages or direct-call inputs, not both.")
@@ -71,12 +70,11 @@ class LMRequest(BaseModel):
         else:
             normalized_messages, positional_tools = _messages_from_items(items, prompt=prompt)
             collected_tools.extend(positional_tools)
-        config = LMConfig(**_lm_config_data_from_kwargs(kwargs))
         return cls(
             model=model,
             messages=normalized_messages,
             tools=[_coerce_tool_spec(tool) for tool in collected_tools],
-            config=config,
+            config=config or LMConfig(),
         )
 
     @classmethod
@@ -86,12 +84,10 @@ class LMRequest(BaseModel):
         model: str,
         prompt: str | None = None,
         messages: list[dict[str, Any] | LMMessage] | None = None,
-        **kwargs: Any,
+        config: LMConfig | None = None,
     ) -> LMRequest:
-        return cls.from_call(model=model, prompt=prompt, messages=messages, **kwargs)
+        return cls.from_call(model=model, prompt=prompt, messages=messages, config=config)
 
-    def with_config_overrides(self, **kwargs: Any) -> LMRequest:
-        if not kwargs:
-            return self
-        merged = _merge_config_overrides(self.config, kwargs)
+    def with_config_overrides(self, config: LMConfig) -> LMRequest:
+        merged = _merge_config_overrides(self.config, config.model_dump(exclude_none=True))
         return self.model_copy(update={"config": merged}, deep=True)

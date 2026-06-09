@@ -4,6 +4,7 @@ from typing import Any, TextIO
 
 from typing_extensions import override
 
+from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.parallel import Parallel
 from dspy.predict.protocol import Predictor
 from dspy.primitives.base_module import BaseModule
@@ -56,17 +57,22 @@ class Module(BaseModule, metaclass=ProgramMeta):
             self.callbacks = []
 
     @with_callbacks(kind="module")
-    async def __call__(self, *args, **kwargs) -> Prediction:
-        run = resolve_run(run=kwargs.pop("run", None), bound_run=self.run)
-        kwargs["run"] = run
+    async def __call__(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs: Any,
+    ) -> Prediction:
+        run = resolve_run(run=run, bound_run=self.run)
         run.caller_modules.append(self)
         try:
             if run.telemetry.track_usage and run.usage_tracker is None:
                 with track_usage(run) as usage_tracker:
-                    output = await self.aforward(*args, **kwargs)
+                    output = await self.aforward(run=run, options=options, **inputs)
                 tokens = usage_tracker.get_total_tokens()
             else:
-                output = await self.aforward(*args, **kwargs)
+                output = await self.aforward(run=run, options=options, **inputs)
                 tokens = (
                     run.usage_tracker.get_total_tokens() if run.telemetry.track_usage and run.usage_tracker else None
                 )
@@ -77,6 +83,15 @@ class Module(BaseModule, metaclass=ProgramMeta):
             run.caller_modules.pop()
 
     acall = __call__
+
+    async def aforward(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs: Any,
+    ) -> Prediction:
+        raise NotImplementedError(f"{type(self).__name__} must implement aforward().")
 
     def named_predictors(self):
         return [(name, param) for name, param in self.named_parameters() if isinstance(param, Predictor)]
@@ -122,7 +137,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
         timeout: int = 120,
         straggler_limit: int = 3,
     ) -> list[Any] | tuple[list[Any], list[Any], list[BaseException]]:
-        exec_pairs = [(self, example.inputs()) for example in examples]
+        exec_pairs = [(self, example.as_inputs()) for example in examples]
         parallel_executor = Parallel(
             run=run,
             num_threads=num_threads,

@@ -103,6 +103,9 @@ class LocalProvider(Provider):
         logger.info(f"Server ready on random port {port}! Logs are available via lm.get_logs() method on returned lm.")
         lm.kwargs["api_base"] = f"http://localhost:{port}/v1"
         lm.kwargs["api_key"] = "local"
+        lm.provider_options = lm.provider_options.model_copy(
+            update={"api_base": f"http://localhost:{port}/v1", "api_key": "local"}
+        )
         lm_attrs = cast("Any", lm)
         lm_attrs.get_logs = get_logs
         lm_attrs.process = process

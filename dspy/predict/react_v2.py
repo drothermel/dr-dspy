@@ -8,6 +8,8 @@ import pydantic
 from dspy.adapters.types.history import History
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
+from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
+from dspy.core.types.config import LMConfig, LMToolChoice
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
@@ -81,15 +83,27 @@ class ReActV2(Module):
         ).strip()
         return make_task_spec(fields, instructions=instructions)
 
-    async def aforward(self, **input_args):
-        run = resolve_run(run=input_args.pop("run", None), bound_run=self.run)
+    async def aforward(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **input_args,
+    ):
+        run = resolve_run(run=run, bound_run=self.run)
         max_iters = input_args.pop("max_iters", self.max_iters)
         history = _coerce_history(input_args.pop("history", None))
         pending_inputs = {name: input_args[name] for name in self.task_spec.input_fields if name in input_args}
         break_reason = "max_iters"
         for turn_index in range(max_iters):
             try:
-                pred = await self.react(history=history, tools=list(self.tools.values()), **pending_inputs, run=run)
+                pred = await self.react(
+                    history=history,
+                    tools=list(self.tools.values()),
+                    **pending_inputs,
+                    run=run,
+                    options=options,
+                )
                 tool_calls = _coerce_tool_calls(getattr(pred, "tool_calls", None))
             except (AdapterParseError, ValueError) as err:
                 logger.warning("Ending ReActV2 loop after parse failure: %s", _fmt_exc(err))
@@ -162,7 +176,12 @@ class ReActV2(Module):
             pred = await self.react(
                 history=history,
                 tools=list(self.tools.values()),
-                config={"tool_choice": {"mode": "required", "allowed": ["submit"]}, "reasoning": None},
+                options=PredictOptions(
+                    config=LMConfig(
+                        tool_choice=LMToolChoice(mode="required", allowed=["submit"]),
+                        reasoning=None,
+                    )
+                ),
                 **pending_inputs,
                 run=run,
             )

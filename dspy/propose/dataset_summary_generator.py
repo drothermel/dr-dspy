@@ -1,5 +1,6 @@
 import re
 
+from dspy.core.types.config import LMConfig
 from dspy.predict.predict import Predict
 from dspy.propose.utils import strip_prefix
 from dspy.runtime.run_context import RunContext
@@ -67,7 +68,7 @@ async def create_dataset_summary(
     upper_lim = min(len(trainset), view_data_batch_size)
     prompt_model = get_prompt_model(prompt_model, run)
     with optimizer_lm_context(run, lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model") as opt_run:
-        observation = await Predict(DatasetDescriptorTaskSpec(), n=1, temperature=1.0)(
+        observation = await Predict(DatasetDescriptorTaskSpec(), config=LMConfig(n=1, temperature=1.0))(
             examples=order_input_keys_in_string(trainset[0:upper_lim].__repr__()), run=opt_run
         )
     observations = observation["observations"]
@@ -87,7 +88,9 @@ async def create_dataset_summary(
             with optimizer_lm_context(
                 run, lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model"
             ) as opt_run:
-                output = await Predict(DatasetDescriptorWithPriorObservationsTaskSpec(), n=1, temperature=1.0)(
+                output = await Predict(
+                    DatasetDescriptorWithPriorObservationsTaskSpec(), config=LMConfig(n=1, temperature=1.0)
+                )(
                     prior_observations=observations,
                     examples=order_input_keys_in_string(trainset[b:upper_lim].__repr__()),
                     run=opt_run,
@@ -107,11 +110,13 @@ async def create_dataset_summary(
         with optimizer_lm_context(
             run, lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model"
         ) as opt_run:
-            summary = await Predict(ObservationSummarizerTaskSpec(), n=1, temperature=1.0)(
+            summary = await Predict(ObservationSummarizerTaskSpec(), config=LMConfig(n=1, temperature=1.0))(
                 observations=observations, run=opt_run
             )
     else:
-        summary = await Predict(ObservationSummarizerTaskSpec(), n=1, temperature=1.0)(observations=observations)
+        summary = await Predict(ObservationSummarizerTaskSpec(), config=LMConfig(n=1, temperature=1.0))(
+            observations=observations
+        )
     if verbose:
         pass
     if log_file:
