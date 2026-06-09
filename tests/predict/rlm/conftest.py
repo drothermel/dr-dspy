@@ -6,7 +6,6 @@ from dspy.clients.base_lm import BaseLM
 from dspy.core.types import LMRequest, LMResponse
 from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.primitives.prediction import Prediction
-from dspy.primitives.sandbox_serializable import SandboxSerializable
 
 
 class FailingSubLM(BaseLM):
@@ -62,40 +61,32 @@ def multiply_tool(a: int = 0, b: int = 0) -> str:
     return str(a * b)
 
 
-class _StubSerializable(SandboxSerializable):
+class _StubSerializable:
     def __init__(self, data: str = "stub_data"):
         self.data = data
 
-    @override
     def sandbox_setup(self) -> str:
         return "import json"
 
-    @override
     def to_sandbox(self) -> bytes:
         return self.data.encode("utf-8")
 
-    @override
     def sandbox_assignment(self, var_name: str, data_expr: str) -> str:
         return f"{var_name} = {data_expr}"
 
-    @override
     def rlm_preview(self, max_chars: int = 500) -> str:
         return f"StubData({self.data})"
 
 
-class _BinarySerializable(SandboxSerializable):
-    @override
+class _BinarySerializable:
     def sandbox_setup(self) -> str:
         return ""
 
-    @override
     def to_sandbox(self) -> bytes:
         return b"\xff\xfe\xfd"
 
-    @override
     def sandbox_assignment(self, var_name: str, data_expr: str) -> str:
         return f"{var_name} = {data_expr}"
 
-    @override
     def rlm_preview(self, max_chars: int = 500) -> str:
         return "BinaryPayload"

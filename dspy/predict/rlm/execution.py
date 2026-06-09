@@ -15,7 +15,7 @@ from dspy.primitives.code_interpreter import SIMPLE_TYPES, CodeInterpreter, Code
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
-from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
+from dspy.primitives.sandbox_protocol import SandboxSerializable, build_repl_variable
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator

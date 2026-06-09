@@ -312,9 +312,9 @@ class GroundedProposer:
         program,
         demo_candidates,
         trial_logs,
-        N,
+        N,  # noqa: N803
         *,
-        run,  # noqa: N803
+        run,
     ) -> dict[int, list[str]]:
         await self._ensure_data_summary(run=run)
         proposed_instructions = {}

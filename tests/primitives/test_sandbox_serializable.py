@@ -1,35 +1,32 @@
-import pytest
-from typing_extensions import override
-
 from dspy.primitives.repl_types import REPLVariable
-from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
+from dspy.primitives.sandbox_protocol import (
+    SandboxSerializable,
+    SandboxSerializablePydanticMixin,
+    build_repl_variable,
+    to_repl_variable,
+)
 from dspy.task_spec import input_field, output_field
 
 
-class ExampleSerializable(SandboxSerializable):
+class ExampleSerializable(SandboxSerializablePydanticMixin):
     def __init__(self, data: str = "example_data"):
         self.data = data
 
-    @override
     def sandbox_setup(self) -> str:
         return "import json"
 
-    @override
     def to_sandbox(self) -> bytes:
         return self.data.encode("utf-8")
 
-    @override
     def sandbox_assignment(self, var_name: str, data_expr: str) -> str:
         return f"{var_name} = json.loads({data_expr})"
 
-    @override
     def rlm_preview(self, max_chars: int = 500) -> str:
         preview = f"ExampleData: {self.data}"
         return preview[:max_chars] + "..." if len(preview) > max_chars else preview
 
 
-class IncompleteSerializable(SandboxSerializable):
-    @override
+class IncompleteSerializable:
     def sandbox_setup(self) -> str:
         return ""
 
@@ -48,16 +45,16 @@ class NotASubclass:
         return "NotASubclass"
 
 
-class TestABCConformance:
+class TestProtocolConformance:
     def test_subclass_conformance(self):
         assert isinstance(ExampleSerializable(), SandboxSerializable)
 
-    def test_incomplete_subclass_cannot_instantiate(self):
-        with pytest.raises(TypeError, match="abstract"):
-            IncompleteSerializable()
+    def test_incomplete_class_can_instantiate(self):
+        obj = IncompleteSerializable()
+        assert not isinstance(obj, SandboxSerializable)
 
-    def test_structural_conformance_no_longer_accepted(self):
-        assert not isinstance(NotASubclass(), SandboxSerializable)
+    def test_structural_conformance_accepted(self):
+        assert isinstance(NotASubclass(), SandboxSerializable)
         assert not isinstance("hello", SandboxSerializable)
 
 
@@ -116,9 +113,9 @@ class TestBuildReplVariable:
         assert "import json" in var.desc
 
 
-class TestToReplVariableMethod:
-    def test_default_to_repl_variable(self):
+class TestToReplVariableFunction:
+    def test_to_repl_variable(self):
         obj = ExampleSerializable("payload")
-        var = obj.to_repl_variable("data")
+        var = to_repl_variable(obj, "data")
         assert isinstance(var, REPLVariable)
         assert "ExampleData: payload" in var.preview

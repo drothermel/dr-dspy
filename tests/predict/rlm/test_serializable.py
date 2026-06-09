@@ -2,12 +2,10 @@ import asyncio
 import base64
 
 import pytest
-from typing_extensions import override
 
 from dspy.predict.rlm import RLM
 from dspy.primitives.code_interpreter import FinalOutput
 from dspy.primitives.python_interpreter import PythonInterpreter
-from dspy.primitives.sandbox_serializable import SandboxSerializable
 from dspy.testing import DummyLM
 from tests.mock_interpreter import MockInterpreter
 from tests.predict.rlm.conftest import _BinarySerializable, _StubSerializable, make_mock_predictor
@@ -72,20 +70,16 @@ class TestPrepareSerializableVars:
         rlm = RLM(ts("data, query -> answer"), interpreter=mock)
         large_text = "x" * (2 * 1024 * 1024)
 
-        class _LargeText(SandboxSerializable):
-            @override
+        class _LargeText:
             def sandbox_setup(self) -> str:
                 return ""
 
-            @override
             def to_sandbox(self) -> bytes:
                 return large_text.encode("utf-8")
 
-            @override
             def sandbox_assignment(self, var_name: str, data_expr: str) -> str:
                 return f"{var_name} = {data_expr}"
 
-            @override
             def rlm_preview(self, max_chars: int = 500) -> str:
                 return f"LargeText({len(large_text)} chars)"
 
@@ -113,20 +107,16 @@ class TestLargeSerializableRoundTrip:
     def test_large_payload_round_trips_through_real_sandbox(self):
         large_text = "abc123" * (200 * 1024)
 
-        class _LargeText(SandboxSerializable):
-            @override
+        class _LargeText:
             def sandbox_setup(self) -> str:
                 return ""
 
-            @override
             def to_sandbox(self) -> bytes:
                 return large_text.encode("utf-8")
 
-            @override
             def sandbox_assignment(self, var_name: str, data_expr: str) -> str:
                 return f"{var_name} = {data_expr}"
 
-            @override
             def rlm_preview(self, max_chars: int = 500) -> str:
                 return f"LargeText({len(large_text)} chars)"
 
