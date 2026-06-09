@@ -5,15 +5,13 @@ import threading
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
-from dspy.clients.finetune.provider import DefaultFinetuneProvider, TrainingJob
+from dspy.clients.finetune.registry import infer_finetune_provider
 from dspy.clients.model_id import split_provider_model
 from dspy.errors import LMUnsupportedFeatureError
-from dspy.integrations.finetune.databricks import DatabricksProvider
-from dspy.integrations.finetune.local import LocalProvider
-from dspy.integrations.finetune.openai import OpenAIProvider
 
 if TYPE_CHECKING:
     from dspy.clients.finetune.protocol import FinetuneProvider, ReinforceJob
+    from dspy.clients.finetune.provider import TrainingJob
     from dspy.clients.finetune.utils import TrainDataFormat
     from dspy.clients.lm.client import LM
 
@@ -21,13 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def infer_provider(model: str) -> FinetuneProvider:
-    if DatabricksProvider.is_provider_model(model):
-        return DatabricksProvider()
-    if LocalProvider.is_provider_model(model):
-        return LocalProvider()
-    if OpenAIProvider.is_provider_model(model):
-        return OpenAIProvider()
-    return DefaultFinetuneProvider()
+    return infer_finetune_provider(model)
 
 
 def launch(lm: LM, launch_kwargs: dict[str, Any] | None = None) -> None:

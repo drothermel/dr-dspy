@@ -14,6 +14,7 @@ ALLOWLIST_SUFFIXES = (
     "adapters/base/call.py",
     "clients/lm/errors.py",
     "clients/lm_registry.py",
+    "clients/finetune/registry.py",
     "adapters/types/tool/tool.py",
     "adapters/utils/multimodal.py",
     # resolve_adapter / settings redesign — separate work
