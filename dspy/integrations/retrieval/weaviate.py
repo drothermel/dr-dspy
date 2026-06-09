@@ -1,19 +1,16 @@
 import asyncio
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 from uuid import uuid4
 
 from dspy._internal.lazy_import import import_optional
 from dspy.retrievers.types import RetrievedPassage
-
-if TYPE_CHECKING:
-    import weaviate
 
 
 class WeaviateRM:
     def __init__(
         self,
         weaviate_collection_name: str,
-        weaviate_client: "weaviate.WeaviateClient | weaviate.Client",
+        weaviate_client: Any,
         weaviate_collection_text_key: str | None = "content",
         k: int = 3,
         tenant_id: str | None = None,
@@ -61,7 +58,7 @@ class WeaviateRM:
                     results = collection.query.hybrid(query=query, limit=k, **kwargs)
                 parsed_results = [result.properties[self._weaviate_collection_text_key] for result in results.objects]
             elif self._client_type == "Client":
-                q = cast("Any", self._weaviate_client).query.get(
+                q = self._weaviate_client.query.get(
                     self._weaviate_collection_name, [self._weaviate_collection_text_key]
                 )
                 if tenant:
@@ -90,10 +87,9 @@ class WeaviateRM:
     def insert(self, new_object_properties: dict[str, object]) -> None:
         if self._client_type == "WeaviateClient":
             import_optional("weaviate", extra="weaviate", feature="WeaviateRM")
-            from weaviate.util import get_valid_uuid
 
             cast("Any", self._weaviate_collection).data.insert(
-                properties=cast("Any", new_object_properties), uuid=get_valid_uuid(uuid4())
+                properties=cast("Any", new_object_properties), uuid=str(uuid4())
             )
         else:
             raise AttributeError("`insert` is not supported for the v3 Weaviate Python client, please upgrade to v4.")
