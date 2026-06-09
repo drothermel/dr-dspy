@@ -6,8 +6,8 @@ from dspy.adapters.json_adapter import JSONAdapter
 from dspy.predict.predict import Predict
 from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, TransparencyMode
 from dspy.runtime.call_log.inspect import read_call_log_for_run
-from dspy.testing import DummyLM
 from tests.runtime.test_transparency import SampleTaskSpec
+from tests.test_utils import DummyLM
 
 
 def test_read_call_log_disk_only_returns_jsonl_tail(tmp_path, monkeypatch):

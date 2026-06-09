@@ -9,8 +9,8 @@ from dspy.primitives import Example, Module
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.bootstrap_session import BootstrapCompileSession
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 def simple_metric(example, prediction, trace=None):

@@ -15,8 +15,8 @@ from dspy.primitives import Example, Module
 from dspy.task_spec import default_task_instructions, input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 QA_TASK_SPEC = ts("question->answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",)))
 

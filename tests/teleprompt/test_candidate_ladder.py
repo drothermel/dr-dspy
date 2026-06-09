@@ -12,8 +12,8 @@ from dspy.teleprompt.candidate_ladder import (
     iter_candidate_seeds,
 )
 from dspy.teleprompt.compilation import CompileResult
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 class DummyModule(Module):

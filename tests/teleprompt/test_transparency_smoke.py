@@ -8,7 +8,7 @@ from dspy.task_spec import TaskSpec, input_field, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, COPROCompileParams, EvaluateCompileParams
 from dspy.teleprompt.copro_optimizer import COPRO
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 
 class QATaskSpec(TaskSpec):

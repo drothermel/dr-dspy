@@ -7,9 +7,9 @@ import pytest
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.runtime import CallLogMode, TelemetryConfig
 from dspy.runtime.run_context import RunContext
-from dspy.testing import DummyLM
 from tests.clients.dr_llm._helpers import make_lm_request
 from tests.clients.dr_llm.conftest import backend_request_for_lm, seed_complete_samples
+from tests.test_utils import DummyLM
 
 if TYPE_CHECKING:
     from dspy.clients.dr_llm import DrLlmPoolLM

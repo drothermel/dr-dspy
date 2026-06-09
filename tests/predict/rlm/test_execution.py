@@ -10,10 +10,10 @@ from dspy.predict.rlm import RLM
 from dspy.predict.rlm import execution as rlm_execution
 from dspy.primitives import CodeInterpreterError, FinalOutput
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.testing import DummyLM
 from tests.mock_interpreter import MockInterpreter
 from tests.predict.rlm.conftest import make_mock_predictor
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 class TestRLMCodeFenceParsing:

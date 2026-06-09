@@ -10,8 +10,8 @@ from dspy.primitives import Example, Module
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import KNNFewShotCompileParams
 from dspy.teleprompt.knn_fewshot import KNNFewShot
-from dspy.testing import DummyLM, DummyVectorizer
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM, DummyVectorizer
 
 
 def mock_example(question: str, answer: str) -> Example:

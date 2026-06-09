@@ -5,8 +5,8 @@ from dspy.primitives import Example, Module
 from dspy.teleprompt.compile_params import COPROCompileParams, EvaluateCompileParams
 from dspy.teleprompt.copro.types import CoproEvaluatedCandidate
 from dspy.teleprompt.copro_optimizer import COPRO
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 def simple_metric(example, prediction, trace=None):

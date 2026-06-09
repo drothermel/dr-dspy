@@ -5,8 +5,8 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module
 from dspy.teleprompt.compile_params import RandomSearchCompileParams
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 class SimpleModule(Module):

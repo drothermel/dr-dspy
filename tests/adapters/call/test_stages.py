@@ -9,11 +9,11 @@ from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCalls
 from dspy.core.types import NativeAdaptationMode
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.testing import DummyLM
 from tests.adapters.call.test_pipeline import FunctionCallingLM, ReasoningFunctionCallingLM
 from tests.adapters.conftest import CapturingLM, StopAdapterCallCapture, make_adapter_run
 from tests.adapters.test_native_adaptation import StubLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 def test_prepare_adapter_call_records_native_function_calling_mutations():

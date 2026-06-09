@@ -6,8 +6,8 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module, Prediction
 from dspy.runtime.optimization_trace import FailedPrediction, TraceData
 from dspy.teleprompt.grpo.rollout_groups import build_rollout_batches, validate_trace_data_and_log_issues
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 class _SinglePredictModule(Module):

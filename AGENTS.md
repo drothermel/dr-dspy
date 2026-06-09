@@ -281,12 +281,15 @@ Task input validation runs in `AdapterCallPipeline.execute` via `dspy.task_spec.
 5. **Retrievers:** `dspy.retrievers.types` (`RetrievedPassage`, `QueryRetriever`); built-in `dspy.retrievers.embeddings`
 6. **Datasets (spine):** `dspy.datasets.dataset` (`Dataset`), `dspy.datasets.rows` (`rows_to_examples`)
 7. **Propose:** `dspy.propose.grounded_proposer`, `dspy.propose.source_format` (teleprompt / predict internals)
-8. **Internal / test-only:** `dspy._internal.*`, `dspy.testing.*`
+8. **Internal / test-only:** `dspy._internal.*`
 
 ## Do not import from (internal/legacy)
 
 - `dspy._internal.*` — lazy import machinery, unbatchify batching helper
-- `dspy.testing.*` — test doubles only
+
+## Test doubles (contributors)
+
+LM and retrieval doubles live under `tests/test_utils/` (for example `from tests.test_utils import DummyLM`). They are repo-local test infrastructure and are not shipped as public DSPy API.
 
 ## Internal call-site conventions
 

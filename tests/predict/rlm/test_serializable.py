@@ -7,10 +7,10 @@ from dspy.predict.rlm import RLM
 from dspy.predict.rlm import execution as rlm_execution
 from dspy.primitives import FinalOutput
 from dspy.primitives.python_interpreter import PythonInterpreter
-from dspy.testing import DummyLM
 from tests.mock_interpreter import MockInterpreter
 from tests.predict.rlm.conftest import _BinarySerializable, _StubSerializable, make_mock_predictor
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 class TestBuildVariablesWithSerializable:

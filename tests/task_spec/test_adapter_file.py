@@ -14,8 +14,8 @@ from dspy.primitives import Example
 from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
 from dspy.teleprompt.compile_params import LabeledFewShotCompileParams
 from dspy.teleprompt.vanilla import LabeledFewShot
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 @pytest.fixture

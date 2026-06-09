@@ -5,7 +5,7 @@ import pytest
 from dspy.evaluate.auto_evaluation import SemanticF1
 from dspy.evaluate.metric_invoke import call_metric, invoke_metric, normalize_metric_score
 from dspy.primitives import Example, Prediction
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 
 def test_normalize_metric_score_bool():

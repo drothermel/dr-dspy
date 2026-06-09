@@ -33,7 +33,7 @@ from dspy.primitives import Example, Module
 from dspy.runtime.batch import Parallel
 from dspy.serialization.json import to_jsonable
 from dspy.task_spec import TaskSpec, default_task_instructions, input_field, make_task_spec, output_field
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 from tests.test_utils.spy_lm import SpyLM
 
 

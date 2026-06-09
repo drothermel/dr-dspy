@@ -8,7 +8,7 @@ from dspy.adapters.types.tool import Tool
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.code_act import CodeAct
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 pytestmark = pytest.mark.deno
 BasicQA = make_task_spec(

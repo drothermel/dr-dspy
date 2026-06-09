@@ -14,8 +14,8 @@ from dspy.propose.grounded_proposer import (
     generate_instruction_class,
 )
 from dspy.task_spec.predictor_context import get_task_spec
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 @pytest.mark.parametrize(

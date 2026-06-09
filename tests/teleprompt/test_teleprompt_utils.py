@@ -6,7 +6,7 @@ import pytest
 from dspy.predict.predict import Predict  # noqa: F401 — initialize predict before primitives lazy import
 from dspy.primitives import Module
 from dspy.teleprompt.eval_batch import eval_candidate_program
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 
 class DummyModule(Module):

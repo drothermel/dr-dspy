@@ -14,7 +14,7 @@ from dspy.runtime.transparency.resolve import LM_CONFIG_PROVENANCE_FIELDS
 from dspy.runtime.transparency.types import CompiledCall, TransparencyViolation
 from dspy.runtime.transparency.validate import collect_compiled_call_violations
 from dspy.task_spec import TaskSpec, input_field, output_field
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 
 class SampleTaskSpec(TaskSpec):

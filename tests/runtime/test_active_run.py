@@ -11,7 +11,7 @@ from dspy.runtime.active_run import call_scope, get_active_run, get_active_usage
 from dspy.runtime.callback import NoOpCallback
 from dspy.runtime.config import CallLogMode
 from dspy.runtime.usage_tracker import UsageTracker, track_usage
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 
 class _OuterModule(Module):

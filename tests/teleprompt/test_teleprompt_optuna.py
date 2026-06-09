@@ -6,8 +6,8 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module
 from dspy.teleprompt.compile_params import BootstrapOptunaCompileParams
 from dspy.teleprompt.teleprompt_optuna import BootstrapFewShotWithOptuna
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 def simple_metric(example, prediction, trace=None):

@@ -13,9 +13,9 @@ from dspy.core.types import LMOutput, LMRequest, LMResponse, LMToolCallPart, LMU
 from dspy.history import TurnLog, turn_to_format_dict
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.react_v2 import ReActV2
-from dspy.testing import DummyLM
 from tests.adapters.conftest import captured_lm_kwargs
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 def _turn_dict(turn) -> dict:

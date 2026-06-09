@@ -6,7 +6,7 @@ from dspy.runtime import CallLogMode, RunContext, TelemetryConfig
 from dspy.runtime.active_run import call_scope
 from dspy.runtime.call_log.coordinator import append_disk_call, record_call
 from dspy.runtime.call_log.disk_record import build_disk_call_record
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 
 class _StubModule:

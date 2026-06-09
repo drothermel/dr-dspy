@@ -7,8 +7,8 @@ from dspy.primitives import Example, Module, Prediction
 from dspy.runtime import run_with_trace
 from dspy.runtime.optimization_trace import FailedPrediction, TraceCapturingModule
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 class _TraceProgram(Module):

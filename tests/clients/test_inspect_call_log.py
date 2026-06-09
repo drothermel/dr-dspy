@@ -14,8 +14,8 @@ from dspy.core.types import (
 )
 from dspy.predict.predict import Predict
 from dspy.runtime.inspect_call_log import pretty_print_call_log
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 def test_inspect_call_log_basic(capsys, make_run):

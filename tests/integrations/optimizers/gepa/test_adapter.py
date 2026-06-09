@@ -1,8 +1,8 @@
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.integrations.optimizers.gepa.adapter import DspyAdapter
 from dspy.runtime import CallLogMode, TelemetryConfig, TransparencyMode
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 def test_gepa_reflection_uses_predict_path(make_run):

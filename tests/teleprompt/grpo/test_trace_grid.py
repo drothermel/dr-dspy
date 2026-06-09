@@ -6,7 +6,7 @@ from dspy.primitives import Example, Prediction
 from dspy.runtime.optimization_trace import TraceData
 from dspy.teleprompt.grpo import trace_grid as trace_grid_module
 from dspy.teleprompt.grpo.trace_grid import collect_teacher_trace_grid
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 
 def _trace_entry(example_ind: int, *, score: float = 1.0) -> TraceData:

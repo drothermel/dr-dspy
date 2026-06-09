@@ -9,7 +9,7 @@ from typing_extensions import override
 
 from dspy.adapters.types.document import Document
 from dspy.errors import AdapterParseError
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 if TYPE_CHECKING:
     from litellm.utils import ModelResponse

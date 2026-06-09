@@ -101,7 +101,7 @@ def test_bootstrap_trace_data(make_run):
 
 def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch, make_run):
     from dspy.teleprompt.core import trace_collection as trace_collection_module
-    from dspy.testing import DummyLM
+    from tests.test_utils import DummyLM
 
     run = make_run(lm=DummyLM([{}]))
 
@@ -136,7 +136,7 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch, make_run):
 
 
 def test_collect_trace_data_does_not_mutate_inner_forward(monkeypatch, make_run):
-    from dspy.testing import DummyLM
+    from tests.test_utils import DummyLM
 
     class DummyProgram(Module):
         async def _aforward_impl(self, *, run, options=None, **inputs):

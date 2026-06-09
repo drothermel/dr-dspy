@@ -12,7 +12,7 @@ from dspy.history import (
 )
 from dspy.primitives import Prediction
 from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, TransparencyMode
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 _ = LMRequest
 

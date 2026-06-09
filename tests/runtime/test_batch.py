@@ -3,8 +3,8 @@ import asyncio
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module
 from dspy.runtime.batch import Parallel
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 def test_parallel_module(make_run):

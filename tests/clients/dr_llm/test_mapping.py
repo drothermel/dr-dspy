@@ -14,8 +14,8 @@ from dspy.clients.dr_llm.provider_name import parse_dr_llm_provider
 from dspy.core.types import LMConfig, LMMessage, LMMessageRole, LMReasoningConfig, LMRequest, ReasoningEffort, User
 from dspy.core.types.parts import LMImagePart, LMTextPart
 from dspy.errors import LMConfigurationError, LMUnsupportedFeatureError
-from dspy.testing import DummyLM
 from tests.clients.dr_llm._helpers import make_backend_response, make_lm_request
+from tests.test_utils import DummyLM
 
 
 def test_parse_dr_llm_provider_rejects_unknown() -> None:

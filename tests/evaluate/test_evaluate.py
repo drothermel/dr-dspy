@@ -14,8 +14,8 @@ from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Prediction
 from dspy.runtime.callback import NoOpCallback
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 def new_example(question, answer):

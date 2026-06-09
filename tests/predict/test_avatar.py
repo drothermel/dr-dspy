@@ -7,8 +7,8 @@ from dspy.adapters.types.tool import Tool
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.avatar import Avatar
 from dspy.predict.avatar.models import ActionOutput
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 def test_avatar_requires_tool_instances():

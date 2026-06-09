@@ -6,8 +6,8 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module, Prediction
 from dspy.teleprompt.bootstrap_finetune import BootstrapFinetune, filter_trace_data_for_finetune
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 if TYPE_CHECKING:
     from dspy.clients.lm import LM

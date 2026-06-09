@@ -10,8 +10,8 @@ from dspy.core.types import LMConfig
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives import Module
 from dspy.runtime.callback import ACTIVE_CALL_ID, NoOpCallback, with_callbacks
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 class MyCallback(NoOpCallback):

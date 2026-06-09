@@ -12,8 +12,8 @@ from dspy.errors import LMUnexpectedError
 from dspy.runtime import CallLogMode, TelemetryConfig
 from dspy.runtime.log_paths import resolve_run_bucket
 from dspy.runtime.run_context import RunContext
-from dspy.testing import DummyLM
 from tests.clients.dr_llm._helpers import make_backend_response, make_lm_request
+from tests.test_utils import DummyLM
 
 
 def _capabilities() -> BackendCapabilities:

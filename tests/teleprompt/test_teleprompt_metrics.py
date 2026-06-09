@@ -4,7 +4,7 @@ import pytest
 
 from dspy.evaluate.metric_invoke import invoke_metric, normalize_metric_score
 from dspy.primitives import Example, Prediction
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 
 def test_invoke_metric_async_function(make_run):

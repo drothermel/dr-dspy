@@ -7,7 +7,7 @@ from typing_extensions import override
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format.chat_request import message_to_openai_chat, to_openai_chat_request
 from dspy.core.types import LMRequest, coerce_lm_config
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 try:
     from litellm.utils import Choices, Message, ModelResponse

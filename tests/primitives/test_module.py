@@ -21,8 +21,8 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Module, Prediction
 from dspy.runtime.batch import Parallel
 from dspy.task_spec import default_task_instructions
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 QUESTION_ANSWER_TASK_SPEC = ts(
     "question -> answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",))

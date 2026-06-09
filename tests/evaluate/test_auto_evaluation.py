@@ -4,7 +4,7 @@ import pytest
 
 from dspy.evaluate.auto_evaluation import CompleteAndGrounded, SemanticF1
 from dspy.primitives import Example, Prediction
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 
 def test_semantic_f1_returns_prediction_without_threshold(make_run):

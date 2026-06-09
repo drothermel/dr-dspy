@@ -12,8 +12,8 @@ from dspy.history import (
 )
 from dspy.predict.predict import Predict
 from dspy.predict.protocol import Predictor
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 def test_lm_satisfies_lm_forward_protocol():

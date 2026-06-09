@@ -14,8 +14,8 @@ from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BetterTogetherCompileParams, RandomSearchCompileParams
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.teleprompt.registry import register_teleprompter, validate_compile_params
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 def simple_metric(example, prediction, trace=None):

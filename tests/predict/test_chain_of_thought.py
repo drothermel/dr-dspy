@@ -12,8 +12,8 @@ from dspy.clients.lm import LM
 from dspy.core.types import LMProviderOptions
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.task_spec import default_task_instructions
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 def test_initialization_with_string_signature(make_run):

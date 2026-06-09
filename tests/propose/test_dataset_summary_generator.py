@@ -5,7 +5,7 @@ import pytest
 
 from dspy.primitives import Prediction
 from dspy.propose.dataset_summary_generator import create_dataset_summary
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 
 def test_create_dataset_summary_empty_trainset_raises(make_run):

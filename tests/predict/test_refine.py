@@ -6,8 +6,8 @@ from dspy.errors import SamplingExhaustedError
 from dspy.predict.predict import Predict
 from dspy.predict.refine import Refine
 from dspy.primitives import Module, Prediction
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 class DummyModule(Module):

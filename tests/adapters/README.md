@@ -4,7 +4,7 @@
 
 1. **Contract** (`test_format_contract.py`, `call/test_*.py`) — roles, field markers, `lm_kwargs` structure, pipeline stage mutations.
 2. **Golden** (`format_exact_messages_*` in adapter-specific files) — full prompt snapshots; keep curated.
-3. **Integration** — end-to-end `acall` with `DummyLM` or mocked litellm.
+3. **Integration** — end-to-end `acall` with `tests.test_utils.DummyLM` or mocked litellm.
 
 ## Layout
 

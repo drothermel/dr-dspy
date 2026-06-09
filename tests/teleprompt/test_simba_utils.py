@@ -3,8 +3,8 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Module
 from dspy.runtime import CallLogMode, RunContext, TelemetryConfig
 from dspy.teleprompt.simba_utils import prepare_models_for_resampling
-from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 class SimpleModule(Module):

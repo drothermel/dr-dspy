@@ -42,7 +42,7 @@ def make_mock_predictor(responses: list[dict]):
 
 @contextmanager
 def dummy_lm_context(responses: list[dict], make_run):
-    from dspy.testing import DummyLM
+    from tests.test_utils import DummyLM
 
     lm = DummyLM(responses)
     make_run(lm=lm)

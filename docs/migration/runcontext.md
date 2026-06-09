@@ -115,6 +115,8 @@ APIs; do not rely on implicit global run state outside module/tool execution.
 Use the `make_run` fixture when tests construct their own LM:
 
 ```python
+from tests.test_utils import DummyLM
+
 def test_example(make_run):
     lm = DummyLM([{"answer": "ok"}])
     run = make_run(lm=lm)

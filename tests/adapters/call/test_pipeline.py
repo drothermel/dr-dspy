@@ -11,9 +11,9 @@ from dspy.clients.lm import LM
 from dspy.clients.openai_format.chat_request import message_to_openai_chat
 from dspy.core.types import LMOutput, LMRequest, LMResponse, LMTextPart, LMThinkingPart, LMUsage
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.testing import DummyLM
 from tests.adapters.conftest import CapturingLM, StopAdapterCallCapture, make_adapter_run
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 @pytest.mark.asyncio

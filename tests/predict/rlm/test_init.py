@@ -8,10 +8,10 @@ from dspy.adapters.types.tool import Tool
 from dspy.clients.lm import LM
 from dspy.predict.rlm import RLM
 from dspy.predict.rlm import tools as rlm_tools
-from dspy.testing import DummyLM
 from tests.mock_interpreter import MockInterpreter
 from tests.predict.rlm.conftest import FailingSubLM
 from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
 class TestRLMInitialization:

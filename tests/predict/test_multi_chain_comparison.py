@@ -5,7 +5,7 @@ import pytest
 from dspy.predict.multi_chain_comparison import MultiChainComparison
 from dspy.primitives import Prediction
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.testing import DummyLM
+from tests.test_utils import DummyLM
 
 BasicQA = make_task_spec(
     {

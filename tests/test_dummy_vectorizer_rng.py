@@ -1,6 +1,6 @@
 import random
 
-from dspy.testing import DummyVectorizer
+from tests.test_utils import DummyVectorizer
 
 
 def test_dummy_vectorizer_does_not_mutate_global_rng():
