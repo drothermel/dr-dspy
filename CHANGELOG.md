@@ -26,7 +26,8 @@
   - Disk logging scoped to `RunContext.log_session`; use `run.inspect_call_log()` / `run.read_call_log()`.
 - Primitives hard cutover (see `docs/migration/primitives.md`):
   - `Parameter` marker removed; `Predict(Module)` only; use `Predictor` protocol for isinstance checks.
-  - `BaseModule.named_parameters()` / `parameters()` → `named_predictors()` / `predictors()`.
+  - `BaseModule` removed; graph introspection and persistence live on `Module`.
+  - `Module.named_parameters()` / `parameters()` → `named_predictors()` / `predictors()`.
   - `BatchResult.failures` is always populated for failed indices; `return_failed_examples=`, `Parallel.failed_examples`, and `Parallel.exceptions` removed.
 
 ### Migration

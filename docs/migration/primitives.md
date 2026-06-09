@@ -18,7 +18,8 @@ from dspy.primitives import BatchFailure, BatchResult, Example, Module, Predicti
 | `named_sub_modules(skip_compiled=…)` | `skip_compiled` removed; compiled subgraphs are opaque by default |
 | `async def aforward` on `Module` subclasses | implement `async def _aforward_impl` instead |
 | `await module.batch(...)` / `await parallel(...)` return `list` or 3-tuple | returns `BatchResult`; use `.results` and `.failures` |
-| `named_parameters()` / `parameters()` on `BaseModule` | `named_predictors()` / `predictors()` |
+| `named_parameters()` / `parameters()` on `Module` | `named_predictors()` / `predictors()` |
+| `from dspy.primitives import BaseModule` / `BaseModule` subclassing | removed — subclass `Module` |
 | `Predict(Module, Parameter)` / `Parameter` marker | `Predict(Module)`; use `Predictor` protocol for isinstance checks |
 | `return_failed_examples=` on `Module.batch` / `Parallel` | removed; `BatchResult.failures` is always populated for failed indices |
 | `Parallel.failed_examples` / `Parallel.exceptions` | removed; use `BatchResult.failures` |
