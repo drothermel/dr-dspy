@@ -138,11 +138,11 @@ class AlfWorld:
         self.POOL = EnvPool(size=max_threads)
         dataset = [Example.from_record({"idx": idx}, input_keys=("idx",)) for idx in range(3500)]
         random.Random(0).shuffle(dataset)
-        trainset, devset = (dataset[:3000], dataset[-500:])
-        if len(trainset) + len(devset) > len(dataset):
+        train, dev = (dataset[:3000], dataset[-500:])
+        if len(train) + len(dev) > len(dataset):
             raise ValueError("Train and dev split sizes cannot exceed dataset size.")
-        self.trainset = trainset
-        self.devset = devset
+        self.train = train
+        self.dev = dev
 
     def __del__(self) -> None:
         self.POOL.close_all()

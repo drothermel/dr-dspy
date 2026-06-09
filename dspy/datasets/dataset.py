@@ -2,21 +2,12 @@ from __future__ import annotations
 
 import random
 import uuid
-from typing import TYPE_CHECKING, Any, cast
-
-from pydantic import BaseModel, ConfigDict
+from typing import TYPE_CHECKING, cast
 
 from dspy.primitives import Example
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-
-
-class DatasetSeedSplits(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    train_sets: list[list[Example]]
-    eval_sets: list[list[Example]]
 
 
 class Dataset:
@@ -115,40 +106,3 @@ class Dataset:
             example_obj = Example.from_record(record, input_keys=tuple(self.input_keys))
             output.append(example_obj)
         return output
-
-    @classmethod
-    def prepare_by_seed(
-        cls,
-        train_seeds: list[int] | None = None,
-        train_size: int = 16,
-        dev_size: int = 1000,
-        divide_eval_per_seed: bool = True,
-        eval_seed: int = 2023,
-        **kwargs: object,
-    ) -> DatasetSeedSplits:
-        train_seeds = train_seeds or [1, 2, 3, 4, 5]
-        data_args: dict[str, Any] = {
-            "train_size": train_size,
-            "eval_seed": eval_seed,
-            "dev_size": dev_size,
-            "test_size": 0,
-            **kwargs,
-        }
-        dataset = cls(**data_args)
-        eval_set = dataset.dev
-        eval_sets: list[list[Example]] = []
-        train_sets: list[list[Example]] = []
-        examples_per_seed = dev_size // len(train_seeds) if divide_eval_per_seed else dev_size
-        eval_offset = 0
-        for train_seed in train_seeds:
-            data_args["train_seed"] = train_seed
-            dataset.reset_seeds(**data_args)
-            eval_sets.append(eval_set[eval_offset : eval_offset + examples_per_seed])
-            train_sets.append(dataset.train)
-            if len(eval_sets[-1]) != examples_per_seed:
-                raise ValueError(len(eval_sets[-1]))
-            if len(train_sets[-1]) != train_size:
-                raise ValueError(len(train_sets[-1]))
-            if divide_eval_per_seed:
-                eval_offset += examples_per_seed
-        return DatasetSeedSplits(train_sets=train_sets, eval_sets=eval_sets)
