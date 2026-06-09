@@ -9,9 +9,9 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module, Prediction
 from dspy.propose.source_format import get_formatted_source
 from dspy.runtime.run_context import RunContext
+from dspy.task_spec.predictor_context import get_task_spec, resolve_optimizer_lm, set_task_spec
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.simba_specs import SimbaOfferFeedbackTaskSpec
-from dspy.teleprompt.task_spec_context import get_task_spec, resolve_optimizer_lm, set_task_spec
 from dspy.teleprompt.trace_helpers import run_program_with_trace
 from dspy.teleprompt.utils import optimizer_lm_context
 

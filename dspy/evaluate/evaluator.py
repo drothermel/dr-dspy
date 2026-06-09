@@ -21,9 +21,9 @@ from typing_extensions import override
 if TYPE_CHECKING:
     import pandas as pd
 
+    from dspy.evaluate.metric_contract import OptimizerMetric
     from dspy.primitives import Example, Module
     from dspy.runtime.run_context import RunContext
-    from dspy.teleprompt.metrics import OptimizerMetric
 
 from dspy.evaluate.metric_invoke import invoke_metric
 from dspy.primitives import Prediction

@@ -22,6 +22,7 @@ from dspy.clients.lm import LM
 from dspy.evaluate.evaluator import Evaluate
 from dspy.primitives import Example, Module
 from dspy.runtime.run_context import RunContext
+from dspy.task_spec.predictor_context import get_task_spec
 from dspy.teleprompt.bootstrap_finetune import (
     FinetuneTeleprompter,
     all_predictors_have_lms,
@@ -32,7 +33,6 @@ from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import GRPOCompileParams
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
-from dspy.teleprompt.task_spec_context import get_task_spec
 
 logger = logging.getLogger(__name__)
 

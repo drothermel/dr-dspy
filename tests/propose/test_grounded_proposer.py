@@ -13,7 +13,7 @@ from dspy.propose.grounded_proposer import (
     GroundedProposer,
     generate_instruction_class,
 )
-from dspy.teleprompt.task_spec_context import get_task_spec
+from dspy.task_spec.predictor_context import get_task_spec
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 

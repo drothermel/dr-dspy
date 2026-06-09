@@ -7,7 +7,7 @@ from dspy.core.types.call_options import ModuleCallOptions
 from dspy.errors import AdapterParseError
 from dspy.primitives import Example, Module, Prediction
 from dspy.runtime.run_context import RunContext
-from dspy.teleprompt.task_spec_context import get_task_spec
+from dspy.task_spec.predictor_context import get_task_spec
 from dspy.teleprompt.utils import make_optimizer_evaluator
 
 logger = logging.getLogger(__name__)

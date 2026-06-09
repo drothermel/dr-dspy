@@ -13,8 +13,8 @@ from dspy.integrations.optimizers.gepa.task_specs import FrameworkGepaInstructio
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Prediction
 from dspy.runtime.run_context import RunContext
+from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, TraceData
-from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
 try:

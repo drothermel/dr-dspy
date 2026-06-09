@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
+from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compilation import CompileResult, CompileStats
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, InferRulesCompileParams
@@ -14,7 +15,6 @@ from dspy.teleprompt.errors import is_demo_shrinkable_error
 from dspy.teleprompt.infer_rules_specs import rules_induction_task_spec
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
-from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context, split_trainset_holdout
 
 logger = logging.getLogger(__name__)

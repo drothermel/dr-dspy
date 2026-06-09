@@ -1,6 +1,6 @@
 from dspy.clients.lm import LM
 from dspy.predict.predict import Predict
-from dspy.teleprompt.task_spec_context import resolve_optimizer_lm
+from dspy.task_spec.predictor_context import resolve_optimizer_lm
 
 
 def test_resolve_optimizer_lm_uses_run_default(make_run):

@@ -8,6 +8,7 @@ from dspy.core.types.config import LMConfig
 from dspy.predict.predict import Predict
 from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
+from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
 from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
 from dspy.teleprompt.compile_params import COPROCompileParams
 from dspy.teleprompt.copro.task_specs import (
@@ -16,7 +17,6 @@ from dspy.teleprompt.copro.task_specs import (
 )
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
-from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
 logger = logging.getLogger(__name__)

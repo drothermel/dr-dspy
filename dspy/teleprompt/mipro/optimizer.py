@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from dspy.clients.lm import LM
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
+from dspy.task_spec.predictor_context import resolve_optimizer_lm
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import MIPROv2CompileParams
 from dspy.teleprompt.mipro.bootstrap import bootstrap_fewshot_examples
@@ -18,7 +19,6 @@ from dspy.teleprompt.mipro.settings import (
     set_random_seeds,
 )
 from dspy.teleprompt.registry import register_teleprompter
-from dspy.teleprompt.task_spec_context import resolve_optimizer_lm
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
 if TYPE_CHECKING:

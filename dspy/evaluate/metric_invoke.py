@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING, Any
 from dspy.primitives import Module, Prediction
 
 if TYPE_CHECKING:
+    from dspy.evaluate.metric_contract import OptimizerMetric
     from dspy.runtime.run_context import RunContext
-    from dspy.teleprompt.metrics import OptimizerMetric
 
 __all__ = ["call_metric", "invoke_metric", "normalize_metric_score"]
 

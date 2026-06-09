@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 from dspy.predict.protocol import Predictor
 from dspy.primitives import Module
 from dspy.propose.source_format import get_formatted_source
-from dspy.teleprompt.task_spec_context import get_task_spec
+from dspy.task_spec.predictor_context import get_task_spec
 
 if TYPE_CHECKING:
     from dspy.primitives import Example
