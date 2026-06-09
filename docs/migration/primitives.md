@@ -20,6 +20,8 @@ from dspy.primitives import BatchFailure, BatchResult, Example, Module, Predicti
 | `await module.batch(...)` / `await parallel(...)` return `list` or 3-tuple | returns `BatchResult`; use `.results` and `.failures` |
 | `named_parameters()` / `parameters()` on `BaseModule` | `named_predictors()` / `predictors()` |
 | `Predict(Module, Parameter)` / `Parameter` marker | `Predict(Module)`; use `Predictor` protocol for isinstance checks |
+| `return_failed_examples=` on `Module.batch` / `Parallel` | removed; `BatchResult.failures` is always populated for failed indices |
+| `Parallel.failed_examples` / `Parallel.exceptions` | removed; use `BatchResult.failures` |
 | `sync_file` JSON-RPC notification | request/response; failures raise `CodeInterpreterError` |
 | Save-time `.pkl` warning text | describes save semantics, not load |
 
@@ -41,4 +43,4 @@ Call modules with `await module(..., run=run)`. Direct `await module.aforward(..
 - Use `Example.from_record(record, input_keys=(...))` for labeled training rows; use `Prediction.from_record(record)` for model outputs.
 - `Prediction` equality compares store fields and attached `Completions` objects (identity), not numeric scores.
 - `Prediction` rich comparisons and arithmetic (`+`, `/`, `<`, etc.) coerce through `float(prediction["score"])`. Missing `score` raises `ValueError`.
-- `Module.batch` and `Parallel(...)(pairs)` return `BatchResult` with `.results` and `.failures` (`BatchFailure` entries with `.input` and `.exception`).
+- `Module.batch` and `Parallel(...)(pairs)` return `BatchResult` with `.results` and `.failures`. Failures are always populated for indices that raised an exception (`BatchFailure` entries with `.input` and `.exception`).

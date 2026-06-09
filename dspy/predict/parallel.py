@@ -15,7 +15,6 @@ class Parallel:
         max_concurrency: int | None = None,
         max_errors: int | None = None,
         access_examples: bool = True,
-        return_failed_examples: bool = False,
         provide_traceback: bool | None = None,
         disable_progress_bar: bool = False,
         timeout: int = 120,
@@ -29,7 +28,6 @@ class Parallel:
         else:
             self.max_errors = max_errors
         self.access_examples = access_examples
-        self.return_failed_examples = return_failed_examples
         if provide_traceback is None and exec_cfg is not None:
             self.provide_traceback = exec_cfg.provide_traceback
         else:
@@ -37,8 +35,6 @@ class Parallel:
         self.disable_progress_bar = disable_progress_bar
         self.timeout = timeout
         self.straggler_limit = straggler_limit
-        self.failed_examples: list[Any] = []
-        self.exceptions: list[BaseException] = []
         self._last_stats = BoundedRunStats()
         self._active_run: RunContext | None = None
 
@@ -91,15 +87,10 @@ class Parallel:
             self._active_run = None
         self._last_stats = stats
         failures: list[BatchFailure] = []
-        if self.return_failed_examples:
-            self.failed_examples = []
-            self.exceptions = []
-            for failed_idx in stats.failed_indices:
-                if failed_idx < len(exec_pairs):
-                    _, original_example = exec_pairs[failed_idx]
-                    self.failed_examples.append(original_example)
-                    exception = stats.exceptions_map.get(failed_idx)
-                    if exception is not None:
-                        self.exceptions.append(exception)
-                        failures.append(BatchFailure(input=original_example, exception=exception))
+        for failed_idx in stats.failed_indices:
+            if failed_idx < len(exec_pairs):
+                _, original_example = exec_pairs[failed_idx]
+                exception = stats.exceptions_map.get(failed_idx)
+                if exception is not None:
+                    failures.append(BatchFailure(input=original_example, exception=exception))
         return BatchResult(results=results, failures=tuple(failures))

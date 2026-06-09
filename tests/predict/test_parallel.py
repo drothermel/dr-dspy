@@ -182,7 +182,7 @@ def test_batch_with_failed_examples(make_run):
         Example.from_record({"value": 42}, input_keys=("value",)),
         Example.from_record({"value": 3}, input_keys=("value",)),
     ]
-    batch_result = asyncio.run(module.batch(examples, return_failed_examples=True, provide_traceback=True, run=run))
+    batch_result = asyncio.run(module.batch(examples, provide_traceback=True, run=run))
     assert batch_result.results == ["success-1", None, "success-3"]
     assert len(batch_result.failures) == 1
     assert batch_result.failures[0].input["value"] == 42
