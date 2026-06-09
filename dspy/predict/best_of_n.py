@@ -3,7 +3,7 @@ from collections.abc import Callable
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.predict import Module, Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
-from dspy.teleprompt.utils import run_program_with_trace
+from dspy.teleprompt.trace_helpers import run_program_with_trace
 
 
 class BestOfN(Module):

@@ -14,7 +14,7 @@ from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.compile_params import AvatarOptimizerCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
-from dspy.teleprompt.utils import run_program_with_trace
+from dspy.teleprompt.trace_helpers import run_program_with_trace
 
 DEFAULT_MAX_EXAMPLES = 10
 

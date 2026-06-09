@@ -7,7 +7,6 @@ from dspy.evaluate.evaluator import Evaluate
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.config import CallSite
 from dspy.runtime.transparency import resolve_adapter
-from dspy.teleprompt.trace_helpers import run_program_with_trace, trace_to_demos
 
 if TYPE_CHECKING:
     from dspy.primitives.example import Example
@@ -60,6 +59,4 @@ __all__ = [
     "make_optimizer_evaluator",
     "optimizer_lm_context",
     "optimizer_run_context",
-    "run_program_with_trace",
-    "trace_to_demos",
 ]

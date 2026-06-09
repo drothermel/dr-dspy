@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol, TextIO
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TextIO
 
 from pydantic import BaseModel, ConfigDict, Field, SkipValidation
 
@@ -14,6 +14,7 @@ from dspy.runtime.config import (
     disk_call_log_enabled,
 )
 from dspy.runtime.inspect_call_log import pretty_print_call_log
+from dspy.runtime.run_context_model import rebuild_run_context_model
 from dspy.runtime.run_log import create_run_log_session, resolve_log_root, resolve_run_bucket
 
 if TYPE_CHECKING:
@@ -34,6 +35,8 @@ class RunContext(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
+    _model_schema_rebuilt: ClassVar[bool] = False
+
     lm: BaseLM
     adapter: Adapter
     callbacks: SkipValidation[list[Callback]] = Field(default_factory=list)
@@ -46,6 +49,13 @@ class RunContext(BaseModel):
     telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
     log_session: RunLogSession | None = None
     call_site: CallSite | None = None
+
+    @classmethod
+    def _ensure_model_schema_rebuilt(cls) -> None:
+        if cls._model_schema_rebuilt:
+            return
+        rebuild_run_context_model(cls)
+        cls._model_schema_rebuilt = True
 
     @classmethod
     def create(
@@ -67,7 +77,7 @@ class RunContext(BaseModel):
         if adapter is None:
             raise ValueError("RunContext requires an adapter.")
 
-        _ensure_run_context_model_rebuilt()
+        cls._ensure_model_schema_rebuilt()
 
         run = cls(
             lm=lm,
@@ -177,16 +187,3 @@ def resolve_run(
         "No RunContext available. Pass run=RunContext.create(lm=LM(...), adapter=...) to the call, "
         "or bind run at Module/Predict construction."
     )
-
-
-from dspy.runtime.run_context_model import rebuild_run_context_model
-
-_run_context_model_rebuilt = False
-
-
-def _ensure_run_context_model_rebuilt() -> None:
-    global _run_context_model_rebuilt
-    if _run_context_model_rebuilt:
-        return
-    rebuild_run_context_model(RunContext)
-    _run_context_model_rebuilt = True

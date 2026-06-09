@@ -17,7 +17,7 @@ async def run_program_with_trace(
     run: RunContext,
     *,
     options: ModuleCallOptions | None = None,
-) -> tuple[Prediction, list]:
+) -> tuple[Prediction, list[Any]]:
     item_run = run.fork(optimization_trace=[], call_log=[])
     inputs = example.as_inputs() if isinstance(example, Example) else example
     prediction = await program(**inputs, run=item_run, options=options)
@@ -25,7 +25,7 @@ async def run_program_with_trace(
     return prediction, trace
 
 
-def trace_to_demos(trace: list, predictor2name: dict[int, str]) -> dict[str, list[Example]]:
+def trace_to_demos(trace: list[Any], predictor2name: dict[int, str]) -> dict[str, list[Example]]:
     name2traces: dict[str, list[Example]] = {}
     for step in trace:
         predictor, inputs, outputs = step

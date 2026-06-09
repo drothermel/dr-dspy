@@ -6,8 +6,8 @@ from typing import Any, cast
 import json_repair
 
 from dspy.adapters.types.tool import ToolCalls
-from dspy.adapters.utils import serialize_for_json
 from dspy.core.types import LMToolCallPart
+from dspy.task_spec.json_serialize import serialize_for_json
 
 
 def _provider_value(value: object, key: str, default: object = None) -> object:

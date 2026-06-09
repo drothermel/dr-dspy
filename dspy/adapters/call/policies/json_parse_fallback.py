@@ -31,7 +31,6 @@ class JSONParseFallbackPolicy:
         run: RunContext,
         error: AdapterParseError,
     ) -> list[dict[str, Any]]:
-        _ = (adapter, error)
         fallback = self._fallback_factory()
         return await AdapterCallPipeline.execute(
             fallback,

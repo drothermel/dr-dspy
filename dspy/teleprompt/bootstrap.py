@@ -11,7 +11,7 @@ from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, LabeledFewShotCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec
-from dspy.teleprompt.utils import run_program_with_trace, trace_to_demos
+from dspy.teleprompt.trace_helpers import run_program_with_trace, trace_to_demos
 
 from .vanilla import LabeledFewShot
 

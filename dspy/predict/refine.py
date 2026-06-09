@@ -11,7 +11,7 @@ from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.runtime.transparency import resolve_adapter
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.formatting import get_field_spec_description_string
-from dspy.teleprompt.utils import run_program_with_trace
+from dspy.teleprompt.trace_helpers import run_program_with_trace
 
 from .predict import Module
 

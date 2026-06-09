@@ -12,14 +12,11 @@ from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.call.policies.response_format import StructuredOutputPolicy
 from dspy.adapters.format_shared import ChatFormatMixin
 from dspy.adapters.types.tool import ToolCalls
-from dspy.adapters.utils import (
-    parse_output_field,
-    serialize_for_json,
-    validate_parsed_fields,
-)
+from dspy.adapters.utils import parse_output_field, validate_parsed_fields
 from dspy.errors import AdapterParseError
 from dspy.task_spec import FieldBinding, field_bindings, format_field_value, get_annotation_name, translate_field_type
 from dspy.task_spec.field_spec import FieldRole
+from dspy.task_spec.json_serialize import serialize_for_json
 
 if TYPE_CHECKING:
     from dspy.adapters.types.base_type import Type

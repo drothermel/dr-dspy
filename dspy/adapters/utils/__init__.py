@@ -1,4 +1,3 @@
-from .json import serialize_for_json
 from .messages import build_lm_message
 from .multimodal import (
     build_multimodal_user_message_content,
@@ -18,7 +17,6 @@ __all__ = [
     "inputs_include_multimodal_custom_type_values",
     "parse_output_field",
     "parse_value",
-    "serialize_for_json",
     "validate_parsed_fields",
     "value_contains_multimodal_custom_type",
 ]

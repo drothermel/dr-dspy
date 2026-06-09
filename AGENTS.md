@@ -228,10 +228,11 @@ See `docs/migration/call-options.md` for before/after examples.
 
 Optimizer/bootstrap teacher contexts must include a configured `adapter` (use `optimizer_lm_context` from `dspy.teleprompt.utils`).
 
-Teleprompter evaluation and trace helpers live in `dspy.teleprompt.utils`:
+Teleprompter evaluation helpers live in `dspy.teleprompt.utils`; optimization trace helpers live in `dspy.teleprompt.trace_helpers`:
 
 ```python
-from dspy.teleprompt.utils import make_optimizer_evaluator, resolve_max_errors, run_program_with_trace, trace_to_demos
+from dspy.teleprompt.trace_helpers import run_program_with_trace, trace_to_demos
+from dspy.teleprompt.utils import make_optimizer_evaluator, resolve_max_errors
 
 evaluate = make_optimizer_evaluator(
     run,

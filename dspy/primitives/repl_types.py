@@ -7,7 +7,7 @@ import pydantic
 from pydantic import Field
 from typing_extensions import override
 
-from dspy.adapters.utils import serialize_for_json
+from dspy.task_spec.json_serialize import serialize_for_json
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
