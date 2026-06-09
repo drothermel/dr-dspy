@@ -19,9 +19,9 @@ def is_conversation_turn_log_type(annotation: Any) -> bool:
     return _is_type_or_optional(annotation, TurnLog)
 
 
-def is_repl_history_type(annotation: Any) -> bool:
+def _is_repl_history_type(annotation: Any) -> bool:
     return _is_type_or_optional(annotation, REPLHistory)
 
 
 def is_agent_history_type(annotation: Any) -> bool:
-    return is_conversation_turn_log_type(annotation) or is_repl_history_type(annotation)
+    return is_conversation_turn_log_type(annotation) or _is_repl_history_type(annotation)

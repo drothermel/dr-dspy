@@ -3,8 +3,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-import pydantic
-from pydantic import Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_serializer
 from typing_extensions import override
 
 if TYPE_CHECKING:
@@ -16,20 +15,23 @@ if TYPE_CHECKING:
 __all__ = ["REPLVariable", "REPLEntry", "REPLHistory"]
 
 
-class REPLVariable(pydantic.BaseModel):
+class REPLVariable(BaseModel):
     name: str
     type_name: str
     desc: str = ""
     constraints: str = ""
     total_length: int
     preview: str
-    model_config = pydantic.ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True)
 
     @classmethod
     def from_value(
         cls, name: str, value: Any, field: FieldSpec | None = None, preview_chars: int = 1000
     ) -> REPLVariable:
-        jsonable = TypeAdapter(type(value)).dump_python(value, mode="json")
+        try:
+            jsonable = TypeAdapter(type(value)).dump_python(value, mode="json")
+        except Exception:
+            jsonable = str(value)
         value_str = json.dumps(jsonable, indent=2) if isinstance(jsonable, (dict, list)) else str(jsonable)
         is_truncated = len(value_str) > preview_chars
         if is_truncated:
@@ -59,16 +61,16 @@ class REPLVariable(pydantic.BaseModel):
         lines.append(f"Preview:\n```\n{self.preview}\n```")
         return "\n".join(lines)
 
-    @pydantic.model_serializer()
+    @model_serializer()
     def serialize_model(self) -> str:
         return self.format()
 
 
-class REPLEntry(pydantic.BaseModel):
+class REPLEntry(BaseModel):
     reasoning: str = ""
     code: str
     output: str
-    model_config = pydantic.ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True)
 
     @staticmethod
     def format_output(output: str, max_output_chars: int = 10000) -> str:
@@ -85,10 +87,10 @@ class REPLEntry(pydantic.BaseModel):
         return f"=== Step {index + 1} ===\n{reasoning_line}Code:\n{code_block}\n{self.format_output(self.output, max_output_chars)}"
 
 
-class REPLHistory(pydantic.BaseModel):
+class REPLHistory(BaseModel):
     entries: list[REPLEntry] = Field(default_factory=list)
     max_output_chars: int = 10000
-    model_config = pydantic.ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True)
 
     def format(self) -> str:
         if not self.entries:
@@ -97,7 +99,7 @@ class REPLHistory(pydantic.BaseModel):
             (entry.format(index=i, max_output_chars=self.max_output_chars) for i, entry in enumerate(self.entries))
         )
 
-    @pydantic.model_serializer()
+    @model_serializer()
     def serialize_model(self) -> str:
         return self.format()
 
@@ -106,14 +108,11 @@ class REPLHistory(pydantic.BaseModel):
         return cls()
 
     def append_turn(self, event: TurnEvent) -> REPLHistory:
-        return self.append(
+        new_entry = REPLEntry(
             reasoning=str(event.reasoning or ""),
             code=str(event.code or ""),
             output=str(event.output or ""),
         )
-
-    def append(self, *, reasoning: str = "", code: str, output: str) -> REPLHistory:
-        new_entry = REPLEntry(reasoning=reasoning, code=code, output=output)
         return REPLHistory(entries=list(self.entries) + [new_entry], max_output_chars=self.max_output_chars)
 
     def truncate_oldest(self, n: int = 1) -> REPLHistory:

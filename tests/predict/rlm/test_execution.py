@@ -3,7 +3,7 @@ import asyncio
 import pytest
 
 from dspy.adapters.types.tool import Tool
-from dspy.history.repl_history import REPLEntry, REPLHistory, REPLVariable
+from dspy.history import REPLEntry, REPLHistory, REPLVariable, TurnEvent
 from dspy.predict.rlm import RLM, _strip_code_fences
 from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
 from dspy.task_spec import input_field, make_task_spec, output_field
@@ -39,8 +39,8 @@ class TestRLMCodeFenceParsing:
 class TestRLMFormatting:
     def test_format_history(self):
         history = REPLHistory()
-        history = history.append(reasoning="Need to check the data", code="print(1)", output="1")
-        history = history.append(reasoning="Now calculate", code="x = 2", output="")
+        history = history.append_turn(TurnEvent(reasoning="Need to check the data", code="print(1)", output="1"))
+        history = history.append_turn(TurnEvent(reasoning="Now calculate", code="x = 2", output=""))
         formatted = history.format()
         assert "Step 1" in formatted
         assert "Step 2" in formatted
@@ -104,7 +104,7 @@ class TestRLMFormatting:
 class TestREPLTypes:
     def test_repl_history_immutability(self):
         h1 = REPLHistory()
-        h2 = h1.append(code="print(1)", output="1")
+        h2 = h1.append_turn(TurnEvent(code="print(1)", output="1"))
         assert len(h1) == 0
         assert len(h2) == 1
 
@@ -112,8 +112,8 @@ class TestREPLTypes:
         h = REPLHistory()
         assert len(h) == 0
         assert not bool(h)
-        h = h.append(code="x = 1", output="")
-        h = h.append(code="x = 2", output="")
+        h = h.append_turn(TurnEvent(code="x = 1", output=""))
+        h = h.append_turn(TurnEvent(code="x = 2", output=""))
         assert len(h) == 2
         assert bool(h)
         codes = [e.code for e in h]
@@ -145,7 +145,7 @@ class TestREPLTypes:
 
     def test_repl_history_threads_max_output_chars(self, make_run):
         h = REPLHistory(max_output_chars=50)
-        h2 = h.append(code="print(1)", output="a" * 100)
+        h2 = h.append_turn(TurnEvent(code="print(1)", output="a" * 100))
         assert h2.max_output_chars == 50
         formatted = h2.format()
         assert "50 characters omitted" in formatted
