@@ -28,7 +28,7 @@ class LMProviderOptions(BaseModel):
         return self
 
     def to_kwargs(self) -> dict[str, Any]:
-        data = self.model_dump(exclude_none=True, exclude={"extensions"})
+        data = self.model_dump(exclude_none=True, exclude={"extensions", "cache"})
         data.update(self.extensions)
         return data
 

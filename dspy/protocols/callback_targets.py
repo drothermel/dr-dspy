@@ -6,7 +6,7 @@ from typing import Any, Protocol, runtime_checkable
 @runtime_checkable
 class LMCallbackTarget(Protocol):
     model: str
-    history: list[Any]
+    call_log: list[Any]
 
     async def __call__(self, request: Any) -> Any: ...
 

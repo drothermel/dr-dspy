@@ -67,7 +67,7 @@ def resolve_call(
     adapter_class = type(adapter).__name__
     if adapter_notes:
         adapter_class = f"{adapter_class}({'; '.join(adapter_notes)})"
-    cache = getattr(lm, "cache", lm.kwargs.get("cache") if hasattr(lm, "kwargs") else None)
+    cache = lm.provider_options.cache
     return CompiledCall(
         call_id=str(uuid.uuid4()),
         module=module,

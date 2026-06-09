@@ -203,7 +203,6 @@ class BaseLM:
             "response": {
                 "outputs": outputs,
                 "usage": response.usage_as_dict(),
-                "cache_hit": getattr(response, "cache_hit", False),
             },
         }
         append_call_record(record, session=session)
@@ -229,7 +228,6 @@ class BaseLM:
     @classmethod
     def load_state(cls, state: dict[str, Any], *, allow_custom_lm_class: bool = False) -> "BaseLM":
         state = dict(state)
-        state.pop("cache", None)
         class_path = state.pop(LM_CLASS_STATE_KEY, None)
         if cls is BaseLM:
             if class_path is None:
