@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Union, get_args, get_origin
 from pydantic import TypeAdapter, ValidationError
 
 from dspy.history.discovery import is_agent_history_type
-from dspy.task_spec.annotation_format import get_type_name
+from dspy.task_spec.type_format import format_type_annotation
 
 if TYPE_CHECKING:
     from dspy.task_spec.task_spec import TaskSpec
@@ -62,13 +62,13 @@ def validate_task_inputs_from_spec(task_spec: TaskSpec, inputs: dict[str, Any]) 
         if value is None:
             if not _annotation_allows_none(field.type_):
                 raise ValueError(
-                    f"Type mismatch for task input field {field_name!r}: expected {get_type_name(field.type_)}, "
+                    f"Type mismatch for task input field {field_name!r}: expected {format_type_annotation(field.type_)}, "
                     f"got incompatible value None."
                 )
             continue
         if not _is_value_compatible_with_type(value, field.type_):
             raise ValueError(
-                f"Type mismatch for task input field {field_name!r}: expected {get_type_name(field.type_)}, "
+                f"Type mismatch for task input field {field_name!r}: expected {format_type_annotation(field.type_)}, "
                 f"got incompatible value {value!r}."
             )
     return validated

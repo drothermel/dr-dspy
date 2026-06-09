@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, cast
 from dspy.adapters.format_field_structure import build_field_structure_instructions, build_role_field_sections
 from dspy.adapters.prompt_format import (
     format_field_value,
-    get_annotation_name,
     get_field_spec_description_string,
 )
 from dspy.adapters.types.tool import ToolCalls
@@ -15,6 +14,7 @@ from dspy.adapters.utils import build_multimodal_user_message_content, inputs_in
 from dspy.clients.openai_format.chat_request import message_to_openai_chat
 from dspy.task_spec import FieldBinding
 from dspy.task_spec.field_spec import FIELD_NAME_BODY, FieldRole
+from dspy.task_spec.type_format import format_type_annotation
 
 if TYPE_CHECKING:
     from dspy.adapters.base.protocols import ChatFormattableAdapter
@@ -35,7 +35,9 @@ def output_field_type_hint(field_type: object) -> str:
     if field_type == ToolCalls:
         return ' (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]})'
     if field_type is not str:
-        return f" (must be formatted as a valid Python {get_annotation_name(field_type)})"
+        return (
+            f" (must be formatted as a valid Python {format_type_annotation(field_type, quote_string_literals=True)})"
+        )
     return ""
 
 
