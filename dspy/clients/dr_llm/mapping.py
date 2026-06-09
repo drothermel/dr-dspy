@@ -6,6 +6,7 @@ from dr_llm.backends.models import BackendRequest, BackendResponse
 from dr_llm.llm import CallMode, EffortSpec, Message, ProviderName, SamplingControls
 
 from dspy.clients.dr_llm.contract import reject_unsupported_merged_config
+from dspy.clients.model_id import split_provider_model
 from dspy.core.types import LMOutput, LMRequest, LMResponse, LMUsage
 from dspy.core.types.config import LMConfig, merge_lm_request_config
 from dspy.core.types.parts import (
@@ -32,13 +33,6 @@ _UNSUPPORTED_PART_TYPES = (
     LMVideoPart,
     LMToolCallPart,
 )
-
-
-def split_provider_model(model: str) -> tuple[str, str]:
-    if "/" in model:
-        provider, rest = model.split("/", 1)
-        return provider, rest
-    return ProviderName.OPENAI, model
 
 
 def probe_backend_request(lm: Any, *, mode: CallMode = CallMode.api) -> BackendRequest:

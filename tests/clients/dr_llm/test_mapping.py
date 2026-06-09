@@ -9,7 +9,6 @@ from dspy.clients.dr_llm.mapping import (
     backend_response_to_lm_response,
     lm_request_to_backend_request,
     probe_backend_request,
-    split_provider_model,
 )
 from dspy.core.types import LMMessage, LMMessageRole, LMRequest, User
 from dspy.core.types.config import LMConfig, LMReasoningConfig, ReasoningEffort
@@ -24,11 +23,6 @@ def test_probe_backend_request_rejects_unknown_provider() -> None:
     lm.model = "not-a-provider/gpt-4.1-mini"
     with pytest.raises(LMUnsupportedFeatureError, match="provider"):
         probe_backend_request(lm)
-
-
-def test_split_provider_model() -> None:
-    assert split_provider_model("openai/gpt-4.1-mini") == ("openai", "gpt-4.1-mini")
-    assert split_provider_model("gpt-4.1-mini") == ("openai", "gpt-4.1-mini")
 
 
 def test_lm_request_to_backend_request_maps_text_messages() -> None:

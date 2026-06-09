@@ -17,6 +17,7 @@ from dspy.clients.lm.errors import (
 )
 from dspy.clients.lm.headers import _add_dspy_identifier_to_headers
 from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
+from dspy.clients.model_id import split_provider_model
 from dspy.clients.openai import OpenAIProvider
 from dspy.clients.openai_format import (
     completion_to_lm_response,
@@ -109,9 +110,7 @@ class LM(BaseLM):
 
     @property
     def _provider_name(self) -> str:
-        if "/" in self.model:
-            return self.model.split("/", 1)[0]
-        return "openai"
+        return split_provider_model(self.model)[0]
 
     @property
     @override
