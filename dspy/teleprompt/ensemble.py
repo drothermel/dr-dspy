@@ -1,23 +1,20 @@
 import random
 
 from pydantic import BaseModel
-from typing_extensions import override
 
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.teleprompt.compile_params import EnsembleCompileParams
-from dspy.teleprompt.teleprompt import Teleprompter
 
 
-class Ensemble(Teleprompter):
+class Ensemble:
     def __init__(self, *, reduce_fn=None, size=None, deterministic=False) -> None:
         assert deterministic is False, "TODO: Implement example hashing for deterministic ensemble."
         self.reduce_fn = reduce_fn
         self.size = size
         self.deterministic = deterministic
 
-    @override
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = EnsembleCompileParams.model_validate(params)
         programs = params.programs

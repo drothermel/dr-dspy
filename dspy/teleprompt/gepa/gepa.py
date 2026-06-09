@@ -8,12 +8,9 @@ import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
-from typing_extensions import override
-
 from dspy._meta.experimental import experimental
 from dspy.primitives.prediction import Prediction
 from dspy.teleprompt.compile_params import GEPACompileParams
-from dspy.teleprompt.teleprompt import Teleprompter
 
 if TYPE_CHECKING:
     from gepa import GEPAResult
@@ -117,7 +114,7 @@ class DspyGEPAResult:
 
 
 @experimental(version="3.0.0")
-class GEPA(Teleprompter):
+class GEPA:
     def __init__(
         self,
         metric: GEPAFeedbackMetric,
@@ -219,7 +216,6 @@ class GEPA(Teleprompter):
         total += (periodic_fulls + extra_final) * V
         return total
 
-    @override
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = GEPACompileParams.model_validate(params)
         trainset = params.trainset

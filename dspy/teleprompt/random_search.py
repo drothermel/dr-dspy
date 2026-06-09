@@ -2,7 +2,6 @@ import random
 from typing import Any, cast
 
 from pydantic import BaseModel
-from typing_extensions import override
 
 from dspy.primitives.module import Module
 from dspy.runtime.async_parallel import resolve_max_errors
@@ -12,14 +11,13 @@ from dspy.teleprompt.compile_params import (
     LabeledFewShotCompileParams,
     RandomSearchCompileParams,
 )
-from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.utils import make_optimizer_evaluator
 
 from .bootstrap import BootstrapFewShot
 from .vanilla import LabeledFewShot
 
 
-class BootstrapFewShotWithRandomSearch(Teleprompter):
+class BootstrapFewShotWithRandomSearch:
     def __init__(
         self,
         metric,
@@ -45,7 +43,6 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         self.num_candidate_sets = num_candidate_programs
         self.max_labeled_demos = max_labeled_demos
 
-    @override
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = RandomSearchCompileParams.model_validate(params)
         self.trainset = params.trainset

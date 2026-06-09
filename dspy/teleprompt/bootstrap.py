@@ -4,7 +4,6 @@ import threading
 
 import tqdm
 from pydantic import BaseModel
-from typing_extensions import override
 
 from dspy.core.hashing import Hasher
 from dspy.primitives.module import Module
@@ -12,7 +11,6 @@ from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, LabeledFewShotCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec
-from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.utils import run_program_with_trace, trace_to_demos
 
 from .vanilla import LabeledFewShot
@@ -20,7 +18,7 @@ from .vanilla import LabeledFewShot
 logger = logging.getLogger(__name__)
 
 
-class BootstrapFewShot(Teleprompter):
+class BootstrapFewShot:
     def __init__(
         self,
         metric=None,
@@ -41,7 +39,6 @@ class BootstrapFewShot(Teleprompter):
         self.error_count = 0
         self.error_lock = threading.Lock()
 
-    @override
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = BootstrapFewShotCompileParams.model_validate(params)
         self.trainset = params.trainset

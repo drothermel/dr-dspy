@@ -2,7 +2,6 @@ import types
 from typing import Any
 
 from pydantic import BaseModel
-from typing_extensions import override
 
 from dspy.clients.embedding import Embedder
 from dspy.core.types.call_options import ModuleCallOptions
@@ -12,15 +11,13 @@ from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, KNNFewShotCompileParams
-from dspy.teleprompt.teleprompt import Teleprompter
 
 
-class KNNFewShot(Teleprompter):
+class KNNFewShot:
     def __init__(self, k: int, trainset: list[Example], vectorizer: Embedder, **few_shot_bootstrap_args: Any) -> None:
         self.knn = KNN(k, trainset, vectorizer=vectorizer)
         self.few_shot_bootstrap_args = few_shot_bootstrap_args
 
-    @override
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = KNNFewShotCompileParams.model_validate(params)
         teacher = params.teacher

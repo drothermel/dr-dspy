@@ -3,7 +3,6 @@ from random import sample
 from typing import Any, Callable, cast
 
 from pydantic import BaseModel
-from typing_extensions import override
 
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.avatar.models import ActionOutput
@@ -15,7 +14,6 @@ from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.compile_params import AvatarOptimizerCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
-from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.utils import run_program_with_trace
 
 DEFAULT_MAX_EXAMPLES = 10
@@ -81,7 +79,7 @@ class _AvatarEvalModule(Module):
         )
 
 
-class AvatarOptimizer(Teleprompter):
+class AvatarOptimizer:
     def __init__(
         self,
         metric: Callable,
@@ -168,7 +166,6 @@ class AvatarOptimizer(Teleprompter):
             raise ValueError("No negative examples found, try raising the lower_bound or providing more training data")
         return (avg_score, pos_inputs, neg_inputs)
 
-    @override
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = AvatarOptimizerCompileParams.model_validate(params)
         trainset = params.trainset

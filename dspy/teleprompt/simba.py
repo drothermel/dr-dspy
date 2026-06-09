@@ -4,13 +4,10 @@ import logging
 import random
 from typing import TYPE_CHECKING, Any, Callable, cast
 
-from typing_extensions import override
-
 from dspy._internal.lazy_import import require
 from dspy.predict.parallel import Parallel
 from dspy.teleprompt.simba_utils import append_a_demo, append_a_rule, prepare_models_for_resampling, wrap_program
 from dspy.teleprompt.task_spec_context import get_prompt_model
-from dspy.teleprompt.teleprompt import Teleprompter
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -25,7 +22,7 @@ np = require("numpy")
 logger = logging.getLogger(__name__)
 
 
-class SIMBA(Teleprompter):
+class SIMBA:
     def __init__(
         self,
         *,
@@ -57,7 +54,6 @@ class SIMBA(Teleprompter):
         else:
             self.strategies = [append_a_rule]
 
-    @override
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = SIMBACompileParams.model_validate(params)
         trainset = params.trainset

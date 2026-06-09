@@ -3,7 +3,6 @@ from collections import defaultdict
 from typing import Any, Callable, cast
 
 from pydantic import BaseModel
-from typing_extensions import override
 
 from dspy.adapters.base import Adapter
 from dspy.clients.lm import LM
@@ -13,12 +12,11 @@ from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_trace import bootstrap_trace_data
 from dspy.teleprompt.compile_params import BootstrapFinetuneCompileParams
-from dspy.teleprompt.teleprompt import Teleprompter
 
 logger = logging.getLogger(__name__)
 
 
-class FinetuneTeleprompter(Teleprompter):
+class FinetuneTeleprompter:
     def __init__(self, train_kwargs: dict[str, Any] | dict[LM, dict[str, Any]] | None = None) -> None:
         self.train_kwargs: dict[LM, Any] = self.convert_to_lm_dict(train_kwargs or {})
 
@@ -47,7 +45,6 @@ class BootstrapFinetune(FinetuneTeleprompter):
         self.exclude_demos = exclude_demos
         self.max_concurrency = max_concurrency
 
-    @override
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = BootstrapFinetuneCompileParams.model_validate(params)
         trainset = params.trainset

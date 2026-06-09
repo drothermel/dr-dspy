@@ -3,7 +3,6 @@ import random
 from typing import Callable, cast
 
 from pydantic import BaseModel, ConfigDict
-from typing_extensions import override
 
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
@@ -25,8 +24,8 @@ from dspy.teleprompt.compile_params import (
     RandomSearchCompileParams,
 )
 from dspy.teleprompt.eval_batch import eval_candidate_program
+from dspy.teleprompt.protocol import Teleprompter
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
-from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.utils import make_optimizer_evaluator
 
 logger = logging.getLogger(__name__)
@@ -81,7 +80,7 @@ def _default_compile_params(
     return PassthroughCompileParams(trainset=trainset, teacher=teacher_arg, valset=valset)
 
 
-class BetterTogether(Teleprompter):
+class BetterTogether:
     STRAT_SEP = " -> "
 
     def __init__(self, metric: Callable, **optimizers: Teleprompter) -> None:
@@ -96,7 +95,6 @@ class BetterTogether(Teleprompter):
                 raise TypeError(f"Optimizer '{key}' must be a Teleprompter, got {type(optimizer).__name__}")
         self.optimizers: dict[str, Teleprompter] = optimizers
 
-    @override
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = BetterTogetherCompileParams.model_validate(params)
         logger.info(f"\n{BOLD}==> BETTERTOGETHER COMPILATION STARTED <=={ENDC}")

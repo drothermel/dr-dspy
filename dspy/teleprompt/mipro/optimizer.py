@@ -1,7 +1,6 @@
 from typing import Any, Callable, Literal
 
 from pydantic import BaseModel
-from typing_extensions import override
 
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
@@ -17,11 +16,10 @@ from dspy.teleprompt.mipro.settings import (
     set_random_seeds,
 )
 from dspy.teleprompt.task_spec_context import get_prompt_model
-from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
 
-class MIPROv2(Teleprompter):
+class MIPROv2:
     def __init__(
         self,
         metric: Callable,
@@ -66,7 +64,6 @@ class MIPROv2(Teleprompter):
         self.seed = seed
         self.rng = None
 
-    @override
     async def compile(self, student: Any, *, params: BaseModel, run: RunContext) -> Any:
         params = MIPROv2CompileParams.model_validate(params)
         trainset = params.trainset

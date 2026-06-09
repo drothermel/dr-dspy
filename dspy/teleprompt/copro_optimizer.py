@@ -3,7 +3,6 @@ import statistics
 from collections import defaultdict
 
 from pydantic import BaseModel
-from typing_extensions import override
 
 from dspy.core.types.config import LMConfig
 from dspy.predict.predict import Predict
@@ -12,7 +11,6 @@ from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.compile_params import COPROCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
-from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
 logger = logging.getLogger(__name__)
@@ -52,7 +50,7 @@ class GenerateInstructionGivenAttemptsTaskSpec(TaskSpec):
     )
 
 
-class COPRO(Teleprompter):
+class COPRO:
     def __init__(
         self, prompt_model=None, metric=None, breadth=10, depth=3, init_temperature=1.4, track_stats=False, **_kwargs
     ) -> None:
@@ -100,7 +98,6 @@ class COPRO(Teleprompter):
         logger.debug(f"i: {task_spec.instructions}")
         logger.debug(f"p: {list(task_spec.fields.values())[-1].prefix}")
 
-    @override
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = COPROCompileParams.model_validate(params)
         module = student.deepcopy()

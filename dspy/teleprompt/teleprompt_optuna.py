@@ -1,12 +1,10 @@
 from typing import Any, cast
 
 from pydantic import BaseModel
-from typing_extensions import override
 
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, BootstrapOptunaCompileParams
-from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.utils import make_optimizer_evaluator
 
 from .bootstrap import BootstrapFewShot
@@ -24,7 +22,7 @@ def _import_optuna():
     return optuna
 
 
-class BootstrapFewShotWithOptuna(Teleprompter):
+class BootstrapFewShotWithOptuna:
     def __init__(
         self,
         metric,
@@ -69,7 +67,6 @@ class BootstrapFewShotWithOptuna(Teleprompter):
         trial.set_user_attr("program", program2)
         return cast("Any", result).score
 
-    @override
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = BootstrapOptunaCompileParams.model_validate(params)
         optuna = _import_optuna()
