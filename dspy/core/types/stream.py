@@ -5,6 +5,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from dspy.core.types.lm_output import LMOutput
+from dspy.core.types.lm_response import LMResponse
 from dspy.core.types.parts import (
     LMAudioPart,
     LMCitationPart,
@@ -16,7 +18,7 @@ from dspy.core.types.parts import (
 )
 from dspy.core.types.parts.serialize import _finalize_stream_part, _parse_json_object
 from dspy.core.types.request import LMRequest
-from dspy.core.types.response import LMOutput, LMResponse, LMUsage
+from dspy.core.types.usage import LMUsage
 
 
 class LMDelta(BaseModel):

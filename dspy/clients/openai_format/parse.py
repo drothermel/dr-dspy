@@ -14,16 +14,18 @@ from dspy.core.types import (
     LMDocumentPart,
     LMImagePart,
     LMOpaquePart,
+    LMOutput,
     LMPart,
     LMRefusalPart,
+    LMResponse,
     LMTextPart,
     LMThinkingPart,
     LMToolCallPart,
+    LMUsage,
     LMVideoPart,
 )
 from dspy.core.types.parts.models import _coerce_part
 from dspy.core.types.request import LMRequest
-from dspy.core.types.response import LMOutput, LMResponse, LMUsage
 from dspy.errors import LMInvalidRequestError
 
 logger = logging.getLogger(__name__)

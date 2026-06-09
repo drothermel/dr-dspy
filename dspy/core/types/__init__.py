@@ -2,6 +2,7 @@ from typing import Any
 
 from dspy.core.types.adaptation import NativeAdaptationMode
 from dspy.core.types.builders import Assistant, Developer, System, ToolCall, ToolResult, User
+from dspy.core.types.call_record import CallRecord
 from dspy.core.types.embedding_options import EmbedderOptions
 from dspy.core.types.lm import LMForward
 from dspy.core.types.lm_config import (
@@ -14,7 +15,9 @@ from dspy.core.types.lm_config import (
     merge_lm_config,
     merge_lm_request_config,
 )
+from dspy.core.types.lm_output import LMOutput
 from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
+from dspy.core.types.lm_response import LMResponse
 from dspy.core.types.messages import LMMessage, LMMessageRole
 from dspy.core.types.parts import (
     LMAudioPart,
@@ -32,7 +35,6 @@ from dspy.core.types.parts import (
     LMVideoPart,
 )
 from dspy.core.types.request import LMRequest
-from dspy.core.types.response import CallRecord, LMOutput, LMResponse, LMUsage
 from dspy.core.types.stream import (
     AsyncLMStream,
     LMAnyDelta,
@@ -52,6 +54,7 @@ from dspy.core.types.stream import (
     LMToolCallDelta,
 )
 from dspy.core.types.tool_spec import LMToolChoice, LMToolSpec, coerce_tool_spec
+from dspy.core.types.usage import LMUsage
 
 UserMessageContent = str | list[dict[str, Any]]
 

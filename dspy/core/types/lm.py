@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from dspy.core.types.lm_response import LMResponse
     from dspy.core.types.request import LMRequest
-    from dspy.core.types.response import LMResponse
 
 
 @runtime_checkable
