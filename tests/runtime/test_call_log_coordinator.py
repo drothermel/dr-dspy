@@ -3,6 +3,7 @@ import json
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.core.types import CallRecord, LMRequest, LMResponse
 from dspy.runtime import CallLogMode, RunContext, TelemetryConfig
+from dspy.runtime.active_run import call_scope
 from dspy.runtime.call_log.coordinator import append_disk_call, record_call
 from dspy.runtime.call_log.disk_record import build_disk_call_record
 from dspy.testing import DummyLM
@@ -42,7 +43,7 @@ def test_record_call_bounded_append_truncates_oldest():
     assert [entry.timestamp for entry in lm.call_log] == ["t2", "t3"]
 
 
-def test_record_call_fan_out_shares_entry_identity():
+async def test_record_call_fan_out_shares_entry_identity():
     lm = DummyLM([{"answer": "ok"}])
     run = RunContext.create(
         lm=lm,
@@ -50,9 +51,9 @@ def test_record_call_fan_out_shares_entry_identity():
         telemetry=TelemetryConfig(call_log=CallLogMode.memory),
     )
     module = _StubModule()
-    run.caller_modules.append(module)  # type: ignore[arg-type]
     entry = _sample_record()
-    record_call(entry=entry, run=run, lm=lm)
+    async with call_scope(run=run, caller=module):  # type: ignore[arg-type]
+        record_call(entry=entry, run=run, lm=lm)
     assert id(run.call_log[0]) == id(lm.call_log[0]) == id(module.call_log[0])
 
 

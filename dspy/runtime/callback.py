@@ -10,8 +10,9 @@ from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, TypeVar
 if TYPE_CHECKING:
     from dspy.runtime.run_context import RunContext
 
+from dspy.runtime.active_run import get_active_run
+
 ACTIVE_CALL_ID: ContextVar[str | None] = ContextVar("active_call_id", default=None)
-ACTIVE_RUN: ContextVar[RunContext | None] = ContextVar("active_run", default=None)
 logger = logging.getLogger(__name__)
 
 
@@ -226,7 +227,7 @@ def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F |
 
 
 def _get_active_callbacks(instance: Any, run: RunContext | None = None, *, kind: CallbackKind) -> list[Callback]:
-    effective_run = run if run is not None else (ACTIVE_RUN.get() if kind == "tool" else None)
+    effective_run = run if run is not None else (get_active_run() if kind == "tool" else None)
     callbacks = list(effective_run.callbacks) if effective_run else []
     return callbacks + getattr(instance, "callbacks", [])
 

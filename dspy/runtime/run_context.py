@@ -16,7 +16,6 @@ from dspy.runtime.run_log_session import RunLogSession
 if TYPE_CHECKING:
     from dspy.adapters.base import Adapter
     from dspy.clients.base_lm import BaseLM
-    from dspy.primitives import Module
     from dspy.runtime.callback import Callback
     from dspy.runtime.usage_tracker import UsageTracker
 
@@ -39,7 +38,6 @@ class RunContext(BaseModel):
     call_log: list[CallRecord] = Field(default_factory=list)
     usage_tracker: UsageTracker | None = None
     retrieval: Any | None = None
-    caller_modules: list[Module] = Field(default_factory=list)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
     telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
     log_session: RunLogSession | None = None
@@ -118,7 +116,6 @@ class RunContext(BaseModel):
             call_log=call_log,
             usage_tracker=usage_tracker,
             retrieval=retrieval,
-            caller_modules=[],
             execution=execution,
             telemetry=telemetry,
             log_session=log_session,

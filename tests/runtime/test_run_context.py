@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from dspy.adapters.json_adapter import JSONAdapter
-from dspy.primitives import Module
 from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, TransparencyMode, resolve_run
 from dspy.runtime.callback import NoOpCallback
 from dspy.testing import DummyLM
@@ -16,10 +15,6 @@ _MEMORY_TELEMETRY = TelemetryConfig(call_log=CallLogMode.memory)
 
 
 class _EchoCallback(NoOpCallback):
-    pass
-
-
-class _StubModule(Module):
     pass
 
 
@@ -37,16 +32,14 @@ def test_create_rejects_missing_adapter():
         RunContext.create(lm=lm, adapter=cast("Adapter", None), telemetry=_MEMORY_TELEMETRY)
 
 
-def test_fork_replaces_lm_and_clears_caller_modules():
+def test_fork_replaces_lm_and_clears_optimization_trace_override():
     lm = DummyLM([{"answer": "ok"}])
     other_lm = DummyLM([{"answer": "other"}])
     adapter = JSONAdapter()
     run = RunContext.create(lm=lm, adapter=adapter, telemetry=_MEMORY_TELEMETRY)
-    run.caller_modules.append(_StubModule())
     forked = run.fork(lm=other_lm, optimization_trace=[])
     assert forked.lm is other_lm
     assert forked.optimization_trace == []
-    assert forked.caller_modules == []
     assert run.optimization_trace == []
 
 

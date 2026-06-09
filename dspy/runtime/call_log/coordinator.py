@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from dspy.runtime.active_run import get_caller_modules
 from dspy.runtime.call_log.disk_record import build_disk_call_record
 from dspy.runtime.config import memory_call_log_enabled
 from dspy.runtime.run_log_session import append_call_record
@@ -25,7 +26,7 @@ def record_call(*, entry: CallRecord, run: RunContext, lm: BaseLM) -> None:
     max_entries = run.telemetry.max_call_log_entries
     _append_bounded(run.call_log, entry, max_entries)
     _append_bounded(lm.call_log, entry, max_entries)
-    for module in run.caller_modules:
+    for module in get_caller_modules():
         _append_bounded(module.call_log, entry, max_entries)
 
 
