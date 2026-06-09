@@ -137,19 +137,6 @@ def has_answer(tokenized_answers, text) -> bool:
     return False
 
 
-def locate_answers(tokenized_answers, text):
-    tokenized_text = DPR_tokenize(text)
-    occurrences = []
-    text_words, text_word_positions = (tokenized_text.words(uncased=True), tokenized_text.offsets())
-    answers_words = [ans.words(uncased=True) for ans in tokenized_answers]
-    for single_answer in answers_words:
-        for i in range(len(text_words) - len(single_answer) + 1):
-            if single_answer == text_words[i : i + len(single_answer)]:
-                (offset, _), (_, endpos) = (text_word_positions[i], text_word_positions[i + len(single_answer) - 1])
-                occurrences.append((offset, endpos))
-    return occurrences
-
-
 STokenizer = SimpleTokenizer()
 
 
@@ -159,14 +146,3 @@ def DPR_tokenize(text):
 
 def DPR_normalize(text):
     return DPR_tokenize(text).words(uncased=True)
-
-
-def strip_accents(text):
-    text = unicodedata.normalize("NFD", text)
-    output = []
-    for char in text:
-        cat = unicodedata.category(char)
-        if cat == "Mn":
-            continue
-        output.append(char)
-    return "".join(output)

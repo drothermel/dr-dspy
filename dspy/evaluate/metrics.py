@@ -3,7 +3,7 @@ import string
 import unicodedata
 from collections import Counter
 
-from dspy.dsp.utils.utils import print_message
+from dspy.evaluate.dpr import DPR_normalize, has_answer
 
 
 def EM(prediction, answers_list):
@@ -52,8 +52,6 @@ def f1_score(prediction, ground_truth):
     ground_truth_tokens = normalize_text(s=ground_truth).split()
     common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
     num_same = sum(common.values())
-    if len(prediction_tokens) == len(ground_truth_tokens) == 0:
-        print_message("\n#> F1 Metric: Rare edge case of len(prediction_tokens) == len(ground_truth_tokens) == 0.\n")
     if num_same == 0:
         return 0
     precision = 1.0 * num_same / len(prediction_tokens)
@@ -84,18 +82,12 @@ def precision_score(prediction, ground_truth):
     ground_truth_tokens = normalize_text(s=ground_truth).split()
     common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
     num_same = sum(common.values())
-    if len(prediction_tokens) == len(ground_truth_tokens) == 0:
-        print_message(
-            "\n#> Precision Metric: Rare edge case of len(prediction_tokens) == len(ground_truth_tokens) == 0.\n"
-        )
     if num_same == 0:
         return 0
     return 1.0 * num_same / len(prediction_tokens)
 
 
 def _passage_match(passages: list[str], answers: list[str]) -> bool:
-    from dspy.dsp.utils.dpr import DPR_normalize, has_answer
-
     def passage_has_answers(passage: str, answers: list[str]) -> bool:
         return has_answer(
             tokenized_answers=[DPR_normalize(normalize_text(s=ans)) for ans in answers], text=normalize_text(s=passage)

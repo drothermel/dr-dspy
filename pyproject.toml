@@ -264,7 +264,7 @@ ban-relative-imports = "all"
 ]
 "scripts/*.py" = ["T201"]  # CLI scripts may print status to stdout/stderr
 "dspy/core/types/builders.py" = ["N802"]  # Legacy message builder API (System, User, ...)
-"dspy/dsp/utils/dpr.py" = ["N802"]  # Legacy DPR_* tokenizer helpers
+"dspy/evaluate/dpr.py" = ["N802"]  # Legacy DPR_* tokenizer helpers
 "dspy/utils/dotdict.py" = ["N801"]  # Legacy dotdict type name
 "dspy/dsp/utils/utils.py" = ["N801"]  # Removed in dsp cutover phase 4
 "dspy/evaluate/metrics.py" = ["N802"]  # Legacy metric names (EM, F1, HotPotF1)
