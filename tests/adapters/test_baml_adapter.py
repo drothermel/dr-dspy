@@ -19,7 +19,7 @@ from dspy.adapters.types.image import Image
 from dspy.adapters.types.tool import Tool
 from dspy.clients.lm import LM
 from dspy.history import TurnLog
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import input_field, make_task_spec, output_field
 from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs, make_adapter_run
 from tests.task_spec.helpers import ts
 
@@ -87,7 +87,10 @@ def test_baml_adapter_format_exact_messages_with_nested_output():
         tags: list[str]
 
     TypedSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "answer": FieldSpec.output("answer", type_=BamlNested)},
+        {
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", type_=BamlNested, desc="The answer."),
+        },
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -110,7 +113,10 @@ def test_baml_adapter_format_exact_messages_with_nested_output():
 
 def test_baml_adapter_basic_schema_generation():
     TestSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "patient": FieldSpec.output("patient", type_=PatientDetails)},
+        {
+            "question": input_field("question", desc="The question."),
+            "patient": output_field("patient", type_=PatientDetails, desc="The patient."),
+        },
         instructions="Given the fields `question`, produce the fields `patient`.",
     )
     adapter = BAMLAdapter()
@@ -125,7 +131,10 @@ def test_baml_adapter_basic_schema_generation():
 
 def test_baml_adapter_handles_optional_fields():
     TestSignature = make_task_spec(
-        {"input": FieldSpec.input("input"), "patient": FieldSpec.output("patient", type_=PatientDetails)},
+        {
+            "input": input_field("input", desc="The input."),
+            "patient": output_field("patient", type_=PatientDetails, desc="The patient."),
+        },
         instructions="Given the fields `input`, produce the fields `patient`.",
     )
     adapter = BAMLAdapter()
@@ -143,7 +152,10 @@ def test_baml_adapter_handles_primitive_types():
         flag: bool
 
     TestSignature = make_task_spec(
-        {"input": FieldSpec.input("input"), "output": FieldSpec.output("output", type_=SimpleModel)},
+        {
+            "input": input_field("input", desc="The input."),
+            "output": output_field("output", type_=SimpleModel, desc="The output."),
+        },
         instructions="Given the fields `input`, produce the fields `output`.",
     )
     adapter = BAMLAdapter()
@@ -156,7 +168,10 @@ def test_baml_adapter_handles_primitive_types():
 
 def test_baml_adapter_handles_lists_with_bracket_notation():
     TestSignature = make_task_spec(
-        {"input": FieldSpec.input("input"), "addresses": FieldSpec.output("addresses", type_=ModelWithLists)},
+        {
+            "input": input_field("input", desc="The input."),
+            "addresses": output_field("addresses", type_=ModelWithLists, desc="The addresses."),
+        },
         instructions="Given the fields `input`, produce the fields `addresses`.",
     )
     adapter = BAMLAdapter()
@@ -171,7 +186,10 @@ def test_baml_adapter_handles_lists_with_bracket_notation():
 
 def test_baml_adapter_handles_complex_nested_models():
     TestSignature = make_task_spec(
-        {"input": FieldSpec.input("input"), "complex": FieldSpec.output("complex", type_=ComplexNestedModel)},
+        {
+            "input": input_field("input", desc="The input."),
+            "complex": output_field("complex", type_=ComplexNestedModel, desc="The complex."),
+        },
         instructions="Given the fields `input`, produce the fields `complex`.",
     )
     adapter = BAMLAdapter()
@@ -185,7 +203,10 @@ def test_baml_adapter_handles_complex_nested_models():
 
 def test_baml_adapter_raise_error_on_circular_references():
     TestSignature = make_task_spec(
-        {"input": FieldSpec.input("input"), "circular": FieldSpec.output("circular", type_=CircularModel)},
+        {
+            "input": input_field("input", desc="The input."),
+            "circular": output_field("circular", type_=CircularModel, desc="The circular."),
+        },
         instructions="Given the fields `input`, produce the fields `circular`.",
     )
     adapter = BAMLAdapter()
@@ -197,9 +218,9 @@ def test_baml_adapter_raise_error_on_circular_references():
 def test_baml_adapter_formats_pydantic_inputs_as_clean_json():
     TestSignature = make_task_spec(
         {
-            "patient": FieldSpec.input("patient", type_=PatientDetails),
-            "question": FieldSpec.input("question"),
-            "answer": FieldSpec.output("answer"),
+            "patient": input_field("patient", type_=PatientDetails, desc="The patient."),
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `patient`, `question`, produce the fields `answer`.",
     )
@@ -223,10 +244,10 @@ def test_baml_adapter_formats_pydantic_inputs_as_clean_json():
 def test_baml_adapter_handles_mixed_input_types():
     TestSignature = make_task_spec(
         {
-            "patient": FieldSpec.input("patient", type_=PatientDetails),
-            "priority": FieldSpec.input("priority", type_=int),
-            "notes": FieldSpec.input("notes"),
-            "result": FieldSpec.output("result"),
+            "patient": input_field("patient", type_=PatientDetails, desc="The patient."),
+            "priority": input_field("priority", type_=int, desc="The priority."),
+            "notes": input_field("notes", desc="The notes."),
+            "result": output_field("result", desc="The result."),
         },
         instructions="Given the fields `patient`, `priority`, `notes`, produce the fields `result`.",
     )
@@ -250,7 +271,10 @@ def test_baml_adapter_handles_schema_generation_errors_gracefully():
         field: object
 
     TestSignature = make_task_spec(
-        {"input": FieldSpec.input("input"), "output": FieldSpec.output("output", type_=ProblematicModel)},
+        {
+            "input": input_field("input", desc="The input."),
+            "output": output_field("output", type_=ProblematicModel, desc="The output."),
+        },
         instructions="Given the fields `input`, produce the fields `output`.",
     )
     adapter = BAMLAdapter()
@@ -264,9 +288,9 @@ def test_baml_adapter_handles_schema_generation_errors_gracefully():
 def test_baml_adapter_raises_on_missing_fields():
     TestSignature = make_task_spec(
         {
-            "input": FieldSpec.input("input"),
-            "patient": FieldSpec.output("patient", type_=PatientDetails),
-            "summary": FieldSpec.output("summary"),
+            "input": input_field("input", desc="The input."),
+            "patient": output_field("patient", type_=PatientDetails, desc="The patient."),
+            "summary": output_field("summary", desc="The summary."),
         },
         instructions="Given the fields `input`, produce the fields `patient`, `summary`.",
     )
@@ -280,7 +304,10 @@ def test_baml_adapter_raises_on_missing_fields():
 
 def test_baml_adapter_handles_type_casting_errors():
     TestSignature = make_task_spec(
-        {"input": FieldSpec.input("input"), "patient": FieldSpec.output("patient", type_=PatientDetails)},
+        {
+            "input": input_field("input", desc="The input."),
+            "patient": output_field("patient", type_=PatientDetails, desc="The patient."),
+        },
         instructions="Given the fields `input`, produce the fields `patient`.",
     )
     adapter = BAMLAdapter()
@@ -292,8 +319,8 @@ def test_baml_adapter_handles_type_casting_errors():
 def test_baml_adapter_with_images():
     TestSignature = make_task_spec(
         {
-            "image_data": FieldSpec.input("image_data", type_=ImageWrapper),
-            "description": FieldSpec.output("description"),
+            "image_data": input_field("image_data", type_=ImageWrapper, desc="The image data."),
+            "description": output_field("description", desc="The description."),
         },
         instructions="Given the fields `image_data`, produce the fields `description`.",
     )
@@ -317,9 +344,9 @@ def test_baml_adapter_with_images():
 def test_baml_adapter_with_tools():
     TestSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "answer": FieldSpec.output("answer"),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `answer`.",
     )
@@ -350,7 +377,10 @@ def test_baml_adapter_with_tools():
 
 def test_baml_adapter_with_code():
     CodeAnalysisSignature = make_task_spec(
-        {"code": FieldSpec.input("code", type_=Code), "analysis": FieldSpec.output("analysis")},
+        {
+            "code": input_field("code", type_=Code, desc="The code."),
+            "analysis": output_field("analysis", desc="The analysis."),
+        },
         instructions="Given the fields `code`, produce the fields `analysis`.",
     )
     adapter = BAMLAdapter()
@@ -364,7 +394,7 @@ def test_baml_adapter_with_code():
     assert "def hello():" in user_message
     assert "print('Hello, world!')" in user_message
     CodeGenSignature = make_task_spec(
-        {"task": FieldSpec.input("task"), "code": FieldSpec.output("code", type_=Code)},
+        {"task": input_field("task", desc="The task."), "code": output_field("code", type_=Code, desc="The code.")},
         instructions="Given the fields `task`, produce the fields `code`.",
     )
     lm = LM(model="openai/gpt-4o-mini")
@@ -389,9 +419,9 @@ def test_baml_adapter_with_code():
 def test_baml_adapter_with_conversation_history():
     TestSignature = make_task_spec(
         {
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "question": FieldSpec.input("question"),
-            "answer": FieldSpec.output("answer"),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `history`, `question`, produce the fields `answer`.",
     )
@@ -417,7 +447,10 @@ def test_baml_adapter_with_conversation_history():
 
 def test_baml_vs_json_adapter_token_efficiency():
     TestSignature = make_task_spec(
-        {"input": FieldSpec.input("input"), "complex": FieldSpec.output("complex", type_=ComplexNestedModel)},
+        {
+            "input": input_field("input", desc="The input."),
+            "complex": output_field("complex", type_=ComplexNestedModel, desc="The complex."),
+        },
         instructions="Given the fields `input`, produce the fields `complex`.",
     )
     baml_adapter = BAMLAdapter()
@@ -429,7 +462,10 @@ def test_baml_vs_json_adapter_token_efficiency():
 
 def test_baml_vs_json_adapter_functional_compatibility():
     TestSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "patient": FieldSpec.output("patient", type_=PatientDetails)},
+        {
+            "question": input_field("question", desc="The question."),
+            "patient": output_field("patient", type_=PatientDetails, desc="The patient."),
+        },
         instructions="Given the fields `question`, produce the fields `patient`.",
     )
     baml_adapter = BAMLAdapter()
@@ -445,7 +481,10 @@ def test_baml_vs_json_adapter_functional_compatibility():
 @pytest.mark.asyncio
 async def test_baml_adapter_async_functionality():
     TestSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "patient": FieldSpec.output("patient", type_=PatientDetails)},
+        {
+            "question": input_field("question", desc="The question."),
+            "patient": output_field("patient", type_=PatientDetails, desc="The patient."),
+        },
         instructions="Given the fields `question`, produce the fields `patient`.",
     )
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_acompletion:
@@ -474,7 +513,10 @@ def test_baml_adapter_with_field_aliases():
         patient_age: int = pydantic.Field(alias="age")
 
     TestSignature = make_task_spec(
-        {"input": FieldSpec.input("input"), "data": FieldSpec.output("data", type_=ModelWithAliases)},
+        {
+            "input": input_field("input", desc="The input."),
+            "data": output_field("data", type_=ModelWithAliases, desc="The data."),
+        },
         instructions="Given the fields `input`, produce the fields `data`.",
     )
     adapter = BAMLAdapter()
@@ -491,7 +533,10 @@ def test_baml_adapter_field_alias_without_description():
         field_with_description: str = pydantic.Field(description="This field has a description", alias="desc_field")
 
     TestSignature = make_task_spec(
-        {"input": FieldSpec.input("input"), "data": FieldSpec.output("data", type_=ModelWithAliasNoDescription)},
+        {
+            "input": input_field("input", desc="The input."),
+            "data": output_field("data", type_=ModelWithAliasNoDescription, desc="The data."),
+        },
         instructions="Given the fields `input`, produce the fields `data`.",
     )
     adapter = BAMLAdapter()
@@ -517,9 +562,9 @@ def test_baml_adapter_multiple_pydantic_input_fields():
 
     TestSignature = make_task_spec(
         {
-            "input_1": FieldSpec.input("input_1", type_=UserProfile, desc="User profile information"),
-            "input_2": FieldSpec.input("input_2", type_=SystemConfig, desc="System configuration settings"),
-            "result": FieldSpec.output("result", desc="Resulting output after processing"),
+            "input_1": input_field("input_1", type_=UserProfile, desc="User profile information"),
+            "input_2": input_field("input_2", type_=SystemConfig, desc="System configuration settings"),
+            "result": output_field("result", desc="Resulting output after processing"),
         },
         instructions="Given the fields `input_1`, `input_2`, produce the fields `result`.",
     )

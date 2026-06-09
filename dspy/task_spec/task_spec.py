@@ -1,10 +1,10 @@
 import hashlib
 import json
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dspy.task_spec.field_spec import FieldSpec
+from dspy.task_spec.field_spec import FieldRole, FieldSpec
 from dspy.task_spec.serialize import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
 
 
@@ -58,21 +58,21 @@ class TaskSpec(BaseModel):
     def append(self, field: FieldSpec) -> "TaskSpec":
         if field.name in self.fields:
             raise ValueError(f"Field already exists: {field.name}")
-        if field.role == "input":
+        if field.role == FieldRole.INPUT:
             return self.model_copy(update={"inputs": (*self.inputs, field)})
         return self.model_copy(update={"outputs": (*self.outputs, field)})
 
     def prepend(self, field: FieldSpec) -> "TaskSpec":
         if field.name in self.fields:
             raise ValueError(f"Field already exists: {field.name}")
-        if field.role == "input":
+        if field.role == FieldRole.INPUT:
             return self.model_copy(update={"inputs": (field, *self.inputs)})
         return self.model_copy(update={"outputs": (field, *self.outputs)})
 
     def insert(self, index: int, field: FieldSpec) -> "TaskSpec":
         if field.name in self.fields:
             raise ValueError(f"Field already exists: {field.name}")
-        if field.role == "input":
+        if field.role == FieldRole.INPUT:
             fields = list(self.inputs)
             fields.insert(index, field)
             return self.model_copy(update={"inputs": tuple(fields)})
@@ -84,7 +84,7 @@ class TaskSpec(BaseModel):
         if name not in self.fields:
             raise KeyError(f"Unknown field: {name}")
         field = self.fields[name]
-        if field.role == "input":
+        if field.role == FieldRole.INPUT:
             return self.model_copy(update={"inputs": tuple(f for f in self.inputs if f.name != name)})
         return self.model_copy(update={"outputs": tuple(f for f in self.outputs if f.name != name)})
 
@@ -121,14 +121,19 @@ class TaskSpec(BaseModel):
         )
 
     def to_declaration(self) -> str:
-        lines = [f"TaskSpec(name={self.name!r}, instructions={self.instructions!r})", f"  spec: {self.spec_string}"]
-        for field in (*self.inputs, *self.outputs):
-            role: Literal["input", "output"] = field.role
-            lines.append(f"  {role} {field.name}: {field.type_!r} desc={field.desc!r} prefix={field.prefix!r}")
+        field_lines = [
+            f"  {field.role.value} {field.name}: {field.type_!r} desc={field.desc!r} prefix={field.prefix!r}"
+            for field in (*self.inputs, *self.outputs)
+        ]
+        lines = [
+            f"TaskSpec(name={self.name!r}, instructions={self.instructions!r})",
+            f"  spec: {self.spec_string}",
+            *field_lines,
+        ]
         return "\n".join(lines)
 
     def _replace_field(self, name: str, field: FieldSpec) -> "TaskSpec":
-        if field.role == "input":
+        if field.role == FieldRole.INPUT:
             inputs = tuple(field if f.name == name else f for f in self.inputs)
             return self.model_copy(update={"inputs": inputs})
         outputs = tuple(field if f.name == name else f for f in self.outputs)

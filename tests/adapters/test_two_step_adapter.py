@@ -10,7 +10,7 @@ from dspy.clients.openai_format import message_to_openai_chat
 from dspy.core.types import LMRequest, LMResponse
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.utils.dummies import DummyLM
 from dspy.utils.exceptions import AdapterParseError
 from tests.adapters.conftest import format_messages_and_lm_kwargs
@@ -53,9 +53,9 @@ def test_two_step_adapter_format_exact_messages_for_simple_signature_with_demo(m
 def test_two_step_adapter_format_exact_messages_with_typed_outputs(make_run):
     TypedSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "count": FieldSpec.output("count", type_=int),
-            "answer": FieldSpec.output("answer"),
+            "question": input_field("question", desc="The question."),
+            "count": output_field("count", type_=int, desc="The count."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `question`, produce the fields `count`, `answer`.",
     )
@@ -78,9 +78,9 @@ def test_two_step_adapter_format_exact_messages_with_typed_outputs(make_run):
 def test_two_step_adapter_format_includes_turn_log_history(make_run):
     QAWithHistory = make_task_spec(
         {
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "question": FieldSpec.input("question"),
-            "answer": FieldSpec.output("answer"),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `history`, `question`, produce the fields `answer`.",
     )
@@ -104,9 +104,9 @@ def test_two_step_adapter_format_includes_turn_log_history(make_run):
 def test_two_step_adapter_call(make_run):
     TestSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question", desc="The math question to solve"),
-            "solution": FieldSpec.output("solution", desc="Step by step solution"),
-            "answer": FieldSpec.output("answer", type_=float, desc="The final numerical answer"),
+            "question": input_field("question", desc="The math question to solve"),
+            "solution": output_field("solution", desc="Step by step solution"),
+            "answer": output_field("answer", type_=float, desc="The final numerical answer"),
         },
         instructions="Given the fields `question`, produce the fields `solution`, `answer`.",
     )
@@ -143,9 +143,9 @@ def test_two_step_adapter_call(make_run):
 async def test_two_step_adapter_async_call(make_run):
     TestSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question", desc="The math question to solve"),
-            "solution": FieldSpec.output("solution", desc="Step by step solution"),
-            "answer": FieldSpec.output("answer", type_=float, desc="The final numerical answer"),
+            "question": input_field("question", desc="The math question to solve"),
+            "solution": output_field("solution", desc="Step by step solution"),
+            "answer": output_field("answer", type_=float, desc="The final numerical answer"),
         },
         instructions="Given the fields `question`, produce the fields `solution`, `answer`.",
     )
@@ -182,9 +182,9 @@ async def test_two_step_adapter_async_call(make_run):
 async def test_two_step_adapter_extraction(make_run):
     ComplexSignature = make_task_spec(
         {
-            "input_text": FieldSpec.input("input_text", desc="Source text to tag"),
-            "tags": FieldSpec.output("tags", type_=list[str], desc="List of relevant tags"),
-            "confidence": FieldSpec.output("confidence", type_=float, desc="Confidence score"),
+            "input_text": input_field("input_text", desc="Source text to tag"),
+            "tags": output_field("tags", type_=list[str], desc="List of relevant tags"),
+            "confidence": output_field("confidence", type_=float, desc="Confidence score"),
         },
         instructions="Given the fields `input_text`, produce the fields `tags`, `confidence`.",
     )
@@ -201,8 +201,8 @@ async def test_two_step_adapter_extraction(make_run):
 async def test_two_step_adapter_extraction_errors(make_run):
     TestSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question", desc="The question to answer"),
-            "answer": FieldSpec.output("answer", desc="The answer to the question"),
+            "question": input_field("question", desc="The question to answer"),
+            "answer": output_field("answer", desc="The answer to the question"),
         },
         instructions="Given the fields `question`, produce the fields `answer`.",
     )

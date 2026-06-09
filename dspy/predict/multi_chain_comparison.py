@@ -25,13 +25,18 @@ class MultiChainComparison(Module):
         for idx in range(M):
             field_name = f"reasoning_attempt_{idx + 1}"
             extended_task_spec = extended_task_spec.append(
-                input_field(field_name, str, desc="${reasoning attempt}", prefix=f"Student Attempt #{idx + 1}:")
+                input_field(
+                    field_name,
+                    str,
+                    desc=f"Reasoning attempt {idx + 1} from a student chain.",
+                    prefix=f"Student Attempt #{idx + 1}:",
+                )
             )
         extended_task_spec = extended_task_spec.prepend(
             output_field(
                 "rationale",
                 str,
-                desc="${corrected reasoning}",
+                desc="Corrected reasoning synthesized from student attempts.",
                 prefix="Accurate Reasoning: Thank you everyone. Let's now holistically",
             )
         )

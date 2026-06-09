@@ -45,7 +45,7 @@ class CodeAct(Module):
         instructions = self._build_instructions(task_spec, tools_by_name)
         codeact_task_spec = (
             make_task_spec(dict(task_spec.input_fields), instructions="\n".join(instructions))
-            .append(input_field("turn_log", TurnLog))
+            .append(input_field("turn_log", TurnLog, desc="Previous code executions and their outputs."))
             .append(
                 output_field(
                     "generated_code",
@@ -57,7 +57,7 @@ class CodeAct(Module):
         )
         extract_task_spec = make_task_spec(
             {**task_spec.input_fields, **task_spec.output_fields}, instructions=task_spec.instructions
-        ).append(input_field("turn_log", TurnLog))
+        ).append(input_field("turn_log", TurnLog, desc="Previous code executions and their outputs."))
         self.tools: dict[str, Tool] = tools_by_name
         self.codeact = Predict(codeact_task_spec)
         self.extractor = ChainOfThought(extract_task_spec)

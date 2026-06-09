@@ -12,7 +12,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool
 from dspy.predict.react import ReAct
 from dspy.primitives.prediction import Prediction
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.utils.dummies import DummyLM
 from dspy.utils.exceptions import ContextWindowExceededError
 from tests.task_spec.helpers import ts
@@ -97,9 +97,9 @@ def test_tool_calling_with_pydantic_args(make_run):
 
     InvitationSignature = make_task_spec(
         {
-            "participant_name": FieldSpec.input("participant_name", desc="The name of the participant to invite"),
-            "event_info": FieldSpec.input("event_info", type_=CalendarEvent, desc="The information about the event"),
-            "invitation_letter": FieldSpec.output(
+            "participant_name": input_field("participant_name", desc="The name of the participant to invite"),
+            "event_info": input_field("event_info", type_=CalendarEvent, desc="The information about the event"),
+            "invitation_letter": output_field(
                 "invitation_letter", desc="The invitation letter to be sent to the participant"
             ),
         },
@@ -172,7 +172,10 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
         return {"name": name}
 
     CustomerService = make_task_spec(
-        {"user_request": FieldSpec.input("user_request"), "process_result": FieldSpec.output("process_result")},
+        {
+            "user_request": input_field("user_request", desc="The user request."),
+            "process_result": output_field("process_result", desc="The process result."),
+        },
         instructions="Handle customer service requests.",
         name="CustomerService",
     )
@@ -355,9 +358,9 @@ async def test_async_tool_calling_with_pydantic_args(make_run):
 
     InvitationSignature = make_task_spec(
         {
-            "participant_name": FieldSpec.input("participant_name", desc="The name of the participant to invite"),
-            "event_info": FieldSpec.input("event_info", type_=CalendarEvent, desc="The information about the event"),
-            "invitation_letter": FieldSpec.output(
+            "participant_name": input_field("participant_name", desc="The name of the participant to invite"),
+            "event_info": input_field("event_info", type_=CalendarEvent, desc="The information about the event"),
+            "invitation_letter": output_field(
                 "invitation_letter", desc="The invitation letter to be sent to the participant"
             ),
         },

@@ -2,7 +2,6 @@ import pytest
 
 from dspy.task_spec import (
     FieldRole,
-    FieldSpec,
     TaskSpec,
     default_task_instructions,
     infer_prefix,
@@ -29,8 +28,8 @@ def test_make_task_spec_requires_instructions():
 def test_make_task_spec_from_field_dict():
     spec = make_task_spec(
         {
-            "question": FieldSpec.input("question", desc="The question"),
-            "answer": FieldSpec.output("answer", desc="The answer"),
+            "question": input_field("question", desc="The question"),
+            "answer": output_field("answer", desc="The answer"),
         },
         instructions="Answer briefly.",
         name="QA",
@@ -67,9 +66,9 @@ def test_with_updated_field():
 
 def test_append_prepend_delete():
     base = ts("q -> a", instructions="Test")
-    with_reasoning = base.append(FieldSpec.output("reasoning", desc="Chain of thought"))
+    with_reasoning = base.append(output_field("reasoning", desc="Chain of thought"))
     assert list(with_reasoning.output_fields) == ["a", "reasoning"]
-    with_context = base.prepend(FieldSpec.input("context", desc="Background"))
+    with_context = base.prepend(input_field("context", desc="Background"))
     assert list(with_context.input_fields) == ["context", "q"]
     trimmed = with_context.delete("context")
     assert list(trimmed.input_fields) == ["q"]
@@ -125,9 +124,9 @@ def test_infer_prefix():
     assert infer_prefix("snake_case_text") == "Snake Case Text"
 
 
-def test_field_spec_default_desc():
-    field = FieldSpec.input("my_field")
-    assert field.desc == "${my_field}"
+def test_field_spec_requires_explicit_desc():
+    field = input_field("my_field", desc="Description of my field.")
+    assert field.desc == "Description of my field."
     assert field.prefix == "My Field:"
 
 
@@ -154,12 +153,12 @@ def test_make_task_spec_from_field_lists():
 
 def test_make_task_spec_rejects_mismatched_field_role():
     with pytest.raises(ValueError, match=r"expected.*output"):
-        make_task_spec(outputs=[input_field("answer")], instructions="Test.")
+        make_task_spec(outputs=[input_field("answer", desc="The answer.")], instructions="Test.")
 
 
 def test_make_task_spec_rejects_spec_and_lists():
     with pytest.raises(TypeError, match="not both"):
-        make_task_spec("q -> a", inputs=[input_field("q")], instructions="Test.")
+        make_task_spec("q -> a", inputs=[input_field("q", desc="The q.")], instructions="Test.")
 
 
 def test_custom_types_in_string_spec():

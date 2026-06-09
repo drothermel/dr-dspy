@@ -19,7 +19,7 @@ from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
 from dspy.history import TurnLog
 from dspy.primitives.example import Example
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.task_spec.pydantic_bridge import task_spec_output_field_infos
 from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs, make_adapter_run
 from tests.task_spec.helpers import ts
@@ -66,7 +66,10 @@ def test_xml_adapter_parse_raises_on_missing_field():
 
 def test_xml_adapter_parse_casts_types():
     TestSignature = make_task_spec(
-        {"number": FieldSpec.output("number", type_=int), "flag": FieldSpec.output("flag", type_=bool)},
+        {
+            "number": output_field("number", type_=int, desc="The number."),
+            "flag": output_field("flag", type_=bool, desc="The flag."),
+        },
         instructions="Given the fields , produce the fields `number`, `flag`.",
     )
     adapter = XMLAdapter()
@@ -77,7 +80,7 @@ def test_xml_adapter_parse_casts_types():
 
 def test_xml_adapter_parse_raises_on_type_error():
     TestSignature = make_task_spec(
-        {"number": FieldSpec.output("number", type_=int)},
+        {"number": output_field("number", type_=int, desc="The number.")},
         instructions="Given the fields , produce the fields `number`.",
     )
     adapter = XMLAdapter()
@@ -94,7 +97,10 @@ def test_xml_adapter_format_and_parse_nested_model():
         label: str
 
     TestSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "result": FieldSpec.output("result", type_=InnerModel)},
+        {
+            "question": input_field("question", desc="The question."),
+            "result": output_field("result", type_=InnerModel, desc="The result."),
+        },
         instructions="Given the fields `question`, produce the fields `result`.",
     )
     adapter = XMLAdapter()
@@ -122,7 +128,7 @@ def test_xml_adapter_format_and_parse_list_of_models():
         score: float
 
     TestSignature = make_task_spec(
-        {"items": FieldSpec.output("items", type_=list[Item])},
+        {"items": output_field("items", type_=list[Item], desc="The items.")},
         instructions="Given the fields , produce the fields `items`.",
     )
     adapter = XMLAdapter()
@@ -154,9 +160,9 @@ def test_xml_adapter_with_tool_like_output():
 
     TestSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tool_calls": FieldSpec.output("tool_calls", type_=list[ToolCall]),
-            "answer": FieldSpec.output("answer"),
+            "question": input_field("question", desc="The question."),
+            "tool_calls": output_field("tool_calls", type_=list[ToolCall], desc="The tool calls."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `question`, produce the fields `tool_calls`, `answer`.",
     )
@@ -195,7 +201,10 @@ def test_xml_adapter_formats_nested_images():
         tag: list[str]
 
     MySignature = make_task_spec(
-        {"image": FieldSpec.input("image", type_=ImageWrapper), "text": FieldSpec.output("text")},
+        {
+            "image": input_field("image", type_=ImageWrapper, desc="The image."),
+            "text": output_field("text", desc="The text."),
+        },
         instructions="Given the fields `image`, produce the fields `text`.",
     )
     image1 = Image(url="https://example.com/image1.jpg")
@@ -220,7 +229,10 @@ def test_xml_adapter_formats_nested_images():
 
 def test_xml_adapter_with_code():
     CodeAnalysis = make_task_spec(
-        {"code": FieldSpec.input("code", type_=Code), "result": FieldSpec.output("result")},
+        {
+            "code": input_field("code", type_=Code, desc="The code."),
+            "result": output_field("result", desc="The result."),
+        },
         instructions="Analyze the time complexity of the code",
     )
     adapter = XMLAdapter()
@@ -231,7 +243,10 @@ def test_xml_adapter_with_code():
     assert Code.description() in messages[0]["content"]
     assert "print('Hello, world!')" in messages[1]["content"]
     CodeGeneration = make_task_spec(
-        {"question": FieldSpec.input("question"), "code": FieldSpec.output("code", type_=Code)},
+        {
+            "question": input_field("question", desc="The question."),
+            "code": output_field("code", type_=Code, desc="The code."),
+        },
         instructions="Generate code to answer the question",
     )
     adapter = XMLAdapter()
@@ -257,9 +272,9 @@ def test_xml_adapter_with_code():
 def test_xml_adapter_full_prompt():
     QA = make_task_spec(
         {
-            "query": FieldSpec.input("query"),
-            "context": FieldSpec.input("context", type_=str | None),
-            "answer": FieldSpec.output("answer"),
+            "query": input_field("query", desc="The query."),
+            "context": input_field("context", type_=str | None, desc="The context."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `query`, `context`, produce the fields `answer`.",
     )
@@ -306,11 +321,11 @@ def test_xml_adapter_format_exact_non_native_tool_result_history_field():
 
     ToolHistorySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "next_thought": FieldSpec.output("next_thought"),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "next_thought": output_field("next_thought", desc="The next thought."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
@@ -372,9 +387,9 @@ def test_xml_adapter_format_exact_messages_for_two_input_signature():
 def test_xml_adapter_format_exact_messages_with_demo_and_typed_output():
     MultiAnswer = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "answer": FieldSpec.output("answer"),
-            "score": FieldSpec.output("score", type_=float),
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="The answer."),
+            "score": output_field("score", type_=float, desc="The score."),
         },
         instructions="Given the fields `question`, produce the fields `answer`, `score`.",
     )
@@ -420,12 +435,12 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
 
     RichRenderingSignature = make_task_spec(
         {
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "image": FieldSpec.input("image", type_=Image),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "profile": FieldSpec.input("profile", type_=Profile),
-            "question": FieldSpec.input("question"),
-            "answer": FieldSpec.output("answer", type_=AnswerCard),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "image": input_field("image", type_=Image, desc="The image."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "profile": input_field("profile", type_=Profile, desc="The profile."),
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", type_=AnswerCard, desc="The answer."),
         },
         instructions="Answer using all supplied context.",
     )
@@ -539,7 +554,10 @@ def test_xml_adapter_format_exact_messages_with_nested_pydantic_output():
         address: XmlAddress
 
     PydanticSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "summary": FieldSpec.output("summary", type_=XmlSummary)},
+        {
+            "question": input_field("question", desc="The question."),
+            "summary": output_field("summary", type_=XmlSummary, desc="The summary."),
+        },
         instructions="Given the fields `question`, produce the fields `summary`.",
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -563,10 +581,10 @@ def test_xml_adapter_format_exact_messages_with_nested_pydantic_output():
 def test_xml_adapter_format_exact_messages_with_incomplete_demo():
     IncompleteDemoSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "context": FieldSpec.input("context"),
-            "answer": FieldSpec.output("answer"),
-            "score": FieldSpec.output("score", type_=float),
+            "question": input_field("question", desc="The question."),
+            "context": input_field("context", desc="The context."),
+            "answer": output_field("answer", desc="The answer."),
+            "score": output_field("score", type_=float, desc="The score."),
         },
         instructions="Given the fields `question`, `context`, produce the fields `answer`, `score`.",
     )
@@ -602,9 +620,9 @@ def test_xml_adapter_format_exact_messages_with_incomplete_demo():
 def test_format_system_message():
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "answers": FieldSpec.output("answers", type_=list[str]),
-            "scores": FieldSpec.output("scores", type_=list[float]),
+            "question": input_field("question", desc="The question."),
+            "answers": output_field("answers", type_=list[str], desc="The answers."),
+            "scores": output_field("scores", type_=list[float], desc="The scores."),
         },
         instructions="Answer the question with multiple answers and scores",
     )

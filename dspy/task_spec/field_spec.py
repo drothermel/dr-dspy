@@ -1,6 +1,6 @@
 import re
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -22,11 +22,15 @@ def infer_prefix(attribute_name: str) -> str:
     return " ".join(title_cased_words)
 
 
+def field_desc_from_name(name: str) -> str:
+    return f"The {infer_prefix(name).lower()}."
+
+
 def input_field(
     name: str,
     type_: Any = str,
     *,
-    desc: str | None = None,
+    desc: str,
     prefix: str | None = None,
     is_type_undefined: bool = False,
     constraints: str | None = None,
@@ -36,8 +40,8 @@ def input_field(
     return FieldSpec(
         name=name,
         type=type_,
-        desc=desc if desc is not None else f"${{{name}}}",
-        role=FieldRole.INPUT.value,
+        desc=desc,
+        role=FieldRole.INPUT,
         prefix=prefix if prefix is not None else infer_prefix(name) + ":",
         is_type_undefined=is_type_undefined,
         constraints=constraints,
@@ -47,13 +51,18 @@ def input_field(
 
 
 def output_field(
-    name: str, type_: Any = str, *, desc: str | None = None, prefix: str | None = None, constraints: str | None = None
+    name: str,
+    type_: Any = str,
+    *,
+    desc: str,
+    prefix: str | None = None,
+    constraints: str | None = None,
 ) -> "FieldSpec":
     return FieldSpec(
         name=name,
         type=type_,
-        desc=desc if desc is not None else f"${{{name}}}",
-        role=FieldRole.OUTPUT.value,
+        desc=desc,
+        role=FieldRole.OUTPUT,
         prefix=prefix if prefix is not None else infer_prefix(name) + ":",
         constraints=constraints,
     )
@@ -64,7 +73,7 @@ class FieldSpec(BaseModel):
     name: str
     type_: Any = Field(alias="type")
     desc: str
-    role: Literal["input", "output"]
+    role: FieldRole
     prefix: str
     is_type_undefined: bool = False
     constraints: str | None = None
@@ -83,6 +92,8 @@ class FieldSpec(BaseModel):
         constraints: str | None = None,
         default: Any = _UNSET,
     ) -> "FieldSpec":
+        if desc is None:
+            raise TypeError("desc is required. Use input_field(..., desc=...) with an explicit description.")
         return input_field(
             name,
             type_,
@@ -103,6 +114,8 @@ class FieldSpec(BaseModel):
         prefix: str | None = None,
         constraints: str | None = None,
     ) -> "FieldSpec":
+        if desc is None:
+            raise TypeError("desc is required. Use output_field(..., desc=...) with an explicit description.")
         return output_field(name, type_, desc=desc, prefix=prefix, constraints=constraints)
 
     def with_updates(

@@ -2,7 +2,7 @@ from typing import Any, get_args, get_origin
 
 from dspy.task_spec.field_spec import _UNSET, FieldSpec, input_field, output_field
 
-TASK_SPEC_VERSION = 2
+TASK_SPEC_VERSION = 3
 
 
 def field_spec_to_dict(field: FieldSpec) -> dict[str, Any]:
@@ -10,7 +10,7 @@ def field_spec_to_dict(field: FieldSpec) -> dict[str, Any]:
         "name": field.name,
         "type": _type_to_str(field.type_),
         "desc": field.desc,
-        "role": field.role,
+        "role": field.role.value,
         "prefix": field.prefix,
         "is_type_undefined": field.is_type_undefined,
         "constraints": field.constraints,

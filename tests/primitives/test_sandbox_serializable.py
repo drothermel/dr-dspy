@@ -3,6 +3,7 @@ from typing_extensions import override
 
 from dspy.primitives.repl_types import REPLVariable
 from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
+from dspy.task_spec import input_field, output_field
 
 
 class ExampleSerializable(SandboxSerializable):
@@ -100,13 +101,13 @@ class TestBuildReplVariable:
         assert "import json" in var.desc
 
     def test_passes_field_info_through(self):
-        from dspy.task_spec import FieldSpec, make_task_spec
+        from dspy.task_spec import make_task_spec
         from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
 
         spec = make_task_spec(
             {
-                "data": FieldSpec.input("data", type_=ExampleSerializable, desc="A data column"),
-                "answer": FieldSpec.output("answer"),
+                "data": input_field("data", type_=ExampleSerializable, desc="A data column"),
+                "answer": output_field("answer", desc="The answer."),
             },
             instructions="Process data.",
         )

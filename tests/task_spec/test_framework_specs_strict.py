@@ -16,7 +16,6 @@ from dspy.teleprompt.copro_optimizer import BasicGenerateInstructionTaskSpec, Ge
 from dspy.teleprompt.gepa.instruction_proposal import GenerateEnhancedMultimodalInstructionTaskSpec
 from dspy.teleprompt.gepa.task_specs import FrameworkGepaInstructionProposalTaskSpec
 from dspy.teleprompt.simba_utils import SimbaOfferFeedbackTaskSpec
-from dspy.utils.transparency import collect_task_spec_violations, is_placeholder_desc
 
 FRAMEWORK_SPECS: list[type[TaskSpec]] = [
     ToolCallResultsTaskSpec,
@@ -39,8 +38,8 @@ FRAMEWORK_SPECS: list[type[TaskSpec]] = [
 @pytest.mark.parametrize("spec_cls", FRAMEWORK_SPECS)
 def test_framework_task_specs_have_explicit_field_descs(spec_cls):
     spec = spec_cls()
-    violations = collect_task_spec_violations(spec)
-    assert violations == [], f"{spec_cls.__name__} has placeholder descs: {violations}"
+    for field in (*spec.inputs, *spec.outputs):
+        assert field.desc.strip(), f"{spec_cls.__name__}.{field.name} must have a non-empty desc"
     assert spec.name.startswith("framework.")
 
 
@@ -54,4 +53,4 @@ def test_chain_of_thought_reasoning_field_has_explicit_desc():
 
     cot = ChainOfThought(QATaskSpec())
     reasoning_field = cot.predict.task_spec.output_fields["reasoning"]
-    assert not is_placeholder_desc(reasoning_field.desc, "reasoning")
+    assert reasoning_field.desc.strip()

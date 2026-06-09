@@ -27,7 +27,7 @@ def get_field_spec_description_string(fields: dict[str, FieldSpec]) -> str:
         (
             name,
             field.type_,
-            field.desc if field.desc != f"${{{name}}}" else "",
+            field.desc,
             field.constraints,
         )
         for name, field in fields.items()

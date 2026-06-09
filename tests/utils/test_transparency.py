@@ -9,12 +9,7 @@ from dspy.predict.predict import Predict
 from dspy.runtime import CallLogMode, TelemetryConfig
 from dspy.task_spec import TaskSpec, input_field, output_field
 from dspy.utils.dummies import DummyLM
-from dspy.utils.transparency import (
-    CompiledCall,
-    TransparencyViolation,
-    collect_task_spec_violations,
-    validate_compiled_call,
-)
+from dspy.utils.transparency import CompiledCall, TransparencyViolation, validate_compiled_call
 
 
 class SampleTaskSpec(TaskSpec):
@@ -24,31 +19,18 @@ class SampleTaskSpec(TaskSpec):
     outputs: tuple = (output_field("answer", desc="The answer."),)
 
 
-class PlaceholderTaskSpec(TaskSpec):
-    name: str = "Placeholder"
-    instructions: str = "Do the thing."
-    inputs: tuple = (input_field("question"),)
-    outputs: tuple = (output_field("answer"),)
-
-
-def test_validate_compiled_call_dedupes_identical_task_specs(make_run):
-    spec = PlaceholderTaskSpec()
+def test_validate_compiled_call_warn_reports_config_violations(make_run):
     call = CompiledCall(
         call_id="1",
         adapter_class="JSONAdapter",
-        original_task_spec=spec,
-        processed_task_spec=spec,
+        original_task_spec=SampleTaskSpec(),
+        processed_task_spec=SampleTaskSpec(),
         config=LMConfig(temperature=0.0, max_tokens=100),
         lm_model="openai/gpt-4o-mini",
         cache=False,
     )
     violations = validate_compiled_call(call, "warn")
-    assert len(violations) == 2
-
-
-def test_collect_task_spec_violations_detects_placeholder_desc(make_run):
-    violations = collect_task_spec_violations(PlaceholderTaskSpec())
-    assert len(violations) == 2
+    assert violations == []
 
 
 def test_validate_compiled_call_strict_raises_on_missing_adapter(make_run):

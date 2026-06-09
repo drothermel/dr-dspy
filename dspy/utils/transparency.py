@@ -5,16 +5,16 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from dspy.task_spec import TaskSpec
+
 if TYPE_CHECKING:
     from dspy.runtime.run_context import RunContext
 
 from dspy.clients.lm_strict import lm_kwargs_max_tokens
 from dspy.core.types import LMConfig
-from dspy.task_spec import TaskSpec
 
 logger = logging.getLogger(__name__)
 TransparencyMode = Literal["strict", "warn", "verbose", "off"]
-PLACEHOLDER_DESC_PREFIX = "${"
 
 
 class TransparencyViolation(Exception):
@@ -69,20 +69,6 @@ def resolve_call_site(
     return CallSite(module=default_module, phase=default_phase, lm_role=default_lm_role)
 
 
-def is_placeholder_desc(desc: str, field_name: str) -> bool:
-    return desc == f"${{{field_name}}}"
-
-
-def collect_task_spec_violations(task_spec: TaskSpec | None) -> list[str]:
-    if task_spec is None:
-        return []
-    return [
-        f"Field {field.name!r} uses placeholder desc {field.desc!r}. Fix: set an explicit desc= on input_field/output_field."
-        for field in (*task_spec.inputs, *task_spec.outputs)
-        if is_placeholder_desc(field.desc, field.name)
-    ]
-
-
 def collect_config_violations(*, config: LMConfig, lm_kwargs: dict[str, Any], cache: bool | None) -> list[str]:
     violations: list[str] = []
     temperature = config.temperature if config.temperature is not None else lm_kwargs.get("temperature")
@@ -106,11 +92,6 @@ def validate_compiled_call(call: CompiledCall, mode: TransparencyMode) -> list[s
     violations = list(call.violations)
     if not call.adapter_class:
         violations.append("adapter not configured. Fix: RunContext.create(lm=LM(...), adapter=JSONAdapter()).")
-    task_specs = [call.original_task_spec]
-    if call.processed_task_spec is not None and call.processed_task_spec is not call.original_task_spec:
-        task_specs.append(call.processed_task_spec)
-    for task_spec in task_specs:
-        violations.extend(collect_task_spec_violations(task_spec))
     if call.lm_model:
         violations.extend(collect_config_violations(config=call.config, lm_kwargs=call.lm_kwargs, cache=call.cache))
     if mode == "strict" and violations:

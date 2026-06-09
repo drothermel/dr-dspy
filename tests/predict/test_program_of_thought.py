@@ -4,19 +4,22 @@ from unittest.mock import patch
 import pytest
 
 from dspy.predict.program_of_thought import ProgramOfThought
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.utils.dummies import DummyLM
 
 BasicQA = make_task_spec(
-    {"question": FieldSpec.input("question"), "answer": FieldSpec.output("answer", desc="often between 1 and 5 words")},
+    {
+        "question": input_field("question", desc="The question."),
+        "answer": output_field("answer", desc="often between 1 and 5 words"),
+    },
     instructions="Answer the question.",
     name="BasicQA",
 )
 ExtremumFinder = make_task_spec(
     {
-        "input_list": FieldSpec.input("input_list"),
-        "maximum": FieldSpec.output("maximum", desc="The maximum of the given numbers"),
-        "minimum": FieldSpec.output("minimum", desc="The minimum of the given numbers"),
+        "input_list": input_field("input_list", desc="The input list."),
+        "maximum": output_field("maximum", desc="The maximum of the given numbers"),
+        "minimum": output_field("minimum", desc="The minimum of the given numbers"),
     },
     instructions="Find the maximum and minimum values.",
     name="ExtremumFinder",

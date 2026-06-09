@@ -29,7 +29,7 @@ from dspy.clients.lm import LM
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.utils.exceptions import LMUnexpectedError
 from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs, make_adapter_run
 from tests.task_spec.helpers import ts
@@ -73,9 +73,9 @@ def test_json_adapter_format_exact_messages_for_simple_signature():
 def test_json_adapter_format_exact_messages_with_demo_and_typed_output():
     MultiAnswer = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "answer": FieldSpec.output("answer"),
-            "confidence": FieldSpec.output("confidence", type_=float),
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="The answer."),
+            "confidence": output_field("confidence", type_=float, desc="The confidence."),
         },
         instructions="Given the fields `question`, produce the fields `answer`, `confidence`.",
     )
@@ -104,9 +104,9 @@ def test_json_adapter_format_exact_messages_with_demo_and_typed_output():
 def test_json_adapter_format_exact_messages_with_described_and_bool_outputs():
     TestSignature = make_task_spec(
         {
-            "input1": FieldSpec.input("input1"),
-            "output1": FieldSpec.output("output1", desc="String output field"),
-            "output2": FieldSpec.output("output2", type_=bool),
+            "input1": input_field("input1", desc="The input 1."),
+            "output1": output_field("output1", desc="String output field"),
+            "output2": output_field("output2", type_=bool, desc="The output 2."),
         },
         instructions="Given the fields `input1`, produce the fields `output1`, `output2`.",
     )
@@ -147,12 +147,12 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
 
     RichRenderingSignature = make_task_spec(
         {
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "image": FieldSpec.input("image", type_=Image),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "profile": FieldSpec.input("profile", type_=Profile),
-            "question": FieldSpec.input("question"),
-            "answer": FieldSpec.output("answer", type_=AnswerCard),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "image": input_field("image", type_=Image, desc="The image."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "profile": input_field("profile", type_=Profile, desc="The profile."),
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", type_=AnswerCard, desc="The answer."),
         },
         instructions="Answer using all supplied context.",
     )
@@ -256,9 +256,9 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
 def test_json_adapter_format_exact_messages_with_int_and_mapping_outputs():
     IntDictSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "count": FieldSpec.output("count", type_=int),
-            "metadata": FieldSpec.output("metadata", type_=dict[str, int]),
+            "question": input_field("question", desc="The question."),
+            "count": output_field("count", type_=int, desc="The count."),
+            "metadata": output_field("metadata", type_=dict[str, int], desc="The metadata."),
         },
         instructions="Given the fields `question`, produce the fields `count`, `metadata`.",
     )
@@ -288,9 +288,9 @@ def test_json_adapter_format_exact_messages_with_literal_and_enum_outputs():
 
     LiteralEnumSignature = make_task_spec(
         {
-            "text": FieldSpec.input("text"),
-            "decision": FieldSpec.output("decision", type_=Literal["accept", "reject"]),
-            "label": FieldSpec.output("label", type_=Label),
+            "text": input_field("text", desc="The text."),
+            "decision": output_field("decision", type_=Literal["accept", "reject"], desc="The decision."),
+            "label": output_field("label", type_=Label, desc="The label."),
         },
         instructions="Given the fields `text`, produce the fields `decision`, `label`.",
     )
@@ -324,7 +324,10 @@ def test_json_adapter_format_exact_messages_with_nested_pydantic_output():
         scores: list[float]
 
     PydanticSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "summary": FieldSpec.output("summary", type_=JsonNestedSummary)},
+        {
+            "question": input_field("question", desc="The question."),
+            "summary": output_field("summary", type_=JsonNestedSummary, desc="The summary."),
+        },
         instructions="Given the fields `question`, produce the fields `summary`.",
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -348,10 +351,10 @@ def test_json_adapter_format_exact_messages_with_nested_pydantic_output():
 def test_json_adapter_format_exact_messages_with_incomplete_demo():
     IncompleteDemoSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "context": FieldSpec.input("context"),
-            "answer": FieldSpec.output("answer"),
-            "score": FieldSpec.output("score", type_=float),
+            "question": input_field("question", desc="The question."),
+            "context": input_field("context", desc="The context."),
+            "answer": output_field("answer", desc="The answer."),
+            "score": output_field("score", type_=float, desc="The score."),
         },
         instructions="Given the fields `question`, `context`, produce the fields `answer`, `score`.",
     )
@@ -397,9 +400,9 @@ def test_json_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
 
     NativeToolSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `tool_calls`.",
     )
@@ -442,7 +445,10 @@ def test_json_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
 
 def test_json_adapter_format_exact_messages_with_tool_calls_output_demo():
     ToolCallsSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls)},
+        {
+            "question": input_field("question", desc="The question."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
+        },
         instructions="Given the fields `question`, produce the fields `tool_calls`.",
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -480,11 +486,11 @@ def test_json_adapter_format_exact_non_native_tool_result_history_field():
 
     ToolHistorySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "next_thought": FieldSpec.output("next_thought"),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "next_thought": output_field("next_thought", desc="The next thought."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
@@ -526,11 +532,11 @@ def test_json_adapter_passes_structured_output_when_supported_by_model(make_run)
 
     TestSignature = make_task_spec(
         {
-            "input1": FieldSpec.input("input1"),
-            "output1": FieldSpec.output("output1"),
-            "output2": FieldSpec.output("output2", type_=bool, desc="Boolean output field"),
-            "output3": FieldSpec.output("output3", type_=OutputField3, desc="Nested output field"),
-            "output4_unannotated": FieldSpec.output("output4_unannotated", desc="Unannotated output field"),
+            "input1": input_field("input1", desc="The input 1."),
+            "output1": output_field("output1", desc="The output 1."),
+            "output2": output_field("output2", type_=bool, desc="Boolean output field"),
+            "output3": output_field("output3", type_=OutputField3, desc="Nested output field"),
+            "output4_unannotated": output_field("output4_unannotated", desc="Unannotated output field"),
         },
         instructions="Given the fields `input1`, produce the fields `output1`, `output2`, `output3`, `output4_unannotated`.",
     )
@@ -561,9 +567,9 @@ def test_json_adapter_passes_structured_output_when_supported_by_model(make_run)
 def test_json_adapter_not_using_structured_outputs_when_not_supported_by_model(make_run):
     TestSignature = make_task_spec(
         {
-            "input1": FieldSpec.input("input1"),
-            "output1": FieldSpec.output("output1"),
-            "output2": FieldSpec.output("output2", type_=bool),
+            "input1": input_field("input1", desc="The input 1."),
+            "output1": output_field("output1", desc="The output 1."),
+            "output2": output_field("output2", type_=bool, desc="The output 2."),
         },
         instructions="Given the fields `input1`, produce the fields `output1`, `output2`.",
     )
@@ -588,11 +594,11 @@ def test_json_adapter_with_structured_outputs_does_not_mutate_original_signature
 
     TestSignature = make_task_spec(
         {
-            "input1": FieldSpec.input("input1"),
-            "output1": FieldSpec.output("output1"),
-            "output2": FieldSpec.output("output2", type_=bool, desc="Boolean output field"),
-            "output3": FieldSpec.output("output3", type_=OutputField3, desc="Nested output field"),
-            "output4_unannotated": FieldSpec.output("output4_unannotated", desc="Unannotated output field"),
+            "input1": input_field("input1", desc="The input 1."),
+            "output1": output_field("output1", desc="The output 1."),
+            "output2": output_field("output2", type_=bool, desc="Boolean output field"),
+            "output3": output_field("output3", type_=OutputField3, desc="Nested output field"),
+            "output4_unannotated": output_field("output4_unannotated", desc="Unannotated output field"),
         },
         instructions="Given the fields `input1`, produce the fields `output1`, `output2`, `output3`, `output4_unannotated`.",
     )
@@ -651,9 +657,9 @@ def test_json_adapter_on_pydantic_model(make_run):
 
     TestSignature = make_task_spec(
         {
-            "user": FieldSpec.input("user", type_=User, desc="The user who asks the question"),
-            "question": FieldSpec.input("question", desc="Question the user asks"),
-            "answer": FieldSpec.output("answer", type_=Answer, desc="Answer to this question"),
+            "user": input_field("user", type_=User, desc="The user who asks the question"),
+            "question": input_field("question", desc="Question the user asks"),
+            "answer": output_field("answer", type_=Answer, desc="Answer to this question"),
         },
         instructions="Given the fields `user`, `question`, produce the fields `answer`.",
     )
@@ -734,7 +740,7 @@ def test_json_adapter_parse_raise_error_on_mismatch_fields():
 def test_json_adapter_formats_image():
     image = Image(url="https://example.com/image.jpg")
     MySignature = make_task_spec(
-        {"image": FieldSpec.input("image", type_=Image), "text": FieldSpec.output("text")},
+        {"image": input_field("image", type_=Image, desc="The image."), "text": output_field("text", desc="The text.")},
         instructions="Given the fields `image`, produce the fields `text`.",
     )
     adapter = JSONAdapter()
@@ -751,7 +757,7 @@ def test_json_adapter_formats_image():
 
 def test_json_adapter_formats_image_with_few_shot_examples():
     MySignature = make_task_spec(
-        {"image": FieldSpec.input("image", type_=Image), "text": FieldSpec.output("text")},
+        {"image": input_field("image", type_=Image, desc="The image."), "text": output_field("text", desc="The text.")},
         instructions="Given the fields `image`, produce the fields `text`.",
     )
     adapter = JSONAdapter()
@@ -780,7 +786,10 @@ def test_json_adapter_formats_image_with_nested_images():
         tag: list[str]
 
     MySignature = make_task_spec(
-        {"image": FieldSpec.input("image", type_=ImageWrapper), "text": FieldSpec.output("text")},
+        {
+            "image": input_field("image", type_=ImageWrapper, desc="The image."),
+            "text": output_field("text", desc="The text."),
+        },
         instructions="Given the fields `image`, produce the fields `text`.",
     )
     image1 = Image(url="https://example.com/image1.jpg")
@@ -805,7 +814,10 @@ def test_json_adapter_formats_with_nested_documents():
         documents: list[Document]
 
     MySignature = make_task_spec(
-        {"document": FieldSpec.input("document", type_=DocumentWrapper), "text": FieldSpec.output("text")},
+        {
+            "document": input_field("document", type_=DocumentWrapper, desc="The document."),
+            "text": output_field("text", desc="The text."),
+        },
         instructions="Given the fields `document`, produce the fields `text`.",
     )
     doc1 = Document(data="Hello, world!")
@@ -836,7 +848,10 @@ def test_json_adapter_formats_image_with_few_shot_examples_with_nested_images():
         tag: list[str]
 
     MySignature = make_task_spec(
-        {"image": FieldSpec.input("image", type_=ImageWrapper), "text": FieldSpec.output("text")},
+        {
+            "image": input_field("image", type_=ImageWrapper, desc="The image."),
+            "text": output_field("text", desc="The text."),
+        },
         instructions="Given the fields `image`, produce the fields `text`.",
     )
     image1 = Image(url="https://example.com/image1.jpg")
@@ -862,10 +877,10 @@ def test_json_adapter_formats_image_with_few_shot_examples_with_nested_images():
 def test_json_adapter_with_tool():
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "answer": FieldSpec.output("answer"),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "answer": output_field("answer", desc="The answer."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Answer question with the help of the tools",
     )
@@ -937,7 +952,10 @@ def test_json_adapter_with_tool():
 
 def test_json_adapter_with_code():
     CodeAnalysis = make_task_spec(
-        {"code": FieldSpec.input("code", type_=Code), "result": FieldSpec.output("result")},
+        {
+            "code": input_field("code", type_=Code, desc="The code."),
+            "result": output_field("result", desc="The result."),
+        },
         instructions="Analyze the time complexity of the code",
     )
     adapter = JSONAdapter()
@@ -948,7 +966,10 @@ def test_json_adapter_with_code():
     assert Code.description() in messages[0]["content"]
     assert "print('Hello, world!')" in messages[1]["content"]
     CodeGeneration = make_task_spec(
-        {"question": FieldSpec.input("question"), "code": FieldSpec.output("code", type_=Code)},
+        {
+            "question": input_field("question", desc="The question."),
+            "code": output_field("code", type_=Code, desc="The code."),
+        },
         instructions="Generate code to answer the question",
     )
     adapter = JSONAdapter()
@@ -974,9 +995,9 @@ def test_json_adapter_with_code():
 def test_json_adapter_formats_conversation_history():
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "answer": FieldSpec.output("answer"),
+            "question": input_field("question", desc="The question."),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `question`, `history`, produce the fields `answer`.",
     )
@@ -1015,9 +1036,9 @@ async def test_json_adapter_on_pydantic_model_async(make_run):
 
     TestSignature = make_task_spec(
         {
-            "user": FieldSpec.input("user", type_=User, desc="The user who asks the question"),
-            "question": FieldSpec.input("question", desc="Question the user asks"),
-            "answer": FieldSpec.output("answer", type_=Answer, desc="Answer to this question"),
+            "user": input_field("user", type_=User, desc="The user who asks the question"),
+            "question": input_field("question", desc="Question the user asks"),
+            "answer": output_field("answer", type_=Answer, desc="Answer to this question"),
         },
         instructions="Given the fields `user`, `question`, produce the fields `answer`.",
     )
@@ -1066,7 +1087,10 @@ async def test_json_adapter_on_pydantic_model_async(make_run):
 
 def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_lm_error(make_run):
     TestSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "answer": FieldSpec.output("answer", desc="String output field")},
+        {
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="String output field"),
+        },
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
     run = make_run(lm=LM(model="openai/gpt-4o-mini"), adapter=JSONAdapter())
@@ -1082,7 +1106,10 @@ def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_lm_err
 
 def test_json_adapter_json_mode_no_structured_outputs(make_run):
     TestSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "answer": FieldSpec.output("answer", desc="String output field")},
+        {
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="String output field"),
+        },
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
     run = make_run(lm=LM(model="openai/gpt-4o"), adapter=JSONAdapter())
@@ -1107,7 +1134,10 @@ def test_json_adapter_json_mode_no_structured_outputs(make_run):
 @pytest.mark.asyncio
 async def test_json_adapter_json_mode_no_structured_outputs_async(make_run):
     TestSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "answer": FieldSpec.output("answer", desc="String output field")},
+        {
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="String output field"),
+        },
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
     program = Predict(TestSignature)
@@ -1132,7 +1162,10 @@ async def test_json_adapter_json_mode_no_structured_outputs_async(make_run):
 @pytest.mark.asyncio
 async def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_lm_error_async(make_run):
     TestSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "answer": FieldSpec.output("answer", desc="String output field")},
+        {
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="String output field"),
+        },
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
     program = Predict(TestSignature)
@@ -1148,7 +1181,10 @@ async def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_
 
 def test_error_message_on_json_adapter_failure(make_run):
     TestSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "answer": FieldSpec.output("answer", desc="String output field")},
+        {
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="String output field"),
+        },
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
     program = Predict(TestSignature)
@@ -1167,7 +1203,10 @@ def test_error_message_on_json_adapter_failure(make_run):
 @pytest.mark.asyncio
 async def test_error_message_on_json_adapter_failure_async(make_run):
     TestSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "answer": FieldSpec.output("answer", desc="String output field")},
+        {
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="String output field"),
+        },
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
     program = Predict(TestSignature)
@@ -1186,10 +1225,10 @@ async def test_error_message_on_json_adapter_failure_async(make_run):
 def test_json_adapter_toolcalls_native_function_calling():
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "answer": FieldSpec.output("answer"),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "answer": output_field("answer", desc="The answer."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `answer`, `tool_calls`.",
     )
@@ -1258,10 +1297,10 @@ def test_json_adapter_toolcalls_native_function_calling():
 def test_json_adapter_toolcalls_no_native_function_calling():
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "answer": FieldSpec.output("answer"),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "answer": output_field("answer", desc="The answer."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `answer`, `tool_calls`.",
     )
@@ -1297,9 +1336,9 @@ def test_json_adapter_toolcalls_no_native_function_calling():
 def test_json_adapter_native_reasoning():
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "reasoning": FieldSpec.output("reasoning", type_=Reasoning),
-            "answer": FieldSpec.output("answer"),
+            "question": input_field("question", desc="The question."),
+            "reasoning": output_field("reasoning", type_=Reasoning, desc="The reasoning."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `question`, produce the fields `reasoning`, `answer`.",
     )
@@ -1398,9 +1437,9 @@ def test_json_adapter_with_responses_api(make_run):
 def test_format_system_message():
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "answers": FieldSpec.output("answers", type_=list[str]),
-            "scores": FieldSpec.output("scores", type_=list[float]),
+            "question": input_field("question", desc="The question."),
+            "answers": output_field("answers", type_=list[str], desc="The answers."),
+            "scores": output_field("scores", type_=list[float], desc="The scores."),
         },
         instructions="Answer the question with multiple answers and scores",
     )

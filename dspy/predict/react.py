@@ -55,14 +55,14 @@ class ReAct(Module):
         instr.append("When providing `next_tool_args`, the value inside the field must be in JSON format")
         react_task_spec = (
             make_task_spec(dict(task_spec.input_fields), instructions="\n".join(instr))
-            .append(input_field("turn_log", TurnLog))
-            .append(output_field("next_thought", str))
-            .append(output_field("next_tool_name", str))
-            .append(output_field("next_tool_args", dict[str, Any]))
+            .append(input_field("turn_log", TurnLog, desc="Previous thoughts, tool calls, and tool results."))
+            .append(output_field("next_thought", str, desc="Your next reasoning step toward solving the task."))
+            .append(output_field("next_tool_name", str, desc="Name of the tool to call next."))
+            .append(output_field("next_tool_args", dict[str, Any], desc="JSON arguments for the next tool call."))
         )
         fallback_task_spec = make_task_spec(
             {**task_spec.input_fields, **task_spec.output_fields}, instructions=task_spec.instructions
-        ).append(input_field("turn_log", TurnLog))
+        ).append(input_field("turn_log", TurnLog, desc="Previous thoughts, tool calls, and tool results."))
         self.tools = tools_by_name
         self.react = Predict(react_task_spec)
         self.extract = ChainOfThought(fallback_task_spec)

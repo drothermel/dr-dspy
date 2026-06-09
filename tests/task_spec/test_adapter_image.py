@@ -12,7 +12,7 @@ from PIL import Image as PILImage
 from dspy.adapters.types.image import Image, encode_image
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
-from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
+from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
 from dspy.teleprompt.compile_params import LabeledFewShotCompileParams
 from dspy.teleprompt.vanilla import LabeledFewShot
 from dspy.utils.dummies import DummyLM
@@ -198,8 +198,8 @@ def test_save_load_complex_default_types(make_run):
     ]
     ComplexTypeSignature = make_task_spec(
         {
-            "image_list": FieldSpec.input("image_list", type_=list[Image], desc="A list of images"),
-            "caption": FieldSpec.output("caption", desc="A caption for the image list"),
+            "image_list": input_field("image_list", type_=list[Image], desc="A list of images"),
+            "caption": output_field("caption", desc="A caption for the image list"),
         },
         instructions="Caption image lists.",
         name="ComplexTypeSignature",
@@ -222,12 +222,18 @@ def test_save_load_complex_default_types(make_run):
 
 
 BasicImageSignature = make_task_spec(
-    {"image": FieldSpec.input("image", type_=Image), "output": FieldSpec.output("output")},
+    {
+        "image": input_field("image", type_=Image, desc="The image."),
+        "output": output_field("output", desc="The output."),
+    },
     instructions="Basic signature with a single image input.",
     name="BasicImageSignature",
 )
 ImageListSignature = make_task_spec(
-    {"image_list": FieldSpec.input("image_list", type_=list[Image]), "output": FieldSpec.output("output")},
+    {
+        "image_list": input_field("image_list", type_=list[Image], desc="The image list."),
+        "output": output_field("output", desc="The output."),
+    },
     instructions="Signature with a list of images input.",
     name="ImageListSignature",
 )
@@ -291,7 +297,10 @@ def test_save_load_pydantic_model(make_run):
         output: str
 
     PydanticSignature = make_task_spec(
-        {"model_input": FieldSpec.input("model_input", type_=ImageModel), "output": FieldSpec.output("output")},
+        {
+            "model_input": input_field("model_input", type_=ImageModel, desc="The model input."),
+            "output": output_field("output", desc="The output."),
+        },
         instructions="Process pydantic image model.",
         name="PydanticSignature",
     )
@@ -327,7 +336,10 @@ def test_save_load_pydantic_model(make_run):
 
 def test_optional_image_field(make_run):
     OptionalImageSignature = make_task_spec(
-        {"image": FieldSpec.input("image", type_=Image | None), "output": FieldSpec.output("output")},
+        {
+            "image": input_field("image", type_=Image | None, desc="The image."),
+            "output": output_field("output", desc="The output."),
+        },
         instructions="Process optional image.",
         name="OptionalImageSignature",
     )
@@ -344,8 +356,8 @@ def test_pdf_url_support(make_run):
     assert ";base64," in pdf_image.url
     PDFSignature = make_task_spec(
         {
-            "document": FieldSpec.input("document", type_=Image, desc="A PDF document"),
-            "summary": FieldSpec.output("summary", desc="A summary of the PDF"),
+            "document": input_field("document", type_=Image, desc="A PDF document"),
+            "summary": output_field("summary", desc="A summary of the PDF"),
         },
         instructions="Summarize PDF documents.",
         name="PDFSignature",
@@ -393,8 +405,8 @@ def test_pdf_from_file(make_run):
         assert ";base64," in pdf_image.url
         FilePDFSignature = make_task_spec(
             {
-                "document": FieldSpec.input("document", type_=Image, desc="A PDF document from file"),
-                "summary": FieldSpec.output("summary", desc="A summary of the PDF"),
+                "document": input_field("document", type_=Image, desc="A PDF document from file"),
+                "summary": output_field("summary", desc="A summary of the PDF"),
             },
             instructions="Summarize PDF from file.",
             name="FilePDFSignature",

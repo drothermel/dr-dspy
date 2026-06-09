@@ -31,7 +31,7 @@ from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
-from dspy.task_spec import FieldSpec, TaskSpec, default_task_instructions, make_task_spec
+from dspy.task_spec import TaskSpec, default_task_instructions, input_field, make_task_spec, output_field
 from dspy.utils.dummies import DummyLM
 from dspy.utils.serialize import to_jsonable
 from tests.test_utils.spy_lm import SpyLM
@@ -189,9 +189,9 @@ def test_instructions_after_dump_and_load_state():
 def test_demos_after_dump_and_load_state():
     TranslateToEnglish = make_task_spec(
         {
-            "content": FieldSpec.input("content"),
-            "language": FieldSpec.input("language"),
-            "translation": FieldSpec.output("translation"),
+            "content": input_field("content", desc="The content."),
+            "language": input_field("language", desc="The language."),
+            "translation": output_field("translation", desc="The translation."),
         },
         instructions="Translate content from a language to English.",
         name="TranslateToEnglish",
@@ -217,10 +217,12 @@ def test_demos_after_dump_and_load_state():
 def test_typed_demos_after_dump_and_load_state():
     InventorySignature = make_task_spec(
         {
-            "items": FieldSpec.input("items", type_=list[InventoryItem]),
-            "language": FieldSpec.input("language"),
-            "translated_items": FieldSpec.output("translated_items", type_=list[InventoryItem]),
-            "total_quantity": FieldSpec.output("total_quantity", type_=int),
+            "items": input_field("items", type_=list[InventoryItem], desc="The items."),
+            "language": input_field("language", desc="The language."),
+            "translated_items": output_field(
+                "translated_items", type_=list[InventoryItem], desc="The translated items."
+            ),
+            "total_quantity": output_field("total_quantity", type_=int, desc="The total quantity."),
         },
         instructions="Handle inventory items and their translations.",
         name="InventorySignature",
@@ -267,8 +269,8 @@ def test_typed_demos_after_dump_and_load_state():
 def test_signature_fields_after_dump_and_load_state(tmp_path):
     CustomSignature = make_task_spec(
         {
-            "sentence": FieldSpec.input("sentence", desc="I am an innocent input!"),
-            "sentiment": FieldSpec.output("sentiment"),
+            "sentence": input_field("sentence", desc="I am an innocent input!"),
+            "sentiment": output_field("sentiment", desc="The sentiment."),
         },
         instructions="I am just an instruction.",
         name="CustomSignature",
@@ -278,8 +280,8 @@ def test_signature_fields_after_dump_and_load_state(tmp_path):
     original_instance.save(file_path)
     CustomSignature2 = make_task_spec(
         {
-            "sentence": FieldSpec.input("sentence", desc="I am a malicious input!"),
-            "sentiment": FieldSpec.output("sentiment", desc="I am a malicious output!"),
+            "sentence": input_field("sentence", desc="I am a malicious input!"),
+            "sentiment": output_field("sentiment", desc="I am a malicious output!"),
         },
         instructions="I am not a pure instruction.",
         name="CustomSignature2",
@@ -571,9 +573,9 @@ def test_datetime_inputs_and_outputs(make_run):
 
     TimedSignature = make_task_spec(
         {
-            "events": FieldSpec.input("events", type_=list[TimedEvent]),
-            "summary": FieldSpec.output("summary"),
-            "next_event_time": FieldSpec.output("next_event_time", type_=datetime),
+            "events": input_field("events", type_=list[TimedEvent], desc="The events."),
+            "summary": output_field("summary", desc="The summary."),
+            "next_event_time": output_field("next_event_time", type_=datetime, desc="The next event time."),
         },
         instructions="Process timed events.",
         name="TimedSignature",
@@ -611,8 +613,8 @@ def test_explicitly_valued_enum_inputs_and_outputs(make_run):
 
     StatusSignature = make_task_spec(
         {
-            "current_status": FieldSpec.input("current_status", type_=Status),
-            "next_status": FieldSpec.output("next_status", type_=Status),
+            "current_status": input_field("current_status", type_=Status, desc="The current status."),
+            "next_status": output_field("next_status", type_=Status, desc="The next status."),
         },
         instructions="Advance status.",
         name="StatusSignature",
@@ -635,8 +637,8 @@ def test_enum_inputs_and_outputs_with_shared_names_and_values(make_run):
 
     TicketStatusSignature = make_task_spec(
         {
-            "current_status": FieldSpec.input("current_status", type_=TicketStatus),
-            "next_status": FieldSpec.output("next_status", type_=TicketStatus),
+            "current_status": input_field("current_status", type_=TicketStatus, desc="The current status."),
+            "next_status": output_field("next_status", type_=TicketStatus, desc="The next status."),
         },
         instructions="Advance ticket status.",
         name="TicketStatusSignature",
@@ -654,8 +656,8 @@ def test_auto_valued_enum_inputs_and_outputs(make_run):
     Status = enum.Enum("Status", ["PENDING", "IN_PROGRESS", "COMPLETED"])
     StatusSignature = make_task_spec(
         {
-            "current_status": FieldSpec.input("current_status", type_=Status),
-            "next_status": FieldSpec.output("next_status", type_=Status),
+            "current_status": input_field("current_status", type_=Status, desc="The current status."),
+            "next_status": output_field("next_status", type_=Status, desc="The next status."),
         },
         instructions="Advance auto-valued status.",
         name="StatusSignature",
@@ -684,7 +686,9 @@ def test_named_predictors(make_run):
 
 def test_output_only(make_run):
     OutputOnlySignature = make_task_spec(
-        {"output": FieldSpec.output("output")}, instructions="Produce output.", name="OutputOnlySignature"
+        {"output": output_field("output", desc="The output.")},
+        instructions="Produce output.",
+        name="OutputOnlySignature",
     )
     predictor = Predict(OutputOnlySignature)
     lm = DummyLM([{"output": "short answer"}])
@@ -707,9 +711,9 @@ def test_load_state_chaining(make_run):
 def test_call_predict_with_chat_history(adapter_type, make_run):
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "answer": FieldSpec.output("answer"),
+            "question": input_field("question", desc="The question."),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Answer with chat history.",
         name="MySignature",
@@ -867,17 +871,17 @@ def test_error_message_on_invalid_lm_setup(make_run):
 def test_field_constraints(adapter_type, make_run):
     ConstrainedSignature = make_task_spec(
         {
-            "text": FieldSpec.input("text", desc="Input text", constraints="minimum length: 5, maximum length: 100"),
-            "number": FieldSpec.input(
+            "text": input_field("text", desc="Input text", constraints="minimum length: 5, maximum length: 100"),
+            "number": input_field(
                 "number", type_=int, desc="A number between 0 and 10", constraints="greater than: 0, less than: 10"
             ),
-            "score": FieldSpec.output(
+            "score": output_field(
                 "score",
                 type_=float,
                 desc="Score between 0 and 1",
                 constraints="greater than or equal to: 0.0, less than or equal to: 1.0",
             ),
-            "count": FieldSpec.output(
+            "count": output_field(
                 "count", type_=int, desc="Even number count", constraints="a multiple of the given number: 2"
             ),
         },
@@ -948,7 +952,10 @@ def test_dump_state_pydantic_non_primitive_types(make_run):
         created_at: datetime
 
     TestSignature = make_task_spec(
-        {"website_info": FieldSpec.input("website_info", type_=WebsiteInfo), "summary": FieldSpec.output("summary")},
+        {
+            "website_info": input_field("website_info", type_=WebsiteInfo, desc="The website info."),
+            "summary": output_field("summary", desc="The summary."),
+        },
         instructions="Summarize website info.",
         name="TestSignature",
     )
@@ -1010,9 +1017,9 @@ def test_per_module_history_disabled(make_run):
 def test_input_field_default_value(make_run):
     SignatureWithDefault = make_task_spec(
         {
-            "context": FieldSpec.input("context", default="DEFAULT_CONTEXT"),
-            "question": FieldSpec.input("question"),
-            "answer": FieldSpec.output("answer"),
+            "context": input_field("context", default="DEFAULT_CONTEXT", desc="The context."),
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Answer using context.",
         name="SignatureWithDefault",
@@ -1050,9 +1057,9 @@ def test_missing_optional_input_field_no_warning(caplog, make_run):
     run = log_test_helper()
     OptionalInputSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "context": FieldSpec.input("context", type_=str | None),
-            "answer": FieldSpec.output("answer"),
+            "question": input_field("question", desc="The question."),
+            "context": input_field("context", type_=str | None, desc="The context."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Answer with optional context.",
         name="OptionalInputSignature",
@@ -1067,9 +1074,9 @@ def test_missing_required_input_field_still_warns(make_run):
     run = log_test_helper()
     OptionalInputSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "context": FieldSpec.input("context", type_=str | None),
-            "answer": FieldSpec.output("answer"),
+            "question": input_field("question", desc="The question."),
+            "context": input_field("context", type_=str | None, desc="The context."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Answer with optional context.",
         name="OptionalInputSignature",
@@ -1090,9 +1097,9 @@ def test_warning_images(make_run):
 def test_type_mismatch_warning(make_run):
     TypedSignature = make_task_spec(
         {
-            "count": FieldSpec.input("count", type_=int),
-            "name": FieldSpec.input("name"),
-            "result": FieldSpec.output("result"),
+            "count": input_field("count", type_=int, desc="The count."),
+            "name": input_field("name", desc="The name."),
+            "result": output_field("result", desc="The result."),
         },
         instructions="Typed inputs.",
         name="TypedSignature",
@@ -1107,9 +1114,9 @@ def test_type_mismatch_warning(make_run):
 def test_correct_types_no_warning(make_run):
     TypedSignature = make_task_spec(
         {
-            "count": FieldSpec.input("count", type_=int),
-            "name": FieldSpec.input("name"),
-            "result": FieldSpec.output("result"),
+            "count": input_field("count", type_=int, desc="The count."),
+            "name": input_field("name", desc="The name."),
+            "result": output_field("result", desc="The result."),
         },
         instructions="Typed inputs.",
         name="TypedSignature",
@@ -1122,7 +1129,10 @@ def test_correct_types_no_warning(make_run):
 
 def test_list_type_validation(make_run):
     ComplexSignature = make_task_spec(
-        {"items": FieldSpec.input("items", type_=list[str]), "result": FieldSpec.output("result")},
+        {
+            "items": input_field("items", type_=list[str], desc="The items."),
+            "result": output_field("result", desc="The result."),
+        },
         instructions="Process items.",
         name="ComplexSignature",
     )
@@ -1139,9 +1149,9 @@ def test_literal_type_validation(make_run):
 
     LiteralSignature = make_task_spec(
         {
-            "status": FieldSpec.input("status", type_=Literal["pending", "approved", "rejected"]),
-            "priority": FieldSpec.input("priority", type_=Literal[1, 2, 3]),
-            "result": FieldSpec.output("result"),
+            "status": input_field("status", type_=Literal["pending", "approved", "rejected"], desc="The status."),
+            "priority": input_field("priority", type_=Literal[1, 2, 3], desc="The priority."),
+            "result": output_field("result", desc="The result."),
         },
         instructions="Validate literals.",
         name="LiteralSignature",
@@ -1160,7 +1170,10 @@ def test_literal_union_type_validation(make_run):
     from typing import Literal
 
     UnionLiteralSignature = make_task_spec(
-        {"mode": FieldSpec.input("mode", type_=Literal["auto", "manual"] | None), "result": FieldSpec.output("result")},
+        {
+            "mode": input_field("mode", type_=Literal["auto", "manual"] | None, desc="The mode."),
+            "result": output_field("result", desc="The result."),
+        },
         instructions="Validate union literals.",
         name="UnionLiteralSignature",
     )
@@ -1175,7 +1188,10 @@ def test_literal_union_type_validation(make_run):
 
 def test_list_string(make_run):
     TypedSignature = make_task_spec(
-        {"nameList": FieldSpec.input("nameList", type_=list[str]), "result": FieldSpec.output("result")},
+        {
+            "nameList": input_field("nameList", type_=list[str], desc="The name list."),
+            "result": output_field("result", desc="The result."),
+        },
         instructions="Process name list.",
         name="TypedSignature",
     )
@@ -1190,9 +1206,9 @@ def test_list_string(make_run):
 def test_nested_list_type_validation(make_run):
     NestedListSignature = make_task_spec(
         {
-            "numbers": FieldSpec.input("numbers", type_=list[int]),
-            "names": FieldSpec.input("names", type_=list[str]),
-            "result": FieldSpec.output("result"),
+            "numbers": input_field("numbers", type_=list[int], desc="The numbers."),
+            "names": input_field("names", type_=list[str], desc="The names."),
+            "result": output_field("result", desc="The result."),
         },
         instructions="Validate nested lists.",
         name="NestedListSignature",
@@ -1210,7 +1226,10 @@ def test_nested_list_type_validation(make_run):
 
 def test_nested_dict_type_validation(make_run):
     DictSignature = make_task_spec(
-        {"mapping": FieldSpec.input("mapping", type_=dict[str, int]), "result": FieldSpec.output("result")},
+        {
+            "mapping": input_field("mapping", type_=dict[str, int], desc="The mapping."),
+            "result": output_field("result", desc="The result."),
+        },
         instructions="Validate dict input.",
         name="DictSignature",
     )
@@ -1227,9 +1246,9 @@ def test_nested_dict_type_validation(make_run):
 def test_nested_tuple_type_validation(make_run):
     TupleSignature = make_task_spec(
         {
-            "fixed_tuple": FieldSpec.input("fixed_tuple", type_=tuple[str, int, bool]),
-            "var_tuple": FieldSpec.input("var_tuple", type_=tuple[int, ...]),
-            "result": FieldSpec.output("result"),
+            "fixed_tuple": input_field("fixed_tuple", type_=tuple[str, int, bool], desc="The fixed tuple."),
+            "var_tuple": input_field("var_tuple", type_=tuple[int, ...], desc="The var tuple."),
+            "result": output_field("result", desc="The result."),
         },
         instructions="Validate tuple input.",
         name="TupleSignature",
@@ -1325,9 +1344,9 @@ def test_untyped_string_signature(make_run):
 def test_untyped_class_signature(make_run):
     TestSignature = make_task_spec(
         {
-            "count": FieldSpec.input("count", is_type_undefined=True),
-            "name": FieldSpec.input("name", is_type_undefined=True),
-            "result": FieldSpec.output("result"),
+            "count": input_field("count", is_type_undefined=True, desc="The count."),
+            "name": input_field("name", is_type_undefined=True, desc="The name."),
+            "result": output_field("result", desc="The result."),
         },
         instructions="Untyped class fields.",
         name="TestSignature",
@@ -1341,9 +1360,9 @@ def test_untyped_class_signature(make_run):
 def test_string_to_list_signature(make_run):
     TestSignature = make_task_spec(
         {
-            "name": FieldSpec.input("name"),
-            "count": FieldSpec.input("count", is_type_undefined=True),
-            "result": FieldSpec.output("result"),
+            "name": input_field("name", desc="The name."),
+            "count": input_field("count", is_type_undefined=True, desc="The count."),
+            "result": output_field("result", desc="The result."),
         },
         instructions="String to list validation.",
         name="TestSignature",
@@ -1361,7 +1380,10 @@ def test_custom_signature_types(enable_type_warnings, make_run):
             text: str
 
     task_spec = make_task_spec(
-        {"query": FieldSpec.input("query", type_=MyContainer.Query), "answer": FieldSpec.output("answer")},
+        {
+            "query": input_field("query", type_=MyContainer.Query, desc="The query."),
+            "answer": output_field("answer", desc="The answer."),
+        },
         instructions="Answer the query.",
     )
     predict_instance = Predict(task_spec)

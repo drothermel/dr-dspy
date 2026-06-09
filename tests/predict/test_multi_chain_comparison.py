@@ -2,11 +2,14 @@ import asyncio
 
 from dspy.predict.multi_chain_comparison import MultiChainComparison
 from dspy.primitives.prediction import Prediction
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.utils.dummies import DummyLM
 
 BasicQA = make_task_spec(
-    {"question": FieldSpec.input("question"), "answer": FieldSpec.output("answer", desc="often between 1 and 5 words")},
+    {
+        "question": input_field("question", desc="The question."),
+        "answer": output_field("answer", desc="often between 1 and 5 words"),
+    },
     instructions="Answer questions with short factoid answers.",
     name="BasicQA",
 )

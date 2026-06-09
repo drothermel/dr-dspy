@@ -3,6 +3,7 @@ from typing import Any, Literal, cast
 from pydantic import BaseModel, Field, create_model
 from pydantic.fields import FieldInfo
 
+from dspy.task_spec.field_spec import FieldRole
 from dspy.task_spec.task_spec import TaskSpec
 from dspy.utils.constants import IS_TYPE_UNDEFINED
 
@@ -28,7 +29,7 @@ def task_spec_to_pydantic_model(spec: TaskSpec) -> type[BaseModel]:
     field_defs: dict[str, Any] = {}
     for field in (*spec.inputs, *spec.outputs):
         json_schema_extra: dict[str, Any] = {
-            "__dspy_field_type": field.role,
+            "__dspy_field_type": field.role.value,
             "desc": field.desc,
             "prefix": field.prefix,
         }
@@ -37,7 +38,7 @@ def task_spec_to_pydantic_model(spec: TaskSpec) -> type[BaseModel]:
         if field.constraints:
             json_schema_extra["constraints"] = field.constraints
         field_kwargs: dict[str, Any] = {"json_schema_extra": json_schema_extra, "description": field.desc}
-        if field.role == "input" and field.has_default:
+        if field.role == FieldRole.INPUT and field.has_default:
             field_kwargs["default"] = field.default
         field_defs[field.name] = (field.type_, Field(**field_kwargs))
     model_name = spec.name.replace(" ", "_")

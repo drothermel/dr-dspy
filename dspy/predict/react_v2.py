@@ -62,13 +62,11 @@ class ReActV2(Module):
     def _make_react_task_spec(self) -> TaskSpec:
         fields: dict[str, FieldSpec] = {}
         for name, field in self.task_spec.input_fields.items():
-            fields[name] = input_field(
-                name, _optional_annotation(field.type_), desc=field.desc if field.desc != f"${{{name}}}" else None
-            )
-        fields["turn_log"] = input_field("turn_log", TurnLog)
-        fields["tools"] = input_field("tools", list[Tool])
-        fields["next_thought"] = output_field("next_thought", Reasoning)
-        fields["tool_calls"] = output_field("tool_calls", ToolCalls)
+            fields[name] = input_field(name, _optional_annotation(field.type_), desc=field.desc)
+        fields["turn_log"] = input_field("turn_log", TurnLog, desc="Previous thoughts, tool calls, and tool results.")
+        fields["tools"] = input_field("tools", list[Tool], desc="Tools available for this step.")
+        fields["next_thought"] = output_field("next_thought", Reasoning, desc="Your next reasoning step.")
+        fields["tool_calls"] = output_field("tool_calls", ToolCalls, desc="Tool calls to execute next.")
         inputs = ", ".join(f"`{name}`" for name in self.task_spec.input_fields)
         outputs = ", ".join(f"`{name}`" for name in self.task_spec.output_fields)
         tool_names = ", ".join(f"`{name}`" for name in self.tools)

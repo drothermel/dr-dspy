@@ -23,7 +23,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.task_spec import FieldSpec, default_task_instructions, make_task_spec
+from dspy.task_spec import default_task_instructions, input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
 from dspy.utils.dummies import DummyLM
@@ -112,9 +112,9 @@ def test_save_and_load_with_pkl(tmp_path, make_run):
 
     MySignature = make_task_spec(
         {
-            "current_date": FieldSpec.input("current_date", type_=datetime.date),
-            "target_date": FieldSpec.input("target_date", type_=datetime.date),
-            "date_diff": FieldSpec.output(
+            "current_date": input_field("current_date", type_=datetime.date, desc="The current date."),
+            "target_date": input_field("target_date", type_=datetime.date, desc="The target date."),
+            "date_diff": output_field(
                 "date_diff", type_=int, desc="The difference in days between the current_date and the target_date"
             ),
         },

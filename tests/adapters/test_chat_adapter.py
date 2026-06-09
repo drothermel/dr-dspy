@@ -33,7 +33,7 @@ from dspy.history import TurnLog
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.utils.exceptions import AdapterParseError
 from tests.adapters.conftest import (
     adapter_format_as_openai,
@@ -92,8 +92,8 @@ def test_chat_adapter_quotes_literals_as_expected(
 ):
     TestSignature = make_task_spec(
         {
-            "input_text": FieldSpec.input("input_text", type_=input_literal),
-            "output_text": FieldSpec.output("output_text", type_=output_literal),
+            "input_text": input_field("input_text", type_=input_literal, desc="The input text."),
+            "output_text": output_field("output_text", type_=output_literal, desc="The output text."),
         },
         instructions="Given the fields `input_text`, produce the fields `output_text`.",
     )
@@ -161,9 +161,9 @@ def test_chat_adapter_format_exact_messages_for_simple_signature():
 def test_chat_adapter_format_exact_messages_with_demo_and_typed_outputs():
     MultiAnswer = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "answers": FieldSpec.output("answers", type_=list[str]),
-            "scores": FieldSpec.output("scores", type_=list[float]),
+            "question": input_field("question", desc="The question."),
+            "answers": output_field("answers", type_=list[str], desc="The answers."),
+            "scores": output_field("scores", type_=list[float], desc="The scores."),
         },
         instructions="Answer the question with multiple answers and scores",
     )
@@ -208,7 +208,10 @@ def test_chat_adapter_format_exact_messages_with_nested_pydantic_models():
         score: float
 
     PydanticSignature = make_task_spec(
-        {"person": FieldSpec.input("person", type_=Person), "summary": FieldSpec.output("summary", type_=Summary)},
+        {
+            "person": input_field("person", type_=Person, desc="The person."),
+            "summary": output_field("summary", type_=Summary, desc="The summary."),
+        },
         instructions="Given the fields `person`, produce the fields `summary`.",
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -235,10 +238,10 @@ def test_chat_adapter_format_exact_messages_with_nested_pydantic_models():
 def test_chat_adapter_format_exact_messages_with_incomplete_demo():
     IncompleteDemoSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "context": FieldSpec.input("context"),
-            "answer": FieldSpec.output("answer"),
-            "confidence": FieldSpec.output("confidence", type_=float),
+            "question": input_field("question", desc="The question."),
+            "context": input_field("context", desc="The context."),
+            "answer": output_field("answer", desc="The answer."),
+            "confidence": output_field("confidence", type_=float, desc="The confidence."),
         },
         instructions="Given the fields `question`, `context`, produce the fields `answer`, `confidence`.",
     )
@@ -274,9 +277,9 @@ def test_chat_adapter_format_exact_messages_with_incomplete_demo():
 def test_chat_adapter_format_exact_messages_with_history():
     HistorySignature = make_task_spec(
         {
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "question": FieldSpec.input("question"),
-            "answer": FieldSpec.output("answer"),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `history`, `question`, produce the fields `answer`.",
     )
@@ -335,7 +338,10 @@ def test_chat_adapter_format_exact_messages_with_list_value_for_string_input():
 
 def test_chat_adapter_format_exact_messages_with_literal_output():
     LiteralSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "verdict": FieldSpec.output("verdict", type_=Literal["yes", "no"])},
+        {
+            "question": input_field("question", desc="The question."),
+            "verdict": output_field("verdict", type_=Literal["yes", "no"], desc="The verdict."),
+        },
         instructions="Given the fields `question`, produce the fields `verdict`.",
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -359,11 +365,11 @@ def test_chat_adapter_format_exact_messages_with_literal_output():
 def test_chat_adapter_format_exact_messages_with_multimodal_custom_type_inputs():
     CustomTypeSignature = make_task_spec(
         {
-            "image": FieldSpec.input("image", type_=Image),
-            "audio": FieldSpec.input("audio", type_=Audio),
-            "file": FieldSpec.input("file", type_=File),
-            "document": FieldSpec.input("document", type_=Document),
-            "answer": FieldSpec.output("answer"),
+            "image": input_field("image", type_=Image, desc="The image."),
+            "audio": input_field("audio", type_=Audio, desc="The audio."),
+            "file": input_field("file", type_=File, desc="The file."),
+            "document": input_field("document", type_=Document, desc="The document."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `image`, `audio`, `file`, `document`, produce the fields `answer`.",
     )
@@ -431,12 +437,12 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
 
     RichRenderingSignature = make_task_spec(
         {
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "image": FieldSpec.input("image", type_=Image),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "profile": FieldSpec.input("profile", type_=Profile),
-            "question": FieldSpec.input("question"),
-            "answer": FieldSpec.output("answer", type_=AnswerCard),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "image": input_field("image", type_=Image, desc="The image."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "profile": input_field("profile", type_=Profile, desc="The profile."),
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", type_=AnswerCard, desc="The answer."),
         },
         instructions="Answer using all supplied context.",
     )
@@ -552,7 +558,10 @@ def test_chat_adapter_format_exact_messages_with_base_custom_type_input():
             return "An event block."
 
     EventSignature = make_task_spec(
-        {"event": FieldSpec.input("event", type_=Event), "answer": FieldSpec.output("answer")},
+        {
+            "event": input_field("event", type_=Event, desc="The event."),
+            "answer": output_field("answer", desc="The answer."),
+        },
         instructions="Given the fields `event`, produce the fields `answer`.",
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -582,7 +591,10 @@ def test_chat_adapter_format_exact_messages_with_base_custom_type_input():
 
 def test_chat_adapter_format_exact_messages_with_citations_output_demo():
     CitationSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "citations": FieldSpec.output("citations", type_=Citations)},
+        {
+            "question": input_field("question", desc="The question."),
+            "citations": output_field("citations", type_=Citations, desc="The citations."),
+        },
         instructions="Given the fields `question`, produce the fields `citations`.",
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
@@ -639,9 +651,9 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_citations(
 
     CitationSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "answer": FieldSpec.output("answer"),
-            "citations": FieldSpec.output("citations", type_=Citations),
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="The answer."),
+            "citations": output_field("citations", type_=Citations, desc="The citations."),
         },
         instructions="Given the fields `question`, produce the fields `answer`, `citations`.",
     )
@@ -703,9 +715,9 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_reasoning(
 
     NativeReasoningSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "reasoning": FieldSpec.output("reasoning", type_=Reasoning),
-            "answer": FieldSpec.output("answer"),
+            "question": input_field("question", desc="The question."),
+            "reasoning": output_field("reasoning", type_=Reasoning, desc="The reasoning."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `question`, produce the fields `reasoning`, `answer`.",
     )
@@ -753,10 +765,10 @@ def test_chat_adapter_native_tool_calling_still_enables_native_reasoning():
 
     NativeToolReasoningSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "next_thought": FieldSpec.output("next_thought", type_=Reasoning),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "next_thought": output_field("next_thought", type_=Reasoning, desc="The next thought."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
@@ -778,9 +790,9 @@ def test_chat_adapter_nonnative_strips_native_tool_kwargs():
 
     NonNativeToolSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `tool_calls`.",
     )
@@ -800,9 +812,9 @@ def test_chat_adapter_format_exact_messages_with_reasoning_and_code_outputs():
     python_code = cast("Any", Code)["python"]
     CodeSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "reasoning": FieldSpec.output("reasoning", type_=Reasoning),
-            "code": FieldSpec.output("code", type_=python_code),
+            "question": input_field("question", desc="The question."),
+            "reasoning": output_field("reasoning", type_=Reasoning, desc="The reasoning."),
+            "code": output_field("code", type_=python_code, desc="The code."),
         },
         instructions="Given the fields `question`, produce the fields `reasoning`, `code`.",
     )
@@ -845,9 +857,9 @@ def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_tool_calli
 
     NativeToolSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `tool_calls`.",
     )
@@ -909,9 +921,9 @@ def test_adapter_native_tool_calling_can_request_parallel_tool_calls(adapter):
 
     NativeToolSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `tool_calls`.",
     )
@@ -939,9 +951,9 @@ def test_adapter_native_tool_calling_respects_lm_kwargs_parallel_tool_call_overr
 
     NativeToolSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `tool_calls`.",
     )
@@ -970,11 +982,11 @@ def test_chat_adapter_native_tool_history_replay():
 
     NativeToolHistorySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "next_thought": FieldSpec.output("next_thought", type_=Reasoning),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "next_thought": output_field("next_thought", type_=Reasoning, desc="The next thought."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
@@ -1029,11 +1041,11 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
 
     NativeToolHistorySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "next_thought": FieldSpec.output("next_thought", type_=Reasoning),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "next_thought": output_field("next_thought", type_=Reasoning, desc="The next thought."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
@@ -1080,10 +1092,10 @@ def test_chat_adapter_native_tool_history_skips_empty_user_message():
 
     NativeToolHistorySignature = make_task_spec(
         {
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "next_thought": FieldSpec.output("next_thought", type_=Reasoning),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "next_thought": output_field("next_thought", type_=Reasoning, desc="The next thought."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
@@ -1135,11 +1147,11 @@ def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_i
 
     NativeToolHistorySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "next_thought": FieldSpec.output("next_thought", type_=Reasoning),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "next_thought": output_field("next_thought", type_=Reasoning, desc="The next thought."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
@@ -1168,11 +1180,11 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
 
     ToolHistorySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "next_thought": FieldSpec.output("next_thought"),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "next_thought": output_field("next_thought", desc="The next thought."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
@@ -1226,11 +1238,11 @@ def test_non_native_tool_history_remains_text_based(adapter):
 
     ToolHistorySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "next_thought": FieldSpec.output("next_thought"),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "next_thought": output_field("next_thought", desc="The next thought."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `history`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
@@ -1277,9 +1289,9 @@ def test_chat_adapter_format_accepts_custom_history_formatter_returning_messages
 
     HistorySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "answer": FieldSpec.output("answer"),
+            "question": input_field("question", desc="The question."),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `question`, `history`, produce the fields `answer`.",
     )
@@ -1301,9 +1313,9 @@ def test_chat_adapter_format_exact_messages_with_tool_input():
 
     ToolSignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "answer": FieldSpec.output("answer"),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `answer`.",
     )
@@ -1360,19 +1372,19 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
 
     KitchenSinkSignature = make_task_spec(
         {
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "image": FieldSpec.input("image", type_=Image),
-            "audio": FieldSpec.input("audio", type_=Audio),
-            "file": FieldSpec.input("file", type_=File),
-            "document": FieldSpec.input("document", type_=Document),
-            "event": FieldSpec.input("event", type_=Event),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "profile": FieldSpec.input("profile", type_=Profile),
-            "context": FieldSpec.input("context"),
-            "question": FieldSpec.input("question"),
-            "answer": FieldSpec.output("answer", type_=AnswerCard),
-            "verdict": FieldSpec.output("verdict", type_=Literal["yes", "no"]),
-            "confidence": FieldSpec.output("confidence", type_=float),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "image": input_field("image", type_=Image, desc="The image."),
+            "audio": input_field("audio", type_=Audio, desc="The audio."),
+            "file": input_field("file", type_=File, desc="The file."),
+            "document": input_field("document", type_=Document, desc="The document."),
+            "event": input_field("event", type_=Event, desc="The event."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "profile": input_field("profile", type_=Profile, desc="The profile."),
+            "context": input_field("context", desc="The context."),
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", type_=AnswerCard, desc="The answer."),
+            "verdict": output_field("verdict", type_=Literal["yes", "no"], desc="The verdict."),
+            "confidence": output_field("confidence", type_=float, desc="The confidence."),
         },
         instructions="Answer carefully using every available signal.",
     )
@@ -1548,9 +1560,9 @@ def test_chat_adapter_with_pydantic_models(make_run):
 
     TestSignature = make_task_spec(
         {
-            "owner": FieldSpec.input("owner", type_=PetOwner),
-            "question": FieldSpec.input("question"),
-            "output": FieldSpec.output("output", type_=Answer),
+            "owner": input_field("owner", type_=PetOwner, desc="The owner."),
+            "question": input_field("question", desc="The question."),
+            "output": output_field("output", type_=Answer, desc="The output."),
         },
         instructions="Given the fields `owner`, `question`, produce the fields `output`.",
     )
@@ -1580,9 +1592,9 @@ def test_chat_adapter_with_pydantic_models(make_run):
 def test_chat_adapter_signature_information(make_run):
     TestSignature = make_task_spec(
         {
-            "input1": FieldSpec.input("input1", desc="String Input"),
-            "input2": FieldSpec.input("input2", type_=int, desc="Integer Input"),
-            "output": FieldSpec.output("output", desc="String Output"),
+            "input1": input_field("input1", desc="String Input"),
+            "input2": input_field("input2", type_=int, desc="Integer Input"),
+            "output": output_field("output", desc="String Output"),
         },
         instructions="Given the fields `input1`, `input2`, produce the fields `output`.",
     )
@@ -1622,7 +1634,7 @@ def test_chat_adapter_exception_raised_on_failure():
 def test_chat_adapter_formats_image():
     image = Image(url="https://example.com/image.jpg")
     MySignature = make_task_spec(
-        {"image": FieldSpec.input("image", type_=Image), "text": FieldSpec.output("text")},
+        {"image": input_field("image", type_=Image, desc="The image."), "text": output_field("text", desc="The text.")},
         instructions="Given the fields `image`, produce the fields `text`.",
     )
     adapter = ChatAdapter()
@@ -1639,7 +1651,7 @@ def test_chat_adapter_formats_image():
 
 def test_chat_adapter_formats_image_with_few_shot_examples():
     MySignature = make_task_spec(
-        {"image": FieldSpec.input("image", type_=Image), "text": FieldSpec.output("text")},
+        {"image": input_field("image", type_=Image, desc="The image."), "text": output_field("text", desc="The text.")},
         instructions="Given the fields `image`, produce the fields `text`.",
     )
     adapter = ChatAdapter()
@@ -1670,7 +1682,10 @@ def test_chat_adapter_formats_image_with_nested_images():
         tag: list[str]
 
     MySignature = make_task_spec(
-        {"image": FieldSpec.input("image", type_=ImageWrapper), "text": FieldSpec.output("text")},
+        {
+            "image": input_field("image", type_=ImageWrapper, desc="The image."),
+            "text": output_field("text", desc="The text."),
+        },
         instructions="Given the fields `image`, produce the fields `text`.",
     )
     image1 = Image(url="https://example.com/image1.jpg")
@@ -1696,7 +1711,10 @@ def test_chat_adapter_formats_image_with_few_shot_examples_with_nested_images():
         tag: list[str]
 
     MySignature = make_task_spec(
-        {"image": FieldSpec.input("image", type_=ImageWrapper), "text": FieldSpec.output("text")},
+        {
+            "image": input_field("image", type_=ImageWrapper, desc="The image."),
+            "text": output_field("text", desc="The text."),
+        },
         instructions="Given the fields `image`, produce the fields `text`.",
     )
     image1 = Image(url="https://example.com/image1.jpg")
@@ -1722,10 +1740,10 @@ def test_chat_adapter_formats_image_with_few_shot_examples_with_nested_images():
 def test_chat_adapter_with_tool():
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "answer": FieldSpec.output("answer"),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "answer": output_field("answer", desc="The answer."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Answer question with the help of the tools",
     )
@@ -1758,7 +1776,10 @@ def test_chat_adapter_with_tool():
 
 def test_chat_adapter_with_code():
     CodeAnalysis = make_task_spec(
-        {"code": FieldSpec.input("code", type_=Code), "result": FieldSpec.output("result")},
+        {
+            "code": input_field("code", type_=Code, desc="The code."),
+            "result": output_field("result", desc="The result."),
+        },
         instructions="Analyze the time complexity of the code",
     )
     adapter = ChatAdapter()
@@ -1769,7 +1790,10 @@ def test_chat_adapter_with_code():
     assert Code.description() in messages[0]["content"]
     assert "print('Hello, world!')" in messages[1]["content"]
     CodeGeneration = make_task_spec(
-        {"question": FieldSpec.input("question"), "code": FieldSpec.output("code", type_=Code)},
+        {
+            "question": input_field("question", desc="The question."),
+            "code": output_field("code", type_=Code, desc="The code."),
+        },
         instructions="Generate code to answer the question",
     )
     adapter = ChatAdapter()
@@ -1794,7 +1818,10 @@ def test_chat_adapter_with_code():
 
 def test_code_output_field_omits_json_schema_in_prompt():
     CodeGeneration = make_task_spec(
-        {"question": FieldSpec.input("question"), "code": FieldSpec.output("code", type_=Code)},
+        {
+            "question": input_field("question", desc="The question."),
+            "code": output_field("code", type_=Code, desc="The code."),
+        },
         instructions="Generate code to answer the question",
     )
     adapter = ChatAdapter()
@@ -1810,7 +1837,10 @@ def test_code_output_field_omits_json_schema_in_prompt():
 
 def test_citations_output_field_keeps_json_schema_in_prompt():
     CitationGeneration = make_task_spec(
-        {"question": FieldSpec.input("question"), "citations": FieldSpec.output("citations", type_=Citations)},
+        {
+            "question": input_field("question", desc="The question."),
+            "citations": output_field("citations", type_=Citations, desc="The citations."),
+        },
         instructions="Given the fields `question`, produce the fields `citations`.",
     )
     adapter = ChatAdapter()
@@ -1825,9 +1855,9 @@ def test_citations_output_field_keeps_json_schema_in_prompt():
 def test_chat_adapter_formats_conversation_history():
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=TurnLog),
-            "answer": FieldSpec.output("answer"),
+            "question": input_field("question", desc="The question."),
+            "history": input_field("history", type_=TurnLog, desc="The history."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `question`, `history`, produce the fields `answer`.",
     )
@@ -1854,10 +1884,10 @@ def test_chat_adapter_formats_conversation_history():
 def test_chat_adapter_toolcalls_native_function_calling():
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "answer": FieldSpec.output("answer"),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "answer": output_field("answer", desc="The answer."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `answer`, `tool_calls`.",
     )
@@ -1926,9 +1956,9 @@ def test_chat_adapter_toolcalls_native_function_calling():
 def test_chat_adapter_toolcalls_vague_match():
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `tool_calls`.",
     )
@@ -1992,9 +2022,9 @@ def test_chat_adapter_toolcalls_vague_match():
 def test_chat_adapter_native_reasoning():
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "reasoning": FieldSpec.output("reasoning", type_=Reasoning),
-            "answer": FieldSpec.output("answer"),
+            "question": input_field("question", desc="The question."),
+            "reasoning": output_field("reasoning", type_=Reasoning, desc="The reasoning."),
+            "answer": output_field("answer", desc="The answer."),
         },
         instructions="Given the fields `question`, produce the fields `reasoning`, `answer`.",
     )
@@ -2043,7 +2073,10 @@ def test_chat_adapter_parses_float_with_underscores(make_run):
         score: float
 
     MySignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "score": FieldSpec.output("score", type_=Score)},
+        {
+            "question": input_field("question", desc="The question."),
+            "score": output_field("score", type_=Score, desc="The score."),
+        },
         instructions="Given the fields `question`, produce the fields `score`.",
     )
     adapter = ChatAdapter()
@@ -2071,9 +2104,9 @@ def test_chat_adapter_parses_float_with_underscores(make_run):
 def test_format_system_message(make_run):
     MySignature = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "answers": FieldSpec.output("answers", type_=list[str]),
-            "scores": FieldSpec.output("scores", type_=list[float]),
+            "question": input_field("question", desc="The question."),
+            "answers": output_field("answers", type_=list[str], desc="The answers."),
+            "scores": output_field("scores", type_=list[float], desc="The scores."),
         },
         instructions="Answer the question with multiple answers and scores",
     )
@@ -2111,10 +2144,10 @@ def test_tool_call_with_null_content_does_not_raise():
     adapter = ChatAdapter(use_native_function_calling=True)
     task_spec = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "answer": FieldSpec.output("answer"),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "answer": output_field("answer", desc="The answer."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `answer`, `tool_calls`.",
     )
@@ -2142,10 +2175,10 @@ def test_tool_call_with_unstructured_content_does_not_raise():
     adapter = ChatAdapter(use_native_function_calling=True)
     original_task_spec = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "next_thought": FieldSpec.output("next_thought", type_=Reasoning),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "next_thought": output_field("next_thought", type_=Reasoning, desc="The next thought."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `next_thought`, `tool_calls`.",
     )
@@ -2174,10 +2207,10 @@ def test_tool_call_with_structured_content_preserves_other_outputs():
     adapter = ChatAdapter(use_native_function_calling=True)
     original_task_spec = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "answer": FieldSpec.output("answer"),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "answer": output_field("answer", desc="The answer."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `answer`, `tool_calls`.",
     )
@@ -2205,9 +2238,9 @@ def test_provider_tool_calls_preserve_id_and_repair_arguments():
     adapter = ChatAdapter(use_native_function_calling=True)
     task_spec = make_task_spec(
         {
-            "question": FieldSpec.input("question"),
-            "tools": FieldSpec.input("tools", type_=list[Tool]),
-            "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
+            "question": input_field("question", desc="The question."),
+            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
         },
         instructions="Given the fields `question`, `tools`, produce the fields `tool_calls`.",
     )
@@ -2245,7 +2278,10 @@ def test_native_response_type_without_parse_lm_output_raises():
             return self.label
 
     OpaqueSignature = make_task_spec(
-        {"question": FieldSpec.input("question"), "answer": FieldSpec.output("answer", type_=OpaqueType)},
+        {
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", type_=OpaqueType, desc="The answer."),
+        },
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
     adapter = ChatAdapter(native_response_types=[OpaqueType])

@@ -6,7 +6,7 @@ from dspy.adapters.types.tool import Tool
 from dspy.predict.rlm import RLM, _strip_code_fences
 from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
 from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
-from dspy.task_spec import FieldSpec, make_task_spec
+from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
 from dspy.utils.dummies import DummyLM
 from tests.mock_interpreter import MockInterpreter
@@ -167,7 +167,7 @@ class TestREPLTypes:
     def test_repl_variable_with_field_info(self, make_run):
         spec = make_task_spec(
             {
-                "query": FieldSpec.input(
+                "query": input_field(
                     "query",
                     desc="The user's question",
                     constraints="greater than or equal to: 0.0, less than or equal to: 100.0",
@@ -194,9 +194,9 @@ class TestREPLTypes:
     def test_build_variables_includes_field_metadata(self, make_run):
         QASig = make_task_spec(
             {
-                "context": FieldSpec.input("context", desc="Background information"),
-                "question": FieldSpec.input("question", desc="The question to answer"),
-                "answer": FieldSpec.output("answer"),
+                "context": input_field("context", desc="Background information"),
+                "question": input_field("question", desc="The question to answer"),
+                "answer": output_field("answer", desc="The answer."),
             },
             instructions="Answer questions.",
             name="QASig",

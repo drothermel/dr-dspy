@@ -10,7 +10,7 @@ import pytest
 from dspy.adapters.types.file import File, encode_file_to_dict
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
-from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
+from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
 from dspy.teleprompt.compile_params import LabeledFewShotCompileParams
 from dspy.teleprompt.vanilla import LabeledFewShot
 from dspy.utils.dummies import DummyLM
@@ -201,7 +201,10 @@ def test_file_in_signature(sample_text_file, make_run):
 
 def test_file_list_in_signature(sample_text_file, make_run):
     FileListSignature = make_task_spec(
-        {"documents": FieldSpec.input("documents", type_=list[File]), "summary": FieldSpec.output("summary")},
+        {
+            "documents": input_field("documents", type_=list[File], desc="The documents."),
+            "summary": output_field("summary", desc="The summary."),
+        },
         instructions="Summarize documents.",
         name="FileListSignature",
     )
@@ -215,7 +218,10 @@ def test_file_list_in_signature(sample_text_file, make_run):
 
 def test_optional_file_field(make_run):
     OptionalFileSignature = make_task_spec(
-        {"document": FieldSpec.input("document", type_=File | None), "output": FieldSpec.output("output")},
+        {
+            "document": input_field("document", type_=File | None, desc="The document."),
+            "output": output_field("output", desc="The output."),
+        },
         instructions="Process optional file.",
         name="OptionalFileSignature",
     )
