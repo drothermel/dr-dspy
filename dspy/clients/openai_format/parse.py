@@ -19,6 +19,7 @@ from dspy.core.types import (
     LMToolCallPart,
     LMUsage,
 )
+from dspy.errors import LMInvalidRequestError
 
 logger = logging.getLogger(__name__)
 
@@ -187,18 +188,25 @@ def citation_to_part(citation: Any) -> LMCitationPart:
 
 
 def extract_citations_from_choice(choice: Any) -> list[LMCitationPart]:
-    try:
-        message = get_value(choice, "message")
-        provider_specific_fields = get_value(message, "provider_specific_fields", {}) or {}
-        citations_data = provider_specific_fields.get("citations")
-        if isinstance(citations_data, list):
-            citations = []
-            for item in citations_data:
-                citations.extend(item if isinstance(item, list) else [item])
-            return [citation_to_part(citation) for citation in citations]
-    except Exception:
+    message = get_value(choice, "message")
+    if message is None:
         return []
-    return []
+    provider_specific_fields = get_value(message, "provider_specific_fields")
+    if provider_specific_fields is None:
+        return []
+    if not isinstance(provider_specific_fields, dict):
+        raise LMInvalidRequestError(
+            "provider_specific_fields must be a dict when present on an OpenAI-format choice message."
+        )
+    citations_data = provider_specific_fields.get("citations")
+    if citations_data is None:
+        return []
+    if not isinstance(citations_data, list):
+        raise LMInvalidRequestError("citations must be a list when present in provider_specific_fields.")
+    citations = []
+    for item in citations_data:
+        citations.extend(item if isinstance(item, list) else [item])
+    return [citation_to_part(citation) for citation in citations]
 
 
 def responses_annotations_to_citations(content_item: Any) -> list[LMCitationPart]:
