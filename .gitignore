@@ -29,7 +29,9 @@ __pycache__/
 # Other
 .vscode
 *.tsv
+!scripts/coderabbit_shard_map.tsv
 .dr_llm/
+/reviews/
 *.pt
 gpt*.txt
 *.env
