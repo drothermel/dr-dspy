@@ -1,8 +1,8 @@
 import pytest
+from pydantic import ValidationError
 
 from dspy.adapters.types.tool import ToolCallResults, ToolCalls
 from dspy.task_spec import TaskSpec, make_task_spec
-from dspy.task_spec.serialize import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
 from dspy.task_spec.type_registry import (
     BUILTIN_TYPES_BY_NAME,
     DSPY_TYPE_ALIASES,
@@ -10,6 +10,7 @@ from dspy.task_spec.type_registry import (
     type_from_str,
     type_to_str,
 )
+from dspy.task_spec.wire import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
 
 
 def _dspy_types_for_round_trip() -> list[tuple[str, type]]:
@@ -102,14 +103,14 @@ def test_from_dict_rejects_old_task_spec_version():
 
 
 @pytest.mark.parametrize("missing_key", ["type", "desc", "prefix", "role", "name"])
-def test_field_spec_from_dict_raises_value_error_on_missing_required_key(missing_key):
+def test_field_spec_from_dict_raises_on_missing_required_key(missing_key):
     data = field_spec_to_dict(make_task_spec("q -> a", instructions="Answer.").input_fields["q"])
     data.pop(missing_key)
-    with pytest.raises(ValueError, match=f"missing required key {missing_key!r}"):
+    with pytest.raises(ValidationError):
         field_spec_from_dict(data)
 
 
-def test_field_spec_from_dict_raises_value_error_when_has_default_without_default_key():
+def test_field_spec_from_dict_raises_when_has_default_without_default_key():
     data = field_spec_to_dict(make_task_spec("q -> a", instructions="Answer.").input_fields["q"])
     data["has_default"] = True
     data.pop("default", None)
@@ -117,8 +118,15 @@ def test_field_spec_from_dict_raises_value_error_when_has_default_without_defaul
         field_spec_from_dict(data)
 
 
-def test_field_spec_from_dict_raises_value_error_on_invalid_role():
+def test_field_spec_from_dict_raises_on_invalid_role():
     data = field_spec_to_dict(make_task_spec("q -> a", instructions="Answer.").input_fields["q"])
     data["role"] = "sidecar"
-    with pytest.raises(ValueError, match="invalid role"):
+    with pytest.raises(ValidationError):
+        field_spec_from_dict(data)
+
+
+def test_field_spec_wire_rejects_extra_keys():
+    data = field_spec_to_dict(make_task_spec("q -> a", instructions="Answer.").input_fields["q"])
+    data["unexpected"] = True
+    with pytest.raises(ValidationError):
         field_spec_from_dict(data)

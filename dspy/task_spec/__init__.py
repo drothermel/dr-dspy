@@ -19,9 +19,9 @@ from dspy.task_spec.field_spec import (
 )
 from dspy.task_spec.invariants import validate_task_spec
 from dspy.task_spec.parse import parse_task_spec_string
-from dspy.task_spec.serialize import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
 from dspy.task_spec.task_spec import TaskSpec
 from dspy.task_spec.validation import validate_task_inputs, validate_task_inputs_from_spec
+from dspy.task_spec.wire import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
 
 __all__ = [
     "FIELD_NAME_PATTERN",

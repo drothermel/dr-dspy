@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from dspy.task_spec.field_spec import _UNSET, FieldRole, FieldSpec
 from dspy.task_spec.invariants import validate_task_spec
-from dspy.task_spec.serialize import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
+from dspy.task_spec.wire import TASK_SPEC_VERSION, FieldSpecWire, TaskSpecWire, field_spec_to_dict
 
 
 class TaskSpec(BaseModel):
@@ -105,29 +105,24 @@ class TaskSpec(BaseModel):
         return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
     def to_dict(self) -> dict:
-        return {
-            "task_spec_version": TASK_SPEC_VERSION,
-            "name": self.name,
-            "instructions": self.instructions,
-            "inputs": [field_spec_to_dict(field) for field in self.inputs],
-            "outputs": [field_spec_to_dict(field) for field in self.outputs],
-        }
+        wire = TaskSpecWire(
+            task_spec_version=TASK_SPEC_VERSION,
+            name=self.name,
+            instructions=self.instructions,
+            inputs=[FieldSpecWire.from_field_spec(field) for field in self.inputs],
+            outputs=[FieldSpecWire.from_field_spec(field) for field in self.outputs],
+        )
+        return wire.model_dump(mode="python")
 
     @classmethod
     def from_dict(cls, data: dict, *, custom_types: dict[str, type] | None = None) -> "TaskSpec":
-        version = data.get("task_spec_version")
-        if version != TASK_SPEC_VERSION:
-            raise ValueError(
-                f"Unsupported task_spec_version: {version!r}. Expected {TASK_SPEC_VERSION}. Recompile or recreate the program with the current DSPy version."
-            )
-        spec = cls(
-            name=data["name"],
-            instructions=data["instructions"],
-            inputs=tuple(field_spec_from_dict(item, custom_types=custom_types) for item in data["inputs"]),
-            outputs=tuple(field_spec_from_dict(item, custom_types=custom_types) for item in data["outputs"]),
+        wire = TaskSpecWire.model_validate(data)
+        return cls(
+            name=wire.name,
+            instructions=wire.instructions,
+            inputs=tuple(item.to_field_spec(custom_types=custom_types) for item in wire.inputs),
+            outputs=tuple(item.to_field_spec(custom_types=custom_types) for item in wire.outputs),
         )
-        validate_task_spec(spec)
-        return spec
 
     def to_debug_string(self) -> str:
         """Human-readable debug dump; not stable for parsing or persistence."""
