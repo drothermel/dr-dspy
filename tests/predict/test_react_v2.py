@@ -38,6 +38,33 @@ def test_react_v2_submit_tool_returns_original_output_fields(make_run):
     assert "tool_call_results" not in react.react.task_spec.input_fields
 
 
+def test_react_v2_async_tool_via_acall(make_run):
+    async def lookup(query: str) -> str:
+        return f"found {query}"
+
+    lm = DummyLM(
+        [
+            {
+                "next_thought": "I should look this up.",
+                "tool_calls": ToolCalls.from_dict_list([{"name": "lookup", "args": {"query": "cats"}}]),
+            },
+            {
+                "next_thought": "I can answer now.",
+                "tool_calls": ToolCalls.from_dict_list([{"name": "submit", "args": {"answer": "found cats"}}]),
+            },
+        ]
+    )
+    run = make_run(lm=lm, adapter=ChatAdapter())
+    pred = asyncio.run(
+        ReActV2(ts("question -> answer"), tools=[Tool(lookup, description="Look up a query.")])(
+            question="cats", run=run
+        )
+    )
+    assert pred.answer == "found cats"
+    assert pred.termination_reason == "submit"
+    assert _turn_tool_calls(pred.turn_log.turns[0]).tool_call_results.tool_call_results[0].value == "found cats"
+
+
 def test_react_v2_text_mock_lm_loop_records_inputs_once(make_run):
 
     def lookup(query: str) -> str:

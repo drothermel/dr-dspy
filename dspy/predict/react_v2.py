@@ -122,7 +122,7 @@ class ReActV2(Module):
                 break_reason = "empty_tool_calls"
                 break
             tool_calls = _ensure_tool_call_ids(tool_calls, turn_index)
-            tool_call_results, final_outputs = self._execute_tool_calls(tool_calls)
+            tool_call_results, final_outputs = await self._execute_tool_calls(tool_calls)
             event = self._history_event(pending_inputs, pred, tool_calls, tool_call_results)
             if final_outputs is not None:
                 event.update(final_outputs)
@@ -132,7 +132,7 @@ class ReActV2(Module):
                 return Prediction(**final_outputs, turn_log=turn_log, termination_reason="submit")
         return await self._forced_submit(turn_log, pending_inputs, break_reason, max_iters, run=run)
 
-    def _execute_tool_calls(self, tool_calls: ToolCalls) -> tuple[ToolCallResults, dict[str, Any] | None]:
+    async def _execute_tool_calls(self, tool_calls: ToolCalls) -> tuple[ToolCallResults, dict[str, Any] | None]:
         values = []
         is_errors = []
         final_outputs = None
@@ -142,7 +142,7 @@ class ReActV2(Module):
                 is_errors.append(True)
                 continue
             try:
-                value = self.tools[tool_call.name](**tool_call.args or {})
+                value = await self.tools[tool_call.name].acall(**(tool_call.args or {}))
                 values.append(value)
                 is_errors.append(False)
                 if tool_call.name == "submit" and isinstance(value, dict):
@@ -206,7 +206,7 @@ class ReActV2(Module):
         submit_calls = ToolCalls(tool_calls=[call for call in tool_calls.tool_calls if call.name == "submit"])
         if not submit_calls.tool_calls:
             return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
-        tool_call_results, final_outputs = self._execute_tool_calls(submit_calls)
+        tool_call_results, final_outputs = await self._execute_tool_calls(submit_calls)
         event = self._history_event(pending_inputs, pred, submit_calls, tool_call_results)
         if final_outputs is not None:
             event.update(final_outputs)
