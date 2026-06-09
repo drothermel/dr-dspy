@@ -789,13 +789,13 @@ async def test_lm_usage_with_async(make_run):
     from dspy.runtime.usage_tracker import UsageTracker
 
     program = Predict(pspec("question -> answer"))
-    original_aforward = program.aforward
+    original_aforward_impl = program._aforward_impl
 
-    async def patched_aforward(self, *, run, options=None, **inputs):
+    async def patched_aforward_impl(self, *, run, options=None, **inputs):
         await asyncio.sleep(1)
-        return await original_aforward(run=run, options=options, **inputs)
+        return await original_aforward_impl(run=run, options=options, **inputs)
 
-    cast("Any", program).aforward = types.MethodType(patched_aforward, program)
+    cast("Any", program)._aforward_impl = types.MethodType(patched_aforward_impl, program)
     run = make_run(
         lm=LM("openai/gpt-4o-mini"),
         adapter=ChatAdapter(),

@@ -58,9 +58,9 @@ async def bootstrap_trace_data(
             return prediction.format_reward or format_failure_score
         return metric(example, prediction, trace) if metric else True
 
-    original_aforward = object.__getattribute__(program, "aforward")
+    original_aforward_impl = object.__getattribute__(program, "_aforward_impl")
 
-    async def patched_aforward(
+    async def patched_aforward_impl(
         program_to_use: Module,
         *,
         run: RunContext,
@@ -69,7 +69,10 @@ async def bootstrap_trace_data(
     ):
         item_run = run.fork(optimization_trace=[], call_log=[])
         try:
-            return (await original_aforward(run=item_run, options=options, **kwargs), list(item_run.optimization_trace))
+            return (
+                await original_aforward_impl(run=item_run, options=options, **kwargs),
+                list(item_run.optimization_trace),
+            )
         except AdapterParseError as e:
             completion_str = e.lm_response
             parsed_result = e.parsed_result
@@ -101,13 +104,13 @@ async def bootstrap_trace_data(
             return (failed_pred, trace)
 
     program_any = cast("Any", program)
-    program_any.aforward = MethodType(patched_aforward, program)
+    program_any._aforward_impl = MethodType(patched_aforward_impl, program)
     try:
         results = (
             await evaluator(program, run=run, metric=wrapped_metric, callback_metadata=callback_metadata)
         ).results
     finally:
-        program_any.aforward = original_aforward
+        program_any._aforward_impl = original_aforward_impl
     data = []
     for example_ind, (example, prediction, score) in enumerate(results):
         try:

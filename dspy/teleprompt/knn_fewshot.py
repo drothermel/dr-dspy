@@ -23,7 +23,7 @@ class KNNFewShot:
         student_copy = student.reset_copy()
         knn_few_shot = self
 
-        async def aforward_pass(
+        async def _aforward_impl_pass(
             _,
             *,
             run: RunContext,
@@ -41,5 +41,5 @@ class KNNFewShot:
             )
             return await compiled_program(run=run, options=options, **kwargs)
 
-        student_copy.aforward = types.MethodType(aforward_pass, student_copy)
+        student_copy._aforward_impl = types.MethodType(_aforward_impl_pass, student_copy)
         return student_copy

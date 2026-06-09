@@ -195,6 +195,6 @@ class AvatarOptimizer:
                 self.optimize_for == "min" and best_score > score
             ):
                 set_task_spec(predictor=best_actor.actor, task_spec=actor_task_spec.with_instructions(new_instruction))
-                best_actor.actor_clone = deepcopy(best_actor.actor)  # ty: ignore[unresolved-attribute]
+                best_actor.actor_clone = deepcopy(best_actor.actor)
                 best_score = score
         return best_actor

@@ -58,5 +58,5 @@ def test_ensemble_with_size_limitation(make_run):
 
 
 def test_ensemble_deterministic_behavior():
-    with pytest.raises(AssertionError, match=r"TODO: Implement example hashing for deterministic ensemble\."):
+    with pytest.raises(AssertionError, match=r"Deterministic ensemble is not supported"):
         Ensemble(deterministic=True)
