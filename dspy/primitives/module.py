@@ -3,15 +3,13 @@ from __future__ import annotations
 import copy
 import logging
 from collections import deque
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-import cloudpickle
-import orjson
 from typing_extensions import Self, override
 
-from dspy.persistence import get_dependency_versions, warn_dependency_version_drift
-from dspy.persistence import save_program as persist_program
+from dspy.persistence.program import save_program as persist_program
+from dspy.persistence.state import apply_module_state, dump_module_state, save_state
+from dspy.persistence.state import load_state as load_state_file
 from dspy.predict.protocol import Predictor
 from dspy.primitives.prediction import Prediction
 from dspy.runtime import Callback, RunContext, resolve_run, track_usage, with_callbacks
@@ -20,6 +18,7 @@ from dspy.runtime.batch import Parallel
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+    from pathlib import Path
 
     from dspy.clients.base_lm import BaseLM
     from dspy.primitives.batch_result import BatchResult
@@ -179,15 +178,21 @@ class Module:
         return new_instance
 
     def dump_state(self, json_mode: bool = True) -> dict[str, Any]:
-        return {name: predictor.dump_state(json_mode=json_mode) for name, predictor in self.named_predictors()}
+        return dump_module_state(self, json_mode=json_mode)
 
-    def load_state(self, state: dict[str, Any], *, allow_unsafe_lm_state: bool = False) -> Self:
-        def _apply(module: Module) -> None:
-            for name, predictor in module.named_predictors():
-                predictor.load_state(state[name], allow_unsafe_lm_state=allow_unsafe_lm_state)
-
-        _apply(self.deepcopy())
-        _apply(self)
+    def load_state(
+        self,
+        state: dict[str, Any],
+        *,
+        allow_unsafe_lm_state: bool = False,
+        custom_types: dict[str, type] | None = None,
+    ) -> Self:
+        apply_module_state(
+            self,
+            state,
+            allow_unsafe_lm_state=allow_unsafe_lm_state,
+            custom_types=custom_types,
+        )
         return self
 
     def save(
@@ -196,54 +201,26 @@ class Module:
         save_program: bool = False,
         modules_to_serialize: list[object] | None = None,
     ) -> None:
-        metadata = {"dependency_versions": get_dependency_versions()}
-        path = Path(path)
         if save_program:
             persist_program(self, path, modules_to_serialize=modules_to_serialize)
             return
-        if path.suffix == ".json":
-            state = self.dump_state()
-            state["metadata"] = metadata
-            try:
-                with path.open("wb") as f:
-                    f.write(orjson.dumps(state, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE))
-            except Exception as e:
-                raise RuntimeError(
-                    f"Failed to save state to {path} with error: {e}. Your DSPy program may contain non json-serializable objects, please consider saving the state in .pkl by using `path` ending with `.pkl`, or saving the whole program by setting `save_program=True`."
-                )
-        elif path.suffix == ".pkl":
-            logger.warning(
-                'Saving state to .pkl uses pickle serialization, which can execute arbitrary code when loaded. Prefer module.save("module.json") for safer state-only saves.'
-            )
-            state = self.dump_state(json_mode=False)
-            state["metadata"] = metadata
-            with path.open("wb") as f:
-                cloudpickle.dump(state, f)
-        else:
-            raise ValueError(f"`path` must end with `.json` or `.pkl` when `save_program=False`, but received: {path}")
+        save_state(self, path)
 
-    def load(self, path: str | Path, allow_pickle: bool = False, allow_unsafe_lm_state: bool = False) -> None:
-        path = Path(path)
-        if path.suffix == ".json":
-            with path.open("rb") as f:
-                state = orjson.loads(f.read())
-        elif path.suffix == ".pkl":
-            if not allow_pickle:
-                raise ValueError(
-                    "Loading .pkl files can run arbitrary code, which may be dangerous. Prefer saving with .json files if possible. Set `allow_pickle=True` if you are sure about the source of the file and in a trusted environment."
-                )
-            with path.open("rb") as f:
-                state = cloudpickle.load(f)
-        else:
-            raise ValueError(f"`path` must end with `.json` or `.pkl`, but received: {path}")
-        dependency_versions = get_dependency_versions()
-        saved_dependency_versions = state["metadata"]["dependency_versions"]
-        warn_dependency_version_drift(
-            saved=saved_dependency_versions,
-            current=dependency_versions,
-            log=logger,
+    def load(
+        self,
+        path: str | Path,
+        allow_pickle: bool = False,
+        allow_unsafe_lm_state: bool = False,
+        custom_types: dict[str, type] | None = None,
+    ) -> Self:
+        load_state_file(
+            self,
+            path,
+            allow_pickle=allow_pickle,
+            allow_unsafe_lm_state=allow_unsafe_lm_state,
+            custom_types=custom_types,
         )
-        self.load_state(state, allow_unsafe_lm_state=allow_unsafe_lm_state)
+        return self
 
     @with_callbacks(kind="module")
     async def __call__(

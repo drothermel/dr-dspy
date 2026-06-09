@@ -20,11 +20,10 @@ except ImportError:
     pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
-from dspy.persistence import load_program
+from dspy.persistence import load_program, logger
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module, Prediction
-from dspy.primitives.module import logger
 from dspy.runtime.batch import Parallel
 from dspy.task_spec import default_task_instructions, input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
@@ -441,9 +440,9 @@ def test_load_with_version_mismatch(tmp_path, make_run):
     logger.setLevel(logging.WARNING)
     try:
         save_path = tmp_path / "program.pkl"
-        with patch("dspy.primitives.module.get_dependency_versions", return_value=save_versions):
+        with patch("dspy.persistence.metadata.get_dependency_versions", return_value=save_versions):
             predict.save(save_path)
-        with patch("dspy.primitives.module.get_dependency_versions", return_value=load_versions):
+        with patch("dspy.persistence.metadata.get_dependency_versions", return_value=load_versions):
             loaded_predict = Predict(QA_TASK_SPEC)
             loaded_predict.load(save_path, allow_pickle=True)
         assert len(handler.messages) == 4
@@ -507,10 +506,10 @@ def test_load_warns_when_saved_metadata_missing_dependency_keys(tmp_path):
     logger.setLevel(logging.WARNING)
     try:
         save_path = tmp_path / "program.pkl"
-        with patch("dspy.primitives.module.get_dependency_versions", return_value=save_versions):
+        with patch("dspy.persistence.metadata.get_dependency_versions", return_value=save_versions):
             predict.save(save_path)
         handler.messages.clear()
-        with patch("dspy.primitives.module.get_dependency_versions", return_value=load_versions):
+        with patch("dspy.persistence.metadata.get_dependency_versions", return_value=load_versions):
             loaded_predict = Predict(QA_TASK_SPEC)
             loaded_predict.load(save_path, allow_pickle=True)
         missing_key_messages = [
