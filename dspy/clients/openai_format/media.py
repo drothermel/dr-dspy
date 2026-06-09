@@ -1,12 +1,30 @@
 from __future__ import annotations
 
-import base64
-import mimetypes
 from typing import Any
 
 import pydantic
 
+from dspy.clients.media_uri import (
+    data_uri,
+    data_uri_from_path,
+    media_type_for_path,
+    read_path_base64,
+    split_data_uri,
+)
 from dspy.core.types import LMAudioPart, LMBinaryPart, LMDocumentPart, LMImagePart, LMTextPart
+
+__all__ = [
+    "data_uri",
+    "data_uri_from_path",
+    "get_value",
+    "media_format",
+    "media_source",
+    "media_type_for_path",
+    "model_dump",
+    "part_text",
+    "read_path_base64",
+    "split_data_uri",
+]
 
 
 def media_source(part: LMImagePart | LMAudioPart | LMDocumentPart | LMBinaryPart) -> str:
@@ -19,33 +37,6 @@ def media_source(part: LMImagePart | LMAudioPart | LMDocumentPart | LMBinaryPart
     if part.path is not None:
         return data_uri_from_path(part.path, fallback_media_type=part.media_type)
     raise ValueError(f"{type(part).__name__} has no media source.")
-
-
-def read_path_base64(path: str) -> str:
-    with open(path, "rb") as file:
-        return base64.b64encode(file.read()).decode("ascii")
-
-
-def media_type_for_path(path: str, *, fallback: str) -> str:
-    return mimetypes.guess_type(path)[0] or fallback
-
-
-def data_uri_from_path(path: str, *, fallback_media_type: str) -> str:
-    return data_uri(media_type=media_type_for_path(path, fallback=fallback_media_type), data=read_path_base64(path))
-
-
-def data_uri(media_type: str, data: str) -> str:
-    if data.startswith("data:"):
-        return data
-    return f"data:{media_type};base64,{data}"
-
-
-def split_data_uri(value: str) -> tuple[str, str]:
-    if not value.startswith("data:") or "," not in value:
-        return ("application/octet-stream", value)
-    header, data = value.split(",", 1)
-    media_type = header.removeprefix("data:").split(";", 1)[0]
-    return (media_type, data)
 
 
 def media_format(media_type: str) -> str:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, cast
 
-from dspy.clients.openai_binary import binary_to_openai
+from dspy.clients.media_uri import data_uri, split_data_uri
 from dspy.core.types.parts import (
     LMAudioPart,
     LMBinaryPart,
@@ -16,7 +16,6 @@ from dspy.core.types.parts import (
     LMToolResultPart,
     LMVideoPart,
 )
-from dspy.core.types.parts.openai import _split_data_uri
 from dspy.core.types.request import LMRequest
 
 
@@ -92,7 +91,7 @@ def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
         input_audio: dict[str, Any] = {"format": _history_media_format(part.media_type)}
         if part.data is not None:
             if part.data.startswith("data:"):
-                media_type, data = _split_data_uri(part.data)
+                media_type, data = split_data_uri(part.data)
                 input_audio["format"] = _history_media_format(media_type)
                 input_audio["data"] = data
             else:
@@ -130,6 +129,8 @@ def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
             data["context"] = part.context
         return data
     if isinstance(part, LMBinaryPart):
+        from dspy.clients.openai_format.binary import binary_to_openai
+
         return binary_to_openai(part)
     from dspy.clients.openai_format.serialize import part_to_openai_blocks
 
@@ -138,7 +139,7 @@ def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
 
 def _history_part_source(part: LMImagePart | LMAudioPart | LMVideoPart | LMDocumentPart | LMBinaryPart) -> str | None:
     if part.data is not None:
-        return part.data if part.data.startswith("data:") else f"data:{part.media_type};base64,{part.data}"
+        return data_uri(media_type=part.media_type, data=part.data)
     return part.url or part.file_id or part.path
 
 

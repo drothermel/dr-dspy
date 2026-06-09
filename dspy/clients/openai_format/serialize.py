@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 import pydantic
 
-from dspy.clients.openai_binary import binary_to_openai
+from dspy.clients.openai_format.binary import binary_to_openai
 from dspy.clients.openai_format.media import (
     media_format,
     media_source,

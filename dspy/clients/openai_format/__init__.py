@@ -1,4 +1,3 @@
-from dspy.clients.openai_binary import binary_to_openai
 from dspy.clients.openai_format.chat_request import message_to_openai_chat, to_openai_chat_request
 from dspy.clients.openai_format.parse import (
     completion_to_lm_response,

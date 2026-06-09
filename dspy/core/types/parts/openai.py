@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlparse
 
+from dspy.clients.media_uri import split_data_uri
 from dspy.core.types.parts.models import (
     LMAudioPart,
     LMBinaryPart,
@@ -84,7 +85,7 @@ def _image_source_to_part(source: str) -> LMImagePart:
     if not isinstance(source, str):
         raise TypeError("Image URL must be a string.")
     if source.startswith("data:"):
-        media_type, data = _split_data_uri(source)
+        media_type, data = split_data_uri(source)
         return LMImagePart(data=data, media_type=media_type)
     media_type = mimetypes.guess_type(urlparse(source).path)[0] or "image/png"
     return LMImagePart(url=source, media_type=media_type)
@@ -100,7 +101,7 @@ def _audio_dict_to_part(audio: dict[str, Any]) -> LMAudioPart:
     if audio.get("data") is not None:
         data = audio["data"]
         if isinstance(data, str) and data.startswith("data:"):
-            media_type, data = _split_data_uri(data)
+            media_type, data = split_data_uri(data)
         return LMAudioPart(data=data, media_type=media_type)
     if audio.get("url") is not None:
         return LMAudioPart(url=audio["url"], media_type=media_type)
@@ -113,10 +114,10 @@ def _audio_dict_to_part(audio: dict[str, Any]) -> LMAudioPart:
 
 def _binary_dict_to_part(file: dict[str, Any]) -> LMBinaryPart:
     if file.get("file_data") is not None:
-        media_type, data = _split_data_uri(file["file_data"])
+        media_type, data = split_data_uri(file["file_data"])
         return LMBinaryPart(data=data, media_type=media_type, filename=file.get("filename"))
     if file.get("data") is not None:
-        media_type, data = _split_data_uri(file["data"])
+        media_type, data = split_data_uri(file["data"])
         return LMBinaryPart(data=data, media_type=media_type, filename=file.get("filename"))
     if file.get("file_id") is not None:
         return LMBinaryPart(file_id=file["file_id"], filename=file.get("filename"))
@@ -161,7 +162,7 @@ def _media_dict_to_video_part(video: dict[str, Any]) -> LMVideoPart:
     if video.get("data") is not None:
         data = video["data"]
         if isinstance(data, str) and data.startswith("data:"):
-            media_type, data = _split_data_uri(data)
+            media_type, data = split_data_uri(data)
         else:
             media_type = video.get("media_type") or "video/mp4"
         return LMVideoPart(data=data, media_type=media_type)
@@ -174,17 +175,9 @@ def _media_dict_to_video_part(video: dict[str, Any]) -> LMVideoPart:
     raise ValueError("Video content block requires data, url, file_id, or path.")
 
 
-def _split_data_uri(value: str) -> tuple[str, str]:
-    if not value.startswith("data:") or "," not in value:
-        return ("application/octet-stream", value)
-    header, data = value.split(",", 1)
-    media_type = header.removeprefix("data:").split(";", 1)[0]
-    return (media_type, data)
-
-
 def _media_source_kwargs(source: str, *, default_media_type: str) -> dict[str, str]:
     if source.startswith("data:"):
-        media_type, data = _split_data_uri(source)
+        media_type, data = split_data_uri(source)
         return {"data": data, "media_type": media_type}
     parsed = urlparse(source)
     if parsed.scheme in {"http", "https"}:
