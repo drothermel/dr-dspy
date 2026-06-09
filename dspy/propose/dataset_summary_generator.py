@@ -1,3 +1,9 @@
+"""Dataset summary generation for grounded instruction proposal.
+
+Import ``create_dataset_summary`` from ``dspy.propose.dataset_summary_generator``.
+"""
+
+import logging
 import re
 
 from dspy.core.types.config import LMConfig
@@ -7,6 +13,8 @@ from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.task_spec_context import get_prompt_model
 from dspy.teleprompt.utils import optimizer_lm_context
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["create_dataset_summary"]
 
@@ -21,7 +29,7 @@ class ObservationSummarizerTaskSpec(TaskSpec):
         output_field(
             "summary",
             str,
-            desc="Two to Three sentence summary of only the most significant highlights of my observations",
+            desc="Two-to-three sentence summary of only the most significant highlights of my observations",
         ),
     )
 
@@ -31,13 +39,17 @@ class DatasetDescriptorTaskSpec(TaskSpec):
     instructions: str = "Given several examples from a dataset please write observations about trends that hold for most or all of the samples. Some areas you may consider in your observations: topics, content, syntax, conciseness, etc. It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative"
     inputs: tuple[FieldSpec, ...] = (input_field("examples", str, desc="Sample data points from the dataset"),)
     outputs: tuple[FieldSpec, ...] = (
-        output_field("observations", str, desc="Somethings that holds true for most or all of the data you observed"),
+        output_field(
+            "observations",
+            str,
+            desc="Something that holds true for most or all of the data you observed",
+        ),
     )
 
 
 class DatasetDescriptorWithPriorObservationsTaskSpec(TaskSpec):
     name: str = "framework.propose.dataset_descriptor_with_prior"
-    instructions: str = "Given several examples from a dataset please write observations about trends that hold for most or all of the samples. I will also provide you with a few observations I have already made. Please add your own observations or if you feel the observations are comprehensive say 'COMPLETE'. Some areas you may consider in your observations: topics, content, syntax, conciceness, etc. It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative"
+    instructions: str = "Given several examples from a dataset please write observations about trends that hold for most or all of the samples. I will also provide you with a few observations I have already made. Please add your own observations or if you feel the observations are comprehensive say 'COMPLETE'. Some areas you may consider in your observations: topics, content, syntax, conciseness, etc. It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative"
     inputs: tuple[FieldSpec, ...] = (
         input_field("examples", str, desc="Sample data points from the dataset"),
         input_field("prior_observations", str, desc="Some prior observations I made about the data"),
@@ -46,7 +58,7 @@ class DatasetDescriptorWithPriorObservationsTaskSpec(TaskSpec):
         output_field(
             "observations",
             str,
-            desc="Somethings that holds true for most or all of the data you observed or COMPLETE if you have nothing to add",
+            desc="Something that holds true for most or all of the data you observed or COMPLETE if you have nothing to add",
         ),
     )
 
@@ -66,7 +78,7 @@ async def create_dataset_summary(
     *, trainset, view_data_batch_size, prompt_model, run: RunContext, log_file=None, verbose=False
 ):
     if verbose:
-        pass
+        logger.debug("Creating dataset summary for %s examples", len(trainset))
     upper_lim = min(len(trainset), view_data_batch_size)
     prompt_model = get_prompt_model(prompt_model, run)
     with optimizer_lm_context(run, lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model") as opt_run:
@@ -84,8 +96,6 @@ async def create_dataset_summary(
             calls += 1
             if calls >= max_calls:
                 break
-            if verbose:
-                pass
             upper_lim = min(len(trainset), b + view_data_batch_size)
             with optimizer_lm_context(
                 run, lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model"
@@ -106,23 +116,13 @@ async def create_dataset_summary(
             if log_file:
                 log_file.write(f"observations {observations}\n")
     except Exception:
-        if verbose:
-            pass
-    if prompt_model:
-        with optimizer_lm_context(
-            run, lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model"
-        ) as opt_run:
-            summary = await Predict(ObservationSummarizerTaskSpec(), config=LMConfig(n=1, temperature=1.0))(
-                observations=observations, run=opt_run
-            )
-    else:
-        summary = await Predict(ObservationSummarizerTaskSpec(), config=LMConfig(n=1, temperature=1.0))(
-            observations=observations
+        logger.debug(
+            "Incremental dataset summary observation failed; continuing with partial observations.", exc_info=True
         )
-    if verbose:
-        pass
+    with optimizer_lm_context(run, lm=prompt_model, phase="propose.dataset_summary", lm_role="prompt_model") as opt_run:
+        summary = await Predict(ObservationSummarizerTaskSpec(), config=LMConfig(n=1, temperature=1.0))(
+            observations=observations, run=opt_run
+        )
     if log_file:
         log_file.write(f"summary: {summary}\n")
-    if verbose:
-        pass
     return strip_prefix(summary.summary)

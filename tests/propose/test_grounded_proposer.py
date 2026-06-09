@@ -30,7 +30,12 @@ def test_propose_instructions_for_program(demo_candidates, make_run):
     run = make_run(lm=prompt_model)
     result = asyncio.run(
         proposer.propose_instructions_for_program(
-            trainset=trainset, program=program, demo_candidates=demo_candidates, trial_logs={}, N=1, run=run
+            trainset=trainset,
+            program=program,
+            demo_candidates=demo_candidates,
+            trial_logs={},
+            num_candidates=1,
+            run=run,
         )
     )
     assert isinstance(result, dict)

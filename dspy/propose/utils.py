@@ -1,72 +1,43 @@
-import json
+"""Formatting helpers for grounded instruction proposal.
+
+Import utilities from ``dspy.propose.utils``.
+"""
+
+from __future__ import annotations
+
 import re
+from typing import TYPE_CHECKING, Any
 
 from dspy.predict.protocol import Predictor
 from dspy.primitives import Module
 from dspy.propose.source_format import get_formatted_source
 from dspy.teleprompt.task_spec_context import get_task_spec
 
+if TYPE_CHECKING:
+    from dspy.primitives import Example
+    from dspy.propose.protocol import TrialLogs
+
 __all__ = [
     "strip_prefix",
     "get_dspy_source_code",
     "create_example_string",
-    "create_instruction_set_history_string",
     "create_predictor_level_history_string",
-    "get_program_instruction_set_string",
-    "parse_list_of_instructions",
 ]
 
 
-def strip_prefix(text):
+def strip_prefix(text: str) -> str:
     pattern = "^[\\*\\s]*(([\\w\\'\\-]+\\s+){0,4}[\\w\\'\\-]+):\\s*"
     modified_text = re.sub(pattern, "", text)
     return modified_text.strip('"')
 
 
-def create_instruction_set_history_string(base_program, trial_logs, top_n):
-    program_history = []
-    for trial_num in trial_logs:
-        trial = trial_logs[trial_num]
-        if "program_path" in trial:
-            trial_program = base_program.deepcopy()
-            trial_program.load(trial["program_path"])
-            program_history.append({"program": trial_program, "score": trial["score"]})
-    seen_programs = set()
-    unique_program_history = []
-    for entry in program_history:
-        program = entry["program"]
-        instruction_set = get_program_instruction_set_string(program)
-        if instruction_set not in seen_programs:
-            seen_programs.add(instruction_set)
-            unique_program_history.append(entry)
-    top_n_program_history = sorted(unique_program_history, key=lambda x: x["score"], reverse=True)[:top_n]
-    top_n_program_history.reverse()
-    instruction_set_history_string = ""
-    for entry in top_n_program_history:
-        program = entry["program"]
-        score = entry["score"]
-        instruction_set = get_program_instruction_set_string(program)
-        instruction_set_history_string += instruction_set + f" | Score: {score}\n\n"
-    return instruction_set_history_string
-
-
-def parse_list_of_instructions(instruction_string):
-    try:
-        return json.loads(instruction_string)
-    except json.JSONDecodeError:
-        pass
-    return re.findall('"([^"]*)"', instruction_string)
-
-
-def get_program_instruction_set_string(program) -> str:
-    instruction_list = []
-    for _, pred in enumerate(program.predictors()):
-        pred_instructions = get_task_spec(pred).instructions
-        instruction_list.append(f'"{pred_instructions}"')
-    return f"[{', '.join(instruction_list)}]"
-
-
-def create_predictor_level_history_string(*, base_program, predictor_i, trial_logs, top_n):
+def create_predictor_level_history_string(
+    *,
+    base_program: Module,
+    predictor_i: int,
+    trial_logs: TrialLogs,
+    top_n: int,
+) -> str:
     instruction_aggregate = {}
     instruction_history = []
     for trial_num in trial_logs:
@@ -76,7 +47,8 @@ def create_predictor_level_history_string(*, base_program, predictor_i, trial_lo
             trial_program.load(trial["program_path"])
             instruction_history.append({"program": trial_program, "score": trial["score"]})
     for history_item in instruction_history:
-        predictor = history_item["program"].predictors()[predictor_i]
+        trial_program: Module = history_item["program"]
+        predictor = trial_program.predictors()[predictor_i]
         instruction = get_task_spec(predictor).instructions
         score = history_item["score"]
         if instruction in instruction_aggregate:
@@ -102,7 +74,7 @@ def create_predictor_level_history_string(*, base_program, predictor_i, trial_lo
     return predictor_history_string
 
 
-def create_example_string(*, fields, example):
+def create_example_string(*, fields: dict[str, Any], example: Example) -> str:
     output = []
     for field_name, field_values in fields.items():
         name = field_values.prefix
@@ -112,7 +84,7 @@ def create_example_string(*, fields, example):
     return "\n".join(output)
 
 
-def get_dspy_source_code(module):
+def get_dspy_source_code(module: Module) -> str:
     header = []
     base_code = ""
     if type(module).__name__ != "Predict" and type(module).__name__ != "ChainOfThought":

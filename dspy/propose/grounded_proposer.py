@@ -1,9 +1,15 @@
+"""Grounded instruction proposer for teleprompt optimizers.
+
+Import ``GroundedProposer`` from ``dspy.propose.grounded_proposer``.
+"""
+
 import logging
 import random
 
 from dspy.predict.predict import Predict
 from dspy.primitives import Module, Prediction
 from dspy.propose.dataset_summary_generator import create_dataset_summary
+from dspy.propose.protocol import TrialLogs
 from dspy.propose.utils import (
     create_example_string,
     create_predictor_level_history_string,
@@ -49,7 +55,7 @@ class DescribeProgramTaskSpec(TaskSpec):
 
 class DescribeModuleTaskSpec(TaskSpec):
     name: str = "framework.propose.describe_module"
-    instructions: str = "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe the purpose of one of the specified module in this pipeline."
+    instructions: str = "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe the purpose of the specified module in this pipeline."
     inputs: tuple[FieldSpec, ...] = (
         input_field(
             "program_code", str, desc="Pseudocode for a language model program designed to solve a particular task."
@@ -107,7 +113,7 @@ def generate_instruction_task_spec(
     return make_task_spec(
         fields,
         instructions="Use the information below to learn about a task that we are trying to solve using calls to an LM, then generate a new instruction that will be used to prompt a Language Model to better solve the task.",
-        name="GenerateSingleModuleInstruction",
+        name="framework.propose.generate_single_module_instruction",
     )
 
 
@@ -204,8 +210,6 @@ class GenerateModuleInstruction(Module):
                         )
                     ).program_description
                 )
-                if self.verbose:
-                    pass
                 inputs = []
                 outputs = []
                 for field_name, field in get_task_spec(program.predictors()[pred_i]).fields.items():
@@ -222,16 +226,12 @@ class GenerateModuleInstruction(Module):
                         program_description=program_description,
                         program_example=task_demos,
                         module=module_code,
-                        max_depth=10,
                         run=run,
                     )
                 ).module_description
             except Exception:
-                if self.verbose:
-                    pass
+                logger.debug("Program-aware instruction proposal failed; disabling program_aware.", exc_info=True)
                 self.program_aware = False
-        if self.verbose:
-            pass
         instruction_inputs = {
             "dataset_description": data_summary,
             "program_code": self.program_code_string,
@@ -313,8 +313,8 @@ class GroundedProposer:
         trainset,
         program,
         demo_candidates,
-        trial_logs,
-        N,  # noqa: N803
+        trial_logs: TrialLogs,
+        num_candidates: int,
         *,
         run,
     ) -> dict[int, list[str]]:
@@ -323,28 +323,20 @@ class GroundedProposer:
         if self.set_history_randomly:
             use_history = self.rng.random() < 0.5
             self.use_instruct_history = use_history
-            if self.verbose:
-                pass
         if not demo_candidates:
-            if self.verbose:
-                pass
             self.use_task_demos = False
-            num_demos = N
+            num_demos = num_candidates
         else:
             num_demos = max(len(demo_candidates[0]), 1)
         for pred_i, predictor in enumerate(program.predictors()):
-            for demo_set_i in range(num_demos)[: min(N, num_demos)]:
+            for demo_set_i in range(num_demos)[: min(num_candidates, num_demos)]:
                 if pred_i not in proposed_instructions:
                     proposed_instructions[pred_i] = []
                 selected_tip = None
                 if self.set_tip_randomly:
-                    if self.verbose:
-                        pass
                     selected_tip_key = self.rng.choice(list(TIPS.keys()))
                     selected_tip = TIPS[selected_tip_key]
                     self.use_tip = bool(selected_tip)
-                    if self.verbose:
-                        pass
                 proposed_instructions[pred_i].append(
                     await self.propose_instruction_for_predictor(
                         program=program,
@@ -360,7 +352,16 @@ class GroundedProposer:
         return proposed_instructions
 
     async def propose_instruction_for_predictor(
-        self, program, predictor, pred_i, demo_candidates, demo_set_i, trial_logs, tip=None, *, run
+        self,
+        program,
+        predictor,
+        pred_i,
+        demo_candidates,
+        demo_set_i,
+        trial_logs: TrialLogs,
+        tip=None,
+        *,
+        run,
     ) -> str:
         await self._ensure_data_summary(run=run)
         instruction_history = create_predictor_level_history_string(

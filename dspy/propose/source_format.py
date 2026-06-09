@@ -1,3 +1,8 @@
+"""Source formatting helpers for program-aware instruction proposal.
+
+Import ``get_formatted_source`` from ``dspy.propose.source_format``.
+"""
+
 from __future__ import annotations
 
 import ast

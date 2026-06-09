@@ -50,7 +50,7 @@ async def propose_instructions(
         trainset=trainset,
         program=program,
         demo_candidates=demo_candidates,
-        N=num_instruct_candidates,
+        num_candidates=num_instruct_candidates,
         trial_logs={},
         run=run,
     )
