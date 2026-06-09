@@ -39,7 +39,7 @@ def test_basic_example(make_run):
     question = "What is the color of the sky?"
     lm = DummyLM([{"rationale": "my rationale", "answer": "blue"}])
     run = make_run(lm=lm)
-    final_pred = asyncio.run(compare_answers(completions=completions, question=question, run=run))
+    final_pred = asyncio.run(compare_answers(student_completions=completions, question=question, run=run))
     assert final_pred.rationale == "my rationale"
     assert final_pred.answer == "blue"
 
@@ -47,5 +47,18 @@ def test_basic_example(make_run):
 def test_rejects_wrong_completion_count(make_run):
     compare_answers = MultiChainComparison(BasicQA, num_chains=2)
     run = make_run(lm=DummyLM([{"rationale": "my rationale", "answer": "blue"}]))
-    with pytest.raises(ValueError, match="doesn't match the expected number M"):
-        asyncio.run(compare_answers(completions=completions, question="What is the color of the sky?", run=run))
+    with pytest.raises(ValueError, match="doesn't match num_chains"):
+        asyncio.run(
+            compare_answers(
+                student_completions=completions,
+                question="What is the color of the sky?",
+                run=run,
+            )
+        )
+
+
+def test_requires_student_completions(make_run):
+    compare_answers = MultiChainComparison(BasicQA)
+    run = make_run(lm=DummyLM([{"rationale": "my rationale", "answer": "blue"}]))
+    with pytest.raises(TypeError, match="requires student_completions"):
+        asyncio.run(compare_answers(student_completions=[], question="What is the color of the sky?", run=run))

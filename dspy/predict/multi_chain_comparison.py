@@ -1,12 +1,25 @@
+from __future__ import annotations
+
+from typing import Any
+
 from dspy.core.types import LMConfig, merge_lm_config
-from dspy.core.types.call_options import ModuleCallOptions
+from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.predict.predict import Predict
-from dspy.primitives import Module
-from dspy.runtime.run_context import RunContext
+from dspy.primitives import Module, Prediction
+from dspy.runtime.run_context import RunContext  # noqa: TC001 — runtime signature typing
 from dspy.task_spec import TaskSpec, input_field, output_field
+
+StudentCompletion = Prediction | dict[str, Any]
 
 
 class MultiChainComparison(Module):
+    """Compare multiple student chain completions and synthesize corrected reasoning.
+
+    Callers must pass ``student_completions`` as a keyword argument: a list of
+    ``Prediction`` or mapping records containing each chain's rationale/reasoning
+    and final output field. The list length must equal ``num_chains``.
+    """
+
     def __init__(
         self,
         task_spec: TaskSpec,
@@ -48,13 +61,23 @@ class MultiChainComparison(Module):
         *,
         run: RunContext,
         options: ModuleCallOptions | None = None,
-        completions: list,
-        **inputs,
+        student_completions: list[StudentCompletion],
+        **inputs: Any,
     ):
+        if not student_completions:
+            raise TypeError("MultiChainComparison requires student_completions: list[Prediction | dict[str, Any]].")
         attempts = []
-        for c in completions:
-            rationale = c.get("rationale", c.get("reasoning")).strip().split("\n")[0].strip()
-            answer = str(c[self.last_key]).strip().split("\n")[0].strip()
+        for completion in student_completions:
+            rationale_source = (
+                completion.get("rationale", completion.get("reasoning"))
+                if hasattr(completion, "get")
+                else getattr(completion, "rationale", getattr(completion, "reasoning", ""))
+            )
+            rationale = str(rationale_source).strip().split("\n")[0].strip()
+            answer_value = (
+                completion[self.last_key] if hasattr(completion, "__getitem__") else getattr(completion, self.last_key)
+            )
+            answer = str(answer_value).strip().split("\n")[0].strip()
             attempts.append(f"«I'm trying to {rationale} I'm not sure but my prediction is {answer}»")
         if len(attempts) != self.num_chains:
             raise ValueError(
