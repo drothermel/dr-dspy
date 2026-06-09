@@ -215,6 +215,36 @@ def test_load_with_version_mismatch(tmp_path, make_run):
         logger.removeHandler(handler)
 
 
+def test_save_pkl_emits_save_warning(tmp_path):
+    predict = Predict(QA_TASK_SPEC)
+
+    class ListHandler(logging.Handler):
+        def __init__(self):
+            super().__init__()
+            self.messages = []
+
+        @override
+        def emit(self, record):
+            self.messages.append(record.getMessage())
+
+    handler = ListHandler()
+    original_level = logger.level
+    logger.addHandler(handler)
+    logger.setLevel(logging.WARNING)
+    try:
+        json_path = tmp_path / "module.json"
+        predict.save(json_path)
+        assert not any("Saving state to .pkl" in msg for msg in handler.messages)
+
+        handler.messages.clear()
+        pkl_path = tmp_path / "module.pkl"
+        predict.save(pkl_path)
+        assert any("Saving state to .pkl" in msg for msg in handler.messages)
+    finally:
+        logger.setLevel(original_level)
+        logger.removeHandler(handler)
+
+
 def test_load_warns_when_saved_metadata_missing_dependency_keys(tmp_path):
     save_versions = {"python": "3.9"}
     load_versions = {"python": "3.9", "dspy": "2.5.0", "cloudpickle": "2.1"}

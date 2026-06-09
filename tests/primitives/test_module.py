@@ -189,7 +189,12 @@ class DuplicateModule(Module):
 
 def test_named_parameters_duplicate_references():
     module = DuplicateModule()
-    module.named_parameters()
+    named = module.named_parameters()
+    assert len(named) == 1
+    assert len(module.parameters()) == 1
+    assert named[0][1] is module.p0
+    assert named[0][1] is module.p1
+    assert named[0][0] in {"self.p0", "self.p1"}
 
 
 def test_load_state_is_transactional():

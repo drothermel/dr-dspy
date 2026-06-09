@@ -93,3 +93,54 @@ def test_prediction_lm_usage_round_trip():
     prediction = Prediction(score=1.0)
     prediction.set_lm_usage(usage)
     assert prediction.get_lm_usage() == usage
+
+
+def test_completions_empty_dict_has_zero_length():
+    completions = Completions({})
+    assert len(completions) == 0
+
+
+def test_completions_index_by_int_returns_prediction():
+    completions = Completions({"answer": ["a", "b"]})
+    first = completions[0]
+    assert isinstance(first, Prediction)
+    assert first.answer == "a"
+
+
+def test_completions_index_by_str_returns_list():
+    completions = Completions({"answer": ["a", "b"]})
+    assert completions["answer"] == ["a", "b"]
+
+
+def test_completions_index_out_of_range_raises():
+    completions = Completions({"answer": ["a"]})
+    with pytest.raises(IndexError, match="Index out of range"):
+        _ = completions[1]
+
+
+def test_completions_contains_key():
+    completions = Completions({"answer": ["a"]})
+    assert "answer" in completions
+    assert "missing" not in completions
+
+
+def test_prediction_from_completions():
+    prediction = Prediction.from_completions([{"answer": "a"}, {"answer": "b"}])
+    assert prediction.answer == "a"
+    assert prediction.completions is not None
+    assert len(prediction.completions) == 2
+    second = prediction.completions[1]
+    assert isinstance(second, Prediction)
+    assert second.answer == "b"
+
+
+def test_prediction_equality_includes_completions():
+    left = Prediction.from_completions([{"answer": "a"}, {"answer": "b"}])
+    right = Prediction.from_record({"answer": "a"})
+    object.__setattr__(right, "_completions", Completions({"answer": ["a", "c"]}))
+    assert left != right
+
+    shared = left.completions
+    clone = Prediction.from_record({"answer": "a"})
+    object.__setattr__(clone, "_completions", shared)
+    assert left == clone
