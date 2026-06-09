@@ -757,6 +757,8 @@ moved under `python_interpreter/`; shared host-side JSON-RPC loop in
 
 ### P5.2 Decide the status of `dspy.testing` and consolidate test doubles
 
+**Status:** Done (2026-06).
+
 **Sources:** External review; Manual test-suite review.
 
 Problem:
@@ -784,6 +786,14 @@ Details to preserve:
 - Adapter-specific capture helpers can stay near adapter tests when they depend
   on adapter internals.
 - Avoid leaving helper behavior half-public and undocumented.
+
+**Delivered:** Repo-local decision — deleted `dspy/testing/` from the wheel;
+`DummyLM` and `DummyVectorizer` under `tests/test_utils/` with split helpers
+(`answer_routing`, `field_formatting`, `output_assembly`); shared catalog in
+`tests/test_utils/lm/catalog.py` (`SequentialTextLM`, `FailingLM`,
+`CapabilityStubLM`, `NativeToolCallLM`); `SpyLM` under `tests/test_utils/lm/`;
+contributor docs in `tests/README.md` and `AGENTS.md`; regression test for
+`follow_examples=True` with no field headers.
 
 ### P5.3 Make adapter tests reusable without weakening prompt contracts
 

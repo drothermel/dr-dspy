@@ -201,24 +201,23 @@ Problem:
   `to_json()` -> `model_dump_json()`. Pydantic cannot serialize a bare
   `Exception`, so consumers calling `.to_json()` on an error event raise a
   serialization error instead of producing a payload.
-- `dspy/testing/dummy_lm.py` builds `fields = defaultdict(int)` and then calls
-  `max(fields.values())`. When `follow_examples=True` and no message matches
-  `FIELD_HEADER_PATTERN`, `fields` is empty and `max()` raises
-  `ValueError: max() arg is an empty sequence`.
 
 Target shape:
 
 - Override `LMStreamErrorEvent.to_json` or add a field serializer so error
   events emit a stable JSON-safe shape, such as
   `{"type": "error", "error": str(self.error)}`.
-- Return `None` from `DummyLM._use_example` when no fields are found, before
-  calling `max()`.
 
 Details to preserve:
 
 - Keep the other stream-event payloads unchanged.
 - Add regression tests for `LMStream` and `AsyncLMStream` error/result
-  serialization, and for `DummyLM(follow_examples=True)` with no field headers.
+  serialization.
+
+**Partial delivery (2026-06):** `DummyLM(follow_examples=True)` with no field
+headers now returns empty output instead of raising; regression tests live in
+`tests/test_utils/test_dummy_lm.py`. Stream error-event serialization remains
+open.
 
 ### P1.3 Add typed Databricks retrieval response boundaries
 
@@ -539,7 +538,6 @@ Add focused tests before or while fixing the relevant behavior:
 - `Unbatchify` close-after-call and output-count mismatch behavior.
 - `run_bounded` with valid `None` results.
 - `LMStream` and `AsyncLMStream` error/result serialization behavior.
-- `DummyLM(follow_examples=True)` with no field headers.
 - GRPO validation behavior under optimized Python.
 - Adapter JSON parsing with unexpected output fields.
 - XML adapter JSON repair behavior.
