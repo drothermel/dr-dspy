@@ -126,6 +126,7 @@ class RunContext(BaseModel):
         if isinstance(telemetry, dict):
             telemetry = self.telemetry.model_copy(update=telemetry)
 
+        explicit_log_session = "log_session" in overrides
         callbacks = list(overrides.pop("callbacks", self.callbacks))
         optimization_trace = list(overrides.pop("optimization_trace", self.optimization_trace))
         call_log = list(overrides.pop("call_log", self.call_log))
@@ -140,7 +141,7 @@ class RunContext(BaseModel):
             unknown = ", ".join(sorted(overrides))
             raise TypeError(f"RunContext.fork() got unexpected keyword argument(s): {unknown}")
 
-        return RunContext(
+        forked = RunContext(
             lm=lm,
             adapter=adapter,
             callbacks=callbacks,
@@ -154,6 +155,8 @@ class RunContext(BaseModel):
             log_session=log_session,
             call_site=call_site,
         )
+        forked._ensure_log_session(explicit_log_session=explicit_log_session)
+        return forked
 
     def _init_run_session(self) -> None:
         from dspy.utils.run_log import create_run_log_session
@@ -172,6 +175,21 @@ class RunContext(BaseModel):
             call_log_dir=self.telemetry.call_log_dir,
             settings_snapshot=snapshot,
         )
+
+    def _ensure_log_session(self, *, explicit_log_session: bool) -> None:
+        from dspy.utils.run_log import resolve_log_root, resolve_run_bucket
+
+        if not disk_call_log_enabled(self.telemetry):
+            self.log_session = None
+            return
+        if explicit_log_session:
+            return
+        if self.log_session is None:
+            self._init_run_session()
+            return
+        expected_root = resolve_log_root(self.telemetry.call_log_dir)
+        if self.log_session.run_dir.parent.parent != expected_root / resolve_run_bucket():
+            self._init_run_session()
 
     def inspect_call_log(self, n: int = 1, file: TextIO | None = None) -> None:
         from dspy.utils.inspect_call_log import pretty_print_call_log

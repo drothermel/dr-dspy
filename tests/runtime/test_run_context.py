@@ -120,3 +120,35 @@ def test_fork_rejects_unknown_kwargs():
     run = RunContext.create(lm=lm, adapter=adapter, init_run_log=False)
     with pytest.raises(TypeError, match="telemtry"):
         run.fork(telemtry="strict")
+
+
+def test_fork_enables_disk_logging_session(tmp_path, monkeypatch):
+    monkeypatch.setenv("DSPY_LOG_DIR", str(tmp_path))
+    lm = DummyLM([{"answer": "ok"}])
+    adapter = JSONAdapter()
+    run = RunContext.create(
+        lm=lm,
+        adapter=adapter,
+        telemetry=TelemetryConfig(call_log=CallLogMode.off),
+        init_run_log=False,
+    )
+    assert run.log_session is None
+    forked = run.fork(telemetry=TelemetryConfig(call_log=CallLogMode.disk))
+    assert forked.log_session is not None
+    assert forked.log_session.run_dir.exists()
+    assert (forked.log_session.run_dir / "run.json").exists()
+
+
+def test_fork_disables_disk_logging_session(tmp_path, monkeypatch):
+    monkeypatch.setenv("DSPY_LOG_DIR", str(tmp_path))
+    lm = DummyLM([{"answer": "ok"}])
+    adapter = JSONAdapter()
+    run = RunContext.create(
+        lm=lm,
+        adapter=adapter,
+        telemetry=TelemetryConfig(call_log=CallLogMode.disk),
+        init_run_log=True,
+    )
+    assert run.log_session is not None
+    forked = run.fork(telemetry=TelemetryConfig(call_log=CallLogMode.off))
+    assert forked.log_session is None
