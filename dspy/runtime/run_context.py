@@ -13,6 +13,8 @@ from dspy.runtime.config import (
     TelemetryConfig,
     disk_call_log_enabled,
 )
+from dspy.runtime.inspect_call_log import pretty_print_call_log
+from dspy.runtime.run_log import create_run_log_session, resolve_log_root, resolve_run_bucket
 
 if TYPE_CHECKING:
     from dspy.adapters.base import Adapter
@@ -60,13 +62,12 @@ class RunContext(BaseModel):
         telemetry: TelemetryConfig | None = None,
         init_run_log: bool = True,
     ) -> RunContext:
-        _ensure_run_context_model()
-        from dspy.clients.base_lm import BaseLM as BaseLMType
-
-        if not isinstance(lm, BaseLMType):
+        if not hasattr(lm, "model"):
             raise TypeError(f"RunContext requires a BaseLM instance, got {type(lm).__name__}.")
         if adapter is None:
             raise ValueError("RunContext requires an adapter.")
+
+        _ensure_run_context_model_rebuilt()
 
         run = cls(
             lm=lm,
@@ -84,7 +85,6 @@ class RunContext(BaseModel):
         return run
 
     def fork(self, **overrides: Any) -> RunContext:
-        _ensure_run_context_model()
         execution = overrides.pop("execution", self.execution)
         telemetry = overrides.pop("telemetry", self.telemetry)
         if isinstance(execution, dict):
@@ -125,8 +125,6 @@ class RunContext(BaseModel):
         return forked
 
     def _init_run_session(self) -> None:
-        from dspy.runtime.run_log import create_run_log_session
-
         if not disk_call_log_enabled(self.telemetry):
             self.log_session = None
             return
@@ -143,8 +141,6 @@ class RunContext(BaseModel):
         )
 
     def _ensure_log_session(self, *, explicit_log_session: bool) -> None:
-        from dspy.runtime.run_log import resolve_log_root, resolve_run_bucket
-
         if not disk_call_log_enabled(self.telemetry):
             self.log_session = None
             return
@@ -158,8 +154,6 @@ class RunContext(BaseModel):
             self._init_run_session()
 
     def inspect_call_log(self, n: int = 1, file: TextIO | None = None) -> None:
-        from dspy.runtime.inspect_call_log import pretty_print_call_log
-
         pretty_print_call_log(call_log=self.call_log, n=n, file=file)
 
     def read_call_log(self, n: int = 10) -> list[dict[str, Any]]:
@@ -185,30 +179,14 @@ def resolve_run(
     )
 
 
-_RUN_CONTEXT_MODEL_BUILT = False
+from dspy.runtime.run_context_model import rebuild_run_context_model
+
+_run_context_model_rebuilt = False
 
 
-def _ensure_run_context_model() -> None:
-    global _RUN_CONTEXT_MODEL_BUILT
-    if _RUN_CONTEXT_MODEL_BUILT:
+def _ensure_run_context_model_rebuilt() -> None:
+    global _run_context_model_rebuilt
+    if _run_context_model_rebuilt:
         return
-    from dspy.adapters.base.adapter import Adapter
-    from dspy.clients.base_lm import BaseLM
-    from dspy.core.types import CallRecord
-    from dspy.primitives.module import Module
-    from dspy.runtime.callback import Callback
-    from dspy.runtime.run_log import RunLogSession
-    from dspy.runtime.usage_tracker import UsageTracker
-
-    RunContext.model_rebuild(
-        _types_namespace={
-            "BaseLM": BaseLM,
-            "Adapter": Adapter,
-            "Callback": Callback,
-            "CallRecord": CallRecord,
-            "UsageTracker": UsageTracker,
-            "Module": Module,
-            "RunLogSession": RunLogSession,
-        }
-    )
-    _RUN_CONTEXT_MODEL_BUILT = True
+    rebuild_run_context_model(RunContext)
+    _run_context_model_rebuilt = True

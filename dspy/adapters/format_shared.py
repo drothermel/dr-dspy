@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import build_multimodal_user_message_content, inputs_include_multimodal_custom_type_values
-from dspy.clients.openai_format import message_to_openai_chat
+from dspy.clients.openai_format.chat_request import message_to_openai_chat
 from dspy.task_spec import (
     FieldBinding,
     field_bindings,

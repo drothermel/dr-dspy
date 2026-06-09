@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from dspy.clients.openai_format import extract_citations_from_choice
+from dspy.clients.openai_format.parse import extract_citations_from_choice
 from dspy.errors import LMInvalidRequestError
 
 

@@ -20,6 +20,14 @@ repos:
         language: system
         pass_filenames: false
 
+  - repo: local
+    hooks:
+      - id: check-lazy-imports
+        name: check lazy imports
+        entry: uv run python scripts/check_lazy_imports.py
+        language: system
+        pass_filenames: false
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:

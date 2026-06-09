@@ -3,15 +3,14 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
-from dspy.primitives.example import Example
+from dspy.evaluate.evaluator import Evaluate
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.config import CallSite
 from dspy.runtime.transparency import resolve_adapter
+from dspy.teleprompt.trace_helpers import run_program_with_trace, trace_to_demos
 
 if TYPE_CHECKING:
-    from dspy.core.types.call_options import ModuleCallOptions
-    from dspy.primitives.module import Module
-    from dspy.primitives.prediction import Prediction
+    from dspy.primitives.example import Example
     from dspy.runtime.run_context import RunContext
 
 
@@ -24,8 +23,6 @@ def make_optimizer_evaluator(
     max_errors: int | None,
     **kwargs: Any,
 ):
-    from dspy.evaluate.evaluate import Evaluate
-
     effective_max_errors = resolve_max_errors(max_errors, run)
     return Evaluate(
         devset=devset,
@@ -34,34 +31,6 @@ def make_optimizer_evaluator(
         max_errors=effective_max_errors,
         **kwargs,
     )
-
-
-async def run_program_with_trace(
-    program: Module,
-    example: Example | dict[str, Any],
-    run: RunContext,
-    *,
-    options: ModuleCallOptions | None = None,
-) -> tuple[Prediction, list]:
-    item_run = run.fork(optimization_trace=[], call_log=[])
-    inputs = example.as_inputs() if isinstance(example, Example) else example
-    prediction = await program(**inputs, run=item_run, options=options)
-    trace = list(item_run.optimization_trace)
-    return prediction, trace
-
-
-def trace_to_demos(trace: list, predictor2name: dict[int, str]) -> dict[str, list[Example]]:
-    name2traces: dict[str, list[Example]] = {}
-    for step in trace:
-        predictor, inputs, outputs = step
-        demo = Example.from_record({"augmented": True, **inputs, **outputs})
-        try:
-            predictor_name = predictor2name[id(predictor)]
-        except KeyError:
-            continue
-        name2traces[predictor_name] = name2traces.get(predictor_name, [])
-        name2traces[predictor_name].append(demo)
-    return name2traces
 
 
 def optimizer_run_context(
@@ -85,3 +54,12 @@ def optimizer_lm_context(run: RunContext, *, lm, adapter=None, phase: str, lm_ro
         call_site=call_site
     )
     yield child
+
+
+__all__ = [
+    "make_optimizer_evaluator",
+    "optimizer_lm_context",
+    "optimizer_run_context",
+    "run_program_with_trace",
+    "trace_to_demos",
+]

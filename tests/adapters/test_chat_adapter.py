@@ -27,7 +27,7 @@ from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
-from dspy.clients.openai_format import provider_tool_call_to_part
+from dspy.clients.openai_format.parse import provider_tool_call_to_part
 from dspy.core.types import LMOutput, LMPart, LMResponse, LMTextPart, LMThinkingPart
 from dspy.errors import AdapterParseError
 from dspy.history import TurnLog

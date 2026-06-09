@@ -7,7 +7,7 @@ from typing_extensions import override
 if TYPE_CHECKING:
     from collections.abc import Callable
 from dspy.clients.lm import LM
-from dspy.clients.openai_format import message_to_openai_chat
+from dspy.clients.openai_format.chat_request import message_to_openai_chat
 from dspy.core.types import LMRequest, LMResponse
 
 

@@ -6,12 +6,13 @@ from typing_extensions import override
 
 from dspy.adapters.base import Adapter
 from dspy.adapters.call.capabilities import AdapterCapabilities
-from dspy.adapters.call.policies.parse_fallback import JSONParseFallbackPolicy, NoOpParseFallbackPolicy
+from dspy.adapters.call.policies.json_parse_fallback import JSONParseFallbackPolicy
 from dspy.adapters.format_shared import FIELD_HEADER_PATTERN, ChatFormatMixin
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.utils import parse_output_field, validate_parsed_fields
 
 if TYPE_CHECKING:
+    from dspy.adapters.call.policies.parse_fallback import NoOpParseFallbackPolicy
     from dspy.adapters.types.base_type import Type
     from dspy.runtime.callback import Callback
     from dspy.task_spec import TaskSpec

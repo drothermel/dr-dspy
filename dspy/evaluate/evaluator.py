@@ -22,7 +22,7 @@ from dspy.primitives.prediction import Prediction
 from dspy.runtime.async_parallel import resolve_max_concurrency, resolve_max_errors, run_bounded
 from dspy.runtime.callback import with_callbacks
 from dspy.runtime.run_context import RunContext
-from dspy.teleprompt.utils import run_program_with_trace
+from dspy.teleprompt.trace_helpers import run_program_with_trace
 
 logger = logging.getLogger(__name__)
 

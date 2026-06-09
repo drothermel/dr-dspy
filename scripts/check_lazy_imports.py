@@ -22,6 +22,7 @@ ALLOWLIST_SUFFIXES = (
     "clients/__init__.py",
     "teleprompt/gepa/gepa.py",
     "integrations/optimizers/gepa/adapter.py",
+    "runtime/run_context_model.py",
     "teleprompt/grpo.py",
     "teleprompt/bootstrap_finetune.py",
     "evaluate/metrics.py",

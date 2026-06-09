@@ -6,7 +6,7 @@ from typing_extensions import override
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.two_step_adapter import TwoStepAdapter
 from dspy.clients.base_lm import BaseLM
-from dspy.clients.openai_format import message_to_openai_chat
+from dspy.clients.openai_format.chat_request import message_to_openai_chat
 from dspy.core.types import LMRequest, LMResponse
 from dspy.errors import AdapterParseError
 from dspy.history import TurnLog

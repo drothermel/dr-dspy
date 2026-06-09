@@ -19,7 +19,7 @@ from dspy.clients.finetune import (
     TrainDataFormat,
 )
 from dspy.clients.lm import LM
-from dspy.evaluate.evaluate import Evaluate
+from dspy.evaluate.evaluator import Evaluate
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
@@ -477,7 +477,7 @@ class GRPO(FinetuneTeleprompter):
                                     f"Adapter {adapter} does not support finetune data formatting. "
                                     "GRPO training requires an adapter with capabilities.supports_finetune=True."
                                 )
-                            from dspy.clients.openai_format import message_to_openai_chat
+                            from dspy.clients.openai_format.chat_request import message_to_openai_chat
 
                             inp_messages = [
                                 message_to_openai_chat(message)

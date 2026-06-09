@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Protocol
 
+from dspy.adapters.structured_output import get_structured_outputs_response_format, has_open_ended_mapping
+from dspy.adapters.types.tool import ToolCalls
 from dspy.core.types.config import LMConfig, coerce_lm_config
 from dspy.errors import LMError
 
@@ -61,16 +63,13 @@ class StructuredOutputPolicy:
         inputs: dict[str, Any],
         run_once: Callable[[LMConfig | None], Awaitable[list[dict[str, Any]]]],
     ) -> list[dict[str, Any]]:
-        from dspy.adapters.json_adapter import _get_structured_outputs_response_format, _has_open_ended_mapping
-        from dspy.adapters.types.tool import ToolCalls
-
         resolved_config = coerce_lm_config(config)
         if "response_format" not in lm.supported_params:
             return await run_once(resolved_config)
 
         has_tool_calls = any(field.type_ == ToolCalls for field in task_spec.output_fields.values())
         if (
-            _has_open_ended_mapping(task_spec)
+            has_open_ended_mapping(task_spec)
             or (not adapter.use_native_function_calling and has_tool_calls)
             or (not lm.supports_response_schema)
         ):
@@ -78,7 +77,7 @@ class StructuredOutputPolicy:
             return await run_once(json_config)
 
         try:
-            structured_output_model = _get_structured_outputs_response_format(
+            structured_output_model = get_structured_outputs_response_format(
                 task_spec=task_spec, use_native_function_calling=adapter.use_native_function_calling
             )
             structured_config = resolved_config.model_copy(update={"response_format": structured_output_model})

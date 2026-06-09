@@ -6,6 +6,7 @@ Before committing, run these in order. **Each command must exit 0** — do not c
 uv run ruff check --fix
 uv run ty check --fix
 uv run ruff format
+uv run python scripts/check_lazy_imports.py
 ```
 
 `uv run ty check --fix` is a required commit gate: fix or resolve every reported diagnostic before committing. Re-run the full sequence after fixes.
@@ -27,8 +28,14 @@ result = await program(
 )
 
 # Evaluation
-evaluator = Evaluate(devset=devset, metric=my_metric)
-score = await evaluator(program, run=run)
+from dspy.evaluate.evaluator import Evaluate
+
+evaluate = Evaluate(devset=devset, metric=my_metric)
+score = await evaluate(program, run=run)
+
+# OpenAI wire-format helpers (import submodules directly)
+from dspy.clients.openai_format.chat_request import message_to_openai_chat, to_openai_chat_request
+from dspy.clients.openai_format.parse import completion_to_lm_response
 
 # Parallel batch
 parallel = Parallel(max_concurrency=8)
@@ -245,7 +252,9 @@ Task input validation runs in `AdapterCallPipeline.execute`; do not rely on dupl
 
 1. **Public spine:** `dspy.runtime`, `dspy.core.types`, `dspy.task_spec`, `dspy.errors`, `dspy.persistence`, `dspy.serialization`
 2. **Integrations:** `dspy.integrations.*` (optional extras: `mcp`, `langchain`, `optuna`, `gepa`, `datasets`; import vendor modules directly, e.g. `dspy.integrations.finetune.openai`, `dspy.integrations.retrieval.weaviate`, `dspy.integrations.optimizers.gepa.adapter`, `dspy.integrations.datasets.huggingface`, `dspy.integrations.datasets.hotpotqa`)
-3. **Internal / test-only:** `dspy._internal.*`, `dspy.testing.*`
+3. **Client format helpers:** `dspy.clients.openai_format.*` submodules only (empty package `__init__`; e.g. `dspy.clients.openai_format.chat_request`, `dspy.clients.openai_format.parse`)
+4. **Evaluation:** `dspy.evaluate.evaluator` (`Evaluate`, `EvaluationResult`); other helpers under `dspy.evaluate.*` submodules
+5. **Internal / test-only:** `dspy._internal.*`, `dspy.testing.*`
 
 ## Do not import from (internal/legacy)
 

@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from dspy.clients.openai_format.serialize import text_config_kwargs
-from dspy.core.types import LMMessage, LMRequest, LMTextPart
+from dspy.core.types.messages import LMMessage
+from dspy.core.types.parts import LMTextPart
+from dspy.core.types.request import LMRequest
 
 
 def to_openai_text_request(request: LMRequest) -> dict[str, Any]:

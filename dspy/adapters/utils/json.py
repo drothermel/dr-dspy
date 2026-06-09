@@ -1,8 +1,3 @@
-from pydantic import TypeAdapter
+from dspy.task_spec.json_serialize import serialize_for_json
 
-
-def serialize_for_json(value: object) -> object:
-    try:
-        return TypeAdapter(type(value)).dump_python(value, mode="json")
-    except Exception:
-        return str(value)
+__all__ = ["serialize_for_json"]

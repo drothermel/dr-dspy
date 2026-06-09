@@ -7,7 +7,7 @@ from typing_extensions import override
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool, ToolCalls
 from dspy.clients.base_lm import BaseLM
-from dspy.clients.openai_format import message_to_openai_chat
+from dspy.clients.openai_format.chat_request import message_to_openai_chat
 from dspy.core.types import LMOutput, LMRequest, LMResponse, LMToolCallPart, LMUsage
 from dspy.predict.react_v2 import ReActV2
 from dspy.testing import DummyLM

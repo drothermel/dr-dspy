@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
-from dspy.evaluate.evaluate import Evaluate
+from dspy.evaluate.evaluator import Evaluate
 from dspy.integrations.optimizers.optuna.distributions import get_param_distributions
 from dspy.integrations.optimizers.optuna.import_ import import_optuna
 from dspy.integrations.optimizers.optuna.study import add_observed_trial, create_maximize_study

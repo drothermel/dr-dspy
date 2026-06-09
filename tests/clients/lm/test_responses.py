@@ -99,7 +99,7 @@ def test_reasoning_effort_responses_api(make_run):
 
 
 def test_responses_api_converts_images_correctly():
-    from dspy.clients.openai_format import to_openai_responses_request
+    from dspy.clients.openai_format.responses_request import to_openai_responses_request
     from dspy.core.types import LMConfig, LMImagePart, LMRequest, LMTextPart, User
 
     base64_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
@@ -137,7 +137,7 @@ def test_responses_api_converts_images_correctly():
 
 
 def test_responses_api_converts_files_correctly():
-    from dspy.clients.openai_format import to_openai_responses_request
+    from dspy.clients.openai_format.responses_request import to_openai_responses_request
     from dspy.core.types import LMBinaryPart, LMConfig, LMRequest, LMTextPart, User
 
     request = LMRequest(
@@ -199,7 +199,7 @@ def test_responses_api_converts_files_correctly():
 
 
 def test_responses_api_preserves_multi_message_structure(make_run):
-    from dspy.clients.openai_format import to_openai_responses_request
+    from dspy.clients.openai_format.responses_request import to_openai_responses_request
     from dspy.core.types import Assistant, LMConfig, LMRequest, System, User
 
     request = LMRequest(

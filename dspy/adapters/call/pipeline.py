@@ -4,8 +4,12 @@ from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.call.policies.parse_fallback import NoOpParseFallbackPolicy
 from dspy.adapters.call.policies.response_format import NoOpResponseFormatPolicy
+from dspy.adapters.call.two_step import TwoStepCallExecutor
 from dspy.core.types.config import coerce_lm_config
+from dspy.core.types.openai_compat import request_messages_as_openai
 from dspy.errors import AdapterParseError, LMError
+from dspy.predict.call_validation import validate_task_inputs
+from dspy.runtime.transparency import resolve_call, resolve_call_site, resolve_lm_config, validate_compiled_call
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -32,12 +36,8 @@ class AdapterCallPipeline:
         call_site: CallSite | None = None,
         allow_parse_fallback: bool = True,
     ) -> list[dict[str, Any]]:
-        from dspy.predict.call_validation import validate_task_inputs
-
         inputs = validate_task_inputs(task_spec, inputs)
         if getattr(adapter, "call_mode", None) == "two_step":
-            from dspy.adapters.call.two_step import TwoStepCallExecutor
-
             return await TwoStepCallExecutor.execute(
                 cast("Any", adapter),
                 lm=lm,
@@ -86,9 +86,6 @@ class AdapterCallPipeline:
         call_site: CallSite | None,
         allow_parse_fallback: bool,
     ) -> list[dict[str, Any]]:
-        from dspy.core.types.openai_compat import request_messages_as_openai
-        from dspy.runtime.transparency import resolve_call, resolve_call_site, resolve_lm_config, validate_compiled_call
-
         try:
             resolved_config = coerce_lm_config(config)
             original_field_names = set(task_spec.fields.keys())

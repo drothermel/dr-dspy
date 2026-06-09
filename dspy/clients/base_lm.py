@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import copy as copy_module
 import datetime
 import importlib
 import inspect
 import uuid
-from typing import Any, TextIO
+from typing import TYPE_CHECKING, Any, TextIO
 
 from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
 from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
@@ -13,9 +15,11 @@ from dspy.core.types.openai_compat import request_messages_as_openai
 from dspy.runtime.callback import Callback, with_callbacks
 from dspy.runtime.config import disk_call_log_enabled, memory_call_log_enabled
 from dspy.runtime.inspect_call_log import pretty_print_call_log
-from dspy.runtime.run_context import RunContext
 from dspy.runtime.run_log import RunLogSession, append_call_record, redact_config, redact_messages
-from dspy.runtime.transparency import CompiledCall
+
+if TYPE_CHECKING:
+    from dspy.runtime.run_context import RunContext
+    from dspy.runtime.transparency import CompiledCall
 
 LM_CLASS_STATE_KEY = "_dspy_lm_class"
 PROVIDER_OPTIONS_STATE_KEY = "_dspy_provider_options"
@@ -227,7 +231,7 @@ class BaseLM:
         }
 
     @classmethod
-    def load_state(cls, state: dict[str, Any], *, allow_custom_lm_class: bool = False) -> "BaseLM":
+    def load_state(cls, state: dict[str, Any], *, allow_custom_lm_class: bool = False) -> BaseLM:
         state = dict(state)
         class_path = state.pop(LM_CLASS_STATE_KEY, None)
         if cls is BaseLM:
@@ -274,7 +278,7 @@ class BaseLM:
         temperature: float | None = None,
         max_tokens: int | None = None,
         provider_options: LMProviderOptions | None = None,
-    ) -> "BaseLM":
+    ) -> BaseLM:
         new_instance = copy_module.copy(self)
         new_instance.call_log = []
         new_instance.callbacks = list(getattr(self, "callbacks", []) or [])
@@ -291,7 +295,7 @@ class BaseLM:
         new_instance.kwargs = validate_lm_kwargs(new_kwargs)
         return new_instance
 
-    def inspect_call_log(self, n: int = 1, file: "TextIO | None" = None) -> None:
+    def inspect_call_log(self, n: int = 1, file: TextIO | None = None) -> None:
         pretty_print_call_log(call_log=self.call_log, n=n, file=file)
 
     def record_call(self, entry: CallRecord, *, run: RunContext) -> None:

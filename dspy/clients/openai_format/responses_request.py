@@ -11,7 +11,9 @@ from dspy.clients.openai_format.serialize import (
     tool_result_to_openai,
     tool_to_openai,
 )
-from dspy.core.types import LMMessage, LMRequest, LMToolCallPart, LMToolResultPart
+from dspy.core.types.messages import LMMessage
+from dspy.core.types.parts import LMToolCallPart, LMToolResultPart
+from dspy.core.types.request import LMRequest
 
 
 def to_openai_responses_request(request: LMRequest) -> dict[str, Any]:

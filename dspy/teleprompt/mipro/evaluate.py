@@ -1,7 +1,7 @@
 import logging
 from typing import TYPE_CHECKING, Any
 
-from dspy.evaluate.evaluate import Evaluate
+from dspy.evaluate.evaluator import Evaluate
 from dspy.integrations.optimizers.optuna.distributions import get_param_distributions
 from dspy.integrations.optimizers.optuna.study import add_observed_trial
 from dspy.runtime.run_context import RunContext

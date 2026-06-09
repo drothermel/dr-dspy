@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from dspy.errors import LMConfigurationError
+from dspy.core.types.lm_provider import LMProviderOptions
+from dspy.errors import LMConfigurationError, LMUnsupportedFeatureError
 
 if TYPE_CHECKING:
     from dspy.core.types.config import LMConfig
-    from dspy.core.types.lm_provider import LMProviderOptions
 
 
 def provider_options_from_serialized_state(
@@ -14,14 +14,12 @@ def provider_options_from_serialized_state(
     provider_data: dict[str, Any] | None,
     remaining: dict[str, Any],
 ) -> LMProviderOptions:
-    from dspy.core.types.lm_provider import LMProviderOptions as ProviderOptions
-
     merged = dict(remaining)
     if provider_data:
         merged = {**provider_data, **merged}
-    fields = set(ProviderOptions.model_fields)
+    fields = set(LMProviderOptions.model_fields)
     data = {key: value for key, value in merged.items() if key in fields}
-    return ProviderOptions(**data)
+    return LMProviderOptions(**data)
 
 
 def _provider_options_non_empty(provider_options: LMProviderOptions | None) -> bool:
@@ -59,8 +57,6 @@ def validate_dr_llm_ctor(
 
 def reject_unsupported_merged_config(config: LMConfig, *, model: str) -> None:
     """Reject per-request LMConfig fields that dr-llm v1 does not map to BackendRequest."""
-    from dspy.errors import LMUnsupportedFeatureError
-
     if config.response_format is not None:
         raise LMUnsupportedFeatureError(
             "dr-llm backends v1 do not support structured response_format.",

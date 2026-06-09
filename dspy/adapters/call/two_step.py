@@ -7,6 +7,7 @@ from dspy.core.types import LMRequest
 from dspy.core.types.config import coerce_lm_config, merge_lm_request_config
 from dspy.core.types.openai_compat import request_messages_as_openai
 from dspy.errors import AdapterParseError, LMError
+from dspy.runtime.transparency import resolve_call, resolve_lm_config, validate_compiled_call
 
 if TYPE_CHECKING:
     from dspy.adapters.two_step_adapter import TwoStepAdapter
@@ -28,8 +29,6 @@ class TwoStepCallExecutor:
         inputs: dict[str, Any],
         run: RunContext,
     ) -> list[dict[str, Any]]:
-        from dspy.runtime.transparency import resolve_call, resolve_lm_config, validate_compiled_call
-
         resolved_config = coerce_lm_config(config)
         messages = adapter.format(task_spec=task_spec, demos=demos, inputs=inputs)
         merged_config, provenance = resolve_lm_config(lm, resolved_config)

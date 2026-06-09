@@ -1,7 +1,7 @@
 from typing import Any, cast
 
 from dspy.adapters.types.tool import ToolCallResults, ToolCalls
-from dspy.clients.openai_format import to_openai_chat_request
+from dspy.clients.openai_format.chat_request import to_openai_chat_request
 from dspy.core.types import LMMessage, LMRequest, LMToolResultPart
 
 

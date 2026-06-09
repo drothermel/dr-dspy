@@ -1309,7 +1309,7 @@ def test_json_adapter_toolcalls_no_native_function_calling():
         return f"The weather in {city} is sunny"
 
     tools = [Tool(get_weather, description="Get the weather for a city")]
-    with mock.patch("dspy.adapters.json_adapter._get_structured_outputs_response_format") as mock_structured:
+    with mock.patch("dspy.adapters.structured_output.get_structured_outputs_response_format") as mock_structured:
         with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
             mock_completion.return_value = ModelResponse(
                 choices=[Choices(message=Message(content="{'answer': 'sunny', 'tool_calls': {'tool_calls': []}}"))],

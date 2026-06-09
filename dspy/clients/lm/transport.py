@@ -10,15 +10,15 @@ from pydantic import BaseModel, ConfigDict
 from dspy.clients.lm.headers import _add_dspy_identifier_to_headers
 from dspy.clients.lm.litellm_access import _get_litellm
 from dspy.clients.model_id import split_provider_model
-from dspy.clients.openai_format import (
+from dspy.clients.openai_format.chat_request import to_openai_chat_request
+from dspy.clients.openai_format.parse import (
     completion_to_lm_response,
     cost_from_response,
     responses_to_lm_response,
-    to_openai_chat_request,
-    to_openai_responses_request,
-    to_openai_text_request,
     usage_from_response,
 )
+from dspy.clients.openai_format.responses_request import to_openai_responses_request
+from dspy.clients.openai_format.text_request import to_openai_text_request
 from dspy.core.types import LMRequest, LMResponse
 from dspy.core.types.config import merge_lm_request_config
 from dspy.errors import LMConfigurationError

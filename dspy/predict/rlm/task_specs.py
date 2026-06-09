@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dspy.adapters.utils import translate_field_type
 from dspy.predict.rlm.tools import format_tool_docs
 from dspy.primitives.repl_types import REPLHistory
-from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
+from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field, translate_field_type
 
 if TYPE_CHECKING:
     from dspy.predict.rlm.module import RLM

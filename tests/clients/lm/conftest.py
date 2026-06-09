@@ -117,7 +117,7 @@ def _direct_lm_case(lm_kind: str, outputs: list[str]):
         lm = _TypedContractLM("custom-model", outputs=outputs)
 
         def get_messages(index: int) -> list[dict[str, object]]:
-            from dspy.clients.openai_format import to_openai_chat_request
+            from dspy.clients.openai_format.chat_request import to_openai_chat_request
 
             return to_openai_chat_request(lm.requests[index])["messages"]
 

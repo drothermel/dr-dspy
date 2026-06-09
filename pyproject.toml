@@ -268,7 +268,9 @@ ban-relative-imports = "all"
 "dspy/predict/best_of_n.py" = ["N803"]  # Legacy N parameter name
 "dspy/predict/multi_chain_comparison.py" = ["N803"]  # Legacy M parameter name
 "dspy/predict/refine.py" = ["N803"]  # Legacy N parameter name
-"dspy/runtime/run_context.py" = ["TC001"]  # TransparencyMode required at runtime for Pydantic
+"dspy/runtime/run_context.py" = ["E402", "TC001"]  # model_rebuild after class; transparency types at runtime
+"dspy/clients/openai_format/serialize.py" = ["TC001"]  # LMConfig/LMToolSpec used at runtime in serializers
+"dspy/clients/openai_format/*.py" = ["TC001"]  # spine types used at runtime in wire-format helpers
 
 [tool.ty.src]
 include = ["dspy", "tests"]

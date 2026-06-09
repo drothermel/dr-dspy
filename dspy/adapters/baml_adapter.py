@@ -7,8 +7,8 @@ from typing_extensions import override
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.utils import build_multimodal_user_message_content, inputs_include_multimodal_custom_type_values
-from dspy.adapters.utils import format_field_value as original_format_field_value
 from dspy.task_spec import TaskSpec
+from dspy.task_spec import format_field_value as original_format_field_value
 
 COMMENT_SYMBOL = "#"
 INDENTATION = "  "

@@ -1,6 +1,3 @@
-from dspy.task_spec import format_field_value, get_annotation_name, translate_field_type
-from dspy.task_spec.formatting import get_field_spec_description_string as get_field_description_string
-
 from .json import serialize_for_json
 from .messages import build_lm_message
 from .multimodal import (
@@ -18,14 +15,10 @@ __all__ = [
     "collect_multimodal_content_blocks",
     "field_value_to_content_blocks",
     "find_enum_member",
-    "format_field_value",
-    "get_annotation_name",
-    "get_field_description_string",
     "inputs_include_multimodal_custom_type_values",
     "parse_output_field",
     "parse_value",
     "serialize_for_json",
-    "translate_field_type",
     "validate_parsed_fields",
     "value_contains_multimodal_custom_type",
 ]

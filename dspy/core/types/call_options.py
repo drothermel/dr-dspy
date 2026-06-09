@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, SkipValidation
 
 from dspy.core.types.config import LMConfig
-
-if TYPE_CHECKING:
-    from dspy.core.types.lm import LMForward
-    from dspy.task_spec.task_spec import TaskSpec
+from dspy.core.types.lm import LMForward
+from dspy.task_spec.task_spec import TaskSpec
 
 
 class ModuleCallOptions(BaseModel):
@@ -31,8 +29,6 @@ def ensure_predict_options_built() -> None:
     global _predict_options_built
     if _predict_options_built:
         return
-    from dspy.core.types.lm import LMForward
-    from dspy.task_spec.task_spec import TaskSpec
 
     PredictOptions.model_rebuild(_types_namespace={"LMForward": LMForward, "TaskSpec": TaskSpec})
     _predict_options_built = True

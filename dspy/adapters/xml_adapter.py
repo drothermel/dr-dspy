@@ -6,13 +6,11 @@ from typing_extensions import override
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.utils import (
     build_multimodal_user_message_content,
-    format_field_value,
     inputs_include_multimodal_custom_type_values,
     parse_output_field,
-    translate_field_type,
     validate_parsed_fields,
 )
-from dspy.task_spec import FieldBinding, TaskSpec, field_bindings
+from dspy.task_spec import FieldBinding, TaskSpec, field_bindings, format_field_value, translate_field_type
 from dspy.task_spec.field_spec import FieldRole
 
 

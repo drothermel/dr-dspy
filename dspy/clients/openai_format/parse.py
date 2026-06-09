@@ -5,20 +5,18 @@ import logging
 from typing import Any
 
 from dspy.clients.openai_format.media import get_value, model_dump, split_data_uri
-from dspy.core.types import (
+from dspy.core.types.parts import (
     LMAudioPart,
     LMBinaryPart,
     LMCitationPart,
     LMImagePart,
-    LMOutput,
     LMRefusalPart,
-    LMRequest,
-    LMResponse,
     LMTextPart,
     LMThinkingPart,
     LMToolCallPart,
-    LMUsage,
 )
+from dspy.core.types.request import LMRequest
+from dspy.core.types.response import LMOutput, LMResponse, LMUsage
 from dspy.errors import LMInvalidRequestError
 
 logger = logging.getLogger(__name__)

@@ -3,6 +3,7 @@ from typing import Any
 from typing_extensions import override
 
 from dspy.adapters.base import Adapter
+from dspy.adapters.call.pipeline import AdapterCallPipeline
 from dspy.clients.base_lm import BaseLM
 from dspy.core.types.config import LMConfig
 from dspy.runtime.config import CallSite
@@ -40,8 +41,6 @@ class TwoStepAdapter(Adapter):
         )
 
     async def _run_extraction(self, *, original_task_spec: TaskSpec, text: str, run: RunContext) -> dict[str, Any]:
-        from dspy.adapters.call.pipeline import AdapterCallPipeline
-
         extraction_adapter, _adapter_notes = resolve_adapter(self.extraction_adapter or run.adapter)
         extractor_task_spec = self._create_extractor_task_spec(original_task_spec)
         config, _provenance = resolve_lm_config(self.extraction_model, LMConfig())

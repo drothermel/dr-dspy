@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from dspy.adapters.base import Adapter
+from dspy.adapters.call.pipeline import AdapterCallPipeline
 from dspy.task_spec import TaskSpec, input_field
 
 if TYPE_CHECKING:
@@ -46,8 +47,6 @@ class HintInjectingAdapter(Adapter):
         run: RunContext,
         call_site: CallSite | None = None,
     ) -> list[dict[str, Any]]:
-        from dspy.adapters.call.pipeline import AdapterCallPipeline
-
         hint_name = self._task_spec_to_name.get(task_spec, "N/A")
         inputs = dict(inputs)
         inputs["hint_"] = self._hint_map.get(hint_name, "N/A")
