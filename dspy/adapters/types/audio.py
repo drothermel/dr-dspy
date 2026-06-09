@@ -74,7 +74,7 @@ class Audio(FieldTypeMixin):
                 install_command="Install with `pip install soundfile`.",
             )
         byte_buffer = io.BytesIO()
-        sf.write(byte_buffer, array, sampling_rate, format=format.upper(), subtype="PCM_16")  # ty: ignore[invalid-argument-type]
+        sf.write(byte_buffer, array, sampling_rate, format=format.upper(), subtype="PCM_16")
         encoded_data = base64.b64encode(byte_buffer.getvalue()).decode("utf-8")
         return cls(data=encoded_data, audio_format=format)
 
