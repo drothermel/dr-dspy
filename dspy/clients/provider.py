@@ -3,8 +3,6 @@ from __future__ import annotations
 from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any
 
-from typing_extensions import override
-
 if TYPE_CHECKING:
     from threading import Thread
 
@@ -27,10 +25,6 @@ class TrainingJob(Future):
         self.train_data_format = train_data_format
         self.train_kwargs = train_kwargs or {}
         super().__init__()
-
-    @override
-    def cancel(self) -> bool:
-        return super().cancel()
 
     def status(self) -> Any:
         raise NotImplementedError

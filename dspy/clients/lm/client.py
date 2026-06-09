@@ -197,7 +197,7 @@ class LM(BaseLM):
         thread.start()
         return job
 
-    def reinforce(self, train_kwargs) -> ReinforceJob:
+    def reinforce(self, train_kwargs: dict[str, Any]) -> ReinforceJob:
         if not self.provider.reinforceable:
             raise LMUnsupportedFeatureError(
                 f"Provider {self.provider} does not implement the reinforcement learning interface.",

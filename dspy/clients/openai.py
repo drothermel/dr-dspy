@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -11,6 +12,8 @@ from dspy.clients.utils_finetune import TrainDataFormat, TrainingStatus, save_da
 
 if TYPE_CHECKING:
     from dspy.clients.protocol import ReinforceJob as ReinforceJobProtocol
+
+logger = logging.getLogger(__name__)
 
 
 def _openai() -> Any:
@@ -164,12 +167,23 @@ class OpenAIProvider:
                 timestamp = remote_job.estimated_finish
                 if timestamp:
                     estimated_finish_dt = datetime.fromtimestamp(timestamp)
-                    estimated_finish_dt - datetime.now()
+                    remaining_seconds = (estimated_finish_dt - datetime.now()).total_seconds()
+                    logger.debug(
+                        "OpenAI fine-tune job %s estimated finish in %.0f seconds",
+                        job.provider_job_id,
+                        remaining_seconds,
+                    )
                     reported_estimated_time = True
             page = _openai().fine_tuning.jobs.list_events(fine_tuning_job_id=job.provider_job_id, limit=1)
             new_event = page.data[0] if page.data else None
             if new_event and new_event.id != cur_event_id:
-                datetime.fromtimestamp(new_event.created_at)
+                logger.debug(
+                    "OpenAI fine-tune job %s event %s at %s: %s",
+                    job.provider_job_id,
+                    new_event.id,
+                    datetime.fromtimestamp(new_event.created_at).isoformat(),
+                    getattr(new_event, "message", new_event),
+                )
                 cur_event_id = new_event.id
             time.sleep(poll_frequency)
             done = OpenAIProvider.is_terminal_training_status(job.status())

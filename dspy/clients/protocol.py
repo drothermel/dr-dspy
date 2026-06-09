@@ -1,3 +1,11 @@
+"""Finetune provider contracts.
+
+Providers are namespace classes: static methods plus nested ``TrainingJob`` and
+``ReinforceJob`` class attributes. ``LM`` stores a provider instance for
+convenience (for example ``OpenAIProvider()``), but the protocol is satisfied
+by the class itself — do not assume providers must be instantiated to work.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
