@@ -240,6 +240,12 @@ GEPA custom instruction proposers must implement `AsyncProposalFn` with `async d
 
 Task input validation runs in `AdapterCallPipeline.execute`; do not rely on duplicate validation in `Predict`.
 
+## Import tiers
+
+1. **Public spine:** `dspy.runtime`, `dspy.core.types`, `dspy.task_spec`, `dspy.errors`, `dspy.persistence`, `dspy.serialization`
+2. **Integrations:** `dspy.integrations.*` (optional extras: `mcp`, `langchain`)
+3. **Internal / legacy / test-only:** `dspy._internal.*`, `dspy._legacy.*`, `dspy.testing.*`
+
 ## Internal call-site conventions
 
 - Use keyword arguments for multi-arg calls to DSPy-internal functions when meaning is not obvious from position.
