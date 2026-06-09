@@ -14,7 +14,7 @@ from dspy.clients.dr_llm.mapping import (
     backend_response_to_lm_response,
     lm_request_to_backend_request,
 )
-from dspy.runtime.run_log import resolve_run_bucket
+from dspy.runtime.log_paths import resolve_run_bucket
 
 if TYPE_CHECKING:
     from dr_llm.llm.providers.core.registry import ProviderRegistry

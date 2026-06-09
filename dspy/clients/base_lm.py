@@ -16,7 +16,8 @@ from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_option
 from dspy.runtime.callback import Callback, with_callbacks
 from dspy.runtime.config import disk_call_log_enabled, memory_call_log_enabled
 from dspy.runtime.inspect_call_log import pretty_print_call_log
-from dspy.runtime.run_log import RunLogSession, append_call_record, redact_config, redact_messages
+from dspy.runtime.log_redaction import redact_config, redact_messages
+from dspy.runtime.run_log_session import RunLogSession, append_call_record
 
 if TYPE_CHECKING:
     from dspy.runtime.run_context import RunContext

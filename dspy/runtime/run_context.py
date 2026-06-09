@@ -8,22 +8,16 @@ from pydantic import BaseModel, ConfigDict, Field, SkipValidation
 
 from dspy.clients.openai_format.chat_request import request_messages_as_openai
 from dspy.core.types import CallRecord
-from dspy.runtime.config import (
-    CallSite,
-    ExecutionConfig,
-    TelemetryConfig,
-    disk_call_log_enabled,
-)
+from dspy.runtime.config import CallSite, ExecutionConfig, TelemetryConfig
 from dspy.runtime.inspect_call_log import pretty_print_call_log
 from dspy.runtime.run_context_model import rebuild_run_context_model
-from dspy.runtime.run_log import create_run_log_session, resolve_log_root, resolve_run_bucket
+from dspy.runtime.run_log_session import RunLogSession, ensure_log_session, init_log_session
 
 if TYPE_CHECKING:
     from dspy.adapters.base import Adapter
     from dspy.clients.base_lm import BaseLM
     from dspy.primitives import Module
     from dspy.runtime.callback import Callback
-    from dspy.runtime.run_log import RunLogSession
     from dspy.runtime.usage_tracker import UsageTracker
 
 
@@ -92,7 +86,7 @@ class RunContext(BaseModel):
             telemetry=telemetry or TelemetryConfig(),
         )
         if init_run_log:
-            run._init_run_session()
+            init_log_session(run)
         return run
 
     def fork(self, **overrides: Any) -> RunContext:
@@ -132,37 +126,8 @@ class RunContext(BaseModel):
             log_session=log_session,
             call_site=call_site,
         )
-        forked._ensure_log_session(explicit_log_session=explicit_log_session)
+        ensure_log_session(forked, explicit_log_session=explicit_log_session)
         return forked
-
-    def _init_run_session(self) -> None:
-        if not disk_call_log_enabled(self.telemetry):
-            self.log_session = None
-            return
-        snapshot = {
-            "lm": self.lm.model if hasattr(self.lm, "model") else repr(self.lm),
-            "adapter": type(self.adapter).__name__,
-            "retrieval": repr(self.retrieval) if self.retrieval is not None else None,
-            "execution": self.execution.model_dump(),
-            "telemetry": self.telemetry.model_dump(),
-        }
-        self.log_session = create_run_log_session(
-            call_log_dir=self.telemetry.call_log_dir,
-            settings_snapshot=snapshot,
-        )
-
-    def _ensure_log_session(self, *, explicit_log_session: bool) -> None:
-        if not disk_call_log_enabled(self.telemetry):
-            self.log_session = None
-            return
-        if explicit_log_session:
-            return
-        if self.log_session is None:
-            self._init_run_session()
-            return
-        expected_root = resolve_log_root(self.telemetry.call_log_dir)
-        if self.log_session.run_dir.parent.parent != expected_root / resolve_run_bucket():
-            self._init_run_session()
 
     def inspect_call_log(self, n: int = 1, file: TextIO | None = None) -> None:
         pretty_print_call_log(call_log=self.call_log, n=n, file=file)

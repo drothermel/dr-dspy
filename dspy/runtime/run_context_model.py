@@ -12,7 +12,7 @@ def rebuild_run_context_model(run_context_cls: type[BaseModel]) -> None:
     from dspy.core.types.response import CallRecord
     from dspy.primitives import Module
     from dspy.runtime.callback import Callback
-    from dspy.runtime.run_log import RunLogSession
+    from dspy.runtime.run_log_session import RunLogSession
     from dspy.runtime.usage_tracker import UsageTracker
 
     run_context_cls.model_rebuild(

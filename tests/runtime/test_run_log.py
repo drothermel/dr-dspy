@@ -1,6 +1,8 @@
 import json
 
-from dspy.runtime.run_log import append_call_record, create_run_log_session, redact_messages, slug_run_id
+from dspy.runtime.log_paths import slug_run_id
+from dspy.runtime.log_redaction import redact_messages
+from dspy.runtime.run_log_session import append_call_record, create_run_log_session
 
 
 def test_slug_run_id():
