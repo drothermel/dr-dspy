@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from dspy.core.types.lm import LMForward
 from dspy.history import ConversationTurnLog, TurnEvent, TurnLog
 from dspy.predict.predict import Predict
@@ -34,6 +37,21 @@ def test_turn_log_append_turn_round_trip():
     assert turn.tool_name == "search"
     assert turn.tool_args == {"q": "test"}
     assert turn.observation == "found"
+
+
+def test_turn_log_rejects_empty_event():
+    with pytest.raises(ValueError, match="Cannot append an empty TurnEvent"):
+        TurnLog.empty().append_turn(TurnEvent())
+
+
+def test_turn_log_immutable_after_append():
+    event = TurnEvent(thought="original")
+    log = TurnLog.empty().append_turn(event)
+    with pytest.raises(ValidationError):
+        event.thought = "mutated"
+    turn = log.turns[0]
+    assert isinstance(turn, TurnEvent)
+    assert turn.thought == "original"
 
 
 def test_turn_log_coerces_dict_turns_on_load():

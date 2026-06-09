@@ -12,7 +12,7 @@ class TurnEvent(BaseModel):
     extra fields (e.g. ReActV2 pending inputs merged into the event).
     """
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(frozen=True, extra="allow")
 
     thought: Any | None = None
     next_thought: Any | None = None

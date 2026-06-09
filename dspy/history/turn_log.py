@@ -37,7 +37,7 @@ class TurnLog(BaseModel):
 
     def append_turn(self, event: TurnEvent) -> TurnLog:
         if not event.to_dict():
-            return self
+            raise ValueError("Cannot append an empty TurnEvent; at least one field must be set.")
         return TurnLog(turns=(*self.turns, event))
 
 
