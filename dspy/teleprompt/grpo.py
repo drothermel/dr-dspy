@@ -467,10 +467,7 @@ class GRPO(FinetuneTeleprompter):
                             configured_adapter = (
                                 self.adapter[pred_lm] if isinstance(self.adapter, dict) else self.adapter
                             )
-                            adapter, _ = resolve_adapter(
-                                configured_adapter or run.adapter,
-                                transparency=run.telemetry.transparency,
-                            )
+                            adapter, _ = resolve_adapter(configured_adapter or run.adapter)
                             if not adapter.capabilities.supports_finetune:
                                 raise TypeError(
                                     f"Adapter {adapter} does not support finetune data formatting. "

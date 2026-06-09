@@ -14,8 +14,7 @@ def optimizer_run_context(
     lm_role: str,
     **extra,
 ) -> RunContext:
-    transparency = run.telemetry.transparency
-    resolved_adapter, _notes = resolve_adapter(adapter or run.adapter, transparency=transparency)
+    resolved_adapter, _notes = resolve_adapter(adapter or run.adapter)
     return run.fork(lm=lm, adapter=resolved_adapter, **extra)
 
 

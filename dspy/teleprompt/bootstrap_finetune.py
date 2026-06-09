@@ -141,7 +141,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
         from dspy.compile.resolve import resolve_adapter
 
         configured_adapter = self.adapter[lm] if isinstance(self.adapter, dict) else self.adapter
-        adapter, _ = resolve_adapter(configured_adapter or run.adapter, transparency=run.telemetry.transparency)
+        adapter, _ = resolve_adapter(configured_adapter or run.adapter)
         data_format = infer_data_format(adapter)
         for item in trace_data:
             for pred_ind, _ in enumerate(item["trace"]):

@@ -107,7 +107,7 @@ run = RunContext.create(
 result = asyncio.run(program(question="What is DSPy?", run=run))
 ```
 
-Opt down for legacy behavior: `TelemetryConfig(transparency="off", call_log=CallLogMode.off)` on `RunContext.create`.
+Opt down for legacy behavior: `TelemetryConfig(transparency="off", call_log=CallLogMode.off)` on `RunContext.create`. An explicit `adapter=` is still required in all modes.
 
 Environment variables:
 

@@ -8,27 +8,12 @@ from dspy.clients.base_lm import BaseLM
 from dspy.clients.lm_normalize import lm_kwargs_max_tokens
 from dspy.core.types.config import LMConfig, _merge_lm_config, coerce_lm_config, lm_defaults_config
 from dspy.task_spec import TaskSpec
-from dspy.utils.transparency import CompiledCall, TransparencyMode
+from dspy.utils.transparency import CompiledCall, TransparencyViolation
 
 
-def resolve_adapter(
-    settings_adapter: Adapter | None,
-    *,
-    transparency: TransparencyMode = "strict",
-    fallback_adapter_factory: Any | None = None,
-) -> tuple[Adapter, list[str]]:
-    notes: list[str] = []
-    if settings_adapter is not None:
-        return (settings_adapter, notes)
-    if transparency == "off":
-        if fallback_adapter_factory is None:
-            from dspy.adapters.chat_adapter import ChatAdapter
-
-            fallback_adapter_factory = ChatAdapter
-        notes.append("defaulted to ChatAdapter because transparency=off and adapter was not configured")
-        return (fallback_adapter_factory(), notes)
-    from dspy.utils.transparency import TransparencyViolation
-
+def resolve_adapter(adapter: Adapter | None) -> tuple[Adapter, list[str]]:
+    if adapter is not None:
+        return (adapter, [])
     raise TransparencyViolation(
         "adapter not configured.",
         fixes=[

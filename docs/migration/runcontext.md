@@ -61,6 +61,8 @@ telemetry = TelemetryConfig(transparency="off", call_log=CallLogMode.off)
 run = RunContext.create(lm=lm, adapter=adapter, telemetry=telemetry, init_run_log=False)
 ```
 
+`adapter` is required on every `RunContext.create(...)`, including when `transparency="off"`. There is no implicit `ChatAdapter` fallback.
+
 ## Forking for scoped overrides
 
 Replace `settings.context(...)` with `run.fork(...)` and pass the forked run to the call:

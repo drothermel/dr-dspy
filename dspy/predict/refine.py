@@ -75,7 +75,7 @@ class Refine(Module):
         lm = self.module.get_lm() or run.lm
         best_pred, best_trace, best_reward = (None, None, -float("inf"))
         advice = None
-        adapter, _ = resolve_adapter(run.adapter, transparency=run.telemetry.transparency)
+        adapter, _ = resolve_adapter(run.adapter)
         for idx in range(self.N):
             lm_ = lm.copy(temperature=1.0)
             mod = self.module.deepcopy()

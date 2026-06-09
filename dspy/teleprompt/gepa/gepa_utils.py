@@ -273,7 +273,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
 
                     if self.run is None:
                         raise ValueError("DspyAdapter requires a RunContext.")
-                    adapter, _ = resolve_adapter(self.run.adapter, transparency=self.run.telemetry.transparency)
+                    adapter, _ = resolve_adapter(self.run.adapter)
                     structure_instruction = ""
                     for message in adapter.format(task_spec=get_task_spec(module), demos=[], inputs={}):
                         structure_instruction += message.role + ": " + (message.text or "") + "\n"

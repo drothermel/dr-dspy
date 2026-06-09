@@ -219,9 +219,7 @@ class LM(BaseLM):
                 provider=self._provider_name,
             )
         lm_defaults = {
-            key: value
-            for key, value in self.kwargs.items()
-            if value is not None and key not in {"cache", "reasoning"}
+            key: value for key, value in self.kwargs.items() if value is not None and key not in {"cache", "reasoning"}
         }
         return {**lm_defaults, **provider_request}
 
