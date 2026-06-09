@@ -130,7 +130,14 @@ class DatabricksProvider:
         logger.info(
             f"Waiting for serving endpoint {model_name} to be ready, this might take a few minutes... You can check the status of the endpoint at {databricks_host}/ml/endpoints/{model_name}"
         )
-        from openai import OpenAI
+        from openai import (
+            APIConnectionError,
+            APIStatusError,
+            APITimeoutError,
+            NotFoundError,
+            OpenAI,
+            RateLimitError,
+        )
 
         client = OpenAI(api_key=databricks_token, base_url=f"{databricks_host}/serving-endpoints")
         num_retries = deploy_timeout // 60
@@ -144,7 +151,9 @@ class DatabricksProvider:
                     client.completions.create(prompt="hi", model=model_name, max_tokens=1)
                 logger.info(f"Databricks model serving endpoint {model_name} is ready!")
                 return
-            except Exception:
+            except (NotFoundError, APIConnectionError, APITimeoutError, RateLimitError, APIStatusError) as exc:
+                if isinstance(exc, APIStatusError) and exc.status_code not in (404, 503):
+                    raise
                 time.sleep(60)
         raise ValueError(
             f"Failed to create serving endpoint {model_name} on Databricks model serving platform within {deploy_timeout} seconds."
@@ -248,16 +257,18 @@ def _create_directory_in_databricks_unity_catalog(w: WorkspaceClient, databricks
     schema = match.group("schema")
     volume = match.group("volume")
     volume_path = f"{catalog}.{schema}.{volume}"
+    from databricks.sdk.errors.platform import NotFound, ResourceDoesNotExist
+
     try:
         w.volumes.read(volume_path)
-    except Exception:
+    except (NotFound, ResourceDoesNotExist):
         raise ValueError(
             f"Databricks Unity Catalog volume does not exist: {volume_path}, please create it on the Databricks workspace."
         )
     try:
         w.files.get_directory_metadata(databricks_unity_catalog_path)
         logger.info(f"Directory {databricks_unity_catalog_path} already exists, skip creating it.")
-    except Exception:
+    except (NotFound, ResourceDoesNotExist):
         logger.info(f"Creating directory {databricks_unity_catalog_path} in Databricks Unity Catalog...")
         w.files.create_directory(databricks_unity_catalog_path)
         logger.info(f"Successfully created directory {databricks_unity_catalog_path} in Databricks Unity Catalog!")

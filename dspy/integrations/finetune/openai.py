@@ -98,18 +98,22 @@ class OpenAIProvider:
 
     @staticmethod
     def does_job_exist(job_id: str) -> bool:
+        from openai import NotFoundError
+
         try:
             _openai().fine_tuning.jobs.retrieve(job_id)
             return True
-        except Exception:
+        except NotFoundError:
             return False
 
     @staticmethod
     def does_file_exist(file_id: str) -> bool:
+        from openai import NotFoundError
+
         try:
             _openai().files.retrieve(file_id)
             return True
-        except Exception:
+        except NotFoundError:
             return False
 
     @staticmethod
@@ -129,7 +133,8 @@ class OpenAIProvider:
         if job_id is None:
             return TrainingStatus.not_started
         err_msg = f"Job with ID {job_id} does not exist."
-        assert OpenAIProvider.does_job_exist(job_id), err_msg
+        if not OpenAIProvider.does_job_exist(job_id):
+            raise ValueError(err_msg)
         provider_job = _openai().fine_tuning.jobs.retrieve(job_id)
         provider_status = provider_job.status
         return provider_status_to_training_status.get(provider_status, TrainingStatus.pending)
