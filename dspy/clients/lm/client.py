@@ -1,11 +1,10 @@
 import logging
-import os
 import threading
 from typing import Any, Literal
 
 from typing_extensions import override
 
-from dspy.clients._litellm import get_litellm, is_litellm_context_window_error
+from dspy.clients._litellm import is_litellm_context_window_error
 from dspy.clients.lm.errors import (
     _exception_message,
     _exception_provider_code,
@@ -15,25 +14,20 @@ from dspy.clients.lm.errors import (
     _lm_error_class_from_litellm_exception,
     _lm_error_class_from_status,
 )
-from dspy.clients.lm.headers import _add_dspy_identifier_to_headers
+from dspy.clients.lm.litellm_access import _get_litellm
+from dspy.clients.lm.transport import (
+    completion_fn_for_model_type,
+    lm_response_for_model_type,
+    provider_request_for_model_type,
+)
 from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.clients.model_id import split_provider_model
 from dspy.clients.openai import OpenAIProvider
-from dspy.clients.openai_format import (
-    completion_to_lm_response,
-    cost_from_response,
-    responses_to_lm_response,
-    to_openai_chat_request,
-    to_openai_responses_request,
-    to_openai_text_request,
-    usage_from_response,
-)
 from dspy.clients.openai_format.reasoning_models import is_openai_reasoning_model
 from dspy.clients.protocol import FinetuneProvider, ReinforceJob
 from dspy.clients.provider import DefaultFinetuneProvider, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat
 from dspy.core.types import LMRequest, LMResponse
-from dspy.core.types.config import merge_lm_request_config
 from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.errors import ContextWindowExceededError, LMConfigurationError, LMError, LMUnsupportedFeatureError
 from dspy.runtime.callback import Callback
@@ -41,10 +35,6 @@ from dspy.runtime.callback import Callback
 from ..base_lm import BaseLM
 
 logger = logging.getLogger(__name__)
-
-
-def _get_litellm():
-    return get_litellm(feature="dspy.clients.lm.LM")
 
 
 class LM(BaseLM):
@@ -161,22 +151,9 @@ class LM(BaseLM):
         return exc_cls(message or "", **error_kwargs)
 
     async def aforward(self, request: LMRequest) -> LMResponse:
-        import dspy.clients.lm as lm_package
-
-        provider_request = self._provider_request(request)
+        provider_request = provider_request_for_model_type(self.model_type, request, self)
         litellm_cache_args = {"no-cache": True, "no-store": True}
-        if self.model_type == "chat":
-            completion = lm_package.alitellm_completion
-        elif self.model_type == "text":
-            completion = lm_package.alitellm_text_completion
-        elif self.model_type == "responses":
-            completion = lm_package.alitellm_responses_completion
-        else:
-            raise LMConfigurationError(
-                f"Unsupported model_type {self.model_type!r} for `dspy.clients.lm.LM`.",
-                model=self.model,
-                provider=self._provider_name,
-            )
+        completion = completion_fn_for_model_type(self.model_type, lm=self)
         try:
             results = await completion(request=provider_request, num_retries=self.num_retries, cache=litellm_cache_args)
         except Exception as e:
@@ -184,55 +161,7 @@ class LM(BaseLM):
                 raise
             raise self._wrap_litellm_exception(e) from e
         self._check_truncation(results)
-        return self._response_from_provider(results, request)
-
-    def _provider_request(self, request: LMRequest) -> dict[str, Any]:
-        if self.use_developer_role and self.model_type == "responses":
-            request = request.model_copy(
-                update={
-                    "messages": [
-                        message.model_copy(update={"role": "developer"}) if message.role == "system" else message
-                        for message in request.messages
-                    ]
-                }
-            )
-        request = request.model_copy(update={"config": merge_lm_request_config(lm=self, config=request.config)})
-        if self.model_type == "chat":
-            provider_request = to_openai_chat_request(request)
-        elif self.model_type == "text":
-            provider_request = to_openai_text_request(request)
-        elif self.model_type == "responses":
-            provider_request = to_openai_responses_request(request)
-        else:
-            raise LMConfigurationError(
-                f"Unsupported model_type {self.model_type!r} for `dspy.clients.lm.LM`.",
-                model=self.model,
-                provider=self._provider_name,
-            )
-        lm_defaults = {
-            key: value for key, value in self.kwargs.items() if value is not None and key not in {"cache", "reasoning"}
-        }
-        return {**lm_defaults, **provider_request}
-
-    def _response_from_provider(self, response: Any, request: LMRequest) -> LMResponse:
-        if self.model_type == "responses":
-            lm_response = responses_to_lm_response(response=response, request=request)
-        elif self.model_type in {"chat", "text"}:
-            lm_response = completion_to_lm_response(response=response, request=request)
-        else:
-            raise LMConfigurationError(
-                f"Unsupported model_type {self.model_type!r} for `dspy.clients.lm.LM`.",
-                model=self.model,
-                provider=self._provider_name,
-            )
-        return lm_response.model_copy(
-            update={
-                "model": getattr(response, "model", None) or lm_response.model,
-                "usage": usage_from_response(response),
-                "cost": cost_from_response(response),
-                "provider_response": response,
-            }
-        )
+        return lm_response_for_model_type(self.model_type, results, request, self)
 
     def launch(self, launch_kwargs: dict[str, Any] | None = None) -> None:
         self.provider.launch(self, launch_kwargs)
@@ -326,47 +255,3 @@ class LM(BaseLM):
             logger.warning(
                 f"LM response was truncated due to exceeding max_tokens={self.kwargs['max_tokens']}. You can inspect the latest LM interactions with `lm.inspect_call_log()` or `run.inspect_call_log()`. To avoid truncation, consider passing a larger max_tokens when setting up LM. You may also consider increasing the temperature (currently {self.kwargs['temperature']})  if the reason for truncation is repetition."
             )
-
-
-async def alitellm_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
-    cache = cache or {"no-cache": True, "no-store": True}
-    request = dict(request)
-    headers = _add_dspy_identifier_to_headers(request.pop("headers", None))
-    return await _get_litellm().acompletion(
-        cache=cache, num_retries=num_retries, retry_strategy="exponential_backoff_retry", headers=headers, **request
-    )
-
-
-async def alitellm_text_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
-    cache = cache or {"no-cache": True, "no-store": True}
-    request = dict(request)
-    model = request.pop("model").split("/", 1)
-    headers = request.pop("headers", None)
-    provider, model = (model[0] if len(model) > 1 else "openai", model[-1])
-    api_key = request.pop("api_key", None) or os.getenv(f"{provider}_API_KEY")
-    api_base = request.pop("api_base", None) or os.getenv(f"{provider}_API_BASE")
-    prompt = request.pop("prompt")
-    return await _get_litellm().atext_completion(
-        cache=cache,
-        model=f"text-completion-openai/{model}",
-        api_key=api_key,
-        api_base=api_base,
-        prompt=prompt,
-        num_retries=num_retries,
-        retry_strategy="exponential_backoff_retry",
-        headers=_add_dspy_identifier_to_headers(headers),
-        **request,
-    )
-
-
-async def alitellm_responses_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
-    cache = cache or {"no-cache": True, "no-store": True}
-    request = dict(request)
-    headers = request.pop("headers", None)
-    return await _get_litellm().aresponses(
-        cache=cache,
-        num_retries=num_retries,
-        retry_strategy="exponential_backoff_retry",
-        headers=_add_dspy_identifier_to_headers(headers),
-        **request,
-    )

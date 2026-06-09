@@ -16,7 +16,7 @@ from dspy.errors import (
 
 
 def _safe_litellm_exception_class(name: str) -> type[Exception] | None:
-    from dspy.clients.lm.client import _get_litellm
+    from dspy.clients.lm.litellm_access import _get_litellm
 
     cls = getattr(_get_litellm(), name, None)
     return cls if isinstance(cls, type) and issubclass(cls, Exception) else None
