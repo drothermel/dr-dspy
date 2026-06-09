@@ -123,7 +123,10 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch, make_run):
 
             return _Result()
 
-    monkeypatch.setattr(bootstrap_trace_module, "Evaluate", DummyEvaluate)
+    def fake_make_optimizer_evaluator(*_args, **_kwargs):
+        return DummyEvaluate()
+
+    monkeypatch.setattr(bootstrap_trace_module, "make_optimizer_evaluator", fake_make_optimizer_evaluator)
     asyncio.run(
         bootstrap_trace_module.bootstrap_trace_data(
             program=DummyProgram(), dataset=[], callback_metadata={"disable_logging": True}, run=run

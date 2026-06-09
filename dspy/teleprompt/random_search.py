@@ -4,7 +4,6 @@ from typing import Any, cast
 from pydantic import BaseModel
 from typing_extensions import override
 
-from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import (
@@ -13,6 +12,7 @@ from dspy.teleprompt.compile_params import (
     RandomSearchCompileParams,
 )
 from dspy.teleprompt.teleprompt import Teleprompter
+from dspy.teleprompt.utils import make_optimizer_evaluator, resolve_max_errors
 
 from .bootstrap import BootstrapFewShot
 from .vanilla import LabeledFewShot
@@ -52,7 +52,7 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         teacher = params.teacher
         restrict = params.restrict
         labeled_sample = params.labeled_sample
-        effective_max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors
+        effective_max_errors = resolve_max_errors(self.max_errors, run)
         scores = []
         all_subscores = []
         score_data = []
@@ -103,11 +103,12 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
                     params=BootstrapFewShotCompileParams(trainset=trainset_copy, teacher=teacher),
                     run=run,
                 )
-            evaluate = Evaluate(
+            evaluate = make_optimizer_evaluator(
+                run,
                 devset=self.valset,
                 metric=self.metric,
                 max_concurrency=self.max_concurrency,
-                max_errors=effective_max_errors,
+                max_errors=self.max_errors,
                 display_table=False,
                 display_progress=True,
             )

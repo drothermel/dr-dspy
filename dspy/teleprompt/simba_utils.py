@@ -12,7 +12,7 @@ from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.formatting import get_field_spec_description_string
 from dspy.teleprompt.task_spec_context import get_prompt_model, get_task_spec, set_task_spec
-from dspy.teleprompt.utils import optimizer_lm_context
+from dspy.teleprompt.utils import optimizer_lm_context, run_program_with_trace
 from dspy.utils.source_format import get_formatted_source
 
 logger = logging.getLogger(__name__)
@@ -35,13 +35,12 @@ def prepare_models_for_resampling(*, program: Module, n: int, run: RunContext, t
 def wrap_program(*, program: Module, metric: Callable, run: RunContext):
 
     async def wrapped_program(example):
-        item_run = run.fork(optimization_trace=[], call_log=[])
         prediction, trace, score = (None, None, 0.0)
         try:
-            prediction = await program(**example.as_inputs(), run=item_run)
+            prediction, trace = await run_program_with_trace(program, example, run)
         except Exception as e:
             logger.warning(e)
-        trace = list(item_run.optimization_trace)
+            trace = []
         output = None
         score = 0.0
         output_metadata = {}

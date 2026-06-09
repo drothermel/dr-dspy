@@ -16,6 +16,7 @@ from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.compile_params import AvatarOptimizerCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
+from dspy.teleprompt.utils import run_program_with_trace
 
 DEFAULT_MAX_EXAMPLES = 10
 
@@ -105,9 +106,7 @@ class AvatarOptimizer(Teleprompter):
     async def process_example(self, actor, example, return_outputs, *, run: RunContext):
         actor = deepcopy(actor)
         try:
-            item_run = run.fork(optimization_trace=[], call_log=[])
-            prediction = await actor(**example.as_inputs(), run=item_run)
-            trace = list(item_run.optimization_trace)
+            prediction, trace = await run_program_with_trace(actor, example, run)
             score = self.metric(example, prediction, trace)
             if return_outputs:
                 return (example, prediction, score)

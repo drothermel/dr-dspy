@@ -11,6 +11,7 @@ from dspy.predict.predict import Predict, Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
+from dspy.teleprompt.utils import run_program_with_trace
 from dspy.utils.source_format import get_formatted_source
 
 from .predict import Module
@@ -84,18 +85,16 @@ class Refine(Module):
             task_spec2name = {predictor.task_spec: name for name, predictor in mod.named_predictors()}
             module_names = [name for name, _ in mod.named_predictors()]
             try:
-                item_run = run.fork(optimization_trace=[], call_log=[])
                 if not advice:
-                    outputs = await mod(**inputs, run=item_run, options=options)
+                    outputs, trace = await run_program_with_trace(mod, inputs, run, options=options)
                 else:
                     hint_adapter = HintInjectingAdapter(
                         inner=adapter,
                         hint_map=advice,
                         task_spec_to_name=task_spec2name,
                     )
-                    hint_run = item_run.fork(adapter=hint_adapter)
-                    outputs = await mod(**inputs, run=hint_run, options=options)
-                trace = list(item_run.optimization_trace)
+                    hint_run = run.fork(adapter=hint_adapter)
+                    outputs, trace = await run_program_with_trace(mod, inputs, hint_run, options=options)
                 reward = self.reward_fn(inputs, outputs)
                 if reward > best_reward:
                     best_reward, best_pred, best_trace = (reward, outputs, trace)

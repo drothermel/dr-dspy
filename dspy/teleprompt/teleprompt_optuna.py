@@ -5,11 +5,11 @@ from typing import Any, cast
 from pydantic import BaseModel
 from typing_extensions import override
 
-from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, BootstrapOptunaCompileParams
 from dspy.teleprompt.teleprompt import Teleprompter
+from dspy.teleprompt.utils import make_optimizer_evaluator
 
 from .bootstrap import BootstrapFewShot
 
@@ -49,10 +49,12 @@ class BootstrapFewShotWithOptuna(Teleprompter):
         self.max_labeled_demos = max_labeled_demos
 
     async def _evaluate_program(self, program, *, run: RunContext):
-        evaluate = Evaluate(
+        evaluate = make_optimizer_evaluator(
+            run,
             devset=self.valset,
             metric=self.metric,
             max_concurrency=self.max_concurrency,
+            max_errors=None,
             display_table=False,
             display_progress=True,
         )

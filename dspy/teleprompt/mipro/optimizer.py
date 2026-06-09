@@ -3,7 +3,6 @@ from typing import Any, Callable, Literal
 from pydantic import BaseModel
 from typing_extensions import override
 
-from dspy.evaluate.evaluate import Evaluate
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import MIPROv2CompileParams
 from dspy.teleprompt.mipro.bootstrap import bootstrap_fewshot_examples
@@ -18,7 +17,7 @@ from dspy.teleprompt.mipro.settings import (
 )
 from dspy.teleprompt.task_spec_context import get_prompt_model
 from dspy.teleprompt.teleprompt import Teleprompter
-from dspy.teleprompt.utils import optimizer_lm_context
+from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context, resolve_max_errors
 
 
 class MIPROv2(Teleprompter):
@@ -87,7 +86,7 @@ class MIPROv2(Teleprompter):
         provide_traceback = params.provide_traceback
         self.task_model = get_prompt_model(self.task_model, run)
         self.prompt_model = get_prompt_model(self.prompt_model, run)
-        effective_max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors
+        effective_max_errors = resolve_max_errors(self.max_errors, run)
         effective_max_bootstrapped_demos = (
             max_bootstrapped_demos if max_bootstrapped_demos is not None else self.max_bootstrapped_demos
         )
@@ -122,11 +121,12 @@ class MIPROv2(Teleprompter):
         if minibatch and minibatch_size > len(valset):
             raise ValueError(f"Minibatch size cannot exceed the size of the valset. Valset size: {len(valset)}.")
         program = student.deepcopy()
-        evaluate = Evaluate(
+        evaluate = make_optimizer_evaluator(
+            run,
             devset=valset,
             metric=self.metric,
             max_concurrency=self.max_concurrency,
-            max_errors=effective_max_errors,
+            max_errors=self.max_errors,
             display_table=False,
             display_progress=True,
             provide_traceback=provide_traceback,

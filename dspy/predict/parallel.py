@@ -4,7 +4,7 @@ from typing import Any
 
 from dspy.primitives.example import Example
 from dspy.runtime.run_context import RunContext, resolve_run
-from dspy.utils.async_parallel import BoundedRunStats, resolve_max_concurrency, run_bounded
+from dspy.utils.async_parallel import BoundedRunStats, resolve_max_concurrency, resolve_max_errors, run_bounded
 
 
 class Parallel:
@@ -73,7 +73,7 @@ class Parallel:
             configured=self.max_concurrency,
             run=run,
         )
-        max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors
+        max_errors = resolve_max_errors(self.max_errors, run)
         provide_traceback = (
             self.provide_traceback if self.provide_traceback is not None else run.execution.provide_traceback
         )

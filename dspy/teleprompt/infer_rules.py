@@ -5,7 +5,6 @@ import random
 from pydantic import BaseModel
 from typing_extensions import override
 
-from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
@@ -13,7 +12,7 @@ from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, InferRulesCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
-from dspy.teleprompt.utils import optimizer_lm_context
+from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
 logger = logging.getLogger(__name__)
 
@@ -118,12 +117,12 @@ class InferRules(BootstrapFewShot):
         ]
 
     async def evaluate_program(self, program, dataset, *, run: RunContext):
-        effective_max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors
-        evaluate = Evaluate(
+        evaluate = make_optimizer_evaluator(
+            run,
             devset=dataset,
             metric=self.metric,
             max_concurrency=self.max_concurrency,
-            max_errors=effective_max_errors,
+            max_errors=self.max_errors,
             display_table=False,
             display_progress=True,
         )

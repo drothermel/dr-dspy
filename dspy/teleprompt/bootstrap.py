@@ -6,12 +6,12 @@ import tqdm
 from pydantic import BaseModel
 from typing_extensions import override
 
-from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, LabeledFewShotCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
+from dspy.teleprompt.utils import resolve_max_errors, run_program_with_trace, trace_to_demos
 from dspy.utils.hasher import Hasher
 
 from .vanilla import LabeledFewShot
@@ -111,12 +111,10 @@ class BootstrapFewShot(Teleprompter):
             lm = lm.copy(temperature=1.0) if round_idx > 0 else lm
             if round_idx > 0:
                 teacher_run = teacher_run.fork(lm=lm)
-            item_run = teacher_run.fork(optimization_trace=[], call_log=[])
             for name, predictor in teacher.named_predictors():
                 predictor_cache[name] = predictor.demos
                 predictor.demos = [x for x in predictor.demos if x != example]
-            prediction = await teacher(**example.as_inputs(), run=item_run)
-            trace = list(item_run.optimization_trace)
+            prediction, trace = await run_program_with_trace(teacher, example, teacher_run)
             for name, predictor in teacher.named_predictors():
                 predictor.demos = predictor_cache[name]
             if self.metric:
@@ -129,20 +127,12 @@ class BootstrapFewShot(Teleprompter):
             with self.error_lock:
                 self.error_count += 1
                 current_error_count = self.error_count
-            effective_max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors
+            effective_max_errors = resolve_max_errors(self.max_errors, run)
             if current_error_count >= effective_max_errors:
                 raise
             logger.exception(f"Failed to run or to evaluate example {example} with {self.metric} due to {e}.")
         if success:
-            for step in trace:
-                predictor, inputs, outputs = step
-                demo = Example.from_record({"augmented": True, **inputs, **outputs})
-                try:
-                    predictor_name = self.predictor2name[id(predictor)]
-                except KeyError:
-                    continue
-                name2traces[predictor_name] = name2traces.get(predictor_name, [])
-                name2traces[predictor_name].append(demo)
+            name2traces = trace_to_demos(trace, self.predictor2name)
             for name, demos in name2traces.items():
                 if len(demos) > 1:
                     rng = random.Random(Hasher.hash(tuple(demos)))

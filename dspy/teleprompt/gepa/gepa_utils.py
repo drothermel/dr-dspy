@@ -10,7 +10,6 @@ from gepa import EvaluationBatch, GEPAAdapter
 from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
-from dspy.evaluate.evaluate import Evaluate
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
@@ -19,7 +18,7 @@ from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, TraceData
 from dspy.teleprompt.gepa.task_specs import FrameworkGepaInstructionProposalTaskSpec
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
-from dspy.teleprompt.utils import optimizer_lm_context
+from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
 if TYPE_CHECKING:
     from gepa.core.adapter import ProposalFn
@@ -185,13 +184,16 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                         score = self.failure_score
                     scores.append(score)
             return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajs)
-        evaluator = Evaluate(
+        if self.run is None:
+            raise ValueError("DspyAdapter requires a RunContext.")
+        evaluator = make_optimizer_evaluator(
+            self.run,
             devset=batch,
             metric=self.metric_fn,
             max_concurrency=self.max_concurrency,
+            max_errors=len(batch) * 100,
             failure_score=self.failure_score,
             provide_traceback=True,
-            max_errors=len(batch) * 100,
         )
         res = await evaluator(program, run=self.run, callback_metadata=callback_metadata)
         outputs = [r[1] for r in res.results]

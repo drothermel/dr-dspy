@@ -20,7 +20,8 @@ import tqdm
 
 from dspy.primitives.prediction import Prediction
 from dspy.runtime.run_context import RunContext
-from dspy.utils.async_parallel import resolve_max_concurrency, run_bounded
+from dspy.teleprompt.utils import run_program_with_trace
+from dspy.utils.async_parallel import resolve_max_concurrency, resolve_max_errors, run_bounded
 from dspy.utils.callback import with_callbacks
 
 logger = logging.getLogger(__name__)
@@ -93,13 +94,11 @@ class Evaluate:
         tqdm.tqdm._instances.clear()
 
         async def process_item(example):
-            item_run = run.fork(optimization_trace=[], call_log=[])
-            prediction = await program(**example.as_inputs(), run=item_run)
-            trace = list(item_run.optimization_trace)
+            prediction, trace = await run_program_with_trace(program, example, run)
             score = metric(example, prediction, trace)
             return (prediction, score)
 
-        max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors
+        max_errors = resolve_max_errors(self.max_errors, run)
         provide_traceback = (
             self.provide_traceback if self.provide_traceback is not None else run.execution.provide_traceback
         )

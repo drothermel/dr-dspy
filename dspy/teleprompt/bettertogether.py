@@ -5,7 +5,6 @@ from typing import Callable, cast
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import override
 
-from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
@@ -27,6 +26,7 @@ from dspy.teleprompt.compile_params import (
 from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.teleprompt.teleprompt import Teleprompter
+from dspy.teleprompt.utils import make_optimizer_evaluator, resolve_max_errors
 
 logger = logging.getLogger(__name__)
 YELLOW = "\x1b[93m"
@@ -108,7 +108,7 @@ class BetterTogether(Teleprompter):
         trainset, valset = self._prepare_trainset_and_valset(
             trainset=params.trainset, valset=params.valset, valset_ratio=params.valset_ratio
         )
-        effective_max_errors = params.max_errors if params.max_errors is not None else run.execution.max_errors
+        effective_max_errors = resolve_max_errors(params.max_errors, run)
         parsed_strategy = self._prepare_strategy(params.strategy)
         optimizer_compile_args = self._prepare_optimizer_compile_args(params.optimizer_compile_args, teacher)
         student = await self._run_strategies(
@@ -363,7 +363,8 @@ class BetterTogether(Teleprompter):
             logger.info(f"{YELLOW}No validation set provided. Skipping evaluation.{ENDC}")
             return None
         logger.info(f"{BLUE}Evaluating on {len(valset)} validation examples...{ENDC}")
-        evaluate = Evaluate(
+        evaluate = make_optimizer_evaluator(
+            run,
             devset=valset,
             metric=self.metric,
             max_concurrency=max_concurrency,

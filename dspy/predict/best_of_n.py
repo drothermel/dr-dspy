@@ -3,6 +3,7 @@ from collections.abc import Callable
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.predict import Module, Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
+from dspy.teleprompt.utils import run_program_with_trace
 
 
 class BestOfN(Module):
@@ -35,9 +36,7 @@ class BestOfN(Module):
             mod = self.module.deepcopy()
             mod.set_lm(lm_)
             try:
-                item_run = run.fork(optimization_trace=[], call_log=[])
-                pred = await mod(**inputs, run=item_run, options=options)
-                trace = list(item_run.optimization_trace)
+                pred, trace = await run_program_with_trace(mod, inputs, run, options=options)
                 reward = self.reward_fn(inputs, pred)
                 if reward > best_reward:
                     best_reward, best_pred, best_trace = (reward, pred, trace)

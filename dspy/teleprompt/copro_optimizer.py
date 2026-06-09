@@ -6,7 +6,6 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.core.types.config import LMConfig
-from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
@@ -14,7 +13,7 @@ from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.compile_params import COPROCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
-from dspy.teleprompt.utils import optimizer_lm_context
+from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +118,15 @@ class COPRO(Teleprompter):
                 "save_as_json",
             }
         }
-        evaluator = Evaluate(devset=trainset, metric=self.metric, **evaluate_kwargs)
+        extra_evaluate_kwargs = {key: value for key, value in evaluate_call_kwargs.items() if key != "max_concurrency"}
+        evaluator = make_optimizer_evaluator(
+            run,
+            devset=trainset,
+            metric=self.metric,
+            max_concurrency=evaluate_kwargs.get("max_concurrency"),
+            max_errors=evaluate_kwargs.get("max_errors"),
+            **extra_evaluate_kwargs,
+        )
         total_calls = 0
         results_best = {
             id(p): {"depth": [], "max": [], "average": [], "min": [], "std": []} for p in module.predictors()

@@ -30,6 +30,10 @@ def resolve_max_concurrency(
     return default
 
 
+def resolve_max_errors(optimizer_max_errors: int | None, run: RunContext) -> int:
+    return optimizer_max_errors if optimizer_max_errors is not None else run.execution.max_errors
+
+
 T = TypeVar("T")
 R = TypeVar("R")
 

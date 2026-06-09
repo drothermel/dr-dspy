@@ -4,12 +4,12 @@ from types import MethodType
 from typing import Any, Callable, TypedDict, cast
 
 from dspy.core.types.call_options import ModuleCallOptions
-from dspy.evaluate.evaluate import Evaluate
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.task_spec_context import get_task_spec
+from dspy.teleprompt.utils import make_optimizer_evaluator
 from dspy.utils.exceptions import AdapterParseError
 
 logger = logging.getLogger(__name__)
@@ -43,12 +43,14 @@ async def bootstrap_trace_data(
     callback_metadata: dict[str, Any] | None = None,
 ) -> list[TraceData]:
     _ = capture_failed_parses
-    evaluator = Evaluate(
+    evaluator = make_optimizer_evaluator(
+        run,
         devset=dataset,
+        metric=None,
         max_concurrency=max_concurrency,
+        max_errors=len(dataset) * 10,
         display_progress=True,
         provide_traceback=False,
-        max_errors=len(dataset) * 10,
         failure_score=failure_score,
     )
 
