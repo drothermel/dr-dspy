@@ -1,3 +1,4 @@
+# Internal: import from dspy.clients.openai_format.serialize only in tests and spine-adjacent code.
 from __future__ import annotations
 
 import os

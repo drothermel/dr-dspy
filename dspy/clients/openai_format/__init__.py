@@ -4,7 +4,6 @@ from dspy.clients.openai_format.parse import (
     cost_from_response,
     extract_citations_from_choice,
     provider_tool_call_to_part,
-    responses_function_call_to_part,
     responses_to_lm_response,
     usage_from_response,
 )
@@ -17,7 +16,9 @@ __all__ = [
     "to_openai_text_request",
     "completion_to_lm_response",
     "responses_to_lm_response",
-    "provider_tool_call_to_part",
-    "responses_function_call_to_part",
     "usage_from_response",
+    "cost_from_response",
+    "message_to_openai_chat",
+    "provider_tool_call_to_part",
+    "extract_citations_from_choice",
 ]
