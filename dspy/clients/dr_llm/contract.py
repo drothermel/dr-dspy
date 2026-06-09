@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from dspy.errors import LMConfigurationError
 
 if TYPE_CHECKING:
+    from dspy.core.types.config import LMConfig
     from dspy.core.types.lm_provider import LMProviderOptions
 
 
@@ -54,3 +55,66 @@ def validate_dr_llm_ctor(
             "(for example OPENAI_API_KEY), not provider_options.",
             model=model,
         )
+
+
+def reject_unsupported_merged_config(config: LMConfig, *, model: str) -> None:
+    """Reject per-request LMConfig fields that dr-llm v1 does not map to BackendRequest."""
+    from dspy.errors import LMUnsupportedFeatureError
+
+    if config.response_format is not None:
+        raise LMUnsupportedFeatureError(
+            "dr-llm backends v1 do not support structured response_format.",
+            model=model,
+            features=["response_format"],
+        )
+    if config.stop is not None:
+        raise LMUnsupportedFeatureError(
+            "dr-llm backends v1 do not support stop sequences.",
+            model=model,
+            features=["stop"],
+        )
+    if config.n is not None:
+        raise LMUnsupportedFeatureError(
+            "dr-llm backends v1 do not support n>1 sampling.",
+            model=model,
+            features=["n"],
+        )
+    if config.logprobs is not None:
+        raise LMUnsupportedFeatureError(
+            "dr-llm backends v1 do not support logprobs.",
+            model=model,
+            features=["logprobs"],
+        )
+    if config.tool_choice is not None:
+        raise LMUnsupportedFeatureError(
+            "dr-llm backends v1 do not support tool_choice.",
+            model=model,
+            features=["tool_choice"],
+        )
+    if config.prompt_cache is not None:
+        raise LMUnsupportedFeatureError(
+            "dr-llm backends v1 do not support prompt_cache.",
+            model=model,
+            features=["prompt_cache"],
+        )
+    if config.extensions:
+        raise LMUnsupportedFeatureError(
+            "dr-llm backends v1 do not support LMConfig.extensions.",
+            model=model,
+            features=["extensions"],
+        )
+    reasoning = config.reasoning
+    if reasoning is not None:
+        unsupported_reasoning_fields: list[str] = []
+        if reasoning.max_tokens is not None:
+            unsupported_reasoning_fields.append("reasoning.max_tokens")
+        if reasoning.summary is not None:
+            unsupported_reasoning_fields.append("reasoning.summary")
+        if unsupported_reasoning_fields:
+            joined = ", ".join(unsupported_reasoning_fields)
+            raise LMUnsupportedFeatureError(
+                f"dr-llm backends v1 only support reasoning.effort via BackendRequest.effort; "
+                f"unsupported field(s): {joined}.",
+                model=model,
+                features=["reasoning"],
+            )

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from dr_llm.backends.models import BackendCapabilities
 
-_V1_SUPPORTED_PARAMS = frozenset({"temperature", "max_tokens", "top_p"})
+_V1_SUPPORTED_PARAMS = frozenset({"temperature", "max_tokens", "top_p", "reasoning"})
 _REASONING_CONTROL_MODES = frozenset({"reasoning", "thinking", "effort"})
 
 

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import Any, Literal, cast
 
 from dr_llm.backends.models import BackendRequest, BackendResponse
 from dr_llm.llm import CallMode, EffortSpec, Message, ProviderName, SamplingControls
 
+from dspy.clients.dr_llm.contract import reject_unsupported_merged_config
 from dspy.core.types import LMOutput, LMRequest, LMResponse, LMUsage
 from dspy.core.types.config import LMConfig, merge_lm_request_config
 from dspy.core.types.parts import (
@@ -18,10 +19,7 @@ from dspy.core.types.parts import (
     LMToolCallPart,
     LMVideoPart,
 )
-from dspy.errors import LMUnsupportedFeatureError
-
-if TYPE_CHECKING:
-    from dr_llm.llm.response import LlmResponse
+from dspy.errors import LMConfigurationError, LMUnsupportedFeatureError
 
 _MessageRole = Literal["system", "user", "assistant"]
 _ALLOWED_MESSAGE_ROLES = frozenset({"system", "user", "assistant"})
@@ -53,13 +51,14 @@ def probe_backend_request(lm: Any, *, mode: CallMode = CallMode.api) -> BackendR
             model=lm.model,
         ) from exc
     merged = merge_lm_request_config(lm, LMConfig())
+    reject_unsupported_merged_config(merged, model=lm.model)
     return BackendRequest(
         provider=provider,
         model=model_name,
         mode=mode,
         messages=[Message(role="user", content="")],
         max_tokens=merged.max_tokens,
-        effort=_effort_from_config(merged),
+        effort=_effort_from_config(merged, model=lm.model),
         sampling=_sampling_from_config(merged),
     )
 
@@ -70,12 +69,6 @@ def _reject_unsupported_request(request: LMRequest) -> None:
             "dr-llm backends v1 do not support tool calling.",
             model=request.model,
             features=["tools"],
-        )
-    if request.config.response_format is not None:
-        raise LMUnsupportedFeatureError(
-            "dr-llm backends v1 do not support structured response_format.",
-            model=request.model,
-            features=["response_format"],
         )
     for message in request.messages:
         if message.role not in _ALLOWED_MESSAGE_ROLES:
@@ -122,13 +115,16 @@ def _sampling_from_config(config: LMConfig) -> SamplingControls | None:
     return SamplingControls(temperature=temperature, top_p=top_p)
 
 
-def _effort_from_config(config: LMConfig) -> EffortSpec:
+def _effort_from_config(config: LMConfig, *, model: str) -> EffortSpec:
     reasoning = config.reasoning
     if reasoning is not None and reasoning.effort is not None:
         try:
             return EffortSpec(reasoning.effort.lower())
-        except ValueError:
-            pass
+        except ValueError as exc:
+            raise LMConfigurationError(
+                f"Invalid reasoning effort {reasoning.effort!r} for dr-llm backend.",
+                model=model,
+            ) from exc
     return EffortSpec.NA
 
 
@@ -140,6 +136,7 @@ def lm_request_to_backend_request(
 ) -> BackendRequest:
     _reject_unsupported_request(request)
     merged = merge_lm_request_config(lm, request.config)
+    reject_unsupported_merged_config(merged, model=request.model)
     provider_name, model_name = split_provider_model(request.model)
     try:
         provider = ProviderName(provider_name)
@@ -161,7 +158,7 @@ def lm_request_to_backend_request(
         mode=mode,
         messages=messages,
         max_tokens=merged.max_tokens,
-        effort=_effort_from_config(merged),
+        effort=_effort_from_config(merged, model=request.model),
         reasoning=None,
         sampling=_sampling_from_config(merged),
         metadata=dict(request.metadata),
@@ -230,8 +227,3 @@ def backend_response_to_lm_response(
         cost=_cost_to_float(response.cost),
         provider_response=response,
     )
-
-
-def llm_response_to_backend_response(response: LlmResponse, **meta: Any) -> BackendResponse:
-    payload = response.model_dump()
-    return BackendResponse(**payload, **meta)

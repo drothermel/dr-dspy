@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
+from dr_llm.llm import EffortSpec
 
 from dspy.clients.dr_llm.mapping import (
     backend_response_to_lm_response,
@@ -9,9 +12,9 @@ from dspy.clients.dr_llm.mapping import (
     split_provider_model,
 )
 from dspy.core.types import LMMessage, LMMessageRole, LMRequest, User
-from dspy.core.types.config import LMConfig
+from dspy.core.types.config import LMConfig, LMReasoningConfig, ReasoningEffort
 from dspy.core.types.parts import LMImagePart, LMTextPart
-from dspy.errors import LMUnsupportedFeatureError
+from dspy.errors import LMConfigurationError, LMUnsupportedFeatureError
 from dspy.testing import DummyLM
 from tests.clients.dr_llm._helpers import make_backend_response, make_lm_request
 
@@ -76,6 +79,68 @@ def test_lm_request_rejects_multimodal_parts() -> None:
         messages=[User(LMImagePart(url="https://example.com/x.png"))],
     )
     with pytest.raises(LMUnsupportedFeatureError):
+        lm_request_to_backend_request(request, lm=lm)
+
+
+@pytest.mark.parametrize(
+    ("config_kwargs", "feature"),
+    [
+        ({"response_format": {"type": "json_object"}}, "response_format"),
+        ({"stop": ["END"]}, "stop"),
+        ({"n": 2}, "n"),
+        ({"logprobs": True}, "logprobs"),
+        ({"tool_choice": {"mode": "auto"}}, "tool_choice"),
+        ({"prompt_cache": {"enabled": True}}, "prompt_cache"),
+        ({"extensions": {"foo": "bar"}}, "extensions"),
+    ],
+)
+def test_lm_request_rejects_unsupported_merged_config(config_kwargs: dict, feature: str) -> None:
+    lm = DummyLM([{"answer": "x"}])
+    request = LMRequest(
+        model="openai/gpt-4.1-mini",
+        messages=[User(LMTextPart(text="hi"))],
+        config=LMConfig(**config_kwargs),
+    )
+    with pytest.raises(LMUnsupportedFeatureError, match=feature):
+        lm_request_to_backend_request(request, lm=lm)
+
+
+def test_lm_request_rejects_unsupported_reasoning_fields() -> None:
+    lm = DummyLM([{"answer": "x"}])
+    request = LMRequest(
+        model="openai/gpt-4.1-mini",
+        messages=[User(LMTextPart(text="hi"))],
+        config=LMConfig(reasoning=LMReasoningConfig(max_tokens=1000)),
+    )
+    with pytest.raises(LMUnsupportedFeatureError, match="reasoning"):
+        lm_request_to_backend_request(request, lm=lm)
+
+
+def test_lm_request_maps_reasoning_effort() -> None:
+    lm = DummyLM([{"answer": "x"}])
+    request = LMRequest(
+        model="openai/gpt-4.1-mini",
+        messages=[User(LMTextPart(text="hi"))],
+        config=LMConfig(reasoning=LMReasoningConfig(effort=ReasoningEffort.HIGH)),
+    )
+    backend_request = lm_request_to_backend_request(request, lm=lm)
+    assert backend_request.effort == EffortSpec.HIGH
+
+
+def test_effort_from_config_raises_on_invalid_effort() -> None:
+    lm = DummyLM([{"answer": "x"}])
+    request = LMRequest(
+        model="openai/gpt-4.1-mini",
+        messages=[User(LMTextPart(text="hi"))],
+        config=LMConfig(reasoning=LMReasoningConfig(effort=ReasoningEffort.LOW)),
+    )
+    with (
+        patch(
+            "dspy.clients.dr_llm.mapping.EffortSpec",
+            side_effect=ValueError("invalid effort"),
+        ),
+        pytest.raises(LMConfigurationError, match="reasoning effort"),
+    ):
         lm_request_to_backend_request(request, lm=lm)
 
 
