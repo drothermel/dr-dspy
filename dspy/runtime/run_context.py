@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, TextIO
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dspy.utils.transparency import TransparencyMode
+from dspy.utils.transparency import CallSite, TransparencyMode
 
 if TYPE_CHECKING:
     from dspy.utils.usage_tracker import UsageTracker
@@ -68,6 +68,7 @@ class RunContext(BaseModel):
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
     telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
     log_session: Any | None = None
+    call_site: CallSite | None = None
 
     @classmethod
     def create(
@@ -118,6 +119,7 @@ class RunContext(BaseModel):
         optimization_trace = list(overrides.pop("optimization_trace", self.optimization_trace))
         call_log = list(overrides.pop("call_log", self.call_log))
         log_session = overrides.pop("log_session", self.log_session)
+        call_site = overrides.pop("call_site", self.call_site)
 
         return RunContext(
             lm=overrides.pop("lm", self.lm),
@@ -131,6 +133,7 @@ class RunContext(BaseModel):
             execution=execution,
             telemetry=telemetry,
             log_session=log_session,
+            call_site=call_site,
             **overrides,
         )
 

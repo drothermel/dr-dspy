@@ -11,7 +11,7 @@ from dspy.core.types.config import LMConfig
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec
 from dspy.task_spec.formatting import get_field_spec_description_string
-from dspy.utils.transparency import reset_active_call_metadata, set_active_call_metadata
+from dspy.utils.transparency import CallSite
 
 
 class FrameworkTwoStepExtractorTaskSpec(TaskSpec):
@@ -58,21 +58,21 @@ class TwoStepAdapter(Adapter):
         extraction_adapter, _adapter_notes = resolve_adapter(self.extraction_adapter or run.adapter)
         extractor_task_spec = self._create_extractor_task_spec(original_task_spec)
         config, _provenance = resolve_lm_config(self.extraction_model, LMConfig())
-        metadata_token = set_active_call_metadata(
-            module="TwoStepAdapter", phase="two_step.extraction", lm_role="extraction_model"
+        extraction_site = CallSite(
+            module="TwoStepAdapter",
+            phase="two_step.extraction",
+            lm_role="extraction_model",
         )
-        try:
-            results = await AdapterCallPipeline.execute(
-                extraction_adapter,
-                lm=self.extraction_model,
-                config=config,
-                task_spec=extractor_task_spec,
-                demos=[],
-                inputs={"text": text},
-                run=run,
-            )
-        finally:
-            reset_active_call_metadata(metadata_token)
+        results = await AdapterCallPipeline.execute(
+            extraction_adapter,
+            lm=self.extraction_model,
+            config=config,
+            task_spec=extractor_task_spec,
+            demos=[],
+            inputs={"text": text},
+            run=run,
+            call_site=extraction_site,
+        )
         return results[0]
 
     @override

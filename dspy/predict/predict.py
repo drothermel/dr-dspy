@@ -16,7 +16,7 @@ from dspy.primitives.prediction import Prediction
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec.task_spec import TaskSpec
 from dspy.utils.callback import BaseCallback
-from dspy.utils.transparency import reset_active_call_metadata, set_active_call_metadata
+from dspy.utils.transparency import resolve_call_site
 
 logger = logging.getLogger(__name__)
 UNSAFE_LM_STATE_KEYS = {"api_base", "base_url", "model_list"}
@@ -174,18 +174,20 @@ class Predict(Module, Parameter):
             run=run,
         )
         config, _provenance = resolve_lm_config(lm, config)
-        metadata_token = set_active_call_metadata(module=type(self).__name__, phase="predict", lm_role="default")
-        try:
-            completions = await run.adapter.acall(
-                lm=lm,
-                config=config,
-                task_spec=task_spec,
-                demos=demos,
-                inputs=validated_inputs,
-                run=run,
-            )
-        finally:
-            reset_active_call_metadata(metadata_token)
+        call_site = resolve_call_site(
+            run=run,
+            default_module=type(self).__name__,
+            default_phase="predict",
+        )
+        completions = await run.adapter.acall(
+            lm=lm,
+            config=config,
+            task_spec=task_spec,
+            demos=demos,
+            inputs=validated_inputs,
+            run=run,
+            call_site=call_site,
+        )
         return self._forward_postprocess(completions, task_spec, run, validated_inputs, trace=trace)
 
     def update_config(self, config: LMConfig) -> None:

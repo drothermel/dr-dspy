@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-import contextvars
 import logging
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from dspy.runtime.run_context import RunContext
 
 from dspy.clients.lm_normalize import lm_kwargs_max_tokens
 from dspy.core.types import LMConfig
@@ -12,12 +14,6 @@ from dspy.task_spec import TaskSpec
 
 logger = logging.getLogger(__name__)
 TransparencyMode = Literal["strict", "warn", "verbose", "off"]
-ACTIVE_COMPILED_CALL: contextvars.ContextVar[CompiledCall | None] = contextvars.ContextVar(
-    "active_compiled_call", default=None
-)
-ACTIVE_CALL_METADATA: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
-    "active_call_metadata", default={}
-)
 PLACEHOLDER_DESC_PREFIX = "${"
 
 
@@ -28,6 +24,14 @@ class TransparencyViolation(Exception):
         if self.fixes:
             full_message += "\nFixes:\n" + "\n".join(f"  - {fix}" for fix in self.fixes)
         super().__init__(full_message)
+
+
+class CallSite(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    module: str
+    phase: str = "predict"
+    lm_role: str = "default"
 
 
 class CompiledCall(BaseModel):
@@ -47,6 +51,21 @@ class CompiledCall(BaseModel):
     lm_model: str = ""
     cache: bool | None = None
     violations: list[str] = Field(default_factory=list)
+
+
+def resolve_call_site(
+    *,
+    run: RunContext,
+    call_site: CallSite | None = None,
+    default_module: str,
+    default_phase: str = "predict",
+    default_lm_role: str = "default",
+) -> CallSite:
+    if call_site is not None:
+        return call_site
+    if run.call_site is not None:
+        return run.call_site
+    return CallSite(module=default_module, phase=default_phase, lm_role=default_lm_role)
 
 
 def is_placeholder_desc(desc: str, field_name: str) -> bool:
@@ -84,10 +103,8 @@ def collect_config_violations(*, config: LMConfig, lm_kwargs: dict[str, Any], ca
 
 def validate_compiled_call(call: CompiledCall, mode: TransparencyMode) -> list[str]:
     violations = list(call.violations)
-    if not call.adapter_class or call.adapter_class == "ChatAdapter(default)":
-        violations.append(
-            "adapter not configured (would default to ChatAdapter). Fix: RunContext.create(lm=LM(...), adapter=JSONAdapter())."
-        )
+    if not call.adapter_class:
+        violations.append("adapter not configured. Fix: RunContext.create(lm=LM(...), adapter=JSONAdapter()).")
     for task_spec in (call.original_task_spec, call.processed_task_spec):
         violations.extend(collect_task_spec_violations(task_spec))
     if call.lm_model:
@@ -110,13 +127,3 @@ def validate_compiled_call(call: CompiledCall, mode: TransparencyMode) -> list[s
             call.task_spec_mutations,
         )
     return violations
-
-
-def set_active_call_metadata(**metadata: Any) -> contextvars.Token:
-    current = dict(ACTIVE_CALL_METADATA.get())
-    current.update(metadata)
-    return ACTIVE_CALL_METADATA.set(current)
-
-
-def reset_active_call_metadata(token: contextvars.Token) -> None:
-    ACTIVE_CALL_METADATA.reset(token)

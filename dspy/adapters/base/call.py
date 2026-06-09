@@ -19,6 +19,7 @@ from dspy.utils.exceptions import AdapterParseError
 if TYPE_CHECKING:
     from dspy.adapters.base.adapter import Adapter
     from dspy.clients.base_lm import BaseLM
+    from dspy.utils.transparency import CallSite
 
 
 class AdapterCallMixin(AdapterNativeMixin):
@@ -149,6 +150,7 @@ class AdapterCallMixin(AdapterNativeMixin):
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
         run: RunContext,
+        call_site: CallSite | None = None,
     ) -> list[dict[str, Any]]:
         from dspy.adapters.call.pipeline import AdapterCallPipeline
 
@@ -160,4 +162,5 @@ class AdapterCallMixin(AdapterNativeMixin):
             demos=demos,
             inputs=inputs,
             run=run,
+            call_site=call_site,
         )

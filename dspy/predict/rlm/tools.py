@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from dspy.adapters.types.tool import Tool
 from dspy.core.types.call_options import PredictOptions
 from dspy.predict.rlm.sync_bridge import _run_sub_lm_async
-from dspy.utils.transparency import reset_active_call_metadata, set_active_call_metadata
+from dspy.utils.transparency import CallSite
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -79,15 +79,19 @@ def make_llm_tools(rlm: RLM, run: RunContext | None = None, max_workers: int = 8
             raise RuntimeError(
                 "No LM configured. Pass run=RunContext.create(lm=..., adapter=...) or pass sub_lm to RLM."
             )
-        metadata_token = set_active_call_metadata(module="RLM", phase="rlm.sub_lm", lm_role="sub_lm")
-        try:
-            prediction = await rlm._sub_query_predict(
-                prompt=prompt,
-                run=run,
-                options=PredictOptions(lm=target_lm),
+        sub_run = (
+            run.fork(
+                lm=target_lm,
+                call_site=CallSite(module="RLM", phase="rlm.sub_lm", lm_role="sub_lm"),
             )
-        finally:
-            reset_active_call_metadata(metadata_token)
+            if run is not None
+            else None
+        )
+        prediction = await rlm._sub_query_predict(
+            prompt=prompt,
+            run=sub_run,
+            options=PredictOptions(lm=target_lm),
+        )
         return prediction.response
 
     def _query_lm(prompt: str) -> str:

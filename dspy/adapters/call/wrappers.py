@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types.config import LMConfig
     from dspy.runtime.run_context import RunContext
+    from dspy.utils.transparency import CallSite
 
 
 class HintInjectingAdapter(Adapter):
@@ -43,6 +44,7 @@ class HintInjectingAdapter(Adapter):
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
         run: RunContext,
+        call_site: CallSite | None = None,
     ) -> list[dict[str, Any]]:
         from dspy.adapters.call.pipeline import AdapterCallPipeline
 
@@ -60,4 +62,5 @@ class HintInjectingAdapter(Adapter):
             demos=demos,
             inputs=inputs,
             run=run,
+            call_site=call_site,
         )

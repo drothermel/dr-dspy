@@ -8,12 +8,7 @@ from dspy.core.types import LMRequest
 from dspy.core.types.config import coerce_lm_config, merge_lm_request_config
 from dspy.core.types.history import _history_request_messages_as_openai
 from dspy.utils.exceptions import AdapterParseError, LMError
-from dspy.utils.transparency import (
-    ACTIVE_COMPILED_CALL,
-    reset_active_call_metadata,
-    set_active_call_metadata,
-    validate_compiled_call,
-)
+from dspy.utils.transparency import validate_compiled_call
 
 if TYPE_CHECKING:
     from dspy.adapters.two_step_adapter import TwoStepAdapter
@@ -56,13 +51,7 @@ class TwoStepCallExecutor:
             lm_role="default",
         )
         validate_compiled_call(main_compiled, transparency)
-        main_token = ACTIVE_COMPILED_CALL.set(main_compiled)
-        metadata_token = set_active_call_metadata(module="TwoStepAdapter", phase="two_step.main", lm_role="default")
-        try:
-            response = await lm.acall(request, run=run, compiled=main_compiled)
-        finally:
-            ACTIVE_COMPILED_CALL.reset(main_token)
-            reset_active_call_metadata(metadata_token)
+        response = await lm(request, run=run, compiled=main_compiled)
 
         extractor_task_spec = adapter._create_extractor_task_spec(task_spec)
         values = []

@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from dspy.core.types.config import LMConfig
     from dspy.runtime.run_context import RunContext
     from dspy.task_spec import TaskSpec
+    from dspy.utils.transparency import CallSite
 
 
 class AdapterCallPipeline:
@@ -28,6 +29,7 @@ class AdapterCallPipeline:
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
         run: RunContext,
+        call_site: CallSite | None = None,
         allow_parse_fallback: bool = True,
     ) -> list[dict[str, Any]]:
         if getattr(adapter, "call_mode", None) == "two_step":
@@ -54,6 +56,7 @@ class AdapterCallPipeline:
                 demos=demos,
                 inputs=inputs,
                 run=run,
+                call_site=call_site,
                 allow_parse_fallback=allow_parse_fallback,
             )
 
@@ -77,11 +80,12 @@ class AdapterCallPipeline:
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
         run: RunContext,
+        call_site: CallSite | None,
         allow_parse_fallback: bool,
     ) -> list[dict[str, Any]]:
         from dspy.compile.resolve import resolve_call, resolve_lm_config
         from dspy.core.types.history import _history_request_messages_as_openai
-        from dspy.utils.transparency import ACTIVE_CALL_METADATA, ACTIVE_COMPILED_CALL, validate_compiled_call
+        from dspy.utils.transparency import resolve_call_site, validate_compiled_call
 
         try:
             resolved_config = coerce_lm_config(config)
@@ -96,7 +100,12 @@ class AdapterCallPipeline:
             messages = adapter.format(task_spec=processed_task_spec, demos=demos, inputs=inputs)
             request = adapter._render_request(lm=lm, config=resolved_config, tools=tools, messages=messages)
             merged_config, provenance = resolve_lm_config(lm, resolved_config)
-            metadata = ACTIVE_CALL_METADATA.get()
+            site = resolve_call_site(
+                run=run,
+                call_site=call_site,
+                default_module=type(adapter).__name__,
+                default_phase="adapter",
+            )
             compiled = resolve_call(
                 lm=lm,
                 adapter=adapter,
@@ -106,17 +115,13 @@ class AdapterCallPipeline:
                 config_provenance=provenance,
                 messages=_history_request_messages_as_openai(request),
                 task_spec_mutations=mutations,
-                module=metadata.get("module", type(adapter).__name__),
-                phase=metadata.get("phase", "adapter"),
-                lm_role=metadata.get("lm_role", "default"),
+                module=site.module,
+                phase=site.phase,
+                lm_role=site.lm_role,
             )
             transparency = run.telemetry.transparency
             validate_compiled_call(compiled, transparency)
-            token = ACTIVE_COMPILED_CALL.set(compiled)
-            try:
-                response = await adapter._call_lm(lm=lm, request=request, run=run, compiled=compiled)
-            finally:
-                ACTIVE_COMPILED_CALL.reset(token)
+            response = await adapter._call_lm(lm=lm, request=request, run=run, compiled=compiled)
             return adapter._call_postprocess(
                 processed_task_spec=processed_task_spec,
                 original_task_spec=task_spec,

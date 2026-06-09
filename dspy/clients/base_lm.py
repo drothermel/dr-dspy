@@ -14,7 +14,7 @@ from dspy.runtime.run_context import RunContext, disk_call_log_enabled, memory_c
 from dspy.utils.callback import BaseCallback, with_callbacks
 from dspy.utils.inspect_call_log import pretty_print_call_log
 from dspy.utils.run_log import RunLogSession, append_call_record, redact_config, redact_messages
-from dspy.utils.transparency import ACTIVE_CALL_METADATA, ACTIVE_COMPILED_CALL, CompiledCall
+from dspy.utils.transparency import CompiledCall
 
 LM_CLASS_STATE_KEY = "_dspy_lm_class"
 PROVIDER_OPTIONS_STATE_KEY = "_dspy_provider_options"
@@ -170,9 +170,6 @@ class BaseLM:
         session: RunLogSession | None,
         compiled: CompiledCall | None = None,
     ) -> None:
-        if compiled is None:
-            compiled = ACTIVE_COMPILED_CALL.get()
-        metadata = ACTIVE_CALL_METADATA.get()
         call_id = compiled.call_id if compiled is not None else call_record.uuid if call_record else str(uuid.uuid4())
         messages = _history_request_messages_as_openai(request)
         outputs = [
@@ -189,9 +186,9 @@ class BaseLM:
             "call_id": call_id,
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "caller": {
-                "module": compiled.module if compiled else metadata.get("module"),
-                "phase": compiled.phase if compiled else metadata.get("phase"),
-                "lm_role": compiled.lm_role if compiled else metadata.get("lm_role"),
+                "module": compiled.module if compiled else "unknown",
+                "phase": compiled.phase if compiled else "unknown",
+                "lm_role": compiled.lm_role if compiled else "unknown",
             },
             "lm": {"model": self.model, "model_type": getattr(self, "model_type", None)},
             "adapter": {
