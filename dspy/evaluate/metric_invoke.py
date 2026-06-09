@@ -41,7 +41,15 @@ async def call_metric(
     if inspect.iscoroutinefunction(metric):
         return await metric(example, prediction, trace)
     if isinstance(metric, Module):
-        return await metric(example=example, pred=prediction, trace=trace, run=run)
+        # Optimizer/evaluate paths pass a trace list; module metrics interpret that as threshold mode.
+        use_threshold = trace is not None
+        return await metric(
+            example=example,
+            pred=prediction,
+            trace=trace,
+            use_threshold=use_threshold,
+            run=run,
+        )
     return metric(example, prediction, trace)
 
 
