@@ -15,7 +15,7 @@ from dspy.teleprompt.errors import is_demo_shrinkable_error
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
-from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
+from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context, split_trainset_holdout
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +54,7 @@ class InferRules(BootstrapFewShot):
         trainset = params.trainset
         valset = params.valset
         if valset is None:
-            train_size = int(0.5 * len(trainset))
-            trainset, valset = (trainset[:train_size], trainset[train_size:])
+            trainset, valset = split_trainset_holdout(trainset, holdout_ratio=0.5, seed=params.split_seed)
         await super().compile(
             student,
             params=BootstrapFewShotCompileParams(trainset=trainset, teacher=params.teacher),

@@ -29,7 +29,7 @@ from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.protocol import Teleprompter
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.teleprompt.registry import compile_params_type, register_teleprompter, validate_compile_params
-from dspy.teleprompt.utils import make_optimizer_evaluator
+from dspy.teleprompt.utils import make_optimizer_evaluator, split_trainset_holdout
 
 logger = logging.getLogger(__name__)
 STRATEGY_LABEL_SEP = " -> "
@@ -121,7 +121,10 @@ class BetterTogether:
         )
         student, teacher = self._prepare_student_and_teacher(student=student, teacher=params.teacher)
         trainset, valset = self._prepare_trainset_and_valset(
-            trainset=params.trainset, valset=params.valset, valset_ratio=params.valset_ratio
+            trainset=params.trainset,
+            valset=params.valset,
+            valset_ratio=params.valset_ratio,
+            seed=params.seed,
         )
         effective_max_errors = resolve_max_errors(params.max_errors, run)
         parsed_strategy = self._prepare_strategy(params.strategy)
@@ -171,23 +174,30 @@ class BetterTogether:
         return (student, teacher)
 
     def _prepare_trainset_and_valset(
-        self, trainset: list[Example], valset: list[Example] | None, valset_ratio: float
+        self,
+        trainset: list[Example],
+        valset: list[Example] | None,
+        valset_ratio: float,
+        seed: int | None = None,
     ) -> tuple[list[Example], list[Example] | None]:
         if not trainset:
             raise ValueError("trainset cannot be empty")
         if valset_ratio < 0 or valset_ratio >= 1:
             raise ValueError(f"valset_ratio must be in range [0, 1), got {valset_ratio}")
         trainset = trainset[:]
-        if valset:
+        if valset is not None:
             logger.info(f"{BLUE}Using provided validation set ({len(valset)} examples). Ignoring valset_ratio.{ENDC}")
             return (trainset, valset)
         if valset_ratio == 0:
             logger.info(f"{YELLOW}No validation set provided and valset_ratio=0. No validation set created.{ENDC}")
             return (trainset, None)
         logger.info(f"{BLUE}Sampling {valset_ratio:.1%} of trainset as validation set.{ENDC}")
-        num_val_examples = int(valset_ratio * len(trainset))
-        valset = trainset[:num_val_examples]
-        trainset = trainset[num_val_examples:]
+        if int(valset_ratio * len(trainset)) == 0:
+            logger.info(
+                f"{YELLOW}valset_ratio {valset_ratio:.1%} yields no holdout examples for trainset of size {len(trainset)}; skipping validation split.{ENDC}"
+            )
+            return (trainset, None)
+        trainset, valset = split_trainset_holdout(trainset, holdout_ratio=valset_ratio, seed=seed or 0)
         logger.info(
             f"{BLUE}Created validation set: {len(valset)} examples. Training set: {len(trainset)} examples.{ENDC}"
         )

@@ -100,6 +100,7 @@ class KNNFewShotCompileParams(BaseModel):
 
 class InferRulesCompileParams(BootstrapFewShotCompileParams):
     valset: list[Example] | None = None
+    split_seed: int = 0
 
 
 class GRPOCompileParams(BaseModel):
