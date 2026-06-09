@@ -3,7 +3,7 @@ from typing import Any, cast
 from pydantic import BaseModel
 
 from dspy.integrations.optimizers.optuna.study import create_maximize_study, run_ask_tell_loop
-from dspy.primitives.module import Module
+from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, BootstrapOptunaCompileParams
 from dspy.teleprompt.utils import make_optimizer_evaluator

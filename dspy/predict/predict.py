@@ -9,8 +9,7 @@ from dspy.core.types import LMConfig, coerce_lm_config, merge_lm_config
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
 from dspy.predict.call_validation import resolve_predict_options
 from dspy.predict.parameter import Parameter
-from dspy.primitives.module import Module
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Module, Prediction
 from dspy.runtime.callback import Callback
 from dspy.runtime.run_context import RunContext
 from dspy.runtime.transparency import resolve_call_site, resolve_lm_config

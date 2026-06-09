@@ -5,7 +5,7 @@ import pytest
 from typing_extensions import override
 
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 from dspy.propose.grounded_proposer import GroundedProposer
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts

@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from dspy.primitives.code_interpreter import CodeInterpreterError
+from dspy.primitives import CodeInterpreterError
 from dspy.primitives.python_interpreter import PythonInterpreter
 
 pytestmark = pytest.mark.deno

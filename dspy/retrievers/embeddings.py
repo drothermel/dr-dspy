@@ -10,7 +10,7 @@ from typing_extensions import override
 
 from dspy._internal.lazy_import import require
 from dspy._internal.unbatchify import Unbatchify
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Prediction
 
 np = require("numpy")
 

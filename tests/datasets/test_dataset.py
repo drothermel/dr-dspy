@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from dspy.datasets.dataset import Dataset
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 
 dummy_data = 'content,question,answer\n"This is content 1","What is this?","This is answer 1"\n"This is content 2","What is that?","This is answer 2"\n'
 

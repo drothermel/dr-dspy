@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 from dspy.runtime.async_parallel import BoundedRunStats, resolve_max_concurrency, resolve_max_errors, run_bounded
 from dspy.runtime.run_context import RunContext, resolve_run
 

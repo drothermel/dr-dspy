@@ -1,7 +1,7 @@
 from dspy.core.types import LMConfig, merge_lm_config
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.predict import Predict
-from dspy.primitives.module import Module
+from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import TaskSpec, input_field, output_field
 

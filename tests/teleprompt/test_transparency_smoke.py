@@ -2,7 +2,7 @@ import pytest
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 from dspy.runtime import CallLogMode, TelemetryConfig, TransparencyMode
 from dspy.task_spec import TaskSpec, input_field, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot

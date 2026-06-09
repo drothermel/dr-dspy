@@ -4,7 +4,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.core.types import LMRequest
 from dspy.errors import ContextWindowExceededError
 from dspy.history import REPLEntry, TurnEvent, TurnLog, call_with_repl_history_truncation, call_with_turn_log_truncation
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Prediction
 from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, TransparencyMode
 from dspy.testing import DummyLM
 

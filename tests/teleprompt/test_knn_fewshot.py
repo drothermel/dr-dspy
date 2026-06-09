@@ -6,8 +6,7 @@ from typing_extensions import override
 
 from dspy.clients.embedding import Embedder
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
+from dspy.primitives import Example, Module
 from dspy.teleprompt.compile_params import KNNFewShotCompileParams
 from dspy.teleprompt.knn_fewshot import KNNFewShot
 from dspy.testing import DummyLM, DummyVectorizer

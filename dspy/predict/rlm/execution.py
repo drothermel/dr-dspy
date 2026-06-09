@@ -13,10 +13,16 @@ from dspy.history import REPLEntry, REPLHistory, REPLVariable, TurnEvent
 from dspy.history.truncation import call_with_repl_history_truncation
 from dspy.predict.rlm.sync_bridge import _strip_code_fences
 from dspy.predict.rlm.tools import make_llm_tools
-from dspy.primitives.code_interpreter import SIMPLE_TYPES, CodeInterpreter, CodeInterpreterError, FinalOutput
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import (
+    CodeInterpreter,
+    CodeInterpreterError,
+    FinalOutput,
+    Prediction,
+    SandboxSerializable,
+    build_repl_variable,
+)
+from dspy.primitives.code_interpreter import SIMPLE_TYPES
 from dspy.primitives.python_interpreter import PythonInterpreter
-from dspy.primitives.sandbox_protocol import SandboxSerializable, build_repl_variable
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator

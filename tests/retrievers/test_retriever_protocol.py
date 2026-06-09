@@ -8,7 +8,7 @@ import pytest
 from dspy.retrievers.embeddings import Embeddings
 
 if TYPE_CHECKING:
-    from dspy.primitives.prediction import Prediction
+    from dspy.primitives import Prediction
     from dspy.retrievers.types import QueryRetriever
 
 

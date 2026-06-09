@@ -2,8 +2,7 @@ import asyncio
 from unittest.mock import patch
 
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
+from dspy.primitives import Example, Module
 from dspy.teleprompt.bootstrap_finetune import BootstrapFinetune
 from dspy.teleprompt.compile_params import BootstrapFinetuneCompileParams
 from dspy.testing import DummyLM

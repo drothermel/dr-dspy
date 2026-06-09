@@ -2,7 +2,7 @@ import pytest
 
 from dspy.adapters.types.image import Image
 from dspy.history import TurnLog
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 
 
 def test_example_initialization():

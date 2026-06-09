@@ -8,8 +8,7 @@ import pytest
 
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
+from dspy.primitives import Example, Module
 from dspy.task_spec import default_task_instructions
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts

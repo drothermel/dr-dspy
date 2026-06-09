@@ -2,7 +2,7 @@ from typing import Any, cast
 
 import pytest
 
-from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
+from dspy.primitives import CodeInterpreterError, FinalOutput
 from dspy.primitives.python_interpreter import PythonInterpreter
 from tests.mock_interpreter import MockInterpreter
 

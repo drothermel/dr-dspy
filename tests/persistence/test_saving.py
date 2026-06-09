@@ -8,8 +8,7 @@ from typing_extensions import override
 from dspy.persistence import load
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
+from dspy.primitives import Example, Module
 from dspy.task_spec import default_task_instructions, input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams

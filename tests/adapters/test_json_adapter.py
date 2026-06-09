@@ -29,7 +29,7 @@ from dspy.clients.lm import LM
 from dspy.errors import LMUnexpectedError
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 from dspy.task_spec import input_field, make_task_spec, output_field
 from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs, make_adapter_run
 from tests.task_spec.helpers import ts

@@ -11,8 +11,7 @@ from dspy.evaluate.evaluator import Evaluate, EvaluationResult
 from dspy.evaluate.metrics import answer_exact_match
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Example, Prediction
 from dspy.runtime.callback import NoOpCallback
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts

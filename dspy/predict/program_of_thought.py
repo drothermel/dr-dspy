@@ -4,8 +4,7 @@ import re
 
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.chain_of_thought import ChainOfThought
-from dspy.primitives.code_interpreter import FinalOutput
-from dspy.primitives.module import Module
+from dspy.primitives import FinalOutput, Module
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field

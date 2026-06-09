@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from importlib.util import find_spec
 from typing import Any
 
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Prediction
 
 
 def _is_databricks_sdk_installed() -> bool:

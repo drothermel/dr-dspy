@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, ConfigDict
 
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

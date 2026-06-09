@@ -11,8 +11,7 @@ from dspy.adapters.types.base_type import Type
 from dspy.history import TurnLog
 from dspy.integrations.optimizers.gepa.task_specs import FrameworkGepaInstructionProposalTaskSpec
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Example, Prediction
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, TraceData
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec

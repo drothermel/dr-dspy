@@ -5,7 +5,7 @@ from typing_extensions import override
 from dspy.clients.base_lm import BaseLM
 from dspy.core.types import LMRequest, LMResponse
 from dspy.core.types.lm_provider import LMProviderOptions
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Prediction
 
 
 class FailingSubLM(BaseLM):

@@ -1,7 +1,7 @@
 import pytest
 
 from dspy.predict.predict import Predict
-from dspy.primitives.module import Module
+from dspy.primitives import Module
 from dspy.propose.utils import get_dspy_source_code
 from tests.task_spec.helpers import ts
 

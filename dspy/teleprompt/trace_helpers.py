@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 
 if TYPE_CHECKING:
     from dspy.core.types.call_options import ModuleCallOptions
-    from dspy.primitives.module import Module
-    from dspy.primitives.prediction import Prediction
+    from dspy.primitives import Module, Prediction
     from dspy.runtime.run_context import RunContext
 
 

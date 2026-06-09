@@ -3,7 +3,7 @@ from typing import Any
 
 from dspy._internal.lazy_import import require
 from dspy.clients.embedding import Embedder
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 
 np = require("numpy")
 

@@ -158,7 +158,7 @@ inputs = example.inputs()
 After:
 
 ```python
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 
 example = Example.from_record(
     {"question": "What is 1+1?", "answer": "2"},

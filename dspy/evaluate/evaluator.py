@@ -14,11 +14,10 @@ from typing_extensions import override
 if TYPE_CHECKING:
     import pandas as pd
 
-    from dspy.primitives.example import Example
-    from dspy.primitives.module import Module
+    from dspy.primitives import Example, Module
 import tqdm
 
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Prediction
 from dspy.runtime.async_parallel import resolve_max_concurrency, resolve_max_errors, run_bounded
 from dspy.runtime.callback import with_callbacks
 from dspy.runtime.run_context import RunContext

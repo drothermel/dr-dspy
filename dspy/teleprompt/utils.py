@@ -9,7 +9,7 @@ from dspy.runtime.config import CallSite
 from dspy.runtime.transparency import resolve_adapter
 
 if TYPE_CHECKING:
-    from dspy.primitives.example import Example
+    from dspy.primitives import Example
     from dspy.runtime.run_context import RunContext
 
 

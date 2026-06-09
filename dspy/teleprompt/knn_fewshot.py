@@ -6,8 +6,7 @@ from pydantic import BaseModel
 from dspy.clients.embedding import Embedder
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.knn import KNN
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
+from dspy.primitives import Example, Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, KNNFewShotCompileParams

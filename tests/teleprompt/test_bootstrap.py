@@ -4,8 +4,7 @@ from typing import Any, cast
 import pytest
 
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
+from dspy.primitives import Example, Module
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
 from dspy.testing import DummyLM

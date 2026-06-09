@@ -2,7 +2,7 @@ import logging
 import math
 import random
 
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Prediction
 from dspy.runtime.run_context import RunContext
 
 logger = logging.getLogger(__name__)

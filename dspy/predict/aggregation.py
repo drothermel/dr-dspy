@@ -1,5 +1,5 @@
 from dspy.evaluate.metrics import normalize_text
-from dspy.primitives.prediction import Completions, Prediction
+from dspy.primitives import Completions, Prediction
 
 
 def default_normalize(s):

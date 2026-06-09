@@ -20,7 +20,7 @@ from dspy.runtime.run_log import create_run_log_session, resolve_log_root, resol
 if TYPE_CHECKING:
     from dspy.adapters.base import Adapter
     from dspy.clients.base_lm import BaseLM
-    from dspy.primitives.module import Module
+    from dspy.primitives import Module
     from dspy.runtime.callback import Callback
     from dspy.runtime.run_log import RunLogSession
     from dspy.runtime.usage_tracker import UsageTracker

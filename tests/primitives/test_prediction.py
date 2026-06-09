@@ -1,7 +1,6 @@
 import pytest
 
-from dspy.primitives.example import Example
-from dspy.primitives.prediction import Completions, Prediction
+from dspy.primitives import Completions, Example, Prediction
 
 
 def test_completions_accepts_list_of_dicts():

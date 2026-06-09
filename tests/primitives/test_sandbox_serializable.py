@@ -1,9 +1,6 @@
 from dspy.history.repl_history import REPLVariable
-from dspy.primitives.sandbox_protocol import (
-    SandboxSerializable,
-    SandboxSerializablePydanticMixin,
-    build_repl_variable,
-)
+from dspy.primitives import SandboxSerializable, build_repl_variable
+from dspy.primitives.sandbox_protocol import SandboxSerializablePydanticMixin
 from dspy.task_spec import input_field, output_field
 
 

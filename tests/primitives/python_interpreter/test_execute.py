@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
+from dspy.primitives import CodeInterpreterError, FinalOutput
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.primitives.python_interpreter.tools import extract_parameters
 

@@ -2,7 +2,7 @@ import random
 
 from pydantic import BaseModel
 
-from dspy.primitives.module import Module
+from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import LabeledFewShotCompileParams
 

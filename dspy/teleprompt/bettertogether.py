@@ -4,8 +4,7 @@ from typing import Callable, cast
 
 from pydantic import BaseModel, ConfigDict
 
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
+from dspy.primitives import Example, Module
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_finetune import (

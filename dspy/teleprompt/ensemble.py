@@ -3,7 +3,7 @@ import random
 from pydantic import BaseModel
 
 from dspy.core.types.call_options import ModuleCallOptions
-from dspy.primitives.module import Module
+from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.teleprompt.compile_params import EnsembleCompileParams
 

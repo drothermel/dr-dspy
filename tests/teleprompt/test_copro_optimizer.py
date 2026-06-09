@@ -1,8 +1,7 @@
 import asyncio
 
 from dspy.predict.chain_of_thought import ChainOfThought
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
+from dspy.primitives import Example, Module
 from dspy.teleprompt.compile_params import COPROCompileParams, EvaluateCompileParams
 from dspy.teleprompt.copro_optimizer import COPRO
 from dspy.testing import DummyLM

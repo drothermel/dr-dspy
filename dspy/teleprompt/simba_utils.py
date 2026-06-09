@@ -5,9 +5,7 @@ from typing import Callable
 import orjson
 
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Example, Module, Prediction
 from dspy.propose.source_format import get_formatted_source
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field

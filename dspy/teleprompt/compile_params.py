@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dspy.primitives.example import Example  # noqa: TC001 — pydantic field types
-from dspy.primitives.module import Module  # noqa: TC001 — pydantic field types
+from dspy.primitives import Example, Module  # noqa: TC001 — pydantic field types
 
 
 class EvaluateCompileParams(BaseModel):

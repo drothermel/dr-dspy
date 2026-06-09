@@ -8,7 +8,7 @@ import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Prediction
 from dspy.teleprompt.compile_params import GEPACompileParams
 
 if TYPE_CHECKING:
@@ -24,8 +24,7 @@ if TYPE_CHECKING:
         PredictorFeedbackFn,
         ScoreWithFeedback,
     )
-    from dspy.primitives.example import Example
-    from dspy.primitives.module import Module
+    from dspy.primitives import Example, Module
     from dspy.runtime.run_context import RunContext
 logger = logging.getLogger(__name__)
 AUTO_RUN_SETTINGS = {"light": {"n": 6}, "medium": {"n": 12}, "heavy": {"n": 18}}

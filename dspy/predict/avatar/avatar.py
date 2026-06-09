@@ -2,8 +2,7 @@ from dspy.core.types.call_options import ModuleCallOptions
 from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.avatar.models import Action, ActionOutput, Tool
 from dspy.predict.predict import Predict
-from dspy.primitives.module import Module
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Module, Prediction
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 

@@ -4,7 +4,7 @@ import re
 from typing import Protocol, cast
 
 from dspy.integrations.datasets.import_ import import_datasets
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 
 
 class HasAnswer(Protocol):

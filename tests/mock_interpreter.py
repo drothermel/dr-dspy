@@ -1,6 +1,6 @@
 from typing import Any, Callable
 
-from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
+from dspy.primitives import CodeInterpreterError, FinalOutput
 
 __all__ = ["MockInterpreter"]
 

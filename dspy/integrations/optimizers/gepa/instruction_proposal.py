@@ -7,7 +7,7 @@ from typing_extensions import override
 from dspy.adapters.types.base_type import Type
 from dspy.integrations.optimizers.gepa.adapter import AsyncProposalFn, ReflectiveExample
 from dspy.predict.predict import Predict
-from dspy.primitives.module import Module
+from dspy.primitives import Module
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 
 logger = logging.getLogger(__name__)

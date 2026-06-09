@@ -13,7 +13,7 @@ import orjson
 from dspy.__metadata__ import __version__
 
 if TYPE_CHECKING:
-    from dspy.primitives.base_module import BaseModule
+    from dspy.primitives import BaseModule
 
 logger = logging.getLogger(__name__)
 

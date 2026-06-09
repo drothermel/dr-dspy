@@ -21,9 +21,8 @@ from dspy.persistence import load
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Example, Module, Prediction
+from dspy.primitives.base_module import logger
 from dspy.task_spec import default_task_instructions, input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
@@ -153,7 +152,7 @@ def test_save_with_extra_modules(tmp_path, make_run):
     custom_module_path = tmp_path / "custom_module.py"
     with open(custom_module_path, "w") as f:
         f.write(
-            '\nfrom dspy.predict.chain_of_thought import ChainOfThought\nfrom dspy.primitives.module import Module\nfrom dspy.task_spec import make_task_spec\n\nclass MyModule(Module):\n    def __init__(self):\n        self.cot = ChainOfThought(make_task_spec("q -> a", instructions="Answer the question."))\n\n    async def _aforward_impl(self, q):\n        return await self.cot(q=q)\n'
+            '\nfrom dspy.predict.chain_of_thought import ChainOfThought\nfrom dspy.primitives import Module\nfrom dspy.task_spec import make_task_spec\n\nclass MyModule(Module):\n    def __init__(self):\n        self.cot = ChainOfThought(make_task_spec("q -> a", instructions="Answer the question."))\n\n    async def _aforward_impl(self, q):\n        return await self.cot(q=q)\n'
         )
     sys.path.insert(0, str(tmp_path))
     try:
@@ -181,8 +180,6 @@ def test_save_with_extra_modules(tmp_path, make_run):
 
 
 def test_load_with_version_mismatch(tmp_path, make_run):
-    from dspy.primitives.base_module import logger
-
     save_versions = {"python": "3.9", "dspy": "2.4.0", "cloudpickle": "2.0"}
     load_versions = {"python": "3.10", "dspy": "2.5.0", "cloudpickle": "2.1"}
     predict = Predict(QA_TASK_SPEC)

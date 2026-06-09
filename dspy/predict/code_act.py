@@ -10,9 +10,7 @@ from dspy.core.types.call_options import ModuleCallOptions
 from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
-from dspy.primitives.code_interpreter import FinalOutput
-from dspy.primitives.module import Module
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import FinalOutput, Module, Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.propose.source_format import get_formatted_source
 from dspy.runtime.run_context import RunContext

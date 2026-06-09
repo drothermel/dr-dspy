@@ -11,9 +11,7 @@ except ImportError:
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Example, Module, Prediction
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, bootstrap_trace_data
 

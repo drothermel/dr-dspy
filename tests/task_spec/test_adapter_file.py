@@ -9,7 +9,7 @@ import pytest
 
 from dspy.adapters.types.file import File, encode_file_to_dict
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
 from dspy.teleprompt.compile_params import LabeledFewShotCompileParams
 from dspy.teleprompt.vanilla import LabeledFewShot

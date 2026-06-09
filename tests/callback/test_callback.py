@@ -8,7 +8,7 @@ from typing_extensions import override
 from dspy.adapters.types.tool import Tool
 from dspy.core.types import LMConfig
 from dspy.predict.chain_of_thought import ChainOfThought
-from dspy.primitives.module import Module
+from dspy.primitives import Module
 from dspy.runtime.callback import ACTIVE_CALL_ID, NoOpCallback, with_callbacks
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts

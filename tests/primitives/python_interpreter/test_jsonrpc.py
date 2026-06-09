@@ -41,7 +41,7 @@ def test_runner_jsonrpc_app_errors_match_canonical_json():
 def test_sync_files_raises_on_host_error(monkeypatch):
     from types import SimpleNamespace
 
-    from dspy.primitives.code_interpreter import CodeInterpreterError
+    from dspy.primitives import CodeInterpreterError
     from dspy.primitives.python_interpreter import deno_process
 
     host_path = "/sandbox-host/out.txt"

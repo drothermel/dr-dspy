@@ -2,8 +2,7 @@ import logging
 import random
 
 from dspy.predict.predict import Predict
-from dspy.primitives.module import Module
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Module, Prediction
 from dspy.propose.dataset_summary_generator import create_dataset_summary
 from dspy.propose.utils import (
     create_example_string,

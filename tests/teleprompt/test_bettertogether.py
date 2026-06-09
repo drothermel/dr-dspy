@@ -6,8 +6,7 @@ import pytest
 from pydantic import BaseModel
 
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
+from dspy.primitives import Example, Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bettertogether import BetterTogether
 from dspy.teleprompt.bootstrap_finetune import BootstrapFinetune

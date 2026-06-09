@@ -1,6 +1,5 @@
 from dspy.predict.chain_of_thought import ChainOfThought
-from dspy.primitives.module import Module
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Module, Prediction
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 
 

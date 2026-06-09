@@ -6,7 +6,7 @@ import tqdm
 from pydantic import BaseModel
 
 from dspy.core.hashing import Hasher
-from dspy.primitives.module import Module
+from dspy.primitives import Module
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, LabeledFewShotCompileParams

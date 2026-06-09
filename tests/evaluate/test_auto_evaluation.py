@@ -1,8 +1,7 @@
 import asyncio
 
 from dspy.evaluate.auto_evaluation import CompleteAndGrounded, SemanticF1
-from dspy.primitives.example import Example
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Example, Prediction
 from dspy.testing import DummyLM
 
 

@@ -2,8 +2,7 @@ import asyncio
 from typing import Any, cast
 
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
+from dspy.primitives import Example, Module
 from dspy.teleprompt.compile_params import RandomSearchCompileParams
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.testing import DummyLM

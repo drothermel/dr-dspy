@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from dspy.core.types.config import LMConfig
 from dspy.predict.predict import Predict
-from dspy.primitives.module import Module
+from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.compile_params import COPROCompileParams

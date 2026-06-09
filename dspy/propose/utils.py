@@ -2,7 +2,7 @@ import json
 import re
 
 from dspy.predict.parameter import Parameter
-from dspy.primitives.module import Module
+from dspy.primitives import Module
 from dspy.propose.source_format import get_formatted_source
 from dspy.teleprompt.task_spec_context import get_task_spec
 

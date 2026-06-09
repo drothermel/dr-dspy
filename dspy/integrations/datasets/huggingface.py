@@ -4,7 +4,7 @@ from typing import Any, cast
 from dspy.datasets.dataset import Dataset
 from dspy.datasets.rows import rows_to_examples
 from dspy.integrations.datasets.import_ import import_datasets
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 
 
 def _hf_datasets() -> Any:

@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Mapping, Sequence
 
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 
 
 def rows_to_examples(

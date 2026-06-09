@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from dspy.predict.chain_of_thought import ChainOfThought
-from dspy.primitives.module import Module
+from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot

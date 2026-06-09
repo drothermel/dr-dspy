@@ -33,7 +33,7 @@ from dspy.errors import AdapterParseError
 from dspy.history import TurnLog
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 from dspy.task_spec import input_field, make_task_spec, output_field
 from tests.adapters.conftest import (
     adapter_format_as_openai,

@@ -9,8 +9,7 @@ from dspy.predict.rlm import execution as rlm_execution
 from dspy.predict.rlm import task_specs as rlm_task_specs
 from dspy.predict.rlm import tools as rlm_tools
 from dspy.predict.rlm.task_specs import FrameworkRlmSubQueryTaskSpec
-from dspy.primitives.module import Module
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Module, Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import TaskSpec
 
@@ -19,7 +18,7 @@ if TYPE_CHECKING:
 
     from dspy.adapters.types.tool import Tool
     from dspy.clients.base_lm import BaseLM
-    from dspy.primitives.code_interpreter import CodeInterpreter
+    from dspy.primitives import CodeInterpreter
 
 
 class RLM(Module):

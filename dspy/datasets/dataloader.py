@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, cast
 
 from dspy.datasets.dataset import Dataset
 from dspy.datasets.rows import rows_to_examples
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 from dspy.runtime.run_context import RunContext
 
 if TYPE_CHECKING:

@@ -20,8 +20,7 @@ from dspy.clients.finetune import (
 )
 from dspy.clients.lm import LM
 from dspy.evaluate.evaluator import Evaluate
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
+from dspy.primitives import Example, Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_finetune import (
     FinetuneTeleprompter,

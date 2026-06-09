@@ -2,7 +2,7 @@ from typing import Any, cast
 
 from dspy.evaluate.metrics import answer_exact_match
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 from tests.task_spec.helpers import ts
 
 

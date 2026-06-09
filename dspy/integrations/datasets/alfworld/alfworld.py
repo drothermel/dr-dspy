@@ -7,7 +7,7 @@ import random
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from dspy.primitives.example import Example
+from dspy.primitives import Example
 
 if TYPE_CHECKING:
     from types import TracebackType

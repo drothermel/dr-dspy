@@ -12,8 +12,7 @@ from dspy.core.types.config import LMConfig, LMToolChoice
 from dspy.errors import AdapterParseError
 from dspy.history import TruncationExhaustedError, TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.predict import Predict
-from dspy.primitives.module import Module
-from dspy.primitives.prediction import Prediction
+from dspy.primitives import Module, Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 

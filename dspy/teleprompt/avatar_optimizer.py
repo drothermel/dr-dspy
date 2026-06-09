@@ -8,8 +8,7 @@ from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.avatar.models import ActionOutput
 from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
+from dspy.primitives import Example, Module
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.compile_params import AvatarOptimizerCompileParams

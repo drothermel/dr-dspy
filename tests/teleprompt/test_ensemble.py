@@ -3,7 +3,7 @@ from typing import cast
 
 import pytest
 
-from dspy.primitives.module import Module
+from dspy.primitives import Module
 from dspy.teleprompt.compile_params import EnsembleCompileParams
 from dspy.teleprompt.ensemble import Ensemble
 from dspy.testing import DummyLM

@@ -3,8 +3,7 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
-from dspy.primitives.module import Module
+from dspy.primitives import Example, Module
 from dspy.teleprompt.demo_sets import create_n_fewshot_demo_sets
 from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.testing import DummyLM
