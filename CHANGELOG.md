@@ -4,6 +4,7 @@
 
 ### Breaking changes
 
+- Legacy cleanup (8 phases): centralized LM field normalization (`reasoning_effort` removed from `LMProviderOptions`; use `reasoning={"effort": ...}`); explicit `adapter` required on all `RunContext` modes; `num_threads` renamed to `max_concurrency`; call provenance threaded via `RunContext.call_site` and explicit `compiled=` (context vars removed); `Tool` sync `__call__` no longer runs async tools; `acall` aliases removed from `Module`, `BaseLM`, `Embedding`, `KNN`, and `Adapter`; retrievers are async-only (`await retriever(query)`); teleprompters use nested `params=` (`XCompileParams`) with `run=` top-level.
 - DSPy modules are async-only. Use `await program(...)` instead of `program(...)`.
 - Subclasses must implement `async def aforward(...)`, not `forward`.
 - `Evaluate`, `Parallel`, `Module.batch`, and teleprompter `compile` are async:

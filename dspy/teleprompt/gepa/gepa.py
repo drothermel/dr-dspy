@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 from typing_extensions import override
 
 from dspy.primitives.prediction import Prediction
+from dspy.teleprompt.compile_params import GEPACompileParams  # noqa: TC001 — compile signature
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.annotation import experimental
 
@@ -208,15 +209,10 @@ class GEPA(Teleprompter):
         return total
 
     @override
-    async def compile(
-        self,
-        student: Module,
-        *,
-        trainset: list[Example],
-        teacher: Module | None = None,
-        valset: list[Example] | None = None,
-        run: RunContext,
-    ) -> Module:
+    async def compile(self, student: Module, *, params: GEPACompileParams, run: RunContext) -> Module:
+        trainset = params.trainset
+        teacher = params.teacher
+        valset = params.valset
         from gepa import optimize
 
         from dspy.teleprompt.gepa.gepa_utils import DspyAdapter, LoggerAdapter, ScoreWithFeedback

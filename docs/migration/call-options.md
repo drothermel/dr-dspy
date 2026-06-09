@@ -20,8 +20,8 @@ Reserved names (`lm`, `config`, `demos`, `task_spec`, `trace`, `prediction`) mus
 | `LM("model", cache=False, api_key="...")` | `LM("model", provider_options=LMProviderOptions(cache=False, api_key="..."))` |
 | `Example(a=1, b=2)` / `Example({"a": 1})` | `Example.from_record({"a": 1, "b": 2}, input_keys=("a",))` |
 | `example.inputs()` | `example.as_inputs()` |
-| `await knn(query)` | `await knn.acall(inputs=query)` |
-| `teleprompter.compile(student, trainset=..., max_concurrency=4, run=run)` | `teleprompter.compile(student, trainset=..., evaluate=EvaluateCompileParams(max_concurrency=4), run=run)` (COPRO) |
+| `await knn(query)` | `await knn(inputs=query)` |
+| `teleprompter.compile(student, trainset=..., run=run)` | `teleprompter.compile(student, params=XCompileParams(trainset=...), run=run)` |
 
 ## PredictOptions
 
@@ -189,40 +189,47 @@ nearest = await knn({"question": "What is 3+3?"})
 After:
 
 ```python
-nearest = await knn.acall(inputs={"question": "What is 3+3?"})
-# __call__ is an alias for acall
+nearest = await knn(inputs={"question": "What is 3+3?"})
 ```
 
 ## Compile params
 
-Typed compile params replace loose evaluate kwargs where enforced. `run=` remains a separate required keyword.
+Every teleprompter uses a nested `params=` object. `run=` remains a separate required keyword.
 
-COPRO example — before:
+Before:
 
 ```python
-compiled = await copro.compile(
-    student,
-    trainset=trainset,
-    max_concurrency=4,
-    display_progress=True,
-    run=run,
-)
+compiled = await bootstrap.compile(student, trainset=trainset, teacher=teacher, run=run)
 ```
 
 After:
 
 ```python
-from dspy.teleprompt.compile_params import EvaluateCompileParams
+from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
 
-compiled = await copro.compile(
+compiled = await bootstrap.compile(
     student,
-    trainset=trainset,
-    evaluate=EvaluateCompileParams(max_concurrency=4, display_progress=True),
+    params=BootstrapFewShotCompileParams(trainset=trainset, teacher=teacher),
     run=run,
 )
 ```
 
-`dspy.teleprompt.compile_params` also defines typed params for other teleprompters (`BootstrapFewShotCompileParams`, `MIPROv2CompileParams`, `BetterTogetherCompileParams`, etc.) for callers migrating off scattered kwargs. Teleprompters that have not yet adopted a typed params object still accept their existing keyword arguments alongside `run=`.
+COPRO nests evaluate settings inside its params object:
+
+```python
+from dspy.teleprompt.compile_params import COPROCompileParams, EvaluateCompileParams
+
+compiled = await copro.compile(
+    student,
+    params=COPROCompileParams(
+        trainset=trainset,
+        evaluate=EvaluateCompileParams(max_concurrency=4, display_progress=True),
+    ),
+    run=run,
+)
+```
+
+`dspy.teleprompt.compile_params` defines one params model per teleprompter (`LabeledFewShotCompileParams`, `MIPROv2CompileParams`, `BetterTogetherCompileParams`, `GRPOCompileParams`, etc.). `BetterTogetherCompileParams.optimizer_compile_args` accepts typed params keyed by strategy step (e.g. `{"p": RandomSearchCompileParams(...)}`).
 
 ## Positional arguments rejected
 

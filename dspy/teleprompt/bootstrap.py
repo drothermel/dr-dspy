@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from dspy.primitives.example import Example
 from dspy.runtime.run_context import RunContext
+from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, LabeledFewShotCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.hasher import Hasher
@@ -38,9 +39,9 @@ class BootstrapFewShot(Teleprompter):
         self.error_lock = threading.Lock()
 
     @override
-    async def compile(self, student, *, teacher=None, trainset, run: RunContext):
-        self.trainset = trainset
-        await self._prepare_student_and_teacher(student=student, teacher=teacher, run=run)
+    async def compile(self, student, *, params: BootstrapFewShotCompileParams, run: RunContext):
+        self.trainset = params.trainset
+        await self._prepare_student_and_teacher(student=student, teacher=params.teacher, run=run)
         self._prepare_predictor_mappings()
         await self._bootstrap(run=run)
         self.student = self._train()
@@ -53,7 +54,11 @@ class BootstrapFewShot(Teleprompter):
         assert getattr(self.student, "_compiled", False) is False, "Student must be uncompiled."
         if self.max_labeled_demos and getattr(self.teacher, "_compiled", False) is False:
             teleprompter = LabeledFewShot(k=self.max_labeled_demos)
-            self.teacher = await teleprompter.compile(self.teacher.reset_copy(), trainset=self.trainset, run=run)
+            self.teacher = await teleprompter.compile(
+                self.teacher.reset_copy(),
+                params=LabeledFewShotCompileParams(trainset=self.trainset),
+                run=run,
+            )
 
     def _prepare_predictor_mappings(self) -> None:
         name2predictor, predictor2name = ({}, {})

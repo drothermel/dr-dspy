@@ -9,7 +9,7 @@ from dspy.evaluate.evaluate import Evaluate
 from dspy.predict.predict import Predict
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
-from dspy.teleprompt.compile_params import EvaluateCompileParams
+from dspy.teleprompt.compile_params import COPROCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.teleprompt.utils import optimizer_lm_context
@@ -100,9 +100,10 @@ class COPRO(Teleprompter):
         logger.debug(f"p: {list(task_spec.fields.values())[-1].prefix}")
 
     @override
-    async def compile(self, student, *, trainset, evaluate: EvaluateCompileParams, run: RunContext):
+    async def compile(self, student, *, params: COPROCompileParams, run: RunContext):
         module = student.deepcopy()
-        evaluate_kwargs = evaluate.model_dump(exclude_none=True)
+        evaluate_kwargs = params.evaluate.model_dump(exclude_none=True)
+        trainset = params.trainset
         evaluate_call_kwargs = {
             key: value
             for key, value in evaluate_kwargs.items()

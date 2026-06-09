@@ -2,6 +2,7 @@ import random
 
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap import BootstrapFewShot, LabeledFewShot
+from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, LabeledFewShotCompileParams
 
 
 async def create_n_fewshot_demo_sets(
@@ -35,7 +36,11 @@ async def create_n_fewshot_demo_sets(
             program2 = student.reset_copy()
         elif seed == -2 and max_labeled_demos > 0 and include_non_bootstrapped:
             teleprompter = LabeledFewShot(k=max_labeled_demos)
-            program2 = await teleprompter.compile(student, trainset=trainset_copy, sample=labeled_sample, run=run)
+            program2 = await teleprompter.compile(
+                student,
+                params=LabeledFewShotCompileParams(trainset=trainset_copy, sample=labeled_sample),
+                run=run,
+            )
         elif seed == -1:
             program = BootstrapFewShot(
                 metric=metric,
@@ -46,7 +51,11 @@ async def create_n_fewshot_demo_sets(
                 teacher_run=teacher_run,
                 max_rounds=max_rounds,
             )
-            program2 = await program.compile(student, teacher=teacher, trainset=trainset_copy, run=run)
+            program2 = await program.compile(
+                student,
+                params=BootstrapFewShotCompileParams(trainset=trainset_copy, teacher=teacher),
+                run=run,
+            )
         else:
             rng.shuffle(trainset_copy)
             size = rng.randint(min_num_samples, max_bootstrapped_demos)
@@ -59,7 +68,11 @@ async def create_n_fewshot_demo_sets(
                 teacher_run=teacher_run,
                 max_rounds=max_rounds,
             )
-            program2 = await teleprompter.compile(student, teacher=teacher, trainset=trainset_copy, run=run)
+            program2 = await teleprompter.compile(
+                student,
+                params=BootstrapFewShotCompileParams(trainset=trainset_copy, teacher=teacher),
+                run=run,
+            )
         for i, _ in enumerate(student.predictors()):
             demo_candidates[i].append(program2.predictors()[i].demos)
     return demo_candidates

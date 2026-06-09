@@ -10,6 +10,7 @@ from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
+from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, InferRulesCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.utils import optimizer_lm_context
 
@@ -27,11 +28,17 @@ class InferRules(BootstrapFewShot):
         self.max_errors = kwargs.get("max_errors")
 
     @override
-    async def compile(self, student, *, teacher=None, trainset, run: RunContext, valset=None):
+    async def compile(self, student, *, params: InferRulesCompileParams, run: RunContext):
+        trainset = params.trainset
+        valset = params.valset
         if valset is None:
             train_size = int(0.5 * len(trainset))
             trainset, valset = (trainset[:train_size], trainset[train_size:])
-        await super().compile(student, teacher=teacher, trainset=trainset, run=run)
+        await super().compile(
+            student,
+            params=BootstrapFewShotCompileParams(trainset=trainset, teacher=params.teacher),
+            run=run,
+        )
         original_program = self.student.deepcopy()
         all_predictors = [p for p in original_program.predictors() if hasattr(p, "task_spec")]
         instructions_list = [get_task_spec(p).instructions for p in all_predictors]

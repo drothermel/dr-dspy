@@ -3,7 +3,7 @@ import asyncio
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
-from dspy.teleprompt.compile_params import EvaluateCompileParams
+from dspy.teleprompt.compile_params import COPROCompileParams, EvaluateCompileParams
 from dspy.teleprompt.copro_optimizer import COPRO
 from dspy.utils.dummies import DummyLM
 from tests.task_spec.helpers import ts
@@ -55,8 +55,10 @@ def test_signature_optimizer_optimization_process(make_run):
     optimized_student = asyncio.run(
         optimizer.compile(
             student,
-            trainset=trainset,
-            evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            params=COPROCompileParams(
+                trainset=trainset,
+                evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            ),
             run=run,
         )
     )
@@ -80,8 +82,10 @@ def test_signature_optimizer_statistics_tracking(make_run):
     optimized_student = asyncio.run(
         optimizer.compile(
             student,
-            trainset=trainset,
-            evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            params=COPROCompileParams(
+                trainset=trainset,
+                evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            ),
             run=run,
         )
     )
@@ -108,8 +112,10 @@ def test_optimization_and_output_verification(make_run):
     optimized_student = asyncio.run(
         optimizer.compile(
             student,
-            trainset=trainset,
-            evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            params=COPROCompileParams(
+                trainset=trainset,
+                evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            ),
             run=run,
         )
     )
@@ -130,8 +136,10 @@ def test_statistics_tracking_during_optimization(make_run):
     optimized_student = asyncio.run(
         optimizer.compile(
             student,
-            trainset=trainset,
-            evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            params=COPROCompileParams(
+                trainset=trainset,
+                evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            ),
             run=run,
         )
     )

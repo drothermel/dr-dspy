@@ -1,8 +1,8 @@
-import inspect
 import logging
 import random
-from typing import Any, Callable, cast
+from typing import Callable
 
+from pydantic import BaseModel, ConfigDict
 from typing_extensions import override
 
 from dspy.evaluate.evaluate import Evaluate
@@ -17,6 +17,13 @@ from dspy.teleprompt.bootstrap_finetune import (
     prepare_student,
     prepare_teacher,
 )
+from dspy.teleprompt.compile_params import (
+    BetterTogetherCompileParams,
+    BootstrapFewShotCompileParams,
+    BootstrapFinetuneCompileParams,
+    GEPACompileParams,
+    RandomSearchCompileParams,
+)
 from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.teleprompt.teleprompt import Teleprompter
@@ -27,6 +34,50 @@ GREEN = "\x1b[92m"
 BLUE = "\x1b[94m"
 BOLD = "\x1b[1m"
 ENDC = "\x1b[0m"
+
+
+class PassthroughCompileParams(BaseModel):
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+
+    trainset: list[Example] | None = None
+    teacher: Module | list[Module] | None = None
+    valset: list[Example] | None = None
+
+
+_OPTIMIZER_PARAMS_TYPES: dict[str, type[BaseModel]] = {
+    "BootstrapFewShotWithRandomSearch": RandomSearchCompileParams,
+    "BootstrapFinetune": BootstrapFinetuneCompileParams,
+    "BootstrapFewShot": BootstrapFewShotCompileParams,
+    "GEPA": GEPACompileParams,
+}
+
+
+def _normalize_teacher(teacher: list[Module] | None) -> Module | list[Module] | None:
+    if teacher is None:
+        return None
+    if len(teacher) == 1:
+        return teacher[0]
+    return teacher
+
+
+def _default_compile_params(
+    optimizer: Teleprompter,
+    *,
+    trainset: list[Example],
+    teacher: list[Module] | None,
+    valset: list[Example] | None,
+) -> BaseModel:
+    teacher_arg = _normalize_teacher(teacher)
+    name = optimizer.__class__.__name__
+    if name == "BootstrapFewShotWithRandomSearch":
+        return RandomSearchCompileParams(trainset=trainset, teacher=teacher_arg, valset=valset)
+    if name == "BootstrapFinetune":
+        return BootstrapFinetuneCompileParams(trainset=trainset, teacher=teacher_arg)
+    if name == "BootstrapFewShot":
+        return BootstrapFewShotCompileParams(trainset=trainset, teacher=teacher_arg)
+    if name == "GEPA":
+        return GEPACompileParams(trainset=trainset, teacher=teacher_arg, valset=valset)
+    return PassthroughCompileParams(trainset=trainset, teacher=teacher_arg, valset=valset)
 
 
 class BetterTogether(Teleprompter):
@@ -45,45 +96,31 @@ class BetterTogether(Teleprompter):
         self.optimizers: dict[str, Teleprompter] = optimizers
 
     @override
-    async def compile(
-        self,
-        student: Module,
-        *,
-        trainset: list[Example],
-        teacher: Module | list[Module] | None = None,
-        valset: list[Example] | None = None,
-        max_concurrency: int | None = None,
-        max_errors: int | None = None,
-        provide_traceback: bool | None = None,
-        seed: int | None = None,
-        valset_ratio: float = 0.1,
-        shuffle_trainset_between_steps: bool = True,
-        strategy: str = "p -> w -> p",
-        optimizer_compile_args: dict[str, dict[str, Any]] | None = None,
-        run: RunContext,
-    ) -> Module:
+    async def compile(self, student: Module, *, params: BetterTogetherCompileParams, run: RunContext) -> Module:
         logger.info(f"\n{BOLD}==> BETTERTOGETHER COMPILATION STARTED <=={ENDC}")
-        logger.info(f"{BLUE}Strategy:{ENDC} {strategy}")
-        logger.info(f"{BLUE}Trainset size:{ENDC} {len(trainset)}")
-        logger.info(f"{BLUE}Validation ratio:{ENDC} {(valset_ratio if valset is None else 'using provided valset')}")
-        student, teacher = self._prepare_student_and_teacher(student=student, teacher=teacher)
-        trainset, valset = self._prepare_trainset_and_valset(
-            trainset=trainset, valset=valset, valset_ratio=valset_ratio
+        logger.info(f"{BLUE}Strategy:{ENDC} {params.strategy}")
+        logger.info(f"{BLUE}Trainset size:{ENDC} {len(params.trainset)}")
+        logger.info(
+            f"{BLUE}Validation ratio:{ENDC} {(params.valset_ratio if params.valset is None else 'using provided valset')}"
         )
-        effective_max_errors = max_errors if max_errors is not None else run.execution.max_errors
-        parsed_strategy = self._prepare_strategy(strategy)
-        optimizer_compile_args = self._prepare_optimizer_compile_args(optimizer_compile_args, teacher)
+        student, teacher = self._prepare_student_and_teacher(student=student, teacher=params.teacher)
+        trainset, valset = self._prepare_trainset_and_valset(
+            trainset=params.trainset, valset=params.valset, valset_ratio=params.valset_ratio
+        )
+        effective_max_errors = params.max_errors if params.max_errors is not None else run.execution.max_errors
+        parsed_strategy = self._prepare_strategy(params.strategy)
+        optimizer_compile_args = self._prepare_optimizer_compile_args(params.optimizer_compile_args, teacher)
         student = await self._run_strategies(
             student,
             trainset,
             teacher,
             valset,
-            max_concurrency,
+            params.max_concurrency,
             effective_max_errors,
-            provide_traceback,
-            seed,
+            params.provide_traceback,
+            params.seed,
             parsed_strategy,
-            shuffle_trainset_between_steps,
+            params.shuffle_trainset_between_steps,
             optimizer_compile_args,
             run,
         )
@@ -103,7 +140,7 @@ class BetterTogether(Teleprompter):
         if not teacher:
             return (student, None)
         teacher = [teacher] if not isinstance(teacher, list) else teacher
-        teacher = [prepare_teacher(student=student, teacher=cast("Module | None", t)) for t in teacher]
+        teacher = [prepare_teacher(student=student, teacher=t) for t in teacher]
         return (student, teacher)
 
     def _prepare_trainset_and_valset(
@@ -141,8 +178,8 @@ class BetterTogether(Teleprompter):
         return parsed_strategy
 
     def _prepare_optimizer_compile_args(
-        self, optimizer_compile_args: dict[str, dict[str, Any]] | None, teacher: list[Module] | None
-    ) -> dict[str, dict[str, Any]]:
+        self, optimizer_compile_args: dict[str, BaseModel] | None, teacher: list[Module] | None
+    ) -> dict[str, BaseModel]:
         logger.info(f"{BLUE}Validating optimizer compile arguments...{ENDC}")
         if not optimizer_compile_args:
             return {}
@@ -158,16 +195,14 @@ class BetterTogether(Teleprompter):
                     raise ValueError("GEPA does not accept a teacher argument. Please remove the teacher argument.")
         return optimizer_compile_args
 
-    def _validate_compile_args(self, optimizer: Teleprompter, optimizer_key: str, compile_args: dict[str, Any]) -> None:
-        if "student" in compile_args:
-            raise ValueError(
-                f"'student' is not allowed in optimizer_compile_args for optimizer '{optimizer_key}'. The same student is used throughout compilation."
-            )
-        valid_params = inspect.signature(optimizer.compile).parameters
-        invalid_args = set(compile_args.keys()) - set(valid_params.keys())
-        if invalid_args:
-            raise ValueError(
-                f"Invalid compile arguments for optimizer '{optimizer_key}': {sorted(invalid_args)}. {optimizer.__class__.__name__}.compile() accepts: {list(valid_params.keys())}"
+    def _validate_compile_args(self, optimizer: Teleprompter, optimizer_key: str, compile_args: BaseModel) -> None:
+        expected = _OPTIMIZER_PARAMS_TYPES.get(optimizer.__class__.__name__)
+        if expected is None:
+            return
+        if not isinstance(compile_args, expected):
+            raise TypeError(
+                f"optimizer_compile_args['{optimizer_key}'] must be {expected.__name__}, "
+                f"got {type(compile_args).__name__}"
             )
 
     async def _run_strategies(
@@ -182,7 +217,7 @@ class BetterTogether(Teleprompter):
         seed: int | None,
         parsed_strategy: list[str],
         shuffle_trainset_between_steps: bool,
-        optimizer_args: dict[str, dict[str, Any]],
+        optimizer_args: dict[str, BaseModel],
         run: RunContext,
     ) -> Module:
         rng = random.Random(seed)
@@ -210,14 +245,16 @@ class BetterTogether(Teleprompter):
                 if shuffle_trainset_between_steps:
                     logger.info(f"{BLUE}Shuffling trainset...{ENDC}")
                     rng.shuffle(trainset)
-                compile_args = optimizer_args.get(step_code, {})
+                compile_params = optimizer_args.get(step_code)
+                if compile_params is None:
+                    compile_params = _default_compile_params(
+                        optimizer, trainset=trainset, teacher=teacher, valset=valset
+                    )
                 student, score, is_new_best, lms_relaunched = await self._run_and_evaluate_step(
                     optimizer,
                     student,
-                    teacher,
-                    trainset,
+                    compile_params,
                     valset,
-                    compile_args,
                     candidate_programs,
                     current_strategy,
                     rng,
@@ -267,10 +304,8 @@ class BetterTogether(Teleprompter):
         self,
         optimizer: Teleprompter,
         student: Module,
-        teacher: list[Module] | None,
-        trainset: list[Example],
+        compile_params: BaseModel,
         valset: list[Example] | None,
-        compile_args: dict[str, Any],
         candidate_programs: list,
         current_strategy: str,
         rng: random.Random,
@@ -281,12 +316,8 @@ class BetterTogether(Teleprompter):
     ) -> tuple[Module, float | None, bool, bool]:
         pred_lms_before = [pred.lm for pred in student.predictors()]
         student._compiled = False
-        logger.info(f"{BLUE}Running {optimizer.__class__.__name__} with {len(trainset)} training examples...{ENDC}")
-        potential_args = {"trainset": trainset, "teacher": teacher, "valset": valset, "run": run, **compile_args}
-        sig = inspect.signature(optimizer.compile)
-        accepted_params = set(sig.parameters.keys())
-        filtered_compile_args = {k: v for k, v in potential_args.items() if k in accepted_params and k != "run"}
-        student = await optimizer.compile(student, run=run, **filtered_compile_args)
+        logger.info(f"{BLUE}Running {optimizer.__class__.__name__}...{ENDC}")
+        student = await optimizer.compile(student, params=compile_params, run=run)
         if not all_predictors_have_lms(student):
             logger.warning(
                 f"{YELLOW}Warning: {optimizer.__class__.__name__} incorrectly reset predictor LMs. Restoring to original LMs.{ENDC}"

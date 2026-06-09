@@ -13,6 +13,7 @@ from dspy.adapters.types.image import Image, encode_image
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
+from dspy.teleprompt.compile_params import LabeledFewShotCompileParams
 from dspy.teleprompt.vanilla import LabeledFewShot
 from dspy.utils.dummies import DummyLM
 from tests.task_spec.helpers import ts
@@ -171,7 +172,11 @@ def test_predictor_save_load(sample_url, sample_pil_image, make_run):
     ]
     predictor, lm, run = setup_predictor(signature, {"caption": "A golden retriever"}, make_run)
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False, run=run))
+    compiled_predictor = asyncio.run(
+        optimizer.compile(
+            student=predictor, params=LabeledFewShotCompileParams(trainset=examples, sample=False), run=run
+        )
+    )
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(ts("image: Image -> caption: str"))
@@ -201,7 +206,11 @@ def test_save_load_complex_default_types(make_run):
     )
     predictor, lm, run = setup_predictor(ComplexTypeSignature, {"caption": "A list of images"}, make_run)
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False, run=run))
+    compiled_predictor = asyncio.run(
+        optimizer.compile(
+            student=predictor, params=LabeledFewShotCompileParams(trainset=examples, sample=False), run=run
+        )
+    )
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(ComplexTypeSignature)
@@ -258,7 +267,11 @@ def test_save_load_complex_types(test_case, make_run):
     ]
     predictor, lm, run = setup_predictor(task_spec, test_case["expected"], make_run)
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False, run=run))
+    compiled_predictor = asyncio.run(
+        optimizer.compile(
+            student=predictor, params=LabeledFewShotCompileParams(trainset=examples, sample=False), run=run
+        )
+    )
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(task_spec)
@@ -292,7 +305,11 @@ def test_save_load_pydantic_model(make_run):
     ]
     predictor, lm, run = setup_predictor(PydanticSignature, {"output": "Multiple photos"}, make_run)
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False, run=run))
+    compiled_predictor = asyncio.run(
+        optimizer.compile(
+            student=predictor, params=LabeledFewShotCompileParams(trainset=examples, sample=False), run=run
+        )
+    )
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(PydanticSignature)

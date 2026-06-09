@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from dspy.primitives.example import Example
     from dspy.primitives.module import Module
     from dspy.runtime.run_context import RunContext
+from dspy.teleprompt.compile_params import SIMBACompileParams  # noqa: TC001 — compile signature
+
 np = require("numpy")
 logger = logging.getLogger(__name__)
 
@@ -54,11 +56,12 @@ class SIMBA(Teleprompter):
             self.strategies = [append_a_rule]
 
     @override
-    async def compile(self, student: Module, *, trainset: list[Example], run: RunContext, seed: int = 0) -> Module:
+    async def compile(self, student: Module, *, params: SIMBACompileParams, run: RunContext) -> Module:
+        trainset = params.trainset
         assert len(trainset) >= self.bsize, f"Trainset too small: {len(trainset)} < {self.bsize}"
         prompt_model = get_prompt_model(self.prompt_model, run)
-        rng = random.Random(seed)
-        rng_np = np.random.default_rng(seed)
+        rng = random.Random(params.seed)
+        rng_np = np.random.default_rng(params.seed)
         programs = []
         program_scores = {}
         next_program_idx = 0

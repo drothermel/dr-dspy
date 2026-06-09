@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from dspy.primitives.example import Example  # noqa: TC001 — pydantic field types
 from dspy.primitives.module import Module  # noqa: TC001 — pydantic field types
-from dspy.runtime.run_context import RunContext  # noqa: TC001 — pydantic field types
 
 
 class EvaluateCompileParams(BaseModel):
@@ -39,6 +36,9 @@ class BootstrapFewShotCompileParams(BaseModel):
 class BootstrapOptunaCompileParams(BootstrapFewShotCompileParams):
     max_demos: int
     valset: list[Example] | None = None
+
+
+TelepromptOptunaCompileParams = BootstrapOptunaCompileParams
 
 
 class RandomSearchCompileParams(BootstrapFewShotCompileParams):
@@ -98,6 +98,24 @@ class BootstrapFinetuneCompileParams(BootstrapFewShotCompileParams):
     pass
 
 
+class KNNFewShotCompileParams(BaseModel):
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    teacher: Module | list[Module] | None = None
+
+
+class InferRulesCompileParams(BootstrapFewShotCompileParams):
+    valset: list[Example] | None = None
+
+
+class GRPOCompileParams(BaseModel):
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    trainset: list[Example]
+    teacher: Module | list[Module] | None = None
+    valset: list[Example] | None = None
+
+
 class BetterTogetherCompileParams(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
@@ -111,12 +129,4 @@ class BetterTogetherCompileParams(BaseModel):
     valset_ratio: float = 0.1
     shuffle_trainset_between_steps: bool = True
     strategy: str = "p -> w -> p"
-    optimizer_compile_args: dict[str, dict[str, Any]] | None = None
-
-
-class CompileRunContext(BaseModel):
-    """Shared compile context passed alongside typed params."""
-
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-
-    run: RunContext
+    optimizer_compile_args: dict[str, BaseModel] | None = None

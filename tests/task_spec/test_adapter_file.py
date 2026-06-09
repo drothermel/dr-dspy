@@ -11,6 +11,7 @@ from dspy.adapters.types.file import File, encode_file_to_dict
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.task_spec import FieldSpec, TaskSpec, make_task_spec
+from dspy.teleprompt.compile_params import LabeledFewShotCompileParams
 from dspy.teleprompt.vanilla import LabeledFewShot
 from dspy.utils.dummies import DummyLM
 from tests.task_spec.helpers import ts
@@ -230,7 +231,11 @@ def test_save_load_file_signature(sample_text_file, make_run):
     examples = [Example.from_record({"document": file_obj, "summary": "Test summary"})]
     predictor, lm, run = setup_predictor(signature, {"summary": "A summary"}, make_run)
     optimizer = LabeledFewShot(k=1)
-    compiled_predictor = asyncio.run(optimizer.compile(student=predictor, trainset=examples, sample=False, run=run))
+    compiled_predictor = asyncio.run(
+        optimizer.compile(
+            student=predictor, params=LabeledFewShotCompileParams(trainset=examples, sample=False), run=run
+        )
+    )
     with tempfile.NamedTemporaryFile(mode="w+", delete=True, suffix=".json") as temp_file:
         compiled_predictor.save(temp_file.name)
         loaded_predictor = Predict(ts("document: File -> summary: str"))

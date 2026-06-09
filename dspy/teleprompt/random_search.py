@@ -4,6 +4,11 @@ from typing_extensions import override
 
 from dspy.evaluate.evaluate import Evaluate
 from dspy.runtime.run_context import RunContext
+from dspy.teleprompt.compile_params import (
+    BootstrapFewShotCompileParams,
+    LabeledFewShotCompileParams,
+    RandomSearchCompileParams,
+)
 from dspy.teleprompt.teleprompt import Teleprompter
 
 from .bootstrap import BootstrapFewShot
@@ -37,11 +42,12 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
         self.max_labeled_demos = max_labeled_demos
 
     @override
-    async def compile(
-        self, student, *, teacher=None, trainset, run: RunContext, valset=None, restrict=None, labeled_sample=True
-    ):
-        self.trainset = trainset
-        self.valset = valset or trainset
+    async def compile(self, student, *, params: RandomSearchCompileParams, run: RunContext):
+        self.trainset = params.trainset
+        self.valset = params.valset or params.trainset
+        teacher = params.teacher
+        restrict = params.restrict
+        labeled_sample = params.labeled_sample
         effective_max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors
         scores = []
         all_subscores = []
@@ -55,7 +61,11 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
                 program = student.reset_copy()
             elif seed == -2:
                 teleprompter = LabeledFewShot(k=self.max_labeled_demos)
-                program = await teleprompter.compile(student, trainset=trainset_copy, sample=labeled_sample, run=run)
+                program = await teleprompter.compile(
+                    student,
+                    params=LabeledFewShotCompileParams(trainset=trainset_copy, sample=labeled_sample),
+                    run=run,
+                )
             elif seed == -1:
                 optimizer = BootstrapFewShot(
                     metric=self.metric,
@@ -66,7 +76,11 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
                     max_rounds=self.max_rounds,
                     max_errors=effective_max_errors,
                 )
-                program = await optimizer.compile(student, teacher=teacher, trainset=trainset_copy, run=run)
+                program = await optimizer.compile(
+                    student,
+                    params=BootstrapFewShotCompileParams(trainset=trainset_copy, teacher=teacher),
+                    run=run,
+                )
             else:
                 assert seed >= 0, seed
                 random.Random(seed).shuffle(trainset_copy)
@@ -80,7 +94,11 @@ class BootstrapFewShotWithRandomSearch(Teleprompter):
                     max_rounds=self.max_rounds,
                     max_errors=effective_max_errors,
                 )
-                program = await optimizer.compile(student, teacher=teacher, trainset=trainset_copy, run=run)
+                program = await optimizer.compile(
+                    student,
+                    params=BootstrapFewShotCompileParams(trainset=trainset_copy, teacher=teacher),
+                    run=run,
+                )
             evaluate = Evaluate(
                 devset=self.valset,
                 metric=self.metric,

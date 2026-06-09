@@ -32,7 +32,13 @@ parallel = Parallel(max_concurrency=8)
 results = await parallel([(module, example), ...])
 
 # Optimizers
-compiled = await teleprompter.compile(student, trainset=trainset, run=run)
+from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
+
+compiled = await teleprompter.compile(
+    student,
+    params=BootstrapFewShotCompileParams(trainset=trainset),
+    run=run,
+)
 ```
 
 ## TaskSpec (not Signature)

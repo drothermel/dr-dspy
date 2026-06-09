@@ -6,7 +6,7 @@ from dspy.primitives.example import Example
 from dspy.runtime import CallLogMode, TelemetryConfig
 from dspy.task_spec import TaskSpec, input_field, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
-from dspy.teleprompt.compile_params import EvaluateCompileParams
+from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, COPROCompileParams, EvaluateCompileParams
 from dspy.teleprompt.copro_optimizer import COPRO
 from dspy.utils.dummies import DummyLM
 
@@ -33,7 +33,7 @@ async def test_bootstrap_few_shot_smoke_strict(make_run):
         max_labeled_demos=0,
         teacher_run=run.fork(lm=lm, adapter=json_adapter),
     )
-    compiled = await teleprompter.compile(student, trainset=trainset, run=run)
+    compiled = await teleprompter.compile(student, params=BootstrapFewShotCompileParams(trainset=trainset), run=run)
     result = await compiled(question="2+2", run=run)
     assert result.answer == "4"
 
@@ -52,8 +52,10 @@ async def test_copro_smoke_strict(make_run):
     )
     compiled = await teleprompter.compile(
         student,
-        trainset=[Example.from_record({"question": "2+2", "answer": "4"}, input_keys=("question",))],
-        evaluate=EvaluateCompileParams(max_concurrency=1),
+        params=COPROCompileParams(
+            trainset=[Example.from_record({"question": "2+2", "answer": "4"}, input_keys=("question",))],
+            evaluate=EvaluateCompileParams(max_concurrency=1),
+        ),
         run=run,
     )
     assert compiled is not None

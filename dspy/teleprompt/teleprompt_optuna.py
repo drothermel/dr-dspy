@@ -6,6 +6,7 @@ from typing_extensions import override
 
 from dspy.evaluate.evaluate import Evaluate
 from dspy.runtime.run_context import RunContext
+from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, BootstrapOptunaCompileParams
 from dspy.teleprompt.teleprompt import Teleprompter
 
 from .bootstrap import BootstrapFewShot
@@ -74,13 +75,14 @@ class BootstrapFewShotWithOptuna(Teleprompter):
         return cast("Any", result).score
 
     @override
-    async def compile(self, student, *, teacher=None, max_demos, trainset, run: RunContext, valset=None):
+    async def compile(self, student, *, params: BootstrapOptunaCompileParams, run: RunContext):
         optuna = _import_optuna()
-        self.trainset = trainset
-        self.valset = valset or trainset
+        self.trainset = params.trainset
+        self.valset = params.valset or params.trainset
         self.run = run
         self.student = student.reset_copy()
-        self.teacher = teacher.deepcopy() if teacher is not None else student.reset_copy()
+        self.teacher = params.teacher.deepcopy() if params.teacher is not None else student.reset_copy()
+        max_demos = params.max_demos
         teleprompter_optimize = BootstrapFewShot(
             metric=self.metric,
             max_bootstrapped_demos=max_demos,
@@ -89,7 +91,9 @@ class BootstrapFewShotWithOptuna(Teleprompter):
             max_rounds=self.max_rounds,
         )
         self.compiled_teleprompter = await teleprompter_optimize.compile(
-            self.student, teacher=self.teacher, trainset=self.trainset, run=run
+            self.student,
+            params=BootstrapFewShotCompileParams(trainset=self.trainset, teacher=self.teacher),
+            run=run,
         )
         study = optuna.create_study(direction="maximize")
         study.optimize(self.objective, n_trials=self.num_candidate_sets)

@@ -11,6 +11,7 @@ from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.task_spec import FieldSpec, default_task_instructions, make_task_spec
 from dspy.teleprompt.bootstrap import BootstrapFewShot
+from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
 from dspy.utils.dummies import DummyLM
 from dspy.utils.saving import load
 from tests.task_spec.helpers import ts
@@ -82,7 +83,9 @@ def test_save_compiled_model(tmp_path, make_run):
         return True
 
     optimizer = BootstrapFewShot(max_bootstrapped_demos=4, max_labeled_demos=4, max_rounds=5, metric=dummy_metric)
-    compiled_predict = asyncio.run(optimizer.compile(predict, trainset=trainset, run=run))
+    compiled_predict = asyncio.run(
+        optimizer.compile(predict, params=BootstrapFewShotCompileParams(trainset=trainset), run=run)
+    )
     compiled_predict.save(tmp_path, save_program=True)
     loaded_predict = load(tmp_path, allow_pickle=True)
     assert compiled_predict.demos == loaded_predict.demos

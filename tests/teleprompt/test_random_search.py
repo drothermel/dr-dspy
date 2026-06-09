@@ -4,6 +4,7 @@ from typing import Any, cast
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
+from dspy.teleprompt.compile_params import RandomSearchCompileParams
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.utils.dummies import DummyLM
 from tests.task_spec.helpers import ts
@@ -34,4 +35,6 @@ def test_basic_workflow(make_run):
             {"input": "What does the fox say?", "output": "Ring-ding-ding-ding-dingeringeding!"}, input_keys=("input",)
         ),
     ]
-    asyncio.run(optimizer.compile(student, teacher=teacher, trainset=trainset, run=run))
+    asyncio.run(
+        optimizer.compile(student, params=RandomSearchCompileParams(trainset=trainset, teacher=teacher), run=run)
+    )

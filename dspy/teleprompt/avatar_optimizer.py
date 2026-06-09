@@ -13,6 +13,7 @@ from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
+from dspy.teleprompt.compile_params import AvatarOptimizerCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.teleprompt import Teleprompter
 
@@ -169,7 +170,8 @@ class AvatarOptimizer(Teleprompter):
         return (avg_score, pos_inputs, neg_inputs)
 
     @override
-    async def compile(self, student, *, trainset, run: RunContext):
+    async def compile(self, student, *, params: AvatarOptimizerCompileParams, run: RunContext):
+        trainset = params.trainset
         best_actor = deepcopy(student)
         best_score = -999 if self.optimize_for == "max" else 999
         for _i in range(self.max_iters):

@@ -8,10 +8,10 @@ from dspy.adapters.base import Adapter
 from dspy.clients.lm import LM
 from dspy.clients.utils_finetune import infer_data_format
 from dspy.predict.predict import Predict
-from dspy.primitives.example import Example
 from dspy.primitives.module import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_trace import bootstrap_trace_data
+from dspy.teleprompt.compile_params import BootstrapFinetuneCompileParams
 from dspy.teleprompt.teleprompt import Teleprompter
 
 logger = logging.getLogger(__name__)
@@ -47,14 +47,9 @@ class BootstrapFinetune(FinetuneTeleprompter):
         self.max_concurrency = max_concurrency
 
     @override
-    async def compile(
-        self,
-        student: Module,
-        *,
-        trainset: list[Example],
-        teacher: Module | list[Module] | None = None,
-        run: RunContext,
-    ) -> Module:
+    async def compile(self, student: Module, *, params: BootstrapFinetuneCompileParams, run: RunContext) -> Module:
+        trainset = params.trainset
+        teacher = params.teacher
         logger.info("Preparing the student and teacher programs...")
         all_predictors_have_lms(student)
         logger.info("Bootstrapping data...")

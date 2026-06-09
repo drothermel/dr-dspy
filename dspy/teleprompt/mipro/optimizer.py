@@ -4,6 +4,7 @@ from typing_extensions import override
 
 from dspy.evaluate.evaluate import Evaluate
 from dspy.runtime.run_context import RunContext
+from dspy.teleprompt.compile_params import MIPROv2CompileParams
 from dspy.teleprompt.mipro.bootstrap import bootstrap_fewshot_examples
 from dspy.teleprompt.mipro.propose import propose_instructions
 from dspy.teleprompt.mipro.search import optimize_prompt_parameters
@@ -65,28 +66,23 @@ class MIPROv2(Teleprompter):
         self.rng = None
 
     @override
-    async def compile(
-        self,
-        student: Any,
-        *,
-        trainset: list,
-        teacher: Any = None,
-        valset: list | None = None,
-        num_trials: int | None = None,
-        max_bootstrapped_demos: int | None = None,
-        max_labeled_demos: int | None = None,
-        seed: int | None = None,
-        minibatch: bool = True,
-        minibatch_size: int = 35,
-        minibatch_full_eval_steps: int = 5,
-        program_aware_proposer: bool = True,
-        data_aware_proposer: bool = True,
-        view_data_batch_size: int = 10,
-        tip_aware_proposer: bool = True,
-        fewshot_aware_proposer: bool = True,
-        provide_traceback: bool | None = None,
-        run: RunContext,
-    ) -> Any:
+    async def compile(self, student: Any, *, params: MIPROv2CompileParams, run: RunContext) -> Any:
+        trainset = params.trainset
+        teacher = params.teacher
+        valset = params.valset
+        num_trials = params.num_trials
+        max_bootstrapped_demos = params.max_bootstrapped_demos
+        max_labeled_demos = params.max_labeled_demos
+        seed = params.seed
+        minibatch = params.minibatch
+        minibatch_size = params.minibatch_size
+        minibatch_full_eval_steps = params.minibatch_full_eval_steps
+        program_aware_proposer = params.program_aware_proposer
+        data_aware_proposer = params.data_aware_proposer
+        view_data_batch_size = params.view_data_batch_size
+        tip_aware_proposer = params.tip_aware_proposer
+        fewshot_aware_proposer = params.fewshot_aware_proposer
+        provide_traceback = params.provide_traceback
         self.task_model = get_prompt_model(self.task_model, run)
         self.prompt_model = get_prompt_model(self.prompt_model, run)
         effective_max_errors = self.max_errors if self.max_errors is not None else run.execution.max_errors

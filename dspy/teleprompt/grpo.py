@@ -21,6 +21,7 @@ from dspy.teleprompt.bootstrap_finetune import (
     assert_structural_equivalency,
 )
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, bootstrap_trace_data
+from dspy.teleprompt.compile_params import GRPOCompileParams
 from dspy.teleprompt.task_spec_context import get_task_spec
 
 logger = logging.getLogger(__name__)
@@ -269,15 +270,10 @@ class GRPO(FinetuneTeleprompter):
         return [original_trainset[i] for i in selected_ids]
 
     @override
-    async def compile(
-        self,
-        student: Module,
-        *,
-        trainset: list[Example],
-        teacher: Module | list[Module] | None = None,
-        valset: list[Example] | None = None,
-        run: RunContext,
-    ) -> Module:
+    async def compile(self, student: Module, *, params: GRPOCompileParams, run: RunContext) -> Module:
+        trainset = params.trainset
+        teacher = params.teacher
+        valset = params.valset
         logger.info(
             "Starting the GRPO compilation process... The LM(s) for the student program will be updated in place at the end of the training."
         )

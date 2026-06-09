@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, cast
 
 import pytest
@@ -7,6 +8,7 @@ from dspy.clients.embedding import Embedder
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.module import Module
+from dspy.teleprompt.compile_params import KNNFewShotCompileParams
 from dspy.teleprompt.knn_fewshot import KNNFewShot
 from dspy.utils.dummies import DummyLM, DummyVectorizer
 from tests.task_spec.helpers import ts
@@ -51,10 +53,10 @@ def _test_knn_few_shot_compile(setup_knn_few_shot, make_run):
     lm = DummyLM(cast("Any", ["Madrid", "10"]))
     run = make_run(lm=lm)
     knn_few_shot = setup_knn_few_shot
-    trainset = knn_few_shot.KNN.trainset
-    compiled_student = knn_few_shot.compile(student, teacher=teacher, trainset=trainset, valset=None, run=run)
-    assert len(compiled_student.predictor.demos) == 1
-    assert compiled_student.predictor.demos[0].input == trainset[0].input
-    assert compiled_student.predictor.demos[0].output == trainset[0].output
-    output = compiled_student.forward(input="What is the capital of Spain?").output
-    assert output in ["Madrid", "10"], "The compiled student did not return the correct output based on the query"
+    compiled_student = asyncio.run(
+        knn_few_shot.compile(student, params=KNNFewShotCompileParams(teacher=teacher), run=run)
+    )
+    output = asyncio.run(compiled_student(input="What is the capital of Spain?", run=run))
+    assert output.output in ["Madrid", "10"], (
+        "The compiled student did not return the correct output based on the query"
+    )

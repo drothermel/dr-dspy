@@ -25,6 +25,7 @@ from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.task_spec import FieldSpec, default_task_instructions, make_task_spec
 from dspy.teleprompt.bootstrap import BootstrapFewShot
+from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
 from dspy.utils.dummies import DummyLM
 from dspy.utils.saving import load
 from tests.task_spec.helpers import ts
@@ -136,7 +137,7 @@ def test_save_and_load_with_pkl(tmp_path, make_run):
         return True
 
     optimizer = BootstrapFewShot(max_bootstrapped_demos=4, max_labeled_demos=4, max_rounds=5, metric=dummy_metric)
-    compiled_cot = asyncio.run(optimizer.compile(cot, trainset=trainset, run=run))
+    compiled_cot = asyncio.run(optimizer.compile(cot, params=BootstrapFewShotCompileParams(trainset=trainset), run=run))
     compiled_cot.predict.task_spec = compiled_cot.predict.task_spec.with_instructions("You are a helpful assistant.")
     save_path = tmp_path / "program.pkl"
     compiled_cot.save(save_path)
