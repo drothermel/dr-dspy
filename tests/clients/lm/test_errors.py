@@ -82,7 +82,7 @@ def test_lm_preserves_existing_lm_error_without_self_cause(make_run):
     error = LMRateLimitError("rate limited", model="openai/gpt-4o-mini")
     lm = LM("openai/gpt-4o-mini")
     with (
-        mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error),
+        mock.patch("dspy.clients.lm.transport.alitellm_completion", side_effect=error),
         pytest.raises(LMRateLimitError) as exc_info,
     ):
         asyncio.run(lm(_request(lm, prompt="question"), run=make_run(lm=lm)))
@@ -94,7 +94,7 @@ async def test_lm_preserves_existing_lm_error_without_self_cause_async(make_run)
     error = LMRateLimitError("rate limited", model="openai/gpt-4o-mini")
     lm = LM("openai/gpt-4o-mini")
     with (
-        mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error),
+        mock.patch("dspy.clients.lm.transport.alitellm_completion", side_effect=error),
         pytest.raises(LMRateLimitError) as exc_info,
     ):
         await lm(_request(lm, prompt="question"), run=make_run(lm=lm))

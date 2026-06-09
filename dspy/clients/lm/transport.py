@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import os
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any
+from enum import StrEnum
+from typing import Any
 
-if TYPE_CHECKING:
-    from dspy.core.types import LMRequest, LMResponse
+from pydantic import BaseModel, ConfigDict
 
 from dspy.clients.lm.headers import _add_dspy_identifier_to_headers
 from dspy.clients.lm.litellm_access import _get_litellm
@@ -19,12 +19,29 @@ from dspy.clients.openai_format import (
     to_openai_text_request,
     usage_from_response,
 )
+from dspy.core.types import LMRequest, LMResponse
 from dspy.core.types.config import merge_lm_request_config
 from dspy.errors import LMConfigurationError
 
 LitellmCompletionFn = Callable[..., Awaitable[Any]]
+ToOpenAIRequestFn = Callable[[LMRequest], dict[str, Any]]
+ToLMResponseFn = Callable[[Any, LMRequest], LMResponse]
 
 _DEFAULT_LITELLM_CACHE = {"no-cache": True, "no-store": True}
+
+
+class LitellmCompletionName(StrEnum):
+    CHAT = "alitellm_completion"
+    TEXT = "alitellm_text_completion"
+    RESPONSES = "alitellm_responses_completion"
+
+
+class ModelTypeRoute(BaseModel):
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+    completion_fn_name: LitellmCompletionName
+    to_openai_request: ToOpenAIRequestFn
+    to_lm_response: ToLMResponseFn
 
 
 async def alitellm_completion(request: dict[str, Any], num_retries: int, cache: dict[str, Any] | None = None):
@@ -71,6 +88,33 @@ async def alitellm_responses_completion(request: dict[str, Any], num_retries: in
     )
 
 
+def _completion_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
+    return completion_to_lm_response(response=response, request=request)
+
+
+def _responses_to_lm_response(response: Any, request: LMRequest) -> LMResponse:
+    return responses_to_lm_response(response=response, request=request)
+
+
+_MODEL_TYPE_ROUTES: dict[str, ModelTypeRoute] = {
+    "chat": ModelTypeRoute(
+        completion_fn_name=LitellmCompletionName.CHAT,
+        to_openai_request=to_openai_chat_request,
+        to_lm_response=_completion_to_lm_response,
+    ),
+    "text": ModelTypeRoute(
+        completion_fn_name=LitellmCompletionName.TEXT,
+        to_openai_request=to_openai_text_request,
+        to_lm_response=_completion_to_lm_response,
+    ),
+    "responses": ModelTypeRoute(
+        completion_fn_name=LitellmCompletionName.RESPONSES,
+        to_openai_request=to_openai_responses_request,
+        to_lm_response=_responses_to_lm_response,
+    ),
+}
+
+
 def _unsupported_model_type_error(*, model_type: str, model: str, provider: str) -> LMConfigurationError:
     return LMConfigurationError(
         f"Unsupported model_type {model_type!r} for `dspy.clients.lm.LM`.",
@@ -79,21 +123,27 @@ def _unsupported_model_type_error(*, model_type: str, model: str, provider: str)
     )
 
 
-def completion_fn_for_model_type(model_type: str, *, lm: Any) -> LitellmCompletionFn:
-    import dspy.clients.lm as lm_package
-
+def _route_for_model_type(model_type: str, *, lm: Any) -> ModelTypeRoute:
     provider = split_provider_model(lm.model)[0]
-    if model_type == "chat":
-        return lm_package.alitellm_completion
-    if model_type == "text":
-        return lm_package.alitellm_text_completion
-    if model_type == "responses":
-        return lm_package.alitellm_responses_completion
-    raise _unsupported_model_type_error(model_type=model_type, model=lm.model, provider=provider)
+    route = _MODEL_TYPE_ROUTES.get(model_type)
+    if route is None:
+        raise _unsupported_model_type_error(model_type=model_type, model=lm.model, provider=provider)
+    return route
+
+
+def completion_fn_for_model_type(model_type: str, *, lm: Any) -> LitellmCompletionFn:
+    route = _route_for_model_type(model_type, lm=lm)
+    return getattr(_transport_module(), route.completion_fn_name.value)
+
+
+def _transport_module():
+    import dspy.clients.lm.transport as transport_module
+
+    return transport_module
 
 
 def provider_request_for_model_type(model_type: str, request: LMRequest, lm: Any) -> dict[str, Any]:
-    provider = split_provider_model(lm.model)[0]
+    route = _route_for_model_type(model_type, lm=lm)
     if lm.use_developer_role and model_type == "responses":
         request = request.model_copy(
             update={
@@ -104,14 +154,7 @@ def provider_request_for_model_type(model_type: str, request: LMRequest, lm: Any
             }
         )
     request = request.model_copy(update={"config": merge_lm_request_config(lm=lm, config=request.config)})
-    if model_type == "chat":
-        provider_request = to_openai_chat_request(request)
-    elif model_type == "text":
-        provider_request = to_openai_text_request(request)
-    elif model_type == "responses":
-        provider_request = to_openai_responses_request(request)
-    else:
-        raise _unsupported_model_type_error(model_type=model_type, model=lm.model, provider=provider)
+    provider_request = route.to_openai_request(request)
     lm_defaults = {
         key: value for key, value in lm.kwargs.items() if value is not None and key not in {"cache", "reasoning"}
     }
@@ -119,13 +162,8 @@ def provider_request_for_model_type(model_type: str, request: LMRequest, lm: Any
 
 
 def lm_response_for_model_type(model_type: str, response: Any, request: LMRequest, lm: Any) -> LMResponse:
-    provider = split_provider_model(lm.model)[0]
-    if model_type == "responses":
-        lm_response = responses_to_lm_response(response=response, request=request)
-    elif model_type in {"chat", "text"}:
-        lm_response = completion_to_lm_response(response=response, request=request)
-    else:
-        raise _unsupported_model_type_error(model_type=model_type, model=lm.model, provider=provider)
+    route = _route_for_model_type(model_type, lm=lm)
+    lm_response = route.to_lm_response(response, request)
     return lm_response.model_copy(
         update={
             "model": getattr(response, "model", None) or lm_response.model,

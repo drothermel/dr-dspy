@@ -101,7 +101,7 @@ class _TypedContractLM(BaseLM):
 def _direct_lm_case(lm_kind: str, outputs: list[str]):
     if lm_kind == "current_lm":
         patcher = mock.patch(
-            "dspy.clients.lm.alitellm_completion", side_effect=[_model_response(output) for output in outputs]
+            "dspy.clients.lm.transport.alitellm_completion", side_effect=[_model_response(output) for output in outputs]
         )
         completion = patcher.start()
         lm = LM("custom-model")

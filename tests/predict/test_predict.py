@@ -419,7 +419,7 @@ def test_load_prevents_serialized_endpoint_override_reaching_litellm(tmp_path, e
             super().__init__({"choices": []})
 
     with patch(
-        "dspy.clients.lm.alitellm_completion", new_callable=AsyncMock, return_value=FakeResp()
+        "dspy.clients.lm.transport.alitellm_completion", new_callable=AsyncMock, return_value=FakeResp()
     ) as completion_mock:
         lm = loaded_predict.lm
         assert lm is not None
@@ -457,7 +457,7 @@ def test_load_blocks_serialized_model_list_unless_opted_in(tmp_path, make_run):
     with (
         patch("litellm.batch_completion_models", return_value=FakeResp()) as batch_completion_mock,
         patch(
-            "dspy.clients.lm.alitellm_completion", new_callable=AsyncMock, return_value=FakeResp()
+            "dspy.clients.lm.transport.alitellm_completion", new_callable=AsyncMock, return_value=FakeResp()
         ) as completion_mock,
     ):
         lm = safe_loaded_predict.lm
@@ -748,7 +748,7 @@ def test_lm_usage(make_run):
         telemetry=TelemetryConfig(track_usage=True),
     )
     with patch(
-        "dspy.clients.lm.alitellm_completion",
+        "dspy.clients.lm.transport.alitellm_completion",
         return_value=ModelResponse(
             choices=[{"message": {"content": "[[ ## answer ## ]]\nParis"}}], usage={"total_tokens": 10}
         ),
@@ -766,7 +766,7 @@ def test_lm_usage_with_parallel(make_run):
         telemetry=TelemetryConfig(track_usage=True),
     )
     with patch(
-        "dspy.clients.lm.alitellm_completion",
+        "dspy.clients.lm.transport.alitellm_completion",
         return_value=ModelResponse(
             choices=[{"message": {"content": "[[ ## answer ## ]]\nParis"}}], usage={"total_tokens": 10}
         ),

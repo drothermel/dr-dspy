@@ -49,7 +49,9 @@ def test_responses_api(make_run):
 
 
 def test_lm_replaces_system_with_developer_role(make_run):
-    with mock.patch("dspy.clients.lm.alitellm_responses_completion", return_value={"choices": []}) as mock_completion:
+    with mock.patch(
+        "dspy.clients.lm.transport.alitellm_responses_completion", return_value={"choices": []}
+    ) as mock_completion:
         lm = LM("openai/gpt-4o-mini", model_type="responses", use_developer_role=True)
         asyncio.run(lm(_request(lm, messages=[{"role": "system", "content": "hi"}]), run=make_run(lm=lm)))
         assert mock_completion.call_args.kwargs["request"]["input"][0]["role"] == "developer"
