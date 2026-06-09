@@ -4,15 +4,15 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from dspy.primitives.record_store import RecordStore, _RecordBacked
+from dspy.primitives.record_store import RecordStore, _RecordBacked, _RecordStoreFacade
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Mapping
+    from collections.abc import Mapping
 
     from dspy.task_spec import TaskSpec
 
 
-class Prediction(_RecordBacked):
+class Prediction(_RecordStoreFacade):
     """Model output container backed by a field store.
 
     Equality compares store fields and attached completions, not numeric scores.
@@ -55,38 +55,11 @@ class Prediction(_RecordBacked):
         object.__setattr__(obj, "_store", RecordStore({k: v[0] for k, v in completions.items()}))
         return obj
 
-    def __getitem__(self, key: str) -> Any:
-        return self._store[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self._store[key] = value
-
-    def __contains__(self, key: object) -> bool:
-        return key in self._store
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._store)
-
-    def keys(self, include_dspy: bool = False) -> list[str]:
-        return self._store.keys(include_dspy=include_dspy)
-
-    def values(self, include_dspy: bool = False) -> list[Any]:
-        return self._store.values(include_dspy=include_dspy)
-
-    def items(self, include_dspy: bool = False) -> list[tuple[str, Any]]:
-        return self._store.items(include_dspy=include_dspy)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        return self._store.get(key, default)
-
     @override
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Prediction):
             return NotImplemented
         return self._store == other._store and self._completions == other._completions
-
-    def to_dict(self) -> dict[str, Any]:
-        return self._store.to_dict()
 
     @override
     def __repr__(self) -> str:

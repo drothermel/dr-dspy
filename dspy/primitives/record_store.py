@@ -36,6 +36,40 @@ class _RecordBacked:
             store[key] = value
 
 
+class _RecordStoreFacade(_RecordBacked):
+    """Mixin: mapping protocol delegation to a RecordStore backing field."""
+
+    def _backing_store(self) -> "RecordStore":
+        return object.__getattribute__(self, type(self)._RECORD_ATTR)
+
+    def __getitem__(self, key: str) -> Any:
+        return self._backing_store()[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self._backing_store()[key] = value
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._backing_store()
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.keys())
+
+    def keys(self, include_dspy: bool = False) -> list[str]:
+        return self._backing_store().keys(include_dspy=include_dspy)
+
+    def values(self, include_dspy: bool = False) -> list[Any]:
+        return self._backing_store().values(include_dspy=include_dspy)
+
+    def items(self, include_dspy: bool = False) -> list[tuple[str, Any]]:
+        return self._backing_store().items(include_dspy=include_dspy)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._backing_store().get(key, default)
+
+    def to_dict(self) -> dict[str, Any]:
+        return self._backing_store().to_dict()
+
+
 class RecordStore(_RecordBacked):
     """String-keyed record bag with consistent attribute and mapping access."""
 

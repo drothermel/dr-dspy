@@ -1,12 +1,12 @@
-from collections.abc import Iterator, Mapping
+from collections.abc import Mapping
 from typing import Any
 
 from typing_extensions import override
 
-from dspy.primitives.record_store import RecordStore, _RecordBacked
+from dspy.primitives.record_store import RecordStore, _RecordStoreFacade
 
 
-class Example(_RecordBacked):
+class Example(_RecordStoreFacade):
     _RECORD_ATTR = "_store"
     _RECORD_RESERVED = frozenset({"_store", "_input_keys"})
 
@@ -37,17 +37,8 @@ class Example(_RecordBacked):
             return frozenset()
         return self._input_keys
 
-    def __getitem__(self, key: str) -> Any:
-        return self._store[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self._store[key] = value
-
     def __delitem__(self, key: str) -> None:
         del self._store[key]
-
-    def __contains__(self, key: object) -> bool:
-        return key in self._store
 
     def __len__(self) -> int:
         return len([k for k in self._store if not k.startswith("dspy_")])
@@ -65,18 +56,6 @@ class Example(_RecordBacked):
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Example) and self._store == other._store and self.input_keys == other.input_keys
 
-    def keys(self, include_dspy: bool = False) -> list[str]:
-        return self._store.keys(include_dspy=include_dspy)
-
-    def values(self, include_dspy: bool = False) -> list[Any]:
-        return self._store.values(include_dspy=include_dspy)
-
-    def items(self, include_dspy: bool = False) -> list[tuple[str, Any]]:
-        return self._store.items(include_dspy=include_dspy)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        return self._store.get(key, default)
-
     def with_input_keys(self, *keys: str) -> "Example":
         return self.fork(_input_keys=frozenset(keys))
 
@@ -90,9 +69,6 @@ class Example(_RecordBacked):
     def as_labels(self) -> dict[str, Any]:
         input_keys = self.input_keys
         return {key: self._store[key] for key in self._store if key not in input_keys and not key.startswith("dspy_")}
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self.keys())
 
     def fork(self, **updates: Any) -> "Example":
         store = self._store.copy()
@@ -111,6 +87,3 @@ class Example(_RecordBacked):
         for key in keys:
             del copied[key]
         return copied
-
-    def to_dict(self) -> dict[str, Any]:
-        return self._store.to_dict()
