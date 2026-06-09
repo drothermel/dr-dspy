@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from dspy.adapters.prompt_format import translate_field_type
 from dspy.task_spec import field_bindings
 
 if TYPE_CHECKING:
+    from dspy.adapters.format.field_formatter import FieldFormatter
     from dspy.task_spec import TaskSpec
     from dspy.task_spec.field_spec import FieldRole
 
@@ -35,7 +36,7 @@ def build_field_structure_instructions(
 
 
 def build_role_field_sections(
-    adapter: Any,
+    field_formatter: FieldFormatter,
     task_spec: TaskSpec,
     role: FieldRole,
     *,
@@ -44,6 +45,4 @@ def build_role_field_sections(
     fields_with_values = {
         binding: translate_field_type(binding.field) for binding in field_bindings(task_spec, role=role)
     }
-    if role_label is not None:
-        return adapter.format_field_with_value(fields_with_values=fields_with_values, role=role_label)
-    return adapter.format_field_with_value(fields_with_values=fields_with_values)
+    return field_formatter.format_field_with_value(fields_with_values=fields_with_values, role_label=role_label)

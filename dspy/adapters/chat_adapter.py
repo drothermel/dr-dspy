@@ -7,7 +7,17 @@ from typing_extensions import override
 from dspy.adapters.base import Adapter
 from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.call.policies.json_parse_fallback import JSONParseFallbackPolicy
-from dspy.adapters.format_shared import FIELD_HEADER_PATTERN, ChatFormatMixin
+from dspy.adapters.format.header_formatter import HeaderFieldFormatter
+from dspy.adapters.format.prompt_sections import (
+    FIELD_HEADER_PATTERN,
+    format_field_description,
+    format_field_structure_header,
+    format_header_assistant_message_content,
+    format_header_finetune_data,
+    format_header_user_message_content,
+    format_task_description,
+    header_user_message_output_requirements,
+)
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.utils import parse_output_field, validate_parsed_fields
 from dspy.errors import AdapterParseError
@@ -15,6 +25,7 @@ from dspy.errors import AdapterParseError
 if TYPE_CHECKING:
     from dspy.adapters.call.policies.parse_fallback import NoOpParseFallbackPolicy
     from dspy.adapters.types.field_type import NativeResponseFieldType
+    from dspy.core.types import UserMessageContent
     from dspy.runtime.callback import Callback
     from dspy.task_spec import TaskSpec
 
@@ -34,7 +45,7 @@ def _split_field_sections(completion: str) -> list[tuple[str | None, str]]:
     return [(header, "\n".join(lines).strip()) for header, lines in sections]
 
 
-class ChatAdapter(ChatFormatMixin, Adapter):
+class ChatAdapter(Adapter):
     capabilities = AdapterCapabilities(
         supports_finetune=True,
         field_value_role="none",
@@ -59,6 +70,7 @@ class ChatAdapter(ChatFormatMixin, Adapter):
             native_response_types=native_response_types,
             allow_json_repair=allow_json_repair,
         )
+        self.field_formatter = HeaderFieldFormatter()
         self._json_fallback = json_fallback
         if parse_fallback_policy is None:
             self.parse_fallback_policy = JSONParseFallbackPolicy(fallback_factory=self._json_adapter_fallback)
@@ -75,6 +87,63 @@ class ChatAdapter(ChatFormatMixin, Adapter):
             native_response_types=self.native_response_types,
             allow_json_repair=self.allow_json_repair,
         )
+
+    @override
+    def format_field_description(self, task_spec: TaskSpec) -> str:
+        return format_field_description(task_spec)
+
+    @override
+    def format_field_structure(self, task_spec: TaskSpec) -> str:
+        return format_field_structure_header(self._require_field_formatter(), task_spec)
+
+    @override
+    def format_task_description(self, task_spec: TaskSpec) -> str:
+        return format_task_description(task_spec)
+
+    @override
+    def format_user_message_content(
+        self,
+        task_spec: TaskSpec,
+        inputs: dict[str, Any],
+        prefix: str = "",
+        suffix: str = "",
+        main_request: bool = False,
+    ) -> UserMessageContent:
+        return format_header_user_message_content(
+            self._require_field_formatter(),
+            task_spec,
+            inputs,
+            prefix=prefix,
+            suffix=suffix,
+            main_request=main_request,
+        )
+
+    def user_message_output_requirements(self, task_spec: TaskSpec) -> str:
+        return header_user_message_output_requirements(task_spec)
+
+    @override
+    def format_assistant_message_content(
+        self,
+        task_spec: TaskSpec,
+        outputs: dict[str, Any],
+        missing_field_message: str | None = None,
+    ) -> str:
+        return format_header_assistant_message_content(
+            self._require_field_formatter(),
+            task_spec,
+            outputs,
+            missing_field_message=missing_field_message,
+        )
+
+    @override
+    def format_finetune_data(
+        self,
+        task_spec: TaskSpec,
+        demos: list[dict[str, Any]],
+        inputs: dict[str, Any],
+        outputs: dict[str, Any],
+    ) -> dict[str, list[Any]]:
+        return format_header_finetune_data(self, self._require_field_formatter(), task_spec, demos, inputs, outputs)
 
     @override
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:

@@ -9,11 +9,12 @@ from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.call.mode import AdapterCallMode
 from dspy.adapters.types.field_type import NativeResponseFieldType
 from dspy.runtime.callback import with_callbacks
-from dspy.task_spec import TaskSpec
+from dspy.task_spec import FieldBinding, TaskSpec
 
 if TYPE_CHECKING:
     from dspy.adapters.call.policies.parse_fallback import ParseFallbackPolicy
     from dspy.adapters.call.policies.response_format import ResponseFormatPolicy
+    from dspy.adapters.format.field_formatter import FieldFormatter
     from dspy.runtime.callback import Callback
 
 
@@ -52,6 +53,24 @@ class Adapter(AdapterCallMixin, AdapterFormatMixin):
         self.parallel_tool_calls = parallel_tool_calls
         self.allow_json_repair = allow_json_repair
         self.native_response_types = native_response_types or _DEFAULT_NATIVE_RESPONSE_TYPES
+        self.field_formatter: FieldFormatter | None = None
+
+    def _require_field_formatter(self) -> FieldFormatter:
+        if self.field_formatter is None:
+            raise NotImplementedError(f"{type(self).__name__} does not configure field_formatter.")
+        return self.field_formatter
+
+    def format_field_with_value(
+        self,
+        fields_with_values: dict[FieldBinding, Any],
+        *,
+        role_label: str | None = None,
+        **kwargs: Any,
+    ) -> str:
+        if self.field_formatter is None:
+            raise NotImplementedError(f"{type(self).__name__} does not configure field_formatter.")
+        effective_role = role_label if role_label is not None else kwargs.get("role")
+        return self.field_formatter.format_field_with_value(fields_with_values, role_label=effective_role)
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)

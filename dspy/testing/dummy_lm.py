@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 from typing_extensions import override
 
 from dspy.adapters.chat_adapter import ChatAdapter
-from dspy.adapters.format_shared import FIELD_HEADER_PATTERN
+from dspy.adapters.format.prompt_sections import FIELD_HEADER_PATTERN
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format.chat_request import request_messages_as_openai
 from dspy.clients.openai_format.parse import provider_tool_call_to_part
