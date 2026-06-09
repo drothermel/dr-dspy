@@ -12,6 +12,7 @@ from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.core.types import CallRecord, LMRequest, LMResponse
 from dspy.core.types.config import NativeAdaptationMode
 from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
+from dspy.runtime.active_run import get_active_usage_tracker
 from dspy.runtime.call_log.coordinator import append_disk_call, record_call
 from dspy.runtime.callback import Callback, with_callbacks
 from dspy.runtime.config import disk_call_log_enabled, memory_call_log_enabled
@@ -137,10 +138,11 @@ class BaseLM:
     def _finalize_lm_response(
         self, request: LMRequest, response: LMResponse, *, run: RunContext, compiled: CompiledCall | None = None
     ) -> LMResponse:
-        if run.usage_tracker:
+        usage_tracker = get_active_usage_tracker(run)
+        if usage_tracker:
             usage = response.usage_as_dict()
             if usage:
-                run.usage_tracker.add_usage(lm=self.model, usage_entry=usage)
+                usage_tracker.add_usage(lm=self.model, usage_entry=usage)
         record = None
         memory_enabled = memory_call_log_enabled(run.telemetry)
         disk_enabled = disk_call_log_enabled(run.telemetry)

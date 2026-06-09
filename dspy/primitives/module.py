@@ -16,7 +16,7 @@ from dspy.predict.parallel import Parallel
 from dspy.predict.protocol import Predictor
 from dspy.primitives.prediction import Prediction
 from dspy.runtime import Callback, RunContext, resolve_run, track_usage, with_callbacks
-from dspy.runtime.active_run import call_scope
+from dspy.runtime.active_run import call_scope, get_active_usage_tracker
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -261,9 +261,8 @@ class Module:
                 tokens = usage_tracker.get_total_tokens()
             else:
                 output = await self._aforward_impl(run=run, options=options, **inputs)
-                tokens = (
-                    run.usage_tracker.get_total_tokens() if run.telemetry.track_usage and run.usage_tracker else None
-                )
+                usage_tracker = get_active_usage_tracker(run) if run.telemetry.track_usage else None
+                tokens = usage_tracker.get_total_tokens() if usage_tracker else None
             if tokens:
                 self._set_lm_usage(tokens, output)
             return output

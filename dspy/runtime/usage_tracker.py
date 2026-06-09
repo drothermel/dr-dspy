@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any, Generator
 
 from pydantic import BaseModel
 
+from dspy.runtime.active_run import _AMBIENT_STACK, _push_usage_tracker
+
 if TYPE_CHECKING:
     from dspy.runtime.run_context import RunContext
 
@@ -56,9 +58,8 @@ class UsageTracker:
 @contextmanager
 def track_usage(run: RunContext) -> Generator[UsageTracker, None, None]:
     tracker = UsageTracker()
-    previous = run.usage_tracker
-    run.usage_tracker = tracker
+    token = _push_usage_tracker(run, tracker)
     try:
         yield tracker
     finally:
-        run.usage_tracker = previous
+        _AMBIENT_STACK.reset(token)

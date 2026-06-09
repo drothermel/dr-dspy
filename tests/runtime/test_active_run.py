@@ -7,9 +7,10 @@ from dspy.adapters.types.tool import Tool
 from dspy.predict.predict import Predict  # noqa: F401 — break primitives import cycle
 from dspy.primitives import Module
 from dspy.runtime import RunContext, TelemetryConfig
-from dspy.runtime.active_run import call_scope, get_active_run, get_caller_modules
+from dspy.runtime.active_run import call_scope, get_active_run, get_active_usage_tracker, get_caller_modules
 from dspy.runtime.callback import NoOpCallback
 from dspy.runtime.config import CallLogMode
+from dspy.runtime.usage_tracker import UsageTracker, track_usage
 from dspy.testing import DummyLM
 
 
@@ -91,3 +92,50 @@ async def test_tool_callbacks_resolve_active_run_from_call_scope():
     result = await _ToolModule()(query="ping", run=run)
     assert result == "ping"
     assert callback.tool_runs == [run]
+
+
+def test_nested_track_usage_restores_outer_tracker():
+    run = RunContext.create(
+        lm=DummyLM([{"answer": "ok"}]),
+        adapter=JSONAdapter(),
+        telemetry=TelemetryConfig(call_log=CallLogMode.memory),
+    )
+    with track_usage(run) as outer:
+        outer.add_usage("model-a", {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3})
+        with track_usage(run) as inner:
+            inner.add_usage("model-b", {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30})
+        assert get_active_usage_tracker(run) is outer
+    assert get_active_usage_tracker(run) is None
+
+
+@pytest.mark.asyncio
+async def test_concurrent_track_usage_does_not_corrupt_totals():
+    run = RunContext.create(
+        lm=DummyLM([{"answer": "ok"}]),
+        adapter=JSONAdapter(),
+        telemetry=TelemetryConfig(call_log=CallLogMode.memory),
+    )
+
+    async def worker(prompt_tokens: int) -> int:
+        with track_usage(run) as tracker:
+            await asyncio.sleep(0)
+            tracker.add_usage(
+                "openai/gpt-4o-mini",
+                {"prompt_tokens": prompt_tokens, "completion_tokens": 1, "total_tokens": prompt_tokens + 1},
+            )
+            return tracker.get_total_tokens()["openai/gpt-4o-mini"]["prompt_tokens"]
+
+    assert await asyncio.gather(worker(50), worker(80)) == [50, 80]
+
+
+def test_configured_usage_sink_receives_usage_without_ambient_tracker():
+    sink = UsageTracker()
+    run = RunContext.create(
+        lm=DummyLM([{"answer": "ok"}]),
+        adapter=JSONAdapter(),
+        usage_tracker=sink,
+        telemetry=TelemetryConfig(call_log=CallLogMode.memory),
+    )
+    assert get_active_usage_tracker(run) is sink
+    sink.add_usage("model-a", {"prompt_tokens": 5, "completion_tokens": 1, "total_tokens": 6})
+    assert sink.get_total_tokens()["model-a"]["prompt_tokens"] == 5

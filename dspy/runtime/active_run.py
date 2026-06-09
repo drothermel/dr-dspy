@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextvars
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -38,6 +39,23 @@ def get_active_run() -> RunContext | None:
 
 def get_caller_modules() -> tuple[Module, ...]:
     return tuple(frame.caller for frame in _AMBIENT_STACK.get() if frame.caller is not None)
+
+
+def get_active_usage_tracker(run: RunContext) -> UsageTracker | None:
+    for frame in reversed(_AMBIENT_STACK.get()):
+        if frame.run is run and frame.usage_tracker is not None:
+            return frame.usage_tracker
+    return run.usage_tracker
+
+
+def _push_usage_tracker(run: RunContext, tracker: UsageTracker) -> contextvars.Token[tuple[_AmbientFrame, ...]]:
+    stack = _AMBIENT_STACK.get()
+    if stack and stack[-1].run is run:
+        top = stack[-1]
+        new_frame = _AmbientFrame(run=top.run, caller=top.caller, usage_tracker=tracker)
+        return _AMBIENT_STACK.set(stack[:-1] + (new_frame,))
+    frame = _AmbientFrame(run=run, usage_tracker=tracker)
+    return _AMBIENT_STACK.set(stack + (frame,))
 
 
 @asynccontextmanager
