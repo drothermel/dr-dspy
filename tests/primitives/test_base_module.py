@@ -153,7 +153,7 @@ def test_save_with_extra_modules(tmp_path, make_run):
     custom_module_path = tmp_path / "custom_module.py"
     with open(custom_module_path, "w") as f:
         f.write(
-            '\nfrom dspy.predict.chain_of_thought import ChainOfThought\nfrom dspy.primitives.module import Module\nfrom dspy.task_spec import make_task_spec\n\nclass MyModule(Module):\n    def __init__(self):\n        self.cot = ChainOfThought(make_task_spec("q -> a", instructions="Answer the question."))\n\n    async def aforward(self, q):\n        return await self.cot(q=q)\n'
+            '\nfrom dspy.predict.chain_of_thought import ChainOfThought\nfrom dspy.primitives.module import Module\nfrom dspy.task_spec import make_task_spec\n\nclass MyModule(Module):\n    def __init__(self):\n        self.cot = ChainOfThought(make_task_spec("q -> a", instructions="Answer the question."))\n\n    async def _aforward_impl(self, q):\n        return await self.cot(q=q)\n'
         )
     sys.path.insert(0, str(tmp_path))
     try:
@@ -263,7 +263,7 @@ def test_usage_tracker_in_parallel(make_run):
             self.predict1 = ChainOfThought(ts("question -> answer"))
             self.predict2 = ChainOfThought(ts("question, answer -> score"))
 
-        async def aforward(self, question: str, *, run) -> Prediction:
+        async def _aforward_impl(self, question: str, *, run) -> Prediction:
             answer = await self.predict1(question=question, run=run)
             return await self.predict2(question=question, answer=answer, run=run)
 
@@ -333,7 +333,7 @@ def test_usage_tracker_no_side_effect(make_run):
         def __init__(self):
             self.predict = Predict(QUESTION_ANSWER_TASK_SPEC)
 
-        async def aforward(self, question: str, **kwargs: object) -> str:
+        async def _aforward_impl(self, question: str, **kwargs: object) -> str:
             run = kwargs["run"]
             return (await self.predict(question=question, run=run)).answer
 
@@ -350,7 +350,7 @@ def test_module_history(make_run):
             super().__init__()
             self.cot = ChainOfThought(ts("question -> answer"))
 
-        async def aforward(self, question: str, **kwargs: object) -> Prediction:
+        async def _aforward_impl(self, question: str, **kwargs: object) -> Prediction:
             run = kwargs["run"]
             return await self.cot(question=question, run=run)
 
@@ -387,7 +387,7 @@ def test_module_history_with_concurrency(make_run):
             super().__init__()
             self.cot = ChainOfThought(ts("question -> answer"))
 
-        async def aforward(self, question: str, **kwargs: object) -> Prediction:
+        async def _aforward_impl(self, question: str, **kwargs: object) -> Prediction:
             run = kwargs["run"]
             return await self.cot(question=question, run=run)
 
@@ -419,7 +419,7 @@ async def test_module_history_async(make_run):
             super().__init__()
             self.cot = ChainOfThought(ts("question -> answer"))
 
-        async def aforward(self, question: str, **kwargs: object) -> Prediction:
+        async def _aforward_impl(self, question: str, **kwargs: object) -> Prediction:
             run = kwargs["run"]
             return await self.cot(question=question, run=run)
 
@@ -462,19 +462,21 @@ async def test_module_history_async(make_run):
 def test_forward_direct_call_warning(caplog, make_run):
 
     class TestModule(Module):
-        async def aforward(self, x, **kwargs: object):
+        async def _aforward_impl(self, x, **kwargs: object):
             return x
 
     module = TestModule()
+    run = make_run(lm=DummyLM([{}]))
     with caplog.at_level(logging.WARNING, logger="dspy.primitives.module"):
-        asyncio.run(module.aforward("test"))
-    assert "directly is discouraged" in caplog.text
+        asyncio.run(module.aforward(x="test", run=run))
+        asyncio.run(module.aforward(x="test", run=run))
+    assert caplog.text.count("directly is discouraged") == 1
 
 
 def test_forward_through_call_no_warning(capsys, make_run):
 
     class TestModule(Module):
-        async def aforward(self, x, **kwargs: object):
+        async def _aforward_impl(self, x, **kwargs: object):
             return x
 
     module = TestModule()

@@ -42,7 +42,7 @@ class SingleComponentMultiModalProposer(Module):
         super().__init__()
         self.propose_instruction = Predict(GenerateEnhancedMultimodalInstructionTaskSpec())
 
-    async def aforward(self, current_instruction: str, reflective_dataset: list[ReflectiveExample]) -> str:
+    async def _aforward_impl(self, current_instruction: str, reflective_dataset: list[ReflectiveExample]) -> str:
         formatted_examples, image_map = self._format_examples_with_pattern_analysis(reflective_dataset)
         predict_kwargs = {"current_instruction": current_instruction, "examples_with_feedback": formatted_examples}
         predict_kwargs["examples_with_feedback"] = self._create_multimodal_examples(

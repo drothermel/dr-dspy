@@ -158,7 +158,7 @@ class Predict(Module, Parameter):
         return pred
 
     @override
-    async def aforward(
+    async def _aforward_impl(
         self,
         *,
         run: RunContext,

@@ -16,7 +16,7 @@ class DummyModule(Module):
         self.predictor = Predict(task_spec)
         self.forward_fn = forward_fn
 
-    async def aforward(self, *, run, options=None, **inputs) -> Prediction:
+    async def _aforward_impl(self, *, run, options=None, **inputs) -> Prediction:
         return await self.forward_fn(self, run=run, options=options, **inputs)
 
 

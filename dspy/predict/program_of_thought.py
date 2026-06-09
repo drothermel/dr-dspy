@@ -108,7 +108,7 @@ class ProgramOfThought(Module):
         except Exception as e:
             return (None, str(e))
 
-    async def aforward(
+    async def _aforward_impl(
         self,
         *,
         run: RunContext,

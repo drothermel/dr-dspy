@@ -21,7 +21,7 @@ class BestOfN(Module):
         self.N = N
         self.fail_count = fail_count or N
 
-    async def aforward(
+    async def _aforward_impl(
         self,
         *,
         run: RunContext,

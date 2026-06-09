@@ -34,7 +34,7 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    async def aforward(self, *, run, options=None, **inputs):
+    async def _aforward_impl(self, *, run, options=None, **inputs):
         return await self.predictor(run=run, options=options, **inputs)
 
 
@@ -74,7 +74,7 @@ def test_error_handling_during_bootstrap(make_run):
             super().__init__()
             self.predictor = Predict(signature)
 
-        async def aforward(self, *, run, options=None, **inputs):
+        async def _aforward_impl(self, *, run, options=None, **inputs):
             raise RuntimeError("Simulated error")
 
     student = SimpleModule(ts("input -> output"))

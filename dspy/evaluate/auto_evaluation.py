@@ -42,13 +42,14 @@ def f1_score(precision, recall):
 
 class SemanticF1(Module):
     def __init__(self, threshold=0.66, decompositional=False) -> None:
+        super().__init__()
         self.threshold = threshold
         if decompositional:
             self.module = ChainOfThought(DecompositionalSemanticRecallPrecisionTaskSpec())
         else:
             self.module = ChainOfThought(SemanticRecallPrecisionTaskSpec())
 
-    async def aforward(self, example, pred, trace=None, *, run):
+    async def _aforward_impl(self, example, pred, trace=None, *, run):
         scores = await self.module(
             question=example.question, ground_truth=example.response, system_response=pred.response, run=run
         )
@@ -97,11 +98,12 @@ class AnswerGroundednessTaskSpec(TaskSpec):
 
 class CompleteAndGrounded(Module):
     def __init__(self, threshold=0.66) -> None:
+        super().__init__()
         self.threshold = threshold
         self.completeness_module = ChainOfThought(AnswerCompletenessTaskSpec())
         self.groundedness_module = ChainOfThought(AnswerGroundednessTaskSpec())
 
-    async def aforward(self, example, pred, trace=None, *, run):
+    async def _aforward_impl(self, example, pred, trace=None, *, run):
         completeness = await self.completeness_module(
             question=example.question, ground_truth=example.response, system_response=pred.response, run=run
         )

@@ -1,8 +1,7 @@
-import inspect
 import logging
 from typing import Any, TextIO
 
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.parallel import Parallel
@@ -15,24 +14,36 @@ from dspy.runtime.callback import ACTIVE_RUN
 
 logger = logging.getLogger(__name__)
 
+_DIRECT_AFORWARD_WARNED: set[type] = set()
+
+
+def _warn_direct_aforward_once(cls: type) -> None:
+    if cls in _DIRECT_AFORWARD_WARNED:
+        return
+    _DIRECT_AFORWARD_WARNED.add(cls)
+    logger.warning(
+        "Calling module.aforward(...) on %s directly is discouraged. Please use await module(...) instead.",
+        cls.__name__,
+    )
+
 
 class ProgramMeta(type):
     @override
     def __call__(cls, *args, **kwargs):
         obj = cls.__new__(cls, *args, **kwargs)
         if isinstance(obj, cls):
-            Module._base_init(obj)
             cls.__init__(obj, *args, **kwargs)
         return obj
 
 
 class Module(BaseModule, metaclass=ProgramMeta):
-    @staticmethod
-    def _base_init(obj: Any) -> None:
-        obj._compiled = False
-        obj.callbacks = []
-        obj.call_log = []
-        obj.run = None
+    def __new__(cls, *_args: Any, **_kwargs: Any) -> Self:
+        instance = super().__new__(cls)
+        instance._compiled = False
+        instance.callbacks = []
+        instance.call_log = []
+        instance.run = None
+        return instance
 
     def __init__(self, callbacks=None, run: RunContext | None = None) -> None:
         self.callbacks = callbacks or []
@@ -88,7 +99,17 @@ class Module(BaseModule, metaclass=ProgramMeta):
         options: ModuleCallOptions | None = None,
         **inputs: Any,
     ) -> Prediction:
-        raise NotImplementedError(f"{type(self).__name__} must implement aforward().")
+        _warn_direct_aforward_once(type(self))
+        return await self._aforward_impl(run=run, options=options, **inputs)
+
+    async def _aforward_impl(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs: Any,
+    ) -> Prediction:
+        raise NotImplementedError(f"{type(self).__name__} must implement _aforward_impl().")
 
     def named_predictors(self):
         return [(name, param) for name, param in self.named_parameters() if isinstance(param, Predictor)]
@@ -158,13 +179,5 @@ class Module(BaseModule, metaclass=ProgramMeta):
             )
 
     @override
-    def __getattribute__(self, name):
-        attr = super().__getattribute__(name)
-        if name == "aforward" and callable(attr):
-            stack = inspect.stack()
-            aforward_called_directly = len(stack) <= 1 or stack[1].function != "__call__"
-            if aforward_called_directly:
-                logger.warning(
-                    f"Calling module.aforward(...) on {self.__class__.__name__} directly is discouraged. Please use await module(...) instead."
-                )
-        return attr
+    def __getattribute__(self, name: str) -> Any:
+        return super().__getattribute__(name)

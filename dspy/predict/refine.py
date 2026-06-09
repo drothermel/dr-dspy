@@ -64,7 +64,7 @@ class Refine(Module):
         except TypeError:
             self.reward_fn_code = get_formatted_source(reward_fn.__class__)
 
-    async def aforward(
+    async def _aforward_impl(
         self,
         *,
         run: RunContext,

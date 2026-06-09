@@ -66,7 +66,7 @@ class _AvatarEvalModule(Module):
         self._actor = actor
         self._return_outputs = return_outputs
 
-    async def aforward(
+    async def _aforward_impl(
         self,
         *,
         run: RunContext,

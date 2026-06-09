@@ -27,7 +27,7 @@ def test_parallel_module(make_run):
             self.predictor2 = Predict(ts("input -> output"))
             self.parallel = Parallel(max_concurrency=2)
 
-        async def aforward(self, *, run, options=None, **inputs):
+        async def _aforward_impl(self, *, run, options=None, **inputs):
             example = {"input": inputs["input"]}
             return await self.parallel(
                 [
@@ -73,7 +73,7 @@ def test_batch_module(make_run):
             self.predictor2 = Predict(ts("input -> output, reasoning"))
             self.parallel = Parallel(max_concurrency=2)
 
-        async def aforward(self, *, run, options=None, **inputs):
+        async def _aforward_impl(self, *, run, options=None, **inputs):
             examples = [Example.from_record({"input": inputs["input"]}, input_keys=("input",))] * 5
             res1 = await self.predictor.batch(examples, run=run)
             reasoning_run = make_run(lm=res_lm)
@@ -108,7 +108,7 @@ def test_nested_parallel_module(make_run):
             self.predictor2 = Predict(ts("input -> output"))
             self.parallel = Parallel(max_concurrency=2)
 
-        async def aforward(self, *, run, options=None, **inputs):
+        async def _aforward_impl(self, *, run, options=None, **inputs):
             example = {"input": inputs["input"]}
             return await self.parallel(
                 [
@@ -143,7 +143,7 @@ def test_nested_batch_method(make_run):
             super().__init__()
             self.predictor = Predict(ts("input -> output"))
 
-        async def aforward(self, *, run, options=None, **inputs):
+        async def _aforward_impl(self, *, run, options=None, **inputs):
             input_value = inputs["input"]
             return await self.predictor.batch(
                 [Example.from_record({"input": input_value}, input_keys=("input",))] * 2,
@@ -165,7 +165,7 @@ def test_batch_with_failed_examples(make_run):
     run = make_run(lm=DummyLM([{}]))
 
     class FailingModule(Module):
-        async def aforward(self, *, run, options=None, **inputs) -> str:
+        async def _aforward_impl(self, *, run, options=None, **inputs) -> str:
             value = inputs["value"]
             if value == 42:
                 raise ValueError("test error")
@@ -202,7 +202,7 @@ def test_batch_timeout_and_straggler_limit_params(make_run):
     run = make_run(lm=DummyLM([{}]))
 
     class SimpleModule(Module):
-        async def aforward(self, *, run, options=None, **inputs) -> int:
+        async def _aforward_impl(self, *, run, options=None, **inputs) -> int:
             return inputs["value"] * 2
 
     module = SimpleModule()

@@ -105,11 +105,7 @@ class Example:
 
     def as_labels(self) -> dict[str, Any]:
         input_keys = self.input_keys
-        return {
-            key: self._store[key]
-            for key in self._store
-            if key not in input_keys and not key.startswith("dspy_")
-        }
+        return {key: self._store[key] for key in self._store if key not in input_keys and not key.startswith("dspy_")}
 
     def __iter__(self):
         return iter(dict(self._store))

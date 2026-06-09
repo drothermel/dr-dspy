@@ -106,7 +106,7 @@ def test_bootstrap_trace_data_passes_callback_metadata(monkeypatch, make_run):
     run = make_run(lm=DummyLM([{}]))
 
     class DummyProgram(Module):
-        async def aforward(self, *, run, options=None, **inputs):
+        async def _aforward_impl(self, *, run, options=None, **inputs):
             return Prediction()
 
     captured_metadata: dict[str, Any] = {}

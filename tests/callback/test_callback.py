@@ -200,7 +200,7 @@ def test_tool_calls(make_run):
         def __init__(self):
             self.tools = [Tool(tool_1, description="Tool one."), Tool(tool_2, description="Tool two.")]
 
-        async def aforward(self, *, query: str, run, options=None, **kwargs: object) -> str:
+        async def _aforward_impl(self, *, query: str, run, options=None, **kwargs: object) -> str:
             query = self.tools[0](query=query)
             return self.tools[1](query=query)
 
@@ -236,12 +236,12 @@ def test_active_id(make_run):
             self.child_1 = Child()
             self.child_2 = Child()
 
-        async def aforward(self, *, run, options=None, **inputs):
+        async def _aforward_impl(self, *, run, options=None, **inputs):
             await self.child_1(run=run, options=options, **inputs)
             await self.child_2(run=run, options=options, **inputs)
 
     class Child(Module):
-        async def aforward(self, *, run, options=None, **inputs):
+        async def _aforward_impl(self, *, run, options=None, **inputs):
             pass
 
     callback = CustomCallback()

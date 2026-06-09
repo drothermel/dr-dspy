@@ -79,7 +79,7 @@ class ReActV2(Module):
         ).strip()
         return make_task_spec(fields, instructions=instructions)
 
-    async def aforward(
+    async def _aforward_impl(
         self,
         *,
         run: RunContext,

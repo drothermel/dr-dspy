@@ -29,7 +29,7 @@ class HopModule(Module):
             ts("query -> answer", instructions=default_task_instructions(inputs=("query",), outputs=("answer",)))
         )
 
-    async def aforward(self, question, **kwargs):
+    async def _aforward_impl(self, question, **kwargs):
         run = kwargs.get("run")
         query = (await self.predict1(question=question, run=run)).query
         return await self.predict2(query=query, run=run)

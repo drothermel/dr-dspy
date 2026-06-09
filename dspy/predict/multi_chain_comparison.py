@@ -43,7 +43,7 @@ class MultiChainComparison(Module):
         merged_config = merge_lm_config(LMConfig(temperature=temperature), config) or LMConfig(temperature=temperature)
         self.predict = Predict(extended_task_spec, config=merged_config)
 
-    async def aforward(
+    async def _aforward_impl(
         self,
         *,
         run: RunContext,

@@ -162,7 +162,7 @@ class RLM(Module):
             options=options,
         )
 
-    async def aforward(
+    async def _aforward_impl(
         self,
         *,
         run: RunContext,

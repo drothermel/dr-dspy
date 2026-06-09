@@ -15,7 +15,7 @@ class DummyModule(Module):
     def __init__(self):
         super().__init__()
 
-    async def aforward(self, *, run, options=None, **inputs):
+    async def _aforward_impl(self, *, run, options=None, **inputs):
         pass
 
 

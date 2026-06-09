@@ -26,7 +26,7 @@ class Ensemble:
                 super().__init__()
                 self.programs = programs
 
-            async def aforward(
+            async def _aforward_impl(
                 self,
                 *,
                 run: RunContext,

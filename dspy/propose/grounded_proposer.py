@@ -152,7 +152,7 @@ class GenerateModuleInstruction(Module):
             use_tip=use_tip,
         )
 
-    async def aforward(
+    async def _aforward_impl(
         self,
         demo_candidates,
         pred_i,

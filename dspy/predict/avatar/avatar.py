@@ -55,7 +55,7 @@ class Avatar(Module):
                 return tool.tool.run(tool_input_query)
         return None
 
-    async def aforward(
+    async def _aforward_impl(
         self,
         *,
         run: RunContext,

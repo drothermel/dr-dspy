@@ -26,7 +26,7 @@ class ChainOfThought(Module):
         self.task_spec = task_spec
         self.predict = Predict(extended_task_spec, config=config, callbacks=callbacks)
 
-    async def aforward(
+    async def _aforward_impl(
         self,
         *,
         run: RunContext,

@@ -14,7 +14,7 @@ class MockProgram(Module):
         super().__init__()
         self.output = output
 
-    async def aforward(self, *args: object, **kwargs: object):
+    async def _aforward_impl(self, *args: object, **kwargs: object):
         return self.output
 
 

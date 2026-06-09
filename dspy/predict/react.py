@@ -66,7 +66,7 @@ class ReAct(Module):
         self.react = Predict(react_task_spec)
         self.extract = ChainOfThought(fallback_task_spec)
 
-    async def aforward(
+    async def _aforward_impl(
         self,
         *,
         run: RunContext,

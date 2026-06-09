@@ -15,7 +15,7 @@ class SimpleModule(Module):
         super().__init__()
         self.predictor = Predict(signature)
 
-    async def aforward(self, *, run, options=None, **inputs):
+    async def _aforward_impl(self, *, run, options=None, **inputs):
         return await self.predictor(run=run, options=options, **inputs)
 
 

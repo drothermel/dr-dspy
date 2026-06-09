@@ -74,7 +74,7 @@ class CodeAct(Module):
         return instructions
 
     @override
-    async def aforward(
+    async def _aforward_impl(
         self,
         *,
         run: RunContext,
