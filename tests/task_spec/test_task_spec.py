@@ -44,6 +44,31 @@ def test_duplicate_input_output_names_raise():
         make_task_spec("value -> value", instructions="Do it.")
 
 
+def test_duplicate_input_names_via_field_lists_raise():
+    with pytest.raises(ValueError, match="Duplicate input field name"):
+        make_task_spec(
+            inputs=[
+                input_field("q", desc="First question."),
+                input_field("q", desc="Duplicate question."),
+            ],
+            outputs=[output_field("a", desc="The answer.")],
+            instructions="Answer.",
+        )
+
+
+def test_duplicate_input_names_via_direct_task_spec_raise():
+    field = input_field("q", desc="The question.")
+    with pytest.raises(ValueError, match="Duplicate input field name"):
+        TaskSpec(name="QA", instructions="Answer.", inputs=(field, field), outputs=())
+
+
+def test_from_dict_rejects_duplicate_input_names():
+    payload = make_task_spec("q -> a", instructions="Answer.").to_dict()
+    payload["inputs"].append(payload["inputs"][0])
+    with pytest.raises(ValueError, match="Duplicate input field name"):
+        TaskSpec.from_dict(payload)
+
+
 def test_default_task_instructions():
     text = default_task_instructions(inputs=("a", "b"), outputs=("c",))
     assert text == "Given the fields `a`, `b`, produce the fields `c`."

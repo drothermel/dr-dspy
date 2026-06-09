@@ -98,7 +98,14 @@ def validate_task_inputs_from_spec(task_spec: TaskSpec, inputs: dict[str, Any]) 
         if field_name not in validated:
             continue
         value = validated[field_name]
-        if value is None or field.is_type_undefined:
+        if field.is_type_undefined:
+            continue
+        if value is None:
+            if not _annotation_allows_none(field.type_):
+                raise ValueError(
+                    f"Type mismatch for task input field {field_name!r}: expected {_get_type_name(field.type_)}, "
+                    f"got incompatible value None."
+                )
             continue
         if not _is_value_compatible_with_type(value, field.type_):
             raise ValueError(

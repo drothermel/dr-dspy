@@ -194,7 +194,7 @@ def coerce_lm_config(value: LMConfig | Mapping[str, Any] | None = None) -> LMCon
         return LMConfig()
     if isinstance(value, LMConfig):
         return value
-    return LMConfig(**dict(value))
+    return LMConfig(**_coerce_from_call_config_kwargs(value))
 
 
 def lm_defaults_config(lm: Any) -> LMConfig:

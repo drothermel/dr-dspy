@@ -2,10 +2,30 @@ import hashlib
 import json
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from dspy.task_spec.field_spec import FieldRole, FieldSpec
 from dspy.task_spec.serialize import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
+
+
+def validate_task_spec_field_names(
+    inputs: tuple[FieldSpec, ...],
+    outputs: tuple[FieldSpec, ...],
+) -> None:
+    def _check_within_role_duplicates(fields: tuple[FieldSpec, ...], role_label: str) -> None:
+        names = [field.name for field in fields]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            quoted = ", ".join(f"'{name}'" for name in duplicates)
+            raise ValueError(f"Duplicate {role_label} field name(s): {quoted}.")
+
+    _check_within_role_duplicates(inputs, "input")
+    _check_within_role_duplicates(outputs, "output")
+    cross_role = sorted({field.name for field in inputs}.intersection(field.name for field in outputs))
+    if cross_role:
+        raise ValueError(
+            f"Input and output fields must have distinct names, but found duplicates: '{', '.join(cross_role)}'."
+        )
 
 
 class TaskSpec(BaseModel):
@@ -14,6 +34,11 @@ class TaskSpec(BaseModel):
     instructions: str
     inputs: tuple[FieldSpec, ...] = Field(default_factory=tuple)
     outputs: tuple[FieldSpec, ...] = Field(default_factory=tuple)
+
+    @model_validator(mode="after")
+    def _validate_field_names(self) -> "TaskSpec":
+        validate_task_spec_field_names(self.inputs, self.outputs)
+        return self
 
     @property
     def input_fields(self) -> dict[str, FieldSpec]:

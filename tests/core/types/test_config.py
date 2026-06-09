@@ -12,7 +12,7 @@ from dspy.core.types import (
     LMUsage,
     User,
 )
-from dspy.core.types.config import ReasoningEffort, _merge_config_overrides, _merge_lm_config
+from dspy.core.types.config import ReasoningEffort, _merge_config_overrides, _merge_lm_config, coerce_lm_config
 
 
 def test_merge_lm_config_merges_extensions():
@@ -84,6 +84,27 @@ def test_default_config_does_not_serialize_empty_stop_sequences():
     entry = CallRecord(request=request, response=LMResponse.from_text("ok"), timestamp="timestamp", uuid="uuid")
     assert request.config.stop is None
     assert entry.kwargs == {}
+
+
+def test_coerce_lm_config_rejects_max_completion_tokens():
+    with pytest.raises(ValueError, match="max_completion_tokens"):
+        coerce_lm_config({"max_completion_tokens": 100})
+
+
+def test_coerce_lm_config_rejects_reasoning_effort():
+    with pytest.raises(ValueError, match="reasoning_effort"):
+        coerce_lm_config({"reasoning_effort": "high"})
+
+
+def test_coerce_lm_config_rejects_bool_prompt_cache():
+    with pytest.raises(TypeError, match="bool prompt_cache"):
+        coerce_lm_config({"prompt_cache": True})
+
+
+def test_coerce_lm_config_accepts_valid_mapping():
+    config = coerce_lm_config({"temperature": 0.2, "max_tokens": 100})
+    assert config.temperature == 0.2
+    assert config.max_tokens == 100
 
 
 def test_history_entry_exposes_typed_derived_properties():

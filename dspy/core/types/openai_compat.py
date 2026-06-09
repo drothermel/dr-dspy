@@ -66,14 +66,13 @@ def _history_tool_call_as_openai(call: LMToolCallPart) -> dict[str, Any]:
     return data
 
 
-def _history_tool_result_content(result: LMToolResultPart) -> str:
-    chunks = []
-    for part in result.content:
-        if isinstance(part, LMTextPart):
-            chunks.append(part.text)
-        else:
-            chunks.append(json.dumps(part.model_dump(mode="json", exclude_none=True), ensure_ascii=False))
-    return "".join(chunks)
+def _history_tool_result_content(result: LMToolResultPart) -> str | list[dict[str, Any]]:
+    from dspy.clients.openai_format.serialize import parts_to_openai_content
+
+    content = parts_to_openai_content(result.content)
+    if content == []:
+        return ""
+    return content
 
 
 def _history_message_parts_as_openai_content(parts: list[LMPart]) -> str | list[dict[str, Any]]:
@@ -132,7 +131,9 @@ def _history_part_as_openai_content(part: LMPart) -> dict[str, Any]:
         return data
     if isinstance(part, LMBinaryPart):
         return binary_to_openai(part)
-    return part.model_dump(exclude_none=True)
+    from dspy.clients.openai_format.serialize import part_to_openai_blocks
+
+    return part_to_openai_blocks(part)[0]
 
 
 def _history_part_source(part: LMImagePart | LMAudioPart | LMVideoPart | LMDocumentPart | LMBinaryPart) -> str | None:

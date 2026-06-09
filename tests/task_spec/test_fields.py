@@ -44,3 +44,45 @@ def test_validate_task_inputs_from_spec_rejects_unknown_keys():
     spec = make_task_spec("q -> a", instructions="Answer.")
     with pytest.raises(ValueError, match="Unknown task input field"):
         validate_task_inputs_from_spec(spec, {"extra": 1})
+
+
+def test_validate_task_inputs_from_spec_rejects_none_for_required_str():
+    spec = make_task_spec(
+        inputs=[input_field("q", str, desc="The question.")],
+        outputs=[output_field("a", desc="The answer.")],
+        instructions="Answer.",
+    )
+    with pytest.raises(ValueError, match="got incompatible value None"):
+        validate_task_inputs_from_spec(spec, {"q": None})
+
+
+def test_validate_task_inputs_from_spec_accepts_none_for_optional_str():
+    spec = make_task_spec(
+        inputs=[input_field("q", str | None, desc="Optional question.")],
+        outputs=[output_field("a", desc="The answer.")],
+        instructions="Answer.",
+    )
+    validated = validate_task_inputs_from_spec(spec, {"q": None})
+    assert validated == {"q": None}
+
+
+def test_validate_task_inputs_from_spec_rejects_default_none_on_plain_str():
+    spec = make_task_spec(
+        inputs=[input_field("q", desc="Question with null default.", default=None)],
+        outputs=[output_field("a", desc="The answer.")],
+        instructions="Answer.",
+    )
+    with pytest.raises(ValueError, match="got incompatible value None"):
+        validate_task_inputs_from_spec(spec, {})
+    with pytest.raises(ValueError, match="got incompatible value None"):
+        validate_task_inputs_from_spec(spec, {"q": None})
+
+
+def test_validate_task_inputs_from_spec_accepts_default_none_on_optional_str():
+    spec = make_task_spec(
+        inputs=[input_field("q", str | None, desc="Optional question.", default=None)],
+        outputs=[output_field("a", desc="The answer.")],
+        instructions="Answer.",
+    )
+    assert validate_task_inputs_from_spec(spec, {}) == {"q": None}
+    assert validate_task_inputs_from_spec(spec, {"q": None}) == {"q": None}

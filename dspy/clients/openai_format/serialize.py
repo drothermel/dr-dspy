@@ -23,6 +23,7 @@ from dspy.core.types import (
     LMDocumentPart,
     LMImagePart,
     LMOpaquePart,
+    LMRefusalPart,
     LMTextPart,
     LMThinkingPart,
     LMToolCallPart,
@@ -63,6 +64,8 @@ def part_to_openai_blocks(part: Any) -> list[dict[str, Any]]:
     if isinstance(part, LMCitationPart):
         citation = " ".join(value for value in (part.title, part.text, part.url) if value)
         return [{"type": "text", "text": citation}]
+    if isinstance(part, LMRefusalPart):
+        return [{"type": "text", "text": part.text}]
     if isinstance(part, LMToolResultPart):
         return part_to_openai_blocks(LMTextPart(text="".join(part_text(value) for value in part.content)))
     return [{"type": "text", "text": str(part)}]
