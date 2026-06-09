@@ -2,23 +2,11 @@ import asyncio
 from typing import TYPE_CHECKING, Any, cast
 from uuid import uuid4
 
-from dspy._internal.lazy_import import _detect_dspy_dist
+from dspy._internal.lazy_import import import_optional
 from dspy.retrievers.types import RetrievedPassage
 
 if TYPE_CHECKING:
     import weaviate
-
-
-def _require_weaviate() -> Any:
-    try:
-        import weaviate as weaviate_module
-
-        return weaviate_module
-    except ImportError as err:
-        raise ImportError(
-            f"The 'weaviate' extra is required to use WeaviateRM. "
-            f"Install it with `pip install {_detect_dspy_dist()}[weaviate]`"
-        ) from err
 
 
 class WeaviateRM:
@@ -30,7 +18,7 @@ class WeaviateRM:
         k: int = 3,
         tenant_id: str | None = None,
     ) -> None:
-        _require_weaviate()
+        import_optional("weaviate", extra="weaviate", feature="WeaviateRM")
         self._weaviate_collection_name = weaviate_collection_name
         self._weaviate_client = weaviate_client
         self._weaviate_collection_text_key = weaviate_collection_text_key
@@ -101,7 +89,7 @@ class WeaviateRM:
 
     def insert(self, new_object_properties: dict[str, object]) -> None:
         if self._client_type == "WeaviateClient":
-            _require_weaviate()
+            import_optional("weaviate", extra="weaviate", feature="WeaviateRM")
             from weaviate.util import get_valid_uuid
 
             cast("Any", self._weaviate_collection).data.insert(

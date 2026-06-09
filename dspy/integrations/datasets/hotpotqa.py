@@ -1,11 +1,11 @@
 import random
 from typing import TYPE_CHECKING, ClassVar
 
+from dspy._internal.lazy_import import import_optional
 from dspy.datasets.dataset import Dataset
 
 if TYPE_CHECKING:
     from dspy.evaluate.metric_contract import OptimizerMetric
-from dspy.integrations.datasets.import_ import import_datasets
 
 
 class HotPotQA(Dataset):
@@ -38,7 +38,7 @@ class HotPotQA(Dataset):
             raise ValueError(
                 "Care must be taken when adding support for easy examples.Dev must be all hard to match official dev, but training can be flexible."
             )
-        load_dataset = import_datasets(feature="HotPotQA").load_dataset
+        load_dataset = import_optional("datasets", extra="datasets", feature="HotPotQA").load_dataset
         hf_official_train = load_dataset("hotpot_qa", "fullwiki", split="train")
         hf_official_dev = load_dataset("hotpot_qa", "fullwiki", split="validation")
         official_train = []

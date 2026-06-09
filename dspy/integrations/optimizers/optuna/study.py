@@ -1,11 +1,11 @@
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from dspy.integrations.optimizers.optuna.import_ import import_optuna
+from dspy._internal.lazy_import import import_optional
 
 
 def create_maximize_study(*, seed: int | None = None, feature: str = "Optuna") -> Any:
-    optuna = import_optuna(feature=feature)
+    optuna = import_optional("optuna", extra="optuna", feature=feature)
     if seed is not None:
         sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True)
         return optuna.create_study(direction="maximize", sampler=sampler)
@@ -20,7 +20,7 @@ def add_observed_trial(
     value: float,
     feature: str = "Optuna",
 ) -> None:
-    optuna = import_optuna(feature=feature)
+    optuna = import_optional("optuna", extra="optuna", feature=feature)
     trial = optuna.trial.create_trial(params=params, distributions=distributions, value=value)
     study.add_trial(trial)
 

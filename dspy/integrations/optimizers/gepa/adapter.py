@@ -5,7 +5,7 @@ from typing import Any, Callable, Protocol, TypedDict, cast
 
 from typing_extensions import override
 
-from dspy._internal.lazy_import import _detect_dspy_dist
+from dspy._internal.lazy_import import import_optional
 from dspy.adapters.types.field_type import is_field_type
 from dspy.history import TurnLog
 from dspy.integrations.optimizers.gepa.sync_bridge import run_gepa_sync
@@ -21,13 +21,9 @@ from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
 from dspy.teleprompt.core.evaluator import make_optimizer_evaluator, optimizer_lm_context
 from dspy.teleprompt.core.trace_collection import collect_trace_data, make_trace_collection_evaluator
 
-try:
-    from gepa import EvaluationBatch, GEPAAdapter
-except ImportError as err:
-    raise ImportError(
-        f"The 'gepa' extra is required to use GEPA integrations. "
-        f"Install it with `pip install {_detect_dspy_dist()}[gepa]`."
-    ) from err
+_gepa = import_optional("gepa", extra="gepa", feature="GEPA integrations")
+EvaluationBatch = _gepa.EvaluationBatch
+GEPAAdapter = _gepa.GEPAAdapter
 
 logger = logging.getLogger(__name__)
 

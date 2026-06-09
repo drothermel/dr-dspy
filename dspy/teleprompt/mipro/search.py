@@ -1,9 +1,9 @@
 import logging
 from typing import TYPE_CHECKING, Any
 
+from dspy._internal.lazy_import import import_optional
 from dspy.evaluate.evaluator import Evaluate
 from dspy.integrations.optimizers.optuna.distributions import get_param_distributions
-from dspy.integrations.optimizers.optuna.import_ import import_optuna
 from dspy.integrations.optimizers.optuna.study import add_observed_trial, create_maximize_study, run_ask_tell_loop
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
@@ -153,7 +153,7 @@ async def optimize_prompt_parameters(
     seed: int,
     run: RunContext,
 ) -> CompileResult:
-    optuna = import_optuna()
+    optuna = import_optional("optuna", extra="optuna", feature="MIPRO")
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     logger.info("==> STEP 3: FINDING OPTIMAL PROMPT PARAMETERS <==")
     logger.info(

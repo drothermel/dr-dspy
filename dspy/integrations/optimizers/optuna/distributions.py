@@ -1,6 +1,6 @@
 from typing import Any
 
-from dspy.integrations.optimizers.optuna.import_ import import_optuna
+from dspy._internal.lazy_import import import_optional
 
 
 def get_param_distributions(
@@ -8,7 +8,7 @@ def get_param_distributions(
     instruction_candidates: dict[int, list[str]],
     demo_candidates: dict[int, list] | None,
 ) -> dict[str, Any]:
-    optuna = import_optuna(feature="MIPROv2")
+    optuna = import_optional("optuna", extra="optuna", feature="MIPROv2")
     categorical_distribution = optuna.distributions.CategoricalDistribution
     param_distributions = {}
     for i in range(len(instruction_candidates)):

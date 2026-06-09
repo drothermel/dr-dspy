@@ -2,11 +2,11 @@ import random
 import re
 from typing import TYPE_CHECKING, ClassVar
 
+from dspy._internal.lazy_import import import_optional
 from dspy.datasets.dataset import Dataset
 
 if TYPE_CHECKING:
     from dspy.evaluate.metric_contract import OptimizerMetric
-from dspy.integrations.datasets.import_ import import_datasets
 
 __all__ = ["MATH", "extract_answer"]
 
@@ -26,7 +26,7 @@ class MATH(Dataset):
         test_size: int | None = None,
         input_keys: list[str] | None = None,
     ) -> None:
-        load_dataset = import_datasets(feature="MATH").load_dataset
+        load_dataset = import_optional("datasets", extra="datasets", feature="MATH").load_dataset
         ds = load_dataset("DigitalLearningGmbH/MATH-lighteval", subset)
         records = [
             {

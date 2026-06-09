@@ -1,8 +1,8 @@
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, cast
 
+from dspy._internal.lazy_import import import_optional
 from dspy.datasets.rows import rows_to_examples
-from dspy.integrations.datasets.import_ import import_datasets
 from dspy.primitives import Example
 
 __all__ = [
@@ -14,7 +14,7 @@ __all__ = [
 
 
 def _hf_datasets() -> Any:
-    return import_datasets(feature="examples_from_huggingface")
+    return import_optional("datasets", extra="datasets", feature="examples_from_huggingface")
 
 
 def _examples_from_hf_file(

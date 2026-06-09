@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, ClassVar
 
 import tqdm
 
+from dspy._internal.lazy_import import import_optional
 from dspy.datasets.dataset import Dataset
-from dspy.integrations.datasets.import_ import import_datasets
 
 if TYPE_CHECKING:
     from dspy.evaluate.metric_contract import OptimizerMetric
@@ -37,7 +37,7 @@ class GSM8K(Dataset):
             test_size=test_size,
             input_keys=input_keys or list(self.default_input_keys),
         )
-        datasets = import_datasets(feature="GSM8K")
+        datasets = import_optional("datasets", extra="datasets", feature="GSM8K")
         load_dataset = datasets.load_dataset
         dataset = load_dataset("gsm8k", "main")
         hf_official_train = dataset["train"]
