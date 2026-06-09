@@ -77,17 +77,6 @@ class LMRequest(BaseModel):
             config=config or LMConfig(),
         )
 
-    @classmethod
-    def from_prompt_or_messages(
-        cls,
-        *,
-        model: str,
-        prompt: str | None = None,
-        messages: list[dict[str, Any] | LMMessage] | None = None,
-        config: LMConfig | None = None,
-    ) -> LMRequest:
-        return cls.from_call(model=model, prompt=prompt, messages=messages, config=config)
-
     def with_config_overrides(self, config: LMConfig) -> LMRequest:
         merged = _merge_config_overrides(self.config, config.model_dump(exclude_none=True))
         return self.model_copy(update={"config": merged}, deep=True)

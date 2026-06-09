@@ -4,7 +4,7 @@ from typing import Any
 
 from dspy.core.types.config import LMToolSpec
 from dspy.core.types.messages import LMMessage
-from dspy.core.types.parts import _coerce_part
+from dspy.core.types.parts.models import _coerce_part
 
 
 def _coerce_message(value: dict[str, Any] | LMMessage) -> LMMessage:
@@ -14,10 +14,9 @@ def _coerce_message(value: dict[str, Any] | LMMessage) -> LMMessage:
 
 
 def _is_lm_response(value: Any) -> bool:
-    outputs = getattr(value, "outputs", None)
-    if not isinstance(outputs, list) or not outputs:
-        return False
-    return all(hasattr(output, "parts") for output in outputs)
+    from dspy.core.types.response import LMResponse
+
+    return isinstance(value, LMResponse)
 
 
 def _messages_from_response(response: Any) -> list[LMMessage]:

@@ -13,9 +13,8 @@ from dspy.core.types.parts import (
     LMTextPart,
     LMThinkingPart,
     LMToolCallPart,
-    _finalize_stream_part,
-    _parse_json_object,
 )
+from dspy.core.types.parts.serialize import _finalize_stream_part, _parse_json_object
 from dspy.core.types.request import LMRequest
 from dspy.core.types.response import LMOutput, LMResponse, LMUsage
 
@@ -64,6 +63,10 @@ LMAnyDelta = Annotated[
 
 class LMStreamEvent(BaseModel):
     type: str
+    model_config = ConfigDict(extra="forbid")
+
+    def to_json(self) -> str:
+        return self.model_dump_json(exclude_none=True)
 
 
 class LMStreamStartEvent(LMStreamEvent):

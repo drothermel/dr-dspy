@@ -58,35 +58,28 @@ class TaskSpec(BaseModel):
     def append(self, field: FieldSpec) -> "TaskSpec":
         if field.name in self.fields:
             raise ValueError(f"Field already exists: {field.name}")
-        if field.role == FieldRole.INPUT:
-            return self.model_copy(update={"inputs": (*self.inputs, field)})
-        return self.model_copy(update={"outputs": (*self.outputs, field)})
+        role_fields = self._role_fields(field.role)
+        return self._with_role_fields(field.role, (*role_fields, field))
 
     def prepend(self, field: FieldSpec) -> "TaskSpec":
         if field.name in self.fields:
             raise ValueError(f"Field already exists: {field.name}")
-        if field.role == FieldRole.INPUT:
-            return self.model_copy(update={"inputs": (field, *self.inputs)})
-        return self.model_copy(update={"outputs": (field, *self.outputs)})
+        role_fields = self._role_fields(field.role)
+        return self._with_role_fields(field.role, (field, *role_fields))
 
     def insert(self, index: int, field: FieldSpec) -> "TaskSpec":
         if field.name in self.fields:
             raise ValueError(f"Field already exists: {field.name}")
-        if field.role == FieldRole.INPUT:
-            fields = list(self.inputs)
-            fields.insert(index, field)
-            return self.model_copy(update={"inputs": tuple(fields)})
-        fields = list(self.outputs)
-        fields.insert(index, field)
-        return self.model_copy(update={"outputs": tuple(fields)})
+        role_fields = list(self._role_fields(field.role))
+        role_fields.insert(index, field)
+        return self._with_role_fields(field.role, tuple(role_fields))
 
     def delete(self, name: str) -> "TaskSpec":
         if name not in self.fields:
             raise KeyError(f"Unknown field: {name}")
         field = self.fields[name]
-        if field.role == FieldRole.INPUT:
-            return self.model_copy(update={"inputs": tuple(f for f in self.inputs if f.name != name)})
-        return self.model_copy(update={"outputs": tuple(f for f in self.outputs if f.name != name)})
+        role_fields = tuple(f for f in self._role_fields(field.role) if f.name != name)
+        return self._with_role_fields(field.role, role_fields)
 
     def fingerprint(self) -> str:
         payload = {
@@ -132,9 +125,14 @@ class TaskSpec(BaseModel):
         ]
         return "\n".join(lines)
 
+    def _role_fields(self, role: FieldRole) -> tuple[FieldSpec, ...]:
+        return self.inputs if role == FieldRole.INPUT else self.outputs
+
+    def _with_role_fields(self, role: FieldRole, fields: tuple[FieldSpec, ...]) -> "TaskSpec":
+        if role == FieldRole.INPUT:
+            return self.model_copy(update={"inputs": fields})
+        return self.model_copy(update={"outputs": fields})
+
     def _replace_field(self, name: str, field: FieldSpec) -> "TaskSpec":
-        if field.role == FieldRole.INPUT:
-            inputs = tuple(field if f.name == name else f for f in self.inputs)
-            return self.model_copy(update={"inputs": inputs})
-        outputs = tuple(field if f.name == name else f for f in self.outputs)
-        return self.model_copy(update={"outputs": outputs})
+        role_fields = tuple(field if f.name == name else f for f in self._role_fields(field.role))
+        return self._with_role_fields(field.role, role_fields)
