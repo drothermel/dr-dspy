@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import subprocess
+from os import PathLike
 from pathlib import Path
 from typing import IO, TYPE_CHECKING
 
@@ -33,6 +34,32 @@ def get_runner_path() -> str:
     return str(Path(__file__).resolve().parent.parent / "runner.js")
 
 
+def _build_sandbox_virtual_paths(paths_to_mount: list[PathLike[str] | str]) -> dict[str, str]:
+    basename_counts: dict[str, int] = {}
+    for path in paths_to_mount:
+        if not path:
+            continue
+        basename = Path(path).name
+        basename_counts[basename] = basename_counts.get(basename, 0) + 1
+    host_to_virtual: dict[str, str] = {}
+    basename_seen: dict[str, int] = {}
+    for path in paths_to_mount:
+        if not path:
+            continue
+        host_path = canonicalize_path(path)
+        if host_path in host_to_virtual:
+            continue
+        basename = Path(path).name
+        if basename_counts[basename] > 1:
+            index = basename_seen.get(basename, 0)
+            basename_seen[basename] = index + 1
+            virtual_path = f"/sandbox/{index}_{basename}"
+        else:
+            virtual_path = f"/sandbox/{basename}"
+        host_to_virtual[host_path] = virtual_path
+    return host_to_virtual
+
+
 def mount_files(interpreter: "PythonInterpreter") -> None:
     if interpreter._mounted_files:
         return
@@ -43,6 +70,7 @@ def mount_files(interpreter: "PythonInterpreter") -> None:
         paths_to_mount.extend(interpreter.enable_write_paths)
     if not paths_to_mount:
         return
+    interpreter._sandbox_virtual_paths = _build_sandbox_virtual_paths(paths_to_mount)
     for path in paths_to_mount:
         if not path:
             continue
@@ -52,8 +80,8 @@ def mount_files(interpreter: "PythonInterpreter") -> None:
                 path_obj.open("a").close()
             else:
                 raise FileNotFoundError(f"Cannot mount non-existent file: {path}")
-        virtual_path = f"/sandbox/{path_obj.name}"
         host_path = canonicalize_path(path)
+        virtual_path = interpreter._sandbox_virtual_paths[host_path]
         send_request(
             interpreter=interpreter,
             method="mount_file",
@@ -67,8 +95,8 @@ def sync_files(interpreter: "PythonInterpreter") -> None:
     if not interpreter.enable_write_paths or not interpreter.sync_files:
         return
     for path in interpreter.enable_write_paths:
-        virtual_path = f"/sandbox/{Path(path).name}"
         host_path = canonicalize_path(path)
+        virtual_path = interpreter._sandbox_virtual_paths.get(host_path, f"/sandbox/{Path(path).name}")
         sync_msg = jsonrpc_notification("sync_file", {"virtual_path": virtual_path, "host_path": host_path})
         stdin = deno_stdin(interpreter)
         stdin.write(sync_msg + "\n")
@@ -79,6 +107,7 @@ def ensure_deno_process(interpreter: "PythonInterpreter") -> None:
     if interpreter.deno_process is None or interpreter.deno_process.poll() is not None:
         interpreter._tools_registered = False
         interpreter._mounted_files = False
+        interpreter._sandbox_virtual_paths = {}
         try:
             interpreter.deno_process = subprocess.Popen(
                 interpreter.deno_command,

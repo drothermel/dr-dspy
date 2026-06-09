@@ -107,6 +107,29 @@ def test_enable_read_paths_symlink(tmp_path):
         assert result == "through symlink"
 
 
+def test_enable_read_paths_same_basename_different_dirs(tmp_path):
+    dir_a = tmp_path / "a"
+    dir_b = tmp_path / "b"
+    dir_a.mkdir()
+    dir_b.mkdir()
+    file_a = dir_a / "data.txt"
+    file_b = dir_b / "data.txt"
+    file_a.write_text("from dir a")
+    file_b.write_text("from dir b")
+    with PythonInterpreter(enable_read_paths=[str(file_a), str(file_b)]) as interpreter:
+        code = (
+            "contents = {}\n"
+            "for name in sorted(__import__('os').listdir('/sandbox')):\n"
+            "    with open(f'/sandbox/{name}') as fh:\n"
+            "        contents[name] = fh.read()\n"
+            "contents"
+        )
+        result = interpreter.execute(code)
+        assert set(result) == {"0_data.txt", "1_data.txt"}
+        assert result["0_data.txt"] == "from dir a"
+        assert result["1_data.txt"] == "from dir b"
+
+
 def test_enable_read_paths_multiple_files(tmp_path):
     file1 = tmp_path / "test1.txt"
     file2 = tmp_path / "test2.txt"

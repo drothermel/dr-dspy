@@ -78,6 +78,7 @@ class PythonInterpreter:
             self.deno_command = args
         self.deno_process: subprocess.Popen[str] | None = None
         self._mounted_files = False
+        self._sandbox_virtual_paths: dict[str, str] = {}
         self._request_id = 0
         self._owner_thread: int | None = None
         self._pending_large_vars = {}
