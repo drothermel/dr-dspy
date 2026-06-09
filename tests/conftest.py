@@ -2,6 +2,7 @@ import os
 
 import pytest
 
+from tests.test_utils.run_binding import collect_run_binding_violations
 from tests.test_utils.server import litellm_test_server, read_litellm_test_server_request_logs  # noqa: F401
 
 SKIP_DEFAULT_FLAGS = ["reliability", "extra", "llm_call", "deno"]
@@ -71,6 +72,19 @@ def pytest_collection_modifyitems(config, items):
         for item in items:
             if flag in item.keywords:
                 item.add_marker(skip_mark)
+
+
+def pytest_collection_finish(session):
+    # xdist workers collect in parallel; validate once on the controller.
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return
+    violations = collect_run_binding_violations()
+    if not violations:
+        return
+    message = "Unbound run=run in tests (use run fixture or run = make_run(...)):\n" + "\n".join(
+        v.format() for v in violations
+    )
+    pytest.exit(message, returncode=1)
 
 
 @pytest.fixture
