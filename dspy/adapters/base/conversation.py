@@ -9,19 +9,21 @@ from dspy.adapters.base.tool_calls import (
     _tool_calls_from_message,
     _tool_result_content,
 )
-from dspy.adapters.types.history import History
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.utils import build_lm_message
 from dspy.core.types import LMMessage
+from dspy.history.turn_log import is_turn_log_type
 from dspy.task_spec import TaskSpec
 
 
 class AdapterConversationMixin(AdapterMixinBase):
-    def _get_history_field_name(self, task_spec: TaskSpec) -> str | None:
+    def _get_turn_log_field_name(self, task_spec: TaskSpec) -> str | None:
         for name, field in task_spec.input_fields.items():
-            if field.type_ == History:
+            if is_turn_log_type(field.type_):
                 return name
         return None
+
+    _get_history_field_name = _get_turn_log_field_name
 
     def _get_tool_call_input_field_name(self, task_spec: TaskSpec) -> str | None:
         for name, field in task_spec.input_fields.items():
@@ -42,7 +44,8 @@ class AdapterConversationMixin(AdapterMixinBase):
     def format_conversation_history(
         self, task_spec: TaskSpec, history_field_name: str, inputs: dict[str, Any]
     ) -> list[LMMessage]:
-        conversation_history = inputs[history_field_name].messages if history_field_name in inputs else None
+        turn_log = inputs.get(history_field_name)
+        conversation_history = turn_log.turns if turn_log is not None else None
         if conversation_history is None:
             return []
         messages = []
@@ -98,5 +101,5 @@ class AdapterConversationMixin(AdapterMixinBase):
                 result_input = {"tool_call_results": tool_call_results}
                 content = self.format_user_message_content(task_spec=ToolCallResultsTaskSpec(), inputs=result_input)
                 messages.append(build_lm_message(role="user", content=content))
-        del inputs[history_field_name]
+        inputs.pop(history_field_name, None)
         return messages

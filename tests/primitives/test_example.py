@@ -1,6 +1,6 @@
 import pytest
 
-from dspy.adapters.types.history import History
+from dspy.history import TurnLog
 from dspy.adapters.types.image import Image
 from dspy.primitives.example import Example
 
@@ -126,24 +126,22 @@ def test_example_to_dict():
 
 
 def test_example_to_dict_with_history():
-    history = History(
-        messages=[
+    history = TurnLog(turns=(
             {"question": "What is the capital of France?", "answer": "Paris"},
             {"question": "What is the capital of Germany?", "answer": "Berlin"},
-        ]
-    )
+        ))
     example = Example.from_record({"question": "Test question", "history": history, "answer": "Test answer"})
     result = example.to_dict()
     assert isinstance(result, dict)
     assert "history" in result
     assert isinstance(result["history"], dict)
-    assert "messages" in result["history"]
-    assert result["history"]["messages"] == [
+    assert "turns" in result["history"]
+    assert result["history"]["turns"] == (
         {"question": "What is the capital of France?", "answer": "Paris"},
         {"question": "What is the capital of Germany?", "answer": "Berlin"},
-    ]
+    )
     import json
 
     json_str = json.dumps(result)
     restored = json.loads(json_str)
-    assert restored["history"]["messages"] == result["history"]["messages"]
+    assert list(restored["history"]["turns"]) == list(result["history"]["turns"])

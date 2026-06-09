@@ -5,11 +5,11 @@ from typing import Any, get_args
 
 import pydantic
 
-from dspy.adapters.types.history import History
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
 from dspy.core.types.config import LMConfig, LMToolChoice
+from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
@@ -65,7 +65,7 @@ class ReActV2(Module):
             fields[name] = input_field(
                 name, _optional_annotation(field.type_), desc=field.desc if field.desc != f"${{{name}}}" else None
             )
-        fields["history"] = input_field("history", History)
+        fields["history"] = input_field("history", TurnLog)
         fields["tools"] = input_field("tools", list[Tool])
         fields["next_thought"] = output_field("next_thought", Reasoning)
         fields["tool_calls"] = output_field("tool_calls", ToolCalls)
@@ -121,7 +121,7 @@ class ReActV2(Module):
             event = self._history_event(pending_inputs, pred, tool_calls, tool_call_results)
             if final_outputs is not None:
                 event.update(final_outputs)
-            _append_history_event(history, event)
+            history = history.append_turn(event)
             pending_inputs = {}
             if final_outputs is not None:
                 return Prediction(**final_outputs, history=history, termination_reason="submit")
@@ -165,7 +165,7 @@ class ReActV2(Module):
 
     async def _forced_submit(
         self,
-        history: History,
+        history: TurnLog,
         pending_inputs: dict[str, Any],
         break_reason: str,
         turn_index: int,
@@ -196,7 +196,7 @@ class ReActV2(Module):
         event = self._history_event(pending_inputs, pred, submit_calls, tool_call_results)
         if final_outputs is not None:
             event.update(final_outputs)
-        _append_history_event(history, event)
+        history = history.append_turn(event)
         if final_outputs is not None:
             return Prediction(**final_outputs, history=history, termination_reason="forced_submit")
         return Prediction(history=history, termination_reason=break_reason or "failed")
@@ -218,12 +218,16 @@ def _optional_annotation(annotation: Any) -> Any:
         return annotation
 
 
-def _coerce_history(history: Any) -> History:
+def _coerce_history(history: Any) -> TurnLog:
     if history is None:
-        return History(messages=[])
-    if isinstance(history, History):
+        return TurnLog.empty()
+    if isinstance(history, TurnLog):
         return history
-    return History.model_validate(history)
+    if isinstance(history, dict) and "messages" in history:
+        return TurnLog(turns=tuple(history["messages"]))
+    if isinstance(history, dict) and "turns" in history:
+        return TurnLog.model_validate(history)
+    return TurnLog.model_validate(history)
 
 
 def _coerce_tool_calls(tool_calls: Any) -> ToolCalls:
@@ -239,11 +243,6 @@ def _ensure_tool_call_ids(tool_calls: ToolCalls, turn_index: int) -> ToolCalls:
             tool_call = tool_call.model_copy(update={"id": f"call_{turn_index}_{call_index}"})
         ensured.append(tool_call)
     return ToolCalls(tool_calls=ensured)
-
-
-def _append_history_event(history: History, event: dict[str, Any]) -> None:
-    if event:
-        history.messages.append(event)
 
 
 def _fmt_exc(err: BaseException, *, limit: int = 5) -> str:

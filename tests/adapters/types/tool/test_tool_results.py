@@ -1,4 +1,4 @@
-from dspy.adapters.types.history import History
+from dspy.history import TurnLog
 from dspy.adapters.types.tool import ToolCallResults, ToolCalls
 
 
@@ -24,11 +24,11 @@ def test_tool_call_results_history_serialization_round_trip():
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "hello"})
     results = ToolCallResults.from_tool_calls_and_values([tool_call], [{"answer": "world"}])
     tool_calls = ToolCalls(tool_calls=[tool_call], tool_call_results=results)
-    history = History(messages=[{"tool_calls": tool_calls}])
+    history = TurnLog(turns=({"tool_calls": tool_calls}))
     dumped = history.model_dump(mode="json")
-    restored = History.model_validate(dumped)
+    restored = TurnLog.model_validate(dumped)
     assert dumped == {
-        "messages": [
+        "turns": [
             {
                 "tool_calls": {
                     "tool_calls": [{"name": "search", "args": {"query": "hello"}}],
@@ -41,4 +41,4 @@ def test_tool_call_results_history_serialization_round_trip():
             }
         ]
     }
-    assert restored.messages == dumped["messages"]
+    assert restored.turns == tuple(dumped["turns"])

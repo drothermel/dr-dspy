@@ -13,7 +13,7 @@ except ImportError:
     pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.adapters.format_shared import FieldInfoWithName
 from dspy.adapters.types.code import Code
-from dspy.adapters.types.history import History
+from dspy.history import TurnLog
 from dspy.adapters.types.image import Image
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.xml_adapter import XMLAdapter
@@ -307,7 +307,7 @@ def test_xml_adapter_format_exact_non_native_tool_result_history_field():
     ToolHistorySignature = make_task_spec(
         {
             "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=History),
+            "history": FieldSpec.input("history", type_=TurnLog),
             "tools": FieldSpec.input("tools", type_=list[Tool]),
             "next_thought": FieldSpec.output("next_thought"),
             "tool_calls": FieldSpec.output("tool_calls", type_=ToolCalls),
@@ -322,15 +322,13 @@ def test_xml_adapter_format_exact_non_native_tool_result_history_field():
         demos=[],
         inputs={
             "question": "Q2",
-            "history": History(
-                messages=[
+            "history": TurnLog(turns=(
                     {
                         "question": "Q1",
                         "next_thought": "I should search.",
                         "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
                     }
-                ]
-            ),
+                )),
             "tools": [Tool(search, description="Search for documents.")],
         },
     )
@@ -420,7 +418,7 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
 
     RichRenderingSignature = make_task_spec(
         {
-            "history": FieldSpec.input("history", type_=History),
+            "history": FieldSpec.input("history", type_=TurnLog),
             "image": FieldSpec.input("image", type_=Image),
             "tools": FieldSpec.input("tools", type_=list[Tool]),
             "profile": FieldSpec.input("profile", type_=Profile),
@@ -434,15 +432,13 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
     current_profile = Profile(
         name="Grace", location=Location(city="Arlington", country="USA"), interests=["compilers", "navy"]
     )
-    history = History(
-        messages=[
+    history = TurnLog(turns=(
             {
                 "profile": demo_profile,
                 "question": "Who is Ada?",
                 "answer": AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
             }
-        ]
-    )
+        ))
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=XMLAdapter(),
         task_spec=RichRenderingSignature,
@@ -466,7 +462,7 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
     expected_messages = [
         {
             "role": "system",
-            "content": 'Your input fields are:\n1. `history` (History): \n2. `image` (Image): \n3. `tools` (list[Tool]): \n4. `profile` (Profile): \n5. `question` (str):\nYour output fields are:\n1. `answer` (AnswerCard):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<history>\n{history}\n</history>\n\n<image>\n{image}\n</image>\n\n<tools>\n{tools}\n</tools>\n\n<profile>\n{profile}\n</profile>\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, "sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, "required": ["answer", "sources"], "title": "AnswerCard"}\n</answer>\nIn adhering to this structure, your objective is: \n        Answer using all supplied context.',
+            "content": 'Your input fields are:\n1. `history` (TurnLog): \n2. `image` (Image): \n3. `tools` (list[Tool]): \n4. `profile` (Profile): \n5. `question` (str):\nYour output fields are:\n1. `answer` (AnswerCard):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<history>\n{history}\n</history>\n\n<image>\n{image}\n</image>\n\n<tools>\n{tools}\n</tools>\n\n<profile>\n{profile}\n</profile>\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, "sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, "required": ["answer", "sources"], "title": "AnswerCard"}\n</answer>\nIn adhering to this structure, your objective is: \n        Answer using all supplied context.',
         },
         {
             "role": "user",

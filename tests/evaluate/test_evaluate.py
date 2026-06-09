@@ -7,7 +7,7 @@ import threading
 import pytest
 from typing_extensions import override
 
-from dspy.adapters.types.history import History
+from dspy.history import TurnLog
 from dspy.evaluate.evaluate import Evaluate, EvaluationResult
 from dspy.evaluate.metrics import answer_exact_match
 from dspy.predict.predict import Predict
@@ -214,13 +214,11 @@ def test_evaluation_result_repr(make_run):
 
 def test_evaluate_save_as_json_with_history(make_run):
     run = make_run(lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
-    history1 = History(messages=[{"question": "Previous Q1", "answer": "Previous A1"}])
-    history2 = History(
-        messages=[
+    history1 = TurnLog(turns=({"question": "Previous Q1", "answer": "Previous A1"}))
+    history2 = TurnLog(turns=(
             {"question": "Previous Q2", "answer": "Previous A2"},
             {"question": "Previous Q3", "answer": "Previous A3"},
-        ]
-    )
+        ))
     devset = [
         Example.from_record({"question": "What is 1+1?", "answer": "2", "history": history1}, input_keys=("question",)),
         Example.from_record({"question": "What is 2+2?", "answer": "4", "history": history2}, input_keys=("question",)),
@@ -255,7 +253,7 @@ def test_evaluate_save_as_json_with_history(make_run):
 
 def test_evaluate_save_as_csv_with_history(make_run):
     run = make_run(lm=DummyLM({"What is 1+1?": {"answer": "2"}}))
-    history = History(messages=[{"question": "Previous Q", "answer": "Previous A"}])
+    history = TurnLog(turns=({"question": "Previous Q", "answer": "Previous A"}))
     devset = [
         Example.from_record({"question": "What is 1+1?", "answer": "2", "history": history}, input_keys=("question",))
     ]

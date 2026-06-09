@@ -10,8 +10,8 @@ from gepa import EvaluationBatch, GEPAAdapter
 from typing_extensions import override
 
 from dspy.adapters.types.base_type import Type
-from dspy.adapters.types.history import History
 from dspy.evaluate.evaluate import Evaluate
+from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
@@ -241,13 +241,13 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                 contains_history = False
                 history_key_name = None
                 for input_key, input_val in inputs.items():
-                    if isinstance(input_val, History):
+                    if isinstance(input_val, TurnLog):
                         contains_history = True
                         assert history_key_name is None
                         history_key_name = input_key
                 if contains_history:
                     s = "```json\n"
-                    for i, message in enumerate(inputs[history_key_name].messages):
+                    for i, message in enumerate(inputs[history_key_name].turns):
                         s += f"  {i}: {message}\n"
                     s += "```"
                     new_inputs["Context"] = s

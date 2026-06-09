@@ -61,7 +61,7 @@ def _parse_type_node(node, names: dict[str, Any]) -> Any:
         "Audio": "dspy.adapters.types.audio",
         "Code": "dspy.adapters.types.code",
         "File": "dspy.adapters.types.file",
-        "History": "dspy.adapters.types.history",
+        "TurnLog": "dspy.history.turn_log",
         "Image": "dspy.adapters.types.image",
         "Reasoning": "dspy.adapters.types.reasoning",
         "Tool": "dspy.adapters.types.tool",

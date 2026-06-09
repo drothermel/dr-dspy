@@ -53,10 +53,10 @@ def test_react_v2_text_mock_lm_loop_records_inputs_once(make_run):
     )
     assert pred.answer == "found cats"
     assert pred.termination_reason == "submit"
-    assert sum("question" in event for event in pred.history.messages) == 1
-    assert pred.history.messages[0]["tool_calls"].tool_calls[0].id == "call_0_0"
-    assert "tool_call_results" not in pred.history.messages[0]
-    assert pred.history.messages[0]["tool_calls"].tool_call_results.tool_call_results[0].call_id == "call_0_0"
+    assert sum("question" in event for event in pred.history.turns) == 1
+    assert pred.history.turns[0]["tool_calls"].tool_calls[0].id == "call_0_0"
+    assert "tool_call_results" not in pred.history.turns[0]
+    assert pred.history.turns[0]["tool_calls"].tool_call_results.tool_call_results[0].call_id == "call_0_0"
 
 
 def test_react_v2_continuation_omits_missing_original_inputs(make_run):
@@ -115,7 +115,7 @@ def test_react_v2_text_mode_accepts_top_level_tool_arguments(make_run):
     )
     assert pred.answer == "found cats"
     assert pred.termination_reason == "submit"
-    assert pred.history.messages[0]["tool_calls"].tool_calls[0].args == {"query": "cats"}
+    assert pred.history.turns[0]["tool_calls"].tool_calls[0].args == {"query": "cats"}
 
 
 def test_react_v2_text_mode_accepts_wrapped_submit_arguments(make_run):
@@ -148,7 +148,7 @@ def test_react_v2_unknown_tool_observation_can_continue(make_run):
     )
     run = make_run(lm=lm, adapter=ChatAdapter())
     pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(question="cats", run=run))
-    first_result = pred.history.messages[0]["tool_calls"].tool_call_results.tool_call_results[0]
+    first_result = pred.history.turns[0]["tool_calls"].tool_call_results.tool_call_results[0]
     assert first_result.is_error is True
     assert first_result.call_id == "call_0_0"
     assert "Unknown tool" in first_result.value
@@ -169,8 +169,8 @@ def test_react_v2_accepts_serialized_history_input(make_run):
         ReActV2(ts("question -> answer"), tools=[])(history={"messages": [{"question": "old"}]}, run=run)
     )
     assert pred.answer == "done"
-    assert pred.history.messages[0] == {"question": "old"}
-    assert all(event for event in pred.history.messages)
+    assert pred.history.turns[0] == {"question": "old"}
+    assert all(event for event in pred.history.turns)
 
 
 def test_react_v2_forced_submit_on_empty_tool_calls(make_run):
@@ -289,9 +289,9 @@ def test_react_v2_native_tool_loop_replays_tool_result_with_provider_id(make_run
         )
     )
     assert pred.answer == "found cats"
-    assert pred.history.messages[0]["tool_calls"].tool_calls[0].id == "call_provider_1"
-    assert "tool_call_results" not in pred.history.messages[0]
-    assert pred.history.messages[0]["tool_calls"].tool_call_results.tool_call_results[0].call_id == "call_provider_1"
+    assert pred.history.turns[0]["tool_calls"].tool_calls[0].id == "call_provider_1"
+    assert "tool_call_results" not in pred.history.turns[0]
+    assert pred.history.turns[0]["tool_calls"].tool_call_results.tool_call_results[0].call_id == "call_provider_1"
     assert any(
         message["role"] == "tool" and message["tool_call_id"] == "call_provider_1"
         for message in (message_to_openai_chat(item) for item in lm.calls[1]["messages"])
@@ -313,12 +313,12 @@ def test_react_v2_native_parallel_tool_calls_are_requested_and_replayed(make_run
     )
     assert pred.answer == "found cats and found dogs"
     assert lm.calls[0]["kwargs"]["parallel_tool_calls"] is True
-    assert [call.id for call in pred.history.messages[0]["tool_calls"].tool_calls] == [
+    assert [call.id for call in pred.history.turns[0]["tool_calls"].tool_calls] == [
         "call_provider_1",
         "call_provider_2",
     ]
     assert [
-        result.call_id for result in pred.history.messages[0]["tool_calls"].tool_call_results.tool_call_results
+        result.call_id for result in pred.history.turns[0]["tool_calls"].tool_call_results.tool_call_results
     ] == ["call_provider_1", "call_provider_2"]
     assert [
         message["tool_call_id"]

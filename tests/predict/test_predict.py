@@ -22,7 +22,7 @@ from pydantic import BaseModel, HttpUrl
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
-from dspy.adapters.types.history import History
+from dspy.history import TurnLog
 from dspy.adapters.types.image import Image
 from dspy.clients.base_lm import LM_CLASS_STATE_KEY, PROVIDER_OPTIONS_STATE_KEY, BaseLM
 from dspy.clients.lm import LM
@@ -707,7 +707,7 @@ def test_call_predict_with_chat_history(adapter_type, make_run):
     MySignature = make_task_spec(
         {
             "question": FieldSpec.input("question"),
-            "history": FieldSpec.input("history", type_=History),
+            "history": FieldSpec.input("history", type_=TurnLog),
             "answer": FieldSpec.output("answer"),
         },
         instructions="Answer with chat history.",
@@ -723,7 +723,7 @@ def test_call_predict_with_chat_history(adapter_type, make_run):
     asyncio.run(
         program(
             question="are you sure that's correct?",
-            history=History(messages=[{"question": "what's the capital of france?", "answer": "paris"}]),
+            history=TurnLog(turns=({"question": "what's the capital of france?", "answer": "paris"})),
             run=run,
         )
     )

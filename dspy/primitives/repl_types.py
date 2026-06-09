@@ -108,6 +108,17 @@ class REPLHistory(pydantic.BaseModel):
     def serialize_model(self) -> str:
         return self.format()
 
+    @classmethod
+    def empty(cls) -> REPLHistory:
+        return cls()
+
+    def append_turn(self, event: dict[str, Any]) -> REPLHistory:
+        return self.append(
+            reasoning=str(event.get("reasoning", "")),
+            code=str(event.get("code", "")),
+            output=str(event.get("output", "")),
+        )
+
     def append(self, *, reasoning: str = "", code: str, output: str) -> REPLHistory:
         new_entry = REPLEntry(reasoning=reasoning, code=code, output=output)
         return REPLHistory(entries=list(self.entries) + [new_entry], max_output_chars=self.max_output_chars)

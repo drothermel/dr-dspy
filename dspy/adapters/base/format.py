@@ -11,19 +11,19 @@ from dspy.task_spec import TaskSpec
 class AdapterFormatMixin(AdapterMixinBase):
     def format(self, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any]) -> list[LMMessage]:
         inputs_copy = dict(inputs)
-        history_field_name = self._get_history_field_name(task_spec)
+        turn_log_field_name = self._get_turn_log_field_name(task_spec)
         task_spec_without_history = task_spec
         conversation_history: list[LMMessage] = []
-        if history_field_name:
-            task_spec_without_history = task_spec.delete(history_field_name)
+        if turn_log_field_name:
+            task_spec_without_history = task_spec.delete(turn_log_field_name)
             conversation_history = self.format_conversation_history(
-                task_spec=task_spec, history_field_name=history_field_name, inputs=inputs_copy
+                task_spec=task_spec, history_field_name=turn_log_field_name, inputs=inputs_copy
             )
         messages: list[LMMessage] = []
         system_message = self.format_system_message(task_spec)
         messages.append(build_lm_message(role="system", content=system_message))
         messages.extend(self.format_demos(task_spec=task_spec, demos=demos))
-        if history_field_name:
+        if turn_log_field_name:
             content = self.format_user_message_content(
                 task_spec=task_spec_without_history, inputs=inputs_copy, main_request=True
             )

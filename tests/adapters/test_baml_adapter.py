@@ -15,7 +15,7 @@ except ImportError:
 from dspy.adapters.baml_adapter import COMMENT_SYMBOL, INDENTATION, BAMLAdapter
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types.code import Code
-from dspy.adapters.types.history import History
+from dspy.history import TurnLog
 from dspy.adapters.types.image import Image
 from dspy.adapters.types.tool import Tool
 from dspy.clients.lm import LM
@@ -389,18 +389,16 @@ def test_baml_adapter_with_code():
 def test_baml_adapter_with_conversation_history():
     TestSignature = make_task_spec(
         {
-            "history": FieldSpec.input("history", type_=History),
+            "history": FieldSpec.input("history", type_=TurnLog),
             "question": FieldSpec.input("question"),
             "answer": FieldSpec.output("answer"),
         },
         instructions="Given the fields `history`, `question`, produce the fields `answer`.",
     )
-    history = History(
-        messages=[
+    history = TurnLog(turns=(
             {"question": "What is the patient's age?", "answer": "45 years old"},
             {"question": "Any allergies?", "answer": "Penicillin allergy"},
-        ]
-    )
+        ))
     adapter = BAMLAdapter()
     messages = adapter_format_as_openai(
         adapter=adapter,
