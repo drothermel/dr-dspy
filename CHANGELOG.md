@@ -13,6 +13,11 @@
 - Removed `ParallelExecutor` thread pools; batch execution uses `asyncio`-bounded concurrency.
 - `BaseLM` and `Adapter` are async-only: `await lm(request)`, `await adapter.acall(lm=..., ...)`.
 - `Module.acall` and `BaseLM.acall` remain as aliases for `__call__` (may be removed in a future release).
+- History system refactor (see `docs/migration/history.md`):
+  - `History` → `TurnLog`; agent field `history` → `turn_log`; ReAct/CodeAct `trajectory` → `turn_log`.
+  - `LMHistoryEntry` → `CallRecord`; `lm/module.history` → `call_log`; removed `GLOBAL_HISTORY` / `inspect_history()`.
+  - `run.trace` → `run.optimization_trace`; telemetry unified under `TelemetryConfig.call_log` (`CallLogMode`).
+  - Disk logging scoped to `RunContext.log_session`; use `run.inspect_call_log()` / `run.read_call_log()`.
 
 ### Migration
 

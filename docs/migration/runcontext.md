@@ -11,10 +11,10 @@ DSPy no longer uses the legacy global `settings` singleton. Pass an explicit `Ru
 | `settings.context(lm=..., adapter=...)` | `run = run.fork(lm=..., adapter=...)` |
 | `settings.lm` | `run.lm` |
 | `settings.adapter` | `run.adapter` |
-| `settings.trace` | `run.trace` |
+| `settings.trace` | `run.optimization_trace` |
 | `settings.callbacks` | `run.callbacks` |
 | `settings.track_usage` | `run.telemetry.track_usage` |
-| `settings.disable_history` | `run.telemetry.disable_history` |
+| `settings.disable_history` | `run.telemetry.call_log=CallLogMode.off` |
 | `settings.get("transparency", "strict")` | `run.telemetry.transparency` |
 | `await module(...)` | `await module(..., run=run)` |
 | `await predict(..., lm=..., config=...)` | `await predict(..., run=run, options=PredictOptions(lm=..., config=...))` |
@@ -55,9 +55,9 @@ result = asyncio.run(
 Opt down for legacy behavior:
 
 ```python
-from dspy.runtime import TelemetryConfig
+from dspy.runtime import CallLogMode, TelemetryConfig
 
-telemetry = TelemetryConfig(transparency="off", run_log_enabled=False)
+telemetry = TelemetryConfig(transparency="off", call_log=CallLogMode.off)
 run = RunContext.create(lm=lm, adapter=adapter, telemetry=telemetry, init_run_log=False)
 ```
 
@@ -68,7 +68,7 @@ Replace `settings.context(...)` with `run.fork(...)` and pass the forked run to 
 ```python
 from dspy.core.types import PredictOptions
 
-child = run.fork(lm=other_lm, trace=[])
+child = run.fork(lm=other_lm, optimization_trace=[], call_log=[])
 result = await predict(question="...", run=child)
 result = await predict(
     question="...",
@@ -101,7 +101,9 @@ Environment variables:
 - `DSPY_LOG_DIR` — root directory for run logs (default: `logs/` relative to cwd)
 - `DSPY_RUN_ID` — experiment bucket name (default: `default_run`)
 
-When `telemetry.run_log_enabled=True`, `RunContext.create(...)` creates `{DSPY_LOG_DIR}/{DSPY_RUN_ID}/{timestamp}/` with `run.json` and append-only `calls.jsonl` for every LM call.
+When `telemetry.call_log` is `disk` or `both`, `RunContext.create(...)` creates `{DSPY_LOG_DIR}/{DSPY_RUN_ID}/{timestamp}/` with `run.json` and append-only `calls.jsonl` for every LM call.
+
+Inspect calls with `run.inspect_call_log()` or `run.read_call_log()`. See `docs/migration/history.md` for the full agent vs call vs optimization vocabulary.
 
 Optimizer/bootstrap teacher contexts must include a configured `adapter` (use `optimizer_lm_context` from `dspy.teleprompt.utils`).
 

@@ -35,7 +35,7 @@ Fields:
 | `config` | Merge an `LMConfig` patch for this call |
 | `demos` | Override few-shot demos |
 | `task_spec` | Override the task spec for this call |
-| `trace` | Whether to append to `run.trace` (default `True`) |
+| `trace` | Whether to append to `run.optimization_trace` (default `True`) |
 | `prediction` | Provider predicted-output hint (OpenAI-style content prediction) |
 
 Before:

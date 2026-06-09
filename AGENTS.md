@@ -75,9 +75,10 @@ from dspy.adapters.types.tool import Tool
 tool = Tool(my_func, description="Describe what the tool does.")
 ```
 
-ReAct, CodeAct, RLM, and ReActV2 require `tools=[Tool(...)]` (raw callables are rejected).
+ReAct, CodeAct, RLM, and ReActV2 require `tools=[Tool(...)]` (raw callables are rejected). Agent modules return `turn_log` (`TurnLog` or `REPLHistory`) on predictions.
 
 See `docs/migration/taskspec.md` for the full Signature → TaskSpec translation table.
+See `docs/migration/history.md` for turn logs vs call logs vs optimization traces.
 
 Field descriptions must be explicit under strict transparency (placeholder `${field}` descs are rejected).
 
@@ -91,7 +92,7 @@ import asyncio
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
 from dspy.core.types import LMProviderOptions
-from dspy.runtime import RunContext, TelemetryConfig
+from dspy.runtime import CallLogMode, RunContext, TelemetryConfig
 
 run = RunContext.create(
     lm=LM(
@@ -106,16 +107,17 @@ run = RunContext.create(
 result = asyncio.run(program(question="What is DSPy?", run=run))
 ```
 
-Opt down for legacy behavior: `TelemetryConfig(transparency="off", run_log_enabled=False)` on `RunContext.create`.
+Opt down for legacy behavior: `TelemetryConfig(transparency="off", call_log=CallLogMode.off)` on `RunContext.create`.
 
 Environment variables:
 
 - `DSPY_LOG_DIR` — root directory for run logs (default: `logs/` relative to cwd)
 - `DSPY_RUN_ID` — experiment bucket name (default: `default_run`)
 
-Each `RunContext.create(...)` with `run_log_enabled=True` creates `{DSPY_LOG_DIR}/{DSPY_RUN_ID}/{timestamp}/` with `run.json` and append-only `calls.jsonl` for every LM call.
+Each `RunContext.create(...)` with `call_log` in `(disk, both)` creates `{DSPY_LOG_DIR}/{DSPY_RUN_ID}/{timestamp}/` with `run.json` and append-only `calls.jsonl` for every LM call. Use `run.inspect_call_log()` or `run.read_call_log()` to inspect calls.
 
 See `docs/migration/runcontext.md` for the full settings → RunContext translation table.
+See `docs/migration/history.md` for turn logs, call logs, and optimization traces.
 
 ## Strict call-site kwargs
 
