@@ -717,6 +717,8 @@ day-to-day modification once the main boundaries are stable.
 
 ### P5.1 Split primitive god modules and dynamic record helpers
 
+**Status:** Done (2026-06).
+
 **Sources:** Both reviews; Manual review.
 
 Problem:
@@ -743,6 +745,15 @@ Details to preserve:
 - Keep `Module.batch()` as a thin `Parallel` wrapper unless the runtime move
   creates a better import path.
 - Keep current primitive import paths re-exported while internals move.
+
+**Delivered:** `RecordBacked` in `dspy/primitives/record_backed.py` resolves API
+methods before store fallback and blocks setattr on colliding API names;
+`module_graph.py`, `module_copy.py`, `module_execution.py`, and `module_lm.py`
+extract `Module` internals with a ~120-line facade in `module.py`;
+`dspy/primitives/code_interpreter.py` removed in favor of
+`python_interpreter/protocol.py`; `runner.js` and `jsonrpc_app_errors.json`
+moved under `python_interpreter/`; shared host-side JSON-RPC loop in
+`python_interpreter/pump.py`; migration notes in `docs/migration/primitives.md`.
 
 ### P5.2 Decide the status of `dspy.testing` and consolidate test doubles
 
