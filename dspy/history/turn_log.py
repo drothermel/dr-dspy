@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, get_args, get_origin
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 
@@ -40,11 +40,9 @@ class TurnLog(BaseModel):
             raise ValueError("Cannot append an empty TurnEvent; at least one field must be set.")
         return TurnLog(turns=(*self.turns, event))
 
-
-def is_turn_log_type(annotation: Any) -> bool:
-    if annotation is TurnLog:
-        return True
-    origin = get_origin(annotation)
-    if origin is not None:
-        return any(is_turn_log_type(arg) for arg in get_args(annotation))
-    return False
+    def truncate_oldest(self, n: int = 1) -> TurnLog:
+        if len(self.turns) < n + 1:
+            raise ValueError(
+                "The turn log is too long so your prompt exceeded the context window, but the turn log cannot be truncated because it only has one turn."
+            )
+        return TurnLog(turns=self.turns[n:])

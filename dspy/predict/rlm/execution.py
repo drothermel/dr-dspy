@@ -9,12 +9,12 @@ import pydantic
 
 from dspy.adapters.utils import parse_value
 from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
+from dspy.history.repl_history import REPLEntry, REPLHistory, REPLVariable
 from dspy.predict.rlm.sync_bridge import _strip_code_fences
 from dspy.predict.rlm.tools import make_llm_tools
 from dspy.primitives.code_interpreter import SIMPLE_TYPES, CodeInterpreter, CodeInterpreterError, FinalOutput
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
-from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
 from dspy.primitives.sandbox_protocol import SandboxSerializable, build_repl_variable
 
 if TYPE_CHECKING:

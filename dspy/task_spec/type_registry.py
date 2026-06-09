@@ -35,6 +35,7 @@ DSPY_TYPE_MODULES: dict[str, str] = {
     "Code": "dspy.adapters.types.code",
     "File": "dspy.adapters.types.file",
     "TurnLog": "dspy.history.turn_log",
+    "REPLHistory": "dspy.history.repl_history",
     "Image": "dspy.adapters.types.image",
     "Reasoning": "dspy.adapters.types.reasoning",
     "Tool": "dspy.adapters.types.tool",

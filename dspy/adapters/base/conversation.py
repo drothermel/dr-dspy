@@ -12,15 +12,15 @@ from dspy.adapters.base.tool_calls import (
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.utils import build_lm_message
 from dspy.core.types import LMMessage
+from dspy.history.discovery import is_conversation_turn_log_type
 from dspy.history.turn_event import TurnEvent
-from dspy.history.turn_log import is_turn_log_type
 from dspy.task_spec import TaskSpec
 
 
 class AdapterConversationMixin:
     def _get_turn_log_field_name(self, task_spec: TaskSpec) -> str | None:
         for name, field in task_spec.input_fields.items():
-            if is_turn_log_type(field.type_):
+            if is_conversation_turn_log_type(field.type_):
                 return name
         return None
 

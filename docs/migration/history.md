@@ -8,7 +8,7 @@ DSPy separates three concepts that were previously conflated under "history":
 | LM observability | `CallRecord` | `run.call_log`, `lm.call_log`, disk `calls.jsonl` | What humans inspect after LM calls |
 | Optimizer trace | `list` of trace entries | `run.optimization_trace` | Bootstrap / metric / optimizer debugging |
 
-Public exports: `from dspy.history import AgentHistory, TurnLog, is_turn_log_type`.
+Public exports: `from dspy.history import AgentHistory, REPLHistory, TurnLog, is_conversation_turn_log_type, is_repl_history_type`.
 
 ## Vocabulary (breaking renames)
 

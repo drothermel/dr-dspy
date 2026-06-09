@@ -52,6 +52,7 @@ def test_generic_type_round_trip(generic):
         "input: ToolCalls -> output: str",
         "input: ToolCallResults -> output: str",
         "input: TurnLog -> output: str",
+        "input: REPLHistory -> output: str",
         "input: Reasoning -> output: str",
         "input: Code -> output: str",
         "input: File -> output: str",

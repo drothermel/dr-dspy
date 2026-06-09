@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from pydantic_core import core_schema
 
-from dspy.primitives.repl_types import REPLVariable
+from dspy.history.repl_history import REPLVariable
 
 if TYPE_CHECKING:
     from pydantic import GetCoreSchemaHandler

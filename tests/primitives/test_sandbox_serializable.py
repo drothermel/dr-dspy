@@ -1,4 +1,4 @@
-from dspy.primitives.repl_types import REPLVariable
+from dspy.history.repl_history import REPLVariable
 from dspy.primitives.sandbox_protocol import (
     SandboxSerializable,
     SandboxSerializablePydanticMixin,

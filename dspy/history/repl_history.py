@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
     from dspy.history.turn_event import TurnEvent
     from dspy.task_spec.field_spec import FieldSpec
+
 __all__ = ["REPLVariable", "REPLEntry", "REPLHistory"]
 
 

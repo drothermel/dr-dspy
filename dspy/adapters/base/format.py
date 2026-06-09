@@ -1,15 +1,24 @@
+"""Adapter message formatting.
+
+Canonical message ordering: system, few-shot demos, live conversation history,
+then the current user request (see ``MESSAGE_BUILD_ORDER``).
+
+``TurnLog`` fields expand into interleaved user/assistant messages.
+``REPLHistory`` fields stay inline in the current user block as a formatted
+string via Pydantic serialization (not conversation expansion).
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from dspy.adapters.base.protocols import ComposedAdapter
+
 from dspy.adapters.utils import build_lm_message
 from dspy.core.types import LMMessage
 from dspy.task_spec import TaskSpec
 
-# Canonical message ordering for adapter prompts: system, few-shot demos, live
-# conversation history, then the current user request.
 MESSAGE_BUILD_ORDER = ("system", "demos", "conversation_history", "current_user")
 
 

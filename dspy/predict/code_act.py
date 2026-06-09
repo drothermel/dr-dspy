@@ -7,8 +7,7 @@ from typing_extensions import override
 
 from dspy.adapters.types.tool import Tool
 from dspy.core.types.call_options import ModuleCallOptions
-from dspy.errors import ContextWindowExceededError
-from dspy.history import TurnEvent, TurnLog
+from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.code_interpreter import FinalOutput
@@ -101,34 +100,11 @@ class CodeAct(Module):
             turn_log = turn_log.append_turn(event)
             if code_data.finished:
                 break
-        extract = await self._call_with_potential_turn_log_truncation(
-            self.extractor, turn_log, run, options=options, **inputs
+        extract = await call_with_turn_log_truncation(
+            self.extractor, turn_log=turn_log, run=run, options=options, **inputs
         )
         self.interpreter.shutdown()
         return Prediction(turn_log=turn_log, **extract)
-
-    async def _call_with_potential_turn_log_truncation(
-        self, module, turn_log: TurnLog, run, *, options=None, **input_args
-    ):
-        for _ in range(3):
-            try:
-                return await module(
-                    **input_args,
-                    turn_log=turn_log,
-                    run=run,
-                    options=options,
-                )
-            except ContextWindowExceededError:
-                logger.warning("Turn log exceeded the context window, truncating the oldest turn.")
-                turn_log = self.truncate_turn_log(turn_log)
-        raise ValueError("The context window was exceeded even after 3 attempts to truncate the turn log.")
-
-    def truncate_turn_log(self, turn_log: TurnLog) -> TurnLog:
-        if len(turn_log.turns) < 2:
-            raise ValueError(
-                "The turn log is too long so your prompt exceeded the context window, but the turn log cannot be truncated because it only has one turn."
-            )
-        return TurnLog(turns=turn_log.turns[1:])
 
     def _parse_code(self, code_data):
         code = getattr(code_data, "generated_code", "")

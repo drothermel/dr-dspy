@@ -3,9 +3,9 @@ import asyncio
 import pytest
 
 from dspy.adapters.types.tool import Tool
+from dspy.history.repl_history import REPLEntry, REPLHistory, REPLVariable
 from dspy.predict.rlm import RLM, _strip_code_fences
 from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
-from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.testing import DummyLM
 from tests.mock_interpreter import MockInterpreter

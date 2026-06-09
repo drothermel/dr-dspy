@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from dspy.core.types.lm import LMForward
-from dspy.history import ConversationTurnLog, TurnEvent, TurnLog
+from dspy.history import AgentHistory, ConversationTurnLog, REPLHistory, TurnEvent, TurnLog
 from dspy.predict.predict import Predict
 from dspy.predict.protocol import Predictor
 from dspy.testing import DummyLM
@@ -24,6 +24,10 @@ def test_predict_satisfies_predictor_protocol(make_run):
 
 def test_turn_log_satisfies_conversation_turn_log_protocol():
     assert isinstance(TurnLog.empty(), ConversationTurnLog)
+
+
+def test_repl_history_satisfies_agent_history_protocol():
+    assert isinstance(REPLHistory.empty(), AgentHistory)
 
 
 def test_turn_log_append_turn_round_trip():

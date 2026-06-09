@@ -10,7 +10,7 @@ from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
 from dspy.core.types.config import LMConfig, LMToolChoice
 from dspy.errors import AdapterParseError, ContextWindowExceededError
-from dspy.history import TurnEvent, TurnLog
+from dspy.history import TurnEvent, TurnLog, coerce_turn_log
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
@@ -88,7 +88,7 @@ class ReActV2(Module):
     ):
         run = resolve_run(run=run, bound_run=self.run)
         max_iters = input_args.pop("max_iters", self.max_iters)
-        turn_log = _coerce_turn_log(input_args.pop("turn_log", input_args.pop("history", None)))
+        turn_log = coerce_turn_log(input_args.pop("turn_log", input_args.pop("history", None)))
         pending_inputs = {name: input_args[name] for name in self.task_spec.input_fields if name in input_args}
         break_reason = "max_iters"
         for turn_index in range(max_iters):
@@ -212,18 +212,6 @@ def _optional_annotation(annotation: Any) -> Any:
         return annotation | None
     except TypeError:
         return annotation
-
-
-def _coerce_turn_log(turn_log: Any) -> TurnLog:
-    if turn_log is None:
-        return TurnLog.empty()
-    if isinstance(turn_log, TurnLog):
-        return turn_log
-    if isinstance(turn_log, dict) and "messages" in turn_log:
-        return TurnLog(turns=tuple(turn_log["messages"]))
-    if isinstance(turn_log, dict) and "turns" in turn_log:
-        return TurnLog.model_validate(turn_log)
-    return TurnLog.model_validate(turn_log)
 
 
 def _coerce_tool_calls(tool_calls: Any) -> ToolCalls:
