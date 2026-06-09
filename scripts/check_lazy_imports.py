@@ -18,7 +18,6 @@ ALLOWLIST_SUFFIXES = (
     "adapters/utils/multimodal.py",
     # resolve_adapter / settings redesign — separate work
     "compile/resolve.py",
-    "dsp/utils/settings.py",
     # optional-dependency entrypoints
     "clients/__init__.py",
     "teleprompt/gepa/gepa.py",

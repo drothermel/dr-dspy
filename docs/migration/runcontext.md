@@ -1,6 +1,6 @@
 # RunContext migration guide
 
-DSPy no longer uses global `dspy.dsp.utils.settings`. Pass an explicit `RunContext` via `run=` at call sites.
+DSPy no longer uses the legacy global `settings` singleton. Pass an explicit `RunContext` via `run=` at call sites.
 
 ## Quick translation
 
