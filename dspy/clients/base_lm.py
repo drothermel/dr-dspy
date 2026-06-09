@@ -9,15 +9,13 @@ from typing import TYPE_CHECKING, Any, TextIO
 
 from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
 from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
-from dspy.clients.openai_format.chat_request import request_messages_as_openai
 from dspy.core.types import CallRecord, LMRequest, LMResponse
 from dspy.core.types.config import NativeAdaptationMode
 from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
+from dspy.runtime.call_log.coordinator import append_disk_call, record_call
 from dspy.runtime.callback import Callback, with_callbacks
 from dspy.runtime.config import disk_call_log_enabled, memory_call_log_enabled
 from dspy.runtime.inspect_call_log import pretty_print_call_log
-from dspy.runtime.log_redaction import redact_config, redact_messages
-from dspy.runtime.run_log_session import RunLogSession, append_call_record
 
 if TYPE_CHECKING:
     from dspy.runtime.run_context import RunContext
@@ -55,12 +53,6 @@ def _provider_options_from_kwargs(kwargs: dict[str, Any]) -> LMProviderOptions:
     provider_fields = set(LMProviderOptions.model_fields)
     data = {key: value for key, value in kwargs.items() if key in provider_fields}
     return LMProviderOptions(**data)
-
-
-def _append_bounded(entry_list: list[CallRecord], entry: CallRecord, max_entries: int) -> None:
-    if len(entry_list) >= max_entries:
-        entry_list.pop(0)
-    entry_list.append(entry)
 
 
 class BaseLM:
@@ -162,65 +154,17 @@ class BaseLM:
                 model_type=getattr(self, "model_type", None),
             )
         if memory_enabled and record is not None:
-            self.record_call(record, run=run)
+            record_call(entry=record, run=run, lm=self)
         if disk_enabled:
-            self._append_run_log_entry(
+            append_disk_call(
                 request=request,
                 response=response,
                 call_record=record,
-                session=run.log_session,
+                run=run,
+                lm=self,
                 compiled=compiled,
             )
         return response
-
-    def _append_run_log_entry(
-        self,
-        *,
-        request: LMRequest,
-        response: LMResponse,
-        call_record: CallRecord | None,
-        session: RunLogSession | None,
-        compiled: CompiledCall | None = None,
-    ) -> None:
-        call_id = compiled.call_id if compiled is not None else call_record.uuid if call_record else str(uuid.uuid4())
-        messages = request_messages_as_openai(request)
-        outputs = [
-            {
-                "text": output.text,
-                "tool_calls": [
-                    {"name": call.name, "args": dict(call.args), "id": call.id} for call in output.tool_calls or []
-                ],
-                "logprobs": output.logprobs,
-            }
-            for output in response.outputs
-        ]
-        record = {
-            "call_id": call_id,
-            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-            "caller": {
-                "module": compiled.module if compiled else "unknown",
-                "phase": compiled.phase if compiled else "unknown",
-                "lm_role": compiled.lm_role if compiled else "unknown",
-            },
-            "lm": {"model": self.model, "model_type": getattr(self, "model_type", None)},
-            "adapter": {
-                "class": compiled.adapter_class if compiled else None,
-                "notes": compiled.adapter_notes if compiled else [],
-            },
-            "task_spec": compiled.original_task_spec.to_dict() if compiled and compiled.original_task_spec else None,
-            "processed_task_spec": compiled.processed_task_spec.to_dict()
-            if compiled and compiled.processed_task_spec
-            else None,
-            "task_spec_mutations": compiled.task_spec_mutations if compiled else [],
-            "messages": redact_messages(messages),
-            "config": redact_config(request.config.model_dump(exclude_none=True)),
-            "config_provenance": compiled.config_provenance if compiled else {},
-            "response": {
-                "outputs": outputs,
-                "usage": response.usage_as_dict(),
-            },
-        }
-        append_call_record(record, session=session)
 
     async def aforward(self, request: LMRequest) -> LMResponse:
         raise NotImplementedError("Subclasses must implement this method.")
@@ -307,12 +251,3 @@ class BaseLM:
 
     def inspect_call_log(self, n: int = 1, file: TextIO | None = None) -> None:
         pretty_print_call_log(call_log=self.call_log, n=n, file=file)
-
-    def record_call(self, entry: CallRecord, *, run: RunContext) -> None:
-        if not memory_call_log_enabled(run.telemetry):
-            return
-        max_entries = run.telemetry.max_call_log_entries
-        _append_bounded(run.call_log, entry, max_entries)
-        _append_bounded(self.call_log, entry, max_entries)
-        for module in run.caller_modules:
-            _append_bounded(module.call_log, entry, max_entries)
