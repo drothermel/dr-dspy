@@ -7,9 +7,9 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CANONICAL_PATH = ROOT / "dspy/primitives/jsonrpc_app_errors.json"
+CANONICAL_PATH = ROOT / "dspy/primitives/python_interpreter/jsonrpc_app_errors.json"
 PYTHON_TARGET = ROOT / "dspy/primitives/python_interpreter/jsonrpc.py"
-JS_TARGET = ROOT / "dspy/primitives/runner.js"
+JS_TARGET = ROOT / "dspy/primitives/python_interpreter/runner.js"
 
 PYTHON_BEGIN = "# JSONRPC_APP_ERRORS_BEGIN"
 PYTHON_END = "# JSONRPC_APP_ERRORS_END"

@@ -7,8 +7,8 @@ from os import PathLike
 from pathlib import Path
 from typing import IO, TYPE_CHECKING
 
-from dspy.primitives.code_interpreter import CodeInterpreterError
 from dspy.primitives.python_interpreter.jsonrpc import canonicalize_path, jsonrpc_request
+from dspy.primitives.python_interpreter.protocol import CodeInterpreterError
 
 if TYPE_CHECKING:
     from dspy.primitives.python_interpreter.interpreter import PythonInterpreter
@@ -31,7 +31,7 @@ def get_deno_dir() -> str | None:
 
 
 def get_runner_path() -> str:
-    return str(Path(__file__).resolve().parent.parent / "runner.js")
+    return str(Path(__file__).resolve().parent / "runner.js")
 
 
 def _build_sandbox_virtual_paths(paths_to_mount: list[PathLike[str] | str]) -> dict[str, str]:
@@ -171,27 +171,20 @@ def parse_response_line(response_line: str, context: str) -> dict | None:
 
 
 def send_request(interpreter: "PythonInterpreter", method: str, params: dict, context: str) -> dict:
+    from dspy.primitives.python_interpreter.pump import read_until_response
+
     interpreter._request_id += 1
     request_id = interpreter._request_id
     msg = jsonrpc_request(method=method, params=params, id=request_id)
     stdin = deno_stdin(interpreter)
     stdin.write(msg + "\n")
     stdin.flush()
-    skipped = 0
-    while skipped <= MAX_SKIP_LINES:
-        response_line = read_response_line(interpreter, context)
-        response = parse_response_line(response_line=response_line, context=context)
-        if response is None:
-            skipped += 1
-            continue
-        if response.get("id") != request_id:
-            raise CodeInterpreterError(
-                f"Response ID mismatch {context}: expected {request_id}, got {response.get('id')}"
-            )
-        if "error" in response:
-            raise CodeInterpreterError(f"Error {context}: {response['error'].get('message', 'Unknown error')}")
-        return response
-    raise CodeInterpreterError(f"Too many non-JSON lines ({skipped}) {context}")
+    return read_until_response(
+        interpreter,
+        expected_id=request_id,
+        context=context,
+        on_result=lambda response: response,
+    )
 
 
 def health_check(interpreter: "PythonInterpreter") -> None:

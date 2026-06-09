@@ -2,8 +2,8 @@ import json
 import keyword
 from typing import TYPE_CHECKING, Any
 
-from dspy.primitives.code_interpreter import CodeInterpreterError
 from dspy.primitives.python_interpreter.deno_process import send_request
+from dspy.primitives.python_interpreter.protocol import CodeInterpreterError
 from dspy.serialization.json import to_jsonable
 
 if TYPE_CHECKING:

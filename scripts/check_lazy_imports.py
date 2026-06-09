@@ -33,6 +33,8 @@ ALLOWLIST_SUFFIXES = (
     "history/turn_events/models.py",
     # breaks persistence.program ↔ primitives.module import cycle
     "persistence/program.py",
+    # breaks python_interpreter.deno_process ↔ pump import cycle
+    "primitives/python_interpreter/deno_process.py",
     # breaks persistence.embeddings ↔ retrievers.embeddings import cycle
     "persistence/embeddings.py",
     "evaluate/metrics.py",

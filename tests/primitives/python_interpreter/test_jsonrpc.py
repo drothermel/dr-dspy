@@ -10,8 +10,8 @@ from dspy.primitives.python_interpreter.deno_process import sync_files
 from dspy.primitives.python_interpreter.jsonrpc import jsonrpc_notification
 
 ROOT = Path(__file__).resolve().parents[3]
-CANONICAL_PATH = ROOT / "dspy/primitives/jsonrpc_app_errors.json"
-RUNNER_PATH = ROOT / "dspy/primitives/runner.js"
+CANONICAL_PATH = ROOT / "dspy/primitives/python_interpreter/jsonrpc_app_errors.json"
+RUNNER_PATH = ROOT / "dspy/primitives/python_interpreter/runner.js"
 
 
 def test_jsonrpc_notification_includes_empty_params():

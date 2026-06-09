@@ -20,8 +20,8 @@ from dspy.primitives import (
     SandboxSerializable,
     build_repl_variable,
 )
-from dspy.primitives.code_interpreter import SIMPLE_TYPES
 from dspy.primitives.python_interpreter import PythonInterpreter
+from dspy.primitives.python_interpreter.protocol import SIMPLE_TYPES
 from dspy.runtime.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 
 if TYPE_CHECKING:

@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict
 
-from dspy.primitives.code_interpreter import CodeInterpreterError, annotation_to_sandbox_type
 from dspy.primitives.python_interpreter.deno_process import deno_stdin, send_request
 from dspy.primitives.python_interpreter.jsonrpc import JSONRPC_APP_ERRORS, jsonrpc_error, jsonrpc_result
+from dspy.primitives.python_interpreter.protocol import CodeInterpreterError, annotation_to_sandbox_type
 
 if TYPE_CHECKING:
     from dspy.primitives.python_interpreter.interpreter import PythonInterpreter

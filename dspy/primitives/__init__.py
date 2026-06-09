@@ -2,13 +2,13 @@ import importlib
 from typing import Any
 
 from dspy.primitives.batch_result import BatchFailure, BatchResult
-from dspy.primitives.code_interpreter import (
+from dspy.primitives.example import Example
+from dspy.primitives.prediction import Completions, Prediction
+from dspy.primitives.python_interpreter.protocol import (
     CodeInterpreter,
     CodeInterpreterError,
     FinalOutput,
 )
-from dspy.primitives.example import Example
-from dspy.primitives.prediction import Completions, Prediction
 from dspy.primitives.record_store import RecordStore
 from dspy.primitives.sandbox_protocol import SandboxSerializable, build_repl_variable
 

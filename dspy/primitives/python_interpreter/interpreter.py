@@ -6,15 +6,12 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import subprocess
-from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
 from dspy.primitives.python_interpreter import deno_process
 from dspy.primitives.python_interpreter.deno_process import (
-    MAX_SKIP_LINES,
     ensure_deno_process,
     get_deno_dir,
     get_runner_path,
     mount_files,
-    read_response_line,
     sync_files,
 )
 from dspy.primitives.python_interpreter.jsonrpc import (
@@ -23,13 +20,13 @@ from dspy.primitives.python_interpreter.jsonrpc import (
     jsonrpc_notification,
     jsonrpc_request,
 )
+from dspy.primitives.python_interpreter.protocol import CodeInterpreterError, FinalOutput
+from dspy.primitives.python_interpreter.pump import read_until_response
 from dspy.primitives.python_interpreter.serialize import inject_large_var, inject_variables
 from dspy.primitives.python_interpreter.tools import handle_tool_call, register_tools
 
 
 class PythonInterpreter:
-    _MAX_SKIP_LINES = MAX_SKIP_LINES
-
     def __init__(
         self,
         deno_command: list[str] | None = None,
@@ -124,41 +121,38 @@ class PythonInterpreter:
                 stdin.flush()
             except BrokenPipeError as exc:
                 raise CodeInterpreterError("Deno process stdin unavailable during execution") from exc
-        skipped = 0
-        while skipped <= self._MAX_SKIP_LINES:
-            output_line = read_response_line(self, "during execution")
-            msg = deno_process.parse_response_line(response_line=output_line, context="during execution")
-            if msg is None:
-                skipped += 1
-                continue
-            if "method" in msg and msg["method"] == "tool_call":
+
+        def on_notification(msg: dict[str, Any]) -> bool:
+            if msg.get("method") == "tool_call":
                 handle_tool_call(self, msg)
-                continue
-            if "result" in msg:
-                if msg.get("id") != execute_request_id:
-                    raise CodeInterpreterError(
-                        f"Response ID mismatch: expected {execute_request_id}, got {msg.get('id')}"
-                    )
-                result = msg["result"]
-                sync_files(self)
-                if "final" in result:
-                    return FinalOutput(result["final"])
-                return result.get("output", None)
-            if "error" in msg:
-                if msg.get("id") is not None and msg.get("id") != execute_request_id:
-                    raise CodeInterpreterError(
-                        f"Response ID mismatch: expected {execute_request_id}, got {msg.get('id')}"
-                    )
-                error = msg["error"]
-                error_code = error.get("code", JSONRPC_APP_ERRORS["Unknown"])
-                error_message = error.get("message", "Unknown error")
-                error_data = error.get("data", {})
-                error_type = error_data.get("type", "Error")
-                if error_code == JSONRPC_APP_ERRORS["SyntaxError"]:
-                    raise SyntaxError(f"Invalid Python syntax. message: {error_message}")
-                raise CodeInterpreterError(f"{error_type}: {error_data.get('args') or error_message}")
-            raise CodeInterpreterError(f"Unexpected message format from sandbox: {msg}")
-        raise CodeInterpreterError(f"Too many non-JSON lines ({skipped}) during execution")
+                return True
+            return False
+
+        def on_result(msg: dict[str, Any]) -> Any:
+            result = msg["result"]
+            sync_files(self)
+            if "final" in result:
+                return FinalOutput(result["final"])
+            return result.get("output", None)
+
+        def on_error(msg: dict[str, Any]) -> Any:
+            error = msg["error"]
+            error_code = error.get("code", JSONRPC_APP_ERRORS["Unknown"])
+            error_message = error.get("message", "Unknown error")
+            error_data = error.get("data", {})
+            error_type = error_data.get("type", "Error")
+            if error_code == JSONRPC_APP_ERRORS["SyntaxError"]:
+                raise SyntaxError(f"Invalid Python syntax. message: {error_message}")
+            raise CodeInterpreterError(f"{error_type}: {error_data.get('args') or error_message}")
+
+        return read_until_response(
+            self,
+            expected_id=execute_request_id,
+            context="during execution",
+            on_notification=on_notification,
+            on_result=on_result,
+            on_error=on_error,
+        )
 
     def start(self) -> None:
         ensure_deno_process(self)
