@@ -10,12 +10,26 @@ from dspy.clients.dr_llm.mapping import (
     lm_request_to_backend_request,
     probe_backend_request,
 )
+from dspy.clients.dr_llm.provider_name import parse_dr_llm_provider
 from dspy.core.types import LMMessage, LMMessageRole, LMRequest, User
 from dspy.core.types.config import LMConfig, LMReasoningConfig, ReasoningEffort
 from dspy.core.types.parts import LMImagePart, LMTextPart
 from dspy.errors import LMConfigurationError, LMUnsupportedFeatureError
 from dspy.testing import DummyLM
 from tests.clients.dr_llm._helpers import make_backend_response, make_lm_request
+
+
+def test_parse_dr_llm_provider_rejects_unknown() -> None:
+    with pytest.raises(LMUnsupportedFeatureError, match="not-a-provider"):
+        parse_dr_llm_provider("not-a-provider", model="not-a-provider/gpt-4.1-mini")
+
+
+def test_lm_request_rejects_unknown_provider() -> None:
+    lm = DummyLM([{"answer": "x"}])
+    request = make_lm_request()
+    request = request.model_copy(update={"model": "not-a-provider/gpt-4.1-mini"})
+    with pytest.raises(LMUnsupportedFeatureError, match="provider"):
+        lm_request_to_backend_request(request, lm=lm)
 
 
 def test_probe_backend_request_rejects_unknown_provider() -> None:

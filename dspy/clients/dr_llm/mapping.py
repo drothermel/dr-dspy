@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import Any, Literal, cast
 
 from dr_llm.backends.models import BackendRequest, BackendResponse
-from dr_llm.llm import CallMode, EffortSpec, Message, ProviderName, SamplingControls
+from dr_llm.llm import CallMode, EffortSpec, Message, SamplingControls
 
 from dspy.clients.dr_llm.contract import reject_unsupported_merged_config
+from dspy.clients.dr_llm.provider_name import parse_dr_llm_provider
 from dspy.clients.model_id import split_provider_model
 from dspy.core.types import LMOutput, LMRequest, LMResponse, LMUsage
 from dspy.core.types.config import LMConfig, merge_lm_request_config
@@ -37,13 +38,7 @@ _UNSUPPORTED_PART_TYPES = (
 
 def probe_backend_request(lm: Any, *, mode: CallMode = CallMode.api) -> BackendRequest:
     provider_name, model_name = split_provider_model(lm.model)
-    try:
-        provider = ProviderName(provider_name)
-    except ValueError as exc:
-        raise LMUnsupportedFeatureError(
-            f"Unsupported dr-llm provider {provider_name!r}.",
-            model=lm.model,
-        ) from exc
+    provider = parse_dr_llm_provider(provider_name, model=lm.model)
     merged = merge_lm_request_config(lm, LMConfig())
     reject_unsupported_merged_config(merged, model=lm.model)
     return BackendRequest(
@@ -132,13 +127,7 @@ def lm_request_to_backend_request(
     merged = merge_lm_request_config(lm, request.config)
     reject_unsupported_merged_config(merged, model=request.model)
     provider_name, model_name = split_provider_model(request.model)
-    try:
-        provider = ProviderName(provider_name)
-    except ValueError as exc:
-        raise LMUnsupportedFeatureError(
-            f"Unsupported dr-llm provider {provider_name!r}.",
-            model=request.model,
-        ) from exc
+    provider = parse_dr_llm_provider(provider_name, model=request.model)
     messages = [
         Message(
             role=cast("_MessageRole", message.role),
