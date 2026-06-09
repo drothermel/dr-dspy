@@ -1,5 +1,9 @@
 from dspy.clients.lm.errors import _safe_litellm_exception_class
-from dspy.errors import ContextWindowExceededError, LMInvalidRequestError
+from dspy.errors import ContextWindowExceededError, DSPyError, LMInvalidRequestError
+
+
+class UnknownPredictorInTraceError(DSPyError):
+    """Trace step references a predictor id not present in predictor2name."""
 
 
 def is_demo_shrinkable_error(exc: BaseException) -> bool:

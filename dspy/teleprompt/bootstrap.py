@@ -105,18 +105,17 @@ class BootstrapFewShot:
         teacher = self.teacher
         predictor_cache = {}
         trace: list = []
+        success = False
+        teacher_run = (self.teacher_run or run).fork(optimization_trace=[])
+        lm = teacher_run.lm
+        lm = lm.copy(temperature=1.0) if round_idx > 0 else lm
+        if round_idx > 0:
+            teacher_run = teacher_run.fork(lm=lm)
+        for name, predictor in teacher.named_predictors():
+            predictor_cache[name] = predictor.demos
+            predictor.demos = [x for x in predictor.demos if x != example]
         try:
-            teacher_run = (self.teacher_run or run).fork(optimization_trace=[])
-            lm = teacher_run.lm
-            lm = lm.copy(temperature=1.0) if round_idx > 0 else lm
-            if round_idx > 0:
-                teacher_run = teacher_run.fork(lm=lm)
-            for name, predictor in teacher.named_predictors():
-                predictor_cache[name] = predictor.demos
-                predictor.demos = [x for x in predictor.demos if x != example]
             prediction, trace = await run_program_with_trace(teacher, example, teacher_run)
-            for name, predictor in teacher.named_predictors():
-                predictor.demos = predictor_cache[name]
             if self.metric:
                 metric_val = await invoke_metric(
                     self.metric,
@@ -137,6 +136,9 @@ class BootstrapFewShot:
             if current_error_count >= effective_max_errors:
                 raise
             logger.exception(f"Failed to run or to evaluate example {example} with {self.metric} due to {e}.")
+        finally:
+            for name, predictor in teacher.named_predictors():
+                predictor.demos = predictor_cache[name]
         if success:
             name2traces = trace_to_demos(trace, self.predictor2name)
             for name, demos in name2traces.items():

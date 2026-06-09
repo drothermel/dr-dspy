@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from dspy.primitives import Example
+from dspy.teleprompt.errors import UnknownPredictorInTraceError
 
 if TYPE_CHECKING:
     from dspy.core.types.call_options import ModuleCallOptions
@@ -31,8 +32,10 @@ def trace_to_demos(trace: list[Any], predictor2name: dict[int, str]) -> dict[str
         demo = Example.from_record({"augmented": True, **inputs, **outputs})
         try:
             predictor_name = predictor2name[id(predictor)]
-        except KeyError:
-            continue
+        except KeyError as exc:
+            raise UnknownPredictorInTraceError(
+                f"No predictor mapping for id={id(predictor)!r}; known ids: {sorted(predictor2name)}"
+            ) from exc
         name2traces[predictor_name] = name2traces.get(predictor_name, [])
         name2traces[predictor_name].append(demo)
     return name2traces

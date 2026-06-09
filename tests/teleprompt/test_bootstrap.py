@@ -1,5 +1,6 @@
 import asyncio
 from typing import Any, cast
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -89,6 +90,26 @@ def test_error_handling_during_bootstrap(make_run):
                 student, params=BootstrapFewShotCompileParams(trainset=trainset, teacher=teacher), run=run
             )
         )
+
+
+def test_teacher_demos_restored_on_trace_failure(make_run):
+    student = SimpleModule(ts("input -> output"))
+    teacher = SimpleModule(ts("input -> output"))
+    original_demos = [examples[0]]
+    teacher.predictor.demos = list(original_demos)
+    lm = DummyLM(cast("Any", ["Initial thoughts"]))
+    run = make_run(lm=lm)
+    bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1, max_errors=10)
+    bootstrap.student = student.reset_copy()
+    bootstrap.teacher = teacher
+    bootstrap.name2traces = {"predictor": []}
+    bootstrap._prepare_predictor_mappings()
+
+    with patch("dspy.teleprompt.bootstrap.run_program_with_trace", new_callable=AsyncMock) as mock_trace:
+        mock_trace.side_effect = RuntimeError("trace failed")
+        asyncio.run(bootstrap._bootstrap_one_example(example=examples[0], run=run))
+
+    assert teacher.predictor.demos == original_demos
 
 
 def test_validation_set_usage(make_run):
