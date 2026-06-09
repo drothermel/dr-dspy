@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from dspy._internal.lazy_import import require
 from dspy.predict.parallel import Parallel
@@ -13,8 +13,9 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from dspy.clients.lm import LM
-    from dspy.primitives import Example, Module
+    from dspy.primitives import Module
     from dspy.runtime.run_context import RunContext
+    from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
 from dspy.teleprompt.compile_params import SIMBACompileParams
 from dspy.teleprompt.registry import register_teleprompter
@@ -28,7 +29,7 @@ class SIMBA:
     def __init__(
         self,
         *,
-        metric: Callable[[Example, dict[str, Any]], float],
+        metric: OptimizerMetric,
         bsize: int = 32,
         num_candidates: int = 6,
         max_steps: int = 8,

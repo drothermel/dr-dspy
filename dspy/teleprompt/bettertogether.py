@@ -1,6 +1,5 @@
 import logging
 import random
-from typing import Callable
 
 from pydantic import BaseModel
 
@@ -24,6 +23,7 @@ from dspy.teleprompt.compile_params import (
     RandomSearchCompileParams,
 )
 from dspy.teleprompt.eval_batch import eval_candidate_program
+from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.protocol import Teleprompter
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
 from dspy.teleprompt.registry import compile_params_type, register_teleprompter, validate_compile_params
@@ -82,7 +82,7 @@ def _default_compile_params(
 
 @register_teleprompter(params=BetterTogetherCompileParams)
 class BetterTogether:
-    def __init__(self, metric: Callable, **optimizers: Teleprompter) -> None:
+    def __init__(self, metric: OptimizerMetric, **optimizers: Teleprompter) -> None:
         self.metric = metric
         if not optimizers:
             logger.info(

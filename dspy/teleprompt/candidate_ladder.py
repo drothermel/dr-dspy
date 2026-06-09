@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import random
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from dspy.runtime.run_context import RunContext  # noqa: TC001 — used at runtime in async signatures
 from dspy.teleprompt.bootstrap import BootstrapFewShot, LabeledFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, LabeledFewShotCompileParams
+
+if TYPE_CHECKING:
+    from dspy.teleprompt.metrics import OptimizerMetric
 
 
 class CandidateSeedKind(StrEnum):
@@ -79,7 +82,7 @@ async def compile_candidate_program(
     student: Any,
     trainset: list,
     run: RunContext,
-    metric: Any,
+    metric: OptimizerMetric,
     teacher: Any = None,
     teacher_run: RunContext | None = None,
     max_labeled_demos: int,
@@ -132,7 +135,7 @@ async def generate_demo_candidate_sets(
     config: CandidateLadderConfig,
     trainset: list,
     run: RunContext,
-    metric: Any,
+    metric: OptimizerMetric,
     teacher: Any = None,
     teacher_run: RunContext | None = None,
     max_errors: int | None = None,

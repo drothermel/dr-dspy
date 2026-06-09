@@ -1,6 +1,6 @@
 from copy import deepcopy
 from random import sample
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 from pydantic import BaseModel
 
@@ -14,6 +14,7 @@ from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.compilation import CompileResult, CompileStats
 from dspy.teleprompt.compile_params import AvatarOptimizerCompileParams
+from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.trace_helpers import run_program_with_trace
@@ -85,7 +86,7 @@ class _AvatarEvalModule(Module):
 class AvatarOptimizer:
     def __init__(
         self,
-        metric: Callable,
+        metric: OptimizerMetric,
         max_iters: int = 10,
         lower_bound: int = 0,
         upper_bound: int = 1,

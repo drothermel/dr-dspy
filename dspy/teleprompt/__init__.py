@@ -6,6 +6,7 @@ import importlib
 from typing import Any
 
 from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
+from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.protocol import Teleprompter
 from dspy.teleprompt.registry import compile_params_type, register_teleprompter
 
@@ -86,6 +87,7 @@ __all__ = [
     "LabeledFewShotCompileParams",
     "MIPROv2",
     "MIPROv2CompileParams",
+    "OptimizerMetric",
     "ProgramCandidate",
     "RandomSearchCompileParams",
     "SIMBA",

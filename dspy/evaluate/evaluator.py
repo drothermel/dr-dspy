@@ -1,8 +1,10 @@
 """Async program evaluation over a devset.
 
 Import ``Evaluate`` and ``EvaluationResult`` from ``dspy.evaluate.evaluator``.
-Per-example scores are 0-1 floats; ``EvaluationResult.score`` is the percentage mean.
+Per-example scores are 0-1 floats; ``EvaluationResult.score`` is a 0-100 percentage mean.
 """
+
+from __future__ import annotations
 
 import asyncio
 import csv
@@ -11,7 +13,6 @@ import importlib.util
 import json
 import logging
 import types
-from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -21,12 +22,13 @@ if TYPE_CHECKING:
     import pandas as pd
 
     from dspy.primitives import Example, Module
+    from dspy.runtime.run_context import RunContext
+    from dspy.teleprompt.metrics import OptimizerMetric
 
 from dspy.evaluate.metric_invoke import invoke_metric
 from dspy.primitives import Prediction
 from dspy.runtime.async_parallel import resolve_max_concurrency, resolve_max_errors, run_bounded
 from dspy.runtime.callback import with_callbacks
-from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.trace_helpers import run_program_with_trace
 
 logger = logging.getLogger(__name__)
@@ -35,7 +37,7 @@ __all__ = ["Evaluate", "EvaluationResult"]
 
 
 class EvaluationResult(Prediction):
-    def __init__(self, score: float, results: list[tuple["Example", Prediction, Any]]) -> None:
+    def __init__(self, score: float, results: list[tuple[Example, Prediction, Any]]) -> None:
         super().__init__(score=score, results=results)
 
     @override
@@ -47,8 +49,8 @@ class Evaluate:
     def __init__(
         self,
         *,
-        devset: list["Example"],
-        metric: Callable | None = None,
+        devset: list[Example],
+        metric: OptimizerMetric | None = None,
         max_concurrency: int | None = None,
         display_progress: bool = False,
         display_table: bool | int = False,
@@ -72,10 +74,10 @@ class Evaluate:
     @with_callbacks(kind="evaluate")
     async def __call__(
         self,
-        program: "Module",
+        program: Module,
         run: RunContext,
-        metric: Callable | None = None,
-        devset: list["Example"] | None = None,
+        metric: OptimizerMetric | None = None,
+        devset: list[Example] | None = None,
         max_concurrency: int | None = None,
         display_progress: bool | None = None,
         display_table: bool | int | None = None,
@@ -153,7 +155,7 @@ class Evaluate:
         return EvaluationResult(score=round(100 * score_sum / ntotal, 2), results=results)
 
     @staticmethod
-    def _prepare_results_output(results: list[tuple["Example", Prediction, Any]], metric_name: str):
+    def _prepare_results_output(results: list[tuple[Example, Prediction, Any]], metric_name: str):
         return [
             merge_dicts(example, prediction) | {metric_name: score}
             if prediction_is_dictlike(prediction)
@@ -175,9 +177,7 @@ class Evaluate:
         with Path(path).open("w") as f:
             json.dump(data, f)
 
-    def _construct_result_table(
-        self, results: list[tuple["Example", Prediction, Any]], metric_name: str
-    ) -> "pd.DataFrame":
+    def _construct_result_table(self, results: list[tuple[Example, Prediction, Any]], metric_name: str) -> pd.DataFrame:
         import pandas as pd
 
         data = self._prepare_results_output(results, metric_name)
@@ -186,7 +186,7 @@ class Evaluate:
             return result_df.map(truncate_cell)
         return result_df.applymap(truncate_cell)
 
-    def _display_result_table(self, result_df: "pd.DataFrame", display_table: bool | int, metric_name: str) -> None:
+    def _display_result_table(self, result_df: pd.DataFrame, display_table: bool | int, metric_name: str) -> None:
         if isinstance(display_table, bool):
             df_to_display = result_df.copy()
             truncated_rows = 0
@@ -229,7 +229,7 @@ def truncate_cell(content) -> str:
     return str(content)
 
 
-def stylize_metric_name(df: "pd.DataFrame", metric_name: str) -> "pd.DataFrame":
+def stylize_metric_name(df: pd.DataFrame, metric_name: str) -> pd.DataFrame:
 
     def format_metric(x) -> str:
         if isinstance(x, float):
@@ -242,7 +242,7 @@ def stylize_metric_name(df: "pd.DataFrame", metric_name: str) -> "pd.DataFrame":
     return df
 
 
-def display_dataframe(df: "pd.DataFrame") -> None:
+def display_dataframe(df: pd.DataFrame) -> None:
     import pandas as pd
 
     with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.max_colwidth", 70):

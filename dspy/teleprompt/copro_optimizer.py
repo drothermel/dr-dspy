@@ -11,6 +11,7 @@ from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
 from dspy.teleprompt.compile_params import COPROCompileParams
+from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
@@ -55,7 +56,14 @@ class GenerateInstructionGivenAttemptsTaskSpec(TaskSpec):
 @register_teleprompter(params=COPROCompileParams)
 class COPRO:
     def __init__(
-        self, prompt_model=None, metric=None, breadth=10, depth=3, init_temperature=1.4, track_stats=False, **_kwargs
+        self,
+        prompt_model=None,
+        metric: OptimizerMetric | None = None,
+        breadth=10,
+        depth=3,
+        init_temperature=1.4,
+        track_stats=False,
+        **_kwargs,
     ) -> None:
         if breadth <= 1:
             raise ValueError("Breadth must be greater than 1")

@@ -1,6 +1,5 @@
 import logging
 import textwrap
-from typing import Callable
 
 import orjson
 
@@ -11,6 +10,7 @@ from dspy.propose.source_format import get_formatted_source
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 from dspy.task_spec.formatting import get_field_spec_description_string
+from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.task_spec_context import get_prompt_model, get_task_spec, set_task_spec
 from dspy.teleprompt.trace_helpers import run_program_with_trace
 from dspy.teleprompt.utils import optimizer_lm_context
@@ -32,7 +32,7 @@ def prepare_models_for_resampling(*, program: Module, n: int, run: RunContext, t
     return models
 
 
-def wrap_program(*, program: Module, metric: Callable, run: RunContext):
+def wrap_program(*, program: Module, metric: OptimizerMetric, run: RunContext):
 
     async def wrapped_program(example):
         prediction, trace, score = (None, None, 0.0)

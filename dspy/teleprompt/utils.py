@@ -11,13 +11,14 @@ from dspy.runtime.transparency import resolve_adapter
 if TYPE_CHECKING:
     from dspy.primitives import Example
     from dspy.runtime.run_context import RunContext
+    from dspy.teleprompt.metrics import OptimizerMetric
 
 
 def make_optimizer_evaluator(
     run: RunContext,
     *,
     devset: list[Example],
-    metric,
+    metric: OptimizerMetric,
     max_concurrency: int | None,
     max_errors: int | None,
     **kwargs: Any,

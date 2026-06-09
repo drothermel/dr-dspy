@@ -17,6 +17,7 @@ from dspy.primitives import Module, Prediction
 
 if TYPE_CHECKING:
     from dspy.runtime.run_context import RunContext
+    from dspy.teleprompt.metrics import OptimizerMetric
 
 __all__ = ["call_metric", "invoke_metric", "normalize_metric_score"]
 
@@ -47,7 +48,7 @@ def normalize_metric_score(output: Any) -> float:
 
 
 async def call_metric(
-    metric: Any,
+    metric: OptimizerMetric,
     *,
     example: Any,
     prediction: Any,
@@ -70,7 +71,7 @@ async def call_metric(
 
 
 async def invoke_metric(
-    metric: Any,
+    metric: OptimizerMetric,
     *,
     example: Any,
     prediction: Any,

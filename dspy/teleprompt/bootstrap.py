@@ -12,6 +12,7 @@ from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, LabeledFewShotCompileParams
+from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_task_spec
 from dspy.teleprompt.trace_helpers import run_program_with_trace, trace_to_demos
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 class BootstrapFewShot:
     def __init__(
         self,
-        metric=None,
+        metric: OptimizerMetric | None = None,
         metric_threshold=None,
         teacher_run: RunContext | None = None,
         max_bootstrapped_demos=4,

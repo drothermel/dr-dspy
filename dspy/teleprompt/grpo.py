@@ -30,6 +30,7 @@ from dspy.teleprompt.bootstrap_finetune import (
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, bootstrap_trace_data
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import GRPOCompileParams
+from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_task_spec
 
@@ -47,7 +48,7 @@ async def _wait_until(predicate: Callable[[], bool], poll_interval: float = 1.0)
 class GRPO(FinetuneTeleprompter):
     def __init__(
         self,
-        metric: Callable | None = None,
+        metric: OptimizerMetric | None = None,
         multitask: bool = True,
         train_kwargs: dict[str, Any] | dict[LM, dict[str, Any]] | None = None,
         adapter: Adapter | dict[LM, Adapter] | None = None,

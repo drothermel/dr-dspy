@@ -11,6 +11,7 @@ from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compilation import CompileResult, CompileStats
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, InferRulesCompileParams
+from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
@@ -20,14 +21,32 @@ logger = logging.getLogger(__name__)
 
 @register_teleprompter(params=InferRulesCompileParams)
 class InferRules(BootstrapFewShot):
-    def __init__(self, num_candidates=10, num_rules=10, max_concurrency=None, teacher_run=None, **kwargs) -> None:
-        super().__init__(teacher_run=teacher_run, **kwargs)
+    def __init__(
+        self,
+        metric: OptimizerMetric | None = None,
+        num_candidates: int = 10,
+        num_rules: int = 10,
+        max_concurrency: int | None = None,
+        teacher_run: RunContext | None = None,
+        max_errors: int | None = None,
+        metric_threshold: float | None = None,
+        max_bootstrapped_demos: int = 4,
+        max_labeled_demos: int = 16,
+        max_rounds: int = 1,
+    ) -> None:
+        super().__init__(
+            metric=metric,
+            metric_threshold=metric_threshold,
+            teacher_run=teacher_run,
+            max_bootstrapped_demos=max_bootstrapped_demos,
+            max_labeled_demos=max_labeled_demos,
+            max_rounds=max_rounds,
+            max_errors=max_errors,
+        )
         self.num_candidates = num_candidates
         self.num_rules = num_rules
         self.max_concurrency = max_concurrency
         self.rules_induction_program = RulesInductionProgram(num_rules, teacher_run=teacher_run)
-        self.metric = kwargs.get("metric")
-        self.max_errors = kwargs.get("max_errors")
 
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = InferRulesCompileParams.model_validate(params)

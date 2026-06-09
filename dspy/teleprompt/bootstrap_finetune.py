@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from typing import Any, Callable
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -13,6 +13,7 @@ from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_trace import bootstrap_trace_data
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
+from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ class FinetuneTeleprompter:
 class BootstrapFinetune(FinetuneTeleprompter):
     def __init__(
         self,
-        metric: Callable | None = None,
+        metric: OptimizerMetric | None = None,
         multitask: bool = True,
         train_kwargs: dict[str, Any] | dict[LM, dict[str, Any]] | None = None,
         adapter: Adapter | dict[LM, Adapter] | None = None,

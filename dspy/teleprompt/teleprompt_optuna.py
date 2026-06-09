@@ -7,6 +7,7 @@ from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, BootstrapOptunaCompileParams
+from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.utils import make_optimizer_evaluator
 
@@ -17,7 +18,7 @@ from .bootstrap import BootstrapFewShot
 class BootstrapFewShotWithOptuna:
     def __init__(
         self,
-        metric,
+        metric: OptimizerMetric,
         teacher_run: RunContext | None = None,
         max_bootstrapped_demos=4,
         max_labeled_demos=16,
