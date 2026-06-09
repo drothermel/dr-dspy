@@ -7,7 +7,7 @@ from typing_extensions import override
 
 from dspy.adapters.types.tool import Tool
 from dspy.core.types.call_options import ModuleCallOptions
-from dspy.history import TurnLog
+from dspy.history import TurnEvent, TurnLog
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.code_interpreter import FinalOutput
@@ -90,14 +90,14 @@ class CodeAct(Module):
             code_data = await self.codeact(turn_log=turn_log, run=run, options=options, **inputs)
             code, error = self._parse_code(code_data)
             if error:
-                turn_log = turn_log.append_turn({"observation": f"Failed to parse the generated code: {error}"})
+                turn_log = turn_log.append_turn(TurnEvent(observation=f"Failed to parse the generated code: {error}"))
                 continue
             output, error = self._execute_code(code)
-            event: dict = {"generated_code": code}
+            event = TurnEvent(generated_code=code)
             if not error:
-                event["code_output"] = output
+                event = event.model_copy(update={"code_output": output})
             else:
-                event["observation"] = f"Failed to execute the generated code: {error}"
+                event = event.model_copy(update={"observation": f"Failed to execute the generated code: {error}"})
             turn_log = turn_log.append_turn(event)
             if code_data.finished:
                 break

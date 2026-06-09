@@ -3,7 +3,7 @@ from typing import Any, cast
 
 from dspy.adapters.types.tool import Tool
 from dspy.core.types.call_options import ModuleCallOptions
-from dspy.history import TurnLog
+from dspy.history import TurnEvent, TurnLog
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
@@ -91,12 +91,12 @@ class ReAct(Module):
             except Exception as err:
                 observation = f"Execution error in {pred.next_tool_name}: {_fmt_exc(err)}"
             turn_log = turn_log.append_turn(
-                {
-                    "thought": pred.next_thought,
-                    "tool_name": pred.next_tool_name,
-                    "tool_args": pred.next_tool_args,
-                    "observation": observation,
-                }
+                TurnEvent(
+                    thought=pred.next_thought,
+                    tool_name=pred.next_tool_name,
+                    tool_args=pred.next_tool_args,
+                    observation=observation,
+                )
             )
             if pred.next_tool_name == "finish":
                 break

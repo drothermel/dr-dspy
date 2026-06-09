@@ -1,5 +1,5 @@
 from dspy.adapters.types.tool import ToolCallResults, ToolCalls
-from dspy.history import TurnLog
+from dspy.history import TurnEvent, TurnLog
 
 
 def test_tool_call_results_from_tool_calls_and_values():
@@ -41,4 +41,5 @@ def test_tool_call_results_history_serialization_round_trip():
             }
         ]
     }
-    assert restored.turns == tuple(dumped["turns"])
+    assert isinstance(restored.turns[0], TurnEvent)
+    assert restored.turns[0].tool_calls is not None

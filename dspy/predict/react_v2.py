@@ -9,7 +9,7 @@ from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
 from dspy.core.types.config import LMConfig, LMToolChoice
-from dspy.history import TurnLog
+from dspy.history import TurnEvent, TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
@@ -119,7 +119,7 @@ class ReActV2(Module):
             event = self._history_event(pending_inputs, pred, tool_calls, tool_call_results)
             if final_outputs is not None:
                 event.update(final_outputs)
-            turn_log = turn_log.append_turn(event)
+            turn_log = turn_log.append_turn(TurnEvent.model_validate(event))
             pending_inputs = {}
             if final_outputs is not None:
                 return Prediction(**final_outputs, turn_log=turn_log, termination_reason="submit")
@@ -194,7 +194,7 @@ class ReActV2(Module):
         event = self._history_event(pending_inputs, pred, submit_calls, tool_call_results)
         if final_outputs is not None:
             event.update(final_outputs)
-        turn_log = turn_log.append_turn(event)
+        turn_log = turn_log.append_turn(TurnEvent.model_validate(event))
         if final_outputs is not None:
             return Prediction(**final_outputs, turn_log=turn_log, termination_reason="forced_submit")
         return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")

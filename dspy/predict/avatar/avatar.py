@@ -1,5 +1,5 @@
 from dspy.core.types.call_options import ModuleCallOptions
-from dspy.history import TurnLog
+from dspy.history import TurnEvent, TurnLog
 from dspy.predict.avatar.models import Action, ActionOutput, Tool
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
@@ -81,7 +81,10 @@ class Avatar(Module):
             tool_input_query = action.tool_input_query
             if tool_name == "Finish":
                 turn_log = turn_log.append_turn(
-                    {"action": action, "result": "Gathered all information needed to finish the task."}
+                    TurnEvent(
+                        action=action,
+                        result="Gathered all information needed to finish the task.",
+                    )
                 )
                 break
             tool_output = self._call_tool(tool_name, tool_input_query)
@@ -89,7 +92,7 @@ class Avatar(Module):
                 ActionOutput(tool_name=tool_name, tool_input_query=tool_input_query, tool_output=tool_output)
             )
             turn_log = turn_log.append_turn(
-                {"action": action, "result": tool_output if tool_output is not None else ""}
+                TurnEvent(action=action, result=tool_output if tool_output is not None else "")
             )
             remaining -= 1
         final_answer = await self.finish(**args, turn_log=turn_log, run=run, options=options)

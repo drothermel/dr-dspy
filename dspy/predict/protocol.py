@@ -3,15 +3,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from dspy.core.types.lm import LMForward
+    from dspy.runtime import RunContext
     from dspy.task_spec.task_spec import TaskSpec
 
 
 @runtime_checkable
 class Predictor(Protocol):
     task_spec: TaskSpec
-    demos: list[Any]
-    lm: Any
-    run: Any | None
+    demos: list[dict[str, Any]]
+    lm: LMForward | None
+    run: RunContext | None
 
     def dump_state(self, json_mode: bool = True) -> dict[str, Any]: ...
 

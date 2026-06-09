@@ -10,12 +10,17 @@ import dspy.adapters.base as adapter_base
 import dspy.adapters.utils as adapter_utils
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool
+from dspy.history import TurnEvent
 from dspy.predict.react import ReAct
 from dspy.primitives.prediction import Prediction
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.utils.dummies import DummyLM
 from dspy.utils.exceptions import ContextWindowExceededError
 from tests.task_spec.helpers import ts
+
+
+def _turn_dict(turn: TurnEvent) -> dict:
+    return turn.to_dict()
 
 
 def _turns_from_flat(flat: dict) -> tuple:
@@ -77,7 +82,7 @@ def test_tool_observation_preserves_custom_type(make_run):
     run = make_run(lm=lm, adapter=adapter)
     react = ReAct(ts("question -> answer"), tools=[Tool(make_images, description="Create images.")])
     pred = asyncio.run(react(question="Draw me something red", run=run))
-    observation = pred.turn_log.turns[0]["observation"]
+    observation = _turn_dict(pred.turn_log.turns[0])["observation"]
     assert isinstance(observation, tuple)
     assert len(observation) == 2
     assert all(hasattr(item, "url") or hasattr(item, "data") for item in observation)
@@ -163,7 +168,7 @@ def test_tool_calling_with_pydantic_args(make_run):
         "tool_args_1": {},
         "observation_1": "Completed.",
     }
-    assert outputs.turn_log.turns == _turns_from_flat(expected_trajectory)
+    assert tuple(_turn_dict(t) for t in outputs.turn_log.turns) == _turns_from_flat(expected_trajectory)
 
 
 def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(monkeypatch, make_run):
@@ -210,8 +215,8 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
     run = make_run(lm=lm)
     result = asyncio.run(react(user_request="Help me, my name is Adam", run=run))
     assert result.process_result == "Resolved Adam's request."
-    assert result.turn_log.turns[0]["tool_name"] == "get_user_info"
-    assert result.turn_log.turns[0]["tool_args"] == {"name": "Adam"}
+    assert result.turn_log.turns[0].tool_name == "get_user_info"
+    assert result.turn_log.turns[0].tool_args == {"name": "Adam"}
 
 
 def test_tool_calling_without_typehint(make_run):
@@ -239,7 +244,7 @@ def test_tool_calling_without_typehint(make_run):
         "tool_args_1": {},
         "observation_1": "Completed.",
     }
-    assert outputs.turn_log.turns == _turns_from_flat(expected_trajectory)
+    assert tuple(_turn_dict(t) for t in outputs.turn_log.turns) == _turns_from_flat(expected_trajectory)
 
 
 def test_trajectory_truncation(make_run):
@@ -332,14 +337,14 @@ def test_error_retry(make_run):
         "tool_name_1": "foo",
         "tool_args_1": {"a": 1, "b": 2},
     }
-    assert turns[0]["thought"] == control_expected["thought_0"]
-    assert turns[0]["tool_name"] == control_expected["tool_name_0"]
-    assert turns[0]["tool_args"] == control_expected["tool_args_0"]
-    assert turns[1]["thought"] == control_expected["thought_1"]
-    assert turns[1]["tool_name"] == control_expected["tool_name_1"]
-    assert turns[1]["tool_args"] == control_expected["tool_args_1"]
+    assert turns[0].thought == control_expected["thought_0"]
+    assert turns[0].tool_name == control_expected["tool_name_0"]
+    assert turns[0].tool_args == control_expected["tool_args_0"]
+    assert turns[1].thought == control_expected["thought_1"]
+    assert turns[1].tool_name == control_expected["tool_name_1"]
+    assert turns[1].tool_args == control_expected["tool_args_1"]
     for i in range(2):
-        obs = turns[i]["observation"]
+        obs = turns[i].observation
         assert re.search("\\btool error\\b", obs), f"unexpected observation_{i!r}: {obs}"
 
 
@@ -420,7 +425,7 @@ async def test_async_tool_calling_with_pydantic_args(make_run):
         "tool_args_1": {},
         "observation_1": "Completed.",
     }
-    assert outputs.turn_log.turns == _turns_from_flat(expected_trajectory)
+    assert tuple(_turn_dict(t) for t in outputs.turn_log.turns) == _turns_from_flat(expected_trajectory)
 
 
 @pytest.mark.asyncio
@@ -448,12 +453,12 @@ async def test_async_error_retry(make_run):
         "tool_name_1": "foo",
         "tool_args_1": {"a": 1, "b": 2},
     }
-    assert turns[0]["thought"] == control_expected["thought_0"]
-    assert turns[0]["tool_name"] == control_expected["tool_name_0"]
-    assert turns[0]["tool_args"] == control_expected["tool_args_0"]
-    assert turns[1]["thought"] == control_expected["thought_1"]
-    assert turns[1]["tool_name"] == control_expected["tool_name_1"]
-    assert turns[1]["tool_args"] == control_expected["tool_args_1"]
+    assert turns[0].thought == control_expected["thought_0"]
+    assert turns[0].tool_name == control_expected["tool_name_0"]
+    assert turns[0].tool_args == control_expected["tool_args_0"]
+    assert turns[1].thought == control_expected["thought_1"]
+    assert turns[1].tool_name == control_expected["tool_name_1"]
+    assert turns[1].tool_args == control_expected["tool_args_1"]
     for i in range(2):
-        obs = turns[i]["observation"]
+        obs = turns[i].observation
         assert re.search("\\btool error\\b", obs), f"unexpected observation_{i!r}: {obs}"

@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from dspy.core.types.request import LMRequest
     from dspy.core.types.response import LMResponse
 
 
+@runtime_checkable
 class LMForward(Protocol):
-    async def aforward(self, request: LMRequest) -> LMResponse: ...
+    """Async LM protocol for per-call overrides via ``PredictOptions(lm=...)``.
 
-    async def __call__(self, request: LMRequest) -> LMResponse: ...
+    Implementations must provide ``aforward(request) -> LMResponse``.
+    ``BaseLM.__call__(request, run=..., compiled=...)`` is the runtime entry
+    point with logging and callbacks; it is not part of this protocol.
+    """
+
+    async def aforward(self, request: LMRequest) -> LMResponse: ...

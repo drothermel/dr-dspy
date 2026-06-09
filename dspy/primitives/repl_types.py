@@ -12,6 +12,7 @@ from dspy.adapters.utils import serialize_for_json
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dspy.history.turn_event import TurnEvent
     from dspy.task_spec.field_spec import FieldSpec
 __all__ = ["REPLVariable", "REPLEntry", "REPLHistory"]
 
@@ -105,11 +106,11 @@ class REPLHistory(pydantic.BaseModel):
     def empty(cls) -> REPLHistory:
         return cls()
 
-    def append_turn(self, event: dict[str, Any]) -> REPLHistory:
+    def append_turn(self, event: TurnEvent) -> REPLHistory:
         return self.append(
-            reasoning=str(event.get("reasoning", "")),
-            code=str(event.get("code", "")),
-            output=str(event.get("output", "")),
+            reasoning=str(event.reasoning or ""),
+            code=str(event.code or ""),
+            output=str(event.output or ""),
         )
 
     def append(self, *, reasoning: str = "", code: str, output: str) -> REPLHistory:
