@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any, cast
 
-from dspy.clients.media_uri import data_uri, split_data_uri
 from dspy.clients.openai_format.binary import binary_to_openai
+from dspy.core.types.media_uri import data_uri, split_data_uri
 from dspy.core.types.parts.models import (
     LMAudioPart,
     LMBinaryPart,

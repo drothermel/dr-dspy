@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any
 
-from dspy.clients.media_uri import data_uri, data_uri_from_path
+from dspy.core.types.media_uri import data_uri, data_uri_from_path
 
 if TYPE_CHECKING:
     from dspy.core.types.parts import LMBinaryPart

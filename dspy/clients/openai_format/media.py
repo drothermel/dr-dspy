@@ -4,7 +4,7 @@ from typing import Any
 
 import pydantic
 
-from dspy.clients.media_uri import (
+from dspy.core.types.media_uri import (
     data_uri,
     data_uri_from_path,
     media_type_for_path,

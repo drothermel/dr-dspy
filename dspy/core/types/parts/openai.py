@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlparse
 
-from dspy.clients.media_uri import split_data_uri
+from dspy.core.types.media_uri import split_data_uri
 from dspy.core.types.parts.models import (
     LMAudioPart,
     LMBinaryPart,
