@@ -3,21 +3,20 @@ from __future__ import annotations
 import contextlib
 import datetime
 import logging
+import os
 import random
-import socket
 import string
-import subprocess
-import threading
-import time
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from dspy._internal.lazy_import import import_optional, is_available
 from dspy.clients.finetune.provider import TrainingJob, UnsupportedReinforceJob
 from dspy.clients.finetune.utils import TrainDataFormat, save_data, validate_data_format
+from dspy.integrations.finetune.local_server import attach_local_server, kill_local_server, launch_local_server
 
 if TYPE_CHECKING:
     from dspy.clients.finetune.protocol import ReinforceJob as ReinforceJobProtocol
     from dspy.clients.lm import LM
+
 logger = logging.getLogger(__name__)
 
 _SGLANG_INSTALL_COMMAND = (
@@ -48,91 +47,20 @@ class LocalProvider:
             logger.info("Server is already launched.")
             return
         launch_kwargs = launch_kwargs or {}
-        import os
-
-        model = lm.model
-        if model.startswith("openai/"):
-            model = model[7:]
-        if model.startswith("local:"):
-            model = model[6:]
-        if model.startswith("huggingface/"):
-            model = model[len("huggingface/") :]
-        logger.info(f"Grabbing a free port to launch an SGLang server for model {model}")
-        logger.info(f"We see that CUDA_VISIBLE_DEVICES is {os.environ.get('CUDA_VISIBLE_DEVICES', 'unset')}")
-        port = get_free_port()
+        model = _normalize_model_name(lm.model)
+        logger.info("Grabbing a free port to launch an SGLang server for model %s", model)
+        logger.info("We see that CUDA_VISIBLE_DEVICES is %s", os.environ.get("CUDA_VISIBLE_DEVICES", "unset"))
         timeout = launch_kwargs.get("timeout", 1800)
-        command = [
-            "python",
-            "-m",
-            "sglang.launch_server",
-            "--model-path",
-            model,
-            "--port",
-            str(port),
-            "--host",
-            "0.0.0.0",  # noqa: S104
-        ]
-        process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        logger.info(f"SGLang server process started with PID {process.pid}.")
-        stop_printing_event = threading.Event()
-        logs_buffer = []
-
-        def _tail_process(proc, buffer, stop_event) -> None:
-            while True:
-                line = proc.stdout.readline()
-                if not line and proc.poll() is not None:
-                    break
-                if line:
-                    buffer.append(line)
-                    if not stop_event.is_set():
-                        pass
-
-        thread = threading.Thread(target=_tail_process, args=(process, logs_buffer, stop_printing_event), daemon=True)
-        thread.start()
-        base_url = f"http://localhost:{port}"
-        try:
-            wait_for_server(base_url, timeout=timeout)
-        except TimeoutError:
-            process.kill()
-            raise
-        stop_printing_event.set()
-
-        def get_logs() -> str:
-            return "".join(logs_buffer)
-
-        logger.info(f"Server ready on random port {port}! Logs are available via lm.get_logs() method on returned lm.")
-        lm.kwargs["api_base"] = f"http://localhost:{port}/v1"
-        lm.kwargs["api_key"] = "local"
-        lm.provider_options = lm.provider_options.model_copy(
-            update={"api_base": f"http://localhost:{port}/v1", "api_key": "local"}
+        handle = launch_local_server(model=model, timeout=timeout)
+        attach_local_server(lm, handle)
+        logger.info(
+            "Server ready on random port %s! Logs are available via lm.get_logs() method on returned lm.",
+            handle.port,
         )
-        lm_attrs = cast("Any", lm)
-        lm_attrs.get_logs = get_logs
-        lm_attrs.process = process
-        lm_attrs.thread = thread
 
     @staticmethod
     def kill(lm: LM, _launch_kwargs: dict[str, Any] | None = None) -> None:
-        sglang_utils = import_optional(
-            "sglang.utils",
-            feature="local model launching",
-            install_command=_SGLANG_INSTALL_COMMAND,
-        )
-        terminate_process = sglang_utils.terminate_process
-
-        if not hasattr(lm, "process"):
-            logger.info("No running server to kill.")
-            return
-        terminate_process(lm.process)
-        thread = getattr(lm, "thread", None)
-        if thread is not None:
-            thread.join()
-        del lm.process
-        if hasattr(lm, "thread"):
-            del lm.thread
-        if hasattr(lm, "get_logs"):
-            del lm.get_logs
-        logger.info("Server killed.")
+        kill_local_server(lm)
 
     @staticmethod
     def finetune(
@@ -142,17 +70,14 @@ class LocalProvider:
         train_data_format: TrainDataFormat | str | None,
         train_kwargs: dict[str, Any] | None = None,
     ) -> str:
-        if model.startswith("openai/"):
-            model = model[7:]
-        if model.startswith("local:"):
-            model = model[6:]
+        model = _normalize_model_name(model)
         if not isinstance(train_data_format, TrainDataFormat):
             raise TypeError(f"Expected TrainDataFormat, got {type(train_data_format).__name__}.")
         if train_data_format != TrainDataFormat.CHAT:
             raise ValueError("Only chat models are supported for local finetuning.")
         validate_data_format(train_data, train_data_format)
         data_path = save_data(train_data)
-        logger.info(f"Train data saved to {data_path}")
+        logger.info("Train data saved to %s", data_path)
         output_dir = create_output_dir(model_name=model, data_path=data_path)
         default_train_kwargs = {
             "device": None,
@@ -168,10 +93,20 @@ class LocalProvider:
         }
         train_kwargs = {**default_train_kwargs, **(train_kwargs or {})}
         output_dir = train_kwargs["output_dir"]
-        logger.info(f"Starting local training, will save to {output_dir}")
+        logger.info("Starting local training, will save to %s", output_dir)
         train_sft_locally(model_name=model, train_data=train_data, train_kwargs=train_kwargs)
         logger.info("Training complete")
         return f"local:{output_dir}"
+
+
+def _normalize_model_name(model: str) -> str:
+    if model.startswith("openai/"):
+        model = model[7:]
+    if model.startswith("local:"):
+        model = model[6:]
+    if model.startswith("huggingface/"):
+        model = model[len("huggingface/") :]
+    return model
 
 
 def create_output_dir(model_name, data_path):
@@ -195,7 +130,7 @@ def train_sft_locally(model_name, train_data, train_kwargs):
     device = train_kwargs.get("device", None)
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-    logger.info(f"Using device: {device}")
+    logger.info("Using device: %s", device)
     model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path=model_name).to(device)
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path=model_name)
     with contextlib.suppress(Exception):
@@ -207,7 +142,8 @@ def train_sft_locally(model_name, train_data, train_kwargs):
     if "max_seq_length" not in train_kwargs:
         train_kwargs["max_seq_length"] = 4096
         logger.info(
-            f"The 'train_kwargs' parameter didn't include a 'max_seq_length', defaulting to {train_kwargs['max_seq_length']}"
+            "The 'train_kwargs' parameter didn't include a 'max_seq_length', defaulting to %s",
+            train_kwargs["max_seq_length"],
         )
     from datasets import Dataset
 
@@ -272,28 +208,6 @@ def train_sft_locally(model_name, train_data, train_kwargs):
     gc.collect()
     torch.cuda.empty_cache()
     return sft_config.output_dir
-
-
-def get_free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("localhost", 0))
-        return s.getsockname()[1]
-
-
-def wait_for_server(base_url: str, timeout: int | None = None) -> None:
-    import requests
-
-    start_time = time.time()
-    while True:
-        try:
-            response = requests.get(f"{base_url}/v1/models", headers={"Authorization": "Bearer None"})
-            if response.status_code == 200:
-                time.sleep(5)
-                break
-            if timeout and time.time() - start_time > timeout:
-                raise TimeoutError("Server did not become ready within timeout period")
-        except requests.exceptions.RequestException:
-            time.sleep(1)
 
 
 def encode_sft_example(example, tokenizer, max_seq_length):

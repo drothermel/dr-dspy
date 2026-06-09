@@ -104,4 +104,4 @@ class FinetuneService:
             job.set_result(result_lm)
         except Exception as err:
             logger.exception("Finetune job failed")
-            job.set_result(err)
+            job.set_exception(err)

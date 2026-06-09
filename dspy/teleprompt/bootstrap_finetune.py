@@ -120,8 +120,6 @@ class BootstrapFinetune(FinetuneTeleprompter):
             data_pred_ind = None if self.multitask else pred_ind
             training_key = (pred.lm, data_pred_ind)
             finetuned_lm = key_to_lm[training_key]
-            if isinstance(finetuned_lm, Exception):
-                raise RuntimeError(f"Finetuned LM for predictor {pred_ind} failed.") from finetuned_lm
             pred.lm = finetuned_lm
             pred.demos = [] if self.exclude_demos else pred.demos
         logger.info("BootstrapFinetune has finished compiling the student program")
@@ -144,8 +142,6 @@ class BootstrapFinetune(FinetuneTeleprompter):
 
         async def wait_for_job(ind: int, key: Any, job) -> tuple[Any, LM]:
             result = await asyncio.to_thread(job.result)
-            if isinstance(result, Exception):
-                raise result
             assert job.thread is not None
             await asyncio.to_thread(job.thread.join)
             logger.info(f"Job {ind + 1}/{num_jobs} is done")
