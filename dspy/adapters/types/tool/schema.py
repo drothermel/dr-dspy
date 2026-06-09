@@ -1,7 +1,6 @@
 from typing import Any, Protocol, cast
 
 from dspy._internal.lazy_import import require
-from dspy.adapters.types.base_type import Type
 
 _TYPE_MAPPING = {"string": str, "integer": int, "number": float, "boolean": bool, "array": list, "object": dict}
 jsonschema = require("jsonschema", extra="tools", feature="dspy.adapters.types.tool.Tool argument validation")
@@ -34,7 +33,7 @@ def _resolve_json_schema_reference(schema: dict[str, Any]) -> dict[str, Any]:
 
 def convert_input_schema_to_tool_args(
     schema: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Type], dict[str, str], frozenset[str]]:
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, str], frozenset[str]]:
     args, arg_types, arg_desc = ({}, {}, {})
     properties = schema.get("properties")
     if properties is None:

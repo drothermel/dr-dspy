@@ -5,10 +5,10 @@ import pydantic
 from pydantic import create_model
 from typing_extensions import override
 
-from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.field_type import FieldTypeMixin
 
 
-class Code(Type):
+class Code(FieldTypeMixin):
     code: str
     language: ClassVar[str] = "python"
 

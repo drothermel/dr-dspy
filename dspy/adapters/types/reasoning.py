@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, cast
 import pydantic
 from typing_extensions import override
 
-from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.field_type import FieldTypeMixin
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from dspy.core.types import LMOutput
 
 
-class Reasoning(Type):
+class Reasoning(FieldTypeMixin):
     content: str
 
     @override
@@ -37,25 +37,10 @@ class Reasoning(Type):
         raise ValueError(f"Received invalid value for `dspy.Reasoning`: {data}")
 
     @classmethod
-    @override
     def parse_lm_output(cls, output: LMOutput) -> Reasoning | None:
         if output.reasoning_content:
             return Reasoning(content=output.reasoning_content)
         return None
-
-    @classmethod
-    @override
-    def parse_stream_chunk(cls, chunk: object) -> str | None:
-        try:
-            if choices := getattr(chunk, "choices", None):
-                return getattr(choices[0].delta, "reasoning_content", None)
-        except Exception:
-            return None
-
-    @classmethod
-    @override
-    def is_streamable(cls) -> bool:
-        return True
 
     @override
     def __repr__(self) -> str:

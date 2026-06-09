@@ -6,10 +6,10 @@ from typing import Any
 import pydantic
 from typing_extensions import override
 
-from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.field_type import FieldTypeMixin
 
 
-class File(Type):
+class File(FieldTypeMixin):
     file_data: str | None = None
     file_id: str | None = None
     filename: str | None = None

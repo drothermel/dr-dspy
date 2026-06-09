@@ -7,7 +7,7 @@ from typing import Any, cast
 import pydantic
 from typing_extensions import override
 
-from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.field_type import FieldTypeMixin
 
 try:
     import soundfile as sf
@@ -21,7 +21,7 @@ def _normalize_audio_format(audio_format: str) -> str:
     return audio_format.removeprefix("x-")
 
 
-class Audio(Type):
+class Audio(FieldTypeMixin):
     data: str
     audio_format: str
     model_config = pydantic.ConfigDict(frozen=True, extra="forbid")

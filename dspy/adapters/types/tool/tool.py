@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Callable, cast, get_origin, get_type_hint
 from pydantic import BaseModel, TypeAdapter, create_model
 from typing_extensions import override
 
-from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.field_type import FieldTypeMixin
 from dspy.core.types import LMToolSpec
 from dspy.runtime.callback import with_callbacks
 
@@ -27,7 +27,7 @@ def _validate_json_schema(instance: object, schema: dict[str, Any], arg_name: st
         raise ValueError(f"Arg {arg_name} is invalid: {e.message}") from e
 
 
-class Tool(Type):
+class Tool(FieldTypeMixin):
     func: Callable[..., object]
     name: str | None = None
     desc: str | None = None

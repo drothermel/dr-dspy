@@ -5,18 +5,16 @@ from typing import TYPE_CHECKING, Any, Self, cast
 import pydantic
 from typing_extensions import override
 
-from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.field_type import FieldTypeMixin
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from litellm import ModelResponseStream
-
     from dspy.core.types import LMOutput
 
 
-class Citations(Type):
-    class Citation(Type):
+class Citations(FieldTypeMixin):
+    class Citation(FieldTypeMixin):
         type: str = "char_location"
         cited_text: str
         document_index: int
@@ -89,27 +87,7 @@ class Citations(Type):
         return self.citations[index]
 
     @classmethod
-    @override
-    def is_streamable(cls) -> bool:
-        return True
-
-    @classmethod
-    @override
-    def parse_stream_chunk(cls, chunk: ModelResponseStream) -> Type | str | None:
-        try:
-            if hasattr(chunk, "choices") and chunk.choices:
-                delta = chunk.choices[0].delta
-                if hasattr(delta, "provider_specific_fields") and delta.provider_specific_fields:
-                    citation_data = delta.provider_specific_fields.get("citation")
-                    if citation_data:
-                        return cls.from_dict_list([citation_data])
-        except Exception:
-            pass
-        return None
-
-    @classmethod
-    @override
-    def parse_lm_output(cls, output: LMOutput) -> Type | None:
+    def parse_lm_output(cls, output: LMOutput) -> Citations | None:
         if output.citations:
             return cls.from_dict_list([cls._citation_part_to_dict(citation) for citation in output.citations])
         return None

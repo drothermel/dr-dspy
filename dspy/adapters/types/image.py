@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 import pydantic
 from typing_extensions import override
 
-from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.field_type import FieldTypeMixin
 
 try:
     from PIL import Image as PILImage
@@ -19,7 +19,7 @@ except ImportError:
     PIL_AVAILABLE = False
 
 
-class Image(Type):
+class Image(FieldTypeMixin):
     url: str
     model_config = pydantic.ConfigDict(frozen=True, str_strip_whitespace=True, validate_assignment=True, extra="forbid")
 

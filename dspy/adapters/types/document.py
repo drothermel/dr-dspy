@@ -3,10 +3,10 @@ from typing import Any, Literal
 import pydantic
 from typing_extensions import override
 
-from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.field_type import FieldTypeMixin
 
 
-class Document(Type):
+class Document(FieldTypeMixin):
     data: str
     title: str | None = None
     media_type: Literal["text/plain", "application/pdf"] = "text/plain"

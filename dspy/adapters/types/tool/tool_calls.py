@@ -7,7 +7,7 @@ from pydantic.json_schema import GetJsonSchemaHandler, JsonSchemaValue
 from pydantic_core import CoreSchema
 from typing_extensions import override
 
-from dspy.adapters.types.base_type import Type
+from dspy.adapters.types.field_type import FieldTypeMixin
 from dspy.adapters.utils.json_loads import load_json
 
 if TYPE_CHECKING:
@@ -37,8 +37,8 @@ def normalize_tool_call_dict(data: dict[str, Any], *, repair: bool = False) -> d
     return {"id": data.get("id") or data.get("call_id"), "name": name, "args": arguments}
 
 
-class ToolCalls(Type):
-    class ToolCall(Type):
+class ToolCalls(FieldTypeMixin):
+    class ToolCall(FieldTypeMixin):
         id: str | None = None
         name: str
         args: dict[str, Any]
