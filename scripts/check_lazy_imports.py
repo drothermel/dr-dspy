@@ -29,6 +29,8 @@ ALLOWLIST_SUFFIXES = (
     "core/types/message_coercion.py",
     # breaks runtime.batch ↔ primitives ↔ history import cycle
     "runtime/batch.py",
+    # breaks persistence.program ↔ primitives.module import cycle
+    "persistence/program.py",
     "evaluate/metrics.py",
 )
 

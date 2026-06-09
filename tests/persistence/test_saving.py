@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from typing_extensions import override
 
-from dspy.persistence import load
+from dspy.persistence import load_program
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module
@@ -23,7 +23,7 @@ def test_save_predict(tmp_path, make_run):
     predict.save(tmp_path, save_program=True)
     assert (tmp_path / "metadata.json").exists()
     assert (tmp_path / "program.pkl").exists()
-    loaded_predict = load(tmp_path, allow_pickle=True)
+    loaded_predict = load_program(tmp_path, allow_pickle=True)
     assert isinstance(loaded_predict, Predict)
     assert predict.task_spec == loaded_predict.task_spec
 
@@ -37,7 +37,7 @@ def test_save_custom_model(tmp_path, make_run):
 
     model = CustomModel()
     model.save(tmp_path, save_program=True)
-    loaded_model = load(tmp_path, allow_pickle=True)
+    loaded_model = load_program(tmp_path, allow_pickle=True)
     assert isinstance(loaded_model, CustomModel)
     assert len(model.predictors()) == len(loaded_model.predictors())
     for predictor, loaded_predictor in zip(model.predictors(), loaded_model.predictors(), strict=False):
@@ -61,7 +61,7 @@ def test_save_model_with_custom_signature(tmp_path, make_run):
     predict = Predict(MySignature)
     predict.task_spec = predict.task_spec.with_instructions("You are a helpful assistant.")
     predict.save(tmp_path, save_program=True)
-    loaded_predict = load(tmp_path, allow_pickle=True)
+    loaded_predict = load_program(tmp_path, allow_pickle=True)
     assert isinstance(loaded_predict, Predict)
     assert predict.task_spec == loaded_predict.task_spec
 
@@ -87,7 +87,8 @@ def test_save_compiled_model(tmp_path, make_run):
     )
     compiled_predict = compile_result.program
     compiled_predict.save(tmp_path, save_program=True)
-    loaded_predict = load(tmp_path, allow_pickle=True)
+    loaded_predict = load_program(tmp_path, allow_pickle=True)
+    assert isinstance(loaded_predict, Predict)
     assert compiled_predict.demos == loaded_predict.demos
     assert compiled_predict.task_spec == loaded_predict.task_spec
 
@@ -113,11 +114,11 @@ def test_load_with_version_mismatch(tmp_path):
     logger.addHandler(handler)
     logger.setLevel(logging.WARNING)
     try:
-        with patch("dspy.persistence.get_dependency_versions", return_value=save_versions):
+        with patch("dspy.persistence.metadata.get_dependency_versions", return_value=save_versions):
             predict.save(tmp_path, save_program=True)
         handler.messages.clear()
-        with patch("dspy.persistence.get_dependency_versions", return_value=load_versions):
-            loaded_predict = load(tmp_path, allow_pickle=True)
+        with patch("dspy.persistence.metadata.get_dependency_versions", return_value=load_versions):
+            loaded_predict = load_program(tmp_path, allow_pickle=True)
         mismatch_messages = [msg for msg in handler.messages if "There is a mismatch of" in msg]
         assert len(mismatch_messages) == 3
         assert isinstance(loaded_predict, Predict)
@@ -131,8 +132,8 @@ def test_pickle_loading_requires_explicit_permission(tmp_path):
     predict = Predict(QA_TASK_SPEC)
     predict.save(tmp_path, save_program=True)
     with pytest.raises(ValueError, match="Loading with pickle is not allowed"):
-        load(tmp_path)
-    loaded_predict = load(tmp_path, allow_pickle=True)
+        load_program(tmp_path)
+    loaded_predict = load_program(tmp_path, allow_pickle=True)
     assert isinstance(loaded_predict, Predict)
 
 

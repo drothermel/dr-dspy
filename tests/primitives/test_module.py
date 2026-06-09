@@ -20,7 +20,7 @@ except ImportError:
     pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
-from dspy.persistence import load
+from dspy.persistence import load_program
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module, Prediction
@@ -404,7 +404,7 @@ def test_save_with_extra_modules(tmp_path, make_run):
         sys.path.remove(str(tmp_path))
         del custom_module
         with pytest.raises(ModuleNotFoundError):
-            load(tmp_path, allow_pickle=True)
+            load_program(tmp_path, allow_pickle=True)
         sys.path.insert(0, str(tmp_path))
         import custom_module
 
@@ -412,8 +412,10 @@ def test_save_with_extra_modules(tmp_path, make_run):
         sys.modules.pop("custom_module", None)
         sys.path.remove(str(tmp_path))
         del custom_module
-        loaded_module = load(tmp_path, allow_pickle=True)
-        assert loaded_module.cot.predict.task_spec == cot.cot.predict.task_spec
+        loaded_module = load_program(tmp_path, allow_pickle=True)
+        loaded_cot = getattr(loaded_module, "cot", None)
+        assert loaded_cot is not None
+        assert loaded_cot.predict.task_spec == cot.cot.predict.task_spec
     finally:
         if str(tmp_path) in sys.path:
             sys.path.remove(str(tmp_path))
