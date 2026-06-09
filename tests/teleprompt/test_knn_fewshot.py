@@ -1,66 +1,92 @@
+import asyncio
+from unittest.mock import AsyncMock, patch
+
 import pytest
+from typing_extensions import override
 
-import dspy
+from dspy.clients.embedding import Embedder
+from dspy.predict.predict import Predict
+from dspy.primitives import Example, Module
+from dspy.teleprompt.bootstrap import BootstrapFewShot
+from dspy.teleprompt.compile_params import KNNFewShotCompileParams
 from dspy.teleprompt.knn_fewshot import KNNFewShot
-from dspy.utils.dummies import DummyLM, DummyVectorizer
+from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM, DummyVectorizer
 
 
-def mock_example(question: str, answer: str) -> dspy.Example:
-    """Creates a mock DSP example with specified question and answer."""
-    return dspy.Example(question=question, answer=answer).with_inputs("question")
+def mock_example(question: str, answer: str) -> Example:
+    return Example.from_record({"question": question, "answer": answer}, input_keys=("question",))
 
 
 @pytest.fixture
 def setup_knn_few_shot() -> KNNFewShot:
-    """Sets up a KNNFewShot instance for testing."""
     trainset = [
         mock_example("What is the capital of France?", "Paris"),
         mock_example("What is the largest ocean?", "Pacific"),
         mock_example("What is 2+2?", "4"),
     ]
-    return KNNFewShot(k=2, trainset=trainset, vectorizer=dspy.Embedder(DummyVectorizer()))
+    return KNNFewShot(k=2, trainset=trainset, vectorizer=Embedder(DummyVectorizer()))
 
 
 def test_knn_few_shot_initialization(setup_knn_few_shot):
-    """Tests the KNNFewShot initialization."""
     knn_few_shot = setup_knn_few_shot
-    assert knn_few_shot.KNN.k == 2, "Incorrect k value for KNN"
-    assert len(knn_few_shot.KNN.trainset) == 3, "Incorrect trainset size for KNN"
+    assert knn_few_shot.k == 2
+    assert knn_few_shot.knn.k == 2, "Incorrect k value for KNN"
+    assert len(knn_few_shot.knn.trainset) == 3, "Incorrect trainset size for KNN"
 
 
-class SimpleModule(dspy.Module):
+class SimpleModule(Module):
     def __init__(self, signature):
         super().__init__()
-        self.predictor = dspy.Predict(signature)
+        self.predictor = Predict(signature)
 
-    def forward(self, *args, **kwargs):
-        return self.predictor(**kwargs)
+    async def _aforward_impl(self, *, run, options=None, **inputs):
+        return await self.predictor(run=run, options=options, **inputs)
 
+    @override
     def reset_copy(self):
-        # Creates a new instance of SimpleModule with the same predictor
-        return SimpleModule(self.predictor.signature)
+        copied = SimpleModule(self.predictor.task_spec)
+        if self.predictor.lm is not None:
+            copied.predictor.set_lm(self.predictor.lm)
+        return copied
 
 
-# TODO: Test not working yet
-def _test_knn_few_shot_compile(setup_knn_few_shot):
-    """Tests the compile method of KNNFewShot with SimpleModule as student."""
-    student = SimpleModule("input -> output")
-    teacher = SimpleModule("input -> output")  # Assuming teacher uses the same module type
-
-    # Setup DummyLM with a response for a query similar to one of the training examples
-    lm = DummyLM(["Madrid", "10"])
-    dspy.configure(lm=lm)  # Responses for the capital of Spain and the result of 5+5)
-
+def test_knn_few_shot_forward_uses_neighbors(setup_knn_few_shot, make_run):
+    student = SimpleModule(ts("question -> answer"))
+    lm = DummyLM([{"answer": "Madrid"}, {"answer": "10"}])
+    run = make_run(lm=lm)
+    student.set_lm(lm)
     knn_few_shot = setup_knn_few_shot
-    trainset = knn_few_shot.KNN.trainset
-    compiled_student = knn_few_shot.compile(student, teacher=teacher, trainset=trainset, valset=None)
+    compile_result = asyncio.run(knn_few_shot.compile(student, params=KNNFewShotCompileParams(), run=run))
+    compiled_student = compile_result.program
+    asyncio.run(compiled_student(question="What is the capital of Spain?", run=run))
+    predictor = compiled_student.named_predictors()[0][1]
+    assert len(predictor.demos) == 2
+    assert all(isinstance(demo, Example) for demo in predictor.demos)
 
-    assert len(compiled_student.predictor.demos) == 1
-    assert compiled_student.predictor.demos[0].input == trainset[0].input
-    assert compiled_student.predictor.demos[0].output == trainset[0].output
-    # Simulate a query that is similar to one of the training examples
-    output = compiled_student.forward(input="What is the capital of Spain?").output
 
-    # Validate that the output corresponds to one of the expected DummyLM responses
-    # This assumes the compiled_student's forward method will execute the predictor with the given query
-    assert output in ["Madrid", "10"], "The compiled student did not return the correct output based on the query"
+def test_knn_few_shot_does_not_mutate_inner_forward(setup_knn_few_shot, make_run):
+    student = SimpleModule(ts("question -> answer"))
+    lm = DummyLM([{"answer": "Madrid"}])
+    run = make_run(lm=lm)
+    student.set_lm(lm)
+    original_impl = object.__getattribute__(student, "_aforward_impl")
+    compile_result = asyncio.run(setup_knn_few_shot.compile(student, params=KNNFewShotCompileParams(), run=run))
+    restored_impl = object.__getattribute__(student, "_aforward_impl")
+    assert restored_impl.__func__ is original_impl.__func__
+    assert restored_impl.__self__ is original_impl.__self__
+    asyncio.run(compile_result.program(question="What is the capital of Spain?", run=run))
+
+
+def test_knn_does_not_bootstrap_on_forward(setup_knn_few_shot, make_run):
+    student = SimpleModule(ts("question -> answer"))
+    lm = DummyLM([{"answer": "Madrid"}, {"answer": "Paris"}])
+    run = make_run(lm=lm)
+    student.set_lm(lm)
+    knn_few_shot = setup_knn_few_shot
+    with patch.object(BootstrapFewShot, "compile", new_callable=AsyncMock) as mock_bootstrap:
+        compile_result = asyncio.run(knn_few_shot.compile(student, params=KNNFewShotCompileParams(), run=run))
+        compiled_student = compile_result.program
+        asyncio.run(compiled_student(question="What is the capital of Spain?", run=run))
+        asyncio.run(compiled_student(question="What is 2+2?", run=run))
+        mock_bootstrap.assert_not_called()

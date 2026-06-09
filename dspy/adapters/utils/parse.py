@@ -1,0 +1,121 @@
+"""Adapter parse helpers.
+
+``validate_parsed_fields`` enforces a strict contract: every adapter ``parse`` call
+must return exactly the task spec's output field keys — no missing fields, no extras.
+Partial LM output always fails unless the adapter fills defaults before validation.
+"""
+
+import ast
+import enum
+import json
+import types
+from typing import Any, Literal, Union, cast, get_args, get_origin
+
+import pydantic
+from pydantic import TypeAdapter
+
+from dspy.adapters.types.field_type import is_field_type_class
+from dspy.adapters.utils.json_loads import load_json
+from dspy.errors import AdapterParseError
+from dspy.task_spec.field_spec import FieldSpec
+
+
+def validate_parsed_fields(
+    *,
+    adapter_name: str,
+    task_spec: Any,
+    lm_response: str,
+    fields: dict[str, Any],
+) -> None:
+    expected = set(task_spec.output_fields.keys())
+    actual = set(fields.keys())
+    if actual == expected:
+        return
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    parts = []
+    if missing:
+        parts.append(f"missing field(s): {missing}")
+    if extra:
+        parts.append(f"unexpected field(s): {extra}")
+    raise AdapterParseError(
+        adapter_name=adapter_name,
+        task_spec=task_spec,
+        lm_response=lm_response,
+        parsed_result=fields,
+        message="; ".join(parts),
+    )
+
+
+def parse_output_field(
+    *,
+    adapter_name: str,
+    task_spec: Any,
+    field_name: str,
+    raw_value: object,
+    lm_response: str,
+    field: FieldSpec,
+    repair: bool = False,
+) -> object:
+    try:
+        return parse_value(raw_value, field.type_, repair=repair)
+    except Exception as exc:
+        raise AdapterParseError(
+            adapter_name=adapter_name,
+            task_spec=task_spec,
+            lm_response=lm_response,
+            message=f"Failed to parse field {field_name!r}: {exc}",
+        ) from exc
+
+
+def find_enum_member(enum_type: enum.EnumMeta, identifier: object) -> enum.Enum:
+    for member in enum_type:
+        member = cast("enum.Enum", member)
+        if member.value == identifier:
+            return member
+    if isinstance(identifier, str) and identifier in enum_type.__members__:
+        return cast("enum.Enum", enum_type[identifier])
+    raise ValueError(f"{identifier} is not a valid name or value for the enum {enum_type.__name__}")
+
+
+def parse_value(value: object, annotation: object, *, repair: bool = False) -> object:
+    if annotation is str:
+        return str(value)
+    if isinstance(annotation, enum.EnumMeta):
+        return find_enum_member(enum_type=annotation, identifier=value)
+    origin = get_origin(annotation)
+    if origin is Literal:
+        allowed = get_args(annotation)
+        if value in allowed:
+            return value
+        if isinstance(value, str):
+            v = value.strip()
+            if v.startswith(("Literal[", "str[")) and v.endswith("]"):
+                v = v[v.find("[") + 1 : -1]
+            if len(v) > 1 and v[0] == v[-1] and (v[0] in "\"'"):
+                v = v[1:-1]
+            if v in allowed:
+                return v
+        raise ValueError(f"{value!r} is not one of {allowed!r}")
+    if not isinstance(value, str):
+        return TypeAdapter(annotation).validate_python(value)
+    if origin in (Union, types.UnionType) and type(None) in get_args(annotation) and (str in get_args(annotation)):
+        return TypeAdapter(annotation).validate_python(value)
+    try:
+        candidate = load_json(value, repair=repair)
+    except json.JSONDecodeError:
+        candidate = value
+    if candidate == "" and value != "":
+        try:
+            candidate = ast.literal_eval(value)
+        except (ValueError, SyntaxError):
+            candidate = value
+    try:
+        return TypeAdapter(annotation).validate_python(candidate)
+    except pydantic.ValidationError as e:
+        if is_field_type_class(annotation):
+            try:
+                return TypeAdapter(annotation).validate_python(value)
+            except Exception:
+                raise e
+        raise

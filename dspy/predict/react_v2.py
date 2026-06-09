@@ -1,41 +1,50 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, get_args
+from typing import Any, get_args
 
 import pydantic
 
-import dspy
+from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
-from dspy.primitives.module import Module
-from dspy.primitives.prediction import Prediction
-from dspy.signatures.signature import ensure_signature
-from dspy.utils.annotation import experimental
-from dspy.utils.exceptions import AdapterParseError, ContextWindowExceededError
+from dspy.core.types import LMConfig, LMToolChoice
+from dspy.errors import AdapterParseError
+from dspy.history import ReActV2TurnEvent, TruncationExhaustedError, TurnLog, call_with_history_truncation
+from dspy.predict.agent_constants import REACT_V2_TERMINAL_TOOL
+from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult, format_tool_exception
+from dspy.predict.agent_termination import AgentTerminationReason
+from dspy.predict.call_options import PredictOptions
+from dspy.predict.predict import Predict
+from dspy.predict.tools import normalize_tools
+from dspy.primitives import Module, Prediction
+from dspy.runtime.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
+from dspy.runtime.run_context import RunContext, resolve_run
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 
 logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    from dspy.signatures.signature import Signature
 
-
-@experimental
 class ReActV2(Module):
-    def __init__(self, signature: type[Signature], tools: list[Callable | Tool], max_iters: int = 20):
+    """Tool-calling agent with native ``ToolCalls`` and a typed ``submit`` tool.
+
+    Prefer this module for new agent work. Legacy string-based tool selection
+    remains available via ``ReAct``.
+    """
+
+    def __init__(self, task_spec: TaskSpec, tools: list[Tool], max_iters: int = 20) -> None:
         super().__init__()
-        self.signature = ensure_signature(signature)
+        if not isinstance(task_spec, TaskSpec):
+            raise TypeError(f"ReActV2 requires a TaskSpec instance, got {type(task_spec).__name__}.")
+        self.task_spec = task_spec
         self.max_iters = max_iters
-
-        user_tools = [tool if isinstance(tool, Tool) else Tool(tool) for tool in tools]
-        self.tools = {tool.name: tool for tool in user_tools}
-        if "submit" in self.tools:
-            raise ValueError("`submit` is reserved by ReActV2 as the final-output tool.")
-        self.tools["submit"] = self._make_submit_tool()
-
-        self.react = dspy.Predict(self._make_react_signature())
+        self.tools = normalize_tools(tools)
+        if REACT_V2_TERMINAL_TOOL in self.tools:
+            raise ValueError(f"`{REACT_V2_TERMINAL_TOOL}` is reserved by ReActV2 as the final-output tool.")
+        self.tools[REACT_V2_TERMINAL_TOOL] = self._make_submit_tool()
+        self.react = Predict(self._make_react_task_spec())
 
     def _make_submit_tool(self) -> Tool:
-        output_fields = self.signature.output_fields
+        output_fields = self.task_spec.output_fields
         output_names = list(output_fields)
 
         def submit(**kwargs):
@@ -44,109 +53,145 @@ class ReActV2(Module):
                 raise ValueError(f"Missing required final output field(s): {', '.join(missing)}")
             return {name: kwargs[name] for name in output_names}
 
-        args = {
-            name: _json_schema_for_annotation(field.annotation)
-            for name, field in output_fields.items()
-        }
-        arg_types = {name: field.annotation for name, field in output_fields.items()}
+        args = {name: _json_schema_for_annotation(field.type_) for name, field in output_fields.items()}
+        arg_types = {name: field.type_ for name, field in output_fields.items()}
         return Tool(
-            submit,
-            name="submit",
-            desc="Submit the final outputs for the task.",
-            args=args,
-            arg_types=arg_types,
+            submit, description="Submit the final outputs for the task.", name="submit", args=args, arg_types=arg_types
         )
 
-    def _make_react_signature(self) -> type[Signature]:
-        fields = {}
-        for name, field in self.signature.input_fields.items():
-            fields[name] = (
-                _optional_annotation(field.annotation),
-                dspy.InputField(desc=field.json_schema_extra.get("desc")),
-            )
-
-        fields["history"] = (dspy.History, dspy.InputField())
-        fields["tools"] = (list[dspy.Tool], dspy.InputField())
-        fields["next_thought"] = (dspy.Reasoning, dspy.OutputField())
-        fields["tool_calls"] = (dspy.ToolCalls, dspy.OutputField())
-
-        inputs = ", ".join(f"`{name}`" for name in self.signature.input_fields)
-        outputs = ", ".join(f"`{name}`" for name in self.signature.output_fields)
+    def _make_react_task_spec(self) -> TaskSpec:
+        fields: dict[str, FieldSpec] = {}
+        for name, field in self.task_spec.input_fields.items():
+            fields[name] = input_field(name, _optional_annotation(field.type_), desc=field.desc)
+        fields["turn_log"] = input_field("turn_log", TurnLog, desc="Previous thoughts, tool calls, and tool results.")
+        fields["tools"] = input_field("tools", list[Tool], desc="Tools available for this step.")
+        fields["next_thought"] = output_field("next_thought", Reasoning, desc="Your next reasoning step.")
+        fields["tool_calls"] = output_field("tool_calls", ToolCalls, desc="Tool calls to execute next.")
+        inputs = ", ".join(f"`{name}`" for name in self.task_spec.input_fields)
+        outputs = ", ".join(f"`{name}`" for name in self.task_spec.output_fields)
         tool_names = ", ".join(f"`{name}`" for name in self.tools)
         instructions = "\n".join(
             [
-                self.signature.instructions,
+                self.task_spec.instructions,
                 f"You are an Agent. Use the supplied tools to produce {outputs} from {inputs}.",
                 "Call tools when more information is needed.",
-                f"When the final answer is ready, call `submit` with {outputs}.",
+                f"When the final answer is ready, call `{REACT_V2_TERMINAL_TOOL}` with {outputs}.",
                 f"The available tools are: {tool_names}.",
             ]
         ).strip()
+        return make_task_spec(fields, instructions=instructions)
 
-        return dspy.Signature(fields, instructions)
-
-    def forward(self, **input_args):
+    async def _aforward_impl(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **input_args,
+    ):
+        run = resolve_run(run=run, bound_run=self.run)
         max_iters = input_args.pop("max_iters", self.max_iters)
-        history = _coerce_history(input_args.pop("history", None))
-        pending_inputs = {name: input_args[name] for name in self.signature.input_fields if name in input_args}
+        if "history" in input_args:
+            raise ValueError("ReActV2 accepts `turn_log=` only; the `history=` keyword was removed.")
+        turn_log_raw = input_args.pop("turn_log", None)
+        turn_log = TurnLog.empty() if turn_log_raw is None else TurnLog.model_validate(turn_log_raw)
+        pending_inputs = {name: input_args[name] for name in self.task_spec.input_fields if name in input_args}
 
-        break_reason = "max_iters"
-        for turn_index in range(max_iters):
+        async def step(turn_index: int, turn_log: TurnLog) -> AgentStepResult[TurnLog]:
+            nonlocal pending_inputs
             try:
-                pred = self.react(
-                    history=history,
+                extracted = await call_with_history_truncation(
+                    self.react,
+                    turn_log=turn_log,
                     tools=list(self.tools.values()),
                     **pending_inputs,
+                    run=run,
+                    options=options,
                 )
+                pred = extracted.result
+                turn_log = extracted.turn_log
                 tool_calls = _coerce_tool_calls(getattr(pred, "tool_calls", None))
-            except (AdapterParseError, ValueError) as err:
-                logger.warning("Ending ReActV2 loop after parse failure: %s", _fmt_exc(err))
-                break_reason = "parse_error"
-                break
-            except ContextWindowExceededError:
-                logger.warning("Ending ReActV2 loop after context window exceeded.")
-                break_reason = "context_window_exceeded"
-                break
-
+            except TruncationExhaustedError as err:
+                logger.warning("Ending ReActV2 loop after context window exceeded: %s", err)
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.CONTEXT_WINDOW_EXCEEDED,
+                )
+            except ValueError as err:
+                logger.warning("Ending ReActV2 loop after parse failure: %s", format_tool_exception(err))
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.PARSE_ERROR,
+                )
+            except AdapterParseError as err:
+                logger.warning("Ending ReActV2 loop after parse failure: %s", format_tool_exception(err))
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.PARSE_ERROR,
+                )
             if not tool_calls.tool_calls:
-                break_reason = "empty_tool_calls"
-                break
-
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.EMPTY_TOOL_CALLS,
+                )
             tool_calls = _ensure_tool_call_ids(tool_calls, turn_index)
-            tool_call_results, final_outputs = self._execute_tool_calls(tool_calls)
-            event = self._history_event(pending_inputs, pred, tool_calls, tool_call_results)
-            if final_outputs is not None:
-                event.update(final_outputs)
-            _append_history_event(history, event)
+            tool_call_results, final_outputs = await self._execute_tool_calls(tool_calls)
+            turn_log = turn_log.append_turn(
+                self._history_event(
+                    pending_inputs,
+                    pred,
+                    tool_calls,
+                    tool_call_results,
+                    submit_outputs=final_outputs,
+                )
+            )
             pending_inputs = {}
-
             if final_outputs is not None:
-                return Prediction(**final_outputs, history=history, termination_reason="submit")
+                return AgentStepResult(
+                    history=turn_log,
+                    control=AgentLoopControl.RETURN,
+                    termination_reason=AgentTerminationReason.SUBMIT,
+                    return_value=Prediction(
+                        **final_outputs,
+                        turn_log=turn_log,
+                        termination_reason=AgentTerminationReason.SUBMIT,
+                    ),
+                )
+            return AgentStepResult(history=turn_log)
 
-        return self._forced_submit(history, pending_inputs, break_reason, max_iters)
+        loop_result = await AgentLoopRunner[TurnLog]().run(
+            max_iters=max_iters,
+            initial_history=turn_log,
+            step=step,
+        )
+        if loop_result.return_value is not None:
+            return loop_result.return_value
+        return await self._forced_submit(
+            loop_result.history, pending_inputs, loop_result.termination_reason, max_iters, run=run
+        )
 
-    def _execute_tool_calls(self, tool_calls: ToolCalls) -> tuple[ToolCallResults, dict[str, Any] | None]:
+    async def _execute_tool_calls(self, tool_calls: ToolCalls) -> tuple[ToolCallResults, dict[str, Any] | None]:
         values = []
         is_errors = []
         final_outputs = None
-
         for tool_call in tool_calls.tool_calls:
             if tool_call.name not in self.tools:
                 values.append(f"Unknown tool: {tool_call.name}")
                 is_errors.append(True)
                 continue
-
             try:
-                value = self.tools[tool_call.name](**(tool_call.args or {}))
+                value = await self.tools[tool_call.name].acall(**(tool_call.args or {}))
                 values.append(value)
                 is_errors.append(False)
-                if tool_call.name == "submit" and isinstance(value, dict):
-                    final_outputs = value
+                if tool_call.name == REACT_V2_TERMINAL_TOOL and isinstance(value, dict):
+                    final_outputs = dict(value)
             except Exception as err:
-                values.append(f"Execution error in {tool_call.name}: {_fmt_exc(err)}")
+                values.append(f"Execution error in {tool_call.name}: {format_tool_exception(err)}")
                 is_errors.append(True)
-
-        return ToolCallResults.from_tool_calls_and_values(tool_calls, values, is_errors), final_outputs
+        return (ToolCallResults.from_tool_calls_and_values(tool_calls, values, is_errors), final_outputs)
 
     def _history_event(
         self,
@@ -154,52 +199,91 @@ class ReActV2(Module):
         pred: Prediction,
         tool_calls: ToolCalls,
         tool_call_results: ToolCallResults,
-    ) -> dict[str, Any]:
-        event = dict(pending_inputs)
-        if hasattr(pred, "next_thought") and pred.next_thought is not None:
-            event["next_thought"] = pred.next_thought
-        if tool_calls.tool_calls:
-            if tool_call_results.tool_call_results:
-                tool_calls = tool_calls.model_copy(update={"tool_call_results": tool_call_results})
-            event["tool_calls"] = tool_calls
-        return event
+        *,
+        submit_outputs: dict[str, Any] | None = None,
+    ) -> ReActV2TurnEvent:
+        recorded_tool_calls = tool_calls
+        if tool_calls.tool_calls and tool_call_results.tool_call_results:
+            recorded_tool_calls = tool_calls.model_copy(update={"tool_call_results": tool_call_results})
+        return ReActV2TurnEvent(
+            next_thought=getattr(pred, "next_thought", None),
+            tool_calls=recorded_tool_calls if tool_calls.tool_calls else None,
+            pending_inputs=pending_inputs or None,
+            submit_outputs=submit_outputs,
+        )
 
-    def _forced_submit(
+    async def _forced_submit(
         self,
-        history: dspy.History,
+        turn_log: TurnLog,
         pending_inputs: dict[str, Any],
-        break_reason: str,
+        break_reason: AgentTerminationReason,
         turn_index: int,
+        *,
+        run: RunContext,
     ) -> Prediction:
         try:
-            pred = self.react(
-                history=history,
+            extracted = await call_with_history_truncation(
+                self.react,
+                turn_log=turn_log,
                 tools=list(self.tools.values()),
-                config={
-                    "tool_choice": {"type": "function", "function": {"name": "submit"}},
-                    "reasoning_effort": None,
-                },
+                options=PredictOptions(
+                    config=LMConfig(
+                        tool_choice=LMToolChoice(mode="required", allowed=[REACT_V2_TERMINAL_TOOL]),
+                        reasoning=None,
+                    )
+                ),
                 **pending_inputs,
+                run=run,
             )
+            pred = extracted.result
+            turn_log = extracted.turn_log
             tool_calls = _ensure_tool_call_ids(_coerce_tool_calls(getattr(pred, "tool_calls", None)), turn_index)
-        except (AdapterParseError, ValueError, ContextWindowExceededError) as err:
-            logger.warning("Forced submit failed: %s", _fmt_exc(err))
-            return Prediction(history=history, termination_reason=break_reason or "failed")
-
-        submit_calls = ToolCalls(tool_calls=[call for call in tool_calls.tool_calls if call.name == "submit"])
+        except TruncationExhaustedError as err:
+            logger.warning("Forced submit failed after context window exceeded: %s", err)
+            return Prediction(
+                turn_log=turn_log,
+                termination_reason=break_reason or AgentTerminationReason.FAILED,
+            )
+        except ValueError as err:
+            logger.warning("Forced submit failed: %s", format_tool_exception(err))
+            return Prediction(
+                turn_log=turn_log,
+                termination_reason=break_reason or AgentTerminationReason.FAILED,
+            )
+        except AdapterParseError as err:
+            logger.warning("Forced submit failed: %s", format_tool_exception(err))
+            return Prediction(
+                turn_log=turn_log,
+                termination_reason=break_reason or AgentTerminationReason.FAILED,
+            )
+        submit_calls = ToolCalls(
+            tool_calls=[call for call in tool_calls.tool_calls if call.name == REACT_V2_TERMINAL_TOOL]
+        )
         if not submit_calls.tool_calls:
-            return Prediction(history=history, termination_reason=break_reason or "failed")
-
-        tool_call_results, final_outputs = self._execute_tool_calls(submit_calls)
-        event = self._history_event(pending_inputs, pred, submit_calls, tool_call_results)
+            return Prediction(
+                turn_log=turn_log,
+                termination_reason=break_reason or AgentTerminationReason.FAILED,
+            )
+        tool_call_results, final_outputs = await self._execute_tool_calls(submit_calls)
+        turn_log = turn_log.append_turn(
+            self._history_event(
+                pending_inputs,
+                pred,
+                submit_calls,
+                tool_call_results,
+                submit_outputs=final_outputs,
+            )
+        )
         if final_outputs is not None:
-            event.update(final_outputs)
-        _append_history_event(history, event)
-
-        if final_outputs is not None:
-            return Prediction(**final_outputs, history=history, termination_reason="forced_submit")
-
-        return Prediction(history=history, termination_reason=break_reason or "failed")
+            return Prediction(
+                **final_outputs,
+                turn_log=turn_log,
+                termination_reason=AgentTerminationReason.FORCED_SUBMIT,
+            )
+        return Prediction(
+            turn_log=turn_log,
+            termination_reason=break_reason or AgentTerminationReason.FAILED,
+        )
 
 
 def _json_schema_for_annotation(annotation: Any) -> dict[str, Any]:
@@ -218,14 +302,6 @@ def _optional_annotation(annotation: Any) -> Any:
         return annotation
 
 
-def _coerce_history(history: Any) -> dspy.History:
-    if history is None:
-        return dspy.History(messages=[])
-    if isinstance(history, dspy.History):
-        return history
-    return dspy.History.model_validate(history)
-
-
 def _coerce_tool_calls(tool_calls: Any) -> ToolCalls:
     if tool_calls is None:
         return ToolCalls(tool_calls=[])
@@ -239,14 +315,3 @@ def _ensure_tool_call_ids(tool_calls: ToolCalls, turn_index: int) -> ToolCalls:
             tool_call = tool_call.model_copy(update={"id": f"call_{turn_index}_{call_index}"})
         ensured.append(tool_call)
     return ToolCalls(tool_calls=ensured)
-
-
-def _append_history_event(history: dspy.History, event: dict[str, Any]) -> None:
-    if event:
-        history.messages.append(event)
-
-
-def _fmt_exc(err: BaseException, *, limit: int = 5) -> str:
-    import traceback
-
-    return "\n" + "".join(traceback.format_exception(type(err), err, err.__traceback__, limit=limit)).strip()

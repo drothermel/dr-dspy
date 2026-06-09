@@ -1,103 +1,72 @@
+import asyncio
+from typing import Any, cast
+
 import pytest
 
-import dspy
+from dspy.adapters.types.reasoning import Reasoning
+from dspy.predict.chain_of_thought import ChainOfThought
+from tests.task_spec.helpers import ts
 
 
-def test_reasoning_basic_operations():
-    reasoning = dspy.Reasoning(content="Hello World")
-
-    # Test str conversion
+def test_reasoning_basic_operations(make_run):
+    reasoning = Reasoning(content="Hello World")
     assert str(reasoning) == "Hello World"
     assert repr(reasoning) == "'Hello World'"
-
-    # Test equality
     assert reasoning == "Hello World"
-    assert reasoning == dspy.Reasoning(content="Hello World")
+    assert reasoning == Reasoning(content="Hello World")
     assert reasoning != "hello world"
-    assert reasoning != dspy.Reasoning(content="hello world")
-
-    # Test len
+    assert reasoning != Reasoning(content="hello world")
     assert len(reasoning) == 11
-
-    # Test indexing
     assert reasoning[0] == "H"
     assert reasoning[-1] == "d"
     assert reasoning[0:5] == "Hello"
-
-    # Test in operator
     assert "World" in reasoning
     assert "xyz" not in reasoning
-
-    # Test iteration
-    chars = [c for c in reasoning]
+    chars = list(reasoning)
     assert len(chars) == 11
     assert chars[0] == "H"
 
 
-def test_reasoning_concatenation():
-    reasoning = dspy.Reasoning(content="Hello")
-
-    # Test + operator
+def test_reasoning_concatenation(make_run):
+    reasoning = Reasoning(content="Hello")
     result1 = reasoning + " World"
     assert result1 == "Hello World"
     assert isinstance(result1, str)
-
-    # Test reverse + operator
     result2 = "Prefix: " + reasoning
     assert result2 == "Prefix: Hello"
     assert isinstance(result2, str)
-
-    # Test Reasoning + Reasoning
-    reasoning2 = dspy.Reasoning(content=" World")
+    reasoning2 = Reasoning(content=" World")
     result3 = reasoning + reasoning2
-    assert isinstance(result3, dspy.Reasoning)
+    assert isinstance(result3, Reasoning)
     assert result3.content == "Hello World"
 
 
-def test_reasoning_string_methods():
-    reasoning = dspy.Reasoning(content="  Hello World  ")
-
-    # Test strip
-    assert reasoning.strip() == "Hello World"
-
-    # Test lower/upper
-    assert reasoning.lower() == "  hello world  "
-    assert reasoning.upper() == "  HELLO WORLD  "
-
-    # Test split
-    assert reasoning.strip().split() == ["Hello", "World"]
-    assert reasoning.strip().split(" ") == ["Hello", "World"]
-
-    # Test replace
-    assert reasoning.replace("World", "Python") == "  Hello Python  "
-
-    # Test startswith/endswith
-    assert reasoning.strip().startswith("Hello")
-    assert reasoning.strip().endswith("World")
-    assert not reasoning.strip().startswith("World")
-
-    # Test find
-    assert reasoning.find("World") == 8
-    assert reasoning.find("xyz") == -1
-
-    # Test count
-    assert reasoning.count("l") == 3
-
-    # Test join
-    assert reasoning.strip().join(["a", "b", "c"]) == "aHello WorldbHello Worldc"
+def test_reasoning_string_methods(make_run):
+    reasoning = Reasoning(content="  Hello World  ")
+    text_ops = cast("Any", reasoning)
+    assert text_ops.strip() == "Hello World"
+    assert text_ops.lower() == "  hello world  "
+    assert text_ops.upper() == "  HELLO WORLD  "
+    assert text_ops.strip().split() == ["Hello", "World"]
+    assert text_ops.strip().split(" ") == ["Hello", "World"]
+    assert text_ops.replace("World", "Python") == "  Hello Python  "
+    assert text_ops.strip().startswith("Hello")
+    assert text_ops.strip().endswith("World")
+    assert not text_ops.strip().startswith("World")
+    assert text_ops.find("World") == 8
+    assert text_ops.find("xyz") == -1
+    assert text_ops.count("l") == 3
+    assert text_ops.strip().join(["a", "b", "c"]) == "aHello WorldbHello Worldc"
 
 
-def test_reasoning_with_chain_of_thought():
-    from dspy.utils import DummyLM
+def test_reasoning_with_chain_of_thought(make_run):
+    from tests.test_utils import DummyLM
 
     lm = DummyLM([{"reasoning": "Let me think step by step", "answer": "42"}])
-    dspy.configure(lm=lm)
-
-    cot = dspy.ChainOfThought("question -> answer")
-    result = cot(question="What is the answer?")
-
-    # Test that we can use string methods on result.reasoning
-    assert isinstance(result.reasoning, str)
+    run = make_run(lm=lm)
+    cot = ChainOfThought(ts("question -> answer"))
+    result = asyncio.run(cot(question="What is the answer?", run=run))
+    assert isinstance(result.reasoning, Reasoning)
     assert result.reasoning.strip() == "Let me think step by step"
     assert result.reasoning.lower() == "let me think step by step"
     assert "step by step" in result.reasoning
@@ -105,7 +74,10 @@ def test_reasoning_with_chain_of_thought():
 
 
 def test_reasoning_error_message():
-    reasoning = dspy.Reasoning(content="Hello")
+    reasoning = Reasoning(content="Hello")
+
+    def access_missing_method() -> None:
+        reasoning.nonexistent_method  # noqa: B018
 
     with pytest.raises(AttributeError, match="`Reasoning` object has no attribute 'nonexistent_method'"):
-        reasoning.nonexistent_method
+        access_missing_method()

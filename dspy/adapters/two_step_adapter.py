@@ -1,244 +1,120 @@
 from typing import Any
 
-import json_repair
+from typing_extensions import override
 
 from dspy.adapters.base import Adapter
-from dspy.adapters.chat_adapter import ChatAdapter
-from dspy.adapters.types import ToolCalls
-from dspy.adapters.utils import get_field_description_string
+from dspy.adapters.call.capabilities import AdapterCapabilities
+from dspy.adapters.call.mode import AdapterCallMode
+from dspy.adapters.call.pipeline import AdapterCallPipeline
+from dspy.adapters.prompt_format import get_field_spec_description_string
+from dspy.adapters.two_step.task_specs import build_extractor_task_spec
 from dspy.clients.base_lm import BaseLM
-from dspy.signatures.field import InputField
-from dspy.signatures.signature import Signature, make_signature
-from dspy.utils.exceptions import AdapterParseError, LMError
-
-"""
-NOTE/TODO/FIXME:
-
-The main issue below is that the second step's signature is entirely created on the fly and is invoked with a chat
-adapter explicitly constructed with no demonstrations. This means that it cannot "learn" or get optimized.
-"""
+from dspy.core.types import LMConfig
+from dspy.errors import AdapterOperationError
+from dspy.runtime.config import CallSite
+from dspy.runtime.run_context import RunContext
+from dspy.runtime.transparency.resolve import merge_call_config, require_adapter
+from dspy.task_spec import TaskSpec
 
 
 class TwoStepAdapter(Adapter):
-    """
-    A two-stage adapter that:
-        1. Uses a simpler, more natural prompt for the main LM
-        2. Uses a smaller LM with chat adapter to extract structured data from the response of main LM
-    This adapter uses a common __call__ logic defined in base Adapter class.
-    This class is particularly useful when interacting with reasoning models as the main LM since reasoning models
-    are known to struggle with structured outputs.
+    """Two-step adapter: main LM produces free text; extraction adapter parses fields.
 
-    Examples:
-    ```
-    import dspy
-    lm = dspy.LM(model="openai/o3-mini", max_tokens=16000, temperature = 1.0)
-    adapter = dspy.TwoStepAdapter(dspy.LM("openai/gpt-4o-mini"))
-    dspy.configure(lm=lm, adapter=adapter)
-    program = dspy.ChainOfThought("question->answer")
-    result = program("What is the capital of France?")
-    print(result)
-    ```
+    ``parse`` is not a supported entrypoint — use ``AdapterCallPipeline.execute`` via
+    ``await adapter(...)`` / ``TwoStepAdapter.__call__``.
     """
 
-    def __init__(self, extraction_model: BaseLM, **kwargs):
+    call_mode = AdapterCallMode.TWO_STEP
+    capabilities = AdapterCapabilities(
+        supports_finetune=False,
+        field_value_role="none",
+        default_native_fc=False,
+        supports_structured_output=False,
+    )
+
+    def __init__(self, extraction_model: BaseLM, extraction_adapter: Adapter | None = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         if not isinstance(extraction_model, BaseLM):
-            raise ValueError("extraction_model must be an instance of dspy.BaseLM")
+            raise ValueError("extraction_model must be an instance of dspy.clients.base_lm.BaseLM")
         self.extraction_model = extraction_model
+        self.extraction_adapter = extraction_adapter
 
-    def format(
-        self, signature: type[Signature], demos: list[dict[str, Any]], inputs: dict[str, Any]
-    ) -> list[dict[str, Any]]:
-        """
-        Format a prompt for the first stage with the main LM.
-        This no specific structure is required for the main LM, we customize the format method
-        instead of format_field_description or format_field_structure.
+    @override
+    def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
+        _ = (task_spec, completion)
+        raise AdapterOperationError(
+            "TwoStepAdapter.parse is not supported. Use AdapterCallPipeline.execute via TwoStepAdapter.__call__."
+        )
 
-        Args:
-            signature: The signature of the original task
-            demos: A list of demo examples
-            inputs: The current input
+    async def _run_extraction(self, *, original_task_spec: TaskSpec, text: str, run: RunContext) -> dict[str, Any]:
+        extraction_adapter = require_adapter(self.extraction_adapter or run.adapter)
+        extractor_task_spec = build_extractor_task_spec(
+            original_task_spec,
+            native_response_types=self.native_response_types,
+        )
+        config = merge_call_config(self.extraction_model, LMConfig())
+        extraction_site = CallSite(
+            module="TwoStepAdapter",
+            phase="two_step.extraction",
+            lm_role="extraction_model",
+        )
+        results = await AdapterCallPipeline.execute(
+            extraction_adapter,
+            lm=self.extraction_model,
+            config=config,
+            task_spec=extractor_task_spec,
+            demos=[],
+            inputs={"text": text},
+            run=run,
+            call_site=extraction_site,
+        )
+        return results[0]
 
-        Returns:
-            A list of messages to be passed to the main LM.
-        """
-        messages = []
-
-        # Create a task description for the main LM
-        task_description = self.format_task_description(signature)
-        messages.append({"role": "system", "content": task_description})
-
-        messages.extend(self.format_demos(signature, demos))
-
-        # Format the current input
-        messages.append({"role": "user", "content": self.format_user_message_content(signature, inputs)})
-
-        return messages
-
-    def parse(self, signature: Signature, completion: str) -> dict[str, Any]:
-        """
-        Use a smaller LM (extraction_model) with chat adapter to extract structured data
-        from the raw completion text of the main LM.
-
-        Args:
-            signature: The signature of the original task
-            completion: The completion from the main LM
-
-        Returns:
-            A dictionary containing the extracted structured data.
-        """
-        # The signature is supposed to be "text -> {original output fields}"
-        extractor_signature = self._create_extractor_signature(signature)
-
-        try:
-            # Call the smaller LM to extract structured data from the raw completion text with ChatAdapter
-            parsed_result = ChatAdapter()(
-                lm=self.extraction_model,
-                lm_kwargs={},
-                signature=extractor_signature,
-                demos=[],
-                inputs={"text": completion},
-            )
-            return parsed_result[0]
-
-        except LMError:
-            raise
-        except Exception as e:
-            raise AdapterParseError(
-                adapter_name="TwoStepAdapter",
-                signature=signature,
-                lm_response=completion,
-                message=f"Failed to parse response from the original completion: {e}",
-            ) from e
-
-    async def acall(
-        self,
-        lm: BaseLM,
-        lm_kwargs: dict[str, Any],
-        signature: type[Signature],
-        demos: list[dict[str, Any]],
-        inputs: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        inputs = self.format(signature, demos, inputs)
-
-        outputs = await lm.acall(messages=inputs, **lm_kwargs)
-        # The signature is supposed to be "text -> {original output fields}"
-        extractor_signature = self._create_extractor_signature(signature)
-
-        values = []
-
-        tool_call_output_field_name = self._get_tool_call_output_field_name(signature)
-        for output in outputs:
-            output_logprobs = None
-            tool_calls = None
-            text = output
-
-            if isinstance(output, dict):
-                text = output["text"]
-                output_logprobs = output.get("logprobs")
-                tool_calls = output.get("tool_calls")
-
-            try:
-                # Call the smaller LM to extract structured data from the raw completion text with ChatAdapter
-                value = await ChatAdapter().acall(
-                    lm=self.extraction_model,
-                    lm_kwargs={},
-                    signature=extractor_signature,
-                    demos=[],
-                    inputs={"text": text},
-                )
-                value = value[0]
-
-            except LMError:
-                raise
-            except Exception as e:
-                raise AdapterParseError(
-                    adapter_name="TwoStepAdapter",
-                    signature=signature,
-                    lm_response=str(output),
-                    message=f"Failed to parse response from the original completion: {e}",
-                ) from e
-
-            if tool_calls and tool_call_output_field_name:
-                tool_calls = [
-                    {
-                        "name": v["function"]["name"],
-                        "args": json_repair.loads(v["function"]["arguments"]),
-                    }
-                    for v in tool_calls
-                ]
-                value[tool_call_output_field_name] = ToolCalls.from_dict_list(tool_calls)
-
-            if output_logprobs is not None:
-                value["logprobs"] = output_logprobs
-
-            values.append(value)
-        return values
-
-    def format_task_description(self, signature: Signature) -> str:
-        """Create a description of the task based on the signature"""
+    @override
+    def format_system_message(self, task_spec: TaskSpec) -> str:
         parts = []
-
         parts.append("You are a helpful assistant that can solve tasks based on user input.")
-        parts.append("As input, you will be provided with:\n" + get_field_description_string(signature.input_fields))
-        parts.append("Your outputs must contain:\n" + get_field_description_string(signature.output_fields))
+        parts.append(
+            "As input, you will be provided with:\n" + get_field_spec_description_string(task_spec.input_fields)
+        )
+        parts.append("Your outputs must contain:\n" + get_field_spec_description_string(task_spec.output_fields))
         parts.append("You should lay out your outputs in detail so that your answer can be understood by another agent")
-
-        if signature.instructions:
-            parts.append(f"Specific instructions: {signature.instructions}")
-
+        if task_spec.instructions:
+            parts.append(f"Specific instructions: {task_spec.instructions}")
         return "\n".join(parts)
 
+    @override
+    def format_field_description(self, task_spec: TaskSpec) -> str:
+        return ""
+
+    @override
+    def format_field_structure(self, task_spec: TaskSpec) -> str:
+        return ""
+
+    @override
+    def format_task_description(self, task_spec: TaskSpec) -> str:
+        return ""
+
+    @override
     def format_user_message_content(
         self,
-        signature: type[Signature],
+        task_spec: TaskSpec,
         inputs: dict[str, Any],
         prefix: str = "",
         suffix: str = "",
+        main_request: bool = False,
     ) -> str:
+        _ = main_request
         parts = [prefix]
-
-        for name in signature.input_fields.keys():
-            if name in inputs:
-                parts.append(f"{name}: {inputs.get(name, '')}")
-
+        parts.extend(f"{name}: {inputs.get(name, '')}" for name in task_spec.input_fields if name in inputs)
         parts.append(suffix)
         return "\n\n".join(parts).strip()
 
+    @override
     def format_assistant_message_content(
-        self,
-        signature: type[Signature],
-        outputs: dict[str, Any],
-        missing_field_message: str | None = None,
+        self, task_spec: TaskSpec, outputs: dict[str, Any], missing_field_message: str | None = None
     ) -> str:
-        parts = []
-
-        for name in signature.output_fields.keys():
-            if name in outputs:
-                parts.append(f"{name}: {outputs.get(name, missing_field_message)}")
-
+        parts = [
+            f"{name}: {outputs.get(name, missing_field_message)}" for name in task_spec.output_fields if name in outputs
+        ]
         return "\n\n".join(parts).strip()
-
-    def _create_extractor_signature(
-        self,
-        original_signature: type[Signature],
-    ) -> type[Signature]:
-        """Create a new signature containing a new 'text' input field and all output fields.
-
-        Args:
-            original_signature: The original signature to extract output fields from
-
-        Returns:
-            A new Signature type with a text input field and all output fields
-        """
-        # Create new fields dict with 'text' input field and all output fields
-        new_fields = {
-            "text": (str, InputField()),
-            **{name: (field.annotation, field) for name, field in original_signature.output_fields.items()},
-        }
-
-        outputs_str = ", ".join([f"`{field}`" for field in original_signature.output_fields])
-        instructions = f"The input is a text that should contain all the necessary information to produce the fields {outputs_str}. \
-            Your job is to extract the fields from the text verbatim. Extract precisely the appropriate value (content) for each field."
-
-        return make_signature(new_fields, instructions)

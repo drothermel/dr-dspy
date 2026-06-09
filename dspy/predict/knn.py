@@ -1,53 +1,40 @@
-from dspy.clients import Embedder
-from dspy.primitives import Example
-from dspy.utils.lazy_import import require
+from collections.abc import Mapping
+from typing import Any
 
-np = require("numpy")
+from dspy._internal.lazy_import import require
+from dspy.clients.embedding import Embedder
+from dspy.primitives import Example
+
+np = require("numpy", extra="numpy", feature="KNN few-shot")
+
+
+def _format_input_text(inputs: Mapping[str, Any], input_keys: frozenset[str]) -> str:
+    ordered_keys = [key for key in inputs if key in input_keys] if input_keys else list(inputs)
+    return " | ".join(f"{key}: {inputs[key]}" for key in ordered_keys)
 
 
 class KNN:
-    def __init__(self, k: int, trainset: list[Example], vectorizer: Embedder):
-        """
-        A k-nearest neighbors retriever that finds similar examples from a training set.
-
-        Args:
-            k: Number of nearest neighbors to retrieve
-            trainset: List of training examples to search through
-            vectorizer: The `Embedder` to use for vectorization
-
-        Examples:
-            ```python
-            import dspy
-            from sentence_transformers import SentenceTransformer
-
-            # Create a training dataset with examples
-            trainset = [
-                dspy.Example(input="hello", output="world"),
-                # ... more examples ...
-            ]
-
-            # Initialize KNN with a sentence transformer model
-            knn = KNN(
-                k=3,
-                trainset=trainset,
-                vectorizer=dspy.Embedder(SentenceTransformer("all-MiniLM-L6-v2").encode)
-            )
-
-            # Find similar examples
-            similar_examples = knn(input="hello")
-            ```
-        """
+    def __init__(self, k: int, trainset: list[Example], vectorizer: Embedder) -> None:
         self.k = k
         self.trainset = trainset
         self.embedding = vectorizer
-        trainset_casted_to_vectorize = [
-            " | ".join([f"{key}: {value}" for key, value in example.items() if key in example._input_keys])
-            for example in self.trainset
-        ]
-        self.trainset_vectors = self.embedding(trainset_casted_to_vectorize).astype(np.float32)
+        trainset_casted_to_vectorize = []
+        for example in self.trainset:
+            input_keys = example.input_keys
+            trainset_casted_to_vectorize.append(_format_input_text(dict(example.items()), input_keys))
+        self._train_vectors = trainset_casted_to_vectorize
 
-    def __call__(self, **kwargs) -> list:
-        input_example_vector = self.embedding([" | ".join([f"{key}: {val}" for key, val in kwargs.items()])])
-        scores = np.dot(self.trainset_vectors, input_example_vector.T).squeeze()
+    async def _ensure_train_vectors(self) -> np.ndarray:
+        if not hasattr(self, "trainset_vectors"):
+            vectors = await self.embedding(self._train_vectors)
+            self.trainset_vectors = np.asarray(vectors, dtype=np.float32)
+        return self.trainset_vectors
+
+    async def __call__(self, *, inputs: Mapping[str, Any]) -> list[Example]:
+        trainset_vectors = await self._ensure_train_vectors()
+        input_example_vector = np.asarray(
+            await self.embedding([_format_input_text(inputs, frozenset(inputs))]), dtype=np.float32
+        )
+        scores = np.dot(trainset_vectors, input_example_vector.T).squeeze()
         nearest_samples_idxs = scores.argsort()[-self.k :][::-1]
         return [self.trainset[cur_idx] for cur_idx in nearest_samples_idxs]

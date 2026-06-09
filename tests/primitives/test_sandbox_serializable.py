@@ -1,17 +1,10 @@
-"""Tests for the SandboxSerializable ABC and build_repl_variable helper."""
-
-import pytest
-
-import dspy
-from dspy.primitives.repl_types import REPLVariable
-from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
-
-# -- Stub implementations --
+from dspy.history.repl_history import REPLVariable
+from dspy.primitives import SandboxSerializable, build_repl_variable
+from dspy.primitives.sandbox_protocol import SandboxSerializablePydanticMixin
+from dspy.task_spec import input_field, output_field
 
 
-class ExampleSerializable(SandboxSerializable):
-    """A complete subclass of the SandboxSerializable ABC."""
-
+class ExampleSerializable(SandboxSerializablePydanticMixin):
     def __init__(self, data: str = "example_data"):
         self.data = data
 
@@ -29,16 +22,12 @@ class ExampleSerializable(SandboxSerializable):
         return preview[:max_chars] + "..." if len(preview) > max_chars else preview
 
 
-class IncompleteSerializable(SandboxSerializable):
-    """Missing the other three abstract methods — should not be instantiable."""
-
+class IncompleteSerializable:
     def sandbox_setup(self) -> str:
         return ""
 
 
 class NotASubclass:
-    """Implements all four methods but does not subclass — should NOT pass isinstance."""
-
     def sandbox_setup(self) -> str:
         return "import json"
 
@@ -52,29 +41,20 @@ class NotASubclass:
         return "NotASubclass"
 
 
-# -- ABC enforcement and isinstance() --
-
-
-class TestABCConformance:
+class TestProtocolConformance:
     def test_subclass_conformance(self):
         assert isinstance(ExampleSerializable(), SandboxSerializable)
 
-    def test_incomplete_subclass_cannot_instantiate(self):
-        with pytest.raises(TypeError, match="abstract"):
-            IncompleteSerializable()  # type: ignore[abstract]
+    def test_incomplete_class_can_instantiate(self):
+        obj = IncompleteSerializable()
+        assert not isinstance(obj, SandboxSerializable)
 
-    def test_structural_conformance_no_longer_accepted(self):
-        """Nominal typing only — duck-typed classes must explicitly subclass."""
-        assert not isinstance(NotASubclass(), SandboxSerializable)
+    def test_structural_conformance_accepted(self):
+        assert isinstance(NotASubclass(), SandboxSerializable)
         assert not isinstance("hello", SandboxSerializable)
 
 
-# -- Core methods on a conforming implementation --
-
-
 class TestCoreMethods:
-    """Smoke tests that a conforming implementation behaves as expected."""
-
     def test_sandbox_setup(self):
         assert ExampleSerializable().sandbox_setup() == "import json"
 
@@ -96,16 +76,11 @@ class TestCoreMethods:
 
     def test_rlm_preview_truncation(self):
         preview = ExampleSerializable("x" * 1000).rlm_preview(max_chars=50)
-        assert len(preview) <= 53  # 50 + "..."
+        assert len(preview) <= 53
         assert preview.endswith("...")
 
 
-# -- build_repl_variable helper --
-
-
 class TestBuildReplVariable:
-    """Tests for the module-level helper function."""
-
     def test_builds_variable_with_preview_from_rlm_preview(self):
         obj = ExampleSerializable("my_data")
         var = build_repl_variable(obj, "my_var")
@@ -115,35 +90,20 @@ class TestBuildReplVariable:
         assert var.total_length == len(obj.rlm_preview())
 
     def test_surfaces_sandbox_setup_in_description(self):
-        """sandbox_setup imports should appear in the variable description
-        so the model knows which names are bound in the REPL."""
         var = build_repl_variable(ExampleSerializable(), "x")
         assert "import json" in var.desc
 
     def test_passes_field_info_through(self):
-        field = dspy.InputField(desc="A data column")
-        var = build_repl_variable(ExampleSerializable(), "data", field_info=field)
+        from dspy.task_spec import make_task_spec
+
+        spec = make_task_spec(
+            {
+                "data": input_field("data", type_=ExampleSerializable, desc="A data column"),
+                "answer": output_field("answer", desc="The answer."),
+            },
+            instructions="Process data.",
+        )
+        field = spec.input_fields["data"]
+        var = build_repl_variable(ExampleSerializable(), "data", field=field)
         assert "A data column" in var.desc
-        # Setup note still appended after user-provided desc
         assert "import json" in var.desc
-
-
-class TestToReplVariableMethod:
-    """Tests for the inherited default to_repl_variable() method."""
-
-    def test_default_to_repl_variable(self):
-        obj = ExampleSerializable("payload")
-        var = obj.to_repl_variable("data")
-        assert isinstance(var, REPLVariable)
-        assert "ExampleData: payload" in var.preview
-
-
-class TestSignatureAnnotation:
-    """Subclasses should be usable as dspy.Signature field annotations."""
-
-    def test_subclass_supports_signature_annotation(self):
-        class ExampleSignature(dspy.Signature):
-            data: ExampleSerializable = dspy.InputField()
-            answer: str = dspy.OutputField()
-
-        assert ExampleSignature.input_fields["data"].annotation is ExampleSerializable

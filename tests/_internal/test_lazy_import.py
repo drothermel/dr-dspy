@@ -1,0 +1,175 @@
+import importlib
+import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
+import pytest
+
+from dspy._internal.lazy_import import (
+    _INSTALL_HINTS,
+    _detect_dspy_dist,
+    _MissingModule,
+    import_optional,
+    is_available,
+    require,
+)
+
+
+def test_is_available_true_for_stdlib():
+    assert is_available("json") is True
+
+
+def test_is_available_false_for_missing():
+    assert is_available("definitely_not_a_real_module_xyz") is False
+
+
+def test_is_available_does_not_import_module(monkeypatch):
+    import sys
+
+    target = "mailbox"
+    monkeypatch.delitem(sys.modules, target, raising=False)
+    is_available.cache_clear()
+    assert is_available(target) is True
+    assert target not in sys.modules
+
+
+def test_require_returns_lazy_module_when_present():
+    mod = require("json")
+    assert mod.dumps({"a": 1}) == '{"a": 1}'
+
+
+def test_require_returns_cached_module():
+    mod = require("json")
+    assert mod is sys.modules["json"]
+
+
+def test_require_is_safe_under_concurrent_first_use(tmp_path, monkeypatch):
+    module_name = "dspy_lazy_threaded_module"
+    counter_path = tmp_path / "imports.txt"
+    monkeypatch.syspath_prepend(tmp_path)
+    monkeypatch.delitem(sys.modules, module_name, raising=False)
+    (tmp_path / f"{module_name}.py").write_text(
+        f"import pathlib\nimport time\ntime.sleep(0.1)\npath = pathlib.Path({str(counter_path)!r})\npath.write_text(path.read_text() + '1' if path.exists() else '1')\nvalue = 42\n"
+    )
+    threads = 8
+    barrier = threading.Barrier(threads)
+
+    def read_value(_):
+        barrier.wait()
+        return require(module_name).value
+
+    with ThreadPoolExecutor(max_workers=threads) as executor:
+        assert list(executor.map(read_value, range(threads))) == [42] * threads
+    assert counter_path.read_text() == "1"
+
+
+def test_require_assignment_updates_materialized_module(tmp_path, monkeypatch):
+    module_name = "dspy_lazy_assignment_module"
+    monkeypatch.syspath_prepend(tmp_path)
+    monkeypatch.delitem(sys.modules, module_name, raising=False)
+    (tmp_path / f"{module_name}.py").write_text("value = 1\n")
+    mod = require(module_name)
+    mod.value = 2
+    assert sys.modules[module_name].value == 2
+
+
+def test_require_returns_stub_when_missing():
+    stub = require("definitely_not_a_real_module_xyz", feature="dspy.X")
+    assert isinstance(stub, _MissingModule)
+
+
+def test_require_stub_raises_on_access_with_install_hint():
+    dist = _detect_dspy_dist()
+    stub = require("nonexistent_abc", feature="dspy.Test")
+    with pytest.raises(ImportError) as exc_info:
+        _ = stub.something
+    msg = str(exc_info.value)
+    assert f"{dist}[nonexistent_abc]" in msg, msg
+    assert "dspy.Test" in msg
+
+
+def test_require_stub_uses_install_hint_for_litellm(monkeypatch):
+    import importlib.util
+    import sys
+
+    find_spec = importlib.util.find_spec
+    monkeypatch.delitem(sys.modules, "litellm", raising=False)
+    monkeypatch.setattr(importlib.util, "find_spec", lambda module: None if module == "litellm" else find_spec(module))
+    stub = require("litellm", feature="dspy.clients.lm.LM")
+    with pytest.raises(ImportError) as exc_info:
+        _ = stub.something
+    assert "pip install litellm" in str(exc_info.value)
+
+
+def test_require_stub_uses_explicit_extra():
+    dist = _detect_dspy_dist()
+    stub = require("nonexistent_xyz", extra="custom", feature="dspy.X")
+    with pytest.raises(ImportError) as exc_info:
+        _ = stub.something
+    assert f"{dist}[custom]" in str(exc_info.value)
+
+
+def test_require_stub_falls_back_to_module_name():
+    dist = _detect_dspy_dist()
+    stub = require("nonexistent_xyz", feature="dspy.X")
+    with pytest.raises(ImportError) as exc_info:
+        _ = stub.something
+    assert f"{dist}[nonexistent_xyz]" in str(exc_info.value)
+
+
+def test_import_optional_succeeds_for_stdlib():
+    mod = import_optional("json")
+    assert mod.dumps({"a": 1}) == '{"a": 1}'
+
+
+def test_import_optional_raises_with_extra_hint(monkeypatch):
+    real_import_module = importlib.import_module
+
+    def fake_import_module(name: str, package: str | None = None):
+        if name == "datasets":
+            raise ModuleNotFoundError("No module named 'datasets'", name="datasets")
+        return real_import_module(name, package)
+
+    monkeypatch.delitem(sys.modules, "datasets", raising=False)
+    monkeypatch.setattr(importlib, "import_module", fake_import_module)
+    dist = _detect_dspy_dist()
+    with pytest.raises(ImportError) as exc_info:
+        import_optional("datasets", extra="datasets", feature="Test feature")
+    assert f"{dist}[datasets]" in str(exc_info.value)
+    assert "Test feature" in str(exc_info.value)
+
+
+def test_import_optional_uses_install_command_override():
+    with pytest.raises(ImportError) as exc_info:
+        import_optional(
+            "definitely_not_a_real_module_xyz",
+            feature="custom feature",
+            install_command="Run `pip install custom-pkg`.",
+        )
+    assert "Run `pip install custom-pkg`." in str(exc_info.value)
+    assert "custom feature" in str(exc_info.value)
+
+
+def test_import_optional_reraises_transitive_module_not_found(monkeypatch):
+    real_import_module = importlib.import_module
+
+    def fake_import_module(name: str, package: str | None = None):
+        if name == "optuna":
+            raise ModuleNotFoundError("No module named 'missing_transitive'", name="missing_transitive")
+        return real_import_module(name, package)
+
+    monkeypatch.setattr(importlib, "import_module", fake_import_module)
+    with pytest.raises(ModuleNotFoundError, match="missing_transitive"):
+        import_optional("optuna", extra="optuna", feature="Optuna")
+
+
+def test_install_hints_match_pyproject_extras(pytestconfig):
+    import tomllib
+
+    pyproject = pytestconfig.rootpath / "pyproject.toml"
+    data = tomllib.loads(pyproject.read_text())
+    extras = set(data["project"]["optional-dependencies"])
+    for module, hint in _INSTALL_HINTS.items():
+        assert hint in extras, (
+            f"_INSTALL_HINTS[{module!r}] = {hint!r} is not a declared extra in pyproject.toml (declared: {sorted(extras)})"
+        )

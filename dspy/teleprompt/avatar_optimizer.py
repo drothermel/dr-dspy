@@ -1,217 +1,182 @@
-from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from random import sample
-from typing import Callable
+from random import Random
+from typing import Any, cast
 
 from pydantic import BaseModel
-from tqdm import tqdm
 
-import dspy
-from dspy.predict.avatar import ActionOutput
-from dspy.teleprompt.teleprompt import Teleprompter
+from dspy.evaluate.metric_invoke import invoke_metric
+from dspy.predict.predict import Predict
+from dspy.primitives import Example, Module
+from dspy.runtime import run_with_trace
+from dspy.runtime.batch import Parallel
+from dspy.runtime.call_options import ModuleCallOptions
+from dspy.runtime.run_context import RunContext
+from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
+from dspy.teleprompt.avatar.task_specs import (
+    ComparatorTaskSpec,
+    EvalResult,
+    FeedbackBasedInstructionTaskSpec,
+)
+from dspy.teleprompt.compilation import CompileResult, CompileStats
+from dspy.teleprompt.compile_params import AvatarOptimizerCompileParams
+from dspy.teleprompt.metrics import OptimizerMetric
+from dspy.teleprompt.registry import register_teleprompter
 
 DEFAULT_MAX_EXAMPLES = 10
 
 
-class EvalResult(BaseModel):
-    example: dict
-    score: float
-    actions: list[ActionOutput] | None = None
+class _AvatarEvalModule(Module):
+    def __init__(self, optimizer: "AvatarOptimizer", actor: Module, return_outputs: bool) -> None:
+        super().__init__()
+        self._optimizer = optimizer
+        self._actor = actor
+        self._return_outputs = return_outputs
+
+    async def _aforward_impl(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs,
+    ):
+        example = Example.from_record(inputs)
+        return await self._optimizer.process_example(
+            actor=self._actor, example=example, return_outputs=self._return_outputs, run=run
+        )
 
 
-class Comparator(dspy.Signature):
-    """After executing the given actions on user inputs using the given instruction, some inputs have yielded good, results, while others have not. I'll provide you the inputs along with their, corresponding evaluation metrics:
-
-Task:
-(1) Firstly, identify and contrast the patterns of inputs that have achieved good results with those that have not.
-(2) Then, review the computational logic for any inconsistencies in the previous actions.
-(3) Lastly, specify the modification in tools used that can lead to improved performance on the negative inputs."""
-
-    instruction: str = dspy.InputField(
-        desc="Instruction for the actor to execute the task",
-    )
-    actions: list[str] = dspy.InputField(
-        desc="Actions actor can take to complete the task",
-    )
-    pos_input_with_metrics: list[EvalResult] = dspy.InputField(
-        desc="Positive inputs along with their score on a evaluation metric and actions taken",
-    )
-    neg_input_with_metrics: list[EvalResult] = dspy.InputField(
-        desc="Negative inputs along with their score on a evaluation metric and actions taken",
-    )
-    feedback: str = dspy.OutputField(
-        desc="Feedback for the actor to improve the performance of negative inputs",
-    )
-
-
-class FeedbackBasedInstruction(dspy.Signature):
-    """There is a task that needs to be completed for which one can use multiple tools to achieve the desired outcome. A group's performance was evaluated on a dataset of inputs, the inputs that did well are positive inputs, and the inputs that did not do well are negative inputs.
-
-You received feedback on how they can better use the tools to improve your performance on the negative inputs. You have been provided with the previous instruction, that they followed to use tools to complete the task, and the feedback on your performance.
-
-Your task is to incorporate the feedback and generate a detailed instruction for the group to follow to improve their performance on the task.
-
-Make sure that the new instruction talks about how to use the tools effectively and should be no more than 3 paragraphs long. The previous instruction contains general guidelines that you must retain in the new instruction."""
-
-    previous_instruction: str = dspy.InputField(
-        desc="Previous instruction for the actor to execute the task",
-    )
-    feedback: str = dspy.InputField(
-        desc="Feedback for the actor to improve the performance of negative inputs",
-    )
-    new_instruction: str = dspy.OutputField(
-        desc="New instruction for the actor to execute the task",
-    )
-
-
-class AvatarOptimizer(Teleprompter):
+@register_teleprompter(params=AvatarOptimizerCompileParams)
+class AvatarOptimizer:
     def __init__(
         self,
-        metric: Callable,
+        metric: OptimizerMetric,
         max_iters: int = 10,
         lower_bound: int = 0,
         upper_bound: int = 1,
         max_positive_inputs: int | None = None,
         max_negative_inputs: int | None = None,
         optimize_for: str = "max",
-    ):
+    ) -> None:
         assert metric is not None, "`metric` argument cannot be None. Please provide a metric function."
         self.metric = metric
         self.optimize_for = optimize_for
-
         self.max_iters = max_iters
-
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
-
         self.max_positive_inputs = max_positive_inputs or DEFAULT_MAX_EXAMPLES
         self.max_negative_inputs = max_negative_inputs or DEFAULT_MAX_EXAMPLES
+        self.comparator = Predict(ComparatorTaskSpec())
+        self.feedback_instruction = Predict(FeedbackBasedInstructionTaskSpec())
 
-        self.comparator = dspy.TypedPredictor(Comparator)
-        self.feedback_instruction = dspy.Predict(FeedbackBasedInstruction)
-
-    def process_example(self, actor, example, return_outputs):
+    async def process_example(self, actor, example, return_outputs, *, run: RunContext):
         actor = deepcopy(actor)
-
         try:
-            prediction = actor(**example.inputs().toDict())
-            score = self.metric(example, prediction)
-
+            prediction, trace = await run_with_trace(actor, example, run)
+            score = await invoke_metric(
+                self.metric,
+                example=example,
+                prediction=prediction,
+                trace=trace,
+                run=run,
+            )
             if return_outputs:
-                return example, prediction, score
-            else:
-                return score
-
-        except Exception as e:
-            print(e)
-
+                return (example, prediction, score)
+            return score
+        except Exception:
             if return_outputs:
-                return example, None, 0
-            else:
-                return 0
+                return (example, None, 0)
+            return 0
 
-
-    def thread_safe_evaluator(self, devset, actor, return_outputs=False, num_threads=None):
+    async def thread_safe_evaluator(
+        self, devset, actor, return_outputs=False, max_concurrency=None, *, run: RunContext
+    ):
         total_score = 0
         total_examples = len(devset)
-        results = []
-        num_threads = num_threads or dspy.settings.num_threads
-
-        with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            futures = [executor.submit(self.process_example, actor, example, return_outputs) for example in devset]
-
-            for future in tqdm(futures, total=total_examples, desc="Processing examples"):
-                result = future.result()
-                if return_outputs:
-                    example, prediction, score = result
-                    total_score += score
-                    results.append((example, prediction, score))
-                else:
-                    total_score += result
-
-        avg_metric = total_score / total_examples
-
+        max_concurrency = max_concurrency or run.execution.max_concurrency
+        eval_module = _AvatarEvalModule(self, actor, return_outputs)
+        run_parallel = Parallel(run=run, max_concurrency=max_concurrency, disable_progress_bar=False)
+        exec_pairs = [(eval_module, example) for example in devset]
+        parallel_results = (await run_parallel(exec_pairs)).results
         if return_outputs:
-            return avg_metric, results
-        else:
-            return avg_metric
+            results = []
+            for result in parallel_results:
+                example, prediction, score = cast("tuple[Any, Any, float]", result)
+                total_score += score
+                results.append((example, prediction, score))
+            avg_metric = total_score / total_examples
+            return (avg_metric, results)
+        total_score = sum(cast("float", score) for score in parallel_results)
+        return total_score / total_examples
 
-
-    def _get_pos_neg_results(
-        self,
-        actor: dspy.Module,
-        trainset: list[dspy.Example]
+    async def _get_pos_neg_results(
+        self, actor: Module, trainset: list[Example], *, run: RunContext
     ) -> tuple[float, list[EvalResult], list[EvalResult]]:
         pos_inputs = []
         neg_inputs = []
-
-        avg_score, results = self.thread_safe_evaluator(trainset, actor, return_outputs=True)
-        print(f"Average Score: {avg_score}")
-
+        avg_score, results = await self.thread_safe_evaluator(
+            devset=trainset, actor=actor, return_outputs=True, run=run
+        )
         for example, prediction, score in results:
             if score >= self.upper_bound:
                 pos_inputs.append(
                     EvalResult(
-                        example=example.inputs().toDict(),
+                        example=example.as_inputs(),
                         score=score,
-                        actions=prediction.actions if prediction else None
+                        actions=prediction.actions if prediction else None,
                     )
                 )
             elif score <= self.lower_bound:
                 neg_inputs.append(
                     EvalResult(
-                        example=example.inputs().toDict(),
+                        example=example.as_inputs(),
                         score=score,
-                        actions=prediction.actions if prediction else None
+                        actions=prediction.actions if prediction else None,
                     )
                 )
-
         if len(pos_inputs) == 0:
             raise ValueError("No positive examples found, try lowering the upper_bound or providing more training data")
         if len(neg_inputs) == 0:
             raise ValueError("No negative examples found, try raising the lower_bound or providing more training data")
-
         return (avg_score, pos_inputs, neg_inputs)
 
-
-    def compile(self, student, *, trainset):
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
+        params = AvatarOptimizerCompileParams.model_validate(params)
+        trainset = params.trainset
         best_actor = deepcopy(student)
         best_score = -999 if self.optimize_for == "max" else 999
-
-        for i in range(self.max_iters):
-            print(20*"=")
-            print(f"Iteration {i+1}/{self.max_iters}")
-
-            score, pos_inputs, neg_inputs = self._get_pos_neg_results(best_actor, trainset)
-            print(f"Positive examples: {len(pos_inputs)}")
-            print(f"Negative examples: {len(neg_inputs)}")
-            print(f"Sampling {self.max_positive_inputs} positive examples and {self.max_negative_inputs} negative examples")
-
+        rng = Random(0)
+        for _i in range(self.max_iters):
+            score, pos_inputs, neg_inputs = await self._get_pos_neg_results(best_actor, trainset, run=run)
+            best_score = score
             if self.max_positive_inputs and len(pos_inputs) > self.max_positive_inputs:
-                pos_inputs = sample(pos_inputs, self.max_positive_inputs)
-
+                pos_inputs = rng.sample(pos_inputs, self.max_positive_inputs)
             if self.max_negative_inputs and len(neg_inputs) > self.max_negative_inputs:
-                neg_inputs = sample(neg_inputs, self.max_negative_inputs)
-
-            feedback = self.comparator(
-                instruction=best_actor.actor.signature.instructions,
-                actions=[str(tool) for tool in best_actor.tools],
-                pos_input_with_metrics=pos_inputs,
-                neg_input_with_metrics=neg_inputs
+                neg_inputs = rng.sample(neg_inputs, self.max_negative_inputs)
+            actor_task_spec = get_task_spec(best_actor.actor)
+            feedback = (
+                await self.comparator(
+                    instruction=actor_task_spec.instructions,
+                    actions=[str(tool) for tool in best_actor.tools],
+                    pos_input_with_metrics=pos_inputs,
+                    neg_input_with_metrics=neg_inputs,
+                    run=run,
+                )
             ).feedback
-
-            new_instruction = self.feedback_instruction(
-                previous_instruction=best_actor.actor.signature.instructions,
-                feedback=feedback
+            new_instruction = (
+                await self.feedback_instruction(
+                    previous_instruction=actor_task_spec.instructions, feedback=feedback, run=run
+                )
             ).new_instruction
-
-            print(f"Generated new instruction: {new_instruction}")
-
-            if (self.optimize_for == "max" and best_score < score) or (self.optimize_for == "min" and best_score > score):
-                best_actor.actor.signature = best_actor.actor.signature.with_instructions(new_instruction)
+            candidate_actor = deepcopy(best_actor)
+            set_task_spec(
+                predictor=candidate_actor.actor,
+                task_spec=actor_task_spec.with_instructions(new_instruction),
+            )
+            candidate_score, _, _ = await self._get_pos_neg_results(candidate_actor, trainset, run=run)
+            if (self.optimize_for == "max" and candidate_score > best_score) or (
+                self.optimize_for == "min" and candidate_score < best_score
+            ):
+                best_actor = candidate_actor
                 best_actor.actor_clone = deepcopy(best_actor.actor)
-                best_score = score
-
-        print(f"Best Actor: {best_actor}")
-
-        return best_actor
+                best_score = candidate_score
+        return CompileResult(program=best_actor, stats=CompileStats(best_score=best_score))

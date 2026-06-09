@@ -9,8 +9,24 @@ repos:
         name: ruff (lint)
         types_or: [python, pyi]
         files: ^(dspy|tests)/.*\.py$
-        exclude: ^(dspy/__metadata__\.py|tests/reliability/.*\.py)$
-        args: [--fix-only]
+        exclude: ^dspy/__metadata__\.py$
+        args: [--fix]
+
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty (type check)
+        entry: uv run --all-extras ty check dspy tests
+        language: system
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: check-lazy-imports
+        name: check lazy imports
+        entry: uv run python scripts/check_lazy_imports.py
+        language: system
+        pass_filenames: false
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

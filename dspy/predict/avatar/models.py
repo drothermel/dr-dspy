@@ -1,27 +1,13 @@
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
+from dspy.history.avatar_action import Action
 
-class Tool(BaseModel):
-    tool: Any
-    name: str
-    desc: str | None
-    input_type: str | None = None
-
-    def __str__(self) -> str:
-        return f"{self.name}{f'(valid_input: {self.input_type})' if self.input_type else ''}: {self.desc}"
-
-    def __repr__(self) -> str:
-        return self.__str__()
-
-
-class Action(BaseModel):
-    tool_name: Any = Field(..., description="Name of the tool to use.")
-    tool_input_query: Any = Field(..., description="Query to pass as input to the tool.")
+__all__ = ["Action", "ActionOutput"]
 
 
 class ActionOutput(BaseModel):
     tool_name: str
-    tool_input_query: str
-    tool_output: str
+    tool_args: dict[str, Any]
+    tool_output: str | None

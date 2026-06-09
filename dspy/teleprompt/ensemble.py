@@ -1,40 +1,50 @@
 import random
 
-from dspy.teleprompt.teleprompt import Teleprompter
+from pydantic import BaseModel
 
-"""
-TODO: The EnsembledProgram should actually imitate the structure of the individual programs (IF they are all compatible). This allows compiling with an ensemble program as a (singular) teacher. Basically the top majority-compatible trace will end up being used, if dspy.majority is the reduce_fn.
-"""
+from dspy.primitives import Module
+from dspy.runtime.call_options import ModuleCallOptions
+from dspy.runtime.run_context import RunContext, resolve_run
+from dspy.teleprompt.compilation import CompileResult
+from dspy.teleprompt.compile_params import EnsembleCompileParams
+from dspy.teleprompt.registry import register_teleprompter
 
 
-class Ensemble(Teleprompter):
-    def __init__(self, *, reduce_fn=None, size=None, deterministic=False):
-        """A common reduce_fn is dspy.majority."""
+@register_teleprompter(params=EnsembleCompileParams)
+class Ensemble:
+    """Compile an ensemble of programs. Sampling is intentionally nondeterministic unless ``deterministic`` is enabled."""
 
-        assert deterministic is False, "TODO: Implement example hashing for deterministic ensemble."
-
+    def __init__(self, *, reduce_fn=None, size=None, deterministic=False) -> None:
+        assert deterministic is False, "Deterministic ensemble is not supported; Example is intentionally unhashable."
         self.reduce_fn = reduce_fn
         self.size = size
         self.deterministic = deterministic
 
-    def compile(self, programs):
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
+        params = EnsembleCompileParams.model_validate(params)
+        programs = params.programs
         size = self.size
         reduce_fn = self.reduce_fn
 
-        import dspy
-
-        class EnsembledProgram(dspy.Module):
-            def __init__(self):
+        class EnsembledProgram(Module):
+            def __init__(self) -> None:
                 super().__init__()
                 self.programs = programs
 
-            def forward(self, *args, **kwargs):
+            async def _aforward_impl(
+                self,
+                *,
+                run: RunContext,
+                options: ModuleCallOptions | None = None,
+                **inputs,
+            ):
+                run = resolve_run(run=run, bound_run=self.run)
                 programs = random.sample(self.programs, size) if size else self.programs
-                outputs = [prog(*args, **kwargs) for prog in programs]
-
+                outputs = [await prog(run=run, options=options, **inputs) for prog in programs]
                 if reduce_fn:
                     return reduce_fn(outputs)
-
                 return outputs
 
-        return EnsembledProgram()
+        ensembled = EnsembledProgram()
+        ensembled.run = student.run
+        return CompileResult(program=ensembled)

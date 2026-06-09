@@ -1,59 +1,81 @@
+import asyncio
 from unittest.mock import patch
 
 import pytest
 
-import dspy
-from dspy import ProgramOfThought, Signature
-from dspy.utils import DummyLM
+from dspy.predict.program_of_thought import ProgramOfThought
+from dspy.task_spec import input_field, make_task_spec, output_field
+from tests.test_utils import DummyLM
 
-
-class BasicQA(Signature):
-    question = dspy.InputField()
-    answer = dspy.OutputField(desc="often between 1 and 5 words")
+BasicQA = make_task_spec(
+    {
+        "question": input_field("question", desc="The question."),
+        "answer": output_field("answer", desc="often between 1 and 5 words"),
+    },
+    instructions="Answer the question.",
+    name="BasicQA",
+)
+ExtremumFinder = make_task_spec(
+    {
+        "input_list": input_field("input_list", desc="The input list."),
+        "maximum": output_field("maximum", desc="The maximum of the given numbers"),
+        "minimum": output_field("minimum", desc="The minimum of the given numbers"),
+    },
+    instructions="Find the maximum and minimum values.",
+    name="ExtremumFinder",
+)
 
 
 @pytest.mark.deno
-def test_pot_code_generation():
+def test_pot_shuts_down_interpreter_when_generate_output_raises(make_run):
     lm = DummyLM(
         [
-            {
-                "reasoning": "Reason_A",
-                "generated_code": "```python\nresult = 1+1\nSUBMIT({'answer': result})\n```",
-            },
+            {"reasoning": "Reason_A", "generated_code": "```python\nresult = 1+1\nSUBMIT({'answer': result})\n```"},
+        ]
+    )
+    run = make_run(lm=lm)
+    pot = ProgramOfThought(BasicQA)
+
+    with (
+        patch.object(pot.generate_output, "_aforward_impl", side_effect=RuntimeError("output step failed")),
+        pytest.raises(RuntimeError, match="output step failed"),
+    ):
+        asyncio.run(pot(question="What is 1+1?", run=run))
+    assert pot.interpreter.deno_process is None
+
+
+@pytest.mark.deno
+def test_pot_code_generation(make_run):
+    lm = DummyLM(
+        [
+            {"reasoning": "Reason_A", "generated_code": "```python\nresult = 1+1\nSUBMIT({'answer': result})\n```"},
             {"reasoning": "Reason_B", "answer": "2"},
         ]
     )
-    dspy.configure(lm=lm)
+    run = make_run(lm=lm)
     pot = ProgramOfThought(BasicQA)
-    res = pot(question="What is 1+1?")
+    res = asyncio.run(pot(question="What is 1+1?", run=run))
     assert res.answer == "2"
     assert pot.interpreter.deno_process is None
 
 
-# This test ensures the old finetuned saved models still work
 @pytest.mark.deno
-def test_old_style_pot():
+def test_old_style_pot(make_run):
     lm = DummyLM(
         [
             {"reasoning": "Reason_A", "generated_code": "```python\nresult = 1+1\n```"},
             {"reasoning": "Reason_B", "answer": "2"},
         ]
     )
-    dspy.configure(lm=lm)
+    run = make_run(lm=lm)
     pot = ProgramOfThought(BasicQA)
-    res = pot(question="What is 1+1?")
+    res = asyncio.run(pot(question="What is 1+1?", run=run))
     assert res.answer == "2"
     assert pot.interpreter.deno_process is None
 
 
-class ExtremumFinder(Signature):
-    input_list = dspy.InputField()
-    maximum = dspy.OutputField(desc="The maximum of the given numbers")
-    minimum = dspy.OutputField(desc="The minimum of the given numbers")
-
-
 @pytest.mark.deno
-def test_pot_support_multiple_fields():
+def test_pot_support_multiple_fields(make_run):
     lm = DummyLM(
         [
             {
@@ -63,70 +85,54 @@ def test_pot_support_multiple_fields():
             {"reasoning": "Reason_B", "maximum": "6", "minimum": "2"},
         ]
     )
-    dspy.configure(lm=lm)
+    run = make_run(lm=lm)
     pot = ProgramOfThought(ExtremumFinder)
-    res = pot(input_list="2, 3, 5, 6")
+    res = asyncio.run(pot(input_list="2, 3, 5, 6", run=run))
     assert res.maximum == "6"
     assert res.minimum == "2"
     assert pot.interpreter.deno_process is None
 
 
 @pytest.mark.deno
-def test_pot_code_generation_with_one_error():
+def test_pot_code_generation_with_one_error(make_run):
     lm = DummyLM(
         [
-            {
-                "reasoning": "Reason_A",
-                "generated_code": "```python\nresult = 1+0/0\nSUBMIT({'answer': result})\n```",
-            },
-            {
-                "reasoning": "Reason_B",
-                "generated_code": "```python\nresult = 1+1\nSUBMIT({'answer': result})\n```",
-            },
+            {"reasoning": "Reason_A", "generated_code": "```python\nresult = 1+0/0\nSUBMIT({'answer': result})\n```"},
+            {"reasoning": "Reason_B", "generated_code": "```python\nresult = 1+1\nSUBMIT({'answer': result})\n```"},
             {"reasoning": "Reason_C", "answer": "2"},
         ]
     )
-    dspy.configure(lm=lm)
+    run = make_run(lm=lm)
     pot = ProgramOfThought(BasicQA)
-    res = pot(question="What is 1+1?")
+    res = asyncio.run(pot(question="What is 1+1?", run=run))
     assert res.answer == "2"
     assert pot.interpreter.deno_process is None
 
 
 @pytest.mark.deno
-def test_pot_code_generation_persistent_errors():
+def test_pot_code_generation_persistent_errors(make_run):
     max_iters = 3
     lm = DummyLM(
-        [
-            {
-                "reasoning": "Reason_A",
-                "generated_code": "```python\nresult = 1+0/0\nSUBMIT({'answer': result})\n```",
-            },
-        ]
+        [{"reasoning": "Reason_A", "generated_code": "```python\nresult = 1+0/0\nSUBMIT({'answer': result})\n```"}]
         * max_iters
     )
-    dspy.configure(lm=lm)
-
+    run = make_run(lm=lm)
     pot = ProgramOfThought(BasicQA, max_iters=max_iters)
-    with pytest.raises(RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: ZeroDivisionError:"):
-        pot(question="What is 1+1?")
+    with pytest.raises(RuntimeError, match=r"Max hops reached\. Failed to run ProgramOfThought: ZeroDivisionError:"):
+        asyncio.run(pot(question="What is 1+1?", run=run))
 
 
-def test_pot_code_parse_error():
+def test_pot_code_parse_error(make_run):
     max_iters = 3
-    lm = DummyLM(
-        [
-            {"reasoning": "Reason_A", "generated_code": "```python\ninvalid=python=code\n```"},
-        ]
-        * max_iters
-    )
-    dspy.configure(lm=lm)
+    lm = DummyLM([{"reasoning": "Reason_A", "generated_code": "```python\ninvalid=python=code\n```"}] * max_iters)
+    run = make_run(lm=lm)
     pot = ProgramOfThought(BasicQA, max_iters=max_iters)
     with (
-        patch("dspy.predict.program_of_thought.ProgramOfThought._execute_code") as mock_execute_code,
+        patch("dspy.predict.program_of_thought.execute_generated_code") as mock_execute_code,
         pytest.raises(
-            RuntimeError, match="Max hops reached. Failed to run ProgramOfThought: Error: Code format is not correct."
+            RuntimeError,
+            match=r"Max hops reached\. Failed to run ProgramOfThought: Error: Code format is not correct\.",
         ),
     ):
-        pot(question="What is 1+1?")
+        asyncio.run(pot(question="What is 1+1?", run=run))
     mock_execute_code.assert_not_called()

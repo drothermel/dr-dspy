@@ -1,297 +1,175 @@
-import re
-import textwrap
-from typing import Any, NamedTuple
+from __future__ import annotations
 
-from pydantic.fields import FieldInfo
+from typing import TYPE_CHECKING, Any
+
+from typing_extensions import override
 
 from dspy.adapters.base import Adapter
-from dspy.adapters.types.tool import ToolCalls
-from dspy.adapters.utils import (
-    format_field_value,
-    get_annotation_name,
-    get_field_description_string,
-    parse_value,
-    translate_field_type,
+from dspy.adapters.call.capabilities import AdapterCapabilities
+from dspy.adapters.call.pipeline import AdapterCallPipeline
+from dspy.adapters.call.policies.json_parse_fallback import JSONParseFallbackPolicy
+from dspy.adapters.format.header_formatter import HeaderFieldFormatter
+from dspy.adapters.format.prompt_sections import (
+    FIELD_HEADER_PATTERN,
+    format_field_description,
+    format_field_structure_header,
+    format_header_assistant_message_content,
+    format_header_finetune_data,
+    format_header_user_message_content,
+    format_task_description,
+    header_user_message_output_requirements,
 )
-from dspy.clients.base_lm import BaseLM
-from dspy.signatures.signature import Signature
-from dspy.utils.callback import BaseCallback
-from dspy.utils.exceptions import AdapterParseError, LMError
+from dspy.adapters.json_adapter import JSONAdapter
+from dspy.adapters.utils import parse_output_field, validate_parsed_fields
+from dspy.errors import AdapterParseError
 
-field_header_pattern = re.compile(r"\[\[ ## (\w+) ## \]\]")
+if TYPE_CHECKING:
+    from dspy.adapters.call.policies.parse_fallback import NoOpParseFallbackPolicy
+    from dspy.adapters.types.field_type import NativeResponseFieldType
+    from dspy.core.types import UserMessageContent
+    from dspy.runtime.callback import Callback
+    from dspy.task_spec import TaskSpec
+
+__all__ = ["ChatAdapter"]
 
 
-class FieldInfoWithName(NamedTuple):
-    name: str
-    info: FieldInfo
+def _split_field_sections(completion: str) -> list[tuple[str | None, str]]:
+    sections: list[tuple[str | None, list[str]]] = [(None, [])]
+    for line in completion.splitlines():
+        match = FIELD_HEADER_PATTERN.match(line.strip())
+        if match:
+            header = match.group(1)
+            remaining_content = line[match.end() :].strip()
+            sections.append((header, [remaining_content] if remaining_content else []))
+        else:
+            sections[-1][1].append(line)
+    return [(header, "\n".join(lines).strip()) for header, lines in sections]
 
 
 class ChatAdapter(Adapter):
-    """Default Adapter for most language models.
-
-    The ChatAdapter formats DSPy signatures into a format compatible with most language models.
-    It uses delimiter patterns like `[[ ## field_name ## ]]` to clearly separate input and output fields in
-    the message content.
-
-    Key features:
-        - Structures inputs and outputs using field header markers for clear field delineation.
-        - Provides automatic fallback to JSONAdapter if the chat format fails.
-    """
+    capabilities = AdapterCapabilities(
+        supports_finetune=True,
+        field_value_role="none",
+        default_native_fc=False,
+        supports_structured_output=False,
+    )
 
     def __init__(
         self,
-        callbacks: list[BaseCallback] | None = None,
+        callbacks: list[Callback] | None = None,
         use_native_function_calling: bool = False,
-        native_response_types: list[type[type]] | None = None,
-        use_json_adapter_fallback: bool = True,
+        native_response_types: list[type[NativeResponseFieldType]] | None = None,
         parallel_tool_calls: bool | None = None,
-    ):
-        """
-        Args:
-            callbacks: List of callback functions to execute during adapter methods.
-            use_native_function_calling: Whether to enable native function calling capabilities.
-            native_response_types: List of output field types handled by native LM features.
-            use_json_adapter_fallback: Whether to automatically fallback to JSONAdapter if the ChatAdapter fails.
-                If True, when an error occurs (except ContextWindowExceededError), the adapter will retry using
-                JSONAdapter. Defaults to True.
-            parallel_tool_calls: Whether to request provider-side parallel tool-call generation when native function
-                calling is active. If None, the adapter does not set the provider option.
-        """
+        allow_json_repair: bool = False,
+        json_fallback: JSONAdapter | None = None,
+        parse_fallback_policy: JSONParseFallbackPolicy | NoOpParseFallbackPolicy | None = None,
+    ) -> None:
         super().__init__(
             callbacks=callbacks,
             use_native_function_calling=use_native_function_calling,
             parallel_tool_calls=parallel_tool_calls,
             native_response_types=native_response_types,
+            allow_json_repair=allow_json_repair,
         )
-        self.use_json_adapter_fallback = use_json_adapter_fallback
+        self.field_formatter = HeaderFieldFormatter()
+        self._json_fallback = json_fallback
+        if parse_fallback_policy is None:
+            self.parse_fallback_policy = JSONParseFallbackPolicy(
+                fallback_factory=self._json_adapter_fallback,
+                pipeline_executor=AdapterCallPipeline.execute,
+            )
+        else:
+            self.parse_fallback_policy = parse_fallback_policy
 
-    def _make_json_adapter_fallback(self):
-        from dspy.adapters.json_adapter import JSONAdapter
-
+    def _json_adapter_fallback(self) -> JSONAdapter:
+        if self._json_fallback is not None:
+            return self._json_fallback
         return JSONAdapter(
+            callbacks=self.callbacks,
             use_native_function_calling=self.use_native_function_calling,
             parallel_tool_calls=self.parallel_tool_calls,
+            native_response_types=self.native_response_types,
+            allow_json_repair=self.allow_json_repair,
         )
 
-    def __call__(
-        self,
-        lm: BaseLM,
-        lm_kwargs: dict[str, Any],
-        signature: type[Signature],
-        demos: list[dict[str, Any]],
-        inputs: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        try:
-            return super().__call__(lm, lm_kwargs, signature, demos, inputs)
-        except Exception as e:
-            # fallback to JSONAdapter
-            from dspy.adapters.json_adapter import JSONAdapter
+    @override
+    def format_field_description(self, task_spec: TaskSpec) -> str:
+        return format_field_description(task_spec)
 
-            if isinstance(e, LMError) or isinstance(self, JSONAdapter) or not self.use_json_adapter_fallback:
-                # On LM errors, already using JSONAdapter, or use_json_adapter_fallback is False, we don't want to
-                # retry with a different adapter. Raise the original error instead of the fallback error.
-                raise
-            return self._make_json_adapter_fallback()(lm, lm_kwargs, signature, demos, inputs)
+    @override
+    def format_field_structure(self, task_spec: TaskSpec) -> str:
+        return format_field_structure_header(self._require_field_formatter(), task_spec)
 
-    async def acall(
-        self,
-        lm: BaseLM,
-        lm_kwargs: dict[str, Any],
-        signature: type[Signature],
-        demos: list[dict[str, Any]],
-        inputs: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        try:
-            return await super().acall(lm, lm_kwargs, signature, demos, inputs)
-        except Exception as e:
-            # fallback to JSONAdapter
-            from dspy.adapters.json_adapter import JSONAdapter
+    @override
+    def format_task_description(self, task_spec: TaskSpec) -> str:
+        return format_task_description(task_spec)
 
-            if isinstance(e, LMError) or isinstance(self, JSONAdapter) or not self.use_json_adapter_fallback:
-                # On LM errors, already using JSONAdapter, or use_json_adapter_fallback is False, we don't want to
-                # retry with a different adapter. Raise the original error instead of the fallback error.
-                raise
-            return await self._make_json_adapter_fallback().acall(lm, lm_kwargs, signature, demos, inputs)
-
-    def format_field_description(self, signature: type[Signature]) -> str:
-        return (
-            f"Your input fields are:\n{get_field_description_string(signature.input_fields)}\n"
-            f"Your output fields are:\n{get_field_description_string(signature.output_fields)}"
-        )
-
-    def format_field_structure(self, signature: type[Signature]) -> str:
-        """
-        `ChatAdapter` requires input and output fields to be in their own sections, with section header using markers
-        `[[ ## field_name ## ]]`. An arbitrary field `completed` ([[ ## completed ## ]]) is added to the end of the
-        output fields section to indicate the end of the output fields.
-        """
-        parts = []
-        parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
-
-        def format_signature_fields_for_instructions(fields: dict[str, FieldInfo]):
-            return self.format_field_with_value(
-                fields_with_values={
-                    FieldInfoWithName(name=field_name, info=field_info): translate_field_type(field_name, field_info)
-                    for field_name, field_info in fields.items()
-                },
-            )
-
-        parts.append(format_signature_fields_for_instructions(signature.input_fields))
-        parts.append(format_signature_fields_for_instructions(signature.output_fields))
-        parts.append("[[ ## completed ## ]]\n")
-        return "\n\n".join(parts).strip()
-
-    def format_task_description(self, signature: type[Signature]) -> str:
-        instructions = textwrap.dedent(signature.instructions)
-        objective = ("\n" + " " * 8).join([""] + instructions.splitlines())
-        return f"In adhering to this structure, your objective is: {objective}"
-
+    @override
     def format_user_message_content(
         self,
-        signature: type[Signature],
+        task_spec: TaskSpec,
         inputs: dict[str, Any],
         prefix: str = "",
         suffix: str = "",
         main_request: bool = False,
-    ) -> str:
-        messages = [prefix]
-        for k, v in signature.input_fields.items():
-            if k in inputs:
-                value = inputs.get(k)
-                formatted_field_value = format_field_value(field_info=v, value=value)
-                messages.append(f"[[ ## {k} ## ]]\n{formatted_field_value}")
+    ) -> UserMessageContent:
+        return format_header_user_message_content(
+            self._require_field_formatter(),
+            task_spec,
+            inputs,
+            prefix=prefix,
+            suffix=suffix,
+            main_request=main_request,
+        )
 
-        if main_request:
-            output_requirements = self.user_message_output_requirements(signature)
-            if output_requirements is not None:
-                messages.append(output_requirements)
+    def user_message_output_requirements(self, task_spec: TaskSpec) -> str:
+        return header_user_message_output_requirements(task_spec)
 
-        messages.append(suffix)
-        return "\n\n".join(messages).strip()
-
-    def user_message_output_requirements(self, signature: type[Signature]) -> str:
-        """Returns a simplified format reminder for the language model.
-
-        In chat-based interactions, language models may lose track of the required output format
-        as the conversation context grows longer. This method generates a concise reminder of
-        the expected output structure that can be included in user messages.
-
-        Args:
-            signature (Type[Signature]): The DSPy signature defining the expected input/output fields.
-
-        Returns:
-            str: A simplified description of the required output format.
-
-        Note:
-            This is a more lightweight version of `format_field_structure` specifically designed
-            for inline reminders within chat messages.
-        """
-
-        def type_info(v):
-            if v.annotation == ToolCalls:
-                return ' (must be a JSON object like {"tool_calls": [{"name": "...", "args": {...}}]})'
-            if v.annotation is not str:
-                return f" (must be formatted as a valid Python {get_annotation_name(v.annotation)})"
-            else:
-                return ""
-
-        message = "Respond with the corresponding output fields, starting with the field "
-        message += ", then ".join(f"`[[ ## {f} ## ]]`{type_info(v)}" for f, v in signature.output_fields.items())
-        message += ", and then ending with the marker for `[[ ## completed ## ]]`."
-        return message
-
+    @override
     def format_assistant_message_content(
         self,
-        signature: type[Signature],
+        task_spec: TaskSpec,
         outputs: dict[str, Any],
-        missing_field_message=None,
+        missing_field_message: str | None = None,
     ) -> str:
-        assistant_message_content = self.format_field_with_value(
-            {
-                FieldInfoWithName(name=k, info=v): outputs.get(k, missing_field_message)
-                for k, v in signature.output_fields.items()
-            },
+        return format_header_assistant_message_content(
+            self._require_field_formatter(),
+            task_spec,
+            outputs,
+            missing_field_message=missing_field_message,
         )
-        assistant_message_content += "\n\n[[ ## completed ## ]]\n"
-        return assistant_message_content
 
-    def parse(self, signature: type[Signature], completion: str) -> dict[str, Any]:
-        sections = [(None, [])]
-
-        for line in completion.splitlines():
-            match = field_header_pattern.match(line.strip())
-            if match:
-                # If the header pattern is found, split the rest of the line as content
-                header = match.group(1)
-                remaining_content = line[match.end() :].strip()
-                sections.append((header, [remaining_content] if remaining_content else []))
-            else:
-                sections[-1][1].append(line)
-
-        sections = [(k, "\n".join(v).strip()) for k, v in sections]
-
-        fields = {}
-        for k, v in sections:
-            if (k not in fields) and (k in signature.output_fields):
-                try:
-                    fields[k] = parse_value(v, signature.output_fields[k].annotation)
-                except Exception as e:
-                    raise AdapterParseError(
-                        adapter_name="ChatAdapter",
-                        signature=signature,
-                        lm_response=completion,
-                        message=f"Failed to parse field {k} with value {v} from the LM response. Error message: {e}",
-                    )
-        if fields.keys() != signature.output_fields.keys():
-            raise AdapterParseError(
-                adapter_name="ChatAdapter",
-                signature=signature,
-                lm_response=completion,
-                parsed_result=fields,
-            )
-
-        return fields
-
-    def format_field_with_value(self, fields_with_values: dict[FieldInfoWithName, Any]) -> str:
-        """
-        Formats the values of the specified fields according to the field's DSPy type (input or output),
-        annotation (e.g. str, int, etc.), and the type of the value itself. Joins the formatted values
-        into a single string, which is a multiline string if there are multiple fields.
-
-        Args:
-            fields_with_values: A dictionary mapping information about a field to its corresponding
-                value.
-
-        Returns:
-            The joined formatted values of the fields, represented as a string
-        """
-        output = []
-        for field, field_value in fields_with_values.items():
-            formatted_field_value = format_field_value(field_info=field.info, value=field_value)
-            output.append(f"[[ ## {field.name} ## ]]\n{formatted_field_value}")
-
-        return "\n\n".join(output).strip()
-
+    @override
     def format_finetune_data(
         self,
-        signature: type[Signature],
+        task_spec: TaskSpec,
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
         outputs: dict[str, Any],
     ) -> dict[str, list[Any]]:
-        """
-        Format the call data into finetuning data according to the OpenAI API specifications.
+        return format_header_finetune_data(self, self._require_field_formatter(), task_spec, demos, inputs, outputs)
 
-        For the chat adapter, this means formatting the data as a list of messages, where each message is a dictionary
-        with a "role" and "content" key. The role can be "system", "user", or "assistant". Then, the messages are
-        wrapped in a dictionary with a "messages" key.
-        """
-        system_user_messages = self.format(  # returns a list of dicts with the keys "role" and "content"
-            signature=signature, demos=demos, inputs=inputs
-        )
-        assistant_message_content = self.format_assistant_message_content(  # returns a string, without the role
-            signature=signature, outputs=outputs
-        )
-        assistant_message = {"role": "assistant", "content": assistant_message_content}
-        messages = system_user_messages + [assistant_message]
-        return {"messages": messages}
+    @override
+    def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
+        sections = _split_field_sections(completion)
+        if sections and sections[0][0] is None and sections[0][1]:
+            raise AdapterParseError(
+                adapter_name="ChatAdapter",
+                task_spec=task_spec,
+                lm_response=completion,
+                message=f"Non-empty preamble before the first field header is not allowed: {sections[0][1]!r}",
+            )
+        fields = {}
+        for k, v in sections:
+            if k is not None and k not in fields and k in task_spec.output_fields:
+                fields[k] = parse_output_field(
+                    adapter_name="ChatAdapter",
+                    task_spec=task_spec,
+                    field_name=k,
+                    raw_value=v,
+                    lm_response=completion,
+                    field=task_spec.output_fields[k],
+                    repair=self.allow_json_repair,
+                )
+        validate_parsed_fields(adapter_name="ChatAdapter", task_spec=task_spec, lm_response=completion, fields=fields)
+        return fields

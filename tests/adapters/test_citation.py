@@ -1,8 +1,10 @@
+from typing import Any, cast
+
 import pydantic
 import pytest
 
-import dspy
-from dspy.experimental import Citations
+from dspy.adapters.types.citation import Citations
+from dspy.task_spec import input_field, output_field
 
 
 def test_citation_validate_input():
@@ -11,7 +13,7 @@ def test_citation_validate_input():
         document_index=0,
         start_char_index=0,
         end_char_index=23,
-        supported_text="The Earth orbits the Sun."
+        supported_text="The Earth orbits the Sun.",
     )
     assert citation.cited_text == "The Earth orbits the Sun."
     assert citation.document_index == 0
@@ -19,12 +21,12 @@ def test_citation_validate_input():
     assert citation.end_char_index == 23
     assert citation.type == "char_location"
     assert citation.supported_text == "The Earth orbits the Sun."
-
     with pytest.raises(pydantic.ValidationError):
-        Citations.Citation(cited_text="text")
+        Citations.Citation(**cast("Any", {"cited_text": "text"}))
 
 
 def test_citations_in_nested_type():
+
     class Wrapper(pydantic.BaseModel):
         citations: Citations
 
@@ -33,7 +35,7 @@ def test_citations_in_nested_type():
         document_index=0,
         start_char_index=0,
         end_char_index=13,
-        supported_text="Hello, world!"
+        supported_text="Hello, world!",
     )
     citations = Citations(citations=[citation])
     wrapper = Wrapper(citations=citations)
@@ -47,7 +49,7 @@ def test_citation_with_all_fields():
         document_title="Physics Facts",
         start_char_index=10,
         end_char_index=31,
-        supported_text="Water boils at 100°C."
+        supported_text="Water boils at 100°C.",
     )
     assert citation.cited_text == "Water boils at 100°C."
     assert citation.document_index == 1
@@ -64,11 +66,9 @@ def test_citation_format():
         document_title="Weather Guide",
         start_char_index=5,
         end_char_index=21,
-        supported_text="The sky is blue."
+        supported_text="The sky is blue.",
     )
-
     formatted = citation.format()
-
     assert formatted["type"] == "char_location"
     assert formatted["cited_text"] == "The sky is blue."
     assert formatted["document_index"] == 0
@@ -79,26 +79,26 @@ def test_citation_format():
 
 
 def test_citations_format():
-    citations = Citations(citations=[
-        Citations.Citation(
-            cited_text="First citation",
-            document_index=0,
-            start_char_index=0,
-            end_char_index=14,
-            supported_text="First citation"
-        ),
-        Citations.Citation(
-            cited_text="Second citation",
-            document_index=1,
-            document_title="Source",
-            start_char_index=20,
-            end_char_index=35,
-            supported_text="Second citation"
-        )
-    ])
-
+    citations = Citations(
+        citations=[
+            Citations.Citation(
+                cited_text="First citation",
+                document_index=0,
+                start_char_index=0,
+                end_char_index=14,
+                supported_text="First citation",
+            ),
+            Citations.Citation(
+                cited_text="Second citation",
+                document_index=1,
+                document_title="Source",
+                start_char_index=20,
+                end_char_index=35,
+                supported_text="Second citation",
+            ),
+        ]
+    )
     formatted = citations.format()
-
     assert isinstance(formatted, list)
     assert len(formatted) == 2
     assert formatted[0]["cited_text"] == "First citation"
@@ -114,12 +114,10 @@ def test_citations_from_dict_list():
             "document_title": "Weather Guide",
             "start_char_index": 0,
             "end_char_index": 15,
-            "supported_text": "The sky was blue yesterday."
+            "supported_text": "The sky was blue yesterday.",
         }
     ]
-
     citations = Citations.from_dict_list(citations_data)
-
     assert len(citations.citations) == 1
     assert citations.citations[0].cited_text == "The sky is blue"
     assert citations.citations[0].document_title == "Weather Guide"
@@ -127,38 +125,43 @@ def test_citations_from_dict_list():
 
 def test_citations_postprocessing():
     from dspy.adapters.chat_adapter import ChatAdapter
-    from dspy.signatures.signature import Signature
+    from dspy.core.types import LMCitationPart, LMOutput, LMResponse, LMTextPart
+    from dspy.task_spec import make_task_spec
 
-    class CitationSignature(Signature):
-        """Test signature with citations."""
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
-        citations: Citations = dspy.OutputField()
-
+    CitationSignature = make_task_spec(
+        {
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="The answer."),
+            "citations": output_field("citations", type_=Citations, desc="The citations."),
+        },
+        instructions="Test signature with citations.",
+    )
     adapter = ChatAdapter(native_response_types=[Citations])
-
-    outputs = [{
-        "text": "[[ ## answer ## ]]\nThe answer is blue.\n\n[[ ## citations ## ]]\n[]",
-        "citations": [
-            {
-                "cited_text": "The sky is blue",
-                "document_index": 0,
-                "document_title": "Weather Guide",
-                "start_char_index": 10,
-                "end_char_index": 25,
-                "supported_text": "The sky is blue"
-            }
-        ]
-    }]
-
+    response = LMResponse(
+        model="anthropic/claude-3-5-sonnet-20241022",
+        outputs=[
+            LMOutput(
+                parts=[
+                    LMTextPart(text="[[ ## answer ## ]]\nThe answer is blue.\n\n[[ ## citations ## ]]\n[]"),
+                    LMCitationPart(
+                        text="The sky is blue",
+                        title="Weather Guide",
+                        metadata={
+                            "document_index": 0,
+                            "start_char_index": 10,
+                            "end_char_index": 25,
+                            "supported_text": "The sky is blue",
+                        },
+                    ),
+                ]
+            )
+        ],
+    )
     result = adapter._call_postprocess(
         CitationSignature.delete("citations"),
         CitationSignature,
-        outputs,
-        dspy.LM(model="anthropic/claude-3-5-sonnet-20241022"),
-        lm_kwargs={},
+        response,
     )
-
     assert len(result) == 1
     assert "citations" in result[0]
     assert isinstance(result[0]["citations"], Citations)
@@ -166,29 +169,20 @@ def test_citations_postprocessing():
     assert result[0]["citations"][0].cited_text == "The sky is blue"
 
 
-def test_citation_extraction_from_lm_response():
-    from unittest.mock import MagicMock
+def test_citation_url_round_trip_from_lm_output():
+    class _CitationPart:
+        def __init__(self) -> None:
+            self.text = "quoted"
+            self.title = "Doc"
+            self.url = "https://example.com/doc"
+            self.metadata = {
+                "type": "char_location",
+                "document_index": 0,
+                "start_char_index": 0,
+                "end_char_index": 6,
+            }
 
-    mock_choice = MagicMock(message=MagicMock(provider_specific_fields={"citations": [[
-        {
-            "type": "char_location",
-            "cited_text": "The sky is blue",
-            "document_index": 0,
-            "document_title": "Weather Guide",
-            "start_char_index": 10,
-            "end_char_index": 25,
-            "supported_text": "The sky is blue"
-        }
-    ]]}))
-
-    lm = dspy.LM(model="test")
-    citations = lm._extract_citations_from_response(mock_choice)
-
-    assert citations is not None
-    assert len(citations) == 1
-    assert citations[0]["cited_text"] == "The sky is blue"
-    assert citations[0]["document_index"] == 0
-    assert citations[0]["document_title"] == "Weather Guide"
-    assert citations[0]["start_char_index"] == 10
-    assert citations[0]["end_char_index"] == 25
-    assert citations[0]["supported_text"] == "The sky is blue"
+    data = Citations._citation_part_to_dict(_CitationPart())
+    citation = Citations.Citation(**data)
+    assert citation.url == "https://example.com/doc"
+    assert citation.format()["url"] == "https://example.com/doc"

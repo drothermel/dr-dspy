@@ -2,117 +2,72 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, cast
 
-import dspy
+from dspy._internal.lazy_import import require
+from dspy.runtime.batch import Parallel
+from dspy.task_spec.predictor_context import resolve_optimizer_lm
 from dspy.teleprompt.simba_utils import append_a_demo, append_a_rule, prepare_models_for_resampling, wrap_program
-from dspy.teleprompt.teleprompt import Teleprompter
-from dspy.utils.lazy_import import require
 
-np = require("numpy")
+if TYPE_CHECKING:
+    from pydantic import BaseModel
 
+    from dspy.clients.lm import LM
+    from dspy.primitives import Module
+    from dspy.runtime.run_context import RunContext
+    from dspy.teleprompt.metrics import OptimizerMetric
+from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
+from dspy.teleprompt.compile_params import SIMBACompileParams
+from dspy.teleprompt.registry import register_teleprompter
+
+np = require("numpy", extra="numpy", feature="SIMBA optimization")
 logger = logging.getLogger(__name__)
 
 
-class SIMBA(Teleprompter):
-    """
-    SIMBA (Stochastic Introspective Mini-Batch Ascent) optimizer for DSPy.
-    
-    SIMBA is a DSPy optimizer that uses the LLM to analyze its own performance and 
-    generate improvement rules. It samples mini-batches, identifies challenging examples 
-    with high output variability, then either creates self-reflective rules or adds 
-    successful examples as demonstrations.
-    
-    For more details, see: https://dspy.ai/api/optimizers/SIMBA/
-    """
-
+@register_teleprompter(params=SIMBACompileParams)
+class SIMBA:
     def __init__(
         self,
         *,
-        metric: Callable[[dspy.Example, dict[str, Any]], float],
+        metric: OptimizerMetric,
         bsize: int = 32,
         num_candidates: int = 6,
         max_steps: int = 8,
         max_demos: int = 4,
-        prompt_model: dspy.LM | None = None,
-        teacher_settings: dict | None = None,
-        demo_input_field_maxlen: int = 100_000,
-        num_threads: int | None = None,
+        prompt_model: LM | None = None,
+        teacher_run: RunContext | None = None,
+        demo_input_field_maxlen: int = 100000,
+        max_concurrency: int | None = None,
         temperature_for_sampling: float = 0.2,
         temperature_for_candidates: float = 0.2,
     ) -> None:
-        """
-        Initializes SIMBA.
-
-        Args:
-            metric: A function that takes an Example and a prediction_dict
-                as input and returns a float.
-            bsize: Mini-batch size. Defaults to 32.
-            num_candidates: Number of new candidate programs to produce
-                per iteration. Defaults to 6.
-            max_steps: Number of optimization steps to run. Defaults to 8.
-            max_demos: Maximum number of demos a predictor can hold
-                before dropping some. Defaults to 4.
-            prompt_model: The model to use to evolve the program. When `prompt_model is None`, the globally configured
-                lm is used.
-            teacher_settings: Settings for the teacher model. Defaults to None.
-            demo_input_field_maxlen: Maximum number of characters to keep
-                in an input field when building a new demo. Defaults to 100,000.
-            num_threads: Number of threads for parallel execution.
-                Defaults to None.
-            temperature_for_sampling: Temperature used for picking
-                programs during the trajectory-sampling step. Defaults to 0.2.
-            temperature_for_candidates: Temperature used for picking
-                the source program for building new candidates. Defaults to 0.2.
-        """
         self.metric = metric
         self.bsize = bsize
         self.num_candidates = num_candidates
         self.max_steps = max_steps
         self.max_demos = max_demos
-        self.prompt_model = prompt_model or dspy.settings.lm
-        self.teacher_settings = teacher_settings
+        self.prompt_model = prompt_model
+        self.teacher_run = teacher_run
         self.demo_input_field_maxlen = demo_input_field_maxlen
-        self.num_threads = num_threads
-
+        self.max_concurrency = max_concurrency
         self.temperature_for_sampling = temperature_for_sampling
         self.temperature_for_candidates = temperature_for_candidates
-
         if self.max_demos > 0:
             self.strategies = [append_a_demo(demo_input_field_maxlen), append_a_rule]
         else:
             self.strategies = [append_a_rule]
 
-    def compile(
-        self,
-        student: dspy.Module,
-        *,
-        trainset: list[dspy.Example],
-        seed: int = 0
-    ) -> dspy.Module:
-        """
-        Compile and optimize the student module using SIMBA.
-        
-        Args:
-            student: The module to optimize
-            trainset: Training examples for optimization
-            seed: Random seed for reproducibility
-            
-        Returns:
-            The optimized module with candidate_programs and trial_logs attached
-        """
-        # Basic checks
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
+        params = SIMBACompileParams.model_validate(params)
+        trainset = params.trainset
         assert len(trainset) >= self.bsize, f"Trainset too small: {len(trainset)} < {self.bsize}"
-
-        # Initialize RNG
-        rng = random.Random(seed)
-        rng_np = np.random.default_rng(seed)
-
+        prompt_model = resolve_optimizer_lm(self.prompt_model, run=run)
+        rng = random.Random(params.seed)
+        rng_np = np.random.default_rng(params.seed)
         programs = []
         program_scores = {}
         next_program_idx = 0
 
-        # Helper functions
         def calc_average_score(prog_idx: int) -> float:
             scores = program_scores.get(prog_idx, [])
             if not scores:
@@ -120,10 +75,8 @@ class SIMBA(Teleprompter):
             return sum(scores) / len(scores)
 
         def top_k_plus_baseline(k: int) -> list[int]:
-            # Sort all programs by descending average score
-            scored_programs = sorted(programs, key=lambda p: calc_average_score(p.simba_idx), reverse=True)
-            top_k = [p.simba_idx for p in scored_programs[:k]]
-            # Ensure baseline=0 is in there:
+            scored_programs = sorted(range(len(programs)), key=lambda idx: calc_average_score(idx), reverse=True)
+            top_k = scored_programs[:k]
             if 0 not in top_k and len(top_k) > 0:
                 top_k[-1] = 0
             return list(dict.fromkeys(top_k))
@@ -131,97 +84,65 @@ class SIMBA(Teleprompter):
         def softmax_sample(rng_obj: random.Random, program_idxs: list[int], temperature: float) -> int:
             if not program_idxs:
                 raise ValueError("No programs available for softmax sampling.")
-
-            # Unnormalized weights
             scores = [calc_average_score(idx) for idx in program_idxs]
             exps = [np.exp(s / temperature) for s in scores]
             sum_exps = sum(exps)
             if sum_exps <= 0:
-                # Fallback: uniform if all exps are zero
                 return rng_obj.choice(program_idxs)
-
-            # Weighted random choice
             probs = [val / sum_exps for val in exps]
             return rng_obj.choices(program_idxs, weights=probs, k=1)[0]
 
-        def register_new_program(prog: dspy.Module, score_list: list[float]) -> None:
+        def register_new_program(prog: Module, score_list: list[float]) -> None:
             nonlocal next_program_idx
             next_program_idx += 1
-            new_idx = next_program_idx
-            prog.simba_idx = new_idx
             programs.append(prog)
-            program_scores[new_idx] = score_list
+            program_scores[next_program_idx] = score_list
 
-        # Initialize the baseline program: index=0
         student = student.deepcopy()
-        student.simba_idx = 0
         programs.append(student)
         program_scores[0] = []
-
         winning_programs = [student]
-
-        # Data shuffling
         data_indices = list(range(len(trainset)))
         rng.shuffle(data_indices)
         instance_idx = 0
-
-        # Parallel runner
-        run_parallel = dspy.Parallel(access_examples=False, num_threads=self.num_threads)
-
+        run_parallel = Parallel(run=run, access_examples=False, max_concurrency=self.max_concurrency)
         trial_logs = {}
         for batch_idx in range(self.max_steps):
             trial_logs[batch_idx] = {}
-
-            logger.info(f"Starting batch {batch_idx+1} of {self.max_steps}.")
-
-            # STEP 1: Get next batch
+            logger.info(f"Starting batch {batch_idx + 1} of {self.max_steps}.")
             if instance_idx + self.bsize > len(trainset):
                 rng.shuffle(data_indices)
                 instance_idx = 0
-
             batch_indices = data_indices[instance_idx : instance_idx + self.bsize]
             batch = [trainset[i] for i in batch_indices]
             instance_idx += self.bsize
-
-            # We'll generate (program, model) pairs for the trajectory sampling.
-            # Prepare distinct LMs (with different temperatures, etc.) from the baseline=programs[0].
-            models = prepare_models_for_resampling(programs[0], self.num_candidates, self.teacher_settings)
+            models = prepare_models_for_resampling(
+                program=programs[0], n=self.num_candidates, run=run, teacher_run=self.teacher_run
+            )
             top_programs = top_k_plus_baseline(self.num_candidates)
-
             exec_pairs = []
             predictor2name = {}
-
-            # For each model, for each example, pick a program from the pool via softmax
             for model in models:
                 for example in batch:
-                    chosen_prog_idx = softmax_sample(rng, top_programs, self.temperature_for_sampling)
+                    chosen_prog_idx = softmax_sample(
+                        rng_obj=rng, program_idxs=top_programs, temperature=self.temperature_for_sampling
+                    )
                     candidate_system = programs[chosen_prog_idx].deepcopy()
                     candidate_system.set_lm(model)
-
                     for name, predictor in candidate_system.named_predictors():
                         predictor2name[id(predictor)] = name
-
-                    # Use the special wrap that includes the 'example' in the output
-                    wrapped_candidate_system = wrap_program(candidate_system, self.metric)
+                    wrapped_candidate_system = wrap_program(program=candidate_system, metric=self.metric, run=run)
                     exec_pairs.append((wrapped_candidate_system, example))
-
-            # STEP 2: Execute
             logger.info(f"Sampling program trajectories on {self.bsize} examples x {self.num_candidates} samples.")
-            outputs = run_parallel(exec_pairs)
+            outputs = cast("list[dict[str, Any]]", (await run_parallel(exec_pairs)).results)
             assert len(outputs) == len(exec_pairs) == self.bsize * self.num_candidates
-
-            # STEP 3: Sort the training buckets by (max-to-min gap, max score, and max-to-avg gap).
             buckets = []
             largest_max_to_avg_gap = float("-inf")
             batch_10th_percentile_score = np.percentile([float(o["score"]) for o in outputs], 10)
             batch_90th_percentile_score = np.percentile([float(o["score"]) for o in outputs], 90)
-
-            # We'll chunk `outputs` by example index, each chunk has length = num_candidates
             for idx, _ in enumerate(batch):
-                # gather all results for this example
                 bucket = [outputs[i] for i in range(idx, len(outputs), self.bsize)]
                 bucket.sort(key=lambda x: x["score"], reverse=True)
-
                 max_score = float(bucket[0]["score"])
                 min_score = float(bucket[-1]["score"])
                 avg_score = sum(x["score"] for x in bucket) / len(bucket)
@@ -229,85 +150,68 @@ class SIMBA(Teleprompter):
                 max_to_avg_gap = max_score - avg_score
                 if max_to_avg_gap > largest_max_to_avg_gap:
                     largest_max_to_avg_gap = max_to_avg_gap
-
                 buckets.append((bucket, (max_to_min_gap, max_score, max_to_avg_gap)))
-
-            # sort the buckets
             buckets.sort(key=lambda x: x[1], reverse=True)
-
-            # Baseline for the batch is just the average of all runs
             all_scores_in_this_batch = [o["score"] for o in outputs]
             baseline_score = sum(all_scores_in_this_batch) / len(all_scores_in_this_batch)
-            logger.info(f"Batch {batch_idx+1}: Baseline mini-batch score: {baseline_score}\n")
-
-            # STEP 4: Build new candidate programs by applying a strategy to some top buckets.
+            logger.info(f"Batch {batch_idx + 1}: Baseline mini-batch score: {baseline_score}\n")
             system_candidates = []
             for bucket_idx, (bucket, bucket_stats) in enumerate(buckets):
                 max_to_min_gap, max_score, max_to_avg_gap = bucket_stats
                 logger.info(
-                    f"Batch {batch_idx+1}: Processing bucket #{bucket_idx+1}, with max score {max_score}, "
-                    f"max-to-min gap {max_to_min_gap}, and max-to-avg gap {max_to_avg_gap}."
+                    f"Batch {batch_idx + 1}: Processing bucket #{bucket_idx + 1}, with max score {max_score}, max-to-min gap {max_to_min_gap}, and max-to-avg gap {max_to_avg_gap}."
                 )
-
-                # pick source program
                 src_prog_idx = softmax_sample(
-                    rng, top_k_plus_baseline(self.num_candidates), self.temperature_for_candidates
+                    rng_obj=rng,
+                    program_idxs=top_k_plus_baseline(self.num_candidates),
+                    temperature=self.temperature_for_candidates,
                 )
                 system_candidate = programs[src_prog_idx].deepcopy()
-
-                # Drop some demos from each predictor
                 name2predictor = {}
                 num_demos_list = []
-
                 max_demos_tmp = self.max_demos if self.max_demos > 0 else 3
-
                 for name, predictor in system_candidate.named_predictors():
                     name2predictor[name] = predictor
                     num_demos_list.append(len(predictor.demos))
-
                 num_demos = max(num_demos_list) if num_demos_list else 0
                 num_demos_to_drop = max(rng_np.poisson(num_demos / max_demos_tmp), int(num_demos >= max_demos_tmp))
                 num_demos_to_drop = min(num_demos_to_drop, num_demos)
                 demos_to_drop = [rng.randrange(num_demos) for _ in range(num_demos_to_drop)]
-
-                for _, predictor in name2predictor.items():
+                for predictor in name2predictor.values():
                     predictor.demos = [demo for idxd, demo in enumerate(predictor.demos) if idxd not in demos_to_drop]
-
-                # Pick a strategy
                 strategy = rng.choice(self.strategies)
                 logger.info(
-                    f"Batch {batch_idx+1}: Invoking strategy: {strategy.__name__}"
+                    f"Batch {batch_idx + 1}: Invoking strategy: {strategy.__name__}"
                     + (f", having dropped {num_demos_to_drop} demos per predictor" if num_demos_to_drop else "")
                 )
-
                 try:
-                    strategy(
+                    await strategy(
                         bucket,
                         system_candidate,
+                        run=run,
                         predictor2name=predictor2name,
                         name2predictor=name2predictor,
                         batch_10p_score=batch_10th_percentile_score,
                         batch_90p_score=batch_90th_percentile_score,
-                        prompt_model=self.prompt_model,
+                        prompt_model=prompt_model,
                     )
                 except Exception as e:
-                    logger.error(f"Strategy failed with error: {e}")
+                    logger.exception(f"Strategy failed with error: {e}")
                     continue
-
                 system_candidates.append(system_candidate)
                 logger.info("\n")
-
                 if len(system_candidates) >= self.num_candidates + 1:
                     break
-
-            # STEP 5: Evaluate these new system_candidates on the same mini-batch
-            logger.info(f"Batch {batch_idx+1}: Evaluating {len(system_candidates)} programs on {self.bsize} examples.")
-
-            exec_pairs = [(wrap_program(sys, self.metric), ex) for sys in system_candidates for ex in batch]
-            outputs = run_parallel(exec_pairs)
+            logger.info(
+                f"Batch {batch_idx + 1}: Evaluating {len(system_candidates)} programs on {self.bsize} examples."
+            )
+            exec_pairs = [
+                (wrap_program(program=sys, metric=self.metric, run=run), ex)
+                for sys in system_candidates
+                for ex in batch
+            ]
+            outputs = cast("list[dict[str, Any]]", (await run_parallel(exec_pairs)).results)
             assert len(outputs) == len(exec_pairs) == len(system_candidates) * self.bsize
-
-            # STEP 6: Compute average mini-batch scores for each new candidate
             candidate_scores = []
             for idx_cand, _ in enumerate(system_candidates):
                 start = idx_cand * self.bsize
@@ -315,39 +219,30 @@ class SIMBA(Teleprompter):
                 sys_scores = [outputs[i]["score"] for i in range(start, end)]
                 avg_sys_score = sum(sys_scores) / len(sys_scores)
                 candidate_scores.append(avg_sys_score)
-
             logger.info(
-                f"Scores after {batch_idx+1} batches: {candidate_scores}, "
-                f"Best: {max(candidate_scores) if candidate_scores else 'N/A'}\n"
+                f"Scores after {batch_idx + 1} batches: {candidate_scores}, Best: {(max(candidate_scores) if candidate_scores else 'N/A')}\n"
             )
-
-            # STEP 7: Select the best among these new ones for "winning" record
             if candidate_scores:
                 best_idx_among_candidates = candidate_scores.index(max(candidate_scores))
                 best_program = system_candidates[best_idx_among_candidates]
                 winning_programs.append(best_program.deepcopy())
-
-            # STEP 8: Register all new candidate systems in our global pool
             for idx_cand, cand_sys in enumerate(system_candidates):
                 start = idx_cand * self.bsize
                 end = (idx_cand + 1) * self.bsize
                 sys_scores = [outputs[i]["score"] for i in range(start, end)]
                 register_new_program(cand_sys, sys_scores)
-
-        M = len(winning_programs) - 1  # noqa: N806
-        N = self.num_candidates + 1  # noqa: N806
-        if M < 1:
-            program_idxs = [0] * N
-        else:
-            program_idxs = [round(i * M / (N - 1)) for i in range(N)]
-
+        M = len(winning_programs) - 1
+        N = self.num_candidates + 1
+        program_idxs = [0] * N if M < 1 else [round(i * M / (N - 1)) for i in range(N)]
         program_idxs = list(dict.fromkeys(program_idxs))
-
         candidate_programs = [winning_programs[i].deepcopy() for i in program_idxs]
         logger.info(f"VALIDATION: Evaluating {len(candidate_programs)} programs on the full trainset.")
-        exec_pairs = [(wrap_program(sys, self.metric), ex) for sys in candidate_programs for ex in trainset]
-        outputs = run_parallel(exec_pairs)
-
+        exec_pairs = [
+            (wrap_program(program=sys, metric=self.metric, run=run), ex)
+            for sys in candidate_programs
+            for ex in trainset
+        ]
+        outputs = cast("list[dict[str, Any]]", (await run_parallel(exec_pairs)).results)
         scores = []
         for idx_prog, _ in enumerate(candidate_programs):
             start = idx_prog * len(trainset)
@@ -357,21 +252,22 @@ class SIMBA(Teleprompter):
             scores.append(avg_score)
             if idx_prog != 0:
                 trial_logs[idx_prog - 1]["train_score"] = avg_score
-
-        # Build sorted list of {"score", "program"} dicts
         assert len(scores) == len(candidate_programs)
-        candidate_data = [{"score": s, "program": p} for s, p in zip(scores, candidate_programs, strict=False)]
-        candidate_data.sort(key=lambda x: x["score"], reverse=True)
-
-        best_idx = scores.index(max(scores)) if scores else 0
-        best_program = candidate_programs[best_idx].deepcopy()
-        logger.info(
-            f"Final trainset scores: {scores}, Best: {max(scores) if scores else 'N/A'} "
-            f"(at index {best_idx if scores else 'N/A'})\n\n\n"
+        candidate_entries = [
+            ProgramCandidate(score=score, program=program)
+            for score, program in zip(scores, candidate_programs, strict=True)
+        ]
+        candidate_entries.sort(
+            key=lambda entry: entry.score if entry.score is not None else float("-inf"), reverse=True
         )
-
-        # Attach sorted, scored candidates & logs
-        best_program.candidate_programs = candidate_data
-        best_program.trial_logs = trial_logs
-
-        return best_program
+        best_program = (
+            candidate_entries[0].program.deepcopy() if candidate_entries else candidate_programs[0].deepcopy()
+        )
+        logger.info(
+            f"Final trainset scores: {scores}, Best: {(candidate_entries[0].score if candidate_entries else 'N/A')}\n\n\n"
+        )
+        return CompileResult(
+            program=best_program,
+            candidates=candidate_entries,
+            stats=CompileStats(best_score=max(scores) if scores else None, trial_logs=trial_logs),
+        )

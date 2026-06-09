@@ -1,173 +1,175 @@
-from dspy.primitives.example import Example
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+from typing_extensions import override
+
+from dspy.primitives.record_backed import RecordBacked, RecordStoreFacade
+from dspy.primitives.record_store import RecordStore
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from dspy.task_spec import TaskSpec
 
 
-class Prediction(Example):
-    """A prediction object that contains the output of a DSPy module.
-    
-    Prediction inherits from Example.
-    
-    To allow feedback-augmented scores, Prediction supports comparison operations
-    (<, >, <=, >=) for Predictions with a `score` field. The comparison operations
-    compare the 'score' values as floats. For equality comparison, Predictions are equal
-    if their underlying data stores are equal (inherited from Example).
-    
-    Arithmetic operations (+, /, etc.) are also supported for Predictions with a 'score'
-    field, operating on the score value.
+class Prediction(RecordStoreFacade):
+    """Model output container backed by a field store.
+
+    Equality compares store fields and attached completions, not numeric scores.
+
+    Rich comparisons and arithmetic (``+``, ``/``, ``<``, etc.) coerce operands
+    through ``float(self["score"])``. A missing ``score`` field raises
+    ``ValueError``. Supported operand types are ``int``, ``float``, and
+    ``Prediction``.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    _RECORD_ATTR = "_store"
+    _RECORD_RESERVED = frozenset({"_store", "_completions", "_lm_usage"})
 
-        del self._demos
-        del self._input_keys
+    __hash__ = None
 
-        self._completions = None
-        self._lm_usage = None
+    def __init__(self, **kwargs: Any) -> None:
+        object.__setattr__(self, "_store", RecordStore(kwargs))
+        object.__setattr__(self, "_completions", None)
+        object.__setattr__(self, "_lm_usage", None)
 
-    def get_lm_usage(self):
+    @classmethod
+    def from_record(cls, record: Mapping[str, Any]) -> Prediction:
+        return cls(**dict(record))
+
+    def get_lm_usage(self) -> dict[str, dict[str, Any]] | None:
         return self._lm_usage
 
-    def set_lm_usage(self, value):
+    def set_lm_usage(self, value: dict[str, dict[str, Any]] | None) -> None:
         self._lm_usage = value
 
     @classmethod
-    def from_completions(cls, list_or_dict, signature=None):
+    def from_completions(
+        cls,
+        list_or_dict: list[dict[str, Any]] | dict[str, list[Any]],
+        task_spec: TaskSpec | None = None,
+    ) -> Prediction:
         obj = cls()
-        obj._completions = Completions(list_or_dict, signature=signature)
-        obj._store = {k: v[0] for k, v in obj._completions.items()}
-
+        completions = Completions(list_or_dict, task_spec=task_spec)
+        object.__setattr__(obj, "_completions", completions)
+        object.__setattr__(obj, "_store", RecordStore({k: v[0] for k, v in completions.items()}))
         return obj
 
-    def __repr__(self):
-        store_repr = ",\n    ".join(f"{k}={v!r}" for k, v in self._store.items())
+    @override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Prediction):
+            return NotImplemented
+        return self._store == other._store and self._completions == other._completions
 
+    @override
+    def __repr__(self) -> str:
+        store_repr = ",\n    ".join((f"{k}={v!r}" for k, v in self._store.items()))
         if self._completions is None or len(self._completions) == 1:
             return f"Prediction(\n    {store_repr}\n)"
-
         num_completions = len(self._completions)
-        return f"Prediction(\n    {store_repr},\n    completions=Completions(...)\n) ({num_completions-1} completions omitted)"
+        return f"Prediction(\n    {store_repr},\n    completions=Completions(...)\n) ({num_completions - 1} completions omitted)"
 
-    def __str__(self):
+    @override
+    def __str__(self) -> str:
         return self.__repr__()
 
-    def __float__(self):
+    def __float__(self) -> float:
         if "score" not in self._store:
             raise ValueError("Prediction object does not have a 'score' field to convert to float.")
         return float(self._store["score"])
 
-    def __add__(self, other):
-        if isinstance(other, (float, int)):
-            return self.__float__() + other
-        elif isinstance(other, Prediction):
-            return self.__float__() + float(other)
-        raise TypeError(f"Unsupported type for addition: {type(other)}")
+    def __add__(self, other: float | int | Prediction) -> float:
+        return self.__float__() + _coerce_score_operand(other, operation="addition")
 
-    def __radd__(self, other):
-        if isinstance(other, (float, int)):
-            return other + self.__float__()
-        elif isinstance(other, Prediction):
-            return float(other) + self.__float__()
-        raise TypeError(f"Unsupported type for addition: {type(other)}")
+    def __radd__(self, other: float | int | Prediction) -> float:
+        return _coerce_score_operand(other, operation="addition") + self.__float__()
 
-    def __truediv__(self, other):
-        if isinstance(other, (float, int)):
-            return self.__float__() / other
-        elif isinstance(other, Prediction):
-            return self.__float__() / float(other)
-        raise TypeError(f"Unsupported type for division: {type(other)}")
+    def __truediv__(self, other: float | int | Prediction) -> float:
+        return self.__float__() / _coerce_score_operand(other, operation="division")
 
-    def __rtruediv__(self, other):
-        if isinstance(other, (float, int)):
-            return other / self.__float__()
-        elif isinstance(other, Prediction):
-            return float(other) / self.__float__()
-        raise TypeError(f"Unsupported type for division: {type(other)}")
+    def __rtruediv__(self, other: float | int | Prediction) -> float:
+        return _coerce_score_operand(other, operation="division") / self.__float__()
 
-    def __lt__(self, other):
-        if isinstance(other, (float, int)):
-            return self.__float__() < other
-        elif isinstance(other, Prediction):
-            return self.__float__() < float(other)
-        raise TypeError(f"Unsupported type for comparison: {type(other)}")
+    def __lt__(self, other: float | int | Prediction) -> bool:
+        return self.__float__() < _coerce_score_operand(other, operation="comparison")
 
-    def __le__(self, other):
-        if isinstance(other, (float, int)):
-            return self.__float__() <= other
-        elif isinstance(other, Prediction):
-            return self.__float__() <= float(other)
-        raise TypeError(f"Unsupported type for comparison: {type(other)}")
+    def __le__(self, other: float | int | Prediction) -> bool:
+        return self.__float__() <= _coerce_score_operand(other, operation="comparison")
 
-    def __gt__(self, other):
-        if isinstance(other, (float, int)):
-            return self.__float__() > other
-        elif isinstance(other, Prediction):
-            return self.__float__() > float(other)
-        raise TypeError(f"Unsupported type for comparison: {type(other)}")
+    def __gt__(self, other: float | int | Prediction) -> bool:
+        return self.__float__() > _coerce_score_operand(other, operation="comparison")
 
-    def __ge__(self, other):
-        if isinstance(other, (float, int)):
-            return self.__float__() >= other
-        elif isinstance(other, Prediction):
-            return self.__float__() >= float(other)
-        raise TypeError(f"Unsupported type for comparison: {type(other)}")
+    def __ge__(self, other: float | int | Prediction) -> bool:
+        return self.__float__() >= _coerce_score_operand(other, operation="comparison")
 
     @property
-    def completions(self):
+    def completions(self) -> Completions | None:
         return self._completions
 
 
-class Completions:
-    def __init__(self, list_or_dict, signature=None):
-        self.signature = signature
+def _coerce_score_operand(other: object, *, operation: str) -> float:
+    if isinstance(other, (float, int)):
+        return float(other)
+    if isinstance(other, Prediction):
+        return float(other)
+    raise TypeError(f"Unsupported type for {operation}: {type(other)}")
 
+
+class Completions(RecordBacked):
+    _RECORD_ATTR = "_completions"
+    _RECORD_RESERVED = frozenset({"_completions", "task_spec"})
+
+    def __init__(
+        self,
+        list_or_dict: list[dict[str, Any]] | dict[str, list[Any]],
+        task_spec: TaskSpec | None = None,
+    ) -> None:
+        object.__setattr__(self, "task_spec", task_spec)
         if isinstance(list_or_dict, list):
-            kwargs = {}
+            kwargs: dict[str, list[Any]] = {}
             for arg in list_or_dict:
                 for k, v in arg.items():
                     kwargs.setdefault(k, []).append(v)
         else:
-            kwargs = list_or_dict
+            kwargs = {k: list(v) if isinstance(v, list) else v for k, v in list_or_dict.items()}
+        self._validate_completion_lists(kwargs)
+        object.__setattr__(self, "_completions", kwargs)
 
-        assert all(isinstance(v, list) for v in kwargs.values()), "All values must be lists"
+    @staticmethod
+    def _validate_completion_lists(kwargs: dict[str, list[Any]]) -> None:
+        if not all(isinstance(v, list) for v in kwargs.values()):
+            raise ValueError("All Completions values must be lists")
+        if not kwargs:
+            return
+        lists = list(kwargs.values())
+        length = len(lists[0])
+        if not all(len(v) == length for v in lists):
+            raise ValueError("All Completions lists must have the same length")
 
-        if kwargs:
-            length = len(next(iter(kwargs.values())))
-            assert all(len(v) == length for v in kwargs.values()), "All lists must have the same length"
+    def items(self) -> list[tuple[str, list[Any]]]:
+        return list(self._completions.items())
 
-        self._completions = kwargs
-
-    def items(self):
-        return self._completions.items()
-
-    def __getitem__(self, key):
+    def __getitem__(self, key: int | str) -> Prediction | list[Any]:
         if isinstance(key, int):
             if key < 0 or key >= len(self):
                 raise IndexError("Index out of range")
-
-            return Prediction(**{k: v[key] for k, v in self._completions.items()})
-
+            return Prediction.from_record({k: v[key] for k, v in self._completions.items()})
         return self._completions[key]
 
-    def __getattr__(self, name):
-        if name == "_completions":
-            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
-        if name in self._completions:
-            return self._completions[name]
-
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
-
-    def __len__(self):
-        # Return the length of the list for one of the keys
-        # It assumes all lists have the same length
+    def __len__(self) -> int:
+        if not self._completions:
+            return 0
         return len(next(iter(self._completions.values())))
 
-    def __contains__(self, key):
+    def __contains__(self, key: object) -> bool:
         return key in self._completions
 
-    def __repr__(self):
-        items_repr = ",\n    ".join(f"{k}={v!r}" for k, v in self._completions.items())
+    @override
+    def __repr__(self) -> str:
+        items_repr = ",\n    ".join((f"{k}={v!r}" for k, v in self._completions.items()))
         return f"Completions(\n    {items_repr}\n)"
 
-    def __str__(self):
-        # return str(self._completions)
+    @override
+    def __str__(self) -> str:
         return self.__repr__()

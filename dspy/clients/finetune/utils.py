@@ -1,0 +1,179 @@
+from __future__ import annotations
+
+import os
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, Literal, cast
+
+import orjson
+from pydantic import BaseModel, ConfigDict
+
+from dspy._internal.hashing import hash_pickle
+from dspy.clients.cache_paths import DSPY_CACHEDIR
+
+if TYPE_CHECKING:
+    from dspy.adapters.base import Adapter
+
+
+class TrainingStatus(StrEnum):
+    not_started = "not_started"
+    pending = "pending"
+    running = "running"
+    succeeded = "succeeded"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class TrainDataFormat(StrEnum):
+    CHAT = "chat"
+    COMPLETION = "completion"
+    GRPO_CHAT = "grpo_chat"
+
+
+class FinetuneChatMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant", "system"]
+    content: str
+
+
+class FinetuneAssistantMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["assistant"] = "assistant"
+    content: str
+
+
+class GRPOChatData(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    messages: list[FinetuneChatMessage]
+    completion: FinetuneAssistantMessage
+    reward: float
+
+
+GRPORolloutGroup = list[GRPOChatData]
+
+
+class GRPOGroup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    batch_id: int | None
+    group: list[GRPOChatData]
+
+
+class GRPOStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    current_model: str
+    checkpoints: dict[str, str]
+    pending_batch_ids: list[int]
+    status: str | None = None
+    last_checkpoint: str | None = None
+
+
+def infer_data_format(adapter: Adapter) -> TrainDataFormat:
+    if adapter.capabilities.supports_finetune:
+        return TrainDataFormat.CHAT
+    raise ValueError(f"Could not infer the data format for: {adapter}")
+
+
+def get_finetune_directory() -> str:
+    default_finetunedir = os.path.join(DSPY_CACHEDIR, "finetune")
+    finetune_dir = os.environ.get("DSPY_FINETUNEDIR") or default_finetunedir
+    finetune_dir = os.path.abspath(finetune_dir)
+    os.makedirs(finetune_dir, exist_ok=True)
+    return finetune_dir
+
+
+def write_lines(file_path, data) -> None:
+    with open(file_path, "wb") as f:
+        for item in data:
+            f.write(orjson.dumps(item) + b"\n")
+
+
+def save_data(data: list[dict[str, Any]]) -> str:
+    hash = hash_pickle(data)
+    file_name = f"{hash}.jsonl"
+    finetune_dir = get_finetune_directory()
+    file_path = os.path.join(finetune_dir, file_name)
+    file_path = os.path.abspath(file_path)
+    with open(file_path, "wb") as f:
+        for item in data:
+            f.write(orjson.dumps(item) + b"\n")
+    return file_path
+
+
+def validate_data_format(data: list[dict[str, Any]], data_format: TrainDataFormat) -> None:
+    find_err_funcs = {
+        TrainDataFormat.CHAT: find_data_error_chat,
+        TrainDataFormat.COMPLETION: find_data_errors_completion,
+    }
+    if data_format not in find_err_funcs:
+        raise ValueError(f"Data format {data_format} is not supported.")
+    find_err_func = find_err_funcs[data_format]
+    if not isinstance(data, list):
+        err = f"Data is not a list. Found data type: {type(data)}"
+        raise ValueError(err)
+    data_dict_errors = []
+    for ind, data_dict in enumerate(data):
+        err = f"Not a dictionary -- found data type: {type(data_dict)}"
+        if isinstance(data_dict, dict):
+            err = find_err_func(data_dict)
+        if err:
+            err_dict = {"index": ind, "error": err}
+            data_dict_errors.append(err_dict)
+    if data_dict_errors:
+        finetune_dir = get_finetune_directory()
+        log_path = os.path.join(finetune_dir, "data_format_errors.log")
+        log_path = os.path.abspath(log_path)
+        write_lines(file_path=log_path, data=data_dict_errors)
+        err = f"Data format errors found.  For more details, see the log file: {log_path}"
+        raise ValueError(err)
+
+
+def find_data_errors_completion(data_dict: dict[str, Any]) -> str | None:
+    if "prompt" not in data_dict:
+        return 'Expected Keys: ["completion", "prompt"]; Found Keys: ' + str(sorted(data_dict.keys()))
+    completion_key = "completion" if "completion" in data_dict else "response" if "response" in data_dict else None
+    if completion_key is None:
+        return 'Expected Keys: ["completion", "prompt"]; Found Keys: ' + str(sorted(data_dict.keys()))
+    expected_keys = sorted(["prompt", completion_key])
+    found_keys = sorted(data_dict.keys())
+    if set(expected_keys) != set(found_keys):
+        return f"Expected Keys: {expected_keys}; Found Keys: {found_keys}"
+    if not isinstance(data_dict["prompt"], str):
+        return f"Expected `prompt` to be of type `str`. Found: {type(data_dict['prompt'])}"
+    if not isinstance(data_dict[completion_key], str):
+        return f"Expected `{completion_key}` to be of type `str`. Found: {type(data_dict[completion_key])}"
+    return None
+
+
+def find_data_error_chat(messages: dict[str, Any]) -> str | None:
+    expected_keys = ["messages"]
+    found_keys = sorted(messages.keys())
+    if set(expected_keys) != set(found_keys):
+        return f"Expected Keys: {expected_keys}; Found Keys: {found_keys}"
+    if not isinstance(messages["messages"], list):
+        return f"The value of the `messages` key should be a list instance. Found: {type(messages['messages'])}"
+    for ind, message in enumerate(messages["messages"]):
+        if not isinstance(message, dict):
+            return f"Error in message at index {ind}: expected dict, got {type(message).__name__}"
+        err = find_data_error_chat_message(cast("dict[str, Any]", message))
+        if err:
+            return f"Error in message at index {ind}: {err}"
+    return None
+
+
+def find_data_error_chat_message(message: dict[str, Any]) -> str | None:
+    message_keys = sorted(["role", "content"])
+    found_keys = sorted(message.keys())
+    if set(message_keys) != set(found_keys):
+        return f"Expected Keys: {message_keys}; Found Keys: {found_keys}"
+    expected_roles = sorted(["assistant", "system", "user"])
+    found_role = message["role"]
+    if found_role not in expected_roles:
+        return f"Expected Roles: {expected_roles}; Found Role: {found_role}"
+    if not isinstance(message["content"], str):
+        return f"Expected Content Type: `str`; Found Content Type: {type(message['content'])}"
+    return None

@@ -1,12 +1,4 @@
-<p align="center">
-  <img align="center" src="docs/docs/static/img/dspy_logo.png" width="460px" />
-</p>
-<p align="left">
-
-
 ## DSPy: _Programming_—not prompting—Foundation Models
-
-**Documentation:** [DSPy Docs](https://dspy.ai/)
 
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/dspy?period=monthly)](https://pepy.tech/projects/dspy)
 
@@ -15,13 +7,7 @@
 
 DSPy is the framework for _programming—rather than prompting—language models_. It allows you to iterate fast on **building modular AI systems** and offers algorithms for **optimizing their prompts and weights**, whether you're building simple classifiers, sophisticated RAG pipelines, or Agent loops.
 
-DSPy stands for Declarative Self-improving Python. Instead of brittle prompts, you write compositional _Python code_ and use DSPy to **teach your LM to deliver high-quality outputs**. Learn more via our [official documentation site](https://dspy.ai/) or meet the community, seek help, or start contributing via this GitHub repo and our [Discord server](https://discord.gg/XCGy2WDCQB).
-
-
-## Documentation: [dspy.ai](https://dspy.ai)
-
-
-**Please go to the [DSPy Docs at dspy.ai](https://dspy.ai)**
+DSPy stands for Declarative Self-improving Python. Instead of brittle prompts, you write compositional _Python code_ and use DSPy to **teach your LM to deliver high-quality outputs**. Meet the community, seek help, or start contributing via this repository and our [Discord server](https://discord.gg/XCGy2WDCQB).
 
 
 ## Installation
@@ -41,8 +27,6 @@ pip install git+https://github.com/stanfordnlp/dspy.git
 
 
 ## 📜 Citation & Reading More
-
-If you're looking to understand the framework, please go to the [DSPy Docs at dspy.ai](https://dspy.ai).
 
 If you're looking to understand the underlying research, this is a set of our papers:
 
@@ -85,4 +69,3 @@ If you use DSPy or DSP in a research paper, please cite our work as follows:
 * [**Releasing the DSP Compiler (v0.1)**](https://twitter.com/lateinteraction/status/1625231662849073160)  (Twitter Thread, Feb 2023)
 * [**Introducing DSP**](https://twitter.com/lateinteraction/status/1617953413576425472)  (Twitter Thread, Jan 2023)
 * [**Demonstrate-Search-Predict: Composing retrieval and language models for knowledge-intensive NLP**](https://arxiv.org/abs/2212.14024.pdf) (Academic Paper, Dec 2022) -->
-

@@ -1,163 +1,158 @@
-from copy import deepcopy
+from typing import Any, cast
 
-from pydantic.fields import FieldInfo
-
-import dspy
-from dspy.predict.avatar.models import Action, ActionOutput, Tool
-from dspy.predict.avatar.signatures import Actor
-from dspy.signatures.signature import ensure_signature
-
-
-def get_number_with_suffix(number: int) -> str:
-    if number == 1:
-        return "1st"
-    elif number == 2:
-        return "2nd"
-    elif number == 3:
-        return "3rd"
-    else:
-        return f"{number}th"
+from dspy.adapters.types.tool import Tool
+from dspy.history import AvatarTurnEvent, TurnLog, call_with_history_truncation
+from dspy.predict.agent_constants import AVATAR_TERMINAL_TOOL
+from dspy.predict.agent_loop import AgentLoopControl, AgentLoopRunner, AgentStepResult
+from dspy.predict.agent_termination import AgentTerminationReason
+from dspy.predict.avatar.models import Action, ActionOutput
+from dspy.predict.predict import Predict
+from dspy.predict.tools import normalize_tools
+from dspy.primitives import Module, Prediction
+from dspy.runtime.call_options import ModuleCallOptions
+from dspy.runtime.run_context import RunContext
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 
 
-class Avatar(dspy.Module):
+class Avatar(Module):
     def __init__(
         self,
-        signature,
-        tools,
-        max_iters=3,
-        verbose=False,
-    ):
-        self.signature = ensure_signature(signature)
-        self.input_fields = self.signature.input_fields
-        self.output_fields = self.signature.output_fields
-
-        self.finish_tool = Tool(
-            tool=None,
-            name="Finish",
-            desc="returns the final output and finishes the task",
+        task_spec: TaskSpec,
+        tools: list[Tool],
+        max_iters: int = 3,
+        verbose: bool = False,
+    ) -> None:
+        if not isinstance(task_spec, TaskSpec):
+            raise TypeError(f"Avatar requires a TaskSpec instance, got {type(task_spec).__name__}.")
+        super().__init__()
+        self.task_spec = task_spec
+        self.input_fields = task_spec.input_fields
+        self.output_fields = task_spec.output_fields
+        tools_by_name = normalize_tools(tools)
+        outputs = ", ".join([f"`{k}`" for k in task_spec.output_fields])
+        tools_by_name[AVATAR_TERMINAL_TOOL] = Tool(
+            func=lambda: "Completed.",
+            description=f"Marks the task as complete when all information for producing {outputs} is available.",
+            name=AVATAR_TERMINAL_TOOL,
+            args={},
         )
-
-        self.tools = tools + [self.finish_tool]
-        self.actor_signature = Actor
-
-        for field in list(self.input_fields.keys())[::-1]:
-            self.actor_signature = self.actor_signature.append(
-                field,
-                self._get_field(self.input_fields[field]),
-                type_=self.input_fields[field].annotation,
-            )
-
+        self.tools = list(tools_by_name.values())
+        self.tools_by_name = tools_by_name
         self.verbose = verbose
         self.max_iters = max_iters
-        self.actor = dspy.TypedPredictor(self.actor_signature)
-
-        self.actor_clone = deepcopy(self.actor)
-
-    def _get_field(self, field_info: FieldInfo):
-        if field_info.json_schema_extra["__dspy_field_type"] == "input":
-            return dspy.InputField(
-                desc=field_info.json_schema_extra["desc"],
-            )
-        elif field_info.json_schema_extra["__dspy_field_type"] == "output":
-            return dspy.OutputField(
-                desc=field_info.json_schema_extra["desc"],
-            )
-        else:
-            raise ValueError(f"Unknown field type: {field_info.json_schema_extra['__dspy_field_type']}")
-
-    def _update_signature(self, idx: int, omit_action: bool = False):
-        self.actor.signature = self.actor.signature.with_updated_fields(
-            f"action_{idx}", Action, __dspy_field_type="input"
-        )
-
-        self.actor.signature = self.actor.signature.append(
-            f"result_{idx}",
-            dspy.InputField(
-                prefix=f"Result {idx}:",
-                desc=f"{get_number_with_suffix(idx)} result",
-                type_=str,
-            ),
-        )
-
-        if omit_action:
-            for field in list(self.output_fields.keys()):
-                self.actor.signature = self.actor.signature.append(
-                    field,
-                    self._get_field(self.output_fields[field]),
-                    type_=self.output_fields[field].annotation,
-                )
-        else:
-            self.actor.signature = self.actor.signature.append(
-                f"action_{idx+1}",
-                dspy.OutputField(
-                    prefix=f"Action {idx+1}:",
-                    desc=f"{get_number_with_suffix(idx+1)} action to taken",
-                ),
-            )
-            self.actor.signature = self.actor.signature.with_updated_fields(
-                f"action_{idx+1}",
-                Action,
-            )
-
-    def _call_tool(self, tool_name: str, tool_input_query: str) -> str:
-        for tool in self.tools:
-            if tool.name == tool_name:
-                return tool.tool.run(tool_input_query)
-
-    def forward(self, **kwargs):
-        if self.verbose:
-            print("Starting the task...")
-
-        args = {
-            "goal": self.signature.__doc__,
-            "tools": [tool.name for tool in self.tools],
+        actor_fields: dict[str, FieldSpec] = {
+            "goal": input_field("goal", str, desc="Task to be accomplished."),
+            "tools": input_field("tools", list[str], desc="list of tools to use"),
+            "turn_log": input_field("turn_log", TurnLog, desc="Previous actions and tool results."),
         }
+        for field_name, field in self.input_fields.items():
+            actor_fields[field_name] = input_field(field_name, field.type_, desc=field.desc, prefix=field.prefix)
+        actor_fields["action"] = output_field(
+            "action",
+            Action,
+            desc="Next action to take, including tool_name and tool_args for the selected tool.",
+        )
+        actor_instructions = (
+            "You will be given `Tools` which will be a list of tools to use to accomplish the `Goal`. "
+            "Given the user query, your task is to decide which tool to use and what input values to provide.\n\n"
+            "You will output the action needed to accomplish the `Goal`. `Action` should have a tool to use "
+            "and JSON tool_args to pass to the tool.\n\n"
+            "Note: You can opt to use no tools and provide the final answer directly. You can also use one tool "
+            "multiple times with different tool_args if applicable."
+        )
+        self.actor = Predict(make_task_spec(actor_fields, instructions=actor_instructions, name="Actor"))
+        finish_fields = dict(actor_fields)
+        finish_fields.pop("action")
+        for field_name, field in self.output_fields.items():
+            finish_fields[field_name] = output_field(field_name, field.type_, desc=field.desc, prefix=field.prefix)
+        self.finish = Predict(
+            make_task_spec(
+                finish_fields,
+                instructions=f"{task_spec.instructions}\n\nProduce the final outputs using the turn log.",
+                name="AvatarFinish",
+            )
+        )
 
-        for key in self.input_fields.keys():
-            if key in kwargs:
-                args[key] = kwargs[key]
+    async def _acall_tool(self, tool_name: str, tool_args: dict[str, Any]) -> str | None:
+        tool = self.tools_by_name.get(tool_name)
+        if tool is None:
+            return None
+        result = await tool.acall(**tool_args)
+        if result is None:
+            return None
+        return str(result)
 
-        idx = 1
-        tool_name = None
+    async def _aforward_impl(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs,
+    ):
+        args = {
+            "goal": self.task_spec.instructions,
+            "tools": [tool.name for tool in self.tools],
+            "turn_log": TurnLog.empty(),
+        }
+        for key in self.input_fields:
+            if key in inputs:
+                args[key] = inputs[key]
+        turn_log = TurnLog.empty()
+        actor_inputs = {key: value for key, value in args.items() if key != "turn_log"}
         action_results: list[ActionOutput] = []
-        max_iters = None if "max_iters" not in kwargs else kwargs["max_iters"]
+        max_iters = cast("int", inputs.get("max_iters", self.max_iters))
 
-        while tool_name != "Finish" and (max_iters > 0 if max_iters else True):
-            actor_output = self.actor(**args)
-            action = getattr(actor_output, f"action_{idx}")
-
+        async def step(_turn_index: int, turn_log: TurnLog) -> AgentStepResult[TurnLog]:
+            extracted = await call_with_history_truncation(
+                self.actor,
+                turn_log=turn_log,
+                run=run,
+                options=options,
+                max_attempts=3,
+                **actor_inputs,
+            )
+            turn_log = extracted.turn_log
+            actor_output = extracted.result
+            action = actor_output.action
             tool_name = action.tool_name
-            tool_input_query = action.tool_input_query
-
-            if self.verbose:
-                print(f"Action {idx}: {tool_name} ({tool_input_query})")
-
-            if tool_name != "Finish":
-                tool_output = self._call_tool(tool_name, tool_input_query)
-                action_results.append(
-                    ActionOutput(tool_name=tool_name, tool_input_query=tool_input_query, tool_output=tool_output)
+            tool_args = action.tool_args
+            if tool_name == AVATAR_TERMINAL_TOOL:
+                return AgentStepResult(
+                    history=turn_log.append_turn(
+                        AvatarTurnEvent(
+                            action=action,
+                            result="Gathered all information needed to finish the task.",
+                        )
+                    ),
+                    control=AgentLoopControl.BREAK,
+                    termination_reason=AgentTerminationReason.SUBMIT,
                 )
+            tool_output = await self._acall_tool(tool_name, tool_args)
+            action_results.append(ActionOutput(tool_name=tool_name, tool_args=tool_args, tool_output=tool_output))
+            return AgentStepResult(
+                history=turn_log.append_turn(
+                    AvatarTurnEvent(action=action, result=tool_output if tool_output is not None else "")
+                )
+            )
 
-                self._update_signature(idx)
-
-                args[f"action_{idx}"] = action
-                args[f"result_{idx}"] = tool_output
-            else:
-                self._update_signature(idx, omit_action=True)
-
-                args[f"action_{idx}"] = action
-                args[f"result_{idx}"] = "Gathered all information needed to finish the task."
-                break
-
-            idx += 1
-
-            if max_iters:
-                max_iters -= 1
-
-        final_answer = self.actor(**args)
-        self.actor = deepcopy(self.actor_clone)
-
-        return dspy.Prediction(
-            **{key: getattr(final_answer, key) for key in self.output_fields.keys()},
+        loop_result = await AgentLoopRunner[TurnLog]().run(
+            max_iters=max_iters,
+            initial_history=turn_log,
+            step=step,
+        )
+        extracted = await call_with_history_truncation(
+            self.finish,
+            turn_log=loop_result.history,
+            run=run,
+            options=options,
+            max_attempts=3,
+            **actor_inputs,
+        )
+        final_answer = extracted.result
+        turn_log = extracted.turn_log
+        return Prediction(
+            **{key: getattr(final_answer, key) for key in self.output_fields},
+            turn_log=turn_log,
             actions=action_results,
+            termination_reason=loop_result.termination_reason,
         )

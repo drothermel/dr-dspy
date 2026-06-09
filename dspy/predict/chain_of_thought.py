@@ -1,41 +1,35 @@
-from typing import Any
-
-from pydantic.fields import FieldInfo
-
-import dspy
-from dspy.primitives.module import Module
-from dspy.signatures.signature import Signature, ensure_signature
-
-# NOTE: This restores the legacy rationale_field behavior after PR #8822.
+from dspy.adapters.types.reasoning import Reasoning
+from dspy.core.types import LMConfig
+from dspy.predict.predict import Predict
+from dspy.primitives import Module, Prediction
+from dspy.runtime.call_options import ModuleCallOptions
+from dspy.runtime.callback import Callback
+from dspy.runtime.run_context import RunContext
+from dspy.task_spec import TaskSpec, output_field
 
 
 class ChainOfThought(Module):
     def __init__(
         self,
-        signature: str | type[Signature],
-        rationale_field: FieldInfo | None = None,
-        rationale_field_type: type = str,
-        **config: dict[str, Any],
-    ):
-        """
-        A module that reasons step by step in order to predict the output of a task.
-
-        Args:
-            signature (Type[dspy.Signature]): The signature of the module.
-            rationale_field (Optional[Union[dspy.OutputField, pydantic.fields.FieldInfo]]): The field that will contain the reasoning.
-            rationale_field_type (Type): The type of the rationale field.
-            **config: The configuration for the module.
-        """
+        task_spec: TaskSpec,
+        *,
+        config: LMConfig | None = None,
+        callbacks: list[Callback] | None = None,
+    ) -> None:
         super().__init__()
-        signature = ensure_signature(signature)
-        desc = "${reasoning}"
-        rationale_field_type = rationale_field.annotation if rationale_field else rationale_field_type
-        rationale_field = rationale_field if rationale_field else dspy.OutputField(desc=desc)
-        extended_signature = signature.prepend(name="reasoning", field=rationale_field, type_=rationale_field_type)
-        self.predict = dspy.Predict(extended_signature, **config)
+        if not isinstance(task_spec, TaskSpec):
+            raise TypeError(f"ChainOfThought requires a TaskSpec instance, got {type(task_spec).__name__}.")
+        extended_task_spec = task_spec.prepend(
+            output_field("reasoning", Reasoning, desc="Step-by-step reasoning before producing the final outputs.")
+        )
+        self.task_spec = extended_task_spec
+        self.predict = Predict(extended_task_spec, config=config, callbacks=callbacks)
 
-    def forward(self, **kwargs):
-        return self.predict(**kwargs)
-
-    async def aforward(self, **kwargs):
-        return await self.predict.acall(**kwargs)
+    async def _aforward_impl(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs,
+    ) -> Prediction:
+        return await self.predict(run=run, options=options, **inputs)

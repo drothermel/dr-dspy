@@ -1,353 +1,169 @@
-import inspect
-import logging
-from typing import Any, TextIO
+from __future__ import annotations
 
-from dspy.dsp.utils.settings import settings
-from dspy.predict.parallel import Parallel
-from dspy.primitives.base_module import BaseModule
-from dspy.primitives.example import Example
-from dspy.primitives.prediction import Prediction
-from dspy.utils import magicattr
-from dspy.utils.callback import with_callbacks
-from dspy.utils.inspect_history import pretty_print_history
-from dspy.utils.usage_tracker import track_usage
+from typing import TYPE_CHECKING, Any, cast
 
-logger = logging.getLogger(__name__)
+from typing_extensions import Self, override
 
+from dspy.persistence.program import save_program as persist_program
+from dspy.persistence.state import apply_module_state, dump_module_state, save_state
+from dspy.persistence.state import load_state as load_state_file
+from dspy.primitives import module_copy, module_execution, module_graph, module_lm
+from dspy.runtime import Callback, RunContext, with_callbacks
+from dspy.runtime.batch import Parallel
 
-class ProgramMeta(type):
-    """Metaclass ensuring every ``dspy.Module`` instance is properly initialised."""
+if TYPE_CHECKING:
+    from pathlib import Path
 
-    def __call__(cls, *args, **kwargs):
-        # Create the instance without invoking ``__init__`` so we can inject
-        # the base initialization beforehand.
-        obj = cls.__new__(cls, *args, **kwargs)
-        if isinstance(obj, cls):
-            # ``_base_init`` sets attributes that should exist on all modules
-            # even when a subclass forgets to call ``super().__init__``.
-            Module._base_init(obj)
-            cls.__init__(obj, *args, **kwargs)
-
-            # Guarantee existence of critical attributes if ``__init__`` didn't
-            # create them.
-            if not hasattr(obj, "callbacks"):
-                obj.callbacks = []
-            if not hasattr(obj, "history"):
-                obj.history = []
-        return obj
+    from dspy.clients.base_lm import BaseLM
+    from dspy.primitives.batch_result import BatchResult
+    from dspy.primitives.example import Example
+    from dspy.primitives.prediction import Prediction
+    from dspy.runtime.call_options import ModuleCallOptions
 
 
-class Module(BaseModule, metaclass=ProgramMeta):
-    """Base class for all DSPy modules (programs).
-
-    A Module is a building block for DSPy programs that can contain predictors,
-    sub-modules, and custom logic. Modules can be composed together to create
-    complex pipelines and can be optimized using DSPy's teleprompters.
-
-    All DSPy programs should inherit from this class and implement a ``forward``
-    method that defines the program's logic.
-
-    Args:
-        callbacks: Optional list of callback handlers for instrumentation
-            and monitoring.
-
-    Attributes:
-        callbacks: List of registered callback handlers.
-        history: List of LM call history for this module.
-
-    Examples:
-        >>> import dspy
-        >>> class MyProgram(dspy.Module):
-        ...     def __init__(self):
-        ...         super().__init__()
-        ...         self.predictor = dspy.Predict("question -> answer")
-        ...
-        ...     def forward(self, question):
-        ...         return self.predictor(question=question)
-    """
-
-    def _base_init(self):
-        self._compiled = False
-        self.callbacks = []
-        self.history = []
-
-    def __init__(self, callbacks=None):
+class Module:
+    def __init__(self, callbacks: list[Callback] | None = None, run: RunContext | None = None) -> None:
         self.callbacks = callbacks or []
+        self.run = run
         self._compiled = False
-        # LM calling history of the module.
-        self.history = []
+        self.call_log = []
 
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        state.pop("history", None)
-        state.pop("callbacks", None)
-        return state
+    @property
+    def run(self) -> RunContext | None:
+        return vars(self).get("run")
 
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        if not hasattr(self, "history"):
-            self.history = []
-        if not hasattr(self, "callbacks"):
-            self.callbacks = []
+    @run.setter
+    def run(self, value: RunContext | None) -> None:
+        vars(self)["run"] = value
 
-    @with_callbacks
-    def __call__(self, *args, **kwargs) -> Prediction:
-        from dspy.dsp.utils.settings import thread_local_overrides
+    def __getstate__(self) -> dict[str, Any]:
+        return module_copy.module_getstate(self)
 
-        caller_modules = settings.caller_modules or []
-        caller_modules = list(caller_modules)
-        caller_modules.append(self)
-
-        with settings.context(caller_modules=caller_modules):
-            if settings.track_usage and thread_local_overrides.get().get("usage_tracker") is None:
-                with track_usage() as usage_tracker:
-                    output = self.forward(*args, **kwargs)
-                tokens = usage_tracker.get_total_tokens()
-                self._set_lm_usage(tokens, output)
-
-                return output
-
-            return self.forward(*args, **kwargs)
-
-    @with_callbacks
-    async def acall(self, *args, **kwargs) -> Prediction:
-        from dspy.dsp.utils.settings import thread_local_overrides
-
-        caller_modules = settings.caller_modules or []
-        caller_modules = list(caller_modules)
-        caller_modules.append(self)
-
-        with settings.context(caller_modules=caller_modules):
-            if settings.track_usage and thread_local_overrides.get().get("usage_tracker") is None:
-                with track_usage() as usage_tracker:
-                    output = await self.aforward(*args, **kwargs)
-                    tokens = usage_tracker.get_total_tokens()
-                    self._set_lm_usage(tokens, output)
-
-                    return output
-
-            return await self.aforward(*args, **kwargs)
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        module_copy.module_setstate(self, state)
 
     def named_predictors(self):
-        """Return all named Predict modules in this module.
+        return module_graph.named_predictors(self)
 
-        Iterates through all parameters and returns those that are instances
-        of ``dspy.Predict``, along with their names.
-
-        Returns:
-            list[tuple[str, Predict]]: A list of (name, predictor) tuples
-                where name is the attribute path and predictor is the
-                Predict instance.
-
-        Examples:
-            >>> import dspy
-            >>> class MyProgram(dspy.Module):
-            ...     def __init__(self):
-            ...         super().__init__()
-            ...         self.qa = dspy.Predict("question -> answer")
-            ...         self.summarize = dspy.Predict("text -> summary")
-            ...
-            >>> program = MyProgram()
-            >>> for name, p in program.named_predictors():
-            ...     print(name)
-            qa
-            summarize
-        """
-        from dspy.predict.predict import Predict
-
-        return [(name, param) for name, param in self.named_parameters() if isinstance(param, Predict)]
+    def named_sub_modules(self, type_: type | None = None):
+        return module_graph.named_sub_modules(self, type_=type_)
 
     def predictors(self):
-        """Return all Predict modules in this module.
+        return module_graph.predictors(self)
 
-        Returns:
-            list[Predict]: A list of all Predict instances in this module.
+    def deepcopy(self) -> Self:
+        return cast("Self", module_copy.deepcopy_module(self))
 
-        Examples:
-            >>> import dspy
-            >>> class MyProgram(dspy.Module):
-            ...     def __init__(self):
-            ...         super().__init__()
-            ...         self.qa = dspy.Predict("question -> answer")
-            ...
-            >>> program = MyProgram()
-            >>> len(program.predictors())
-            1
-        """
-        return [param for _, param in self.named_predictors()]
+    def reset_copy(self) -> Self:
+        return cast("Self", module_copy.reset_copy(self))
 
-    def set_lm(self, lm):
-        """Set the language model for all predictors in this module.
+    def dump_state(self, json_mode: bool = True) -> dict[str, Any]:
+        return dump_module_state(self, json_mode=json_mode)
 
-        This method recursively sets the language model for all Predict
-        instances contained within this module.
-
-        Args:
-            lm: The language model instance to use for all predictors.
-
-        Examples:
-            >>> import dspy
-            >>> lm = dspy.LM("openai/gpt-4o-mini")
-            >>> program = dspy.Predict("question -> answer")
-            >>> program.set_lm(lm)
-        """
-        for _, param in self.named_predictors():
-            param.lm = lm
-
-    def get_lm(self):
-        """Get the language model used by this module's predictors.
-
-        Returns the language model if all predictors use the same LM.
-        Raises an error if multiple different LMs are in use.
-
-        Returns:
-            The language model instance used by this module's predictors.
-
-        Raises:
-            ValueError: If multiple different language models are being
-                used by the predictors in this module.
-        """
-        all_used_lms = [param.lm for _, param in self.named_predictors()]
-
-        if len(set(all_used_lms)) == 1:
-            return all_used_lms[0]
-
-        raise ValueError("Multiple LMs are being used in the module. There's no unique LM to return.")
-
-    def __repr__(self):
-        s = []
-
-        for name, param in self.named_predictors():
-            s.append(f"{name} = {param}")
-
-        return "\n".join(s)
-
-    def map_named_predictors(self, func):
-        """Apply a function to all named predictors in this module.
-
-        This method iterates through all Predict instances in the module
-        and applies the given function to each, replacing the original
-        predictor with the function's return value.
-
-        Args:
-            func: A callable that takes a Predict instance and returns
-                a new Predict instance (or compatible object).
-
-        Returns:
-            Module: Returns self for method chaining.
-
-        Examples:
-            >>> import dspy
-            >>> class MyProgram(dspy.Module):
-            ...     def __init__(self):
-            ...         super().__init__()
-            ...         self.qa = dspy.Predict("question -> answer")
-            ...
-            >>> program = MyProgram()
-            >>> program.map_named_predictors(lambda p: p)
-        """
-        for name, predictor in self.named_predictors():
-            set_attribute_by_name(self, name, func(predictor))
+    def load_state(
+        self,
+        state: dict[str, Any],
+        *,
+        allow_unsafe_lm_state: bool = False,
+        custom_types: dict[str, type] | None = None,
+    ) -> Self:
+        apply_module_state(
+            self,
+            state,
+            allow_unsafe_lm_state=allow_unsafe_lm_state,
+            custom_types=custom_types,
+        )
         return self
 
-    def inspect_history(self, n: int = 1, file: "TextIO | None" = None) -> None:
-        """Display the LM call history for this module.
+    def save(
+        self,
+        path: str | Path,
+        save_program: bool = False,
+        modules_to_serialize: list[object] | None = None,
+    ) -> None:
+        if save_program:
+            persist_program(self, path, modules_to_serialize=modules_to_serialize)
+            return
+        save_state(self, path)
 
-        Prints a formatted view of the most recent language model calls
-        made by this module, useful for debugging and understanding
-        the module's behavior.
+    def load(
+        self,
+        path: str | Path,
+        allow_pickle: bool = False,
+        allow_unsafe_lm_state: bool = False,
+        custom_types: dict[str, type] | None = None,
+    ) -> Self:
+        load_state_file(
+            self,
+            path,
+            allow_pickle=allow_pickle,
+            allow_unsafe_lm_state=allow_unsafe_lm_state,
+            custom_types=custom_types,
+        )
+        return self
 
-        Args:
-            n: The number of recent history entries to display.
-                Defaults to 1.
-            file: An optional file-like object to write output to. When
-                provided, ANSI color codes are automatically disabled.
-                Defaults to `None` (prints to stdout).
-        """
-        pretty_print_history(self.history, n, file=file)
+    @with_callbacks(kind="module")
+    async def __call__(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs: Any,
+    ) -> Prediction:
+        return await module_execution.invoke_module(self, run=run, options=options, **inputs)
 
-    def batch(
+    async def aforward(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs: Any,
+    ) -> Prediction:
+        module_execution.warn_direct_aforward_once(type(self))
+        return await self._aforward_impl(run=run, options=options, **inputs)
+
+    async def _aforward_impl(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs: Any,
+    ) -> Prediction:
+        raise NotImplementedError(f"{type(self).__name__} must implement _aforward_impl().")
+
+    def set_lm(self, lm: BaseLM | None) -> None:
+        module_lm.set_lm(self, lm)
+
+    def get_lm(self) -> BaseLM:
+        return module_lm.get_lm(self)
+
+    def optional_lm(self) -> BaseLM | None:
+        return module_lm.optional_lm(self)
+
+    @override
+    def __repr__(self) -> str:
+        s = []
+        for name, predictor in self.named_predictors():
+            s.append(f"{name} = {predictor}")
+        return "\n".join(s)
+
+    async def batch(
         self,
         examples: list[Example],
-        num_threads: int | None = None,
+        run: RunContext,
+        max_concurrency: int | None = None,
         max_errors: int | None = None,
-        return_failed_examples: bool = False,
         provide_traceback: bool | None = None,
         disable_progress_bar: bool = False,
         timeout: int = 120,
-        straggler_limit: int = 3,
-    ) -> list[Example] | tuple[list[Example], list[Example], list[Exception]]:
-        """
-        Processes a list of dspy.Example instances in parallel using the Parallel module.
-
-        Args:
-            examples: List of dspy.Example instances to process.
-            num_threads: Number of threads to use for parallel processing.
-            max_errors: Maximum number of errors allowed before stopping execution.
-                If ``None``, inherits from ``dspy.settings.max_errors``.
-            return_failed_examples: Whether to return failed examples and exceptions.
-            provide_traceback: Whether to include traceback information in error logs.
-            disable_progress_bar: Whether to display the progress bar.
-            timeout: Seconds before a straggler task is resubmitted. Set to 0 to disable.
-            straggler_limit: Only check for stragglers when this many or fewer tasks remain.
-
-        Returns:
-            List of results, and optionally failed examples and exceptions.
-        """
-        # Create a list of execution pairs (self, example)
-        exec_pairs = [(self, example.inputs()) for example in examples]
-
-        # Create an instance of Parallel
+    ) -> BatchResult:
+        exec_pairs = [(self, example.as_inputs()) for example in examples]
         parallel_executor = Parallel(
-            num_threads=num_threads,
+            run=run,
+            max_concurrency=max_concurrency,
             max_errors=max_errors,
-            return_failed_examples=return_failed_examples,
             provide_traceback=provide_traceback,
             disable_progress_bar=disable_progress_bar,
             timeout=timeout,
-            straggler_limit=straggler_limit,
         )
-
-        # Execute the forward method of Parallel
-        if return_failed_examples:
-            results, failed_examples, exceptions = parallel_executor.forward(exec_pairs)
-            return results, failed_examples, exceptions
-        else:
-            results = parallel_executor.forward(exec_pairs)
-            return results
-
-    def _set_lm_usage(self, tokens: dict[str, Any], output: Any):
-        # Some optimizers (e.g., GEPA bootstrap tracing) temporarily patch
-        # module.forward to return a tuple: (prediction, trace).
-        # When usage tracking is enabled, ensure we attach usage to the
-        # prediction object if present.
-        prediction_in_output = None
-        if isinstance(output, Prediction):
-            prediction_in_output = output
-        elif isinstance(output, tuple) and len(output) > 0 and isinstance(output[0], Prediction):
-            prediction_in_output = output[0]
-        if prediction_in_output:
-            prediction_in_output.set_lm_usage(tokens)
-        else:
-            logger.warning("Failed to set LM usage. Please return `dspy.Prediction` object from dspy.Module to enable usage tracking.")
-
-
-    def __getattribute__(self, name):
-        attr = super().__getattribute__(name)
-
-        if name == "forward" and callable(attr):
-            # Check if forward is called through __call__ or directly
-            stack = inspect.stack()
-            forward_called_directly = len(stack) <= 1 or stack[1].function != "__call__"
-
-            if forward_called_directly:
-                logger.warning(
-                    f"Calling module.forward(...) on {self.__class__.__name__} directly is discouraged. "
-                    f"Please use module(...) instead."
-                )
-
-        return attr
-
-
-def set_attribute_by_name(obj, name, value):
-    magicattr.set(obj, name, value)
+        return await parallel_executor(exec_pairs)

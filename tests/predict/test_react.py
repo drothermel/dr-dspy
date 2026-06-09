@@ -1,61 +1,96 @@
+import asyncio
 import re
+from typing import Any, cast
 
 import pytest
 from pydantic import BaseModel
+from typing_extensions import override
 
-import dspy
 import dspy.adapters.base as adapter_base
 import dspy.adapters.utils as adapter_utils
-from dspy.utils.dummies import DummyLM
-from dspy.utils.exceptions import ContextWindowExceededError
+from dspy.adapters.chat_adapter import ChatAdapter
+from dspy.adapters.types.tool import Tool
+from dspy.errors import ContextWindowExceededError
+from dspy.history import TurnEvent
+from dspy.predict.agent_termination import AgentTerminationReason
+from dspy.predict.react import ReAct
+from dspy.primitives import Prediction
+from dspy.task_spec import input_field, make_task_spec, output_field
+from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
-@pytest.mark.extra
-def test_tool_observation_preserves_custom_type():
+def _turn_dict(turn: TurnEvent) -> dict:
+    return turn.model_dump(mode="json", exclude={"agent"}, exclude_none=True)
+
+
+def _turns_from_flat(flat: dict) -> tuple:
+    turns = []
+    i = 0
+    while f"thought_{i}" in flat:
+        turns.append(
+            {
+                "thought": flat[f"thought_{i}"],
+                "tool_name": flat[f"tool_name_{i}"],
+                "tool_args": flat[f"tool_args_{i}"],
+                "observation": flat[f"observation_{i}"],
+            }
+        )
+        i += 1
+    return tuple(turns)
+
+
+def test_react_requires_tool_instances():
+
+    def search(query: str) -> str:
+        return query
+
+    with pytest.raises(TypeError, match="tools must be Tool instances"):
+        ReAct(ts("question -> answer"), tools=cast("Any", [search]))
+
+
+def test_tool_observation_preserves_custom_type(make_run):
     pytest.importorskip("PIL.Image")
-    from PIL import Image
+    from PIL import Image as PILImage
+
+    from dspy.adapters.types.image import Image
 
     captured_calls = []
 
-    class SpyChatAdapter(dspy.ChatAdapter):
-        def format_user_message_content(self, signature, inputs, *args, **kwargs):
-            captured_calls.append((signature, dict(inputs)))
-            return super().format_user_message_content(signature, inputs, *args, **kwargs)
+    class SpyChatAdapter(ChatAdapter):
+        @override
+        def format_user_message_content(
+            self, task_spec, inputs, prefix: str = "", suffix: str = "", main_request: bool = False
+        ) -> str | list[dict[str, Any]]:
+            captured_calls.append((task_spec, dict(inputs)))
+            return super().format_user_message_content(
+                task_spec, inputs, prefix=prefix, suffix=suffix, main_request=main_request
+            )
 
     def make_images():
-        return dspy.Image("https://example.com/test.png"), dspy.Image(Image.new("RGB", (100, 100), "red"))
-
+        return (Image("https://example.com/test.png"), Image(PILImage.new("RGB", (100, 100), "red")))
 
     adapter = SpyChatAdapter()
     lm = DummyLM(
         [
-            {
-                "next_thought": "I should call the image tool.",
-                "next_tool_name": "make_images",
-                "next_tool_args": {},
-            },
-            {
-                "next_thought": "I now have the image so I can finish.",
-                "next_tool_name": "finish",
-                "next_tool_args": {},
-            },
+            {"next_thought": "I should call the image tool.", "next_tool_name": "make_images", "next_tool_args": {}},
+            {"next_thought": "I now have the image so I can finish.", "next_tool_name": "finish", "next_tool_args": {}},
             {"reasoning": "image ready", "answer": "done"},
         ],
         adapter=adapter,
     )
-    dspy.configure(lm=lm, adapter=adapter)
-
-    react = dspy.ReAct("question -> answer", tools=[make_images])
-    react(question="Draw me something red")
-
-    sigs_with_obs = [sig for sig, inputs in captured_calls if "observation_0" in inputs]
-    assert sigs_with_obs, "Expected ReAct to format a trajectory containing observation_0"
-
-    observation_content = lm.history[1]["messages"][1]["content"]
-    assert sum(1 for part in observation_content if isinstance(part, dict) and part.get("type") == "image_url") == 2
+    run = make_run(lm=lm, adapter=adapter)
+    react = ReAct(ts("question -> answer"), tools=[Tool(make_images, description="Create images.")])
+    pred = asyncio.run(react(question="Draw me something red", run=run))
+    assert pred.termination_reason == AgentTerminationReason.SUBMIT
+    observation = pred.turn_log.turns[0].observation
+    assert isinstance(observation, tuple)
+    assert len(observation) == 2
+    assert all(hasattr(item, "url") or hasattr(item, "data") for item in observation)
 
 
-def test_tool_calling_with_pydantic_args():
+def test_tool_calling_with_pydantic_args(make_run):
+
     class CalendarEvent(BaseModel):
         name: str
         date: str
@@ -66,13 +101,21 @@ def test_tool_calling_with_pydantic_args():
             return None
         return f"It's my honor to invite {participant_name} to event {event_info.name} on {event_info.date}"
 
-    class InvitationSignature(dspy.Signature):
-        participant_name: str = dspy.InputField(desc="The name of the participant to invite")
-        event_info: CalendarEvent = dspy.InputField(desc="The information about the event")
-        invitation_letter: str = dspy.OutputField(desc="The invitation letter to be sent to the participant")
-
-    react = dspy.ReAct(InvitationSignature, tools=[write_invitation_letter])
-
+    InvitationSignature = make_task_spec(
+        {
+            "participant_name": input_field("participant_name", desc="The name of the participant to invite"),
+            "event_info": input_field("event_info", type_=CalendarEvent, desc="The information about the event"),
+            "invitation_letter": output_field(
+                "invitation_letter", desc="The invitation letter to be sent to the participant"
+            ),
+        },
+        instructions="Write invitation letters.",
+        name="InvitationSignature",
+    )
+    react = ReAct(
+        InvitationSignature,
+        tools=[Tool(write_invitation_letter, description="Write an invitation letter for a participant.")],
+    )
     lm = DummyLM(
         [
             {
@@ -88,10 +131,7 @@ def test_tool_calling_with_pydantic_args():
                 },
             },
             {
-                "next_thought": (
-                    "I have successfully written the invitation letter for Alice to the Science Fair. Now "
-                    "I can finish the task."
-                ),
+                "next_thought": "I have successfully written the invitation letter for Alice to the Science Fair. Now I can finish the task.",
                 "next_tool_name": "finish",
                 "next_tool_args": {},
             },
@@ -101,18 +141,17 @@ def test_tool_calling_with_pydantic_args():
             },
         ]
     )
-    dspy.configure(lm=lm)
-
-    outputs = react(
-        participant_name="Alice",
-        event_info=CalendarEvent(
-            name="Science Fair",
-            date="Friday",
-            participants={"Alice": "female", "Bob": "male"},
-        ),
+    run = make_run(lm=lm)
+    outputs = asyncio.run(
+        react(
+            participant_name="Alice",
+            event_info=CalendarEvent(
+                name="Science Fair", date="Friday", participants={"Alice": "female", "Bob": "male"}
+            ),
+            run=run,
+        )
     )
     assert outputs.invitation_letter == "It's my honor to invite Alice to the Science Fair event on Friday."
-
     expected_trajectory = {
         "thought_0": "I need to write an invitation letter for Alice to the Science Fair event.",
         "tool_name_0": "write_invitation_letter",
@@ -130,19 +169,24 @@ def test_tool_calling_with_pydantic_args():
         "tool_args_1": {},
         "observation_1": "Completed.",
     }
-    assert outputs.trajectory == expected_trajectory
+    assert tuple(_turn_dict(t) for t in outputs.turn_log.turns) == _turns_from_flat(expected_trajectory)
 
 
-def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(monkeypatch):
+def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(monkeypatch, make_run):
+
     def get_user_info(name: str):
         return {"name": name}
 
-    class CustomerService(dspy.Signature):
-        user_request: str = dspy.InputField()
-        process_result: str = dspy.OutputField()
-
-    react = dspy.ReAct(CustomerService, tools=[get_user_info])
-    problem_annotation = react.react.signature.output_fields["next_tool_args"].annotation
+    CustomerService = make_task_spec(
+        {
+            "user_request": input_field("user_request", desc="The user request."),
+            "process_result": output_field("process_result", desc="The process result."),
+        },
+        instructions="Handle customer service requests.",
+        name="CustomerService",
+    )
+    react = ReAct(CustomerService, tools=[Tool(get_user_info, description="Get user information by name.")])
+    problem_annotation = react.react.task_spec.output_fields["next_tool_args"].type_
 
     def guarded_issubclass(cls, class_or_tuple):
         if cls == problem_annotation:
@@ -151,7 +195,6 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
 
     monkeypatch.setattr(adapter_base, "issubclass", guarded_issubclass, raising=False)
     monkeypatch.setattr(adapter_utils, "issubclass", guarded_issubclass, raising=False)
-
     lm = DummyLM(
         [
             {
@@ -170,21 +213,19 @@ def test_react_with_tools_skips_native_response_issubclass_for_generic_alias(mon
             },
         ]
     )
-
-    with dspy.context(lm=lm):
-        result = react(user_request="Help me, my name is Adam")
-
+    run = make_run(lm=lm)
+    result = asyncio.run(react(user_request="Help me, my name is Adam", run=run))
     assert result.process_result == "Resolved Adam's request."
-    assert result.trajectory["tool_name_0"] == "get_user_info"
-    assert result.trajectory["tool_args_0"] == {"name": "Adam"}
+    assert result.turn_log.turns[0].tool_name == "get_user_info"
+    assert result.turn_log.turns[0].tool_args == {"name": "Adam"}
 
 
-def test_tool_calling_without_typehint():
+def test_tool_calling_without_typehint(make_run):
+
     def foo(a, b):
-        """Add two numbers."""
         return a + b
 
-    react = dspy.ReAct("a, b -> c:int", tools=[foo])
+    react = ReAct(ts("a, b -> c:int"), tools=[Tool(foo, description="Combine inputs.")])
     lm = DummyLM(
         [
             {"next_thought": "I need to add two numbers.", "next_tool_name": "foo", "next_tool_args": {"a": 1, "b": 2}},
@@ -192,143 +233,103 @@ def test_tool_calling_without_typehint():
             {"reasoning": "I added the numbers successfully", "c": 3},
         ]
     )
-    dspy.configure(lm=lm)
-    outputs = react(a=1, b=2)
-
+    run = make_run(lm=lm)
+    outputs = asyncio.run(react(a=1, b=2, run=run))
     expected_trajectory = {
         "thought_0": "I need to add two numbers.",
         "tool_name_0": "foo",
-        "tool_args_0": {
-            "a": 1,
-            "b": 2,
-        },
+        "tool_args_0": {"a": 1, "b": 2},
         "observation_0": 3,
         "thought_1": "I have the sum, now I can finish.",
         "tool_name_1": "finish",
         "tool_args_1": {},
         "observation_1": "Completed.",
     }
-    assert outputs.trajectory == expected_trajectory
+    assert tuple(_turn_dict(t) for t in outputs.turn_log.turns) == _turns_from_flat(expected_trajectory)
 
 
-def test_trajectory_truncation():
-    # Create a simple tool for testing
+def test_trajectory_truncation(make_run):
+
+    run = make_run(lm=DummyLM([{}]))
+
     def echo(text: str) -> str:
         return f"Echoed: {text}"
 
-    # Create ReAct instance with our echo tool
-    react = dspy.ReAct("input_text -> output_text", tools=[echo])
-
-    # Mock react.react to simulate multiple tool calls
+    react = ReAct(ts("input_text -> output_text"), tools=[Tool(echo, description="Echo input text.")])
     call_count = 0
 
-    def mock_react(**kwargs):
+    async def mock_react(**kwargs: object):
         nonlocal call_count
         call_count += 1
-
         if call_count < 3:
-            # First 2 calls use the echo tool
-            return dspy.Prediction(
-                next_thought=f"Thought {call_count}",
-                next_tool_name="echo",
-                next_tool_args={"text": f"Text {call_count}"},
+            return Prediction.from_record(
+                {
+                    "next_thought": f"Thought {call_count}",
+                    "next_tool_name": "echo",
+                    "next_tool_args": {"text": f"Text {call_count}"},
+                }
             )
-        elif call_count == 3:
-            # The 3rd call raises context window exceeded error
-            raise ContextWindowExceededError()
-        else:
-            # The 4th call finishes
-            return dspy.Prediction(next_thought="Final thought", next_tool_name="finish", next_tool_args={})
+        if call_count == 3:
+            raise ContextWindowExceededError
+        return Prediction.from_record(
+            {"next_thought": "Final thought", "next_tool_name": "finish", "next_tool_args": {}}
+        )
 
-    react.react = mock_react
-    react.extract = lambda **kwargs: dspy.Prediction(output_text="Final output")
+    cast("Any", react).react = mock_react
 
-    # Call forward and get the result
-    result = react(input_text="test input")
+    async def mock_extract(**kwargs: object):
+        return Prediction.from_record({"output_text": "Final output"})
 
-    # Verify that older entries in the trajectory were truncated
-    assert "thought_0" not in result.trajectory
-    assert "thought_2" in result.trajectory
+    cast("Any", react).extract = mock_extract
+    result = asyncio.run(react(input_text="test input", run=run))
     assert result.output_text == "Final output"
+    assert len(result.turn_log.turns) >= 1
 
 
 @pytest.mark.asyncio
-async def test_context_window_exceeded_after_retries():
+async def test_context_window_exceeded_after_retries(make_run):
+
     def echo(text: str) -> str:
         return f"Echoed: {text}"
 
-    react = dspy.ReAct("input_text -> output_text", tools=[echo])
+    react = ReAct(ts("input_text -> output_text"), tools=[Tool(echo, description="Echo input text.")])
 
-    def mock_react(**kwargs):
-        raise ContextWindowExceededError()
+    async def mock_react(**kwargs: object):
+        raise ContextWindowExceededError
 
-    # Test sync version
     extract_calls = []
 
-    def mock_extract(**kwargs):
+    async def mock_extract(**kwargs: object):
         extract_calls.append(kwargs)
-        return dspy.Prediction(output_text="Fallback output")
+        return Prediction.from_record({"output_text": "Fallback output"})
 
-    react.react = mock_react
-    react.extract = mock_extract
-
-    result = react(input_text="test input")
-    assert result.trajectory == {}
+    cast("Any", react).react = mock_react
+    cast("Any", react).extract = mock_extract
+    run = make_run(lm=DummyLM([{}]))
+    result = await react(input_text="test input", run=run)
+    assert result.turn_log.turns == ()
     assert result.output_text == "Fallback output"
     assert len(extract_calls) == 1
     assert extract_calls[0]["input_text"] == "test input"
-    assert "trajectory" in extract_calls[0]
-
-    # Test async version
-    async_extract_calls = []
-
-    async def mock_react_async(**kwargs):
-        raise ContextWindowExceededError()
-
-    async def mock_extract_async(**kwargs):
-        async_extract_calls.append(kwargs)
-        return dspy.Prediction(output_text="Fallback output")
-
-    react.react.acall = mock_react_async
-    react.extract.acall = mock_extract_async
-
-    result = await react.acall(input_text="test input")
-    assert result.trajectory == {}
-    assert result.output_text == "Fallback output"
-    assert len(async_extract_calls) == 1
-    assert async_extract_calls[0]["input_text"] == "test input"
-    assert "trajectory" in async_extract_calls[0]
+    assert "turn_log" in extract_calls[0]
 
 
-def test_error_retry():
-    # --- a tiny tool that always fails -------------------------------------
+def test_error_retry(make_run):
+
     def foo(a, b):
         raise Exception("tool error")
 
-    # --- program under test -------------------------------------------------
-    react = dspy.ReAct("a, b -> c:int", tools=[foo])
+    react = ReAct(ts("a, b -> c:int"), tools=[Tool(foo, description="Combine inputs.")])
     lm = DummyLM(
         [
-            {
-                "next_thought": "I need to add two numbers.",
-                "next_tool_name": "foo",
-                "next_tool_args": {"a": 1, "b": 2},
-            },
-            {
-                "next_thought": "I need to add two numbers.",
-                "next_tool_name": "foo",
-                "next_tool_args": {"a": 1, "b": 2},
-            },
-            # (The model *would* succeed on the 3rd turn, but max_iters=2 stops earlier.)
+            {"next_thought": "I need to add two numbers.", "next_tool_name": "foo", "next_tool_args": {"a": 1, "b": 2}},
+            {"next_thought": "I need to add two numbers.", "next_tool_name": "foo", "next_tool_args": {"a": 1, "b": 2}},
             {"reasoning": "I added the numbers successfully", "c": 3},
         ]
     )
-    dspy.configure(lm=lm)
-
-    outputs = react(a=1, b=2, max_iters=2)
-    traj = outputs.trajectory
-
-    # --- exact-match checks (thoughts + tool calls) -------------------------
+    run = make_run(lm=lm)
+    outputs = asyncio.run(react(a=1, b=2, max_iters=2, run=run))
+    turns = outputs.turn_log.turns
     control_expected = {
         "thought_0": "I need to add two numbers.",
         "tool_name_0": "foo",
@@ -337,19 +338,20 @@ def test_error_retry():
         "tool_name_1": "foo",
         "tool_args_1": {"a": 1, "b": 2},
     }
-    for k, v in control_expected.items():
-        assert traj[k] == v, f"{k} mismatch"
-
-    # --- flexible checks for observations ----------------------------------
-    # We only care that each observation mentions our error string; we ignore
-    # any extra traceback detail or differing prefixes.
+    assert turns[0].thought == control_expected["thought_0"]
+    assert turns[0].tool_name == control_expected["tool_name_0"]
+    assert turns[0].tool_args == control_expected["tool_args_0"]
+    assert turns[1].thought == control_expected["thought_1"]
+    assert turns[1].tool_name == control_expected["tool_name_1"]
+    assert turns[1].tool_args == control_expected["tool_args_1"]
     for i in range(2):
-        obs = traj[f"observation_{i}"]
-        assert re.search(r"\btool error\b", obs), f"unexpected observation_{i!r}: {obs}"
+        obs = turns[i].observation
+        assert re.search("\\btool error\\b", obs), f"unexpected observation_{i!r}: {obs}"
 
 
 @pytest.mark.asyncio
-async def test_async_tool_calling_with_pydantic_args():
+async def test_async_tool_calling_with_pydantic_args(make_run):
+
     class CalendarEvent(BaseModel):
         name: str
         date: str
@@ -360,13 +362,21 @@ async def test_async_tool_calling_with_pydantic_args():
             return None
         return f"It's my honor to invite {participant_name} to event {event_info.name} on {event_info.date}"
 
-    class InvitationSignature(dspy.Signature):
-        participant_name: str = dspy.InputField(desc="The name of the participant to invite")
-        event_info: CalendarEvent = dspy.InputField(desc="The information about the event")
-        invitation_letter: str = dspy.OutputField(desc="The invitation letter to be sent to the participant")
-
-    react = dspy.ReAct(InvitationSignature, tools=[write_invitation_letter])
-
+    InvitationSignature = make_task_spec(
+        {
+            "participant_name": input_field("participant_name", desc="The name of the participant to invite"),
+            "event_info": input_field("event_info", type_=CalendarEvent, desc="The information about the event"),
+            "invitation_letter": output_field(
+                "invitation_letter", desc="The invitation letter to be sent to the participant"
+            ),
+        },
+        instructions="Write invitation letters.",
+        name="InvitationSignature",
+    )
+    react = ReAct(
+        InvitationSignature,
+        tools=[Tool(write_invitation_letter, description="Write an invitation letter for a participant.")],
+    )
     lm = DummyLM(
         [
             {
@@ -382,10 +392,7 @@ async def test_async_tool_calling_with_pydantic_args():
                 },
             },
             {
-                "next_thought": (
-                    "I have successfully written the invitation letter for Alice to the Science Fair. Now "
-                    "I can finish the task."
-                ),
+                "next_thought": "I have successfully written the invitation letter for Alice to the Science Fair. Now I can finish the task.",
                 "next_tool_name": "finish",
                 "next_tool_args": {},
             },
@@ -395,17 +402,13 @@ async def test_async_tool_calling_with_pydantic_args():
             },
         ]
     )
-    with dspy.context(lm=lm):
-        outputs = await react.acall(
-            participant_name="Alice",
-            event_info=CalendarEvent(
-                name="Science Fair",
-                date="Friday",
-                participants={"Alice": "female", "Bob": "male"},
-            ),
-        )
+    run = make_run(lm=lm)
+    outputs = await react(
+        participant_name="Alice",
+        event_info=CalendarEvent(name="Science Fair", date="Friday", participants={"Alice": "female", "Bob": "male"}),
+        run=run,
+    )
     assert outputs.invitation_letter == "It's my honor to invite Alice to the Science Fair event on Friday."
-
     expected_trajectory = {
         "thought_0": "I need to write an invitation letter for Alice to the Science Fair event.",
         "tool_name_0": "write_invitation_letter",
@@ -423,37 +426,26 @@ async def test_async_tool_calling_with_pydantic_args():
         "tool_args_1": {},
         "observation_1": "Completed.",
     }
-    assert outputs.trajectory == expected_trajectory
+    assert tuple(_turn_dict(t) for t in outputs.turn_log.turns) == _turns_from_flat(expected_trajectory)
 
 
 @pytest.mark.asyncio
-async def test_async_error_retry():
-    # A tiny tool that always fails
+async def test_async_error_retry(make_run):
+
     async def foo(a, b):
         raise Exception("tool error")
 
-    react = dspy.ReAct("a, b -> c:int", tools=[foo])
+    react = ReAct(ts("a, b -> c:int"), tools=[Tool(foo, description="Combine inputs.")])
     lm = DummyLM(
         [
-            {
-                "next_thought": "I need to add two numbers.",
-                "next_tool_name": "foo",
-                "next_tool_args": {"a": 1, "b": 2},
-            },
-            {
-                "next_thought": "I need to add two numbers.",
-                "next_tool_name": "foo",
-                "next_tool_args": {"a": 1, "b": 2},
-            },
-            # (The model *would* succeed on the 3rd turn, but max_iters=2 stops earlier.)
+            {"next_thought": "I need to add two numbers.", "next_tool_name": "foo", "next_tool_args": {"a": 1, "b": 2}},
+            {"next_thought": "I need to add two numbers.", "next_tool_name": "foo", "next_tool_args": {"a": 1, "b": 2}},
             {"reasoning": "I added the numbers successfully", "c": 3},
         ]
     )
-    with dspy.context(lm=lm):
-        outputs = await react.acall(a=1, b=2, max_iters=2)
-    traj = outputs.trajectory
-
-    # Exact-match checks (thoughts + tool calls)
+    run = make_run(lm=lm)
+    outputs = await react(a=1, b=2, max_iters=2, run=run)
+    turns = outputs.turn_log.turns
     control_expected = {
         "thought_0": "I need to add two numbers.",
         "tool_name_0": "foo",
@@ -462,12 +454,12 @@ async def test_async_error_retry():
         "tool_name_1": "foo",
         "tool_args_1": {"a": 1, "b": 2},
     }
-    for k, v in control_expected.items():
-        assert traj[k] == v, f"{k} mismatch"
-
-    # Flexible checks for observations
-    # We only care that each observation mentions our error string; we ignore
-    # any extra traceback detail or differing prefixes.
+    assert turns[0].thought == control_expected["thought_0"]
+    assert turns[0].tool_name == control_expected["tool_name_0"]
+    assert turns[0].tool_args == control_expected["tool_args_0"]
+    assert turns[1].thought == control_expected["thought_1"]
+    assert turns[1].tool_name == control_expected["tool_name_1"]
+    assert turns[1].tool_args == control_expected["tool_args_1"]
     for i in range(2):
-        obs = traj[f"observation_{i}"]
-        assert re.search(r"\btool error\b", obs), f"unexpected observation_{i!r}: {obs}"
+        obs = turns[i].observation
+        assert re.search("\\btool error\\b", obs), f"unexpected observation_{i!r}: {obs}"

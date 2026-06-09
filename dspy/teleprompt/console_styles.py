@@ -1,0 +1,5 @@
+YELLOW = "\x1b[93m"
+GREEN = "\x1b[92m"
+BLUE = "\x1b[94m"
+BOLD = "\x1b[1m"
+ENDC = "\x1b[0m"

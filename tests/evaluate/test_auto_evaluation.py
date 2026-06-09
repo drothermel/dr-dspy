@@ -1,94 +1,56 @@
-import dspy
+import asyncio
+
+import pytest
+
 from dspy.evaluate.auto_evaluation import CompleteAndGrounded, SemanticF1
-from dspy.primitives.prediction import Prediction
-from dspy.utils.dummies import DummyLM
+from dspy.primitives import Example, Prediction
+from tests.test_utils import DummyLM
 
 
-def test_semantic_f1_returns_prediction_without_trace():
-    # Configure with a dummy LM that returns precision and recall values
-    # ChainOfThought adds a "reasoning" field to the output
-    dspy.configure(
-        lm=DummyLM(
-            [
-                {
-                    "reasoning": "Comparing the responses",
-                    "precision": 1.0,
-                    "recall": 1.0,
-                }
-            ]
-        )
-    )
-
-    # Create example and prediction
-    example = dspy.Example(question="What is 1+1?", response="2")
-    pred = dspy.Prediction(response="2")
-
-    # Test SemanticF1
+def test_semantic_f1_returns_prediction_without_threshold(make_run):
+    run = make_run(lm=DummyLM([{"reasoning": "Comparing the responses", "precision": 1.0, "recall": 1.0}]))
+    example = Example.from_record({"question": "What is 1+1?", "response": "2"})
+    pred = Prediction.from_record({"response": "2"})
     metric = SemanticF1()
-    result = metric(example, pred)
-
+    result = asyncio.run(metric(example=example, pred=pred, run=run))
     assert isinstance(result, Prediction)
     assert hasattr(result, "score")
     assert isinstance(result.score, (int, float, bool))
 
 
-def test_semantic_f1_returns_prediction_with_trace():
-    # Configure with a dummy LM
-    dspy.configure(
-        lm=DummyLM(
-            [
-                {
-                    "reasoning": "Comparing the responses",
-                    "precision": 1.0,
-                    "recall": 1.0,
-                }
-            ]
-        )
-    )
-
-    # Create example and prediction
-    example = dspy.Example(question="What is 1+1?", response="2")
-    pred = dspy.Prediction(response="2")
-
-    # Test SemanticF1 with trace
+def test_semantic_f1_returns_prediction_with_threshold(make_run):
+    run = make_run(lm=DummyLM([{"reasoning": "Comparing the responses", "precision": 1.0, "recall": 1.0}]))
+    example = Example.from_record({"question": "What is 1+1?", "response": "2"})
+    pred = Prediction.from_record({"response": "2"})
     metric = SemanticF1(threshold=0.5)
-    result = metric(example, pred, trace=True)
-
+    result = asyncio.run(metric(example=example, pred=pred, use_threshold=True, run=run))
     assert isinstance(result, Prediction)
     assert hasattr(result, "score")
     assert isinstance(result.score, bool)
 
 
-def test_semantic_f1_score_value():
-    # Configure with a dummy LM that returns specific precision and recall
-    dspy.configure(
-        lm=DummyLM(
-            [
-                {
-                    "reasoning": "Comparing the responses",
-                    "precision": 0.8,
-                    "recall": 0.6,
-                }
-            ]
-        )
-    )
-
-    # Create example and prediction
-    example = dspy.Example(question="test", response="answer")
-    pred = dspy.Prediction(response="response")
-
-    # Test SemanticF1
+def test_semantic_f1_score_value(make_run):
+    run = make_run(lm=DummyLM([{"reasoning": "Comparing the responses", "precision": 0.8, "recall": 0.6}]))
+    example = Example.from_record({"question": "test", "response": "answer"})
+    pred = Prediction.from_record({"response": "response"})
     metric = SemanticF1()
-    result = metric(example, pred)
-
+    result = asyncio.run(metric(example=example, pred=pred, run=run))
     expected_f1 = 2 * (0.8 * 0.6) / (0.8 + 0.6)
     assert isinstance(result, Prediction)
     assert abs(result.score - expected_f1) < 0.001
 
 
-def test_complete_and_grounded_returns_prediction_without_trace():
-    # Configure with a dummy LM
-    dspy.configure(
+def test_semantic_f1_missing_response_field(make_run):
+    run = make_run(lm=DummyLM([]))
+    example = Example.from_record({"question": "What is 1+1?"})
+    pred = Prediction.from_record({"response": "2"})
+    metric = SemanticF1()
+    with pytest.raises(AttributeError, match="example missing required field 'response'"):
+        asyncio.run(metric(example=example, pred=pred, run=run))
+
+
+def test_complete_and_grounded_returns_prediction_without_threshold(make_run):
+    run = make_run(
         lm=DummyLM(
             [
                 {
@@ -107,23 +69,17 @@ def test_complete_and_grounded_returns_prediction_without_trace():
             ]
         )
     )
-
-    # Create example and prediction with context
-    example = dspy.Example(question="What is 1+1?", response="2")
-    pred = dspy.Prediction(response="2", context="context")
-
-    # Test CompleteAndGrounded
+    example = Example.from_record({"question": "What is 1+1?", "response": "2"})
+    pred = Prediction.from_record({"response": "2", "context": "context"})
     metric = CompleteAndGrounded()
-    result = metric(example, pred)
-
+    result = asyncio.run(metric(example=example, pred=pred, run=run))
     assert isinstance(result, Prediction)
     assert hasattr(result, "score")
     assert isinstance(result.score, (int, float, bool))
 
 
-def test_complete_and_grounded_returns_prediction_with_trace():
-    # Configure with a dummy LM
-    dspy.configure(
+def test_complete_and_grounded_returns_prediction_with_threshold(make_run):
+    run = make_run(
         lm=DummyLM(
             [
                 {
@@ -142,50 +98,69 @@ def test_complete_and_grounded_returns_prediction_with_trace():
             ]
         )
     )
-
-    # Create example and prediction with context
-    example = dspy.Example(question="What is 1+1?", response="2")
-    pred = dspy.Prediction(response="2", context="context")
-
-    # Test CompleteAndGrounded with trace
+    example = Example.from_record({"question": "What is 1+1?", "response": "2"})
+    pred = Prediction.from_record({"response": "2", "context": "context"})
     metric = CompleteAndGrounded(threshold=0.7)
-    result = metric(example, pred, trace=True)
-
+    result = asyncio.run(metric(example=example, pred=pred, use_threshold=True, run=run))
     assert isinstance(result, Prediction)
     assert hasattr(result, "score")
     assert isinstance(result.score, bool)
 
 
-def test_semantic_f1_prediction_can_be_compared():
-    # Configure with a dummy LM
-    dspy.configure(
+def test_complete_and_grounded_score_value(make_run):
+    run = make_run(
         lm=DummyLM(
             [
                 {
-                    "reasoning": "Comparing first response",
-                    "precision": 0.8,
-                    "recall": 0.6,
+                    "reasoning": "Analyzing completeness",
+                    "ground_truth_key_ideas": "ideas",
+                    "system_response_key_ideas": "ideas",
+                    "discussion": "overlap",
+                    "completeness": 0.6,
                 },
                 {
-                    "reasoning": "Comparing second response",
-                    "precision": 0.9,
-                    "recall": 0.7,
+                    "reasoning": "Analyzing groundedness",
+                    "system_response_claims": "claims",
+                    "discussion": "supported",
+                    "groundedness": 0.8,
                 },
             ]
         )
     )
+    example = Example.from_record({"question": "test", "response": "answer"})
+    pred = Prediction.from_record({"response": "response", "context": "context"})
+    metric = CompleteAndGrounded()
+    result = asyncio.run(metric(example=example, pred=pred, run=run))
+    expected_f1 = 2 * (0.8 * 0.6) / (0.8 + 0.6)
+    assert isinstance(result, Prediction)
+    assert abs(result.score - expected_f1) < 0.001
 
+
+def test_complete_and_grounded_missing_context_field(make_run):
+    run = make_run(lm=DummyLM([]))
+    example = Example.from_record({"question": "What is 1+1?", "response": "2"})
+    pred = Prediction.from_record({"response": "2"})
+    metric = CompleteAndGrounded()
+    with pytest.raises(AttributeError, match="pred missing required field 'context'"):
+        asyncio.run(metric(example=example, pred=pred, run=run))
+
+
+def test_semantic_f1_prediction_can_be_compared(make_run):
+    run = make_run(
+        lm=DummyLM(
+            [
+                {"reasoning": "Comparing first response", "precision": 0.8, "recall": 0.6},
+                {"reasoning": "Comparing second response", "precision": 0.9, "recall": 0.7},
+            ]
+        )
+    )
     metric = SemanticF1()
-
-    # Create two predictions with different scores
-    example1 = dspy.Example(question="test1", response="answer1")
-    pred1 = dspy.Prediction(response="response1")
-    result1 = metric(example1, pred1)
-
-    example2 = dspy.Example(question="test2", response="answer2")
-    pred2 = dspy.Prediction(response="response2")
-    result2 = metric(example2, pred2)
-
+    example1 = Example.from_record({"question": "test1", "response": "answer1"})
+    pred1 = Prediction.from_record({"response": "response1"})
+    result1 = asyncio.run(metric(example=example1, pred=pred1, run=run))
+    example2 = Example.from_record({"question": "test2", "response": "answer2"})
+    pred2 = Prediction.from_record({"response": "response2"})
+    result2 = asyncio.run(metric(example=example2, pred=pred2, run=run))
     assert isinstance(result1, Prediction)
     assert isinstance(result2, Prediction)
     assert result2.score > result1.score

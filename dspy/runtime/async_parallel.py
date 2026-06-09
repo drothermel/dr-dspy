@@ -1,0 +1,155 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import TYPE_CHECKING, Any, TypeVar
+
+import tqdm
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable, Sequence
+
+    from dspy.runtime.run_context import RunContext
+
+logger = logging.getLogger(__name__)
+
+RUN_BOUNDED_PENDING = object()
+
+
+def resolve_max_concurrency(
+    *,
+    explicit: int | None = None,
+    configured: int | None = None,
+    run: RunContext | None = None,
+    default: int = 8,
+) -> int:
+    if explicit is not None:
+        return explicit
+    if configured is not None:
+        return configured
+    if run is not None:
+        return run.execution.max_concurrency
+    return default
+
+
+def resolve_max_errors(optimizer_max_errors: int | None, run: RunContext) -> int:
+    return optimizer_max_errors if optimizer_max_errors is not None else run.execution.max_errors
+
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+
+class BoundedRunStats:
+    def __init__(self) -> None:
+        self.failed_indices: list[int] = []
+        self.exceptions_map: dict[int, BaseException] = {}
+
+
+class BoundedRunAbortedError(RuntimeError):
+    def __init__(self, stats: BoundedRunStats, *, reason: str = "max_errors exceeded") -> None:
+        self.stats = stats
+        self.reason = reason
+        super().__init__(f"Execution cancelled: {reason}. Failed indices: {stats.failed_indices}")
+
+
+def _finalize_results(results: list[Any]) -> list[Any]:
+    return [None if slot is RUN_BOUNDED_PENDING else slot for slot in results]
+
+
+async def run_bounded(
+    *,
+    items: Sequence[T],
+    fn: Callable[[T], Awaitable[R]],
+    max_concurrency: int,
+    max_errors: int | None = None,
+    provide_traceback: bool | None = None,
+    disable_progress_bar: bool = False,
+    progress_hook: Callable[[list[R | None], int], str | None] | None = None,
+    timeout: float | None = None,
+) -> tuple[list[R | None], BoundedRunStats]:
+    """Run ``fn`` over ``items`` with bounded concurrency.
+
+    ``progress_hook`` receives the live results list. Incomplete slots use the
+    ``RUN_BOUNDED_PENDING`` sentinel; failed slots are ``None`` once recorded.
+    """
+    if max_concurrency < 1:
+        raise ValueError("max_concurrency must be at least 1.")
+    stats = BoundedRunStats()
+    results: list[Any] = [RUN_BOUNDED_PENDING] * len(items)
+    completed_count = 0
+    error_count = 0
+    cancel = asyncio.Event()
+    lock = asyncio.Lock()
+    pbar = tqdm.tqdm(total=len(items), dynamic_ncols=True, disable=disable_progress_bar or len(items) == 0)
+
+    async def run_indexed(index: int, item: T) -> None:
+        nonlocal error_count, completed_count
+        if cancel.is_set():
+            return
+        try:
+            if timeout is not None:
+                outcome = await asyncio.wait_for(fn(item), timeout=timeout)
+            else:
+                outcome = await fn(item)
+        except TimeoutError as exc:
+            if provide_traceback:
+                logger.exception("Timeout for %r after %s seconds: %s", item, timeout, exc)
+            else:
+                logger.error(  # noqa: TRY400
+                    "Timeout for %r after %s seconds. Set `provide_traceback=True` for traceback.",
+                    item,
+                    timeout,
+                    exc_info=False,
+                )
+            async with lock:
+                results[index] = None
+                stats.failed_indices.append(index)
+                stats.exceptions_map[index] = exc
+                error_count += 1
+                if max_errors is not None and error_count >= max_errors:
+                    cancel.set()
+            return
+        except Exception as exc:
+            if provide_traceback:
+                logger.exception("Error for %r: %s", item, exc)
+            else:
+                logger.error(  # noqa: TRY400
+                    "Error for %r: %s. Set `provide_traceback=True` for traceback.",
+                    item,
+                    exc,
+                    exc_info=False,
+                )
+            async with lock:
+                results[index] = None
+                stats.failed_indices.append(index)
+                stats.exceptions_map[index] = exc
+                error_count += 1
+                if max_errors is not None and error_count >= max_errors:
+                    cancel.set()
+            return
+        results[index] = outcome
+        completed_count += 1
+        description = progress_hook(results, len(items)) if progress_hook is not None else None
+        if description is None:
+            description = f"Processed {completed_count} / {len(items)} examples"
+        pbar.set_description(description)
+        pbar.update()
+
+    try:
+        sem = asyncio.Semaphore(max_concurrency)
+
+        async def run_one(index: int, item: T) -> None:
+            if cancel.is_set():
+                return
+            async with sem:
+                if cancel.is_set():
+                    return
+                await run_indexed(index=index, item=item)
+
+        await asyncio.gather(*(run_one(index, item) for index, item in enumerate(items)))
+    finally:
+        pbar.close()
+    if cancel.is_set():
+        raise BoundedRunAbortedError(stats, reason="max_errors exceeded")
+    return (_finalize_results(results), stats)

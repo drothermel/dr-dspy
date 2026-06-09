@@ -1,39 +1,42 @@
-import dspy
-from dspy import Example
-from dspy.predict import Predict
-from dspy.teleprompt import BootstrapFewShotWithRandomSearch
-from dspy.utils.dummies import DummyLM
+import asyncio
+from typing import Any, cast
+
+from dspy.predict.predict import Predict
+from dspy.primitives import Example, Module
+from dspy.teleprompt.compile_params import RandomSearchCompileParams
+from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
+from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
-class SimpleModule(dspy.Module):
+class SimpleModule(Module):
     def __init__(self, signature):
         super().__init__()
         self.predictor = Predict(signature)
 
-    def forward(self, **kwargs):
-        return self.predictor(**kwargs)
+    async def _aforward_impl(self, *, run, options=None, **inputs):
+        return await self.predictor(run=run, options=options, **inputs)
 
 
 def simple_metric(example, prediction, trace=None):
     return example.output == prediction.output
 
 
-def test_basic_workflow():
-    """Test to ensure the basic compile flow runs without errors."""
-    student = SimpleModule("input -> output")
-    teacher = SimpleModule("input -> output")
-
-    lm = DummyLM(
-        [
-            "Initial thoughts",
-            "Finish[blue]",  # Expected output for both training and validation
-        ]
-    )
-    dspy.configure(lm=lm)
-
+def test_basic_workflow(make_run):
+    student = SimpleModule(ts("input -> output"))
+    teacher = SimpleModule(ts("input -> output"))
+    lm = DummyLM(cast("Any", ["Initial thoughts", "Finish[blue]"]))
+    run = make_run(lm=lm)
     optimizer = BootstrapFewShotWithRandomSearch(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
     trainset = [
-        Example(input="What is the color of the sky?", output="blue").with_inputs("input"),
-        Example(input="What does the fox say?", output="Ring-ding-ding-ding-dingeringeding!").with_inputs("input"),
+        Example.from_record({"input": "What is the color of the sky?", "output": "blue"}, input_keys=("input",)),
+        Example.from_record(
+            {"input": "What does the fox say?", "output": "Ring-ding-ding-ding-dingeringeding!"}, input_keys=("input",)
+        ),
     ]
-    optimizer.compile(student, teacher=teacher, trainset=trainset)
+    result = asyncio.run(
+        optimizer.compile(student, params=RandomSearchCompileParams(trainset=trainset, teacher=teacher), run=run)
+    )
+    assert result.program is not None
+    assert len(result.candidates) > 0
+    assert result.program is result.candidates[0].program

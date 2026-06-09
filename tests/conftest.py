@@ -1,41 +1,52 @@
-import copy
 import os
-from collections.abc import Iterator
-from pathlib import Path
-from typing import Any
+
+os.environ.setdefault("DISABLE_AIOHTTP_TRANSPORT", "True")
 
 import pytest
 
+from tests.test_utils.run_binding import collect_run_binding_violations
 from tests.test_utils.server import litellm_test_server, read_litellm_test_server_request_logs  # noqa: F401
 
-SKIP_DEFAULT_FLAGS = ["reliability", "extra", "llm_call", "deno"]
+OPT_IN_MARKERS = ["integration", "llm_call", "deno", "slow"]
 
 
-def _close_cache(cache: Any) -> None:
-    disk_cache = getattr(cache, "disk_cache", None)
-    if hasattr(disk_cache, "close"):
-        disk_cache.close()
+@pytest.fixture
+def json_adapter():
+    from dspy.adapters.json_adapter import JSONAdapter
+
+    return JSONAdapter()
 
 
-@pytest.fixture(autouse=True)
-def clear_settings(tmp_path: Path) -> Iterator[None]:
-    """Ensure each test gets fresh DSPy settings and an isolated cache."""
-    import dspy
+@pytest.fixture
+def run(make_run):
+    from tests.test_utils import DummyLM
 
-    original_cache = dspy.cache
-    dspy.configure_cache(disk_cache_dir=tmp_path / ".dspy_cache")
-    try:
-        yield
-    finally:
-        from dspy.dsp.utils.settings import DEFAULT_CONFIG
+    return make_run(lm=DummyLM([{}]))
 
-        try:
-            dspy.configure(**copy.deepcopy(DEFAULT_CONFIG), inherit_config=False)
-        finally:
-            try:
-                _close_cache(dspy.cache)
-            finally:
-                dspy.cache = original_cache
+
+@pytest.fixture
+def make_run():
+    def _make_run(lm, adapter=None, **kwargs):
+        from dspy.adapters.chat_adapter import ChatAdapter
+        from dspy.runtime import CallLogMode, RunContext, TelemetryConfig, TransparencyMode
+
+        adapter = adapter or ChatAdapter()
+        base_telemetry = TelemetryConfig(transparency=TransparencyMode.off, call_log=CallLogMode.memory)
+        telemetry = kwargs.pop("telemetry", None)
+        if telemetry is None:
+            merged_telemetry = base_telemetry
+        elif isinstance(telemetry, TelemetryConfig):
+            merged_telemetry = base_telemetry.model_copy(update=telemetry.model_dump(exclude_unset=True))
+        else:
+            merged_telemetry = base_telemetry.model_copy(update=telemetry)
+        return RunContext.create(
+            lm=lm,
+            adapter=adapter,
+            telemetry=merged_telemetry,
+            **kwargs,
+        )
+
+    return _make_run
 
 
 @pytest.fixture
@@ -43,36 +54,37 @@ def anyio_backend():
     return "asyncio"
 
 
-# Taken from: https://gist.github.com/justinmklam/b2aca28cb3a6896678e2e2927c6b6a38
 def pytest_addoption(parser):
-    for flag in SKIP_DEFAULT_FLAGS:
-        parser.addoption(
-            f"--{flag}",
-            action="store_true",
-            default=False,
-            help=f"run {flag} tests",
-        )
-
-
-def pytest_configure(config):
-    for flag in SKIP_DEFAULT_FLAGS:
-        config.addinivalue_line("markers", flag)
+    for flag in OPT_IN_MARKERS:
+        parser.addoption(f"--{flag}", action="store_true", default=False, help=f"run {flag} tests")
 
 
 def pytest_collection_modifyitems(config, items):
-    for flag in SKIP_DEFAULT_FLAGS:
+    for flag in OPT_IN_MARKERS:
         if config.getoption(f"--{flag}"):
             continue
-
         skip_mark = pytest.mark.skip(reason=f"need --{flag} option to run")
         for item in items:
             if flag in item.keywords:
                 item.add_marker(skip_mark)
 
 
+def pytest_collection_finish(session):
+    # xdist workers collect in parallel; validate once on the controller.
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return
+    violations = collect_run_binding_violations()
+    if not violations:
+        return
+    message = "Unbound run=run in tests (use run fixture or run = make_run(...)):\n" + "\n".join(
+        v.format() for v in violations
+    )
+    raise pytest.UsageError(message)
+
+
 @pytest.fixture
 def lm_for_test():
     model = os.environ.get("LM_FOR_TEST", None)
     if model is None:
-        pytest.skip("LM_FOR_TEST is not set in the environment variables")
+        pytest.skip(reason="LM_FOR_TEST is not set in the environment variables")
     return model

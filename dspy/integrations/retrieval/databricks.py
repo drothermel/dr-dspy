@@ -1,0 +1,261 @@
+import asyncio
+import json
+import os
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from dspy._internal.lazy_import import import_optional, is_available
+from dspy.retrievers.types import RetrievedPassage
+
+_MISSING_SCORE_SORT_KEY = float("-inf")
+
+
+class DatabricksColumnManifest(BaseModel):
+    name: str
+
+
+class DatabricksManifest(BaseModel):
+    columns: list[DatabricksColumnManifest]
+
+
+class DatabricksQueryResult(BaseModel):
+    data_array: list[list[Any]] = Field(default_factory=list)
+
+
+class DatabricksQueryResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    manifest: DatabricksManifest
+    result: DatabricksQueryResult
+
+
+class DatabricksRMError(Exception):
+    pass
+
+
+class DatabricksRM:
+    def __init__(
+        self,
+        databricks_index_name: str,
+        databricks_endpoint: str | None = None,
+        databricks_token: str | None = None,
+        databricks_client_id: str | None = None,
+        databricks_client_secret: str | None = None,
+        columns: list[str] | None = None,
+        filters_json: str | None = None,
+        k: int = 3,
+        docs_id_column_name: str = "id",
+        docs_uri_column_name: str | None = None,
+        text_column_name: str = "text",
+        use_with_databricks_agent_framework: bool = False,
+    ) -> None:
+        self.databricks_token = databricks_token if databricks_token is not None else os.environ.get("DATABRICKS_TOKEN")
+        self.databricks_endpoint = (
+            databricks_endpoint if databricks_endpoint is not None else os.environ.get("DATABRICKS_HOST")
+        )
+        self.databricks_client_id = (
+            databricks_client_id if databricks_client_id is not None else os.environ.get("DATABRICKS_CLIENT_ID")
+        )
+        self.databricks_client_secret = (
+            databricks_client_secret
+            if databricks_client_secret is not None
+            else os.environ.get("DATABRICKS_CLIENT_SECRET")
+        )
+        if not is_available("databricks.sdk") and (self.databricks_token, self.databricks_endpoint).count(None) > 0:
+            raise ValueError(
+                "To retrieve documents with Databricks Vector Search, you must install the databricks-sdk Python library, supply the databricks_token and databricks_endpoint parameters, or set the DATABRICKS_TOKEN and DATABRICKS_HOST environment variables. You may also supply a service principal the databricks_client_id and databricks_client_secret parameters, or set the DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET"
+            )
+        self.databricks_index_name = databricks_index_name
+        self.columns = list({docs_id_column_name, text_column_name, *(columns or [])})
+        self.filters_json = filters_json
+        self.k = k
+        self.docs_id_column_name = docs_id_column_name
+        self.docs_uri_column_name = docs_uri_column_name
+        self.text_column_name = text_column_name
+        self.use_with_databricks_agent_framework = use_with_databricks_agent_framework
+        if self.use_with_databricks_agent_framework:
+            mlflow = import_optional(
+                "mlflow",
+                feature="Databricks Mosaic Agent Framework",
+                install_command="Install mlflow via `pip install mlflow`.",
+            )
+            mlflow.models.set_retriever_schema(primary_key="doc_id", text_column="page_content", doc_uri="doc_uri")
+
+    async def __call__(
+        self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
+    ) -> list[RetrievedPassage]:
+        return await self.aforward(query=query, query_type=query_type, filters_json=filters_json)
+
+    async def aforward(
+        self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
+    ) -> list[RetrievedPassage]:
+        return await asyncio.to_thread(self._query, query=query, query_type=query_type, filters_json=filters_json)
+
+    def _extract_doc_ids(self, item: dict[str, Any]) -> str:
+        if self.docs_id_column_name == "metadata":
+            docs_dict = json.loads(item["metadata"])
+            return docs_dict["document_id"]
+        return item[self.docs_id_column_name]
+
+    def _get_extra_columns(self, item: dict[str, Any]) -> dict[str, Any]:
+        extra_columns = {
+            k: v
+            for k, v in item.items()
+            if k not in [self.docs_id_column_name, self.text_column_name, self.docs_uri_column_name]
+        }
+        if self.docs_id_column_name == "metadata":
+            extra_columns = {
+                **extra_columns,
+                "metadata": {k: v for k, v in json.loads(item["metadata"]).items() if k != "document_id"},
+            }
+        return extra_columns
+
+    def _to_passages(self, sorted_docs: list[dict[str, Any]]) -> list[RetrievedPassage]:
+        passages: list[RetrievedPassage] = []
+        for doc in sorted_docs:
+            extra = self._get_extra_columns(doc)
+            doc_uri = doc[self.docs_uri_column_name] if self.docs_uri_column_name else None
+            metadata: dict[str, object] = {**extra}
+            if doc_uri is not None:
+                metadata["doc_uri"] = doc_uri
+            score_val = doc.get("score")
+            passages.append(
+                RetrievedPassage(
+                    long_text=doc[self.text_column_name],
+                    pid=self._extract_doc_ids(doc),
+                    score=float(score_val) if score_val is not None else None,
+                    metadata=metadata or None,
+                )
+            )
+        return passages
+
+    def _rows_from_response(self, results: dict[str, Any]) -> list[dict[str, Any]]:
+        response = DatabricksQueryResponse.model_validate(results)
+        col_names = [column.name for column in response.manifest.columns]
+        if self.docs_id_column_name not in col_names:
+            raise DatabricksRMError(
+                f"docs_id_column_name: '{self.docs_id_column_name}' is not in the index columns: \n {col_names}"
+            )
+        if self.text_column_name not in col_names:
+            raise DatabricksRMError(
+                f"text_column_name: '{self.text_column_name}' is not in the index columns: \n {col_names}"
+            )
+        return [dict(zip(col_names, data_row, strict=False)) for data_row in response.result.data_array]
+
+    def _sort_key(self, row: dict[str, Any]) -> float:
+        score_val = row.get("score")
+        if score_val is None:
+            return _MISSING_SCORE_SORT_KEY
+        return float(score_val)
+
+    def _query(
+        self, query: str | list[float], query_type: str = "ANN", filters_json: str | None = None
+    ) -> list[RetrievedPassage]:
+        if isinstance(query, str):
+            query_text = query
+            query_vector = None
+        elif isinstance(query, list):
+            query_vector = query
+            query_text = None
+        else:
+            raise TypeError("Query must be a string or a list of floats.")
+        if is_available("databricks.sdk"):
+            results = self._query_via_databricks_sdk(
+                index_name=self.databricks_index_name,
+                k=self.k,
+                columns=self.columns,
+                query_type=query_type,
+                query_text=query_text,
+                query_vector=query_vector,
+                databricks_token=self.databricks_token,
+                databricks_endpoint=self.databricks_endpoint,
+                databricks_client_id=self.databricks_client_id,
+                databricks_client_secret=self.databricks_client_secret,
+                filters_json=filters_json or self.filters_json,
+            )
+        else:
+            if self.databricks_token is None or self.databricks_endpoint is None:
+                raise DatabricksRMError("Databricks token and endpoint are required for request-based querying.")
+            results = self._query_via_requests(
+                index_name=self.databricks_index_name,
+                k=self.k,
+                columns=self.columns,
+                databricks_token=self.databricks_token,
+                databricks_endpoint=self.databricks_endpoint,
+                query_type=query_type,
+                query_text=query_text,
+                query_vector=query_vector,
+                filters_json=filters_json or self.filters_json,
+            )
+        items = self._rows_from_response(results)
+        sorted_docs = sorted(items, key=self._sort_key, reverse=True)[: self.k]
+        return self._to_passages(sorted_docs)
+
+    @staticmethod
+    def _query_via_databricks_sdk(
+        index_name: str,
+        k: int,
+        columns: list[str],
+        query_type: str,
+        query_text: str | None,
+        query_vector: list[float] | None,
+        databricks_token: str | None,
+        databricks_endpoint: str | None,
+        databricks_client_id: str | None,
+        databricks_client_secret: str | None,
+        filters_json: str | None,
+    ) -> dict[str, Any]:
+        from databricks.sdk import WorkspaceClient
+
+        if (query_text, query_vector).count(None) != 1:
+            raise ValueError("Exactly one of query_text or query_vector must be specified.")
+        if databricks_client_secret and databricks_client_id:
+            databricks_client = WorkspaceClient(client_id=databricks_client_id, client_secret=databricks_client_secret)
+        else:
+            databricks_client = WorkspaceClient(host=databricks_endpoint, token=databricks_token)
+        return databricks_client.vector_search_indexes.query_index(
+            index_name=index_name,
+            query_type=query_type,
+            query_text=query_text,
+            query_vector=query_vector,
+            columns=columns,
+            filters_json=filters_json,
+            num_results=k,
+        ).as_dict()
+
+    @staticmethod
+    def _query_via_requests(
+        index_name: str,
+        k: int,
+        columns: list[str],
+        databricks_token: str,
+        databricks_endpoint: str,
+        query_type: str,
+        query_text: str | None,
+        query_vector: list[float] | None,
+        filters_json: str | None,
+    ) -> dict[str, Any]:
+        import requests
+
+        if (query_text, query_vector).count(None) != 1:
+            raise ValueError("Exactly one of query_text or query_vector must be specified.")
+        headers = {"Authorization": f"Bearer {databricks_token}", "Content-Type": "application/json"}
+        payload: dict[str, object] = {"columns": columns, "num_results": k, "query_type": query_type}
+        if filters_json is not None:
+            payload["filters_json"] = filters_json
+        if query_text is not None:
+            payload["query_text"] = query_text
+        elif query_vector is not None:
+            payload["query_vector"] = query_vector
+        response = requests.post(
+            f"{databricks_endpoint}/api/2.0/vector-search/indexes/{index_name}/query",
+            json=payload,
+            headers=headers,
+            timeout=60,
+        )
+        response.raise_for_status()
+        results = response.json()
+        if "error_code" in results:
+            raise DatabricksRMError(f"ERROR: {results['error_code']} -- {results['message']}")
+        return results

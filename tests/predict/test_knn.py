@@ -1,30 +1,30 @@
 import pytest
 
-import dspy
-from dspy.predict import KNN
-from dspy.utils import DummyVectorizer
+from dspy.clients.embedding import Embedder
+from dspy.predict.knn import KNN
+from dspy.primitives import Example
+from tests.test_utils import DummyVectorizer
 
-pytestmark = pytest.mark.extra
+pytestmark = pytest.mark.asyncio
 
 
-def mock_example(question: str, answer: str) -> dspy.Example:
-    """Creates a mock DSP example with specified question and answer."""
-    return dspy.Example(question=question, answer=answer).with_inputs("question")
+def mock_example(question: str, answer: str) -> Example:
+    return Example.from_record({"question": question, "answer": answer}, input_keys=("question",))
 
 
 @pytest.fixture
-def setup_knn() -> KNN:
-    """Sets up a KNN instance with a mocked vectorizer for testing."""
+async def setup_knn() -> KNN:
     trainset = [
         mock_example("What is the capital of France?", "Paris"),
         mock_example("What is the largest ocean?", "Pacific"),
         mock_example("What is 2+2?", "4"),
     ]
-    return KNN(k=2, trainset=trainset, vectorizer=dspy.Embedder(DummyVectorizer()))
+    knn = KNN(k=2, trainset=trainset, vectorizer=Embedder(DummyVectorizer()))
+    await knn._ensure_train_vectors()
+    return knn
 
 
-def test_knn_initialization(setup_knn):
-    """Tests the KNN initialization and checks if the trainset vectors are correctly created."""
+async def test_knn_initialization(setup_knn):
     import numpy as np
 
     knn = setup_knn
@@ -33,19 +33,17 @@ def test_knn_initialization(setup_knn):
     assert isinstance(knn.trainset_vectors, np.ndarray), "Trainset vectors should be a NumPy array"
 
 
-def test_knn_query(setup_knn):
-    """Tests the KNN query functionality for retrieving the nearest neighbors."""
+async def test_knn_query(setup_knn):
     knn = setup_knn
-    query = {"question": "What is 3+3?"}  # A query close to "What is 2+2?"
-    nearest_samples = knn(**query)
+    query = {"question": "What is 3+3?"}
+    nearest_samples = await knn(inputs=query)
     assert len(nearest_samples) == 2, "Incorrect number of nearest samples returned"
     assert nearest_samples[0].answer == "4", "Incorrect nearest sample returned"
 
 
-def test_knn_query_specificity(setup_knn):
-    """Tests the KNN query functionality for specificity of returned examples."""
+async def test_knn_query_specificity(setup_knn):
     knn = setup_knn
-    query = {"question": "What is the capital of Germany?"}  # A query close to "What is the capital of France?"
-    nearest_samples = knn(**query)
+    query = {"question": "What is the capital of Germany?"}
+    nearest_samples = await knn(inputs=query)
     assert len(nearest_samples) == 2, "Incorrect number of nearest samples returned"
     assert "Paris" in [sample.answer for sample in nearest_samples], "Expected Paris to be a nearest sample answer"

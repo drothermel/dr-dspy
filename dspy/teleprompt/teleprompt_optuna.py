@@ -1,89 +1,119 @@
-from dspy.evaluate.evaluate import Evaluate
-from dspy.teleprompt.teleprompt import Teleprompter
+from dataclasses import dataclass
+from typing import Any, cast
+
+from pydantic import BaseModel
+
+from dspy.evaluate.evaluator import Evaluate
+from dspy.integrations.optimizers.optuna.study import create_maximize_study, run_ask_tell_loop
+from dspy.primitives import Example, Module
+from dspy.runtime.run_context import RunContext
+from dspy.teleprompt.compilation import CompileResult
+from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, BootstrapOptunaCompileParams
+from dspy.teleprompt.core.evaluator import make_optimizer_evaluator
+from dspy.teleprompt.metrics import OptimizerMetric
+from dspy.teleprompt.registry import register_teleprompter
 
 from .bootstrap import BootstrapFewShot
 
 
-def _import_optuna():
-    try:
-        import optuna
-    except ModuleNotFoundError as exc:
-        if exc.name == "optuna":
-            raise ImportError(
-                "BootstrapFewShotWithOptuna requires optional dependency 'optuna'. "
-                "Install it with `pip install dspy[optuna]`."
-            ) from exc
-        raise
-    return optuna
+@dataclass
+class OptunaCompileSession:
+    trainset: list[Example]
+    valset: list[Example]
+    run: RunContext
+    student: Module
+    teacher: Module
+    compiled_teleprompter: Module
+    evaluator: Evaluate
 
 
-class BootstrapFewShotWithOptuna(Teleprompter):
+@register_teleprompter(params=BootstrapOptunaCompileParams)
+class BootstrapFewShotWithOptuna:
     def __init__(
         self,
-        metric,
-        teacher_settings=None,
+        metric: OptimizerMetric,
+        teacher_run: RunContext | None = None,
         max_bootstrapped_demos=4,
         max_labeled_demos=16,
         max_rounds=1,
-        num_candidate_programs=16,
-        num_threads=None,
-    ):
+        num_random_candidates=16,
+        max_concurrency=None,
+    ) -> None:
         self.metric = metric
-        self.teacher_settings = teacher_settings or {}
+        self.teacher_run = teacher_run
         self.max_rounds = max_rounds
-        self.num_threads = num_threads
+        self.max_concurrency = max_concurrency
         self.min_num_samples = 1
         self.max_num_samples = max_bootstrapped_demos
-        self.num_candidate_sets = num_candidate_programs
-        # self.max_num_traces = 1 + int(max_bootstrapped_demos / 2.0 * self.num_candidate_sets)
-
-        # Semi-hacky way to get the parent class's _bootstrap function to stop early.
-        # self.max_bootstrapped_demos = self.max_num_traces
+        self.num_candidate_sets = num_random_candidates
         self.max_labeled_demos = max_labeled_demos
 
-        print("Going to sample between", self.min_num_samples, "and", self.max_num_samples, "traces per predictor.")
-        # print("Going to sample", self.max_num_traces, "traces in total.")
-        print("Will attempt to train", self.num_candidate_sets, "candidate sets.")
+    async def _evaluate_program(self, program, *, evaluator: Evaluate, run: RunContext):
+        return await evaluator(program, run=run)
 
-    def objective(self, trial):
-        program2 = self.student.reset_copy()
+    async def _run_trial(self, trial, *, session: OptunaCompileSession) -> float:
+        program2 = session.student.reset_copy()
         for (name, compiled_predictor), (_, program2_predictor) in zip(
-            self.compiled_teleprompter.named_predictors(), program2.named_predictors(), strict=False,
+            session.compiled_teleprompter.named_predictors(), program2.named_predictors(), strict=True
         ):
             all_demos = compiled_predictor.demos
             demo_index = trial.suggest_int(f"demo_index_for_{name}", 0, len(all_demos) - 1)
             selected_demo = dict(all_demos[demo_index])
             program2_predictor.demos = [selected_demo]
-        evaluate = Evaluate(
-            devset=self.valset,
-            metric=self.metric,
-            num_threads=self.num_threads,
-            display_table=False,
-            display_progress=True,
-        )
-        result = evaluate(program2)
+        result = await self._evaluate_program(program2, evaluator=session.evaluator, run=session.run)
         trial.set_user_attr("program", program2)
-        return result.score
+        return cast("Any", result).score
 
-    def compile(self, student, *, teacher=None, max_demos, trainset, valset=None):
-        optuna = _import_optuna()
-        self.trainset = trainset
-        self.valset = valset or trainset
-        self.student = student.reset_copy()
-        self.teacher = teacher.deepcopy() if teacher is not None else student.reset_copy()
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
+        params = BootstrapOptunaCompileParams.model_validate(params)
+        trainset = params.trainset
+        valset = params.valset or params.trainset
+        student_copy = student.reset_copy()
+        teacher = params.teacher
+        if teacher is None:
+            teacher_copy = student.reset_copy()
+        elif isinstance(teacher, list):
+            raise ValueError(
+                "BootstrapFewShotWithOptuna accepts a single teacher Module, not a list. Pass one teacher or None."
+            )
+        else:
+            teacher_copy = teacher.deepcopy()
+        max_demos = params.max_demos
         teleprompter_optimize = BootstrapFewShot(
             metric=self.metric,
             max_bootstrapped_demos=max_demos,
             max_labeled_demos=self.max_labeled_demos,
-            teacher_settings=self.teacher_settings,
+            teacher_run=self.teacher_run,
             max_rounds=self.max_rounds,
         )
-        self.compiled_teleprompter = teleprompter_optimize.compile(
-            self.student, teacher=self.teacher, trainset=self.trainset,
+        bootstrap_result = await teleprompter_optimize.compile(
+            student_copy,
+            params=BootstrapFewShotCompileParams(trainset=trainset, teacher=teacher_copy),
+            run=run,
         )
-        study = optuna.create_study(direction="maximize")
-        study.optimize(self.objective, n_trials=self.num_candidate_sets)
+        evaluator = make_optimizer_evaluator(
+            run,
+            devset=valset,
+            metric=self.metric,
+            max_concurrency=self.max_concurrency,
+            max_errors=None,
+            display_table=False,
+            display_progress=True,
+        )
+        session = OptunaCompileSession(
+            trainset=trainset,
+            valset=valset,
+            run=run,
+            student=student_copy,
+            teacher=teacher_copy,
+            compiled_teleprompter=bootstrap_result.program,
+            evaluator=evaluator,
+        )
+        study = create_maximize_study(feature="BootstrapFewShotWithOptuna")
+
+        async def _trial_fn(trial):
+            return await self._run_trial(trial, session=session)
+
+        await run_ask_tell_loop(study, self.num_candidate_sets, _trial_fn)
         best_program = study.trials[study.best_trial.number].user_attrs["program"]
-        print("Best score:", study.best_value)
-        print("Best program:", best_program)
-        return best_program
+        return CompileResult.with_compiled_program(best_program)

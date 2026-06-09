@@ -1,18 +1,19 @@
 import pytest
 
-import dspy
-from dspy import Example
+from dspy.adapters.types.image import Image
+from dspy.history import TurnLog
+from dspy.primitives import Example
 
 
 def test_example_initialization():
-    example = Example(a=1, b=2)
+    example = Example.from_record({"a": 1, "b": 2})
     assert example.a == 1
     assert example.b == 2
 
 
 def test_example_initialization_from_base():
-    base = Example(a=1, b=2)
-    example = Example(base=base, c=3)
+    base = Example.from_record({"a": 1, "b": 2})
+    example = base.fork(c=3)
     assert example.a == 1
     assert example.b == 2
     assert example.c == 3
@@ -20,99 +21,121 @@ def test_example_initialization_from_base():
 
 def test_example_initialization_from_dict():
     base_dict = {"a": 1, "b": 2}
-    example = Example(base=base_dict, c=3)
+    example = Example.from_record({**base_dict, "c": 3})
     assert example.a == 1
     assert example.b == 2
     assert example.c == 3
 
 
 def test_example_set_get_item():
-    example = Example()
+    example = Example.from_record({})
     example["a"] = 1
     assert example["a"] == 1
 
 
 def test_example_attribute_access():
-    example = Example(a=1)
+    example = Example.from_record({"a": 1})
     assert example.a == 1
     example.a = 2
     assert example.a == 2
 
 
 def test_example_deletion():
-    example = Example(a=1, b=2)
+    example = Example.from_record({"a": 1, "b": 2})
     del example["a"]
     with pytest.raises(AttributeError):
         _ = example.a
 
 
 def test_example_len():
-    example = Example(a=1, b=2, dspy_hidden=3)
+    example = Example.from_record({"a": 1, "b": 2, "dspy_hidden": 3})
     assert len(example) == 2
 
 
+def test_example_iter_excludes_dspy_keys():
+    example = Example.from_record({"a": 1, "b": 2, "dspy_hidden": 3})
+    assert list(example) == ["a", "b"]
+
+
 def test_example_repr_str_img():
-    example = Example(
-        img=dspy.Image(url="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
+    example = Example.from_record(
+        {"img": Image(url="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")}
     )
     assert (
         repr(example)
-        == "Example({'img': Image(url=data:image/gif;base64,<IMAGE_BASE_64_ENCODED(56)>)}) (input_keys=None)"
+        == "Example({'img': Image(url=data:image/gif;base64,<IMAGE_BASE_64_ENCODED(56)>)}) (input_keys=[])"
     )
     assert (
-        str(example)
-        == "Example({'img': Image(url=data:image/gif;base64,<IMAGE_BASE_64_ENCODED(56)>)}) (input_keys=None)"
+        str(example) == "Example({'img': Image(url=data:image/gif;base64,<IMAGE_BASE_64_ENCODED(56)>)}) (input_keys=[])"
     )
 
 
 def test_example_repr_str():
-    example = Example(a=1)
-    assert repr(example) == "Example({'a': 1}) (input_keys=None)"
-    assert str(example) == "Example({'a': 1}) (input_keys=None)"
+    example = Example.from_record({"a": 1})
+    assert repr(example) == "Example({'a': 1}) (input_keys=[])"
+    assert str(example) == "Example({'a': 1}) (input_keys=[])"
 
 
 def test_example_eq():
-    example1 = Example(a=1, b=2)
-    example2 = Example(a=1, b=2)
+    example1 = Example.from_record({"a": 1, "b": 2})
+    example2 = Example.from_record({"a": 1, "b": 2})
     assert example1 == example2
     assert example1 != ""
 
 
-def test_example_hash():
-    example1 = Example(a=1, b=2)
-    example2 = Example(a=1, b=2)
-    assert hash(example1) == hash(example2)
+def test_example_is_unhashable():
+    example = Example.from_record({"a": 1, "b": 2})
+    with pytest.raises(TypeError):
+        hash(example)
+
+
+def test_example_attr_store_collision():
+    example = Example.from_record({"get": 1})
+    assert callable(example.get)
+    assert example["get"] == 1
+    example["fork"] = "stored"
+    assert callable(example.fork)
+    assert example["fork"] == "stored"
+    with pytest.raises(AttributeError, match="bracket notation"):
+        example.fork = "via-dot"  # ty: ignore[invalid-assignment]
+
+
+def test_example_attr_collision_methods_win_on_dot_access():
+    example = Example.from_record({"keys": 1, "items": 2, "to_dict": 3})
+    assert set(example.keys()) == {"keys", "items", "to_dict"}
+    assert ("keys", 1) in example.items()
+    assert example.to_dict() == {"keys": 1, "items": 2, "to_dict": 3}
 
 
 def test_example_keys_values_items():
-    example = Example(a=1, b=2, dspy_hidden=3)
+    example = Example.from_record({"a": 1, "b": 2, "dspy_hidden": 3})
     assert set(example.keys()) == {"a", "b"}
     assert 1 in example.values()
     assert ("b", 2) in example.items()
 
 
 def test_example_get():
-    example = Example(a=1, b=2)
+    example = Example.from_record({"a": 1, "b": 2})
     assert example.get("a") == 1
     assert example.get("c", "default") == "default"
 
 
 def test_example_with_inputs():
-    example = Example(a=1, b=2).with_inputs("a")
+    example = Example.from_record({"a": 1, "b": 2}, input_keys=("a",))
     assert example._input_keys == {"a"}
 
 
 def test_example_inputs_labels():
-    example = Example(a=1, b=2).with_inputs("a")
-    inputs = example.inputs()
-    assert inputs.toDict() == {"a": 1}
-    labels = example.labels()
-    assert labels.toDict() == {"b": 2}
+    example = Example.from_record({"a": 1, "b": 2}, input_keys=("a",))
+    inputs = example.as_inputs()
+    assert inputs == {"a": 1}
+    labels = example.as_labels()
+    assert labels == {"b": 2}
 
 
 def test_example_copy_without():
-    example = Example(a=1, b=2)
-    copied = example.copy(c=3)
+    example = Example.from_record({"a": 1, "b": 2})
+    copied = example.fork(c=3)
     assert copied.a == 1
     assert copied.c == 3
     without_a = copied.without("a")
@@ -121,36 +144,43 @@ def test_example_copy_without():
 
 
 def test_example_to_dict():
-    example = Example(a=1, b=2)
-    assert example.toDict() == {"a": 1, "b": 2}
+    example = Example.from_record({"a": 1, "b": 2})
+    assert example.to_dict() == {"a": 1, "b": 2}
 
 
-def test_example_to_dict_with_history():
-    """Test that Example.toDict() properly serializes dspy.History objects."""
-    history = dspy.History(
-        messages=[
-            {"question": "What is the capital of France?", "answer": "Paris"},
-            {"question": "What is the capital of Germany?", "answer": "Berlin"},
-        ]
+def test_example_to_dict_with_turn_log():
+    turn_log = TurnLog.model_validate(
+        {
+            "turns": [
+                {
+                    "agent": "task_io",
+                    "fields": {"question": "What is the capital of France?", "answer": "Paris"},
+                },
+                {
+                    "agent": "task_io",
+                    "fields": {"question": "What is the capital of Germany?", "answer": "Berlin"},
+                },
+            ],
+        }
     )
-    example = Example(question="Test question", history=history, answer="Test answer")
-
-    result = example.toDict()
-
-    # Verify the result is a dictionary
+    example = Example.from_record({"question": "Test question", "turn_log": turn_log, "answer": "Test answer"})
+    result = example.to_dict()
     assert isinstance(result, dict)
-    assert "history" in result
-
-    # Verify history is serialized to a dict (not a History object)
-    assert isinstance(result["history"], dict)
-    assert "messages" in result["history"]
-    assert result["history"]["messages"] == [
-        {"question": "What is the capital of France?", "answer": "Paris"},
-        {"question": "What is the capital of Germany?", "answer": "Berlin"},
+    assert "turn_log" in result
+    assert isinstance(result["turn_log"], dict)
+    assert "turns" in result["turn_log"]
+    assert result["turn_log"]["turns"] == [
+        {
+            "agent": "task_io",
+            "fields": {"question": "What is the capital of France?", "answer": "Paris"},
+        },
+        {
+            "agent": "task_io",
+            "fields": {"question": "What is the capital of Germany?", "answer": "Berlin"},
+        },
     ]
-
-    # Verify JSON serialization works
     import json
+
     json_str = json.dumps(result)
     restored = json.loads(json_str)
-    assert restored["history"]["messages"] == result["history"]["messages"]
+    assert list(restored["turn_log"]["turns"]) == list(result["turn_log"]["turns"])

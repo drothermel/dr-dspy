@@ -1,109 +1,69 @@
-import json
 import logging
-import re
 
-import dspy
-from dspy.primitives.code_interpreter import FinalOutput
-from dspy.primitives.module import Module
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.predict.code_execution import execute_generated_code, parse_generated_code
+from dspy.primitives import Module
 from dspy.primitives.python_interpreter import PythonInterpreter
-from dspy.signatures.signature import Signature, ensure_signature
+from dspy.runtime.call_options import ModuleCallOptions
+from dspy.runtime.run_context import RunContext
+from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 
 logger = logging.getLogger(__name__)
 
 
 class ProgramOfThought(Module):
-    """
-    A DSPy module that runs Python programs to solve a problem.
-    This module requires deno to be installed. Please install deno following https://docs.deno.com/runtime/getting_started/installation/
-
-    Examples:
-    ```
-    import dspy
-
-    lm = dspy.LM('openai/gpt-4o-mini')
-    dspy.configure(lm=lm)
-    pot = dspy.ProgramOfThought("question -> answer")
-    pot(question="what is 1+1?")
-    ```
-    """
-
-    def __init__(self, signature: str | type[Signature], max_iters: int = 3, interpreter: PythonInterpreter | None = None):
-        """
-        Args:
-            signature: The signature of the module.
-            max_iters: The maximum number of iterations to retry code generation and execution.
-            interpreter: PythonInterpreter instance to use. If None, a new one is instantiated.
-        """
+    def __init__(self, task_spec: TaskSpec, max_iters: int = 3, interpreter: PythonInterpreter | None = None) -> None:
         super().__init__()
-        self.signature = signature = ensure_signature(signature)
+        if not isinstance(task_spec, TaskSpec):
+            raise TypeError(f"ProgramOfThought requires a TaskSpec instance, got {type(task_spec).__name__}.")
+        self.task_spec = task_spec
         self.max_iters = max_iters
-
-        self.input_fields = signature.input_fields
-        self.output_fields = signature.output_fields
-
-        self.code_generate = dspy.ChainOfThought(
-            dspy.Signature(
-                self._generate_signature("generate").fields,
-                self._generate_instruction("generate"),
-            ),
+        self.input_fields = task_spec.input_fields
+        self.output_fields = task_spec.output_fields
+        self.code_generate = ChainOfThought(
+            make_task_spec(self._mode_fields("generate"), instructions=self._generate_instruction("generate"))
         )
-        self.code_regenerate = dspy.ChainOfThought(
-            dspy.Signature(
-                self._generate_signature("regenerate").fields,
-                self._generate_instruction("regenerate"),
-            ),
+        self.code_regenerate = ChainOfThought(
+            make_task_spec(self._mode_fields("regenerate"), instructions=self._generate_instruction("regenerate"))
         )
-        self.generate_output = dspy.ChainOfThought(
-            dspy.Signature(
-                self._generate_signature("answer").fields,
-                self._generate_instruction("answer"),
-            ),
+        self.generate_output = ChainOfThought(
+            make_task_spec(self._mode_fields("answer"), instructions=self._generate_instruction("answer"))
         )
-        # It will raises exception when dspy cannot find available deno instance by now.
         self.interpreter = interpreter or PythonInterpreter()
 
-    def _generate_signature(self, mode):
-        signature_dict = dict(self.input_fields)
+    def _mode_fields(self, mode: str) -> dict[str, FieldSpec]:
+        fields = dict(self.input_fields)
         fields_for_mode = {
             "generate": {
-                "generated_code": dspy.OutputField(
-                    desc="python code that answers the question",
-                ),
+                "generated_code": output_field("generated_code", str, desc="python code that answers the question")
             },
             "regenerate": {
-                "previous_code": dspy.InputField(
-                    desc="previously-generated python code that errored",
+                "previous_code": input_field(
+                    "previous_code", str, desc="previously-generated python code that errored"
                 ),
-                "error": dspy.InputField(
-                    desc="error message from previously-generated python code",
-                ),
-                "generated_code": dspy.OutputField(
-                    desc="python code that answers the question",
-                ),
+                "error": input_field("error", str, desc="error message from previously-generated python code"),
+                "generated_code": output_field("generated_code", str, desc="python code that answers the question"),
             },
             "answer": {
-                "final_generated_code": dspy.InputField(
-                    desc="python code that answers the question",
+                "final_generated_code": input_field(
+                    "final_generated_code", str, desc="python code that answers the question"
                 ),
-                "code_output": dspy.InputField(
-                    desc="output of previously-generated python code",
-                ),
-            }
-            | self.signature.output_fields,
+                "code_output": input_field("code_output", str, desc="output of previously-generated python code"),
+                **self.output_fields,
+            },
         }
-        signature_dict.update(fields_for_mode[mode])
-        return dspy.Signature(signature_dict)
+        fields.update(fields_for_mode[mode])
+        return fields
 
     def _generate_instruction(self, mode):
+        mode_fields = self._mode_fields(mode)
         mode_inputs = ", ".join(
-            [f"`{field_name}`" for field_name in self._generate_signature(mode).input_fields],
+            [f"`{field_name}`" for field_name in mode_fields if mode_fields[field_name].role == "input"]
         )
         mode_outputs = ", ".join(
-            [f"`{field_name}`" for field_name in self._generate_signature(mode).output_fields],
+            [f"`{field_name}`" for field_name in mode_fields if mode_fields[field_name].role == "output"]
         )
-        final_outputs = ", ".join(
-            [f"`{field_name}`" for field_name in self.output_fields],
-        )
+        final_outputs = ", ".join([f"`{field_name}`" for field_name in self.output_fields])
         if mode == "generate":
             instr = [
                 f"You will be given {mode_inputs} and you will respond with {mode_outputs}.",
@@ -116,65 +76,36 @@ class ProgramOfThought(Module):
                 f"You are given {mode_inputs} due to an error in previous code.",
                 "Your task is to correct the error and provide the new `generated_code`.",
             ]
-        else:  # mode == 'answer'
-            instr = [
-                f"Given the final code {mode_inputs}, provide the final {mode_outputs}.",
-            ]
-
+        else:
+            instr = [f"Given the final code {mode_inputs}, provide the final {mode_outputs}."]
         return "\n".join(instr)
 
-    def _parse_code(self, code_data):
-        code = code_data.get("generated_code", "").split("---", 1)[0].split("\n\n\n", 1)[0]
-        code_match = re.search(r"```python[ \n](.*?)[ \n]```?", code, re.DOTALL)
-        code_block = code_match.group(1) if code_match else code
-        if not code_block:
-            return code, "Error: Empty code after parsing."
-        if "\n" not in code_block and code_block.count("=") > 1:
-            return code, "Error: Code format is not correct."
-        lines = code_block.split("\n")
-        last_line_match = re.match(r"^(\w+)\s*=", lines[-1].strip())
-        if last_line_match and len(lines) > 1:
-            code_block += "\n" + last_line_match.group(1)
-        return code_block, None
-
-    def _execute_code(self, code):
-        """
-        Execute the code using PythonInterpreter and return the output or error.
-        """
-        if not code:
-            return None, "Error: Empty code before execution."
-
+    async def _aforward_impl(
+        self,
+        *,
+        run: RunContext,
+        options: ModuleCallOptions | None = None,
+        **inputs,
+    ):
         try:
-            result = self.interpreter.execute(code)
-            if isinstance(result, FinalOutput):
-                result = result.output
-            # Since it's more complex structure now, just blindly use json to represents all.
-            output = json.dumps(result)
-            return output, None
-        except Exception as e:
-            return None, str(e)
-
-    def forward(self, **kwargs):
-        input_kwargs = {field_name: kwargs[field_name] for field_name in self.input_fields}
-        code_data = self.code_generate(**input_kwargs)
-        output = None
-        code, error = self._parse_code(code_data)
-        if not error:
-            output, error = self._execute_code(code)
-        hop = 1
-        # Retying code generation and execution until no error or reach max_iters
-        while error is not None:
-            logger.error(f"Error in code execution: {error}")
-            if hop == self.max_iters:
-                self.interpreter.shutdown()
-                raise RuntimeError(f"Max hops reached. Failed to run ProgramOfThought: {error}")
-            input_kwargs.update({"previous_code": code, "error": error})
-            code_data = self.code_regenerate(**input_kwargs)
-            code, error = self._parse_code(code_data)
+            input_kwargs = {field_name: inputs[field_name] for field_name in self.input_fields if field_name in inputs}
+            code_data = await self.code_generate(**input_kwargs, run=run, options=options)
+            output = None
+            code, error = parse_generated_code(code_data)
             if not error:
-                output, error = self._execute_code(code)
-            hop += 1
-        input_kwargs.update({"final_generated_code": code, "code_output": output})
-        output_gen_result = self.generate_output(**input_kwargs)
-        self.interpreter.shutdown()
-        return output_gen_result
+                output, error = execute_generated_code(code=code, interpreter=self.interpreter)
+            hop = 1
+            while error is not None:
+                logger.error(f"Error in code execution: {error}")
+                if hop == self.max_iters:
+                    raise RuntimeError(f"Max hops reached. Failed to run ProgramOfThought: {error}")
+                input_kwargs.update({"previous_code": code, "error": error})
+                code_data = await self.code_regenerate(**input_kwargs, run=run, options=options)
+                code, error = parse_generated_code(code_data)
+                if not error:
+                    output, error = execute_generated_code(code=code, interpreter=self.interpreter)
+                hop += 1
+            input_kwargs.update({"final_generated_code": code, "code_output": output})
+            return await self.generate_output(**input_kwargs, run=run, options=options)
+        finally:
+            self.interpreter.shutdown()

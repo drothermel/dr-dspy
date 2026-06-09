@@ -1,25 +1,28 @@
-import dspy
-from dspy import Example
-from dspy.teleprompt.signature_opt import COPRO
-from dspy.utils.dummies import DummyLM
+import asyncio
+
+from dspy.predict.chain_of_thought import ChainOfThought
+from dspy.primitives import Example, Module
+from dspy.teleprompt.compile_params import COPROCompileParams, EvaluateCompileParams
+from dspy.teleprompt.copro.types import CoproEvaluatedCandidate
+from dspy.teleprompt.copro_optimizer import COPRO
+from tests.task_spec.helpers import ts
+from tests.test_utils import DummyLM
 
 
-# Define a simple metric function for testing
-def simple_metric(example, prediction):
-    # Simplified metric for testing: true if prediction matches expected output
+def simple_metric(example, prediction, trace=None):
     return example.output == prediction.output
 
 
-# Example training and validation sets
 trainset = [
-    Example(input="Question: What is the color of the sky?", output="blue").with_inputs("input"),
-    Example(input="Question: What does the fox say?", output="Ring-ding-ding-ding-dingeringeding!").with_inputs(
-        "input"
+    Example.from_record({"input": "Question: What is the color of the sky?", "output": "blue"}, input_keys=("input",)),
+    Example.from_record(
+        {"input": "Question: What does the fox say?", "output": "Ring-ding-ding-ding-dingeringeding!"},
+        input_keys=("input",),
     ),
 ]
 
 
-def test_signature_optimizer_initialization():
+def test_signature_optimizer_initialization(make_run):
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
     assert optimizer.metric == simple_metric, "Metric not correctly initialized"
     assert optimizer.breadth == 2, "Breadth not correctly initialized"
@@ -27,72 +30,70 @@ def test_signature_optimizer_initialization():
     assert optimizer.init_temperature == 1.4, "Initial temperature not correctly initialized"
 
 
-class SimpleModule(dspy.Module):
-    def __init__(self, signature):
+class SimpleModule(Module):
+    def __init__(self, task_spec):
         super().__init__()
-        # COPRO doesn't work with dspy.Predict
-        self.predictor = dspy.ChainOfThought(signature)
+        self.predictor = ChainOfThought(task_spec)
 
-    def forward(self, **kwargs):
-        return self.predictor(**kwargs)
+    async def _aforward_impl(self, *, run, options=None, **inputs):
+        return await self.predictor(run=run, options=options, **inputs)
 
 
-def test_signature_optimizer_optimization_process():
+def test_signature_optimizer_optimization_process(make_run):
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
-    dspy.configure(
+    run = make_run(
         lm=DummyLM(
             [
                 {
                     "proposed_instruction": "Optimized instruction 1",
                     "proposed_prefix_for_output_field": "Optimized instruction 2",
-                },
+                }
             ]
         )
     )
-
-    student = SimpleModule("input -> output")
-
-    # Assuming the compile method of COPRO requires a student module, a development set, and evaluation kwargs
-    optimized_student = optimizer.compile(
-        student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False}
+    student = SimpleModule(ts("input -> output"))
+    result = asyncio.run(
+        optimizer.compile(
+            student,
+            params=COPROCompileParams(
+                trainset=trainset,
+                evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            ),
+            run=run,
+        )
     )
-
-    # Check that the optimized student has been modified from the original
-    # This check can be more specific based on how the optimization modifies the student
-    assert optimized_student is not student, "Optimization did not modify the student"
-
-    # Further tests can be added to verify the specifics of the optimization process,
-    # such as checking the instructions of the optimized student's predictors.
+    assert result.program is not student, "Optimization did not modify the student"
 
 
-def test_signature_optimizer_statistics_tracking():
+def test_signature_optimizer_statistics_tracking(make_run):
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
-    optimizer.track_stats = True  # Enable statistics tracking
-
-    dspy.configure(
+    optimizer.track_stats = True
+    run = make_run(
         lm=DummyLM(
             [
                 {
                     "proposed_instruction": "Optimized instruction 1",
                     "proposed_prefix_for_output_field": "Optimized instruction 2",
-                },
+                }
             ]
         )
     )
-    student = SimpleModule("input -> output")
-    optimized_student = optimizer.compile(
-        student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False}
+    student = SimpleModule(ts("input -> output"))
+    result = asyncio.run(
+        optimizer.compile(
+            student,
+            params=COPROCompileParams(
+                trainset=trainset,
+                evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            ),
+            run=run,
+        )
     )
-
-    # Verify that statistics have been tracked and attached to the optimized student
-    assert hasattr(optimized_student, "total_calls"), "Total calls statistic not tracked"
-    assert hasattr(optimized_student, "results_best"), "Best results statistics not tracked"
+    assert result.stats.metric_calls > 0, "Total calls statistic not tracked"
+    assert result.stats.copro_depth_stats is not None, "Best results statistics not tracked"
 
 
-# Assuming the setup_signature_optimizer fixture and simple_metric function are defined as before
-
-
-def test_optimization_and_output_verification():
+def test_optimization_and_output_verification(make_run):
     lm = DummyLM(
         [
             {"proposed_instruction": "Optimized Prompt", "proposed_prefix_for_output_field": "Optimized Prefix"},
@@ -105,52 +106,62 @@ def test_optimization_and_output_verification():
             {"reasoning": "france", "output": "Paris"},
         ]
     )
-    dspy.configure(lm=lm)
+    run = make_run(lm=lm)
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
-
-    student = SimpleModule("input -> output")
-
-    # Compile the student with the optimizer
-    optimized_student = optimizer.compile(
-        student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False}
+    student = SimpleModule(ts("input -> output"))
+    result = asyncio.run(
+        optimizer.compile(
+            student,
+            params=COPROCompileParams(
+                trainset=trainset,
+                evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            ),
+            run=run,
+        )
     )
-
-    # Simulate calling the optimized student with a new input
     test_input = "What is the capital of France?"
-    prediction = optimized_student(input=test_input)
-
-    print(lm.get_convo(-1))
-
+    prediction = asyncio.run(result.program(input=test_input, run=run))
     assert prediction.output == "Paris"
 
 
-def test_statistics_tracking_during_optimization():
-    dspy.configure(
+def test_statistics_tracking_during_optimization(make_run):
+    run = make_run(
         lm=DummyLM(
-            [
-                {"proposed_instruction": "Optimized Prompt", "proposed_prefix_for_output_field": "Optimized Prefix"},
-            ]
+            [{"proposed_instruction": "Optimized Prompt", "proposed_prefix_for_output_field": "Optimized Prefix"}]
         )
     )
-
     optimizer = COPRO(metric=simple_metric, breadth=2, depth=1, init_temperature=1.4)
-    optimizer.track_stats = True  # Enable statistics tracking
-
-    student = SimpleModule("input -> output")
-    optimized_student = optimizer.compile(
-        student, trainset=trainset, eval_kwargs={"num_threads": 1, "display_progress": False}
+    optimizer.track_stats = True
+    student = SimpleModule(ts("input -> output"))
+    result = asyncio.run(
+        optimizer.compile(
+            student,
+            params=COPROCompileParams(
+                trainset=trainset,
+                evaluate=EvaluateCompileParams(max_concurrency=1, display_progress=False),
+            ),
+            run=run,
+        )
     )
+    assert result.stats.metric_calls > 0, "Optimizer did not track total metric calls"
+    assert result.stats.copro_depth_stats is not None, "Optimizer did not track depth statistics"
+    depth_stats = result.stats.copro_depth_stats
+    assert "results_best" in depth_stats, "Optimizer did not track the best results"
+    assert "results_latest" in depth_stats, "Optimizer did not track the latest results"
+    assert len(depth_stats["results_best"]) > 0, "Optimizer did not properly populate the best results statistics"
+    assert len(depth_stats["results_latest"]) > 0, "Optimizer did not properly populate the latest results statistics"
 
-    # Verify that statistics have been tracked
-    assert hasattr(optimized_student, "total_calls"), "Optimizer did not track total metric calls"
-    assert optimized_student.total_calls > 0, "Optimizer reported no metric calls"
 
-    # Check if the results_best and results_latest contain valid statistics
-    assert "results_best" in optimized_student.__dict__, "Optimizer did not track the best results"
-    assert "results_latest" in optimized_student.__dict__, "Optimizer did not track the latest results"
-    assert len(optimized_student.results_best) > 0, "Optimizer did not properly populate the best results statistics"
-    assert (
-        len(optimized_student.results_latest) > 0
-    ), "Optimizer did not properly populate the latest results statistics"
-
-    # Additional detailed checks can be added here to verify the contents of the tracked statistics
+def test_drop_duplicates_removes_equal_programs_at_same_score():
+    optimizer = COPRO(metric=simple_metric, breadth=2, depth=1)
+    program_a = SimpleModule(ts("input -> output"))
+    program_b = program_a.deepcopy()
+    candidates = [
+        CoproEvaluatedCandidate(score=0.9, program=program_a, instruction="same", prefix="p1", depth=0),
+        CoproEvaluatedCandidate(score=0.9, program=program_b, instruction="same", prefix="p1", depth=0),
+        CoproEvaluatedCandidate(score=0.5, program=program_a.deepcopy(), instruction="other", prefix="p2", depth=0),
+    ]
+    deduped = optimizer._drop_duplicates(candidates)
+    assert len(deduped) == 2
+    assert deduped[0].score == 0.9
+    assert deduped[1].score == 0.5

@@ -1,0 +1,130 @@
+from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from dspy.adapters.call.pipeline import AdapterCallPipeline
+from dspy.adapters.call.wrappers import HintInjectingAdapter
+from dspy.adapters.chat_adapter import ChatAdapter
+from dspy.clients.lm import LM
+from dspy.runtime.config import CallSite
+from tests.adapters.conftest import CapturingLM, StopAdapterCallCapture, make_adapter_run
+from tests.task_spec.helpers import ts
+
+
+@pytest.mark.asyncio
+async def test_hint_injecting_adapter_pipelines_inner_not_wrapper_format():
+    inner = ChatAdapter()
+    format_mock = MagicMock(wraps=inner.format)
+    inner.format = cast("Any", format_mock)
+    task_spec = ts("question -> answer", instructions="Answer the question.")
+    hinted_name = "predict"
+    wrapper = HintInjectingAdapter(
+        inner=inner,
+        hint_map={hinted_name: "try again"},
+    )
+
+    lm = CapturingLM()
+    run = make_adapter_run(lm=lm, adapter=wrapper)
+    pipeline_spy = AsyncMock(wraps=AdapterCallPipeline.execute)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(AdapterCallPipeline, "execute", pipeline_spy)
+        with pytest.raises(StopAdapterCallCapture):
+            await wrapper(
+                lm=lm,
+                config={},
+                task_spec=task_spec,
+                demos=[],
+                inputs={"question": "What is DSPy?"},
+                run=run,
+                call_site=CallSite(module="Predict", predictor_name=hinted_name),
+            )
+
+    pipeline_spy.assert_awaited_once()
+    pipeline_args = pipeline_spy.await_args
+    assert pipeline_args is not None
+    assert pipeline_args.args[0] is inner
+    assert pipeline_args.kwargs["inputs"]["hint_"] == "try again"
+    assert "hint_" in pipeline_args.kwargs["task_spec"].input_fields
+    format_mock.assert_called_once()
+    format_kwargs = format_mock.call_args.kwargs
+    assert format_kwargs["inputs"]["hint_"] == "try again"
+
+
+@pytest.mark.asyncio
+async def test_hint_injecting_adapter_refreshes_policies_from_inner():
+    inner = ChatAdapter()
+    wrapper = HintInjectingAdapter(inner=inner, hint_map={})
+    from dspy.adapters.call.policies.response_format import NoOpResponseFormatPolicy
+
+    new_policy = NoOpResponseFormatPolicy()
+    inner.response_format_policy = new_policy
+    wrapper._sync_from_inner()
+    assert wrapper.response_format_policy is new_policy
+
+
+@pytest.mark.asyncio
+async def test_hint_injecting_adapter_injects_hint_into_user_message():
+    inner = ChatAdapter()
+    task_spec = ts("question -> answer", instructions="Answer the question.")
+    wrapper = HintInjectingAdapter(
+        inner=inner,
+        hint_map={"predict": "focus on brevity"},
+    )
+    lm = CapturingLM(LM("openai/gpt-4o-mini"))
+    with pytest.raises(StopAdapterCallCapture):
+        await wrapper(
+            lm=lm,
+            config={},
+            task_spec=task_spec,
+            demos=[],
+            inputs={"question": "What is DSPy?"},
+            run=make_adapter_run(lm=lm, adapter=wrapper),
+            call_site=CallSite(module="Predict", predictor_name="predict"),
+        )
+    user_message = lm.calls[0]["request"].messages[-1].text
+    assert isinstance(user_message, str)
+    assert "focus on brevity" in user_message
+    assert "[[ ## hint_ ## ]]" in user_message
+
+
+@pytest.mark.asyncio
+async def test_hint_injecting_adapter_uses_na_for_unknown_predictor_name():
+    inner = ChatAdapter()
+    task_spec = ts("question -> answer", instructions="Answer the question.")
+    wrapper = HintInjectingAdapter(inner=inner, hint_map={})
+    lm = CapturingLM(LM("openai/gpt-4o-mini"))
+    with pytest.raises(StopAdapterCallCapture):
+        await wrapper(
+            lm=lm,
+            config={},
+            task_spec=task_spec,
+            demos=[],
+            inputs={"question": "What is DSPy?"},
+            run=make_adapter_run(lm=lm, adapter=wrapper),
+        )
+    user_message = lm.calls[0]["request"].messages[-1].text
+    assert isinstance(user_message, str)
+    assert "N/A" in user_message
+
+
+@pytest.mark.asyncio
+async def test_hint_injecting_adapter_syncs_capabilities_on_each_call():
+    from dataclasses import replace
+
+    inner = ChatAdapter()
+    wrapper = HintInjectingAdapter(inner=inner, hint_map={})
+    inner.capabilities = replace(inner.capabilities, supports_finetune=not inner.capabilities.supports_finetune)
+    task_spec = ts("question -> answer", instructions="Answer.")
+    lm = CapturingLM(LM("openai/gpt-4o-mini"))
+    with pytest.raises(StopAdapterCallCapture):
+        await wrapper(
+            lm=lm,
+            config={},
+            task_spec=task_spec,
+            demos=[],
+            inputs={"question": "hi"},
+            run=make_adapter_run(lm=lm, adapter=wrapper),
+        )
+    assert wrapper.capabilities.supports_finetune == inner.capabilities.supports_finetune
