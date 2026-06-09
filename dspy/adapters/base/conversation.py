@@ -23,8 +23,6 @@ class AdapterConversationMixin(AdapterMixinBase):
                 return name
         return None
 
-    _get_history_field_name = _get_turn_log_field_name
-
     def _get_tool_call_input_field_name(self, task_spec: TaskSpec) -> str | None:
         for name, field in task_spec.input_fields.items():
             field_type = field.type_
@@ -42,9 +40,9 @@ class AdapterConversationMixin(AdapterMixinBase):
         return None
 
     def format_conversation_history(
-        self, task_spec: TaskSpec, history_field_name: str, inputs: dict[str, Any]
+        self, task_spec: TaskSpec, turn_log_field_name: str, inputs: dict[str, Any]
     ) -> list[LMMessage]:
-        turn_log = inputs.get(history_field_name)
+        turn_log = inputs.get(turn_log_field_name)
         conversation_history = turn_log.turns if turn_log is not None else None
         if conversation_history is None:
             return []
@@ -101,5 +99,5 @@ class AdapterConversationMixin(AdapterMixinBase):
                 result_input = {"tool_call_results": tool_call_results}
                 content = self.format_user_message_content(task_spec=ToolCallResultsTaskSpec(), inputs=result_input)
                 messages.append(build_lm_message(role="user", content=content))
-        inputs.pop(history_field_name, None)
+        inputs.pop(turn_log_field_name, None)
         return messages

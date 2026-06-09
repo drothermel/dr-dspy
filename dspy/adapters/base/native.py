@@ -43,7 +43,7 @@ class AdapterMixinBase:
     ) -> str:
         raise NotImplementedError
 
-    def _get_history_field_name(self, task_spec: TaskSpec) -> str | None:
+    def _get_turn_log_field_name(self, task_spec: TaskSpec) -> str | None:
         raise NotImplementedError
 
     def _get_tool_call_input_field_name(self, task_spec: TaskSpec) -> str | None:
@@ -53,7 +53,7 @@ class AdapterMixinBase:
         raise NotImplementedError
 
     def format_conversation_history(
-        self, task_spec: TaskSpec, history_field_name: str, inputs: dict[str, Any]
+        self, task_spec: TaskSpec, turn_log_field_name: str, inputs: dict[str, Any]
     ) -> list[LMMessage]:
         raise NotImplementedError
 

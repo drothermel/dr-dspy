@@ -22,7 +22,6 @@ from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.code import Code
 from dspy.adapters.types.document import Document
 from dspy.adapters.types.file import File
-from dspy.history import TurnLog
 from dspy.adapters.types.image import Image
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
@@ -30,6 +29,7 @@ from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
 from dspy.clients.openai_format import provider_tool_call_to_part
 from dspy.core.types import LMOutput, LMPart, LMResponse, LMTextPart, LMThinkingPart
+from dspy.history import TurnLog
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
@@ -440,13 +440,15 @@ def test_chat_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
     current_profile = Profile(
         name="Grace", location=Location(city="Arlington", country="USA"), interests=["compilers", "navy"]
     )
-    history = TurnLog(turns=(
+    history = TurnLog(
+        turns=(
             {
                 "profile": demo_profile,
                 "question": "Who is Ada?",
                 "answer": AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
             }
-        ))
+        )
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(),
         task_spec=RichRenderingSignature,
@@ -973,13 +975,15 @@ def test_chat_adapter_native_tool_history_replay():
     )
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], [{"items": ["cat"]}])
-    history = TurnLog(turns=(
+    history = TurnLog(
+        turns=(
             {
                 "question": "Q1",
                 "next_thought": Reasoning(content="I should search."),
                 "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
             }
-        ))
+        )
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
@@ -1035,13 +1039,15 @@ def test_chat_adapter_native_tool_history_replays_parallel_tool_results():
         ]
     )
     tool_call_results = ToolCallResults.from_tool_calls_and_values(tool_calls, [{"items": ["cat"]}, {"items": ["dog"]}])
-    history = TurnLog(turns=(
+    history = TurnLog(
+        turns=(
             {
                 "question": "Q1",
                 "next_thought": Reasoning(content="I should search twice."),
                 "tool_calls": tool_calls.model_copy(update={"tool_call_results": tool_call_results}),
             }
-        ))
+        )
+    )
     messages, _lm_kwargs = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
@@ -1134,7 +1140,9 @@ def test_chat_adapter_native_tool_history_skips_unmatched_tool_calls(tool_call_i
     )
     tool_call = ToolCalls.ToolCall(id=tool_call_id, name="search", args={"query": "cats"})
     tool_calls = ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results)
-    history = TurnLog(turns=({"question": "Q1", "next_thought": Reasoning(content="I should search."), "tool_calls": tool_calls}))
+    history = TurnLog(
+        turns=({"question": "Q1", "next_thought": Reasoning(content="I should search."), "tool_calls": tool_calls})
+    )
     messages, _ = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(use_native_function_calling=True),
         task_spec=NativeToolHistorySignature,
@@ -1165,13 +1173,15 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
     )
     tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
     tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
-    history = TurnLog(turns=(
+    history = TurnLog(
+        turns=(
             {
                 "question": "Q1",
                 "next_thought": "I should search.",
                 "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
             }
-        ))
+        )
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(use_native_function_calling=False),
         task_spec=ToolHistorySignature,
@@ -1227,13 +1237,15 @@ def test_non_native_tool_history_remains_text_based(adapter):
         demos=[],
         inputs={
             "question": "Q2",
-            "history": TurnLog(turns=(
+            "history": TurnLog(
+                turns=(
                     {
                         "question": "Q1",
                         "next_thought": "I should search.",
                         "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
                     }
-                )),
+                )
+            ),
             "tools": [Tool(search, description="Search for documents.")],
         },
     )
@@ -1254,8 +1266,8 @@ def test_chat_adapter_format_accepts_custom_history_formatter_returning_messages
 
     class CustomHistoryAdapter(ChatAdapter):
         @override
-        def format_conversation_history(self, task_spec, history_field_name, inputs):
-            del inputs[history_field_name]
+        def format_conversation_history(self, task_spec, turn_log_field_name, inputs):
+            del inputs[turn_log_field_name]
             return [build_lm_message("user", "custom history")]
 
     HistorySignature = make_task_spec(
@@ -1364,7 +1376,8 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
     current_profile = Profile(
         name="Grace", location=Location(city="Arlington", country="USA"), interests=["compilers", "navy"]
     )
-    history = TurnLog(turns=(
+    history = TurnLog(
+        turns=(
             {
                 "profile": demo_profile,
                 "context": ["old note", "older note"],
@@ -1373,7 +1386,8 @@ def test_chat_adapter_format_exact_messages_kitchen_sink():
                 "verdict": "yes",
                 "confidence": 0.8,
             }
-        ))
+        )
+    )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=ChatAdapter(),
         task_spec=KitchenSinkSignature,
@@ -1812,10 +1826,12 @@ def test_chat_adapter_formats_conversation_history():
         },
         instructions="Given the fields `question`, `history`, produce the fields `answer`.",
     )
-    history = TurnLog(turns=(
+    history = TurnLog(
+        turns=(
             {"question": "What is the capital of France?", "answer": "Paris"},
             {"question": "What is the capital of Germany?", "answer": "Berlin"},
-        ))
+        )
+    )
     adapter = ChatAdapter()
     messages = adapter_format_as_openai(
         adapter=adapter,

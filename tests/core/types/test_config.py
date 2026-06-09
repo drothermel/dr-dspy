@@ -2,8 +2,8 @@ import pydantic
 import pytest
 
 from dspy.core.types import (
-    LMConfig,
     CallRecord,
+    LMConfig,
     LMPromptCacheConfig,
     LMReasoningConfig,
     LMRequest,

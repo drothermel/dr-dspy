@@ -15,10 +15,10 @@ except ImportError:
 from dspy.adapters.baml_adapter import COMMENT_SYMBOL, INDENTATION, BAMLAdapter
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types.code import Code
-from dspy.history import TurnLog
 from dspy.adapters.types.image import Image
 from dspy.adapters.types.tool import Tool
 from dspy.clients.lm import LM
+from dspy.history import TurnLog
 from dspy.task_spec import FieldSpec, make_task_spec
 from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs, make_adapter_run
 from tests.task_spec.helpers import ts

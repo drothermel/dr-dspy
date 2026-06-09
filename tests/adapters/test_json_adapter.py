@@ -22,11 +22,11 @@ from openai.types.responses import ResponseOutputMessage
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types.code import Code
-from dspy.history import TurnLog
 from dspy.adapters.types.image import Image
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.clients.lm import LM
+from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.task_spec import FieldSpec, make_task_spec

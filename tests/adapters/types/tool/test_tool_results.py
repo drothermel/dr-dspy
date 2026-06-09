@@ -1,5 +1,5 @@
-from dspy.history import TurnLog
 from dspy.adapters.types.tool import ToolCallResults, ToolCalls
+from dspy.history import TurnLog
 
 
 def test_tool_call_results_from_tool_calls_and_values():

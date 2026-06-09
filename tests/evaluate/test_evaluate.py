@@ -7,9 +7,9 @@ import threading
 import pytest
 from typing_extensions import override
 
-from dspy.history import TurnLog
 from dspy.evaluate.evaluate import Evaluate, EvaluationResult
 from dspy.evaluate.metrics import answer_exact_match
+from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
 from dspy.utils.callback import BaseCallback

@@ -13,11 +13,11 @@ except ImportError:
     pytest.skip("litellm is not installed", allow_module_level=True)  # ty: ignore[too-many-positional-arguments]
 from dspy.adapters.format_shared import FieldInfoWithName
 from dspy.adapters.types.code import Code
-from dspy.history import TurnLog
 from dspy.adapters.types.image import Image
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
+from dspy.history import TurnLog
 from dspy.primitives.example import Example
 from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.task_spec.pydantic_bridge import task_spec_output_field_infos

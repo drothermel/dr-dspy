@@ -1,7 +1,7 @@
 import pytest
 
-from dspy.history import TurnLog
 from dspy.adapters.types.image import Image
+from dspy.history import TurnLog
 from dspy.primitives.example import Example
 
 

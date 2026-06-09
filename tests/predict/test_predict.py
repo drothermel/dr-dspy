@@ -22,11 +22,11 @@ from pydantic import BaseModel, HttpUrl
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import JSONAdapter
-from dspy.history import TurnLog
 from dspy.adapters.types.image import Image
 from dspy.clients.base_lm import LM_CLASS_STATE_KEY, PROVIDER_OPTIONS_STATE_KEY, BaseLM
 from dspy.clients.lm import LM
 from dspy.core.types import LMConfig, LMRequest, PredictOptions
+from dspy.history import TurnLog
 from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict, serialize_object
 from dspy.primitives.example import Example

@@ -17,7 +17,7 @@ class AdapterFormatMixin(AdapterMixinBase):
         if turn_log_field_name:
             task_spec_without_history = task_spec.delete(turn_log_field_name)
             conversation_history = self.format_conversation_history(
-                task_spec=task_spec, history_field_name=turn_log_field_name, inputs=inputs_copy
+                task_spec=task_spec, turn_log_field_name=turn_log_field_name, inputs=inputs_copy
             )
         messages: list[LMMessage] = []
         system_message = self.format_system_message(task_spec)
