@@ -5,6 +5,7 @@ from dspy.adapters.types.tool import Tool
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.agent_helpers import format_tool_exception
+from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.predict.tools import normalize_tools
@@ -69,6 +70,7 @@ class ReAct(Module):
         run = resolve_run(run=run, bound_run=self.run)
         turn_log = TurnLog.empty()
         max_iters = input_args.pop("max_iters", self.max_iters)
+        termination_reason = AgentTerminationReason.MAX_ITERS
         for _idx in range(max_iters):
             try:
                 extracted = await call_with_turn_log_truncation(
@@ -79,6 +81,7 @@ class ReAct(Module):
                 logger.warning(
                     f"Ending the agent loop: Agent failed to select a valid tool: {format_tool_exception(err)}"
                 )
+                termination_reason = AgentTerminationReason.PARSE_ERROR
                 break
             try:
                 tool = self.tools[pred.next_tool_name]
@@ -94,8 +97,13 @@ class ReAct(Module):
                 )
             )
             if pred.next_tool_name == "finish":
+                termination_reason = AgentTerminationReason.SUBMIT
                 break
         extracted = await call_with_turn_log_truncation(
             self.extract, turn_log=turn_log, run=run, options=options, **input_args
         )
-        return Prediction(turn_log=extracted.turn_log, **dict(extracted.result.items()))
+        return Prediction(
+            turn_log=extracted.turn_log,
+            termination_reason=termination_reason,
+            **dict(extracted.result.items()),
+        )

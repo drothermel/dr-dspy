@@ -12,6 +12,7 @@ from dspy.core.types.config import LMConfig, LMToolChoice
 from dspy.errors import AdapterParseError
 from dspy.history import TruncationExhaustedError, TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.agent_helpers import format_tool_exception
+from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.predict import Predict
 from dspy.predict.tools import normalize_tools
 from dspy.primitives import Module, Prediction
@@ -86,7 +87,7 @@ class ReActV2(Module):
         turn_log_raw = input_args.pop("turn_log", None)
         turn_log = TurnLog.empty() if turn_log_raw is None else TurnLog.model_validate(turn_log_raw)
         pending_inputs = {name: input_args[name] for name in self.task_spec.input_fields if name in input_args}
-        break_reason = "max_iters"
+        break_reason = AgentTerminationReason.MAX_ITERS
         for turn_index in range(max_iters):
             try:
                 extracted = await call_with_turn_log_truncation(
@@ -102,18 +103,18 @@ class ReActV2(Module):
                 tool_calls = _coerce_tool_calls(getattr(pred, "tool_calls", None))
             except TruncationExhaustedError as err:
                 logger.warning("Ending ReActV2 loop after context window exceeded: %s", err)
-                break_reason = "context_window_exceeded"
+                break_reason = AgentTerminationReason.CONTEXT_WINDOW_EXCEEDED
                 break
             except ValueError as err:
                 logger.warning("Ending ReActV2 loop after parse failure: %s", format_tool_exception(err))
-                break_reason = "parse_error"
+                break_reason = AgentTerminationReason.PARSE_ERROR
                 break
             except AdapterParseError as err:
                 logger.warning("Ending ReActV2 loop after parse failure: %s", format_tool_exception(err))
-                break_reason = "parse_error"
+                break_reason = AgentTerminationReason.PARSE_ERROR
                 break
             if not tool_calls.tool_calls:
-                break_reason = "empty_tool_calls"
+                break_reason = AgentTerminationReason.EMPTY_TOOL_CALLS
                 break
             tool_calls = _ensure_tool_call_ids(tool_calls, turn_index)
             tool_call_results, final_outputs = await self._execute_tool_calls(tool_calls)
@@ -123,7 +124,11 @@ class ReActV2(Module):
             turn_log = turn_log.append_turn(TurnEvent.model_validate(event))
             pending_inputs = {}
             if final_outputs is not None:
-                return Prediction(**final_outputs, turn_log=turn_log, termination_reason="submit")
+                return Prediction(
+                    **final_outputs,
+                    turn_log=turn_log,
+                    termination_reason=AgentTerminationReason.SUBMIT,
+                )
         return await self._forced_submit(turn_log, pending_inputs, break_reason, max_iters, run=run)
 
     async def _execute_tool_calls(self, tool_calls: ToolCalls) -> tuple[ToolCallResults, dict[str, Any] | None]:
@@ -166,7 +171,7 @@ class ReActV2(Module):
         self,
         turn_log: TurnLog,
         pending_inputs: dict[str, Any],
-        break_reason: str,
+        break_reason: AgentTerminationReason,
         turn_index: int,
         *,
         run: RunContext,
@@ -190,24 +195,43 @@ class ReActV2(Module):
             tool_calls = _ensure_tool_call_ids(_coerce_tool_calls(getattr(pred, "tool_calls", None)), turn_index)
         except TruncationExhaustedError as err:
             logger.warning("Forced submit failed after context window exceeded: %s", err)
-            return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
+            return Prediction(
+                turn_log=turn_log,
+                termination_reason=break_reason or AgentTerminationReason.FAILED,
+            )
         except ValueError as err:
             logger.warning("Forced submit failed: %s", format_tool_exception(err))
-            return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
+            return Prediction(
+                turn_log=turn_log,
+                termination_reason=break_reason or AgentTerminationReason.FAILED,
+            )
         except AdapterParseError as err:
             logger.warning("Forced submit failed: %s", format_tool_exception(err))
-            return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
+            return Prediction(
+                turn_log=turn_log,
+                termination_reason=break_reason or AgentTerminationReason.FAILED,
+            )
         submit_calls = ToolCalls(tool_calls=[call for call in tool_calls.tool_calls if call.name == "submit"])
         if not submit_calls.tool_calls:
-            return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
+            return Prediction(
+                turn_log=turn_log,
+                termination_reason=break_reason or AgentTerminationReason.FAILED,
+            )
         tool_call_results, final_outputs = await self._execute_tool_calls(submit_calls)
         event = self._history_event(pending_inputs, pred, submit_calls, tool_call_results)
         if final_outputs is not None:
             event.update(final_outputs)
         turn_log = turn_log.append_turn(TurnEvent.model_validate(event))
         if final_outputs is not None:
-            return Prediction(**final_outputs, turn_log=turn_log, termination_reason="forced_submit")
-        return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
+            return Prediction(
+                **final_outputs,
+                turn_log=turn_log,
+                termination_reason=AgentTerminationReason.FORCED_SUBMIT,
+            )
+        return Prediction(
+            turn_log=turn_log,
+            termination_reason=break_reason or AgentTerminationReason.FAILED,
+        )
 
 
 def _json_schema_for_annotation(annotation: Any) -> dict[str, Any]:

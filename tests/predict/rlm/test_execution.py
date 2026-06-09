@@ -4,6 +4,7 @@ import pytest
 
 from dspy.adapters.types.tool import Tool
 from dspy.history import REPLEntry, REPLHistory, REPLVariable, TurnEvent
+from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.code_execution import strip_python_fences
 from dspy.predict.rlm import RLM
 from dspy.predict.rlm import execution as rlm_execution
@@ -214,6 +215,7 @@ class TestRLMCallMethod:
         run = make_run(lm=DummyLM([{}]))
         result = asyncio.run(rlm(query="What is the answer?", run=run))
         assert result.answer == "42"
+        assert result.termination_reason == AgentTerminationReason.SUBMIT
 
 
 class TestRLMMaxIterationsFallback:
@@ -232,6 +234,7 @@ class TestRLMMaxIterationsFallback:
         result = asyncio.run(rlm(query="test", run=run))
         assert result.answer == "extracted_answer"
         assert result.final_reasoning == "Extract forced final output"
+        assert result.termination_reason == AgentTerminationReason.MAX_ITERS
 
 
 class TestRLMToolExceptions:

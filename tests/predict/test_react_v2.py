@@ -11,6 +11,7 @@ from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format.chat_request import message_to_openai_chat
 from dspy.core.types import LMOutput, LMRequest, LMResponse, LMToolCallPart, LMUsage
 from dspy.history import TurnLog
+from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.react_v2 import ReActV2
 from dspy.testing import DummyLM
 from tests.adapters.conftest import captured_lm_kwargs
@@ -61,7 +62,7 @@ def test_react_v2_async_tool_via_acall(make_run):
         )
     )
     assert pred.answer == "found cats"
-    assert pred.termination_reason == "submit"
+    assert pred.termination_reason == AgentTerminationReason.SUBMIT
     assert _turn_tool_calls(pred.turn_log.turns[0]).tool_call_results.tool_call_results[0].value == "found cats"
 
 
@@ -89,7 +90,7 @@ def test_react_v2_text_mock_lm_loop_records_inputs_once(make_run):
         )
     )
     assert pred.answer == "found cats"
-    assert pred.termination_reason == "submit"
+    assert pred.termination_reason == AgentTerminationReason.SUBMIT
     assert sum("question" in _turn_dict(event) for event in pred.turn_log.turns) == 1
     assert _turn_tool_calls(pred.turn_log.turns[0]).tool_calls[0].id == "call_0_0"
     assert "tool_call_results" not in _turn_dict(pred.turn_log.turns[0])
@@ -151,7 +152,7 @@ def test_react_v2_text_mode_accepts_top_level_tool_arguments(make_run):
         )
     )
     assert pred.answer == "found cats"
-    assert pred.termination_reason == "submit"
+    assert pred.termination_reason == AgentTerminationReason.SUBMIT
     assert _turn_tool_calls(pred.turn_log.turns[0]).tool_calls[0].args == {"query": "cats"}
 
 
@@ -167,7 +168,7 @@ def test_react_v2_text_mode_accepts_wrapped_submit_arguments(make_run):
     run = make_run(lm=lm, adapter=ChatAdapter(use_native_function_calling=False))
     pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(question="cats", run=run))
     assert pred.answer == "done"
-    assert pred.termination_reason == "submit"
+    assert pred.termination_reason == AgentTerminationReason.SUBMIT
 
 
 def test_react_v2_unknown_tool_observation_can_continue(make_run):
@@ -228,7 +229,7 @@ def test_react_v2_forced_submit_on_empty_tool_calls(make_run):
     run = make_run(lm=lm, adapter=ChatAdapter())
     pred = asyncio.run(ReActV2(ts("question -> answer"), tools=[])(question="cats", run=run))
     assert pred.answer == "forced"
-    assert pred.termination_reason == "forced_submit"
+    assert pred.termination_reason == AgentTerminationReason.FORCED_SUBMIT
     reasoning = lm.call_log[0].request.config.reasoning
     assert reasoning is not None
     assert reasoning.effort == "low"

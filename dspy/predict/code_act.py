@@ -5,6 +5,7 @@ from typing_extensions import override
 from dspy.adapters.types.tool import Tool
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
+from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.code_execution import execute_generated_code, parse_generated_code
 from dspy.predict.predict import Predict
@@ -73,6 +74,7 @@ class CodeAct(Module):
                 self.interpreter(get_formatted_source(tool.func))
             turn_log = TurnLog.empty()
             max_iters = inputs.pop("max_iters", self.max_iters)
+            loop_finished = False
             for _idx in range(max_iters):
                 extracted = await call_with_turn_log_truncation(
                     self.codeact, turn_log=turn_log, run=run, options=options, **inputs
@@ -93,10 +95,16 @@ class CodeAct(Module):
                     event = event.model_copy(update={"observation": f"Failed to execute the generated code: {error}"})
                 turn_log = turn_log.append_turn(event)
                 if code_data.finished:
+                    loop_finished = True
                     break
+            termination_reason = AgentTerminationReason.SUBMIT if loop_finished else AgentTerminationReason.MAX_ITERS
             extracted = await call_with_turn_log_truncation(
                 self.extractor, turn_log=turn_log, run=run, options=options, **inputs
             )
-            return Prediction(turn_log=extracted.turn_log, **dict(extracted.result.items()))
+            return Prediction(
+                turn_log=extracted.turn_log,
+                termination_reason=termination_reason,
+                **dict(extracted.result.items()),
+            )
         finally:
             self.interpreter.shutdown()

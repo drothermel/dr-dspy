@@ -12,6 +12,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool
 from dspy.errors import ContextWindowExceededError
 from dspy.history import TurnEvent
+from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.react import ReAct
 from dspy.primitives import Prediction
 from dspy.task_spec import input_field, make_task_spec, output_field
@@ -82,6 +83,7 @@ def test_tool_observation_preserves_custom_type(make_run):
     run = make_run(lm=lm, adapter=adapter)
     react = ReAct(ts("question -> answer"), tools=[Tool(make_images, description="Create images.")])
     pred = asyncio.run(react(question="Draw me something red", run=run))
+    assert pred.termination_reason == AgentTerminationReason.SUBMIT
     observation = pred.turn_log.turns[0].observation
     assert isinstance(observation, tuple)
     assert len(observation) == 2

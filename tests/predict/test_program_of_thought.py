@@ -128,7 +128,7 @@ def test_pot_code_parse_error(make_run):
     run = make_run(lm=lm)
     pot = ProgramOfThought(BasicQA, max_iters=max_iters)
     with (
-        patch("dspy.predict.program_of_thought.ProgramOfThought._execute_code") as mock_execute_code,
+        patch("dspy.predict.program_of_thought.execute_generated_code") as mock_execute_code,
         pytest.raises(
             RuntimeError,
             match=r"Max hops reached\. Failed to run ProgramOfThought: Error: Code format is not correct\.",

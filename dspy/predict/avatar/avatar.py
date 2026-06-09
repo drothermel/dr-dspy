@@ -3,6 +3,7 @@ from typing import Any, cast
 from dspy.adapters.types.tool import Tool
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
+from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.avatar.models import Action, ActionOutput
 from dspy.predict.predict import Predict
 from dspy.predict.tools import normalize_tools
@@ -99,6 +100,7 @@ class Avatar(Module):
         action_results: list[ActionOutput] = []
         max_iters = cast("int", inputs.get("max_iters", self.max_iters))
         remaining = max_iters
+        termination_reason = AgentTerminationReason.MAX_ITERS
         while remaining > 0:
             extracted = await call_with_turn_log_truncation(
                 self.actor,
@@ -120,6 +122,7 @@ class Avatar(Module):
                         result="Gathered all information needed to finish the task.",
                     )
                 )
+                termination_reason = AgentTerminationReason.SUBMIT
                 break
             tool_output = await self._acall_tool(tool_name, tool_args)
             action_results.append(ActionOutput(tool_name=tool_name, tool_args=tool_args, tool_output=tool_output))
@@ -141,4 +144,5 @@ class Avatar(Module):
             **{key: getattr(final_answer, key) for key in self.output_fields},
             turn_log=turn_log,
             actions=action_results,
+            termination_reason=termination_reason,
         )

@@ -4,6 +4,7 @@ from typing import Any, cast
 import pytest
 
 from dspy.adapters.types.tool import Tool
+from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.avatar import Avatar
 from dspy.predict.avatar.models import ActionOutput
 from dspy.testing import DummyLM
@@ -63,3 +64,4 @@ def test_avatar_finish_skips_tool_execution(make_run):
 
     assert result.answer == "done without tools"
     assert result.actions == []
+    assert result.termination_reason == AgentTerminationReason.SUBMIT

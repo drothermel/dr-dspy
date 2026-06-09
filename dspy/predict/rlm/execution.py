@@ -11,6 +11,7 @@ from dspy.adapters.utils import parse_value
 from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.history import REPLEntry, REPLHistory, REPLVariable, TurnEvent
 from dspy.history.truncation import call_with_repl_history_truncation
+from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.code_execution import strip_python_fences
 from dspy.predict.rlm.tools import make_llm_tools
 from dspy.primitives import (
@@ -149,6 +150,7 @@ async def aextract_fallback(
     return Prediction(
         turn_log=history,
         final_reasoning="Extract forced final output",
+        termination_reason=AgentTerminationReason.MAX_ITERS,
         **{name: getattr(extract_pred, name) for name in output_field_names},
     )
 
@@ -194,7 +196,12 @@ def process_execution_result(
         final_history = history.append_turn(
             TurnEvent(reasoning=pred.reasoning, code=code, output=f"FINAL: {parsed_outputs}")
         )
-        return Prediction(**parsed_outputs or {}, turn_log=final_history, final_reasoning=pred.reasoning)
+        return Prediction(
+            **parsed_outputs or {},
+            turn_log=final_history,
+            final_reasoning=pred.reasoning,
+            termination_reason=AgentTerminationReason.SUBMIT,
+        )
     output = "\n".join(map(str, result)) if isinstance(result, list) else str(result) if result else ""
     output = format_output(output)
     if rlm.verbose:
