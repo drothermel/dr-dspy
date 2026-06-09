@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from dspy.adapters.call.policies.parse_fallback import NoOpParseFallbackPolicy
 from dspy.adapters.call.policies.response_format import NoOpResponseFormatPolicy
 from dspy.adapters.call.stages import invoke_adapter_lm, prepare_adapter_call
 from dspy.adapters.call.two_step import TWO_STEP_MAIN_CALL_SITE, finalize_two_step_main_response
+from dspy.adapters.call.two_step_protocol import is_two_step_adapter
 from dspy.core.types.config import coerce_lm_config
 from dspy.errors import AdapterParseError, LMError
 from dspy.predict.call_validation import validate_task_inputs
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Awaitable, Callable, Mapping
 
     from dspy.adapters.base.adapter import Adapter
     from dspy.clients.base_lm import BaseLM
@@ -36,21 +37,44 @@ class AdapterCallPipeline:
         allow_parse_fallback: bool = True,
     ) -> list[dict[str, Any]]:
         inputs = validate_task_inputs(task_spec, inputs)
-        if getattr(adapter, "call_mode", None) == "two_step":
-            return await AdapterCallPipeline._run_two_step_call(
-                adapter,
+        base_adapter = adapter
+        if is_two_step_adapter(adapter):
+            two_step_adapter = adapter
+
+            async def run_two_step_once(effective_config: LMConfig | None) -> list[dict[str, Any]]:
+                prepared = prepare_adapter_call(
+                    base_adapter,
+                    lm=lm,
+                    config=effective_config,
+                    task_spec=task_spec,
+                    demos=demos,
+                    inputs=inputs,
+                )
+                response = await invoke_adapter_lm(
+                    base_adapter,
+                    prepared,
+                    lm=lm,
+                    run=run,
+                    call_site=call_site or TWO_STEP_MAIN_CALL_SITE,
+                )
+                return await finalize_two_step_main_response(
+                    two_step_adapter,
+                    response=response,
+                    original_task_spec=task_spec,
+                    run=run,
+                )
+
+            return await AdapterCallPipeline._execute_with_response_format_policy(
+                adapter=base_adapter,
                 lm=lm,
                 config=config,
                 task_spec=task_spec,
                 demos=demos,
                 inputs=inputs,
-                run=run,
-                call_site=call_site,
+                run_once=run_two_step_once,
             )
 
-        response_format_policy = adapter.response_format_policy or NoOpResponseFormatPolicy()
-
-        async def run_once(effective_config: LMConfig | None) -> list[dict[str, Any]]:
+        async def run_single_once(effective_config: LMConfig | None) -> list[dict[str, Any]]:
             return await AdapterCallPipeline._run_single_call(
                 adapter,
                 lm=lm,
@@ -63,56 +87,29 @@ class AdapterCallPipeline:
                 allow_parse_fallback=allow_parse_fallback,
             )
 
-        return await response_format_policy.execute(
+        return await AdapterCallPipeline._execute_with_response_format_policy(
             adapter=adapter,
             lm=lm,
-            config=coerce_lm_config(config),
+            config=config,
             task_spec=task_spec,
             demos=demos,
             inputs=inputs,
-            run_once=run_once,
+            run_once=run_single_once,
         )
 
     @staticmethod
-    async def _run_two_step_call(
-        adapter: Adapter,
+    async def _execute_with_response_format_policy(
         *,
+        adapter: Adapter,
         lm: BaseLM,
         config: LMConfig | Mapping[str, Any] | None,
         task_spec: TaskSpec,
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
-        run: RunContext,
-        call_site: CallSite | None,
+        run_once: Callable[[LMConfig | None], Awaitable[list[dict[str, Any]]]],
     ) -> list[dict[str, Any]]:
-        response_format_policy = adapter.response_format_policy or NoOpResponseFormatPolicy()
-
-        async def run_once(effective_config: LMConfig | None) -> list[dict[str, Any]]:
-            prepared = prepare_adapter_call(
-                adapter,
-                lm=lm,
-                config=effective_config,
-                task_spec=task_spec,
-                demos=demos,
-                inputs=inputs,
-            )
-            response = await invoke_adapter_lm(
-                adapter,
-                prepared,
-                lm=lm,
-                run=run,
-                call_site=call_site or TWO_STEP_MAIN_CALL_SITE,
-                default_module="TwoStepAdapter",
-                default_phase="two_step.main",
-            )
-            return await finalize_two_step_main_response(
-                cast("Any", adapter),
-                response=response,
-                original_task_spec=task_spec,
-                run=run,
-            )
-
-        return await response_format_policy.execute(
+        policy = adapter.response_format_policy or NoOpResponseFormatPolicy()
+        return await policy.execute(
             adapter=adapter,
             lm=lm,
             config=coerce_lm_config(config),
@@ -155,8 +152,6 @@ class AdapterCallPipeline:
                 processed_task_spec=prepared.processed_task_spec,
                 original_task_spec=task_spec,
                 response=response,
-                _lm=lm,
-                _config=prepared.config,
             )
         except TypeError:
             raise

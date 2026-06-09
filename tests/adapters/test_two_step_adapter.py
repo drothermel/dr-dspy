@@ -232,6 +232,28 @@ def test_attach_tool_calls_preserves_call_id_from_provider_dict():
 
 
 @pytest.mark.asyncio
+async def test_two_step_pipeline_extraction_error_not_double_wrapped(make_run):
+    TestSignature = make_task_spec(
+        {
+            "question": input_field("question", desc="The question to answer"),
+            "answer": output_field("answer", desc="The answer to the question"),
+        },
+        instructions="Given the fields `question`, produce the fields `answer`.",
+    )
+    main_lm = RecordingTextLM(["main LM response"])
+    extraction_lm = RecordingTextLM(["not parseable extraction output"])
+    adapter = TwoStepAdapter(extraction_lm, extraction_adapter=ChatAdapter())
+    run = make_run(lm=main_lm, adapter=adapter)
+    program = Predict(TestSignature)
+    with pytest.raises(AdapterParseError) as pipeline_error:
+        await program(question="Q?", run=run)
+    with pytest.raises(AdapterParseError) as direct_error:
+        await adapter._run_extraction(original_task_spec=TestSignature, text="main LM response", run=run)
+    assert pipeline_error.value.task_spec == direct_error.value.task_spec
+    assert "Failed to parse response from the original completion" not in str(pipeline_error.value)
+
+
+@pytest.mark.asyncio
 async def test_two_step_adapter_extraction_errors(make_run):
     TestSignature = make_task_spec(
         {
