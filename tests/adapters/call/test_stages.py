@@ -11,9 +11,8 @@ from dspy.core.types import NativeAdaptationMode
 from dspy.task_spec import input_field, make_task_spec, output_field
 from tests.adapters.call.test_pipeline import FunctionCallingLM, ReasoningFunctionCallingLM
 from tests.adapters.conftest import CapturingLM, StopAdapterCallCapture, make_adapter_run
-from tests.adapters.test_native_adaptation import StubLM
 from tests.task_spec.helpers import ts
-from tests.test_utils import DummyLM
+from tests.test_utils import CapabilityStubLM, DummyLM
 
 
 def test_prepare_adapter_call_records_native_function_calling_mutations():
@@ -77,7 +76,7 @@ def test_prepare_adapter_call_records_native_citations_removal():
         instructions="Answer with citations.",
     )
     adapter = ChatAdapter(native_response_types=[Citations])
-    lm = StubLM(citations_adaptation_mode=NativeAdaptationMode.SKIP)
+    lm = CapabilityStubLM(citations_adaptation_mode=NativeAdaptationMode.SKIP)
     prepared = prepare_adapter_call(
         adapter,
         lm=lm,

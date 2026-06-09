@@ -1,21 +1,15 @@
 import asyncio
-import json
-from typing import Any
 
 import pytest
-from typing_extensions import override
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool, ToolCalls
-from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format.chat_request import message_to_openai_chat, request_messages_as_openai
-from dspy.core.types import LMOutput, LMRequest, LMResponse, LMToolCallPart, LMUsage
 from dspy.history import TurnLog, turn_to_format_dict
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.react_v2 import ReActV2
-from tests.adapters.conftest import captured_lm_kwargs
 from tests.task_spec.helpers import ts
-from tests.test_utils import DummyLM
+from tests.test_utils import DummyLM, NativeToolCallLM
 
 
 def _turn_dict(turn) -> dict:
@@ -24,13 +18,6 @@ def _turn_dict(turn) -> dict:
 
 def _turn_tool_calls(turn):
     return turn.tool_calls
-
-
-class ReasoningDummyLM(DummyLM):
-    @property
-    @override
-    def supports_reasoning(self):
-        return True
 
 
 def test_react_v2_submit_tool_returns_original_output_fields(make_run):
@@ -221,14 +208,15 @@ def test_react_v2_accepts_serialized_history_input(make_run):
 
 
 def test_react_v2_forced_submit_on_empty_tool_calls(make_run):
-    lm = ReasoningDummyLM(
+    lm = DummyLM(
         [
             {"next_thought": "No action.", "tool_calls": ToolCalls(tool_calls=[])},
             {
                 "next_thought": "Forced final.",
                 "tool_calls": ToolCalls.from_dict_list([{"name": "submit", "args": {"answer": "forced"}}]),
             },
-        ]
+        ],
+        supports_reasoning=True,
     )
     lm.kwargs["reasoning"] = {"effort": "low"}
     run = make_run(lm=lm, adapter=ChatAdapter())
@@ -242,105 +230,12 @@ def test_react_v2_forced_submit_on_empty_tool_calls(make_run):
     assert lm.call_log[1].request.config.tool_choice is None
 
 
-class NativeToolLM(BaseLM):
-    def __init__(self):
-        super().__init__("native-tool-lm", "chat", temperature=0.0, max_tokens=1000)
-        self.calls = []
-
-    @property
-    @override
-    def supports_function_calling(self):
-        return True
-
-    @override
-    async def aforward(self, request: LMRequest) -> LMResponse:
-        self.calls.append({"messages": request.messages, "kwargs": captured_lm_kwargs(request)})
-        if len(self.calls) == 1:
-            tool_call = {
-                "id": "call_provider_1",
-                "type": "function",
-                "function": {"name": "lookup", "arguments": '{"query":"cats"}'},
-            }
-        else:
-            tool_call = {
-                "id": "call_submit",
-                "type": "function",
-                "function": {"name": "submit", "arguments": '{"answer":"found cats"}'},
-            }
-        function = tool_call["function"]
-        args = json.loads(function["arguments"])
-        return LMResponse(
-            model="native-tool-lm",
-            outputs=[
-                LMOutput(
-                    parts=[LMToolCallPart(id=tool_call["id"], name=function["name"], args=args)],
-                    finish_reason="tool_calls",
-                )
-            ],
-            usage=LMUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0),
-        )
-
-
-class ParallelNativeToolLM(BaseLM):
-    def __init__(self):
-        super().__init__("parallel-native-tool-lm", "chat", temperature=0.0, max_tokens=1000)
-        self.calls = []
-
-    @property
-    @override
-    def supports_function_calling(self):
-        return True
-
-    @override
-    async def aforward(self, request: LMRequest) -> LMResponse:
-        self.calls.append({"messages": request.messages, "kwargs": captured_lm_kwargs(request)})
-        tool_calls: list[dict[str, Any]]
-        if len(self.calls) == 1:
-            tool_calls = [
-                {
-                    "id": "call_provider_1",
-                    "type": "function",
-                    "function": {"name": "lookup", "arguments": '{"query":"cats"}'},
-                },
-                {
-                    "id": "call_provider_2",
-                    "type": "function",
-                    "function": {"name": "lookup", "arguments": '{"query":"dogs"}'},
-                },
-            ]
-        else:
-            tool_calls = [
-                {
-                    "id": "call_submit",
-                    "type": "function",
-                    "function": {"name": "submit", "arguments": '{"answer":"found cats and found dogs"}'},
-                }
-            ]
-        return LMResponse(
-            model="parallel-native-tool-lm",
-            outputs=[
-                LMOutput(
-                    parts=[
-                        LMToolCallPart(
-                            id=tool_call["id"],
-                            name=tool_call["function"]["name"],
-                            args=json.loads(tool_call["function"]["arguments"]),
-                        )
-                        for tool_call in tool_calls
-                    ],
-                    finish_reason="tool_calls",
-                )
-            ],
-            usage=LMUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0),
-        )
-
-
 def test_react_v2_native_tool_loop_replays_tool_result_with_provider_id(make_run):
 
     def lookup(query: str) -> str:
         return f"found {query}"
 
-    lm = NativeToolLM()
+    lm = NativeToolCallLM()
     run = make_run(lm=lm, adapter=ChatAdapter(use_native_function_calling=True))
     pred = asyncio.run(
         ReActV2(ts("question -> answer"), tools=[Tool(lookup, description="Look up a query.")])(
@@ -362,7 +257,7 @@ def test_react_v2_native_parallel_tool_calls_are_requested_and_replayed(make_run
     def lookup(query: str) -> str:
         return f"found {query}"
 
-    lm = ParallelNativeToolLM()
+    lm = NativeToolCallLM(parallel_first_turn=True)
     run = make_run(lm=lm, adapter=ChatAdapter(use_native_function_calling=True, parallel_tool_calls=True))
     pred = asyncio.run(
         ReActV2(ts("question -> answer"), tools=[Tool(lookup, description="Look up a query.")])(

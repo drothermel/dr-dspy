@@ -19,20 +19,7 @@ from dspy.predict.predict import Predict
 from dspy.task_spec import input_field, make_task_spec, output_field
 from tests.adapters.conftest import format_messages_and_lm_kwargs
 from tests.task_spec.helpers import ts
-from tests.test_utils import DummyLM
-
-
-class RecordingTextLM(BaseLM):
-    def __init__(self, texts: list[str], *, model: str = "openai/gpt-4o-mini", temperature: float = 1.0):
-        super().__init__(model, "chat", temperature=temperature, max_tokens=1000)
-        self.texts = list(texts)
-        self.requests: list[LMRequest] = []
-
-    @override
-    async def aforward(self, request: LMRequest) -> LMResponse:
-        self.requests.append(request)
-        text = self.texts.pop(0) if self.texts else "No more responses"
-        return LMResponse.from_text(text, model=self.model)
+from tests.test_utils import DummyLM, SequentialTextLM
 
 
 def test_two_step_adapter_format_exact_messages_for_simple_signature_with_demo(make_run):
@@ -119,7 +106,7 @@ def test_two_step_adapter_call(make_run):
         instructions="Given the fields `question`, produce the fields `solution`, `answer`.",
     )
     program = Predict(TestSignature)
-    main_lm = RecordingTextLM(["text from main LM"])
+    main_lm = SequentialTextLM(["text from main LM"])
     extraction_lm = DummyLM([{"solution": "result", "answer": 12}])
     run = make_run(lm=main_lm, adapter=TwoStepAdapter(extraction_model=extraction_lm, extraction_adapter=ChatAdapter()))
     result = asyncio.run(program(question="What is 5 + 7?", run=run))
@@ -158,7 +145,7 @@ async def test_two_step_adapter_async_call(make_run):
         instructions="Given the fields `question`, produce the fields `solution`, `answer`.",
     )
     program = Predict(TestSignature)
-    main_lm = RecordingTextLM(["text from main LM"])
+    main_lm = SequentialTextLM(["text from main LM"])
     extraction_lm = DummyLM([{"solution": "result", "answer": 12}])
     run = make_run(lm=main_lm, adapter=TwoStepAdapter(extraction_model=extraction_lm, extraction_adapter=ChatAdapter()))
     result = await program(question="What is 5 + 7?", run=run)
@@ -297,8 +284,8 @@ async def test_two_step_pipeline_extraction_error_not_double_wrapped(make_run):
         },
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
-    main_lm = RecordingTextLM(["main LM response"])
-    extraction_lm = RecordingTextLM(["not parseable extraction output"])
+    main_lm = SequentialTextLM(["main LM response"])
+    extraction_lm = SequentialTextLM(["not parseable extraction output"])
     adapter = TwoStepAdapter(extraction_lm, extraction_adapter=ChatAdapter())
     run = make_run(lm=main_lm, adapter=adapter)
     program = Predict(TestSignature)
@@ -320,7 +307,7 @@ async def test_two_step_adapter_extraction_errors(make_run):
         instructions="Given the fields `question`, produce the fields `answer`.",
     )
     first_response = "main LM response"
-    extraction_lm = RecordingTextLM(["not parseable extraction output"])
+    extraction_lm = SequentialTextLM(["not parseable extraction output"])
     adapter = TwoStepAdapter(extraction_lm, extraction_adapter=ChatAdapter())
     run = make_run(lm=extraction_lm, adapter=adapter)
     with pytest.raises(AdapterParseError):

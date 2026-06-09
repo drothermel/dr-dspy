@@ -9,9 +9,8 @@ from dspy.clients.lm import LM
 from dspy.predict.rlm import RLM
 from dspy.predict.rlm import tools as rlm_tools
 from tests.mock_interpreter import MockInterpreter
-from tests.predict.rlm.conftest import FailingSubLM
 from tests.task_spec.helpers import ts
-from tests.test_utils import DummyLM
+from tests.test_utils import DummyLM, FailingLM
 
 
 class TestRLMInitialization:
@@ -103,7 +102,7 @@ class TestRLMInitialization:
         assert "c" in str(exc_info.value)
 
     def test_batched_query_errors_have_clear_markers(self, make_run):
-        sub_lm = FailingSubLM()
+        sub_lm = FailingLM()
         run = make_run(lm=sub_lm)
         rlm = RLM(ts("context -> answer"), max_llm_calls=10, sub_lm=sub_lm)
         tools = rlm_tools.make_llm_tools(rlm, run=run)

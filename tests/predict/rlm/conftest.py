@@ -1,26 +1,7 @@
 from contextlib import contextmanager
 
-from typing_extensions import override
-
-from dspy.clients.base_lm import BaseLM
-from dspy.core.types import LMRequest, LMResponse
-from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.primitives import Prediction
-
-
-class FailingSubLM(BaseLM):
-    def __init__(self) -> None:
-        super().__init__(
-            "fail-lm",
-            "chat",
-            temperature=0.0,
-            max_tokens=1000,
-            provider_options=LMProviderOptions(cache=False),
-        )
-
-    @override
-    async def aforward(self, request: LMRequest) -> LMResponse:
-        raise RuntimeError("LM failed")
+from tests.test_utils import DummyLM
 
 
 def make_mock_predictor(responses: list[dict]):
@@ -42,8 +23,6 @@ def make_mock_predictor(responses: list[dict]):
 
 @contextmanager
 def dummy_lm_context(responses: list[dict], make_run):
-    from tests.test_utils import DummyLM
-
     lm = DummyLM(responses)
     make_run(lm=lm)
     yield lm

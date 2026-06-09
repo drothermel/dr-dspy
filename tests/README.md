@@ -32,3 +32,19 @@ For affected-test reruns, use pytest-testmon. The first run builds `.testmondata
 ```bash
 uv run pytest --testmon
 ```
+
+## Test doubles
+
+Shared LM and retrieval doubles live under `tests/test_utils/`:
+
+| Double | Use when |
+|--------|----------|
+| `DummyLM` | End-to-end module/adapter tests needing structured field answers via an adapter |
+| `SequentialTextLM` | Plain sequential text responses with optional request recording |
+| `SpyLM` | LiteLLM-path tests that need call recording or fixed response text |
+| `NativeToolCallLM` | Native provider tool-call loop tests (`parallel_first_turn=True` for parallel first turn) |
+| `CapabilityStubLM` | Adapter capability/adaptation-mode tests without LM forwarding |
+| `FailingLM` | Error-path tests where the LM must raise |
+| `DummyVectorizer` | Retrieval/KNN tests needing deterministic embeddings |
+
+Keep adapter-pipeline helpers such as `CapturingLM` in `tests/adapters/conftest.py` when they depend on adapter internals. Use local nested LM classes only for test-specific contract assertions.
