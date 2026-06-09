@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import random
-from typing import TYPE_CHECKING, Any, Callable, Protocol, TypedDict, cast
+from typing import Any, Callable, Protocol, TypedDict, cast
 
 from typing_extensions import override
 
@@ -18,32 +18,13 @@ from dspy.teleprompt.bootstrap_trace import FailedPrediction, TraceData
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
-if TYPE_CHECKING:
+try:
     from gepa import EvaluationBatch, GEPAAdapter
-else:
-    try:
-        from gepa import EvaluationBatch, GEPAAdapter
-    except ImportError:
-
-        class _GEPAAdapterStub:
-            def __class_getitem__(cls, _params: object) -> type:
-                return cls
-
-        class GEPAAdapter(_GEPAAdapterStub):
-            pass
-
-        EvaluationBatch = Any
-
-
-def _require_gepa() -> tuple[Any, Any]:
-    try:
-        from gepa import EvaluationBatch, GEPAAdapter
-    except ImportError as err:
-        raise ImportError(
-            f"GEPA requires optional dependency 'gepa'. Install it with `pip install {_detect_dspy_dist()}[gepa]`."
-        ) from err
-    return EvaluationBatch, GEPAAdapter
-
+except ImportError as err:
+    raise ImportError(
+        f"The 'gepa' extra is required to use GEPA integrations. "
+        f"Install it with `pip install {_detect_dspy_dist()}[gepa]`."
+    ) from err
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +84,6 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         reflection_minibatch_size: int | None = None,
         run: RunContext | None = None,
     ) -> None:
-        _require_gepa()
         self.student = student_module
         self.metric_fn = metric_fn
         self.feedback_map = feedback_map
