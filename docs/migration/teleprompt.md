@@ -143,6 +143,18 @@ prediction, trace = await run_program_with_trace(program, example, run)
 demos_by_predictor = trace_to_demos(trace, predictor2name)
 ```
 
+## Optimizer metric contract
+
+Teleprompters accept an `OptimizerMetric` (`from dspy.teleprompt import OptimizerMetric`): a sync or async callable `(example, prediction, trace) -> bool | float | Prediction`, or a `Module` metric. `invoke_metric` (in `dspy.evaluate.metric_invoke`) normalizes scores to `[0, 1]`. GEPA uses the separate five-argument `GEPAFeedbackMetric` protocol.
+
+## Resolving optimizer LMs
+
+Use `resolve_optimizer_lm(lm=None, run=run)` from `dspy.teleprompt.task_spec_context` (replacing `get_prompt_model`). When `lm` is `None`, the active run default (`run.lm`) is used.
+
+## Contract tests
+
+`tests/teleprompt/` encodes optimizer contracts: metric dispatch (`test_metrics.py`), LM fallback (`test_lm_resolver.py`), structural zip safety (`test_structural_zip.py`), infer-rules error handling (`test_infer_rules_errors.py`), and SIMBA resampling immutability (`test_simba_utils.py`).
+
 ## Breaking changes summary
 
 | Area | Change |

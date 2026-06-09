@@ -471,7 +471,7 @@ def test_lm_lifecycle_management(make_run):
     assert mock_kill.called, "kill_lms should be called when models change"
 
 
-def test_error_handling_returns_best_program(make_run):
+def test_error_handling_returns_best_program(make_run, caplog):
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     run = make_run(lm=lm)
@@ -503,6 +503,8 @@ def test_error_handling_returns_best_program(make_run):
     assert result.program is not None, "Should return a program even if a step fails"
     assert result.stats.error_occurred is True, "Error flag should be True"
     assert len(result.candidates) > 0, "Should have at least one candidate program"
+    exception_records = [record for record in caplog.records if record.levelname == "ERROR" and record.exc_info]
+    assert len(exception_records) == 1, "Expected a single exception log on step failure"
 
 
 @pytest.mark.parametrize(

@@ -39,3 +39,4 @@ def test_basic_workflow(make_run):
     )
     assert result.program is not None
     assert len(result.candidates) > 0
+    assert result.program is result.candidates[0].program
