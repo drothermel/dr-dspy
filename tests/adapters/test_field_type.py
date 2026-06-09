@@ -1,7 +1,12 @@
 import pydantic
 
-from dspy.adapters.types.field_type import FieldTypeMixin, extract_field_types_from_annotation
+from dspy.adapters.types.field_type import FieldTypeMixin, extract_field_types_from_annotation, is_field_type
 from dspy.task_spec import input_field, make_task_spec, output_field
+
+
+def test_is_field_type_rejects_strings_with_format_method():
+    assert not is_field_type("plain text")
+    assert not is_field_type('[{"type": "file", "file": {"file_id": "file-test"}}]')
 
 
 def test_basic_extract_field_types_from_annotation():

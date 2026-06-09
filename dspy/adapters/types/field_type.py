@@ -53,7 +53,8 @@ class FieldTypeMixin(pydantic.BaseModel):
 
 
 def is_field_type(value: object) -> bool:
-    return isinstance(value, FieldType)
+    # Use FieldTypeMixin, not the FieldType protocol: str satisfies the protocol via str.format().
+    return isinstance(value, FieldTypeMixin)
 
 
 def is_field_type_class(cls: object) -> bool:
