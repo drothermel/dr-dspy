@@ -10,11 +10,10 @@ string via Pydantic serialization (not conversation expansion).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
-if TYPE_CHECKING:
-    from dspy.adapters.base.protocols import ComposedAdapter
-
+from dspy.adapters.base.conversation import AdapterConversationMixin
+from dspy.adapters.base.protocols import ConversationFormattingAdapter
 from dspy.adapters.utils import build_lm_message
 from dspy.core.types import LMMessage
 from dspy.task_spec import TaskSpec
@@ -22,16 +21,15 @@ from dspy.task_spec import TaskSpec
 MESSAGE_BUILD_ORDER = ("system", "demos", "conversation_history", "current_user")
 
 
-class AdapterFormatMixin:
+class AdapterFormatMixin(AdapterConversationMixin):
     def format(self, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any]) -> list[LMMessage]:
-        adapter = cast("ComposedAdapter", self)
         inputs_copy = dict(inputs)
-        turn_log_field_name = adapter._get_turn_log_field_name(task_spec)
+        turn_log_field_name = self._get_turn_log_field_name(task_spec)
         task_spec_without_history = task_spec
         conversation_history: list[LMMessage] = []
         if turn_log_field_name:
             task_spec_without_history = task_spec.delete(turn_log_field_name)
-            conversation_history = adapter.format_conversation_history(
+            conversation_history = cast("ConversationFormattingAdapter", self).format_conversation_history(
                 task_spec=task_spec, turn_log_field_name=turn_log_field_name, inputs=inputs_copy
             )
         messages: list[LMMessage] = []

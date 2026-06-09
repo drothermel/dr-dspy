@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.base.call import AdapterCallMixin
-from dspy.adapters.base.conversation import AdapterConversationMixin
 from dspy.adapters.base.format import AdapterFormatMixin
 from dspy.adapters.base.native import _DEFAULT_NATIVE_RESPONSE_TYPES
 from dspy.adapters.call.capabilities import AdapterCapabilities
@@ -17,7 +16,7 @@ if TYPE_CHECKING:
     from dspy.runtime.callback import Callback
 
 
-class Adapter(AdapterCallMixin, AdapterFormatMixin, AdapterConversationMixin):
+class Adapter(AdapterCallMixin, AdapterFormatMixin):
     response_format_policy: ResponseFormatPolicy | None = None
     parse_fallback_policy: ParseFallbackPolicy | None = None
     call_mode: str | None = None

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, get_args, get_origin
 
-from dspy.adapters.base.protocols import ComposedAdapterT
+from dspy.adapters.base.protocols import ConversationFormattingAdapter
 from dspy.adapters.base.task_specs import ToolCallResultsTaskSpec
 from dspy.adapters.base.tool_calls import (
     _tool_call_as_openai_message_tool_call,
@@ -41,7 +41,10 @@ class AdapterConversationMixin:
         return None
 
     def format_conversation_history(
-        self: ComposedAdapterT, task_spec: TaskSpec, turn_log_field_name: str, inputs: dict[str, Any]
+        self: ConversationFormattingAdapter,
+        task_spec: TaskSpec,
+        turn_log_field_name: str,
+        inputs: dict[str, Any],
     ) -> list[LMMessage]:
         turn_log = inputs.get(turn_log_field_name)
         conversation_history = turn_log.turns if turn_log is not None else None

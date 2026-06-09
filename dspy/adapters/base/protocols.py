@@ -59,6 +59,10 @@ class NativeAdaptableAdapter(Protocol):
     def _adapt_citations_native(self, task_spec: TaskSpec, field_name: str, lm: BaseLM) -> TaskSpec: ...
 
 
+class ConversationFormattingAdapter(FormattableAdapter, NativeAdaptableAdapter, Protocol):
+    """Formattable adapter surface required for turn-log conversation expansion."""
+
+
 class ComposedAdapter(FormattableAdapter, NativeAdaptableAdapter, Protocol):
     callbacks: list[Callback]
 
