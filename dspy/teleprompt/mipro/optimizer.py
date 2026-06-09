@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel
 
-from dspy.clients.lm import LM
+from dspy.clients.base_lm import BaseLM
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec.predictor_context import resolve_optimizer_lm
@@ -31,8 +31,8 @@ class MIPROv2:
     def __init__(
         self,
         metric: "OptimizerMetric",
-        prompt_model: LM | None = None,
-        task_model: LM | None = None,
+        prompt_model: BaseLM | None = None,
+        task_model: BaseLM | None = None,
         teacher_run: RunContext | None = None,
         max_bootstrapped_demos: int = 4,
         max_labeled_demos: int = 4,

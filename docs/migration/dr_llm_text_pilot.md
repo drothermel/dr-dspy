@@ -77,6 +77,12 @@ Pass a stable explicit `session_id` such as `experiment-name:split:seed`.
 Do not derive acquisition sessions from low-resolution timestamps. Metadata
 does not isolate claims.
 
+Acquisition helpers are not normal `BaseLM.__call__` calls, so DSPy memory and
+disk call logs should not be treated as the source of truth for acquisition
+provenance. Experiment runners that call `acquire_samples_result(...)` should
+persist `claimed_from_cache`, `generated`, and each response's `source`,
+`sample_id`, and `request_fingerprint` provider data in their own artifacts.
+
 ## Minimal `nl-code` TaskSpec Pilot
 
 The fastest post-review DSPy pilot should use direct dr-llm calls, not pools:

@@ -12,7 +12,7 @@ from dspy.teleprompt.simba_utils import append_a_demo, append_a_rule, prepare_mo
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-    from dspy.clients.lm import LM
+    from dspy.clients.base_lm import BaseLM
     from dspy.primitives import Module
     from dspy.runtime.run_context import RunContext
     from dspy.teleprompt.metrics import OptimizerMetric
@@ -34,7 +34,7 @@ class SIMBA:
         num_candidates: int = 6,
         max_steps: int = 8,
         max_demos: int = 4,
-        prompt_model: LM | None = None,
+        prompt_model: BaseLM | None = None,
         teacher_run: RunContext | None = None,
         demo_input_field_maxlen: int = 100000,
         max_concurrency: int | None = None,
