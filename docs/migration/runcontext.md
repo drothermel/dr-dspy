@@ -107,6 +107,6 @@ When `telemetry.call_log` is `disk` or `both`, `RunContext.create(...)` creates 
 
 Inspect calls with `run.inspect_call_log()` or `run.read_call_log()`. See `docs/migration/history.md` for the full agent vs call vs optimization vocabulary.
 
-Optimizer/bootstrap teacher contexts must include a configured `adapter` (use `optimizer_lm_context` from `dspy.teleprompt.utils`).
+Optimizer/bootstrap teacher contexts must include a configured `adapter` (use `optimizer_lm_context` from `dspy.teleprompt.core`).
 
 See `docs/migration/call-options.md` for `PredictOptions`, `LMProviderOptions`, and other strict kwargs.

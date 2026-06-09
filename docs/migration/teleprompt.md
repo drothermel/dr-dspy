@@ -130,7 +130,8 @@ student = inner.program
 ## Evaluation helpers
 
 ```python
-from dspy.teleprompt import make_optimizer_evaluator, resolve_max_errors, run_program_with_trace, trace_to_demos
+from dspy.runtime import run_with_trace
+from dspy.teleprompt import collect_trace_data, make_optimizer_evaluator, resolve_max_errors, trace_to_demos
 
 evaluate = make_optimizer_evaluator(
     run,
@@ -139,7 +140,7 @@ evaluate = make_optimizer_evaluator(
     max_concurrency=8,
     max_errors=resolve_max_errors(None, run),
 )
-prediction, trace = await run_program_with_trace(program, example, run)
+prediction, trace = await run_with_trace(program, example, run)
 demos_by_predictor = trace_to_demos(trace, predictor2name)
 ```
 
@@ -149,7 +150,7 @@ Teleprompters accept an `OptimizerMetric` (`from dspy.teleprompt import Optimize
 
 ## Resolving optimizer LMs
 
-Use `resolve_optimizer_lm(lm=None, run=run)` from `dspy.teleprompt.task_spec_context` (replacing `get_prompt_model`). When `lm` is `None`, the active run default (`run.lm`) is used.
+Use `resolve_optimizer_lm(lm=None, run=run)` from `dspy.task_spec.predictor_context` (replacing `get_prompt_model`). When `lm` is `None`, the active run default (`run.lm`) is used.
 
 ## Contract tests
 

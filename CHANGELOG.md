@@ -5,6 +5,7 @@
 ### Breaking changes
 
 - TaskSpec boundary cutover (P0.2): adapter prompt formatting moved from `dspy.task_spec` to `dspy.adapters.prompt_format` (`format_field_value`, `translate_field_type`, `get_field_spec_description_string` no longer exported from `dspy.task_spec`); spine call validation is `dspy.task_spec.validate_task_inputs`; reserved predict kwargs and `PredictOptions` normalization live in `dspy.predict.options` (`dspy.predict.call_validation` removed); framework TaskSpecs colocated under `dspy.task_spec.framework/` and per-optimizer `task_specs.py` modules.
+- Trace ownership cutover (P0.3): `run_with_trace`, `FailedPrediction`, and `TraceData` live in `dspy.runtime`; batch trace collection is `collect_trace_data` in `dspy.teleprompt.core` (via `TraceCapturingModule`, not `_aforward_impl` monkey-patching); compile-spine helpers moved to `dspy.teleprompt.core`; predictor context helpers moved to `dspy.task_spec.predictor_context`; `OptimizerMetric` types live in `dspy.evaluate.metric_contract`. Removed `run_program_with_trace`, `bootstrap_trace_data`, `capture_failed_parses`, `dspy.teleprompt.trace_helpers`, `dspy.teleprompt.bootstrap_trace`, `dspy.teleprompt.utils`, and `dspy.teleprompt.task_spec_context`.
 - Legacy cleanup (11 phases): centralized LM field normalization (`reasoning_effort` removed from `LMProviderOptions`; use `reasoning={"effort": ...}`); explicit `adapter` required on all `RunContext` modes; `num_threads` renamed to `max_concurrency`; call provenance threaded via `RunContext.call_site` and explicit `compiled=` (context vars removed); `Tool` sync `__call__` no longer runs async tools; `acall` aliases removed from `Module`, `BaseLM`, `Embedding`, `KNN`, and `Adapter`; retrievers are async-only (`await retriever(query)`); teleprompters use nested `params=` (`XCompileParams`) with `run=` top-level.
 - Adapter formatting/parsing cleanup: shared `AdapterFormatMixin` scaffolding (including `TwoStepAdapter` turn_log handling); centralized `validate_task_inputs` in `AdapterCallPipeline` (Predict no longer validates separately).
 - Teleprompt cleanup: shared helpers in `dspy.teleprompt.utils` (`resolve_max_errors`, `make_optimizer_evaluator`, `run_program_with_trace`, `trace_to_demos`); Optuna integrations use native async `study.ask()` / `study.tell()` loops (removed `run_async_from_sync` / executor bridges); GEPA runs `gepa.optimize` in a worker thread and requires async instruction proposers (`AsyncProposalFn`).
@@ -35,8 +36,9 @@
 ### Migration
 
 ```python
-# Teleprompter evaluation helpers
-from dspy.teleprompt import make_optimizer_evaluator, resolve_max_errors, run_program_with_trace
+# Trace and teleprompter evaluation helpers
+from dspy.runtime import run_with_trace
+from dspy.teleprompt import collect_trace_data, make_optimizer_evaluator, resolve_max_errors
 
 evaluate = make_optimizer_evaluator(
     run,
@@ -45,7 +47,7 @@ evaluate = make_optimizer_evaluator(
     max_concurrency=8,
     max_errors=resolve_max_errors(None, run),
 )
-prediction, trace = await run_program_with_trace(program, example, run)
+prediction, trace = await run_with_trace(program, example, run)
 
 # Teleprompter compile returns CompileResult
 from dspy.teleprompt import BootstrapFewShot, BootstrapFewShotCompileParams

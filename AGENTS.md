@@ -230,12 +230,13 @@ result = await predict(
 
 See `docs/migration/call-options.md` for before/after examples.
 
-Optimizer/bootstrap teacher contexts must include a configured `adapter` (use `optimizer_lm_context` from `dspy.teleprompt.utils`).
+Optimizer/bootstrap teacher contexts must include a configured `adapter` (use `optimizer_lm_context` from `dspy.teleprompt.core`).
 
-Teleprompter evaluation helpers live in `dspy.teleprompt` (also `dspy.teleprompt.utils` and `dspy.teleprompt.trace_helpers`); optimization trace helpers live in `dspy.teleprompt.trace_helpers`:
+Trace and compile-spine helpers:
 
 ```python
-from dspy.teleprompt import make_optimizer_evaluator, resolve_max_errors, run_program_with_trace, trace_to_demos
+from dspy.runtime import run_with_trace
+from dspy.teleprompt import collect_trace_data, make_optimizer_evaluator, resolve_max_errors, trace_to_demos
 
 evaluate = make_optimizer_evaluator(
     run,
@@ -244,7 +245,7 @@ evaluate = make_optimizer_evaluator(
     max_concurrency=8,
     max_errors=resolve_max_errors(None, run),
 )
-prediction, trace = await run_program_with_trace(program, example, run)
+prediction, trace = await run_with_trace(program, example, run)
 demos_by_predictor = trace_to_demos(trace, predictor2name)
 ```
 

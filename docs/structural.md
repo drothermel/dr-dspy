@@ -71,6 +71,8 @@ Details to preserve:
 
 ### P0.3 Predict, teleprompt, GEPA, and trace ownership
 
+**Status:** Done (2026-06).
+
 **Sources:** External cross-package review; Manual review.
 
 Problem:
