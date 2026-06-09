@@ -5,9 +5,9 @@ changes, cleanup guarantees, and focused regression coverage. These were
 extracted from `docs/structural.md` so the structural plan can stay focused on
 behavior-preserving refactors.
 
-Use this document after the structural refactor lands. Before implementing each
-chunk, re-verify the finding against the current source tree; some items may
-already have been fixed as part of the structural work.
+Before implementing each chunk, re-verify the finding against the current source
+tree; some items may already have been fixed during structural work or follow-up
+changes.
 
 Source tags:
 
@@ -24,9 +24,7 @@ Source tags:
 These are the highest-priority behavioral fixes because they can leave callers
 blocked, hide failed work, catch cancellation, or leak launched resources.
 
-### P0.1 Harden batched execution completion semantics
-
-**Status:** Partially done (2026-06); re-verify remaining `Unbatchify` work.
+### P0.1 Harden `Unbatchify` completion semantics
 
 **Sources:** Both reviews; Manual review.
 
@@ -37,9 +35,9 @@ Problem:
     joined, so `future.result()` never resolves.
   - `_worker()` zips batch outputs to futures with `strict=False`; if `batch_fn`
     returns fewer outputs than inputs, remaining futures never resolve.
-- `dspy/runtime/async_parallel.py` previously initialized `results` with `None`
-  and counted completed work by non-`None` entries, making a valid `None` result
-  indistinguishable from unfinished or failed work.
+- `close()` now drains the input queue and fails pending futures with
+  `RuntimeError("Unbatchify is closed")`, but post-close submissions are still
+  not rejected at the call site.
 
 Target shape:
 
@@ -47,21 +45,12 @@ Target shape:
 - Validate batch output count before setting futures.
 - Prefer `zip(..., strict=True)` or explicit length checks so mismatch failures
   are immediate and diagnosable.
-- Track `run_bounded` completion separately from result values, or use a private
-  sentinel, while keeping the public return shape unchanged.
 
 Details to preserve:
 
-- Preserve current `run_bounded` cancellation and error-count behavior.
-- Add focused regression coverage for close-after-call, output-count mismatch,
-  and valid `None` task results.
-
-**Delivered:** `run_bounded` now tracks completion with `RUN_BOUNDED_PENDING` as
-part of the structural P1.4 work.
+- Add focused regression coverage for close-after-call and output-count mismatch.
 
 ### P0.2 Keep runtime retry and sampling control flow explicit
-
-**Status:** Verify after structural refactor.
 
 **Sources:** Manual review; External cross-package review.
 
@@ -70,11 +59,11 @@ Problem:
 - `dspy/predict/sampling.py` catches `BaseException` and then filters
   retryability, catching cancellation and interpreter-control exceptions before
   re-raising them.
-- Sampling failure-budget accounting reportedly compares the attempt index
-  against the decrementing failure budget. With successes interspersed, failure
-  exhaustion can depend on where failures occur rather than how many failures
-  happened.
-- Broad transient-error classifiers reportedly treat generic `ValueError` and
+- Sampling failure-budget accounting compares the attempt index against the
+  decrementing failure budget (`if idx > failures_remaining`). With successes
+  interspersed, failure exhaustion can depend on where failures occur rather
+  than how many failures happened.
+- Broad transient-error classifiers treat generic `ValueError` and
   `RuntimeError` as retryable or demo-shrinkable.
 
 Target shape:
@@ -93,8 +82,6 @@ Details to preserve:
 
 ### P0.3 Guarantee finetune launch, polling, futures, and cleanup behavior
 
-**Status:** Verify after structural refactor.
-
 **Sources:** Manual review; External cross-package review.
 
 Problem:
@@ -104,10 +91,10 @@ Problem:
   training.
 - Its `wait_for_server` timeout check only runs after an HTTP response, so
   repeated connection failures can wait indefinitely.
-- Local finetune launch reportedly mutates `lm.kwargs` and provider options to
-  target the local server, but `kill()` does not restore the previous endpoint.
-  The LM can remain pointed at a dead local server.
-- `dspy/clients/finetune/service.py` reportedly stores exceptions with
+- Local finetune launch mutates `lm.kwargs` and provider options to target the
+  local server, but `kill()` does not restore the previous endpoint. The LM can
+  remain pointed at a dead local server.
+- `dspy/clients/finetune/service.py` stores exceptions with
   `Future.set_result` instead of `Future.set_exception`, forcing every caller to
   manually check for an exception result.
 
@@ -129,8 +116,6 @@ Details to preserve:
   failed job futures.
 
 ### P0.4 Ensure launched BetterTogether LMs are always cleaned up
-
-**Status:** Verify after structural refactor.
 
 **Source:** Manual review.
 
@@ -160,8 +145,6 @@ secondary code paths.
 
 ### P1.1 Align adapter parsing with exact field and repair contracts
 
-**Status:** Verify after structural refactor.
-
 **Sources:** Manual review; External cross-package review.
 
 Problem:
@@ -171,7 +154,7 @@ Problem:
 - `dspy/adapters/json_adapter.py` filters unexpected fields before validation,
   so extra LM output keys are silently discarded instead of reported as schema
   drift.
-- `XMLAdapter.parse` reportedly calls `parse_output_field` without forwarding
+- `XMLAdapter.parse` calls `parse_output_field` without forwarding
   `repair=self.allow_json_repair`, unlike ChatAdapter and JSONAdapter.
 
 Target shape:
@@ -188,15 +171,13 @@ Details to preserve:
 - Add focused tests for unexpected JSON output fields and XML parsing with
   repair enabled.
 
-### P1.2 Make stream error events and test doubles fail predictably
-
-**Status:** Verify after structural refactor.
+### P1.2 Make stream error events serialize predictably
 
 **Sources:** Spine parallel review.
 
 Problem:
 
-- `dspy/core/types/stream.py` defines `LMStreamErrorEvent` with
+- `dspy/core/types/stream_events.py` defines `LMStreamErrorEvent` with
   `error: Exception` under `arbitrary_types_allowed=True`, but inherits the base
   `to_json()` -> `model_dump_json()`. Pydantic cannot serialize a bare
   `Exception`, so consumers calling `.to_json()` on an error event raise a
@@ -214,14 +195,7 @@ Details to preserve:
 - Add regression tests for `LMStream` and `AsyncLMStream` error/result
   serialization.
 
-**Partial delivery (2026-06):** `DummyLM(follow_examples=True)` with no field
-headers now returns empty output instead of raising; regression tests live in
-`tests/test_utils/test_dummy_lm.py`. Stream error-event serialization remains
-open.
-
 ### P1.3 Add typed Databricks retrieval response boundaries
-
-**Status:** Verify after structural refactor.
 
 **Sources:** Manual review; External cross-package review.
 
@@ -231,9 +205,9 @@ Problem:
   both return raw response dictionaries.
 - The requests path manually reads JSON without `raise_for_status`.
 - Response validation is spread through the query method.
-- Databricks retrieval reportedly sorts with `row["score"]` while passage
-  conversion uses `.get("score")`. Missing score values can raise during sorting
-  even though later code treats score as optional.
+- Databricks retrieval sorts with `row["score"]` while passage conversion uses
+  `.get("score")`. Missing score values can raise during sorting even though
+  later code treats score as optional.
 
 Target shape:
 
@@ -250,47 +224,15 @@ Details to preserve:
 - Add mocked unit tests for response parsing, missing score handling, path
   validation, and request construction.
 
-### P1.4 Clarify persistence and module state atomicity
-
-**Status:** Verify after structural refactor.
-
-**Sources:** Spine parallel review; External cross-package review.
-
-Problem:
-
-- `dspy/primitives/module.py` `load_state` calls `_apply(self.deepcopy())` and
-  discards the result before `_apply(self)`.
-- Applying to a throwaway deep copy first means a missing `state[name]` key
-  raises before `self` is mutated, giving all-or-nothing semantics. The intent
-  is undocumented and the deep copy of a full program is not free.
-- Persistence state loads reportedly can mutate `self` before validating
-  required keys or surface opaque `KeyError`s for missing metadata.
-
-Target shape:
-
-- If the atomicity guarantee is intended, add a one-line comment naming it and
-  preserve it in persistence helpers.
-- If it is not intended, drop the deep-copy validation pass and update tests to
-  match the weaker contract.
-- Validate required persistence keys before mutating live module state.
-- Translate missing metadata into clear load errors rather than opaque
-  `KeyError`s.
-
-Details to preserve:
-
-- Preserve existing file formats and dependency-version warnings.
-- Add round-trip and failure tests for missing and legacy keys.
-
-### P1.5 Resolve citation URL serialization semantics
-
-**Status:** Verify after structural refactor.
+### P1.4 Resolve citation URL serialization semantics
 
 **Source:** External cross-package review.
 
 Problem:
 
-- `adapters/types/citation.py` reportedly copies a URL into serialized data
-  while the `Citation` model has no `url` field, so Pydantic ignores it.
+- `adapters/types/citation.py` copies a URL into serialized data via
+  `_citation_part_to_dict`, but the `Citation` model has no `url` field, so the
+  value is dropped when citations are reconstructed from dicts.
 
 Target shape:
 
@@ -306,49 +248,16 @@ Details to preserve:
 These should come after the boundary fixes because optimizer behavior depends on
 the runtime, adapter, and persistence contracts being stable.
 
-### P2.1 Verify completed GRPO runtime validation fixes
-
-**Status:** Done (2026-06); re-verify only if nearby code changed.
-
-**Source:** Manual review.
-
-Problem:
-
-- `dspy/teleprompt/grpo.py` implemented `_wait_until` with recursive async
-  calls. A long-running GRPO job could build an unbounded call stack while
-  waiting for an available training batch.
-- `dspy/teleprompt/grpo.py` used `assert` for constructor checks, compile-time
-  input validation, and runtime invariants. These checks disappear under
-  optimized Python.
-
-Target shape:
-
-- Replace recursive polling with a simple
-  `while not predicate(): await sleep(...)` loop.
-- Convert user and config validation to explicit `ValueError` or `TypeError`.
-- Convert data-shape and job-state checks to explicit runtime exceptions with
-  the existing messages.
-
-Details to preserve:
-
-- Keep the same poll interval and completion behavior.
-- Keep validation behavior under optimized Python covered by tests.
-
-**Delivered:** Structural P3.2 extracted GRPO modules, replaced recursive
-polling with iterative `wait_until`, and converted GRPO validation to explicit
-errors.
-
-### P2.2 Preserve shared demo pools during bootstrap
-
-**Status:** Verify after structural refactor.
+### P2.1 Preserve shared demo pools during bootstrap
 
 **Source:** External cross-package review.
 
 Problem:
 
-- `BootstrapFewShot._train` reportedly reassigns the shared labeled-demo pool
-  inside the per-predictor loop. Later predictors then sample from a permanently
-  smaller pool.
+- `BootstrapFewShot._train` in `dspy/teleprompt/bootstrap.py` reassigns the
+  shared labeled-demo pool inside the per-predictor loop (`raw_demos =
+  rng.sample(raw_demos, sample_size)`). Later predictors then sample from a
+  permanently smaller pool.
 
 Target shape:
 
@@ -360,17 +269,15 @@ Details to preserve:
 - Add coverage for multi-predictor demo allocation from a shared labeled-demo
   pool.
 
-### P2.3 Evaluate optimizer candidates before accepting them
-
-**Status:** Verify after structural refactor.
+### P2.2 Evaluate optimizer candidates before accepting them
 
 **Source:** External cross-package review.
 
 Problem:
 
-- `avatar_optimizer.py` reportedly commits a candidate instruction based on the
-  score of the previous instruction. The candidate should be evaluated before it
-  is accepted.
+- `avatar_optimizer.py` commits a candidate instruction based on the score of
+  the previous instruction. The candidate should be evaluated before it is
+  accepted.
 
 Target shape:
 
@@ -382,18 +289,15 @@ Details to preserve:
 - Add a deterministic test where the previous instruction scores well but the
   new candidate should be rejected.
 
-### P2.4 Avoid mutating shared SIMBA logging and trace inputs
-
-**Status:** Verify after structural refactor.
+### P2.3 Avoid mutating shared SIMBA logging and trace inputs
 
 **Source:** External cross-package review.
 
 Problem:
 
-- `simba_utils.py` helpers reportedly mutate bucket and trace input dictionaries
-  in place.
-- The same helpers reportedly overwrite numeric scores with `"N/A"`, which can
-  leak truncation or corruption into other strategies and logs.
+- `simba_utils.py` helpers mutate bucket and trace input dictionaries in place.
+- The same helpers overwrite numeric scores with `"N/A"`, which can leak
+  truncation or corruption into other strategies and logs.
 
 Target shape:
 
@@ -405,25 +309,19 @@ Details to preserve:
 - Add tests that prove the original bucket and trace inputs remain unchanged
   after logging or display helpers run.
 
-### P2.5 Check optimizer edge cases before broader helper consolidation
-
-**Status:** Verify after structural refactor.
+### P2.4 Check optimizer edge cases before broader helper consolidation
 
 **Source:** External cross-package review.
 
 Problem:
 
-- GEPA adapter guard logic reportedly checks `hasattr(x, "__class__")`, which is
-  always true and therefore likely dead.
-- COPRO stats paths reportedly can call `max([])` or divide by zero when latest
-  scores are empty.
-- `Refine` predictor-name mapping is reportedly keyed by `TaskSpec`, which can
-  collapse when two predictors share the same spec.
+- COPRO stats paths can call `max([])` or divide by zero when latest scores are
+  empty (`dspy/teleprompt/copro_optimizer.py`).
+- `Refine` predictor-name mapping is keyed by `TaskSpec`, which can collapse
+  when two predictors share the same spec (`dspy/predict/refine.py`).
 
 Target shape:
 
-- Replace dead GEPA guard logic with the actual type or capability check needed
-  at that boundary.
 - Make COPRO empty-score stats behavior explicit.
 - Key Refine predictor-name mapping by predictor identity or another stable
   per-predictor identifier, not shared `TaskSpec` value equality.
@@ -440,8 +338,6 @@ These are lower priority than hang, cleanup, and schema issues, but they reduce
 surprising mutation and environment-dependent behavior.
 
 ### P3.1 Stop `Completions` from aliasing caller-owned dictionaries
-
-**Status:** Verify after structural refactor.
 
 **Source:** Spine parallel review.
 
@@ -467,13 +363,11 @@ Details to preserve:
 
 ### P3.2 Make LM truncation warnings robust with default config
 
-**Status:** Verify after structural refactor.
-
 **Source:** External cross-package review.
 
 Problem:
 
-- `LM._check_truncation` reportedly indexes `self.kwargs["max_tokens"]` and
+- `LM._check_truncation` indexes `self.kwargs["max_tokens"]` and
   `self.kwargs["temperature"]`, but those keys are only present when
   configured.
 - A truncated response from an LM without explicit values can raise `KeyError`
@@ -490,14 +384,12 @@ Details to preserve:
 
 ### P3.3 Add explicit network timeouts where retries already exist
 
-**Status:** Verify after structural refactor.
-
 **Source:** External cross-package review.
 
 Problem:
 
-- LiteLLM transport calls reportedly configure retries and backoff but no
-  default timeout.
+- LiteLLM transport calls configure retries and backoff but no default timeout
+  (`dspy/clients/lm/transport.py`).
 
 Target shape:
 
@@ -512,13 +404,11 @@ Details to preserve:
 
 ### P3.4 Make randomness contracts explicit
 
-**Status:** Verify after structural refactor.
-
 **Source:** External cross-package review.
 
 Problem:
 
-- Ensemble and evaluation helpers reportedly use unseeded global randomness.
+- Ensemble and evaluation helpers use unseeded global randomness.
 
 Target shape:
 
@@ -536,9 +426,7 @@ Details to preserve:
 Add focused tests before or while fixing the relevant behavior:
 
 - `Unbatchify` close-after-call and output-count mismatch behavior.
-- `run_bounded` with valid `None` results.
 - `LMStream` and `AsyncLMStream` error/result serialization behavior.
-- GRPO validation behavior under optimized Python.
 - Adapter JSON parsing with unexpected output fields.
 - XML adapter JSON repair behavior.
 - Citation serialization with or without URL support.
@@ -546,7 +434,6 @@ Add focused tests before or while fixing the relevant behavior:
 - Local finetune server timeout, endpoint restoration, and cleanup behavior.
 - Finetune job futures that fail.
 - BetterTogether cleanup when baseline evaluation fails.
-- Persistence round trips with missing and legacy keys.
 - Sampling failure budgets with interspersed successes and transient failures.
 - Multi-predictor bootstrap demo allocation from a shared labeled-demo pool.
 - Avatar candidate accept/reject after evaluating the candidate.
