@@ -2,7 +2,6 @@ from dspy.predict.avatar import Avatar
 from dspy.predict.best_of_n import BestOfN
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.code_act import CodeAct
-from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
 from dspy.predict.program_of_thought import ProgramOfThought
 from dspy.predict.react import ReAct
@@ -15,7 +14,6 @@ __all__ = [
     "BestOfN",
     "ChainOfThought",
     "CodeAct",
-    "Parallel",
     "Predict",
     "ProgramOfThought",
     "ReAct",

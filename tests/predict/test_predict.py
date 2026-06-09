@@ -28,9 +28,9 @@ from dspy.clients.lm import LM
 from dspy.core.types import LMConfig, LMRequest
 from dspy.history import TurnLog
 from dspy.predict.call_options import PredictOptions
-from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module
+from dspy.runtime.batch import Parallel
 from dspy.serialization.json import to_jsonable
 from dspy.task_spec import TaskSpec, default_task_instructions, input_field, make_task_spec, output_field
 from dspy.testing import DummyLM

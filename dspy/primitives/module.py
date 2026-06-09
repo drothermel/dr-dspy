@@ -12,11 +12,11 @@ from typing_extensions import Self, override
 
 from dspy.persistence import get_dependency_versions, warn_dependency_version_drift
 from dspy.persistence import save_program as persist_program
-from dspy.predict.parallel import Parallel
 from dspy.predict.protocol import Predictor
 from dspy.primitives.prediction import Prediction
 from dspy.runtime import Callback, RunContext, resolve_run, track_usage, with_callbacks
 from dspy.runtime.active_run import call_scope, get_active_usage_tracker
+from dspy.runtime.batch import Parallel
 
 if TYPE_CHECKING:
     from collections.abc import Generator

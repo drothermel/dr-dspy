@@ -89,7 +89,7 @@ worker = fork_worker_run(run, lm=other_lm)
 result = await predict(question="...", run=worker)
 ```
 
-`Parallel` and trace capture helpers use `fork_worker_run` internally.
+`Parallel` (`from dspy.runtime import Parallel`) and trace capture helpers use `fork_worker_run` internally.
 
 Nested config updates accept model copies or dict patches:
 

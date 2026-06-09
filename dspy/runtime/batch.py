@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dspy.primitives import Example
-from dspy.primitives.batch_result import BatchFailure, BatchResult
 from dspy.runtime.async_parallel import BoundedRunStats, resolve_max_concurrency, resolve_max_errors, run_bounded
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.runtime.run_fork import fork_worker_run
+
+if TYPE_CHECKING:
+    from dspy.primitives.batch_result import BatchResult
 
 
 class Parallel:
@@ -38,6 +39,8 @@ class Parallel:
         self._active_run: RunContext | None = None
 
     async def _run_pair(self, pair: tuple[Any, Any]) -> Any:
+        from dspy.primitives.example import Example
+
         module, example = pair
         run = self._active_run
         assert run is not None
@@ -48,7 +51,7 @@ class Parallel:
             return await module(example, run=item_run)
         if isinstance(example, dict):
             return await module(**example, run=item_run)
-        if isinstance(example, list) and module.__class__.__name__ == "Parallel":
+        if isinstance(example, list) and isinstance(module, Parallel):
             return await module(example, run=item_run)
         if isinstance(example, tuple):
             return await module(*example, run=item_run)
@@ -62,6 +65,8 @@ class Parallel:
         run: RunContext | None = None,
         max_concurrency: int | None = None,
     ) -> BatchResult:
+        from dspy.primitives.batch_result import BatchFailure, BatchResult
+
         run = resolve_run(run=run, bound_run=self.run)
         self._active_run = run
         concurrency = resolve_max_concurrency(

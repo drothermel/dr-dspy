@@ -21,6 +21,7 @@ from dspy.primitives import BatchFailure, BatchResult, Example, Module, Predicti
 | `named_parameters()` / `parameters()` on `Module` | `named_predictors()` / `predictors()` |
 | `from dspy.primitives import BaseModule` / `BaseModule` subclassing | removed — subclass `Module` |
 | `Predict(Module, Parameter)` / `Parameter` marker | `Predict(Module)`; use `Predictor` protocol for isinstance checks |
+| `from dspy.predict import Parallel` | `from dspy.runtime import Parallel` |
 | `return_failed_examples=` on `Module.batch` / `Parallel` | removed; `BatchResult.failures` is always populated for failed indices |
 | `Parallel.failed_examples` / `Parallel.exceptions` | removed; use `BatchResult.failures` |
 | `sync_file` JSON-RPC notification | request/response; failures raise `CodeInterpreterError` |

@@ -1,8 +1,8 @@
 import asyncio
 
-from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module
+from dspy.runtime.batch import Parallel
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 

@@ -22,10 +22,10 @@ from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
 from dspy.persistence import load
 from dspy.predict.chain_of_thought import ChainOfThought
-from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module, Prediction
 from dspy.primitives.module import logger
+from dspy.runtime.batch import Parallel
 from dspy.task_spec import default_task_instructions, input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams

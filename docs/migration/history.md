@@ -84,7 +84,7 @@ prediction, trace = await run_with_trace(
     program, example, run, capture_parse_failures=True
 )
 
-# Evaluate / Parallel fork isolated traces per item
+# Evaluate / Parallel (from dspy.runtime) fork isolated traces per item
 item_run = run.fork(optimization_trace=[], call_log=[])
 ```
 

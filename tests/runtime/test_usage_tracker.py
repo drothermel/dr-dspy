@@ -7,8 +7,8 @@ from pydantic import BaseModel
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
 from dspy.predict.chain_of_thought import ChainOfThought
-from dspy.predict.parallel import Parallel
 from dspy.runtime import TelemetryConfig
+from dspy.runtime.batch import Parallel
 from dspy.runtime.usage_tracker import UsageTracker, track_usage
 from tests.task_spec.helpers import ts
 

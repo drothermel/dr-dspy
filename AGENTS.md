@@ -39,6 +39,8 @@ from dspy.clients.openai_format.chat_request import message_to_openai_chat, to_o
 from dspy.clients.openai_format.parse import completion_to_lm_response
 
 # Parallel batch
+from dspy.runtime import Parallel
+
 parallel = Parallel(max_concurrency=8)
 results = await parallel([(module, example), ...])
 

@@ -5,7 +5,7 @@ import random
 from typing import TYPE_CHECKING, Any, cast
 
 from dspy._internal.lazy_import import require
-from dspy.predict.parallel import Parallel
+from dspy.runtime.batch import Parallel
 from dspy.task_spec.predictor_context import resolve_optimizer_lm
 from dspy.teleprompt.simba_utils import append_a_demo, append_a_rule, prepare_models_for_resampling, wrap_program
 

@@ -21,6 +21,7 @@ from dspy.runtime.usage_tracker import UsageTracker, track_usage
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "FailedPrediction": ("dspy.runtime.optimization_trace", "FailedPrediction"),
+    "Parallel": ("dspy.runtime.batch", "Parallel"),
     "TraceData": ("dspy.runtime.optimization_trace", "TraceData"),
     "run_with_trace": ("dspy.runtime.optimization_trace", "run_with_trace"),
 }
@@ -29,6 +30,7 @@ __all__ = [
     "ACTIVE_CALL_ID",
     "Callback",
     "NoOpCallback",
+    "Parallel",
     "BoundedRunStats",
     "CallLogMode",
     "CallSite",

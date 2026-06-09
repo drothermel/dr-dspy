@@ -27,6 +27,8 @@ ALLOWLIST_SUFFIXES = (
     "runtime/call_log/inspect.py",
     # breaks openai_format.parse ↔ core.types.coercion import cycle
     "core/types/coercion.py",
+    # breaks runtime.batch ↔ primitives ↔ history import cycle
+    "runtime/batch.py",
     "evaluate/metrics.py",
 )
 
