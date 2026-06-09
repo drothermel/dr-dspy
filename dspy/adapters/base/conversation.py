@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, get_args, get_origin
 
-from dspy.adapters.base.native import AdapterMixinBase
+from dspy.adapters.base.protocols import ComposedAdapterT
 from dspy.adapters.base.task_specs import ToolCallResultsTaskSpec
 from dspy.adapters.base.tool_calls import (
     _tool_call_as_openai_message_tool_call,
@@ -17,7 +17,7 @@ from dspy.history.turn_log import is_turn_log_type
 from dspy.task_spec import TaskSpec
 
 
-class AdapterConversationMixin(AdapterMixinBase):
+class AdapterConversationMixin:
     def _get_turn_log_field_name(self, task_spec: TaskSpec) -> str | None:
         for name, field in task_spec.input_fields.items():
             if is_turn_log_type(field.type_):
@@ -41,7 +41,7 @@ class AdapterConversationMixin(AdapterMixinBase):
         return None
 
     def format_conversation_history(
-        self, task_spec: TaskSpec, turn_log_field_name: str, inputs: dict[str, Any]
+        self: ComposedAdapterT, task_spec: TaskSpec, turn_log_field_name: str, inputs: dict[str, Any]
     ) -> list[LMMessage]:
         turn_log = inputs.get(turn_log_field_name)
         conversation_history = turn_log.turns if turn_log is not None else None

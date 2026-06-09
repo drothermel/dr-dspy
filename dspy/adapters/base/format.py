@@ -1,40 +1,64 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
-from dspy.adapters.base.native import AdapterMixinBase
+if TYPE_CHECKING:
+    from dspy.adapters.base.protocols import ComposedAdapter
 from dspy.adapters.utils import build_lm_message
 from dspy.core.types import LMMessage
 from dspy.task_spec import TaskSpec
 
+# Canonical message ordering for adapter prompts: system, few-shot demos, live
+# conversation history, then the current user request.
+MESSAGE_BUILD_ORDER = ("system", "demos", "conversation_history", "current_user")
 
-class AdapterFormatMixin(AdapterMixinBase):
+
+class AdapterFormatMixin:
     def format(self, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any]) -> list[LMMessage]:
+        adapter = cast("ComposedAdapter", self)
         inputs_copy = dict(inputs)
-        turn_log_field_name = self._get_turn_log_field_name(task_spec)
+        turn_log_field_name = adapter._get_turn_log_field_name(task_spec)
         task_spec_without_history = task_spec
         conversation_history: list[LMMessage] = []
         if turn_log_field_name:
             task_spec_without_history = task_spec.delete(turn_log_field_name)
-            conversation_history = self.format_conversation_history(
+            conversation_history = adapter.format_conversation_history(
                 task_spec=task_spec, turn_log_field_name=turn_log_field_name, inputs=inputs_copy
             )
         messages: list[LMMessage] = []
+        self._append_system_message(messages=messages, task_spec=task_spec)
+        self._append_demos(messages=messages, task_spec=task_spec, demos=demos)
+        if turn_log_field_name:
+            self._append_conversation_history(messages=messages, conversation_history=conversation_history)
+            self._append_current_user_message(
+                messages=messages,
+                task_spec=task_spec_without_history,
+                inputs=inputs_copy,
+            )
+        else:
+            self._append_current_user_message(messages=messages, task_spec=task_spec, inputs=inputs_copy)
+        return messages
+
+    def _append_system_message(self, *, messages: list[LMMessage], task_spec: TaskSpec) -> None:
         system_message = self.format_system_message(task_spec)
         messages.append(build_lm_message(role="system", content=system_message))
+
+    def _append_demos(self, *, messages: list[LMMessage], task_spec: TaskSpec, demos: list[dict[str, Any]]) -> None:
         messages.extend(self.format_demos(task_spec=task_spec, demos=demos))
-        if turn_log_field_name:
-            content = self.format_user_message_content(
-                task_spec=task_spec_without_history, inputs=inputs_copy, main_request=True
-            )
-            messages.extend(conversation_history)
-            if content:
-                messages.append(build_lm_message(role="user", content=content))
-        else:
-            content = self.format_user_message_content(task_spec=task_spec, inputs=inputs_copy, main_request=True)
-            if content:
-                messages.append(build_lm_message(role="user", content=content))
-        return messages
+
+    def _append_conversation_history(self, *, messages: list[LMMessage], conversation_history: list[LMMessage]) -> None:
+        messages.extend(conversation_history)
+
+    def _append_current_user_message(
+        self,
+        *,
+        messages: list[LMMessage],
+        task_spec: TaskSpec,
+        inputs: dict[str, Any],
+    ) -> None:
+        content = self.format_user_message_content(task_spec=task_spec, inputs=inputs, main_request=True)
+        if content:
+            messages.append(build_lm_message(role="user", content=content))
 
     def format_system_message(self, task_spec: TaskSpec) -> str:
         return f"{self.format_field_description(task_spec)}\n{self.format_field_structure(task_spec)}\n{self.format_task_description(task_spec)}"

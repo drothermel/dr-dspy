@@ -1,3 +1,10 @@
+"""Hint-injecting adapter wrapper.
+
+The wrapper only augments task inputs with ``hint_`` and delegates execution to
+``_inner`` via ``AdapterCallPipeline``. Format and parse run on ``_inner``, not
+on this wrapper.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -26,15 +33,12 @@ class HintInjectingAdapter(Adapter):
         self._inner = inner
         self._hint_map = hint_map
         self._task_spec_to_name = task_spec_to_name
-        self.response_format_policy = inner.response_format_policy
-        self.parse_fallback_policy = inner.parse_fallback_policy
-        self.capabilities = inner.capabilities
+        self._sync_policies_from_inner()
 
-    def format(self, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any]) -> list[Any]:
-        return self._inner.format(task_spec=task_spec, demos=demos, inputs=inputs)
-
-    def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
-        return self._inner.parse(task_spec=task_spec, completion=completion)
+    def _sync_policies_from_inner(self) -> None:
+        self.response_format_policy = self._inner.response_format_policy
+        self.parse_fallback_policy = self._inner.parse_fallback_policy
+        self.capabilities = self._inner.capabilities
 
     async def __call__(
         self,
@@ -47,6 +51,7 @@ class HintInjectingAdapter(Adapter):
         run: RunContext,
         call_site: CallSite | None = None,
     ) -> list[dict[str, Any]]:
+        self._sync_policies_from_inner()
         hint_name = self._task_spec_to_name.get(task_spec, "N/A")
         inputs = dict(inputs)
         inputs["hint_"] = self._hint_map.get(hint_name, "N/A")

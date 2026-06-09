@@ -18,6 +18,7 @@ from dspy.task_spec.field_spec import FieldRole
 from dspy.task_spec.formatting import get_field_spec_description_string
 
 if TYPE_CHECKING:
+    from dspy.adapters.base.protocols import ChatFormattableAdapter
     from dspy.task_spec import TaskSpec
 
 FIELD_HEADER_PATTERN = re.compile(r"\[\[ ## (\w+) ## \]\]")
@@ -131,9 +132,10 @@ class ChatFormatMixin:
         inputs: dict[str, Any],
         outputs: dict[str, Any],
     ) -> dict[str, list[Any]]:
+        formattable = cast("ChatFormattableAdapter", self)
         system_user_messages = [
             message_to_openai_chat(message)
-            for message in cast("Any", self).format(task_spec=task_spec, demos=demos, inputs=inputs)
+            for message in formattable.format(task_spec=task_spec, demos=demos, inputs=inputs)
         ]
         assistant_message_content = self.format_assistant_message_content(task_spec=task_spec, outputs=outputs)
         assistant_message = {"role": "assistant", "content": assistant_message_content}

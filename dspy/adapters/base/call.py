@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.base.native import AdapterNativeMixin
+from dspy.adapters.base.protocols import ComposedAdapterT
 from dspy.adapters.base.tool_calls import attach_tool_calls_to_parsed_value
 from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.citation import Citations
@@ -31,7 +32,11 @@ if TYPE_CHECKING:
 
 class AdapterCallMixin(AdapterNativeMixin):
     def _call_preprocess(
-        self, lm: BaseLM, config: LMConfig | Mapping[str, Any], task_spec: TaskSpec, inputs: dict[str, Any]
+        self: ComposedAdapterT,
+        lm: BaseLM,
+        config: LMConfig | Mapping[str, Any],
+        task_spec: TaskSpec,
+        inputs: dict[str, Any],
     ) -> tuple[TaskSpec, list[LMToolSpec], LMConfig]:
         if not isinstance(config, LMConfig):
             config = coerce_lm_config(config)
@@ -89,7 +94,7 @@ class AdapterCallMixin(AdapterNativeMixin):
         return (task_spec, tools, config)
 
     def _call_postprocess(
-        self,
+        self: ComposedAdapterT,
         processed_task_spec: TaskSpec,
         original_task_spec: TaskSpec,
         response: LMResponse,
