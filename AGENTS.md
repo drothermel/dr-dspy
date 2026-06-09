@@ -97,7 +97,7 @@ from dspy.adapters.types.tool import Tool
 tool = Tool(my_func, description="Describe what the tool does.")
 ```
 
-ReAct, CodeAct, RLM, and ReActV2 require `tools=[Tool(...)]` (raw callables are rejected). Agent modules return `turn_log` (`TurnLog` or `REPLHistory`) on predictions.
+ReAct, CodeAct, RLM, and ReActV2 require `tools=[Tool(...)]` (raw callables are rejected). Agent modules return `turn_log` (`TurnLog` or `REPLHistory`) on predictions and use `AgentLoopRunner` with `call_with_history_truncation` for iteration and context-window retries. Prefer `ReActV2` for new tool-calling agents.
 
 See `docs/migration/taskspec.md` for the full Signature → TaskSpec translation table.
 See `docs/migration/history.md` for turn logs vs call logs vs optimization traces.

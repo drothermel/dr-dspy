@@ -452,6 +452,8 @@ ownership are clearer, because they touch broad execution paths.
 
 ### P3.1 Unify history truncation and agent loop scaffolding
 
+**Status:** Done (2026-06).
+
 **Sources:** External cross-package review.
 
 Problem:
@@ -478,6 +480,13 @@ Details to preserve:
   the runner should own iteration and termination dispatch.
 - Decide and document which ReAct implementation is canonical if both remain
   public.
+
+**Delivered:** Generic `TruncatableHistory`, `HistoryModule[H]`, and
+`call_with_history_truncation` in `dspy/history/`; `HistoryCallResult[H]`
+replaces per-type result DTOs; `REPLHistoryModule` exported; non-opinionated
+`AgentLoopRunner` in `dspy/predict/agent_loop.py`; ReAct, ReActV2, CodeAct,
+Avatar, and RLM migrated onto the runner; ReActV2 documented as the canonical
+tool-calling agent for new work.
 
 ### P3.2 Decompose GRPO and optimizer trace orchestration
 

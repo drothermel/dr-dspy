@@ -24,6 +24,12 @@ logger = logging.getLogger(__name__)
 
 
 class ReActV2(Module):
+    """Tool-calling agent with native ``ToolCalls`` and a typed ``submit`` tool.
+
+    Prefer this module for new agent work. Legacy string-based tool selection
+    remains available via ``ReAct``.
+    """
+
     def __init__(self, task_spec: TaskSpec, tools: list[Tool], max_iters: int = 20) -> None:
         super().__init__()
         if not isinstance(task_spec, TaskSpec):

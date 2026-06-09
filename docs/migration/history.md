@@ -8,7 +8,7 @@ DSPy separates three concepts that were previously conflated under "history":
 | LM observability | `CallRecord` | `run.call_log`, `lm.call_log`, disk `calls.jsonl` | What humans inspect after LM calls |
 | Optimizer trace | `list` of trace entries | `run.optimization_trace` | Bootstrap / metric / optimizer debugging |
 
-Public exports: `from dspy.history import AgentHistory, REPLHistory, TurnLog, is_agent_history_type, is_conversation_turn_log_type`.
+Public exports: `from dspy.history import AgentHistory, TruncatableHistory, HistoryModule, REPLHistory, TurnLog, TurnLogModule, REPLHistoryModule, call_with_history_truncation, is_agent_history_type, is_conversation_turn_log_type`.
 
 Dict-shaped `turn_log` / `REPLHistory` values passed as task inputs are normalized to typed models when inputs are validated for adapter calls (`dspy.task_spec.validate_task_inputs` in `AdapterCallPipeline.execute`). There is no separate `coerce_turn_log` helper.
 
@@ -40,9 +40,32 @@ input_field("turn_log", TurnLog)
 
 ReAct, ReActV2, CodeAct, Avatar, and RLM return `Prediction(..., turn_log=turn_log, termination_reason=...)`. Agent modules use `AgentTerminationReason` (`dspy.predict.agent_termination`) for `termination_reason`. RLM uses `REPLHistory` with the same `turn_log` field name.
 
+**Canonical agent module:** prefer `ReActV2` for new tool-calling agents (native `ToolCalls`, typed `submit` tool). `ReAct` remains available for legacy string-based `next_tool_name` / `next_tool_args` flows.
+
 Avatar uses canonical `dspy.adapters.types.tool.Tool` instances (same as other agent modules). The actor predictor outputs an `Action` with `tool_name` and structured `tool_args` (JSON dict), executed via `await tool.acall(**tool_args)`. `Prediction.actions` records `ActionOutput` entries with the same `tool_args` shape.
 
 Immutability: `append_turn` returns a new instance; never mutate `.turns` in place.
+
+## History truncation and agent loops
+
+Context-window retries are centralized in `call_with_history_truncation` (`dspy.history`). It accepts any `HistoryModule[H]` where `H` implements `TruncatableHistory` (`TurnLog`, `REPLHistory`):
+
+```python
+from dspy.history import TurnLog, call_with_history_truncation
+
+extracted = await call_with_history_truncation(
+    predictor,
+    turn_log=turn_log,
+    run=run,
+    question="...",
+)
+pred = extracted.result
+turn_log = extracted.turn_log
+```
+
+On `ContextWindowExceededError`, the helper truncates the oldest entry via `truncate_oldest()` and retries (default 3 attempts). Exhaustion raises `TruncationExhaustedError`.
+
+Agent modules delegate iteration to `AgentLoopRunner` (`dspy.predict.agent_loop`). The runner owns `max_iters` dispatch and termination reasons; each module supplies an async step function that returns `AgentStepResult` with `CONTINUE`, `BREAK`, or `RETURN` control.
 
 ## Call observability (`CallRecord` / `run.call_log`)
 
