@@ -1,5 +1,5 @@
 from copy import deepcopy
-from random import sample
+from random import Random
 from typing import Any, cast
 
 from pydantic import BaseModel
@@ -144,12 +144,14 @@ class AvatarOptimizer:
         trainset = params.trainset
         best_actor = deepcopy(student)
         best_score = -999 if self.optimize_for == "max" else 999
+        rng = Random(0)
         for _i in range(self.max_iters):
             score, pos_inputs, neg_inputs = await self._get_pos_neg_results(best_actor, trainset, run=run)
+            best_score = score
             if self.max_positive_inputs and len(pos_inputs) > self.max_positive_inputs:
-                pos_inputs = sample(pos_inputs, self.max_positive_inputs)
+                pos_inputs = rng.sample(pos_inputs, self.max_positive_inputs)
             if self.max_negative_inputs and len(neg_inputs) > self.max_negative_inputs:
-                neg_inputs = sample(neg_inputs, self.max_negative_inputs)
+                neg_inputs = rng.sample(neg_inputs, self.max_negative_inputs)
             actor_task_spec = get_task_spec(best_actor.actor)
             feedback = (
                 await self.comparator(
@@ -165,10 +167,16 @@ class AvatarOptimizer:
                     previous_instruction=actor_task_spec.instructions, feedback=feedback, run=run
                 )
             ).new_instruction
-            if (self.optimize_for == "max" and best_score < score) or (
-                self.optimize_for == "min" and best_score > score
+            candidate_actor = deepcopy(best_actor)
+            set_task_spec(
+                predictor=candidate_actor.actor,
+                task_spec=actor_task_spec.with_instructions(new_instruction),
+            )
+            candidate_score, _, _ = await self._get_pos_neg_results(candidate_actor, trainset, run=run)
+            if (self.optimize_for == "max" and candidate_score > best_score) or (
+                self.optimize_for == "min" and candidate_score < best_score
             ):
-                set_task_spec(predictor=best_actor.actor, task_spec=actor_task_spec.with_instructions(new_instruction))
+                best_actor = candidate_actor
                 best_actor.actor_clone = deepcopy(best_actor.actor)
-                best_score = score
+                best_score = candidate_score
         return CompileResult(program=best_actor, stats=CompileStats(best_score=best_score))

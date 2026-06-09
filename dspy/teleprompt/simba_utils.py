@@ -1,4 +1,8 @@
 import logging
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 import orjson
 
@@ -16,6 +20,11 @@ from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.simba_specs import SimbaOfferFeedbackTaskSpec
 
 logger = logging.getLogger(__name__)
+
+
+def _outputs_dict(value: object) -> dict[str, Any]:
+    mapping = cast("Mapping[str, Any]", value)
+    return dict(mapping)
 
 
 def prepare_models_for_resampling(*, program: Module, n: int, run: RunContext, teacher_run: RunContext | None = None):
@@ -80,10 +89,11 @@ def append_a_demo(demo_input_field_maxlen):
             return False
         for step in trace:
             predictor, _inputs, _outputs = step
-            for k, v in _inputs.items():
+            inputs_copy = dict(_inputs)
+            for k, v in inputs_copy.items():
                 if demo_input_field_maxlen and len(str(v)) > demo_input_field_maxlen:
-                    _inputs[k] = f"{str(v)[:demo_input_field_maxlen]}\n\t\t... <TRUNCATED FOR BREVITY>"
-            demo = Example.from_record({"augmented": True, **_inputs, **_outputs})
+                    inputs_copy[k] = f"{str(v)[:demo_input_field_maxlen]}\n\t\t... <TRUNCATED FOR BREVITY>"
+            demo = Example.from_record({"augmented": True, **inputs_copy, **_outputs})
             name = predictor2name[id(predictor)]
             name2demo[name] = demo
         for name, demo in name2demo.items():
@@ -100,7 +110,7 @@ async def append_a_rule(bucket, system, *, run: RunContext, **kwargs) -> bool:
     batch_10p_score, batch_90p_score = (kwargs["batch_10p_score"], kwargs["batch_90p_score"])
     prompt_model = resolve_optimizer_lm(kwargs["prompt_model"], run=run)
     module_names = [name for name, _ in system.named_predictors()]
-    good, bad = (bucket[0], bucket[-1])
+    good, bad = (bucket[0].copy(), bucket[-1].copy())
     example = good["example"]
     if good["score"] <= batch_10p_score or bad["score"] >= batch_90p_score:
         logger.info(
@@ -109,18 +119,14 @@ async def append_a_rule(bucket, system, *, run: RunContext, **kwargs) -> bool:
         return False
     if good["score"] <= bad["score"]:
         if good["score"] > batch_90p_score:
-            bad["trace"] = []
-            bad["score"] = "N/A"
-            bad["prediction"] = {"N/A": "Prediction not available"}
+            bad = {**bad, "trace": [], "score": "N/A", "prediction": {"N/A": "Prediction not available"}}
         else:
-            good["trace"] = []
-            good["score"] = "N/A"
-            good["prediction"] = {"N/A": "Prediction not available"}
+            good = {**good, "trace": [], "score": "N/A", "prediction": {"N/A": "Prediction not available"}}
     better_trajectory = [
-        {"module_name": predictor2name[id(p)], "inputs": i, "outputs": dict(o)} for p, i, o in good["trace"]
+        {"module_name": predictor2name[id(p)], "inputs": i, "outputs": _outputs_dict(o)} for p, i, o in good["trace"]
     ]
     worse_trajectory = [
-        {"module_name": predictor2name[id(p)], "inputs": i, "outputs": dict(o)} for p, i, o in bad["trace"]
+        {"module_name": predictor2name[id(p)], "inputs": i, "outputs": _outputs_dict(o)} for p, i, o in bad["trace"]
     ]
     kwargs = {
         "program_code": get_formatted_source(system.__class__),
@@ -128,9 +134,9 @@ async def append_a_rule(bucket, system, *, run: RunContext, **kwargs) -> bool:
         "program_inputs": {**example.as_inputs()},
         "oracle_metadata": {**example.as_labels()},
         "better_program_trajectory": better_trajectory,
-        "better_program_outputs": dict(good["prediction"]),
+        "better_program_outputs": _outputs_dict(good["prediction"]),
         "worse_program_trajectory": worse_trajectory,
-        "worse_program_outputs": dict(bad["prediction"] or {}),
+        "worse_program_outputs": _outputs_dict(bad["prediction"] or {}),
         "worse_reward_value": bad["score"],
         "better_reward_value": good["score"],
         "worse_reward_info": bad["output_metadata"],
