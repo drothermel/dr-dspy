@@ -8,7 +8,7 @@ from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.history import TurnLog
 from dspy.task_spec import input_field, make_task_spec, output_field
 from tests.adapters.conftest import format_messages_and_lm_kwargs
-from tests.adapters.scenarios.simple_qa import SIMPLE_QA_INPUTS, SIMPLE_QA_SIGNATURE
+from tests.adapters.scenarios.qa import SIMPLE_QA_CONTRACT_INPUTS, SIMPLE_QA_CONTRACT_SIGNATURE
 
 
 @pytest.mark.parametrize(
@@ -19,9 +19,9 @@ def test_simple_qa_message_contract(adapter_factory):
     adapter = adapter_factory()
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=adapter,
-        task_spec=SIMPLE_QA_SIGNATURE,
+        task_spec=SIMPLE_QA_CONTRACT_SIGNATURE,
         demos=[],
-        inputs=SIMPLE_QA_INPUTS,
+        inputs=SIMPLE_QA_CONTRACT_INPUTS,
     )
     assert messages[0]["role"] == "system"
     assert messages[-1]["role"] == "user"

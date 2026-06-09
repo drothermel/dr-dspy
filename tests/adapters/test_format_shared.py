@@ -3,7 +3,7 @@ from dspy.adapters.format.prompt_sections import output_field_type_hint
 from dspy.adapters.format_field_structure import build_role_field_sections
 from dspy.adapters.types.tool import ToolCalls
 from dspy.task_spec.field_spec import FieldRole
-from tests.adapters.scenarios.simple_qa import SIMPLE_QA_SIGNATURE
+from tests.adapters.scenarios.qa import SIMPLE_QA_CONTRACT_SIGNATURE as SIMPLE_QA_SIGNATURE
 
 
 def test_output_field_type_hint_for_tool_calls():
