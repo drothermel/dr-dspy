@@ -1,3 +1,9 @@
+"""Embedding-based corpus retriever with optional FAISS index.
+
+Import ``Embeddings`` and ``EmbeddingsWithScores`` from ``dspy.retrievers.embeddings``.
+Call ``close()`` when finished to stop the background batch worker.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -52,11 +58,9 @@ class Embeddings:
         corpus: list[str],
         embedder: Embedder,
         k: int = 5,
-        callbacks: list[object] | None = None,
         brute_force_threshold: int = 20000,
         normalize: bool = True,
     ) -> None:
-        self.callbacks = callbacks or []
         self.embedder = embedder
         self.k = k
         self.corpus = corpus

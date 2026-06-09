@@ -1,3 +1,10 @@
+"""Convert dataset rows into ``Example`` records.
+
+Import ``rows_to_examples`` from ``dspy.datasets.rows``. Empty ``rows`` returns ``[]``.
+When ``fields`` is ``None``, field names come from the first row only. Missing keys raise
+``KeyError``.
+"""
+
 from collections.abc import Iterable, Mapping, Sequence
 
 from dspy.primitives import Example

@@ -1,3 +1,9 @@
+"""Retriever spine types.
+
+Import ``QueryRetriever`` and ``RetrievedPassage`` from ``dspy.retrievers.types``.
+Implementations expose instance attribute ``k`` and async ``aforward`` / ``__call__`` entrypoints.
+"""
+
 from __future__ import annotations
 
 from typing import Protocol, TypeVar
