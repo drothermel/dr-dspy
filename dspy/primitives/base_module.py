@@ -140,8 +140,7 @@ class BaseModule:
         save_program: bool = False,
         modules_to_serialize: list[object] | None = None,
     ) -> None:
-        metadata = {}
-        metadata["dependency_versions"] = get_dependency_versions()
+        metadata = {"dependency_versions": get_dependency_versions()}
         path = Path(path)
         if save_program:
             persist_program(self, path, modules_to_serialize=modules_to_serialize)

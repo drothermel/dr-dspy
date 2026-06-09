@@ -7,7 +7,7 @@ members, ``Callable``, and custom classes are omitted from registration metadata
 """
 
 import types
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any, Protocol, Union, get_args, get_origin, runtime_checkable
 
 from typing_extensions import override
@@ -59,7 +59,7 @@ class CodeInterpreter(Protocol):
     """
 
     @property
-    def tools(self) -> dict[str, Callable[..., str]]: ...
+    def tools(self) -> Mapping[str, Callable[..., str]]: ...
 
     def start(self) -> None: ...
 

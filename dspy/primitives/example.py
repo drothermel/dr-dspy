@@ -92,7 +92,7 @@ class Example(_RecordBacked):
         return {key: self._store[key] for key in self._store if key not in input_keys and not key.startswith("dspy_")}
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._store)
+        return iter(self.keys())
 
     def fork(self, **updates: Any) -> "Example":
         store = self._store.copy()

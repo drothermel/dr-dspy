@@ -10,7 +10,7 @@ from dspy.primitives.base_module import BaseModule
 from dspy.primitives.batch_result import BatchResult
 from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
-from dspy.runtime import RunContext, pretty_print_call_log, resolve_run, track_usage, with_callbacks
+from dspy.runtime import Callback, RunContext, pretty_print_call_log, resolve_run, track_usage, with_callbacks
 from dspy.runtime.callback import ACTIVE_RUN
 
 logger = logging.getLogger(__name__)
@@ -29,19 +29,19 @@ def _warn_direct_aforward_once(cls: type) -> None:
 
 
 class Module(BaseModule):
-    def __init__(self, callbacks: list[Any] | None = None, run: RunContext | None = None) -> None:
+    def __init__(self, callbacks: list[Callback] | None = None, run: RunContext | None = None) -> None:
         self.callbacks = callbacks or []
         self.run = run
         self._compiled = False
         self.call_log = []
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
         state.pop("call_log", None)
         state.pop("callbacks", None)
         return state
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
         if not hasattr(self, "call_log"):
             self.call_log = []

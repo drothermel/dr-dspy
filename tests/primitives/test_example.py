@@ -52,6 +52,11 @@ def test_example_len():
     assert len(example) == 2
 
 
+def test_example_iter_excludes_dspy_keys():
+    example = Example.from_record({"a": 1, "b": 2, "dspy_hidden": 3})
+    assert list(example) == ["a", "b"]
+
+
 def test_example_repr_str_img():
     example = Example.from_record(
         {"img": Image(url="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")}

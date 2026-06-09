@@ -134,16 +134,12 @@ class Prediction(_RecordBacked):
         return self._completions
 
 
-def _unsupported_numeric_type(operation: str, other: object) -> TypeError:
-    return TypeError(f"Unsupported type for {operation}: {type(other)}")
-
-
 def _coerce_score_operand(other: object, *, operation: str) -> float:
     if isinstance(other, (float, int)):
         return float(other)
     if isinstance(other, Prediction):
         return float(other)
-    raise _unsupported_numeric_type(operation, other)
+    raise TypeError(f"Unsupported type for {operation}: {type(other)}")
 
 
 class Completions(_RecordBacked):
@@ -172,7 +168,7 @@ class Completions(_RecordBacked):
             raise ValueError("All Completions values must be lists")
         if not kwargs:
             return
-        lists = [v for v in kwargs.values() if isinstance(v, list)]
+        lists = list(kwargs.values())
         length = len(lists[0])
         if not all(len(v) == length for v in lists):
             raise ValueError("All Completions lists must have the same length")

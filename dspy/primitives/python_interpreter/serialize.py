@@ -71,12 +71,9 @@ def serialize_value(value: Any) -> str:
     raise CodeInterpreterError(f"Unsupported value type: {type(value).__name__}")
 
 
-def _validate_variable_names(variables: dict[str, Any], *, large_vars: dict[str, str]) -> None:
-    for key in variables:
-        if not key.isidentifier() or keyword.iskeyword(key):
-            raise CodeInterpreterError(f"Invalid variable name: '{key}'")
-        if key == "json" and large_vars:
-            raise CodeInterpreterError("Invalid variable name: 'json'")
+def _reject_json_name_for_large_vars(*, large_vars: dict[str, str]) -> None:
+    if "json" in large_vars:
+        raise CodeInterpreterError("Invalid variable name: 'json'")
 
 
 def inject_variables(interpreter: "PythonInterpreter", code: str, variables: dict[str, Any]) -> str:
@@ -93,7 +90,7 @@ def inject_variables(interpreter: "PythonInterpreter", code: str, variables: dic
         else:
             small_assignments.append(f"{key} = {serialized}")
 
-    _validate_variable_names(variables, large_vars=large_vars)
+    _reject_json_name_for_large_vars(large_vars=large_vars)
 
     interpreter._pending_large_vars = large_vars
     if large_vars:
