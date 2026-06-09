@@ -49,6 +49,53 @@ class BaseCallback:
     def on_evaluate_end(self, call_id: str, outputs: Any | None, exception: Exception | None = None) -> None: ...
 
 
+def _begin_callback_scope(
+    *,
+    instance: Any,
+    fn: Callable[..., Any],
+    kind: CallbackKind,
+    callbacks: list[BaseCallback],
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+) -> tuple[str, str | None]:
+    call_id = uuid.uuid4().hex
+    _execute_start_callbacks(
+        instance=instance,
+        fn=fn,
+        kind=kind,
+        call_id=call_id,
+        callbacks=callbacks,
+        args=args,
+        kwargs=kwargs,
+    )
+    parent_call_id = ACTIVE_CALL_ID.get()
+    ACTIVE_CALL_ID.set(call_id)
+    return call_id, parent_call_id
+
+
+def _end_callback_scope(
+    *,
+    instance: Any,
+    fn: Callable[..., Any],
+    kind: CallbackKind,
+    call_id: str,
+    parent_call_id: str | None,
+    results: Any,
+    exception: Exception | None,
+    callbacks: list[BaseCallback],
+) -> None:
+    ACTIVE_CALL_ID.set(parent_call_id)
+    _execute_end_callbacks(
+        instance=instance,
+        fn=fn,
+        kind=kind,
+        call_id=call_id,
+        results=results,
+        exception=exception,
+        callbacks=callbacks,
+    )
+
+
 def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F | Callable[[F], F]:
     def decorator(fn: F) -> F:
         if inspect.iscoroutinefunction(fn):
@@ -59,18 +106,14 @@ def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F |
                 callbacks = _get_active_callbacks(instance, run)
                 if not callbacks:
                     return await fn(instance, *args, **kwargs)
-                call_id = uuid.uuid4().hex
-                _execute_start_callbacks(
+                call_id, parent_call_id = _begin_callback_scope(
                     instance=instance,
                     fn=fn,
                     kind=kind,
-                    call_id=call_id,
                     callbacks=callbacks,
                     args=args,
                     kwargs=kwargs,
                 )
-                parent_call_id = ACTIVE_CALL_ID.get()
-                ACTIVE_CALL_ID.set(call_id)
                 results = None
                 exception = None
                 try:
@@ -81,12 +124,12 @@ def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F |
                 else:
                     return results
                 finally:
-                    ACTIVE_CALL_ID.set(parent_call_id)
-                    _execute_end_callbacks(
+                    _end_callback_scope(
                         instance=instance,
                         fn=fn,
                         kind=kind,
                         call_id=call_id,
+                        parent_call_id=parent_call_id,
                         results=results,
                         exception=exception,
                         callbacks=callbacks,
@@ -100,18 +143,14 @@ def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F |
             callbacks = _get_active_callbacks(instance, run)
             if not callbacks:
                 return fn(instance, *args, **kwargs)
-            call_id = uuid.uuid4().hex
-            _execute_start_callbacks(
+            call_id, parent_call_id = _begin_callback_scope(
                 instance=instance,
                 fn=fn,
                 kind=kind,
-                call_id=call_id,
                 callbacks=callbacks,
                 args=args,
                 kwargs=kwargs,
             )
-            parent_call_id = ACTIVE_CALL_ID.get()
-            ACTIVE_CALL_ID.set(call_id)
             results = None
             exception = None
             try:
@@ -122,12 +161,12 @@ def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F |
             else:
                 return results
             finally:
-                ACTIVE_CALL_ID.set(parent_call_id)
-                _execute_end_callbacks(
+                _end_callback_scope(
                     instance=instance,
                     fn=fn,
                     kind=kind,
                     call_id=call_id,
+                    parent_call_id=parent_call_id,
                     results=results,
                     exception=exception,
                     callbacks=callbacks,
