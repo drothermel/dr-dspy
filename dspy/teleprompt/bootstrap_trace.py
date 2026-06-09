@@ -55,7 +55,10 @@ async def bootstrap_trace_data(
     def wrapped_metric(example, prediction, trace=None):
         prediction, _ = prediction
         if isinstance(prediction, FailedPrediction):
-            return prediction.format_reward or format_failure_score
+            reward = prediction.format_reward if prediction.format_reward is not None else format_failure_score
+            if reward < 0.0 or reward > 1.0:
+                return failure_score
+            return reward
         return metric(example, prediction, trace) if metric else True
 
     original_aforward_impl = object.__getattribute__(program, "_aforward_impl")

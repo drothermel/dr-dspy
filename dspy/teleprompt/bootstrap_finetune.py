@@ -11,7 +11,9 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_trace import bootstrap_trace_data
+from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
+from dspy.teleprompt.registry import register_teleprompter
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,7 @@ class FinetuneTeleprompter:
         return defaultdict(lambda: arg)
 
 
+@register_teleprompter(params=BootstrapFewShotCompileParams)
 class BootstrapFinetune(FinetuneTeleprompter):
     def __init__(
         self,
@@ -45,7 +48,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
         self.exclude_demos = exclude_demos
         self.max_concurrency = max_concurrency
 
-    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = BootstrapFewShotCompileParams.model_validate(params)
         trainset = params.trainset
         teacher = params.teacher
@@ -98,8 +101,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
             pred.lm = finetuned_lm
             pred.demos = [] if self.exclude_demos else pred.demos
         logger.info("BootstrapFinetune has finished compiling the student program")
-        student._compiled = True
-        return student
+        return CompileResult.with_compiled_program(student)
 
     @staticmethod
     def finetune_lms(finetune_dict) -> dict[Any, LM]:

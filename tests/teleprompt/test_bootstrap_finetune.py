@@ -47,11 +47,12 @@ def test_compile_with_predict_instances(make_run):
     bootstrap = BootstrapFinetune(metric=simple_metric)
     with patch.object(bootstrap, "finetune_lms") as mock_finetune:
         mock_finetune.return_value = {(lm, None): lm}
-        compiled_student = asyncio.run(
+        result = asyncio.run(
             bootstrap.compile(
                 student, params=BootstrapFewShotCompileParams(trainset=trainset, teacher=teacher), run=run
             )
         )
+        compiled_student = result.program
         assert compiled_student is not None, "Failed to compile student"
         assert hasattr(compiled_student, "_compiled") and compiled_student._compiled, "Student compilation flag not set"
         mock_finetune.assert_called_once()

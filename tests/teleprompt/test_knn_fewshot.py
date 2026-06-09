@@ -52,9 +52,10 @@ def _test_knn_few_shot_compile(setup_knn_few_shot, make_run):
     lm = DummyLM(cast("Any", ["Madrid", "10"]))
     run = make_run(lm=lm)
     knn_few_shot = setup_knn_few_shot
-    compiled_student = asyncio.run(
+    compile_result = asyncio.run(
         knn_few_shot.compile(student, params=KNNFewShotCompileParams(teacher=teacher), run=run)
     )
+    compiled_student = compile_result.program
     output = asyncio.run(compiled_student(input="What is the capital of Spain?", run=run))
     assert output.output in ["Madrid", "10"], (
         "The compiled student did not return the correct output based on the query"

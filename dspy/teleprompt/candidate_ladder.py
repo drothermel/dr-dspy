@@ -95,11 +95,12 @@ async def compile_candidate_program(
         return student.reset_copy()
     if isinstance(seed, LabeledFewShotSeed):
         teleprompter = LabeledFewShot(k=max_labeled_demos)
-        return await teleprompter.compile(
+        result = await teleprompter.compile(
             student,
             params=LabeledFewShotCompileParams(trainset=trainset_copy, sample=labeled_sample),
             run=run,
         )
+        return result.program
     if isinstance(seed, BootstrapSeed):
         bootstrapped_demos = max_bootstrapped_demos
     elif isinstance(seed, RandomizedBootstrapSeed):
@@ -117,11 +118,12 @@ async def compile_candidate_program(
         teacher_run=teacher_run,
         max_rounds=max_rounds,
     )
-    return await teleprompter.compile(
+    result = await teleprompter.compile(
         student,
         params=BootstrapFewShotCompileParams(trainset=trainset_copy, teacher=teacher),
         run=run,
     )
+    return result.program
 
 
 async def generate_demo_candidate_sets(

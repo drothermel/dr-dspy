@@ -28,7 +28,9 @@ from dspy.teleprompt.bootstrap_finetune import (
     assert_structural_equivalency,
 )
 from dspy.teleprompt.bootstrap_trace import FailedPrediction, bootstrap_trace_data
+from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import GRPOCompileParams
+from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_task_spec
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,7 @@ async def _wait_until(predicate: Callable[[], bool], poll_interval: float = 1.0)
     await _wait_until(predicate=predicate, poll_interval=poll_interval)
 
 
+@register_teleprompter(params=GRPOCompileParams)
 class GRPO(FinetuneTeleprompter):
     def __init__(
         self,
@@ -278,7 +281,7 @@ class GRPO(FinetuneTeleprompter):
         selected_ids = self.shuffled_trainset_ids[base_idx:end_idx]
         return [original_trainset[i] for i in selected_ids]
 
-    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = GRPOCompileParams.model_validate(params)
         trainset = params.trainset
         teacher = params.teacher
@@ -593,5 +596,4 @@ class GRPO(FinetuneTeleprompter):
         for job in grpo_training_jobs.values():
             job.terminate()
         logger.info("GRPO compiler has finished compiling the student program")
-        student._compiled = True
-        return student
+        return CompileResult.with_compiled_program(student)

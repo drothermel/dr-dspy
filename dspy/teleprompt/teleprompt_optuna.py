@@ -80,11 +80,12 @@ class BootstrapFewShotWithOptuna:
             teacher_run=self.teacher_run,
             max_rounds=self.max_rounds,
         )
-        self.compiled_teleprompter = await teleprompter_optimize.compile(
+        bootstrap_result = await teleprompter_optimize.compile(
             self.student,
             params=BootstrapFewShotCompileParams(trainset=self.trainset, teacher=self.teacher),
             run=run,
         )
+        self.compiled_teleprompter = bootstrap_result.program
         study = create_maximize_study(feature="BootstrapFewShotWithOptuna")
         await run_ask_tell_loop(study, self.num_candidate_sets, self._run_trial)
         best_program = study.trials[study.best_trial.number].user_attrs["program"]

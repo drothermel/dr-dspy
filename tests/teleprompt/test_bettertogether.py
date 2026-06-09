@@ -3,15 +3,17 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bettertogether import BetterTogether
 from dspy.teleprompt.bootstrap_finetune import BootstrapFinetune
+from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BetterTogetherCompileParams, RandomSearchCompileParams
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
+from dspy.teleprompt.registry import register_teleprompter, validate_compile_params
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 
@@ -55,11 +57,25 @@ class SimpleModule(Module):
         return await self.predictor(run=run, options=options, **inputs)
 
 
+class MockOptimizerCompileParams(BaseModel):
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    trainset: list[Example] | None = None
+    teacher: Module | list[Module] | None = None
+    valset: list[Example] | None = None
+
+
+def _compile_result(program: Module) -> CompileResult:
+    return CompileResult(program=program)
+
+
+@register_teleprompter(params=MockOptimizerCompileParams)
 class SimpleOptimizer:
     async def compile(self, student, *, params: BaseModel, run: RunContext):
-        return student
+        return _compile_result(student)
 
 
+@register_teleprompter(params=MockOptimizerCompileParams)
 class MarkedOptimizer:
     def __init__(self, marker):
         self.marker = marker
@@ -67,16 +83,27 @@ class MarkedOptimizer:
     async def compile(self, student, *, params: BaseModel, run: RunContext):
         prog = SimpleModule(ts("input -> output"))
         cast("Any", prog).marker = self.marker
-        return prog
+        return _compile_result(prog)
 
 
+@register_teleprompter(params=RandomSearchCompileParams)
+class CapturingRandomSearchOptimizer:
+    def __init__(self):
+        self.received_params = None
+
+    async def compile(self, student, *, params: BaseModel, run: RunContext):
+        self.received_params = params
+        return _compile_result(student)
+
+
+@register_teleprompter(params=MockOptimizerCompileParams)
 class CapturingOptimizer:
     def __init__(self):
         self.received_params = None
 
     async def compile(self, student, *, params: BaseModel, run: RunContext):
         self.received_params = params
-        return student
+        return _compile_result(student)
 
 
 @pytest.fixture
@@ -141,29 +168,32 @@ def test_strategy_validation(make_run):
         optimizer._prepare_strategy([])
 
 
+@register_teleprompter(params=MockOptimizerCompileParams)
+class TrackingOptimizer(SimpleOptimizer):
+    def __init__(self) -> None:
+        super().__init__()
+        self.compile_called = False
+
+    async def compile(self, student, *, params: BaseModel, run: RunContext):
+        self.compile_called = True
+        return await super().compile(student, params=params, run=run)
+
+
 def test_compile_basic(make_run):
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "blue"}, {"output": "4"}])
     run = make_run(lm=lm)
     student.set_lm(lm)
 
-    class MockTeleprompter:
-        def __init__(self):
-            self.compile_called = False
-
-        async def compile(self, student, *, params: BaseModel, run: RunContext):
-            self.compile_called = True
-            return student
-
-    mock_p = MockTeleprompter()
+    mock_p = TrackingOptimizer()
     optimizer = BetterTogether(metric=simple_metric, p=mock_p)
     with patch("dspy.teleprompt.bettertogether.eval_candidate_program", new_callable=AsyncMock) as mock_eval:
         mock_eval.return_value = Mock(score=0.8)
         with patch("dspy.teleprompt.bettertogether.launch_lms"), patch("dspy.teleprompt.bettertogether.kill_lms"):
-            compiled = asyncio.run(optimizer.compile(student, params=_bt_params(strategy=["p"]), run=run))
-    assert compiled is not None, "Compilation returned None"
-    assert hasattr(compiled, "candidate_programs"), "Missing candidate_programs attribute"
-    assert hasattr(compiled, "flag_compilation_error_occurred"), "Missing flag_compilation_error_occurred attribute"
+            result = asyncio.run(optimizer.compile(student, params=_bt_params(strategy=["p"]), run=run))
+    assert result.program is not None, "Compilation returned None"
+    assert len(result.candidates) > 0, "Missing candidates"
+    assert result.stats.error_occurred is False, "Unexpected compilation error flag"
     assert mock_p.compile_called, "Mock optimizer compile was not called"
 
 
@@ -212,7 +242,7 @@ def test_optimizer_compile_args_validation():
 def test_student_in_optimizer_compile_args():
     optimizer = BetterTogether(metric=simple_metric)
     try:
-        optimizer._validate_compile_args(optimizer.optimizers["p"], "p", BetterTogetherCompileParams(trainset=trainset))
+        validate_compile_params(optimizer.optimizers["p"], BetterTogetherCompileParams(trainset=trainset))
         raise AssertionError("Should have raised TypeError for wrong compile_args type")
     except TypeError as e:
         assert "RandomSearchCompileParams" in str(e)
@@ -222,7 +252,7 @@ def test_compile_args_passed_to_optimizer(student_with_lm, mock_bt_dependencies,
     run = make_run(lm=student_with_lm.get_lm())
     mock_eval, _, _ = mock_bt_dependencies
     mock_eval.return_value = Mock(score=0.9)
-    mock_p = CapturingOptimizer()
+    mock_p = CapturingRandomSearchOptimizer()
     optimizer = BetterTogether(metric=simple_metric, p=mock_p)
     asyncio.run(
         optimizer.compile(
@@ -257,21 +287,23 @@ def test_compile_args_multi_optimizer_strategy(make_run):
     run = make_run(lm=lm)
     student.set_lm(lm)
 
+    @register_teleprompter(params=PromptTestParams)
     class PromptOptimizer:
         def __init__(self):
             self.received_params = None
 
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             self.received_params = params
-            return student
+            return _compile_result(student)
 
+    @register_teleprompter(params=WeightTestParams)
     class WeightOptimizer:
         def __init__(self):
             self.received_params = None
 
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             self.received_params = params
-            return student
+            return _compile_result(student)
 
     mock_p = PromptOptimizer()
     mock_w = WeightOptimizer()
@@ -303,13 +335,14 @@ def test_compile_args_override_global_params(make_run):
     run = make_run(lm=lm)
     student.set_lm(lm)
 
+    @register_teleprompter(params=RandomSearchCompileParams)
     class CapturingTeleprompter:
         def __init__(self):
             self.received_params = None
 
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             self.received_params = params
-            return student
+            return _compile_result(student)
 
     mock_p = CapturingTeleprompter()
     optimizer = BetterTogether(metric=simple_metric, p=mock_p)
@@ -345,10 +378,11 @@ def test_trainset_shuffling_between_steps(make_run):
     student.set_lm(lm)
     trainsets_received = []
 
+    @register_teleprompter(params=MockOptimizerCompileParams)
     class TrainsetCapturingOptimizer:
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             trainsets_received.append(getattr(params, "trainset", None))
-            return student
+            return _compile_result(student)
 
     mock_p = TrainsetCapturingOptimizer()
     mock_w = TrainsetCapturingOptimizer()
@@ -383,6 +417,7 @@ def test_strategy_execution_order(make_run):
     student.set_lm(lm)
     execution_log = []
 
+    @register_teleprompter(params=MockOptimizerCompileParams)
     class LoggingOptimizer:
         def __init__(self, name):
             self.name = name
@@ -396,7 +431,7 @@ def test_strategy_execution_order(make_run):
             else:
                 typed_optimized.optimization_path = typed_student.optimization_path + [self.name]
             execution_log.append((self.name, typed_optimized.optimization_path.copy()))
-            return optimized
+            return _compile_result(optimized)
 
     mock_p = LoggingOptimizer("p")
     mock_w = LoggingOptimizer("w")
@@ -421,10 +456,6 @@ def test_lm_lifecycle_management(make_run):
     run = make_run(lm=lm)
     student.set_lm(lm)
 
-    class SimpleOptimizer:
-        async def compile(self, student, *, params: BaseModel, run: RunContext):
-            return student
-
     mock_p = SimpleOptimizer()
     mock_w = SimpleOptimizer()
     optimizer = BetterTogether(metric=simple_metric, p=mock_p, w=mock_w)
@@ -446,12 +477,14 @@ def test_error_handling_returns_best_program(make_run):
     run = make_run(lm=lm)
     student.set_lm(lm)
 
+    @register_teleprompter(params=MockOptimizerCompileParams)
     class SuccessfulOptimizer:
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             optimized = SimpleModule(ts("input -> output"))
             cast("Any", optimized).step_name = "p_success"
-            return optimized
+            return _compile_result(optimized)
 
+    @register_teleprompter(params=MockOptimizerCompileParams)
     class FailingOptimizer:
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             raise RuntimeError("Intentional failure for testing")
@@ -467,11 +500,9 @@ def test_error_handling_returns_best_program(make_run):
             patch.object(optimizer, "_models_changed", return_value=False),
         ):
             result = asyncio.run(optimizer.compile(student, params=_bt_params(strategy=["p", "w"]), run=run))
-    assert result is not None, "Should return a program even if a step fails"
-    assert hasattr(result, "flag_compilation_error_occurred"), "Should have error flag"
-    assert result.flag_compilation_error_occurred is True, "Error flag should be True"
-    assert hasattr(result, "candidate_programs"), "Should have candidate_programs"
-    assert len(result.candidate_programs) > 0, "Should have at least one candidate program"
+    assert result.program is not None, "Should return a program even if a step fails"
+    assert result.stats.error_occurred is True, "Error flag should be True"
+    assert len(result.candidates) > 0, "Should have at least one candidate program"
 
 
 @pytest.mark.parametrize(
@@ -497,8 +528,8 @@ def test_program_selection(student_with_lm, test_valset, expected_marker, test_d
             result = asyncio.run(
                 optimizer.compile(student_with_lm, params=_bt_params(valset=test_valset, strategy=["p", "w"]), run=run)
             )
-    assert hasattr(result, "marker"), "Result should have marker"
-    assert result.marker == expected_marker, test_description
+    assert hasattr(result.program, "marker"), "Result should have marker"
+    assert result.program.marker == expected_marker, test_description
 
 
 def test_candidate_programs_structure(student_with_lm, make_run):
@@ -514,23 +545,19 @@ def test_candidate_programs_structure(student_with_lm, make_run):
             patch.object(optimizer, "_models_changed", return_value=False),
         ):
             result = asyncio.run(optimizer.compile(student_with_lm, params=_bt_params(strategy=["p", "w"]), run=run))
-    assert hasattr(result, "candidate_programs"), "Result should have candidate_programs attribute"
-    candidates = result.candidate_programs
+    candidates = result.candidates
     assert len(candidates) == 3, f"Should have 3 candidates, got {len(candidates)}"
     for i, candidate in enumerate(candidates):
-        assert "score" in candidate, f"Candidate {i} missing 'score' key"
-        assert "program" in candidate, f"Candidate {i} missing 'program' key"
-        assert "strategy" in candidate, f"Candidate {i} missing 'strategy' key"
-        assert isinstance(candidate["score"], (int, float)), f"Candidate {i} score should be numeric"
-        assert isinstance(candidate["program"], Module), f"Candidate {i} program should be a Module"
-        assert isinstance(candidate["strategy"], (str, type(None))), f"Candidate {i} strategy should be str or None"
-    scores = [c["score"] for c in candidates]
+        assert candidate.score is not None or candidate.score is None, f"Candidate {i} score missing"
+        assert isinstance(candidate.program, Module), f"Candidate {i} program should be a Module"
+        assert isinstance(candidate.label, (str, type(None))), f"Candidate {i} label should be str or None"
+    scores = [c.score for c in candidates if c.score is not None]
     assert scores == sorted(scores, reverse=True), "Candidates should be sorted by score (descending)"
-    assert candidates[0]["score"] == 0.9, "Best candidate should have score 0.9"
-    assert candidates[0]["program"].marker == "w", "Best candidate should be from optimizer 'w'"
-    baseline = [c for c in candidates if c["strategy"] is None or c["strategy"] == ""]
+    assert candidates[0].score == 0.9, "Best candidate should have score 0.9"
+    assert candidates[0].program.marker == "w", "Best candidate should be from optimizer 'w'"
+    baseline = [c for c in candidates if c.label is None or c.label == ""]
     assert len(baseline) == 1, "Should have exactly one baseline candidate"
-    assert baseline[0]["score"] == 0.5, "Baseline should have score 0.5"
+    assert baseline[0].score == 0.5, "Baseline should have score 0.5"
 
 
 def test_empty_valset_handling(student_with_lm, make_run):
@@ -543,9 +570,9 @@ def test_empty_valset_handling(student_with_lm, make_run):
         patch.object(optimizer, "_models_changed", return_value=False),
     ):
         result = asyncio.run(optimizer.compile(student_with_lm, params=_bt_params(valset=[], strategy=["p"]), run=run))
-    assert hasattr(result, "marker"), "Result should have marker"
-    assert result.marker == "optimized", "Should return the latest program when valset is empty list"
-    assert hasattr(result, "candidate_programs"), "Should have candidate_programs"
+    assert hasattr(result.program, "marker"), "Result should have marker"
+    assert result.program.marker == "optimized", "Should return the latest program when valset is empty list"
+    assert len(result.candidates) > 0, "Should have candidates"
     student2 = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     run = make_run(lm=lm)
@@ -558,5 +585,5 @@ def test_empty_valset_handling(student_with_lm, make_run):
         patch.object(optimizer2, "_models_changed", return_value=False),
     ):
         result2 = asyncio.run(optimizer2.compile(student2, params=_bt_params(valset=None, strategy=["p"]), run=run))
-    assert hasattr(result2, "marker"), "Result2 should have marker"
-    assert result2.marker == "optimized", "Should return the latest program when valset is None"
+    assert hasattr(result2.program, "marker"), "Result2 should have marker"
+    assert result2.program.marker == "optimized", "Should return the latest program when valset is None"

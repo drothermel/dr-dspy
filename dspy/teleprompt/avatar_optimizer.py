@@ -12,7 +12,9 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
+from dspy.teleprompt.compilation import CompileResult, CompileStats
 from dspy.teleprompt.compile_params import AvatarOptimizerCompileParams
+from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.trace_helpers import run_program_with_trace
 
@@ -79,6 +81,7 @@ class _AvatarEvalModule(Module):
         )
 
 
+@register_teleprompter(params=AvatarOptimizerCompileParams)
 class AvatarOptimizer:
     def __init__(
         self,
@@ -172,7 +175,7 @@ class AvatarOptimizer:
             raise ValueError("No negative examples found, try raising the lower_bound or providing more training data")
         return (avg_score, pos_inputs, neg_inputs)
 
-    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = AvatarOptimizerCompileParams.model_validate(params)
         trainset = params.trainset
         best_actor = deepcopy(student)
@@ -204,4 +207,4 @@ class AvatarOptimizer:
                 set_task_spec(predictor=best_actor.actor, task_spec=actor_task_spec.with_instructions(new_instruction))
                 best_actor.actor_clone = deepcopy(best_actor.actor)
                 best_score = score
-        return best_actor
+        return CompileResult(program=best_actor, stats=CompileStats(best_score=best_score))

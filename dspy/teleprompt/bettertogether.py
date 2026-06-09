@@ -1,12 +1,13 @@
 import logging
 import random
-from typing import Callable, cast
+from typing import Callable
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
 from dspy.primitives import Example, Module
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
+from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.bootstrap_finetune import (
     BootstrapFinetune,
     all_predictors_have_lms,
@@ -15,6 +16,7 @@ from dspy.teleprompt.bootstrap_finetune import (
     prepare_student,
     prepare_teacher,
 )
+from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
 from dspy.teleprompt.compile_params import (
     BetterTogetherCompileParams,
     BootstrapFewShotCompileParams,
@@ -24,6 +26,7 @@ from dspy.teleprompt.compile_params import (
 from dspy.teleprompt.eval_batch import eval_candidate_program
 from dspy.teleprompt.protocol import Teleprompter
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
+from dspy.teleprompt.registry import compile_params_type, register_teleprompter, validate_compile_params
 from dspy.teleprompt.utils import make_optimizer_evaluator
 
 logger = logging.getLogger(__name__)
@@ -32,22 +35,7 @@ GREEN = "\x1b[92m"
 BLUE = "\x1b[94m"
 BOLD = "\x1b[1m"
 ENDC = "\x1b[0m"
-
-
-class PassthroughCompileParams(BaseModel):
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
-
-    trainset: list[Example] | None = None
-    teacher: Module | list[Module] | None = None
-    valset: list[Example] | None = None
-
-
-_OPTIMIZER_PARAMS_TYPES: dict[str, type[BaseModel]] = {
-    "BootstrapFewShotWithRandomSearch": RandomSearchCompileParams,
-    "BootstrapFinetune": BootstrapFewShotCompileParams,
-    "BootstrapFewShot": BootstrapFewShotCompileParams,
-    "GEPA": GEPACompileParams,
-}
+STRATEGY_LABEL_SEP = " -> "
 
 
 def _normalize_teacher(teacher: list[Module] | None) -> Module | list[Module] | None:
@@ -66,37 +54,52 @@ def _default_compile_params(
     valset: list[Example] | None,
 ) -> BaseModel:
     teacher_arg = _normalize_teacher(teacher)
-    name = optimizer.__class__.__name__
-    if name == "BootstrapFewShotWithRandomSearch":
-        return RandomSearchCompileParams(trainset=trainset, teacher=teacher_arg, valset=valset)
-    if name == "BootstrapFinetune":
+    optimizer_type = optimizer.__class__
+    if optimizer_type is BootstrapFewShotWithRandomSearch:
+        return RandomSearchCompileParams(
+            trainset=trainset,
+            teacher=teacher_arg,
+            valset=valset,
+            include_baselines=False,
+        )
+    if optimizer_type is BootstrapFinetune:
         return BootstrapFewShotCompileParams(trainset=trainset, teacher=teacher_arg)
-    if name == "BootstrapFewShot":
+    if optimizer_type is BootstrapFewShot:
         return BootstrapFewShotCompileParams(trainset=trainset, teacher=teacher_arg)
-    if name == "GEPA":
+    if optimizer_type.__name__ == "GEPA":
         return GEPACompileParams(trainset=trainset, teacher=teacher_arg, valset=valset)
-    return PassthroughCompileParams(trainset=trainset, teacher=teacher_arg, valset=valset)
+    params_type = compile_params_type(optimizer)
+    field_names = params_type.model_fields
+    kwargs: dict[str, object] = {}
+    if "trainset" in field_names:
+        kwargs["trainset"] = trainset
+    if "teacher" in field_names:
+        kwargs["teacher"] = teacher_arg
+    if "valset" in field_names:
+        kwargs["valset"] = valset
+    return params_type(**kwargs)
 
 
+@register_teleprompter(params=BetterTogetherCompileParams)
 class BetterTogether:
-    STRAT_SEP = " -> "
-
     def __init__(self, metric: Callable, **optimizers: Teleprompter) -> None:
         self.metric = metric
         if not optimizers:
             logger.info(
-                "No optimizers provided. Using defaults: BootstrapFewShotWithRandomSearch (p) and BootstrapFinetune (w). You can use the letters p and w to specify the compile strategy. For example, to run weight optimization after prompt optimization, use strategy='p -> w'."
+                "No optimizers provided. Using defaults: BootstrapFewShotWithRandomSearch (p) and BootstrapFinetune (w). "
+                "Pass strategy=['p', 'w'] to run weight optimization after prompt optimization."
             )
             optimizers = {"p": BootstrapFewShotWithRandomSearch(metric=metric), "w": BootstrapFinetune(metric=metric)}
         for key, optimizer in optimizers.items():
             if not isinstance(optimizer, Teleprompter):
                 raise TypeError(f"Optimizer '{key}' must be a Teleprompter, got {type(optimizer).__name__}")
+            compile_params_type(optimizer)
         self.optimizers: dict[str, Teleprompter] = optimizers
 
-    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = BetterTogetherCompileParams.model_validate(params)
         logger.info(f"\n{BOLD}==> BETTERTOGETHER COMPILATION STARTED <=={ENDC}")
-        logger.info(f"{BLUE}Strategy:{ENDC} {self.STRAT_SEP.join(params.strategy)}")
+        logger.info(f"{BLUE}Strategy:{ENDC} {STRATEGY_LABEL_SEP.join(params.strategy)}")
         logger.info(f"{BLUE}Trainset size:{ENDC} {len(params.trainset)}")
         logger.info(
             f"{BLUE}Validation ratio:{ENDC} {(params.valset_ratio if params.valset is None else 'using provided valset')}"
@@ -108,7 +111,7 @@ class BetterTogether:
         effective_max_errors = resolve_max_errors(params.max_errors, run)
         parsed_strategy = self._prepare_strategy(params.strategy)
         optimizer_compile_args = self._prepare_optimizer_compile_args(params.optimizer_compile_args, teacher)
-        student = await self._run_strategies(
+        result = await self._run_strategies(
             student,
             trainset,
             teacher,
@@ -123,12 +126,14 @@ class BetterTogether:
             run,
         )
         logger.info(f"\n{BOLD}{GREEN}==> BETTERTOGETHER COMPILATION COMPLETE <=={ENDC}")
-        logger.info(f"{GREEN}Best score achieved:{ENDC} {student.candidate_programs[0]['score']}")
-        logger.info(
-            f"{GREEN}Best strategy:{ENDC} {student.candidate_programs[0]['strategy'] or 'original (no optimization)'}"
+        if result.candidates:
+            logger.info(f"{GREEN}Best score achieved:{ENDC} {result.candidates[0].score}")
+            logger.info(f"{GREEN}Best strategy:{ENDC} {result.candidates[0].label or 'original (no optimization)'}")
+        return CompileResult.with_compiled_program(
+            result.program,
+            candidates=result.candidates,
+            stats=result.stats,
         )
-        student._compiled = True
-        return student
 
     def _prepare_student_and_teacher(
         self, student: Module, teacher: Module | list[Module] | None
@@ -167,7 +172,7 @@ class BetterTogether:
     def _prepare_strategy(self, strategy: list[str]) -> list[str]:
         if not strategy:
             raise ValueError("strategy cannot be empty")
-        invalid_steps = [s for s in strategy if s not in self.optimizers]
+        invalid_steps = [step for step in strategy if step not in self.optimizers]
         if invalid_steps:
             raise ValueError(
                 f"Strategy contains invalid optimizer keys: {invalid_steps}. Valid keys are: {list(self.optimizers.keys())}"
@@ -186,21 +191,10 @@ class BetterTogether:
                     f"Invalid optimizer key '{optimizer_key}'. Valid keys are: {list(self.optimizers.keys())}"
                 )
             optimizer = self.optimizers[optimizer_key]
-            self._validate_compile_args(optimizer=optimizer, optimizer_key=optimizer_key, compile_args=compile_args)
-            if optimizer.__class__.__name__ == "GEPA":
-                if teacher is not None:
-                    raise ValueError("GEPA does not accept a teacher argument. Please remove the teacher argument.")
+            validate_compile_params(optimizer, compile_args)
+            if optimizer.__class__.__name__ == "GEPA" and teacher is not None:
+                raise ValueError("GEPA does not accept a teacher argument. Please remove the teacher argument.")
         return optimizer_compile_args
-
-    def _validate_compile_args(self, optimizer: Teleprompter, optimizer_key: str, compile_args: BaseModel) -> None:
-        expected = _OPTIMIZER_PARAMS_TYPES.get(optimizer.__class__.__name__)
-        if expected is None:
-            return
-        if not isinstance(compile_args, expected):
-            raise TypeError(
-                f"optimizer_compile_args['{optimizer_key}'] must be {expected.__name__}, "
-                f"got {type(compile_args).__name__}"
-            )
 
     async def _run_strategies(
         self,
@@ -216,11 +210,11 @@ class BetterTogether:
         shuffle_trainset_between_steps: bool,
         optimizer_args: dict[str, BaseModel],
         run: RunContext,
-    ) -> Module:
+    ) -> CompileResult:
         rng = random.Random(seed)
-        candidate_programs = []
+        candidates: list[ProgramCandidate] = []
         flag_lms_launched = False
-        flag_compilation_error_occurred = False
+        error_occurred = False
         logger.info(f"\n{BOLD}==> BASELINE EVALUATION <=={ENDC}")
         logger.info("Evaluating original program (no optimization applied)")
         launch_lms(student)
@@ -228,10 +222,10 @@ class BetterTogether:
         score = await self._evaluate_on_valset(
             student, valset, rng, max_concurrency, effective_max_errors, provide_traceback, run
         )
-        self._add_candidate(candidate_programs=candidate_programs, student=student, strategy="", score=score)
+        self._add_candidate(candidates=candidates, student=student, strategy_label="", score=score)
         logger.info(f"{YELLOW}Baseline score:{ENDC} {score}")
         for ind, step_code in enumerate(parsed_strategy):
-            current_strategy = self.STRAT_SEP.join(parsed_strategy[: ind + 1])
+            current_strategy = STRATEGY_LABEL_SEP.join(parsed_strategy[: ind + 1])
             optimizer = self.optimizers[step_code]
             logger.info(
                 f"\n{BOLD}==> STEP {ind + 1}/{len(parsed_strategy)}: {optimizer.__class__.__name__.upper()} <=={ENDC}"
@@ -252,7 +246,7 @@ class BetterTogether:
                     student,
                     compile_params,
                     valset,
-                    candidate_programs,
+                    candidates,
                     current_strategy,
                     rng,
                     max_concurrency,
@@ -267,35 +261,37 @@ class BetterTogether:
                 else:
                     logger.info(f"{YELLOW}Score after optimization:{ENDC} {score}")
             except Exception as e:
-                flag_compilation_error_occurred = True
+                error_occurred = True
                 logger.exception(
                     f"{YELLOW}Step {ind + 1}/{len(parsed_strategy)} failed with error: {type(e).__name__}: {e}{ENDC}"
                 )
                 logger.exception(
-                    f"{YELLOW}Stopping optimization early. Returning best program found so far from {len(candidate_programs)} candidate(s).{ENDC}"
+                    f"{YELLOW}Stopping optimization early. Returning best program found so far from {len(candidates)} candidate(s).{ENDC}"
                 )
                 logger.error(f"{YELLOW}Traceback:{ENDC}", exc_info=True)
                 break
         if flag_lms_launched:
             kill_lms(student)
-        candidate_programs_with_idx = [(i, cp) for i, cp in enumerate(candidate_programs)]
-        candidate_programs_with_idx.sort(
-            key=lambda x: (x[1]["score"] if x[1]["score"] is not None else float("-inf"), -x[0]), reverse=True
+        candidates_with_idx = [(i, candidate) for i, candidate in enumerate(candidates)]
+        candidates_with_idx.sort(
+            key=lambda item: (
+                item[1].score if item[1].score is not None else float("-inf"),
+                -item[0],
+            ),
+            reverse=True,
         )
-        candidate_programs = [cp for _, cp in candidate_programs_with_idx]
-        if valset is None or len(valset) == 0:
-            best_program = candidate_programs_with_idx[-1][1]
-        else:
-            best_program = candidate_programs[0]
-        best_student = best_program["program"]
-        best_student.candidate_programs = candidate_programs
-        best_student.flag_compilation_error_occurred = flag_compilation_error_occurred
+        sorted_candidates = [candidate for _, candidate in candidates_with_idx]
+        best_candidate = candidates_with_idx[-1][1] if valset is None or len(valset) == 0 else sorted_candidates[0]
         logger.info(f"\n{BOLD}==> OPTIMIZATION SUMMARY <=={ENDC}")
-        logger.info(f"{GREEN}Best score:{ENDC} {best_program['score']}")
-        strategy_display = best_program["strategy"] if best_program["strategy"] else "original (no optimization)"
+        logger.info(f"{GREEN}Best score:{ENDC} {best_candidate.score}")
+        strategy_display = best_candidate.label if best_candidate.label else "original (no optimization)"
         logger.info(f"{GREEN}Best strategy:{ENDC} {strategy_display}")
-        logger.info(f"{BLUE}Total candidates evaluated:{ENDC} {len(candidate_programs)}")
-        return best_student
+        logger.info(f"{BLUE}Total candidates evaluated:{ENDC} {len(sorted_candidates)}")
+        return CompileResult(
+            program=best_candidate.program,
+            candidates=sorted_candidates,
+            stats=CompileStats(error_occurred=error_occurred, best_score=best_candidate.score),
+        )
 
     async def _run_and_evaluate_step(
         self,
@@ -303,7 +299,7 @@ class BetterTogether:
         student: Module,
         compile_params: BaseModel,
         valset: list[Example] | None,
-        candidate_programs: list,
+        candidates: list[ProgramCandidate],
         current_strategy: str,
         rng: random.Random,
         max_concurrency: int | None,
@@ -314,10 +310,8 @@ class BetterTogether:
         pred_lms_before = [pred.lm for pred in student.predictors()]
         student._compiled = False
         logger.info(f"{BLUE}Running {optimizer.__class__.__name__}...{ENDC}")
-        student = cast(
-            "Module",
-            await optimizer.compile(student, params=compile_params, run=run),
-        )
+        compile_result = await optimizer.compile(student, params=compile_params, run=run)
+        student = compile_result.program
         if not all_predictors_have_lms(student):
             logger.warning(
                 f"{YELLOW}Warning: {optimizer.__class__.__name__} incorrectly reset predictor LMs. Restoring to original LMs.{ENDC}"
@@ -331,10 +325,8 @@ class BetterTogether:
         score = await self._evaluate_on_valset(
             student, valset, rng, max_concurrency, effective_max_errors, provide_traceback, run
         )
-        self._add_candidate(
-            candidate_programs=candidate_programs, student=student, strategy=current_strategy, score=score
-        )
-        valid_scores = [cp["score"] for cp in candidate_programs if cp["score"] is not None]
+        self._add_candidate(candidates=candidates, student=student, strategy_label=current_strategy, score=score)
+        valid_scores = [candidate.score for candidate in candidates if candidate.score is not None]
         best_score_so_far = max(valid_scores) if valid_scores else float("-inf")
         is_new_best = score is not None and score >= best_score_so_far
         return (student, score, is_new_best, lms_relaunched)
@@ -345,8 +337,14 @@ class BetterTogether:
         model_names_after = [lm.model if lm else None for lm in pred_lms_after]
         return model_names_before != model_names_after
 
-    def _add_candidate(self, candidate_programs: list, student: Module, strategy: str, score: float | None) -> None:
-        candidate_programs.append({"score": score, "program": student.deepcopy(), "strategy": strategy})
+    def _add_candidate(
+        self,
+        candidates: list[ProgramCandidate],
+        student: Module,
+        strategy_label: str,
+        score: float | None,
+    ) -> None:
+        candidates.append(ProgramCandidate(score=score, program=student.deepcopy(), label=strategy_label or None))
 
     async def _evaluate_on_valset(
         self,

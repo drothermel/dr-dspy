@@ -35,8 +35,10 @@ async def test_bootstrap_few_shot_smoke_strict(make_run):
         max_labeled_demos=0,
         teacher_run=run.fork(lm=lm, adapter=json_adapter),
     )
-    compiled = await teleprompter.compile(student, params=BootstrapFewShotCompileParams(trainset=trainset), run=run)
-    result = await compiled(question="2+2", run=run)
+    compile_result = await teleprompter.compile(
+        student, params=BootstrapFewShotCompileParams(trainset=trainset), run=run
+    )
+    result = await compile_result.program(question="2+2", run=run)
     assert result.answer == "4"
 
 

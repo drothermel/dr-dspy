@@ -82,9 +82,10 @@ def test_save_compiled_model(tmp_path, make_run):
         return True
 
     optimizer = BootstrapFewShot(max_bootstrapped_demos=4, max_labeled_demos=4, max_rounds=5, metric=dummy_metric)
-    compiled_predict = asyncio.run(
+    compile_result = asyncio.run(
         optimizer.compile(predict, params=BootstrapFewShotCompileParams(trainset=trainset), run=run)
     )
+    compiled_predict = compile_result.program
     compiled_predict.save(tmp_path, save_program=True)
     loaded_predict = load(tmp_path, allow_pickle=True)
     assert compiled_predict.demos == loaded_predict.demos

@@ -11,6 +11,7 @@ from dspy.teleprompt.candidate_ladder import (
     generate_demo_candidate_sets,
     iter_candidate_seeds,
 )
+from dspy.teleprompt.compilation import CompileResult
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 
@@ -72,7 +73,7 @@ def test_generate_demo_candidate_sets_passes_metric_threshold_for_unshuffled(mak
     config = CandidateLadderConfig(num_random=1, max_labeled_demos=1, max_bootstrapped_demos=1)
     with patch("dspy.teleprompt.candidate_ladder.BootstrapFewShot") as MockBootstrap:
         mock_instance = Mock()
-        mock_instance.compile = AsyncMock(return_value=student)
+        mock_instance.compile = AsyncMock(return_value=CompileResult(program=student))
         MockBootstrap.return_value = mock_instance
         asyncio.run(
             generate_demo_candidate_sets(

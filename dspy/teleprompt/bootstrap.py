@@ -10,7 +10,9 @@ from dspy.evaluate.metric_invoke import invoke_metric
 from dspy.primitives import Module
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
+from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, LabeledFewShotCompileParams
+from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_task_spec
 from dspy.teleprompt.trace_helpers import run_program_with_trace, trace_to_demos
 
@@ -19,6 +21,7 @@ from .vanilla import LabeledFewShot
 logger = logging.getLogger(__name__)
 
 
+@register_teleprompter(params=BootstrapFewShotCompileParams)
 class BootstrapFewShot:
     def __init__(
         self,
@@ -40,15 +43,14 @@ class BootstrapFewShot:
         self.error_count = 0
         self.error_lock = threading.Lock()
 
-    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = BootstrapFewShotCompileParams.model_validate(params)
         self.trainset = params.trainset
         await self._prepare_student_and_teacher(student=student, teacher=params.teacher, run=run)
         self._prepare_predictor_mappings()
         await self._bootstrap(run=run)
         self.student = self._train()
-        self.student._compiled = True
-        return self.student
+        return CompileResult.with_compiled_program(self.student)
 
     async def _prepare_student_and_teacher(self, student, teacher, *, run: RunContext) -> None:
         self.student = student.reset_copy()
@@ -56,11 +58,12 @@ class BootstrapFewShot:
         assert getattr(self.student, "_compiled", False) is False, "Student must be uncompiled."
         if self.max_labeled_demos and getattr(self.teacher, "_compiled", False) is False:
             teleprompter = LabeledFewShot(k=self.max_labeled_demos)
-            self.teacher = await teleprompter.compile(
+            teacher_result = await teleprompter.compile(
                 self.teacher.reset_copy(),
                 params=LabeledFewShotCompileParams(trainset=self.trainset),
                 run=run,
             )
+            self.teacher = teacher_result.program
 
     def _prepare_predictor_mappings(self) -> None:
         name2predictor, predictor2name = ({}, {})

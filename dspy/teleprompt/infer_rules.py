@@ -3,20 +3,22 @@ import math
 import random
 
 from pydantic import BaseModel
-from typing_extensions import override
 
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.teleprompt.bootstrap import BootstrapFewShot
+from dspy.teleprompt.compilation import CompileResult, CompileStats
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams, InferRulesCompileParams
+from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_task_spec, set_task_spec
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
 logger = logging.getLogger(__name__)
 
 
+@register_teleprompter(params=InferRulesCompileParams)
 class InferRules(BootstrapFewShot):
     def __init__(self, num_candidates=10, num_rules=10, max_concurrency=None, teacher_run=None, **kwargs) -> None:
         super().__init__(teacher_run=teacher_run, **kwargs)
@@ -27,8 +29,7 @@ class InferRules(BootstrapFewShot):
         self.metric = kwargs.get("metric")
         self.max_errors = kwargs.get("max_errors")
 
-    @override
-    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = InferRulesCompileParams.model_validate(params)
         trainset = params.trainset
         valset = params.valset
@@ -64,7 +65,11 @@ class InferRules(BootstrapFewShot):
                 best_program = candidate_program
             logger.info(f"Evaluated Candidate {candidate_idx + 1} with score {score}. Current best score: {best_score}")
         logger.info(f"Final best score: {best_score}")
-        return best_program if best_program is not None else original_program
+        final_program = best_program if best_program is not None else original_program
+        return CompileResult.with_compiled_program(
+            final_program,
+            stats=CompileStats(best_score=best_score if best_score != -math.inf else None),
+        )
 
     async def induce_natural_language_rules(self, predictor, trainset, *, run: RunContext):
         demos = self.get_predictor_demos(trainset=trainset, predictor=predictor)

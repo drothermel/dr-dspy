@@ -43,9 +43,10 @@ def test_compile_with_predict_instances(make_run):
     lm = DummyLM(cast("Any", ["Initial thoughts", "Finish[blue]"]))
     run = make_run(lm=lm)
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
-    compiled_student = asyncio.run(
+    result = asyncio.run(
         bootstrap.compile(student, params=BootstrapFewShotCompileParams(trainset=trainset, teacher=teacher), run=run)
     )
+    compiled_student = result.program
     assert compiled_student is not None, "Failed to compile student"
     assert hasattr(compiled_student, "_compiled") and compiled_student._compiled, "Student compilation flag not set"
 
@@ -56,9 +57,10 @@ def test_bootstrap_effectiveness(make_run):
     lm = DummyLM([{"output": "blue"}, {"output": "Ring-ding-ding-ding-dingeringeding!"}], follow_examples=True)
     run = make_run(lm=lm, optimization_trace=[])
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
-    compiled_student = asyncio.run(
+    result = asyncio.run(
         bootstrap.compile(student, params=BootstrapFewShotCompileParams(trainset=trainset, teacher=teacher), run=run)
     )
+    compiled_student = result.program
     assert len(compiled_student.predictor.demos) == 1
     assert compiled_student.predictor.demos[0].input == trainset[0].input
     assert compiled_student.predictor.demos[0].output == trainset[0].output
@@ -95,7 +97,8 @@ def test_validation_set_usage(make_run):
     lm = DummyLM([{"output": "Initial thoughts"}, {"output": "Finish[blue]"}])
     run = make_run(lm=lm)
     bootstrap = BootstrapFewShot(metric=simple_metric, max_bootstrapped_demos=1, max_labeled_demos=1)
-    compiled_student = asyncio.run(
+    result = asyncio.run(
         bootstrap.compile(student, params=BootstrapFewShotCompileParams(trainset=trainset, teacher=teacher), run=run)
     )
+    compiled_student = result.program
     assert len(compiled_student.predictor.demos) >= len(valset), "Validation set not used in compiled student demos"

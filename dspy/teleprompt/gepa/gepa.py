@@ -9,7 +9,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
 from dspy.primitives import Prediction
+from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import GEPACompileParams
+from dspy.teleprompt.registry import register_teleprompter
 
 if TYPE_CHECKING:
     from gepa import GEPAResult
@@ -109,6 +111,7 @@ class DspyGEPAResult:
         )
 
 
+@register_teleprompter(params=GEPACompileParams)
 class GEPA:
     def __init__(
         self,
@@ -211,7 +214,7 @@ class GEPA:
         total += (periodic_fulls + extra_final) * V
         return total
 
-    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
+    async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> CompileResult:
         params = GEPACompileParams.model_validate(params)
         trainset = params.trainset
         teacher = params.teacher
@@ -317,4 +320,4 @@ class GEPA:
         if self.track_stats:
             dspy_gepa_result = DspyGEPAResult.from_gepa_result(gepa_result, adapter)
             new_prog.detailed_results = dspy_gepa_result
-        return new_prog
+        return CompileResult(program=new_prog)
