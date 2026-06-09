@@ -69,14 +69,27 @@ Disk logging is scoped to `RunContext.log_session` (no process-global session). 
 ## Optimizer trace
 
 ```python
+from dspy.runtime import run_with_trace
+
 # Predict appends (module, inputs, prediction) tuples when options.trace=True
-assert run.optimization_trace
+prediction, trace = await run_with_trace(program, example, run)
+assert trace
+
+# Parse failures can be captured for bootstrap, GEPA, and GRPO
+prediction, trace = await run_with_trace(
+    program, example, run, capture_parse_failures=True
+)
 
 # Evaluate / Parallel fork isolated traces per item
 item_run = run.fork(optimization_trace=[], call_log=[])
 ```
 
 Metrics still use the third argument name `trace`; it receives `list(item_run.optimization_trace)`.
+
+| Old | New |
+| --- | --- |
+| `run_program_with_trace` | `run_with_trace` (import from `dspy.runtime`) |
+| `capture_failed_parses` | `capture_parse_failures` |
 
 ## Notebook recipe
 
