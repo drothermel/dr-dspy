@@ -153,7 +153,7 @@ Use `resolve_optimizer_lm(lm=None, run=run)` from `dspy.teleprompt.task_spec_con
 
 ## Contract tests
 
-`tests/teleprompt/` encodes optimizer contracts: metric dispatch (`test_metrics.py`), LM fallback (`test_lm_resolver.py`), structural zip safety (`test_structural_zip.py`), infer-rules error handling (`test_infer_rules_errors.py`), and SIMBA resampling immutability (`test_simba_utils.py`).
+`tests/teleprompt/` encodes optimizer contracts: metric dispatch (`test_teleprompt_metrics.py`), LM fallback (`test_lm_resolver.py`), structural zip safety (`test_structural_zip.py`), infer-rules error handling (`test_infer_rules_errors.py`), and SIMBA resampling immutability (`test_simba_utils.py`).
 
 ## Breaking changes summary
 

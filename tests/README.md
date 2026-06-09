@@ -12,6 +12,8 @@ uv run pytest
 
 Pytest is configured to use `-n auto --dist=loadfile` by default. File-level distribution keeps all tests from the same file on one worker, which is a safer default for tests that use module-level state or shared fixtures.
 
+Test module basenames must be unique across the entire `tests/` tree (for example `test_teleprompt_metrics.py`, not `test_metrics.py` in multiple packages). Duplicate basenames break pytest-xdist collection even with `--dist=loadfile`.
+
 To force a serial run, disable xdist for that invocation:
 
 ```bash
