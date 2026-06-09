@@ -126,11 +126,13 @@ def test_example_to_dict():
 
 
 def test_example_to_dict_with_turn_log():
-    turn_log = TurnLog(
-        turns=(
-            {"question": "What is the capital of France?", "answer": "Paris"},
-            {"question": "What is the capital of Germany?", "answer": "Berlin"},
-        )
+    turn_log = TurnLog.model_validate(
+        {
+            "turns": [
+                {"question": "What is the capital of France?", "answer": "Paris"},
+                {"question": "What is the capital of Germany?", "answer": "Berlin"},
+            ],
+        }
     )
     example = Example.from_record({"question": "Test question", "turn_log": turn_log, "answer": "Test answer"})
     result = example.to_dict()

@@ -8,7 +8,7 @@ from dspy.history.turn_event import TurnEvent
 
 
 class TurnLog(BaseModel):
-    turns: tuple[TurnEvent | dict[str, Any], ...] = ()
+    turns: tuple[TurnEvent, ...] = ()
     model_config = ConfigDict(frozen=True)
 
     @field_validator("turns", mode="before")

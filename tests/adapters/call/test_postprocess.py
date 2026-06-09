@@ -53,7 +53,10 @@ def test_enrich_parsed_value_merges_native_reasoning_from_lm_output():
 
 def test_enrich_parsed_value_preserves_logprobs_when_empty_dict():
     task_spec = make_task_spec(
-        {"question": input_field("question", desc="The question."), "answer": output_field("answer", desc="The answer.")},
+        {
+            "question": input_field("question", desc="The question."),
+            "answer": output_field("answer", desc="The answer."),
+        },
         instructions="Answer the question.",
     )
     adapter = ChatAdapter()

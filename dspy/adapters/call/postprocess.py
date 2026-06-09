@@ -19,11 +19,7 @@ class PostprocessEnrichmentAdapter(Protocol):
 def strip_native_response_output_fields(task_spec: TaskSpec, native_response_types: list[type[Type]]) -> TaskSpec:
     for name, field in task_spec.output_fields.items():
         field_type = field.type_
-        if (
-            isinstance(field_type, type)
-            and field_type in native_response_types
-            and issubclass(field_type, Type)
-        ):
+        if isinstance(field_type, type) and field_type in native_response_types and issubclass(field_type, Type):
             task_spec = task_spec.delete(name)
     return task_spec
 

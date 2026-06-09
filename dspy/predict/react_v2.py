@@ -10,7 +10,7 @@ from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
 from dspy.core.types.config import LMConfig, LMToolChoice
 from dspy.errors import AdapterParseError, ContextWindowExceededError
-from dspy.history import TurnEvent, TurnLog, coerce_turn_log
+from dspy.history import TurnEvent, TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
@@ -90,7 +90,8 @@ class ReActV2(Module):
         max_iters = input_args.pop("max_iters", self.max_iters)
         if "history" in input_args:
             raise ValueError("ReActV2 accepts `turn_log=` only; the `history=` keyword was removed.")
-        turn_log = coerce_turn_log(input_args.pop("turn_log", None))
+        turn_log_raw = input_args.pop("turn_log", None)
+        turn_log = TurnLog.empty() if turn_log_raw is None else TurnLog.model_validate(turn_log_raw)
         pending_inputs = {name: input_args[name] for name in self.task_spec.input_fields if name in input_args}
         break_reason = "max_iters"
         for turn_index in range(max_iters):

@@ -90,7 +90,7 @@ def test_two_step_adapter_format_includes_turn_log_history(make_run):
         instructions="Given the fields `turn_log`, `question`, produce the fields `answer`.",
     )
     adapter = TwoStepAdapter(DummyLM([{"answer": "x"}]), extraction_adapter=ChatAdapter())
-    history = TurnLog(turns=({"question": "Q1", "answer": "A1"},))
+    history = TurnLog.model_validate({"turns": [{"question": "Q1", "answer": "A1"}]})
     messages, _ = format_messages_and_lm_kwargs(
         adapter=adapter,
         task_spec=QAWithHistory,

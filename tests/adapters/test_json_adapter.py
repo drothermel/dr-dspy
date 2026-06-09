@@ -161,14 +161,16 @@ def test_json_adapter_format_exact_messages_with_history_demo_pydantic_tools_and
     current_profile = Profile(
         name="Grace", location=Location(city="Arlington", country="USA"), interests=["compilers", "navy"]
     )
-    history = TurnLog(
-        turns=(
-            {
-                "profile": demo_profile,
-                "question": "Who is Ada?",
-                "answer": AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
-            },
-        )
+    history = TurnLog.model_validate(
+        {
+            "turns": [
+                {
+                    "profile": demo_profile,
+                    "question": "Who is Ada?",
+                    "answer": AnswerCard(answer="Ada is a mathematician.", sources=["memory"]),
+                }
+            ],
+        }
     )
     messages, lm_kwargs = format_messages_and_lm_kwargs(
         adapter=JSONAdapter(),
@@ -502,14 +504,16 @@ def test_json_adapter_format_exact_non_native_tool_result_history_field():
         demos=[],
         inputs={
             "question": "Q2",
-            "turn_log": TurnLog(
-                turns=(
-                    {
-                        "question": "Q1",
-                        "next_thought": "I should search.",
-                        "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
-                    },
-                )
+            "turn_log": TurnLog.model_validate(
+                {
+                    "turns": [
+                        {
+                            "question": "Q1",
+                            "next_thought": "I should search.",
+                            "tool_calls": ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
+                        }
+                    ],
+                }
             ),
             "tools": [Tool(search, description="Search for documents.")],
         },
@@ -999,11 +1003,13 @@ def test_json_adapter_formats_conversation_history():
         },
         instructions="Given the fields `question`, `turn_log`, produce the fields `answer`.",
     )
-    history = TurnLog(
-        turns=(
-            {"question": "What is the capital of France?", "answer": "Paris"},
-            {"question": "What is the capital of Germany?", "answer": "Berlin"},
-        )
+    history = TurnLog.model_validate(
+        {
+            "turns": [
+                {"question": "What is the capital of France?", "answer": "Paris"},
+                {"question": "What is the capital of Germany?", "answer": "Berlin"},
+            ],
+        }
     )
     adapter = JSONAdapter()
     messages = adapter_format_as_openai(

@@ -59,6 +59,6 @@ def test_turn_log_immutable_after_append():
 
 
 def test_turn_log_coerces_dict_turns_on_load():
-    log = TurnLog(turns=({"thought": "legacy"},))
+    log = TurnLog.model_validate({"turns": [{"thought": "legacy"}]})
     assert isinstance(log.turns[0], TurnEvent)
     assert log.turns[0].thought == "legacy"

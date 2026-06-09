@@ -1,8 +1,6 @@
-from dspy.history.coercion import coerce_turn_log
 from dspy.history.discovery import (
     is_agent_history_type,
     is_conversation_turn_log_type,
-    is_repl_history_type,
 )
 from dspy.history.protocol import AgentHistory, ConversationTurnLog, TurnLogModule
 from dspy.history.repl_history import REPLEntry, REPLHistory, REPLVariable
@@ -21,8 +19,6 @@ __all__ = [
     "TurnLogCallResult",
     "TurnLogModule",
     "call_with_turn_log_truncation",
-    "coerce_turn_log",
     "is_agent_history_type",
     "is_conversation_turn_log_type",
-    "is_repl_history_type",
 ]

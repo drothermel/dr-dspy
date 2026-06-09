@@ -728,7 +728,9 @@ def test_call_predict_with_chat_history(adapter_type, make_run):
     asyncio.run(
         program(
             question="are you sure that's correct?",
-            turn_log=TurnLog(turns=({"question": "what's the capital of france?", "answer": "paris"},)),
+            turn_log=TurnLog.model_validate(
+                {"turns": [{"question": "what's the capital of france?", "answer": "paris"}]}
+            ),
             run=run,
         )
     )
