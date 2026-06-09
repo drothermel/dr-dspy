@@ -644,6 +644,8 @@ Details to preserve:
 
 ### P4.3 Model agent events, datasets, and integration shapes consistently
 
+**Status:** Done (2026-06).
+
 **Sources:** External cross-package review.
 
 Problem:
@@ -667,6 +669,12 @@ Details to preserve:
 - Preserve wire JSON compatibility if event modeling becomes a migration.
 - Keep lightweight dataset helpers only when they do not model dataset
   lifecycle.
+
+**Delivered:** Discriminated per-agent turn events (`dspy/history/turn_events/`,
+`AgentKind`, `turn_to_format_dict`); agent terminal-tool constants in
+`dspy/predict/agent_constants.py`; `GSM8K` / `MATH` / `AlfWorld` / `HotPotQA`
+on spine `Dataset` with `dspy/integrations/datasets/metrics.py`; `PoolSessionIdResolver`
+and injectable `session_id_resolver=` on `DrLlmPoolLM`.
 
 ### P4.4 Unify optional dependency import patterns
 
