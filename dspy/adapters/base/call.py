@@ -98,8 +98,6 @@ class AdapterCallMixin(AdapterNativeMixin):
         processed_task_spec: TaskSpec,
         original_task_spec: TaskSpec,
         response: LMResponse,
-        _lm: BaseLM,
-        _config: LMConfig | Mapping[str, Any],
     ) -> list[dict[str, Any]]:
         values = []
         tool_call_output_field_name = self._get_tool_call_output_field_name(original_task_spec)

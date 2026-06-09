@@ -33,7 +33,6 @@ class HintInjectingAdapter(Adapter):
         self._inner = inner
         self._hint_map = hint_map
         self._task_spec_to_name = task_spec_to_name
-        self._sync_policies_from_inner()
 
     def _sync_policies_from_inner(self) -> None:
         self.response_format_policy = self._inner.response_format_policy

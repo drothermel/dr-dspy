@@ -4,8 +4,6 @@ import pydantic
 import pytest
 
 from dspy.adapters.types.citation import Citations
-from dspy.clients.lm import LM
-from dspy.core.types import LMConfig
 from dspy.task_spec import input_field, output_field
 
 
@@ -163,8 +161,6 @@ def test_citations_postprocessing():
         CitationSignature.delete("citations"),
         CitationSignature,
         response,
-        LM(model="anthropic/claude-3-5-sonnet-20241022"),
-        LMConfig(),
     )
     assert len(result) == 1
     assert "citations" in result[0]

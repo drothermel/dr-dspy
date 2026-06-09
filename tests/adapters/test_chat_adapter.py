@@ -2163,8 +2163,6 @@ def test_tool_call_with_null_content_does_not_raise():
         processed_task_spec=task_spec,
         original_task_spec=task_spec,
         response=outputs_to_lm_response(outputs),
-        _lm=DummyLM([{}]),
-        _config={},
     )
     assert result is not None
     assert len(result) == 1
@@ -2196,8 +2194,6 @@ def test_tool_call_with_unstructured_content_does_not_raise():
         processed_task_spec=processed_task_spec,
         original_task_spec=original_task_spec,
         response=outputs_to_lm_response(outputs),
-        _lm=DummyLM([{}]),
-        _config={},
     )
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
     assert result[0]["next_thought"] == Reasoning(content="I need a search result.")
@@ -2227,8 +2223,6 @@ def test_tool_call_with_structured_content_preserves_other_outputs():
         processed_task_spec=processed_task_spec,
         original_task_spec=original_task_spec,
         response=outputs_to_lm_response(outputs),
-        _lm=DummyLM([{}]),
-        _config={},
     )
     assert result[0]["answer"] == "I should use a tool."
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
@@ -2287,8 +2281,6 @@ def test_tool_calls_with_malformed_text_raises_parse_error():
             processed_task_spec=processed_task_spec,
             original_task_spec=original_task_spec,
             response=outputs_to_lm_response(outputs),
-            _lm=DummyLM([{}]),
-            _config={},
         )
 
 
@@ -2315,8 +2307,6 @@ def test_tool_calls_without_text_output_fields_skips_text_parse():
         processed_task_spec=processed_task_spec,
         original_task_spec=original_task_spec,
         response=outputs_to_lm_response(outputs),
-        _lm=DummyLM([{}]),
-        _config={},
     )
     assert result[0]["tool_calls"].tool_calls[0].id == "call_1"
     assert "answer" not in result[0] or result[0].get("answer") is None
@@ -2348,8 +2338,6 @@ def test_provider_tool_calls_preserve_id_and_repair_arguments():
         processed_task_spec=task_spec,
         original_task_spec=task_spec,
         response=outputs_to_lm_response(outputs),
-        _lm=DummyLM([{}]),
-        _config={},
     )
     assert result[0]["tool_calls"] == ToolCalls(
         tool_calls=[ToolCalls.ToolCall(id="call_from_responses", name="search", args={"query": "cats"})]

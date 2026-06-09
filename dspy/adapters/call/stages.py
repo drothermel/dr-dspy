@@ -24,8 +24,7 @@ class PreparedAdapterCall(BaseModel):
 
     original_task_spec: TaskSpec
     processed_task_spec: TaskSpec
-    config: LMConfig
-    merged_config: LMConfig
+    request_config: LMConfig
     config_provenance: dict[str, str] = Field(default_factory=dict)
     request: LMRequest
     mutations: list[str] = Field(default_factory=list)
@@ -50,12 +49,11 @@ def prepare_adapter_call(
     ]
     messages = adapter.format(task_spec=processed_task_spec, demos=demos, inputs=inputs)
     request = adapter._render_request(lm=lm, config=resolved_config, tools=tools, messages=messages)
-    merged_config, provenance = resolve_lm_config(lm, resolved_config)
+    request_config, provenance = resolve_lm_config(lm, resolved_config)
     return PreparedAdapterCall(
         original_task_spec=task_spec,
         processed_task_spec=processed_task_spec,
-        config=resolved_config,
-        merged_config=merged_config,
+        request_config=request_config,
         config_provenance=provenance,
         request=request,
         mutations=mutations,
@@ -69,21 +67,19 @@ async def invoke_adapter_lm(
     lm: BaseLM,
     run: RunContext,
     call_site: CallSite | None = None,
-    default_module: str | None = None,
-    default_phase: str = "adapter",
 ) -> LMResponse:
     site = resolve_call_site(
         run=run,
         call_site=call_site,
-        default_module=default_module or type(adapter).__name__,
-        default_phase=default_phase,
+        default_module=type(adapter).__name__,
+        default_phase="adapter",
     )
     compiled = resolve_call(
         lm=lm,
         adapter=adapter,
         task_spec=prepared.original_task_spec,
         processed_task_spec=prepared.processed_task_spec,
-        config=prepared.merged_config,
+        config=prepared.request_config,
         config_provenance=prepared.config_provenance,
         messages=request_messages_as_openai(prepared.request),
         task_spec_mutations=prepared.mutations,
