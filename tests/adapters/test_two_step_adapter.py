@@ -22,51 +22,6 @@ from tests.task_spec.helpers import ts
 from tests.test_utils import DummyLM, SequentialTextLM
 
 
-def test_two_step_adapter_format_exact_messages_for_simple_signature_with_demo(make_run):
-    QA = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
-    adapter = TwoStepAdapter(DummyLM([{"answer": "x"}]), extraction_adapter=ChatAdapter())
-    messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=adapter, task_spec=QA, demos=[{"question": "Q1", "answer": "A1"}], inputs={"question": "Q2"}
-    )
-    expected_messages = [
-        {
-            "role": "system",
-            "content": "You are a helpful assistant that can solve tasks based on user input.\nAs input, you will be provided with:\n1. `question` (str): The question.\nYour outputs must contain:\n1. `answer` (str): The answer.\nYou should lay out your outputs in detail so that your answer can be understood by another agent\nSpecific instructions: Given the fields `question`, produce the fields `answer`.",
-        },
-        {"role": "user", "content": "question: Q1"},
-        {"role": "assistant", "content": "answer: A1"},
-        {"role": "user", "content": "question: Q2"},
-    ]
-    assert messages == expected_messages
-    expected_lm_kwargs = {}
-    assert lm_kwargs == expected_lm_kwargs
-
-
-def test_two_step_adapter_format_exact_messages_with_typed_outputs(make_run):
-    TypedSignature = make_task_spec(
-        {
-            "question": input_field("question", desc="The question."),
-            "count": output_field("count", type_=int, desc="The count."),
-            "answer": output_field("answer", desc="The answer."),
-        },
-        instructions="Given the fields `question`, produce the fields `count`, `answer`.",
-    )
-    adapter = TwoStepAdapter(DummyLM([{"count": 1, "answer": "x"}]), extraction_adapter=ChatAdapter())
-    messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=adapter, task_spec=TypedSignature, demos=[], inputs={"question": "Q"}
-    )
-    expected_messages = [
-        {
-            "role": "system",
-            "content": "You are a helpful assistant that can solve tasks based on user input.\nAs input, you will be provided with:\n1. `question` (str): The question.\nYour outputs must contain:\n1. `count` (int): The count.\n2. `answer` (str): The answer.\nYou should lay out your outputs in detail so that your answer can be understood by another agent\nSpecific instructions: Given the fields `question`, produce the fields `count`, `answer`.",
-        },
-        {"role": "user", "content": "question: Q"},
-    ]
-    assert messages == expected_messages
-    expected_lm_kwargs = {}
-    assert lm_kwargs == expected_lm_kwargs
-
-
 def test_two_step_adapter_format_includes_turn_log_history(make_run):
     QAWithHistory = make_task_spec(
         {

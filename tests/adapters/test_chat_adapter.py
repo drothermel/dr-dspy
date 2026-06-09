@@ -18,7 +18,6 @@ from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.code import Code
 from dspy.adapters.types.field_type import FieldTypeMixin
-from dspy.adapters.types.image import Image
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.xml_adapter import XMLAdapter
@@ -29,7 +28,6 @@ from dspy.errors import AdapterParseError
 from dspy.history import TurnLog
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
-from dspy.primitives import Example
 from dspy.task_spec import input_field, make_task_spec, output_field
 from tests.adapters.conftest import (
     adapter_format_as_openai,
@@ -663,112 +661,6 @@ def test_chat_adapter_exception_raised_on_failure():
     invalid_completion = "{'output':'mismatched value'}"
     with pytest.raises(AdapterParseError, match=r"Adapter ChatAdapter failed to parse.*"):
         adapter.parse(task_spec=signature, completion=invalid_completion)
-
-
-def test_chat_adapter_formats_image():
-    image = Image(url="https://example.com/image.jpg")
-    MySignature = make_task_spec(
-        {"image": input_field("image", type_=Image, desc="The image."), "text": output_field("text", desc="The text.")},
-        instructions="Given the fields `image`, produce the fields `text`.",
-    )
-    adapter = ChatAdapter()
-    messages = adapter_format_as_openai(adapter=adapter, task_spec=MySignature, demos=[], inputs={"image": image})
-    assert len(messages) == 2
-    user_message_content = messages[1]["content"]
-    assert user_message_content is not None
-    assert len(user_message_content) == 3
-    assert user_message_content[0]["type"] == "text"
-    assert user_message_content[2]["type"] == "text"
-    expected_image_content = {"type": "image_url", "image_url": {"url": "https://example.com/image.jpg"}}
-    assert expected_image_content in user_message_content
-
-
-def test_chat_adapter_formats_image_with_few_shot_examples():
-    MySignature = make_task_spec(
-        {"image": input_field("image", type_=Image, desc="The image."), "text": output_field("text", desc="The text.")},
-        instructions="Given the fields `image`, produce the fields `text`.",
-    )
-    adapter = ChatAdapter()
-    demos = [
-        Example.from_record({"image": Image(url="https://example.com/image1.jpg"), "text": "This is a test image"}),
-        Example.from_record(
-            {"image": Image(url="https://example.com/image2.jpg"), "text": "This is another test image"}
-        ),
-    ]
-    messages = adapter_format_as_openai(
-        adapter=adapter,
-        task_spec=MySignature,
-        demos=demos,
-        inputs={"image": Image(url="https://example.com/image3.jpg")},
-    )
-    assert len(messages) == 6
-    assert "[[ ## completed ## ]]\n" in messages[2]["content"]
-    assert "[[ ## completed ## ]]\n" in messages[4]["content"]
-    assert {"type": "image_url", "image_url": {"url": "https://example.com/image1.jpg"}} in messages[1]["content"]
-    assert {"type": "image_url", "image_url": {"url": "https://example.com/image2.jpg"}} in messages[3]["content"]
-    assert {"type": "image_url", "image_url": {"url": "https://example.com/image3.jpg"}} in messages[5]["content"]
-
-
-def test_chat_adapter_formats_image_with_nested_images():
-
-    class ImageWrapper(pydantic.BaseModel):
-        images: list[Image]
-        tag: list[str]
-
-    MySignature = make_task_spec(
-        {
-            "image": input_field("image", type_=ImageWrapper, desc="The image."),
-            "text": output_field("text", desc="The text."),
-        },
-        instructions="Given the fields `image`, produce the fields `text`.",
-    )
-    image1 = Image(url="https://example.com/image1.jpg")
-    image2 = Image(url="https://example.com/image2.jpg")
-    image3 = Image(url="https://example.com/image3.jpg")
-    image_wrapper = ImageWrapper(images=[image1, image2, image3], tag=["test", "example"])
-    adapter = ChatAdapter()
-    messages = adapter_format_as_openai(
-        adapter=adapter, task_spec=MySignature, demos=[], inputs={"image": image_wrapper}
-    )
-    expected_image1_content = {"type": "image_url", "image_url": {"url": "https://example.com/image1.jpg"}}
-    expected_image2_content = {"type": "image_url", "image_url": {"url": "https://example.com/image2.jpg"}}
-    expected_image3_content = {"type": "image_url", "image_url": {"url": "https://example.com/image3.jpg"}}
-    assert expected_image1_content in messages[1]["content"]
-    assert expected_image2_content in messages[1]["content"]
-    assert expected_image3_content in messages[1]["content"]
-
-
-def test_chat_adapter_formats_image_with_few_shot_examples_with_nested_images():
-
-    class ImageWrapper(pydantic.BaseModel):
-        images: list[Image]
-        tag: list[str]
-
-    MySignature = make_task_spec(
-        {
-            "image": input_field("image", type_=ImageWrapper, desc="The image."),
-            "text": output_field("text", desc="The text."),
-        },
-        instructions="Given the fields `image`, produce the fields `text`.",
-    )
-    image1 = Image(url="https://example.com/image1.jpg")
-    image2 = Image(url="https://example.com/image2.jpg")
-    image3 = Image(url="https://example.com/image3.jpg")
-    image_wrapper = ImageWrapper(images=[image1, image2, image3], tag=["test", "example"])
-    demos = [Example.from_record({"image": image_wrapper, "text": "This is a test image"})]
-    image_wrapper_2 = ImageWrapper(images=[Image(url="https://example.com/image4.jpg")], tag=["test", "example"])
-    adapter = ChatAdapter()
-    messages = adapter_format_as_openai(
-        adapter=adapter, task_spec=MySignature, demos=demos, inputs={"image": image_wrapper_2}
-    )
-    assert len(messages) == 4
-    expected_image1_content = {"type": "image_url", "image_url": {"url": "https://example.com/image1.jpg"}}
-    expected_image2_content = {"type": "image_url", "image_url": {"url": "https://example.com/image2.jpg"}}
-    expected_image3_content = {"type": "image_url", "image_url": {"url": "https://example.com/image3.jpg"}}
-    assert expected_image1_content in messages[1]["content"]
-    assert expected_image2_content in messages[1]["content"]
-    assert expected_image3_content in messages[1]["content"]
-    assert {"type": "image_url", "image_url": {"url": "https://example.com/image4.jpg"}} in messages[-1]["content"]
 
 
 def test_chat_adapter_with_tool():

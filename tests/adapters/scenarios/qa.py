@@ -30,6 +30,17 @@ def simple_qa_xml() -> FormatScenarioCase:
     )
 
 
+def two_input_judgement_xml() -> FormatScenarioCase:
+    return FormatScenarioCase(
+        task_spec=ts(
+            "question, answer -> judgement",
+            instructions="Given the fields `question`, `answer`, produce the fields `judgement`.",
+        ),
+        demos=(),
+        inputs={"question": "why did a chicken cross the kitchen?", "answer": "To get to the other side!"},
+    )
+
+
 def demo_typed_outputs_chat() -> FormatScenarioCase:
     task_spec = make_task_spec(
         {

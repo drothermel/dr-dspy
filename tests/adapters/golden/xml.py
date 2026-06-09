@@ -1,12 +1,19 @@
 from dspy.adapters.xml_adapter import XMLAdapter
 from tests.adapters.golden.types import GoldenPromptCase
+from tests.adapters.scenarios.chat_cases import non_native_tool_history_case
 from tests.adapters.scenarios.history import rich_rendering_case
 from tests.adapters.scenarios.pydantic_cases import nested_pydantic_xml
 from tests.adapters.scenarios.qa import (
     demo_typed_outputs_xml,
     incomplete_demo_xml,
     simple_qa_xml,
+    two_input_judgement_xml,
 )
+
+
+def xml_non_native_tool_history_adapter_builder() -> XMLAdapter:
+    return XMLAdapter(use_native_function_calling=False)
+
 
 XML_GOLDEN_CASES: tuple[GoldenPromptCase, ...] = (
     GoldenPromptCase(
@@ -141,6 +148,45 @@ XML_GOLDEN_CASES: tuple[GoldenPromptCase, ...] = (
             {
                 "role": "user",
                 "content": "<question>\nQ2\n</question>\n\n<context>\nC2\n</context>\n\nRespond with the corresponding output fields wrapped in XML tags `<answer>`, then `<score>`.",
+            },
+        ],
+    ),
+    GoldenPromptCase(
+        id="xml/non_native_tool_history",
+        adapter_builder=xml_non_native_tool_history_adapter_builder,
+        scenario=non_native_tool_history_case(),
+        messages=[
+            {
+                "role": "system",
+                "content": 'Your input fields are:\n1. `question` (str): The question.\n2. `turn_log` (TurnLog): The history.\n3. `tools` (list[Tool]): The tools.\nYour output fields are:\n1. `next_thought` (str): The next thought.\n2. `tool_calls` (ToolCalls): The tool calls.\n    Type description of ToolCalls: Tool calls must be a JSON object with `tool_calls`, a list of calls. Each call must include `name` and `args`. Example: {"tool_calls": [{"name": "search", "args": {"query": "cats"}}]}\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<turn_log>\n{turn_log}\n</turn_log>\n\n<tools>\n{tools}\n</tools>\n\n<next_thought>\n{next_thought}\n</next_thought>\n\n<tool_calls>\n{tool_calls}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "$defs": {"ToolCall": {"type": "object", "properties": {"args": {"type": "object", "additionalProperties": true, "title": "Args"}, "name": {"type": "string", "title": "Name"}}, "required": ["name", "args"], "title": "ToolCall"}}, "properties": {"tool_calls": {"type": "array", "items": {"$ref": "#/$defs/ToolCall"}, "title": "Tool Calls"}}, "required": ["tool_calls"], "title": "ToolCalls"}\n</tool_calls>\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `turn_log`, `tools`, produce the fields `next_thought`, `tool_calls`.',
+            },
+            {"role": "user", "content": "<question>\nQ1\n</question>"},
+            {
+                "role": "assistant",
+                "content": '<next_thought>\nI should search.\n</next_thought>\n\n<tool_calls>\n{"tool_calls": [{"name": "search", "args": {"query": "cats"}, "id": "call_1"}]}\n</tool_calls>',
+            },
+            {
+                "role": "user",
+                "content": '<tool_call_results>\n{"tool_call_results": [{"call_id": "call_1", "name": "search", "value": "cat", "is_error": false}]}\n</tool_call_results>',
+            },
+            {
+                "role": "user",
+                "content": "<question>\nQ2\n</question>\n\n<tools>\n[\"search, whose description is <desc>Search for documents.</desc>. It takes arguments {'query': {'type': 'string'}}.\"]\n</tools>\n\nRespond with the corresponding output fields wrapped in XML tags `<next_thought>`, then `<tool_calls>`.",
+            },
+        ],
+    ),
+    GoldenPromptCase(
+        id="xml/two_input_judgement",
+        adapter_builder=XMLAdapter,
+        scenario=two_input_judgement_xml(),
+        messages=[
+            {
+                "role": "system",
+                "content": "Your input fields are:\n1. `question` (str): The question.\n2. `answer` (str): The answer.\nYour output fields are:\n1. `judgement` (str): The judgement.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}\n</answer>\n\n<judgement>\n{judgement}\n</judgement>\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `answer`, produce the fields `judgement`.",
+            },
+            {
+                "role": "user",
+                "content": "<question>\nwhy did a chicken cross the kitchen?\n</question>\n\n<answer>\nTo get to the other side!\n</answer>\n\nRespond with the corresponding output fields wrapped in XML tags `<judgement>`.",
             },
         ],
     ),

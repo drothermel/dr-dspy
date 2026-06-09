@@ -13,14 +13,11 @@ except ImportError:
     pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from dspy.adapters.types.code import Code
 from dspy.adapters.types.image import Image
-from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.clients.lm import LM
-from dspy.history import TurnLog
 from dspy.primitives import Example
 from dspy.task_spec import FieldBinding, input_field, make_task_spec, output_field
-from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs, make_adapter_run
-from tests.history.turn_fixtures import react_v2_turn
+from tests.adapters.conftest import adapter_format_as_openai, make_adapter_run
 from tests.task_spec.helpers import ts
 
 
@@ -295,78 +292,6 @@ def test_xml_adapter_full_prompt():
     expected_user = "<query>\nwhen was Marie Curie born\n</query>\n\nRespond with the corresponding output fields wrapped in XML tags `<answer>`."
     assert messages[0]["content"] == expected_system
     assert messages[1]["content"] == expected_user
-
-
-def test_xml_adapter_format_exact_non_native_tool_result_history_field():
-
-    def search(query: str) -> str:
-        return query
-
-    ToolHistorySignature = make_task_spec(
-        {
-            "question": input_field("question", desc="The question."),
-            "turn_log": input_field("turn_log", type_=TurnLog, desc="The history."),
-            "tools": input_field("tools", type_=list[Tool], desc="The tools."),
-            "next_thought": output_field("next_thought", desc="The next thought."),
-            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
-        },
-        instructions="Given the fields `question`, `turn_log`, `tools`, produce the fields `next_thought`, `tool_calls`.",
-    )
-    tool_call = ToolCalls.ToolCall(id="call_1", name="search", args={"query": "cats"})
-    tool_call_results = ToolCallResults.from_tool_calls_and_values([tool_call], ["cat"])
-    messages, _lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=XMLAdapter(use_native_function_calling=False),
-        task_spec=ToolHistorySignature,
-        demos=[],
-        inputs={
-            "question": "Q2",
-            "turn_log": TurnLog.model_validate(
-                {
-                    "turns": [
-                        react_v2_turn(
-                            pending_inputs={"question": "Q1"},
-                            next_thought="I should search.",
-                            tool_calls=ToolCalls(tool_calls=[tool_call], tool_call_results=tool_call_results),
-                        )
-                    ],
-                }
-            ),
-            "tools": [Tool(search, description="Search for documents.")],
-        },
-    )
-    assert (
-        messages[3]["content"]
-        == '<tool_call_results>\n{"tool_call_results": [{"call_id": "call_1", "name": "search", "value": "cat", "is_error": false}]}\n</tool_call_results>'
-    )
-    assert (
-        messages[4]["content"]
-        == "<question>\nQ2\n</question>\n\n<tools>\n[\"search, whose description is <desc>Search for documents.</desc>. It takes arguments {'query': {'type': 'string'}}.\"]\n</tools>\n\nRespond with the corresponding output fields wrapped in XML tags `<next_thought>`, then `<tool_calls>`."
-    )
-
-
-def test_xml_adapter_format_exact_messages_for_two_input_signature():
-    StringSignature = ts(
-        "question, answer -> judgement",
-        instructions="Given the fields `question`, `answer`, produce the fields `judgement`.",
-    )
-    messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=XMLAdapter(),
-        task_spec=StringSignature,
-        demos=[],
-        inputs={"question": "why did a chicken cross the kitchen?", "answer": "To get to the other side!"},
-    )
-    expected_lm_kwargs = {}
-    assert lm_kwargs == expected_lm_kwargs
-    assert messages == [
-        {
-            "role": "system",
-            "content": "Your input fields are:\n1. `question` (str): The question.\n2. `answer` (str): The answer.\nYour output fields are:\n1. `judgement` (str): The judgement.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}\n</answer>\n\n<judgement>\n{judgement}\n</judgement>\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `answer`, produce the fields `judgement`.",
-        },
-        {
-            "role": "user",
-            "content": "<question>\nwhy did a chicken cross the kitchen?\n</question>\n\n<answer>\nTo get to the other side!\n</answer>\n\nRespond with the corresponding output fields wrapped in XML tags `<judgement>`.",
-        },
-    ]
 
 
 def test_format_system_message():

@@ -20,9 +20,8 @@ from dspy.adapters.types.tool import Tool
 from dspy.clients.lm import LM
 from dspy.history import TurnLog
 from dspy.task_spec import input_field, make_task_spec, output_field
-from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs, make_adapter_run
+from tests.adapters.conftest import adapter_format_as_openai, make_adapter_run
 from tests.history.turn_fixtures import task_io_turn
-from tests.task_spec.helpers import ts
 
 
 class PatientAddress(pydantic.BaseModel):
@@ -57,59 +56,6 @@ class ImageWrapper(pydantic.BaseModel):
 class CircularModel(pydantic.BaseModel):
     name: str
     field: "CircularModel"
-
-
-def test_baml_adapter_format_exact_messages_for_simple_signature_with_demo():
-    QA = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
-    messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=BAMLAdapter(), task_spec=QA, demos=[{"question": "Q1", "answer": "A1"}], inputs={"question": "Q2"}
-    )
-    expected_messages = [
-        {
-            "role": "system",
-            "content": "Your input fields are:\n1. `question` (str): The question.\nYour output fields are:\n1. `answer` (str): The answer.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n# The answer.\nOutput field `answer` should be of type: string\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`.",
-        },
-        {"role": "user", "content": "[[ ## question ## ]]\nQ1"},
-        {"role": "assistant", "content": '{\n  "answer": "A1"\n}'},
-        {
-            "role": "user",
-            "content": "[[ ## question ## ]]\nQ2\n\nRespond with a JSON object in the following order of fields: `answer`.",
-        },
-    ]
-    assert messages == expected_messages
-    expected_lm_kwargs = {}
-    assert lm_kwargs == expected_lm_kwargs
-
-
-def test_baml_adapter_format_exact_messages_with_nested_output():
-
-    class BamlNested(pydantic.BaseModel):
-        value: int
-        tags: list[str]
-
-    TypedSignature = make_task_spec(
-        {
-            "question": input_field("question", desc="The question."),
-            "answer": output_field("answer", type_=BamlNested, desc="The answer."),
-        },
-        instructions="Given the fields `question`, produce the fields `answer`.",
-    )
-    messages, lm_kwargs = format_messages_and_lm_kwargs(
-        adapter=BAMLAdapter(), task_spec=TypedSignature, demos=[], inputs={"question": "Q"}
-    )
-    expected_messages = [
-        {
-            "role": "system",
-            "content": "Your input fields are:\n1. `question` (str): The question.\nYour output fields are:\n1. `answer` (BamlNested): The answer.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n# The answer.\nOutput field `answer` should be of type: {\n  value: int,\n  tags: string[],\n}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`.",
-        },
-        {
-            "role": "user",
-            "content": "[[ ## question ## ]]\nQ\n\nRespond with a JSON object in the following order of fields: `answer` (must be formatted as a valid Python BamlNested).",
-        },
-    ]
-    assert messages == expected_messages
-    expected_lm_kwargs = {}
-    assert lm_kwargs == expected_lm_kwargs
 
 
 def test_baml_adapter_basic_schema_generation():
