@@ -6,7 +6,7 @@ DSPy no longer uses the legacy global `settings` singleton. Pass an explicit `Ru
 
 | Legacy | RunContext |
 | --- | --- |
-| `settings.configure(lm=..., adapter=...)` | `run = RunContext.create(lm=..., adapter=..., init_run_log=False)` |
+| `settings.configure(lm=..., adapter=...)` | `run = RunContext.create(lm=..., adapter=..., telemetry=TelemetryConfig(call_log=CallLogMode.memory))` |
 | `settings.configure(transparency="off")` | `telemetry=TelemetryConfig(transparency="off")` on `RunContext.create` |
 | `settings.context(lm=..., adapter=...)` | `run = run.fork(lm=..., adapter=...)` |
 | `settings.lm` | `run.lm` |
@@ -30,7 +30,7 @@ from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
 from dspy.core.types import LMConfig, LMProviderOptions
 from dspy.predict.call_options import PredictOptions
-from dspy.runtime import RunContext, TelemetryConfig
+from dspy.runtime import CallLogMode, RunContext, TelemetryConfig
 
 run = RunContext.create(
     lm=LM(
@@ -40,8 +40,7 @@ run = RunContext.create(
         provider_options=LMProviderOptions(cache=False),
     ),
     adapter=JSONAdapter(),
-    telemetry=TelemetryConfig(transparency="strict"),
-    init_run_log=False,
+    telemetry=TelemetryConfig(transparency="strict", call_log=CallLogMode.memory),
 )
 result = asyncio.run(program(question="What is DSPy?", run=run))
 result = asyncio.run(
@@ -59,7 +58,7 @@ Opt down for legacy behavior:
 from dspy.runtime import CallLogMode, TelemetryConfig
 
 telemetry = TelemetryConfig(transparency="off", call_log=CallLogMode.off)
-run = RunContext.create(lm=lm, adapter=adapter, telemetry=telemetry, init_run_log=False)
+run = RunContext.create(lm=lm, adapter=adapter, telemetry=telemetry)
 ```
 
 `adapter` is required on every `RunContext.create(...)`, including when `transparency="off"`. There is no implicit `ChatAdapter` fallback.

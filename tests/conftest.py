@@ -39,15 +39,10 @@ def make_run():
             merged_telemetry = base_telemetry.model_copy(update=telemetry.model_dump(exclude_unset=True))
         else:
             merged_telemetry = base_telemetry.model_copy(update=telemetry)
-        init_run_log = kwargs.pop(
-            "init_run_log",
-            merged_telemetry.call_log in (CallLogMode.disk, CallLogMode.both),
-        )
         return RunContext.create(
             lm=lm,
             adapter=adapter,
             telemetry=merged_telemetry,
-            init_run_log=init_run_log,
             **kwargs,
         )
 

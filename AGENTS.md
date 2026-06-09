@@ -63,7 +63,7 @@ import asyncio
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
 from dspy.predict import ChainOfThought, Predict
-from dspy.runtime import RunContext
+from dspy.runtime import CallLogMode, RunContext, TelemetryConfig
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
 
 class QATaskSpec(TaskSpec):
@@ -73,7 +73,11 @@ class QATaskSpec(TaskSpec):
     outputs: tuple[FieldSpec, ...] = (output_field("answer", desc="A concise answer"),)
 
 qa = QATaskSpec()
-run = RunContext.create(lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter(), init_run_log=False)
+run = RunContext.create(
+    lm=LM("openai/gpt-4o-mini"),
+    adapter=JSONAdapter(),
+    telemetry=TelemetryConfig(call_log=CallLogMode.memory),
+)
 predict = Predict(qa)
 result = asyncio.run(predict(question="What is DSPy?", run=run))
 
@@ -149,7 +153,7 @@ run = RunContext.create(
         provider_options=LMProviderOptions(cache=False),
     ),
     adapter=JSONAdapter(),
-    init_run_log=False,
+    telemetry=TelemetryConfig(call_log=CallLogMode.memory),
 )
 result = asyncio.run(program(question="What is DSPy?", run=run))
 ```
@@ -177,10 +181,14 @@ from dr_llm.backends.models import PoolBackendConfig
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.dr_llm import DrLlmDirectLM, DrLlmPoolLM
-from dspy.runtime import RunContext
+from dspy.runtime import CallLogMode, RunContext, TelemetryConfig
 
 direct = DrLlmDirectLM("openai/gpt-4.1-mini", temperature=0.0, max_tokens=4000)
-run = RunContext.create(lm=direct, adapter=JSONAdapter(), init_run_log=False)
+run = RunContext.create(
+    lm=direct,
+    adapter=JSONAdapter(),
+    telemetry=TelemetryConfig(call_log=CallLogMode.memory),
+)
 result = asyncio.run(program(question="What is DSPy?", run=run))
 
 pool = DrLlmPoolLM(

@@ -763,7 +763,6 @@ async def test_module_history_async(make_run):
             lm=LM("openai/gpt-4o-mini"),
             adapter=JSONAdapter(),
             telemetry=TelemetryConfig(call_log=CallLogMode.memory),
-            init_run_log=False,
         )
         fresh_program = MyProgram()
         await fresh_program(question="What is the capital of France?", run=run)

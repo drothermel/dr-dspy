@@ -1037,7 +1037,6 @@ def log_test_helper():
         lm=DummyLM([{"answer": "test output"}]),
         adapter=ChatAdapter(),
         telemetry=TelemetryConfig(transparency=TransparencyMode.off, call_log=CallLogMode.memory),
-        init_run_log=False,
     )
 
 

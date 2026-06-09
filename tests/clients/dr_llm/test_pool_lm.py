@@ -9,6 +9,7 @@ from dr_llm.llm import CallMode
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.dr_llm import DrLlmPoolLM, resolve_pool_session_id
 from dspy.errors import LMUnexpectedError
+from dspy.runtime import CallLogMode, TelemetryConfig
 from dspy.runtime.run_context import RunContext
 from dspy.testing import DummyLM
 from tests.clients.dr_llm._helpers import make_backend_response, make_lm_request
@@ -24,7 +25,11 @@ def _capabilities() -> BackendCapabilities:
 
 
 def test_resolve_pool_session_id_fallback() -> None:
-    run = RunContext.create(lm=DummyLM([{"answer": "x"}]), adapter=JSONAdapter(), init_run_log=False)
+    run = RunContext.create(
+        lm=DummyLM([{"answer": "x"}]),
+        adapter=JSONAdapter(),
+        telemetry=TelemetryConfig(call_log=CallLogMode.memory),
+    )
     assert resolve_pool_session_id(run, fallback="session-1") == "session-1"
 
 
@@ -61,7 +66,11 @@ def test_dr_llm_pool_lm_acquire_samples() -> None:
     direct_backend.capabilities.return_value = _capabilities()
 
     config = PoolBackendConfig(pool_name="test_pool", database_url="postgresql://localhost/test")
-    run = RunContext.create(lm=DummyLM([{"answer": "x"}]), adapter=JSONAdapter(), init_run_log=False)
+    run = RunContext.create(
+        lm=DummyLM([{"answer": "x"}]),
+        adapter=JSONAdapter(),
+        telemetry=TelemetryConfig(call_log=CallLogMode.memory),
+    )
 
     with (
         patch("dspy.clients.dr_llm.pool.PoolBackend", return_value=pool_backend),
@@ -136,7 +145,11 @@ def test_dr_llm_pool_lm_close_after_failed_acquire() -> None:
     direct_backend.capabilities.return_value = _capabilities()
 
     config = PoolBackendConfig(pool_name="test_pool", database_url="postgresql://localhost/test")
-    run = RunContext.create(lm=DummyLM([{"answer": "x"}]), adapter=JSONAdapter(), init_run_log=False)
+    run = RunContext.create(
+        lm=DummyLM([{"answer": "x"}]),
+        adapter=JSONAdapter(),
+        telemetry=TelemetryConfig(call_log=CallLogMode.memory),
+    )
 
     with (
         patch("dspy.clients.dr_llm.pool.PoolBackend", return_value=pool_backend),

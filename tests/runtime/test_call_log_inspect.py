@@ -18,7 +18,6 @@ def test_read_call_log_disk_only_returns_jsonl_tail(tmp_path, monkeypatch):
         lm=lm,
         adapter=json_adapter,
         telemetry=TelemetryConfig(call_log=CallLogMode.disk),
-        init_run_log=True,
     )
     predict = Predict(SampleTaskSpec())
     asyncio.run(predict(question="What is the capital of France?", run=run))

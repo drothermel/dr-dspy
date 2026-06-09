@@ -10,7 +10,8 @@ from dspy.core.types import CallRecord
 from dspy.runtime.call_log.inspect import inspect_call_log_for_run, read_call_log_for_run
 from dspy.runtime.config import CallSite, ExecutionConfig, TelemetryConfig
 from dspy.runtime.run_context_model import rebuild_run_context_model
-from dspy.runtime.run_log_session import RunLogSession, ensure_log_session, init_log_session
+from dspy.runtime.run_log_policy import apply_create_log_policy, apply_fork_log_policy
+from dspy.runtime.run_log_session import RunLogSession
 
 if TYPE_CHECKING:
     from dspy.adapters.base import Adapter
@@ -64,7 +65,6 @@ class RunContext(BaseModel):
         retrieval: RetrievalModule | None = None,
         execution: ExecutionConfig | None = None,
         telemetry: TelemetryConfig | None = None,
-        init_run_log: bool = True,
     ) -> RunContext:
         if not hasattr(lm, "model"):
             raise TypeError(f"RunContext requires a BaseLM instance, got {type(lm).__name__}.")
@@ -84,8 +84,7 @@ class RunContext(BaseModel):
             execution=execution or ExecutionConfig(),
             telemetry=telemetry or TelemetryConfig(),
         )
-        if init_run_log:
-            init_log_session(run)
+        apply_create_log_policy(run)
         return run
 
     def fork(self, **overrides: Any) -> RunContext:
@@ -125,7 +124,7 @@ class RunContext(BaseModel):
             log_session=log_session,
             call_site=call_site,
         )
-        ensure_log_session(forked, explicit_log_session=explicit_log_session)
+        apply_fork_log_policy(forked, self, explicit_log_session=explicit_log_session)
         return forked
 
     def inspect_call_log(self, n: int = 1, file: TextIO | None = None) -> None:

@@ -63,10 +63,10 @@ All module and predictor calls are async. Pass `run=` for `RunContext` and `opti
 import asyncio
 
 from dspy.predict import Predict
-from dspy.runtime import RunContext
+from dspy.runtime import CallLogMode, RunContext, TelemetryConfig
 
 predict = Predict(QATaskSpec())
-run = RunContext.create(lm=lm, adapter=adapter, init_run_log=False)
+run = RunContext.create(lm=lm, adapter=adapter, telemetry=TelemetryConfig(call_log=CallLogMode.memory))
 result = asyncio.run(predict(question="What is DSPy?", run=run))
 # or inside async code:
 # result = await predict(question="What is DSPy?", run=run)

@@ -16,7 +16,6 @@ def make_run():
         lm=DummyLM([{"answer": "ok"}]),
         adapter=ChatAdapter(),
         telemetry=TelemetryConfig(transparency=TransparencyMode.off, call_log=CallLogMode.off),
-        init_run_log=False,
     )
 
 

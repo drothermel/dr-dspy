@@ -31,7 +31,6 @@ def test_record_call_bounded_append_truncates_oldest():
         lm=lm,
         adapter=JSONAdapter(),
         telemetry=TelemetryConfig(call_log=CallLogMode.memory, max_call_log_entries=2),
-        init_run_log=False,
     )
     first = _sample_record(timestamp="t1")
     second = _sample_record(timestamp="t2")
@@ -45,7 +44,11 @@ def test_record_call_bounded_append_truncates_oldest():
 
 def test_record_call_fan_out_shares_entry_identity():
     lm = DummyLM([{"answer": "ok"}])
-    run = RunContext.create(lm=lm, adapter=JSONAdapter(), init_run_log=False)
+    run = RunContext.create(
+        lm=lm,
+        adapter=JSONAdapter(),
+        telemetry=TelemetryConfig(call_log=CallLogMode.memory),
+    )
     module = _StubModule()
     run.caller_modules.append(module)  # type: ignore[arg-type]
     entry = _sample_record()
@@ -69,8 +72,7 @@ def test_append_disk_call_noops_when_session_is_none(tmp_path, monkeypatch):
     run = RunContext.create(
         lm=lm,
         adapter=JSONAdapter(),
-        telemetry=TelemetryConfig(call_log=CallLogMode.disk),
-        init_run_log=False,
+        telemetry=TelemetryConfig(call_log=CallLogMode.memory),
     )
     run.log_session = None
     request = LMRequest(model="test-model", messages=[])
@@ -86,7 +88,6 @@ def test_append_disk_call_writes_jsonl(tmp_path, monkeypatch):
         lm=lm,
         adapter=JSONAdapter(),
         telemetry=TelemetryConfig(call_log=CallLogMode.disk),
-        init_run_log=True,
     )
     request = LMRequest(model="test-model", messages=[])
     response = LMResponse.from_text("ok")

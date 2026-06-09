@@ -90,7 +90,6 @@ def make_adapter_run(*, lm, adapter):
         lm=lm,
         adapter=adapter,
         telemetry=TelemetryConfig(transparency=TransparencyMode.off, call_log=CallLogMode.memory),
-        init_run_log=False,
     )
 
 

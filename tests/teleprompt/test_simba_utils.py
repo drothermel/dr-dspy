@@ -1,7 +1,7 @@
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.predict.predict import Predict
 from dspy.primitives import Module
-from dspy.runtime import RunContext
+from dspy.runtime import CallLogMode, RunContext, TelemetryConfig
 from dspy.teleprompt.simba_utils import prepare_models_for_resampling
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
@@ -20,7 +20,11 @@ class SimpleModule(Module):
 def test_prepare_models_for_resampling_does_not_mutate_teacher_kwargs():
     base_lm = DummyLM([{}])
     original_kwargs = dict(base_lm.kwargs)
-    teacher_run = RunContext.create(lm=base_lm, adapter=JSONAdapter(), init_run_log=False)
+    teacher_run = RunContext.create(
+        lm=base_lm,
+        adapter=JSONAdapter(),
+        telemetry=TelemetryConfig(call_log=CallLogMode.memory),
+    )
     program = SimpleModule(base_lm)
     run = teacher_run
 
