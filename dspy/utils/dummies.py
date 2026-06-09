@@ -110,9 +110,7 @@ class DummyLM(BaseLM):
                 )
             else:
                 answer_iter = cast("Iterator[dict[str, Any]]", self.answers)
-                current_output = self._format_answer_fields(
-                    next(answer_iter, {"answer": "No more responses"})
-                )
+                current_output = self._format_answer_fields(next(answer_iter, {"answer": "No more responses"}))
             outputs.append(self._to_output(current_output))
         return LMResponse(
             model="dummy", outputs=outputs, usage=dotdict(prompt_tokens=0, completion_tokens=0, total_tokens=0)

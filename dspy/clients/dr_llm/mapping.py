@@ -213,9 +213,7 @@ def backend_response_to_lm_response(
         provider_data["sample_id"] = response.sample_id
     if response.request_fingerprint is not None:
         provider_data["request_fingerprint"] = response.request_fingerprint
-    warnings = (
-        [warning.model_dump(mode="json") for warning in response.warnings] if response.warnings else []
-    )
+    warnings = [warning.model_dump(mode="json") for warning in response.warnings] if response.warnings else []
     if warnings:
         provider_data["warnings"] = warnings
     return LMResponse(

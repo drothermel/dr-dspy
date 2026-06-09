@@ -67,9 +67,7 @@ def inject_variables(interpreter: "PythonInterpreter", code: str, variables: dic
             raise CodeInterpreterError("Invalid variable name: 'json'")
     interpreter._pending_large_vars = large_vars
     if large_vars:
-        large_assignments = [
-            f"{k} = json.loads(open('{DSPY_VARS_VPATH}/{k}.json').read())" for k in large_vars
-        ]
+        large_assignments = [f"{k} = json.loads(open('{DSPY_VARS_VPATH}/{k}.json').read())" for k in large_vars]
         assignments = ["import json"] + small_assignments + large_assignments
     else:
         assignments = small_assignments
