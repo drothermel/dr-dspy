@@ -54,7 +54,14 @@ def test_propose_instruction_for_predictor(demo_candidates, make_run):
     prompt_model = TrackingDummyLM([{"proposed_instruction": "instruction"}] * 10)
     program = Predict(ts("question -> answer"))
     proposer = GroundedProposer(
-        prompt_model=prompt_model, program=program, trainset=[], verbose=False, init_temperature=0.7
+        prompt_model=prompt_model,
+        program=program,
+        trainset=[],
+        verbose=False,
+        use_dataset_summary=False,
+        program_aware=False,
+        use_tip=False,
+        init_temperature=0.7,
     )
     run = make_run(lm=prompt_model)
     result = asyncio.run(

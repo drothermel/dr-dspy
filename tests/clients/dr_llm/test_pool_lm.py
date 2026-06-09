@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from dr_llm.backends.models import AcquireResult, BackendCapabilities, PoolBackendConfig
 from dr_llm.llm import CallMode
 
+from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.dr_llm import DrLlmPoolLM, resolve_pool_session_id
 from dspy.runtime.run_context import RunContext
 from dspy.testing import DummyLM
@@ -22,7 +23,7 @@ def _capabilities() -> BackendCapabilities:
 
 
 def test_resolve_pool_session_id_fallback() -> None:
-    run = RunContext.create(lm=DummyLM([{"answer": "x"}]), adapter=MagicMock(), init_run_log=False)
+    run = RunContext.create(lm=DummyLM([{"answer": "x"}]), adapter=JSONAdapter(), init_run_log=False)
     assert resolve_pool_session_id(run, fallback="session-1") == "session-1"
 
 
@@ -59,7 +60,7 @@ def test_dr_llm_pool_lm_acquire_samples() -> None:
     direct_backend.capabilities.return_value = _capabilities()
 
     config = PoolBackendConfig(pool_name="test_pool", database_url="postgresql://localhost/test")
-    run = RunContext.create(lm=DummyLM([{"answer": "x"}]), adapter=MagicMock(), init_run_log=False)
+    run = RunContext.create(lm=DummyLM([{"answer": "x"}]), adapter=JSONAdapter(), init_run_log=False)
 
     with (
         patch("dspy.clients.dr_llm.pool.PoolBackend", return_value=pool_backend),

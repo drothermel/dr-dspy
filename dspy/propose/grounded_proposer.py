@@ -360,6 +360,7 @@ class GroundedProposer:
     async def propose_instruction_for_predictor(
         self, program, predictor, pred_i, demo_candidates, demo_set_i, trial_logs, tip=None, *, run
     ) -> str:
+        await self._ensure_data_summary(run=run)
         instruction_history = create_predictor_level_history_string(
             base_program=program, predictor_i=pred_i, trial_logs=trial_logs, top_n=MAX_INSTRUCT_IN_HISTORY
         )

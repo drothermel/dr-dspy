@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
 
 import pytest
 
+from dspy.adapters.json_adapter import JSONAdapter
 from dspy.runtime.run_context import RunContext
 from dspy.testing import DummyLM
 from tests.clients.dr_llm._helpers import make_lm_request
@@ -37,7 +37,7 @@ async def test_dr_llm_pool_lm_acquire_samples_session_semantics(
     backend_request = backend_request_for_lm(dspy_pool_lm, dspy_lm_request)
     seed_complete_samples(dspy_pool_lm._backend.store, backend_request, count=12)
 
-    run = RunContext.create(lm=DummyLM([{"answer": "x"}]), adapter=MagicMock(), init_run_log=False)
+    run = RunContext.create(lm=DummyLM([{"answer": "x"}]), adapter=JSONAdapter(), init_run_log=False)
 
     first = await dspy_pool_lm.acquire_samples(dspy_lm_request, n=10, run=run, session_id="s1")
     assert len(first) == 10
