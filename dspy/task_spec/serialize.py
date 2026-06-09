@@ -76,19 +76,31 @@ def _type_from_str(type_str: str, *, custom_types: dict[str, type] | None = None
     if type_str.startswith("builtins.") or "." in type_str:
         module_name, _, qualname = type_str.partition(".")
         if module_name == "builtins":
-            return builtins_map.get(type_str, str)
+            builtin = builtins_map.get(type_str)
+            if builtin is not None:
+                return builtin
+            raise ValueError(
+                f"Unknown serialized field type {type_str!r}. Provide it via custom_types= or re-save with the current DSPy version."
+            )
         import importlib
 
-        module = importlib.import_module(module_name)
-        obj: Any = module
-        for part in qualname.split("."):
-            obj = getattr(obj, part)
+        try:
+            module = importlib.import_module(module_name)
+            obj: Any = module
+            for part in qualname.split("."):
+                obj = getattr(obj, part)
+        except (ImportError, AttributeError) as exc:
+            raise ValueError(
+                f"Unknown serialized field type {type_str!r}. Provide it via custom_types= or re-save with the current DSPy version."
+            ) from exc
         return obj
     if custom_types:
         for key, value in custom_types.items():
             if _type_to_str(value) == type_str or key == type_str:
                 return value
-    return str
+    raise ValueError(
+        f"Unknown serialized field type {type_str!r}. Provide it via custom_types= or re-save with the current DSPy version."
+    )
 
 
 def _split_generic_args(args_str: str) -> list[str]:

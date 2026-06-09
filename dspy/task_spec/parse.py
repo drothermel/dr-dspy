@@ -86,12 +86,6 @@ def _parse_type_node(node, names: dict[str, Any]) -> Any:
             resolved_type = getattr(module, type_name)
             names[type_name] = resolved_type
             return resolved_type
-        try:
-            mod = importlib.import_module(type_name)
-            names[type_name] = mod
-            return mod
-        except ImportError:
-            pass
         raise ValueError(f"Unknown type name: {type_name}. Provide it via custom_types=.")
 
     if isinstance(node, ast.Module):
