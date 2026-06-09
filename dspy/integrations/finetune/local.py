@@ -191,6 +191,7 @@ def train_sft_locally(model_name, train_data, train_kwargs):
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
     from trl import SFTConfig, SFTTrainer, setup_chat_format
+
     device = train_kwargs.get("device", None)
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"

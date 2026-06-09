@@ -2,19 +2,18 @@ import base64
 import io
 import mimetypes
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pydantic
 from typing_extensions import override
 
+from dspy._internal.lazy_import import import_optional, is_available
 from dspy.adapters.types.field_type import FieldTypeMixin
 
-try:
-    import soundfile as sf
+SF_AVAILABLE = is_available("soundfile")
 
-    SF_AVAILABLE = True
-except ImportError:
-    SF_AVAILABLE = False
+if TYPE_CHECKING or SF_AVAILABLE:
+    import soundfile as sf
 
 
 def _normalize_audio_format(audio_format: str) -> str:
@@ -69,7 +68,11 @@ class Audio(FieldTypeMixin):
     @classmethod
     def from_array(cls, array: object, sampling_rate: int, format: str = "wav") -> "Audio":
         if not SF_AVAILABLE:
-            raise ImportError("soundfile is required to process audio arrays.")
+            import_optional(
+                "soundfile",
+                feature="audio array encoding",
+                install_command="Install with `pip install soundfile`.",
+            )
         byte_buffer = io.BytesIO()
         sf.write(byte_buffer, array, sampling_rate, format=format.upper(), subtype="PCM_16")  # ty: ignore[invalid-argument-type]
         encoded_data = base64.b64encode(byte_buffer.getvalue()).decode("utf-8")

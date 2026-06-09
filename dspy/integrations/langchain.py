@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any
 
+from dspy._internal.lazy_import import import_optional
 from dspy.adapters.types.tool import Tool, convert_input_schema_to_tool_args
 
 if TYPE_CHECKING:
@@ -7,6 +8,7 @@ if TYPE_CHECKING:
 
 
 def convert_langchain_tool(tool: "BaseTool") -> Tool:
+    import_optional("langchain_core", extra="langchain", feature="LangChain tool conversion")
 
     async def func(**kwargs):
         try:

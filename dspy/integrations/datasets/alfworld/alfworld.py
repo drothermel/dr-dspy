@@ -4,7 +4,7 @@ import contextlib
 import queue
 import random
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast
+from typing import TYPE_CHECKING, ClassVar, Protocol
 
 from dspy._internal.lazy_import import import_optional
 from dspy.datasets.dataset import Dataset
@@ -66,10 +66,10 @@ class EnvPool:
         self.workers = []
         self.available = queue.Queue()
         mp = import_optional(
-                "multiprocess",
-                feature="ALFWorld",
-                install_command="Install via `pip install multiprocess`.",
-            )
+            "multiprocess",
+            feature="ALFWorld",
+            install_command="Install via `pip install multiprocess`.",
+        )
         with contextlib.suppress(RuntimeError):
             mp.set_start_method("spawn", force=True)
         ctx = mp.get_context("spawn")

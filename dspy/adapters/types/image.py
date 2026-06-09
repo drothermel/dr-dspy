@@ -3,20 +3,19 @@ import io
 import mimetypes
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlparse
 
 import pydantic
 from typing_extensions import override
 
+from dspy._internal.lazy_import import import_optional, is_available
 from dspy.adapters.types.field_type import FieldTypeMixin
 
-try:
-    from PIL import Image as PILImage
+PIL_AVAILABLE = is_available("PIL")
 
-    PIL_AVAILABLE = True
-except ImportError:
-    PIL_AVAILABLE = False
+if TYPE_CHECKING or PIL_AVAILABLE:
+    from PIL import Image as PILImage
 
 
 class Image(FieldTypeMixin):
@@ -78,7 +77,11 @@ def encode_image(image: object, download_images: bool = False, verify: bool = Tr
         return _encode_pil_image(image)
     if isinstance(image, bytes):
         if not PIL_AVAILABLE:
-            raise ImportError("Pillow is required to process image bytes.")
+            import_optional(
+                "PIL",
+                feature="image byte encoding",
+                install_command="Install with `pip install pillow`.",
+            )
         img = PILImage.open(io.BytesIO(image))
         return _encode_pil_image(img)
     if isinstance(image, Image):

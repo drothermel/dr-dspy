@@ -85,9 +85,13 @@ class ColBERTv2RetrieverLocal:
         self.searcher = self.get_index()
 
     def build_index(self) -> None:
-        colbert = import_optional("colbert", feature="ColBERT local retrieval", install_command=_COLBERT_INSTALL_COMMAND)
+        colbert = import_optional(
+            "colbert", feature="ColBERT local retrieval", install_command=_COLBERT_INSTALL_COMMAND
+        )
         Indexer = colbert.Indexer
-        infra = import_optional("colbert.infra", feature="ColBERT local retrieval", install_command=_COLBERT_INSTALL_COMMAND)
+        infra = import_optional(
+            "colbert.infra", feature="ColBERT local retrieval", install_command=_COLBERT_INSTALL_COMMAND
+        )
         Run = infra.Run
         RunConfig = infra.RunConfig
         with Run().context(RunConfig(nranks=self.colbert_config.nranks, experiment=self.colbert_config.experiment)):
@@ -95,9 +99,13 @@ class ColBERTv2RetrieverLocal:
             indexer.index(name=self.colbert_config.index_name, collection=self.passages, overwrite=True)
 
     def get_index(self):
-        colbert = import_optional("colbert", feature="ColBERT local retrieval", install_command=_COLBERT_INSTALL_COMMAND)
+        colbert = import_optional(
+            "colbert", feature="ColBERT local retrieval", install_command=_COLBERT_INSTALL_COMMAND
+        )
         Searcher = colbert.Searcher
-        infra = import_optional("colbert.infra", feature="ColBERT local retrieval", install_command=_COLBERT_INSTALL_COMMAND)
+        infra = import_optional(
+            "colbert.infra", feature="ColBERT local retrieval", install_command=_COLBERT_INSTALL_COMMAND
+        )
         Run = infra.Run
         RunConfig = infra.RunConfig
         with Run().context(RunConfig(experiment=self.colbert_config.experiment)):
@@ -149,7 +157,9 @@ class ColBERTv2RerankerLocal:
         assert len(passages) > 0, "Passages should not be empty"
         import numpy as np
 
-        colbert = import_optional("colbert", feature="ColBERT local reranking", install_command=_COLBERT_INSTALL_COMMAND)
+        colbert = import_optional(
+            "colbert", feature="ColBERT local reranking", install_command=_COLBERT_INSTALL_COMMAND
+        )
         ColBERT = colbert.modeling.colbert.ColBERT
         DocTokenizer = colbert.modeling.tokenization.doc_tokenization.DocTokenizer
         QueryTokenizer = colbert.modeling.tokenization.query_tokenization.QueryTokenizer

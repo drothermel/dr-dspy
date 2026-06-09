@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import pytest
 
 import dspy.integrations.retrieval.databricks as databricks_rm
-
-if TYPE_CHECKING:
-    pass
 
 
 def test_databricks_rm_sdk_unavailable_without_credentials(monkeypatch: pytest.MonkeyPatch) -> None:

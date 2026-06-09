@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any
 
+from dspy._internal.lazy_import import import_optional
 from dspy.adapters.types.tool import Tool, convert_input_schema_to_tool_args
 
 if TYPE_CHECKING:
@@ -7,7 +8,8 @@ if TYPE_CHECKING:
 
 
 def _convert_mcp_tool_result(call_tool_result: "mcp.types.CallToolResult") -> str | list[Any]:
-    from mcp.types import TextContent
+    mcp_types = import_optional("mcp.types", extra="mcp", feature="MCP tool conversion")
+    TextContent = mcp_types.TextContent
 
     text_contents: list[TextContent] = []
     non_text_contents = []
@@ -25,6 +27,7 @@ def _convert_mcp_tool_result(call_tool_result: "mcp.types.CallToolResult") -> st
 
 
 def convert_mcp_tool(session: "mcp.ClientSession", tool: "mcp.types.Tool") -> Tool:
+    import_optional("mcp", extra="mcp", feature="MCP tool conversion")
     args, arg_types, arg_desc, required_names = convert_input_schema_to_tool_args(tool.inputSchema)
 
     async def func(*args, **kwargs):
