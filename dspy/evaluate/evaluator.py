@@ -112,9 +112,9 @@ class Evaluate:
 
         def evaluation_progress(results: list, total: int) -> str:
             completed = [r for r in results if r is not None]
-            total_score = sum(r[-1] for r in completed if isinstance(r, tuple))
-            pct = round(100 * total_score / total, 1) if total else 0
-            return f"Average Metric: {total_score:.2f} / {total} ({pct}%)"
+            score_sum = sum(r[-1] for r in completed if isinstance(r, tuple))
+            pct = round(100 * score_sum / total, 1) if total else 0
+            return f"metric sum: {score_sum:.2f}, n={total}, mean={pct}%"
 
         max_errors = resolve_max_errors(self.max_errors, run)
         provide_traceback = (
@@ -132,8 +132,9 @@ class Evaluate:
         assert len(devset) == len(results)
         results = [(Prediction(), self.failure_score) if r is None else r for r in results]
         results = [(example, prediction, score) for example, (prediction, score) in zip(devset, results, strict=False)]
-        ncorrect, ntotal = (sum((score for *_, score in results)), len(devset))
-        logger.info(f"Average Metric: {ncorrect} / {ntotal} ({round(100 * ncorrect / ntotal, 1)}%)")
+        score_sum, ntotal = (sum((score for *_, score in results)), len(devset))
+        mean_pct = round(100 * score_sum / ntotal, 1) if ntotal else 0.0
+        logger.info(f"metric sum: {score_sum:.2f}, n={ntotal}, mean={mean_pct}%")
         if display_table:
             if importlib.util.find_spec("pandas") is not None:
                 metric_name = metric.__name__ if isinstance(metric, types.FunctionType) else metric.__class__.__name__
@@ -149,7 +150,7 @@ class Evaluate:
             metric_name = metric.__name__ if isinstance(metric, types.FunctionType) else metric.__class__.__name__
             data = self._prepare_results_output(results, metric_name)
             await asyncio.to_thread(self._write_results_json, save_as_json, data)
-        return EvaluationResult(score=round(100 * ncorrect / ntotal, 2), results=results)
+        return EvaluationResult(score=round(100 * score_sum / ntotal, 2), results=results)
 
     @staticmethod
     def _prepare_results_output(results: list[tuple["Example", Prediction, Any]], metric_name: str):
@@ -225,7 +226,7 @@ def truncate_cell(content) -> str:
     words = str(content).split()
     if len(words) > 25:
         return " ".join(words[:25]) + "..."
-    return content
+    return str(content)
 
 
 def stylize_metric_name(df: "pd.DataFrame", metric_name: str) -> "pd.DataFrame":
@@ -245,4 +246,4 @@ def display_dataframe(df: "pd.DataFrame") -> None:
     import pandas as pd
 
     with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.max_colwidth", 70):
-        pass
+        print(df)  # noqa: T201 — intentional stdout table for display_table=True

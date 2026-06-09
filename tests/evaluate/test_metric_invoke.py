@@ -31,6 +31,12 @@ def test_normalize_metric_score_unsupported_type_raises():
         normalize_metric_score("bad")
 
 
+@pytest.mark.parametrize("invalid_score", [100, -0.1, 1.5])
+def test_normalize_metric_score_rejects_out_of_range(invalid_score):
+    with pytest.raises(ValueError, match="Metric score must be in \\[0, 1\\]"):
+        normalize_metric_score(invalid_score)
+
+
 def test_call_metric_module_passes_use_threshold(make_run):
     run = make_run(
         lm=DummyLM(

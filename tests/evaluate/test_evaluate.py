@@ -99,7 +99,7 @@ def test_construct_result_df(make_run):
                 "question": ["What is 1+1?", "What is 2+2?", "What is 3+3?"],
                 "example_answer": ["2", "4", "-1"],
                 "pred_answer": ["2", "4", "-1"],
-                "answer_exact_match": [1.0, 1.0, 0.0],
+                "answer_exact_match": ["1.0", "1.0", "0.0"],
             }
         ),
     )
@@ -163,6 +163,21 @@ def test_multi_thread_evaluate_call_cancelled(monkeypatch, make_run):
         asyncio.run(ev(program, run=run))
 
 
+def test_evaluate_fractional_metric_score(make_run):
+    run = make_run(lm=DummyLM({"What is 1+1?": {"answer": "2"}, "What is 2+2?": {"answer": "4"}}))
+    devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
+    program = Predict(ts("question -> answer"))
+
+    def half_credit(example, pred, trace=None):
+        del trace
+        return 0.5
+
+    ev = Evaluate(devset=devset, metric=half_credit, display_progress=False)
+    result = asyncio.run(ev(program, run=run))
+    assert result.score == 50.0
+    assert all(score == 0.5 for *_, score in result.results)
+
+
 def test_evaluate_call_wrong_answer(make_run):
     run = make_run(lm=DummyLM({"What is 1+1?": {"answer": "0"}, "What is 2+2?": {"answer": "0"}}))
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
@@ -172,7 +187,6 @@ def test_evaluate_call_wrong_answer(make_run):
     assert result.score == 0.0
 
 
-@pytest.mark.extra
 @pytest.mark.parametrize(
     "program_with_example",
     [

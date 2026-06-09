@@ -1,5 +1,9 @@
 """Metric dispatch and score normalization for evaluation and optimizers.
 
+Metrics must return bool, a numeric score in ``[0, 1]``, or a ``Prediction`` with
+``score`` in ``[0, 1]``. ``invoke_metric`` normalizes to a 0-1 float; ``Evaluate``
+aggregates those into ``EvaluationResult.score`` as a 0-100 percentage mean.
+
 Import ``invoke_metric``, ``call_metric``, and ``normalize_metric_score`` from
 ``dspy.evaluate.metric_invoke``.
 """
@@ -17,11 +21,17 @@ if TYPE_CHECKING:
 __all__ = ["call_metric", "invoke_metric", "normalize_metric_score"]
 
 
+def _validate_metric_range(score: float) -> float:
+    if score < 0.0 or score > 1.0:
+        raise ValueError(f"Metric score must be in [0, 1]; got {score!r}.")
+    return score
+
+
 def normalize_metric_score(output: Any) -> float:
     if isinstance(output, bool):
         return 1.0 if output else 0.0
     if isinstance(output, (int, float)):
-        return float(output)
+        return _validate_metric_range(float(output))
     if isinstance(output, Prediction):
         if not hasattr(output, "score"):
             raise ValueError(
