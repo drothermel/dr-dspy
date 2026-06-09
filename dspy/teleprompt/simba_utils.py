@@ -3,13 +3,13 @@ import textwrap
 
 import orjson
 
+from dspy.adapters.prompt_format import get_field_spec_description_string
 from dspy.evaluate.metric_invoke import call_metric, normalize_metric_score
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module, Prediction
 from dspy.propose.source_format import get_formatted_source
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
-from dspy.task_spec.formatting import get_field_spec_description_string
 from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.task_spec_context import get_task_spec, resolve_optimizer_lm, set_task_spec
 from dspy.teleprompt.trace_helpers import run_program_with_trace

@@ -7,6 +7,7 @@ from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.call.mode import AdapterCallMode
 from dspy.adapters.call.pipeline import AdapterCallPipeline
 from dspy.adapters.call.postprocess import strip_native_response_output_fields
+from dspy.adapters.prompt_format import get_field_spec_description_string
 from dspy.clients.base_lm import BaseLM
 from dspy.core.types.config import LMConfig
 from dspy.errors import AdapterOperationError
@@ -14,7 +15,6 @@ from dspy.runtime.config import CallSite
 from dspy.runtime.run_context import RunContext
 from dspy.runtime.transparency import resolve_adapter, resolve_lm_config
 from dspy.task_spec import TaskSpec, input_field, make_task_spec
-from dspy.task_spec.formatting import get_field_spec_description_string
 
 
 class TwoStepAdapter(Adapter):

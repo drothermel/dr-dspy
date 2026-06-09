@@ -5,16 +5,16 @@ import textwrap
 from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.format_field_structure import build_field_structure_instructions, build_role_field_sections
+from dspy.adapters.prompt_format import (
+    format_field_value,
+    get_annotation_name,
+    get_field_spec_description_string,
+)
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import build_multimodal_user_message_content, inputs_include_multimodal_custom_type_values
 from dspy.clients.openai_format.chat_request import message_to_openai_chat
-from dspy.task_spec import (
-    FieldBinding,
-    format_field_value,
-    get_annotation_name,
-)
+from dspy.task_spec import FieldBinding
 from dspy.task_spec.field_spec import FIELD_NAME_BODY, FieldRole
-from dspy.task_spec.formatting import get_field_spec_description_string
 
 if TYPE_CHECKING:
     from dspy.adapters.base.protocols import ChatFormattableAdapter

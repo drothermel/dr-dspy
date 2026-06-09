@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from dspy.task_spec import field_bindings, translate_field_type
+from dspy.adapters.prompt_format import translate_field_type
+from dspy.task_spec import field_bindings
 
 if TYPE_CHECKING:
     from dspy.task_spec import TaskSpec

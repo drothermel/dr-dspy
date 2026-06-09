@@ -1,14 +1,17 @@
+"""Adapter-owned prompt rendering for task field values, types, and descriptions."""
+
 from __future__ import annotations
 
 import enum
 import inspect
 import json
 from collections.abc import Mapping
-from typing import Any, Literal, cast
+from typing import Any, Literal, cast, get_args, get_origin
 
 import pydantic
 
 from dspy.adapters.types.code import Code
+from dspy.adapters.types.field_type import extract_field_types_from_annotation
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.task_spec.field_spec import FieldRole, FieldSpec
 from dspy.task_spec.json_serialize import serialize_for_json
@@ -54,6 +57,55 @@ def translate_field_type(field: FieldSpec) -> str:
     return f"{{{field.name}}}{desc}"
 
 
+def get_annotation_name(annotation: object) -> str:
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+    if origin is None:
+        if hasattr(annotation, "__name__"):
+            return cast("str", annotation.__name__)
+        return str(annotation)
+    if origin is Literal:
+        args_str = ", ".join(
+            _quoted_string_for_literal_type_annotation(a) if isinstance(a, str) else get_annotation_name(a)
+            for a in args
+        )
+        return f"{get_annotation_name(origin)}[{args_str}]"
+    args_str = ", ".join(get_annotation_name(a) for a in args)
+    return f"{get_annotation_name(origin)}[{args_str}]"
+
+
+def get_field_spec_description_string(fields: dict[str, FieldSpec]) -> str:
+    entries = [
+        (
+            name,
+            field.type_,
+            field.desc,
+            field.constraints,
+        )
+        for name, field in fields.items()
+    ]
+    return _format_field_description_lines(entries=entries)
+
+
+def _format_field_description_lines(
+    *,
+    entries: list[tuple[str, object, str, str | None]],
+) -> str:
+    field_descriptions = []
+    for idx, (name, annotation, desc, constraints) in enumerate(entries):
+        field_message = f"{idx + 1}. `{name}`"
+        field_message += f" ({get_annotation_name(annotation)})"
+        custom_types = extract_field_types_from_annotation(annotation)
+        for custom_type in custom_types:
+            if len(custom_type.description()) > 0:
+                desc += f"\n    Type description of {get_annotation_name(custom_type)}: {custom_type.description()}"
+        field_message += f": {desc}"
+        if constraints:
+            field_message += f"\nConstraints: {constraints}"
+        field_descriptions.append(field_message)
+    return "\n".join(field_descriptions).strip()
+
+
 def _annotation_is_subclass(annotation: object, expected_base: type) -> bool:
     try:
         return inspect.isclass(annotation) and issubclass(annotation, expected_base)
@@ -88,3 +140,16 @@ def _format_blob(blob: str) -> str:
         return f"«{blob}»"
     modified_blob = blob.replace("\n", "\n    ")
     return f"«««\n    {modified_blob}\n»»»"
+
+
+def _quoted_string_for_literal_type_annotation(s: str) -> str:
+    has_single = "'" in s
+    has_double = '"' in s
+    if has_single and (not has_double):
+        return f'"{s}"'
+    if has_double and (not has_single):
+        return f"'{s}'"
+    if has_single and has_double:
+        escaped = s.replace("'", "\\'")
+        return f"'{escaped}'"
+    return f"'{s}'"
