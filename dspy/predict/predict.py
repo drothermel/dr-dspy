@@ -179,7 +179,7 @@ class Predict(Module, Parameter):
             default_module=type(self).__name__,
             default_phase="predict",
         )
-        completions = await run.adapter.acall(
+        completions = await run.adapter(
             lm=lm,
             config=config,
             task_spec=task_spec,

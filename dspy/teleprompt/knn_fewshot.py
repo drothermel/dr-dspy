@@ -29,7 +29,7 @@ class KNNFewShot(Teleprompter):
             options: ModuleCallOptions | None = None,
             **kwargs,
         ):
-            knn_trainset = await knn_few_shot.knn.acall(inputs=kwargs)
+            knn_trainset = await knn_few_shot.knn(inputs=kwargs)
             bootstrap_args = dict(knn_few_shot.few_shot_bootstrap_args)
             bootstrap_args.pop("run", None)
             few_shot_bootstrap = BootstrapFewShot(**bootstrap_args)

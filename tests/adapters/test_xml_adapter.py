@@ -242,7 +242,7 @@ def test_xml_adapter_with_code():
             model="openai/gpt-4o-mini",
         )
         result = asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=CodeGeneration,

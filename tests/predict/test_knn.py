@@ -36,7 +36,7 @@ async def test_knn_initialization(setup_knn):
 async def test_knn_query(setup_knn):
     knn = setup_knn
     query = {"question": "What is 3+3?"}
-    nearest_samples = await knn.acall(inputs=query)
+    nearest_samples = await knn(inputs=query)
     assert len(nearest_samples) == 2, "Incorrect number of nearest samples returned"
     assert nearest_samples[0].answer == "4", "Incorrect nearest sample returned"
 
@@ -44,6 +44,6 @@ async def test_knn_query(setup_knn):
 async def test_knn_query_specificity(setup_knn):
     knn = setup_knn
     query = {"question": "What is the capital of Germany?"}
-    nearest_samples = await knn.acall(inputs=query)
+    nearest_samples = await knn(inputs=query)
     assert len(nearest_samples) == 2, "Incorrect number of nearest samples returned"
     assert "Paris" in [sample.answer for sample in nearest_samples], "Expected Paris to be a nearest sample answer"

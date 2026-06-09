@@ -30,5 +30,5 @@ async def test_pipeline_preprocess_format_lm_boundary():
     assert request.messages[-1].role == "user"
 
 
-def test_adapter_acall_uses_pipeline():
-    assert ChatAdapter.acall is Adapter.acall
+def test_adapter_call_uses_pipeline():
+    assert ChatAdapter.__call__ is Adapter.__call__

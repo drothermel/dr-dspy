@@ -11,8 +11,7 @@
   `await teleprompter.compile(...)`.
 - Removed streaming (`streamify`, `StreamListener`) and sync bridges (`asyncify`, `syncify`).
 - Removed `ParallelExecutor` thread pools; batch execution uses `asyncio`-bounded concurrency.
-- `BaseLM` and `Adapter` are async-only: `await lm(request)`, `await adapter.acall(lm=..., ...)`.
-- `Module.acall` and `BaseLM.acall` remain as aliases for `__call__` (may be removed in a future release).
+- `BaseLM` and `Adapter` are async-only: `await lm(request, run=...)`, `await adapter(lm=..., run=...)`.
 - History system refactor (see `docs/migration/history.md`):
   - `History` → `TurnLog`; agent field `history` → `turn_log`; ReAct/CodeAct `trajectory` → `turn_log`.
   - `LMHistoryEntry` → `CallRecord`; `lm/module.history` → `call_log`; removed `GLOBAL_HISTORY` / `inspect_history()`.

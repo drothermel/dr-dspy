@@ -33,7 +33,7 @@ async def test_async_chain_of_thought(make_run):
     program = ChainOfThought(
         ts("question -> answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",)))
     )
-    result = await program.acall(question="What is 1+1?", run=run)
+    result = await program(question="What is 1+1?", run=run)
     assert result.answer == "2"
 
 

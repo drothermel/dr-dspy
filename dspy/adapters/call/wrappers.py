@@ -35,7 +35,7 @@ class HintInjectingAdapter(Adapter):
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
         return self._inner.parse(task_spec=task_spec, completion=completion)
 
-    async def acall(
+    async def __call__(
         self,
         *,
         lm: BaseLM,

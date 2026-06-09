@@ -111,7 +111,7 @@ def test_chat_adapter_sync_call():
     adapter = ChatAdapter()
     lm = DummyLM([{"answer": "Paris"}])
     result = asyncio.run(
-        adapter.acall(
+        adapter(
             lm=lm,
             config={},
             task_spec=signature,
@@ -128,7 +128,7 @@ async def test_chat_adapter_async_call():
     signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
     adapter = ChatAdapter()
     lm = DummyLM([{"answer": "Paris"}])
-    result = await adapter.acall(
+    result = await adapter(
         lm=lm,
         config={},
         task_spec=signature,
@@ -1585,7 +1585,7 @@ def test_chat_adapter_signature_information(make_run):
     run = make_run(lm=LM(model="openai/gpt-4o"), adapter=ChatAdapter())
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = default_model_response("[[ ## output ## ]]\nok\n\n[[ ## completed ## ]]")
-        asyncio.run(program.acall(input1="Test", input2=11, run=run))
+        asyncio.run(program(input1="Test", input2=11, run=run))
         mock_completion.assert_called_once()
         _, call_kwargs = mock_completion.call_args
         assert len(call_kwargs["messages"]) == 2
@@ -1775,7 +1775,7 @@ def test_chat_adapter_with_code():
             model="openai/gpt-4o-mini",
         )
         result = asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=CodeGeneration,
@@ -1885,7 +1885,7 @@ def test_chat_adapter_toolcalls_native_function_calling():
             model="openai/gpt-4o-mini",
         )
         result = asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=MySignature,
@@ -1905,7 +1905,7 @@ def test_chat_adapter_toolcalls_native_function_calling():
             choices=[Choices(message=Message(content="{'answer': 'Paris'}"))], model="openai/gpt-4o-mini"
         )
         result = asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=MySignature,
@@ -1946,7 +1946,7 @@ def test_chat_adapter_toolcalls_vague_match():
             model="openai/gpt-4o-mini",
         )
         result = asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=MySignature,
@@ -1970,7 +1970,7 @@ def test_chat_adapter_toolcalls_vague_match():
             model="openai/gpt-4o-mini",
         )
         result = asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=MySignature,
@@ -2020,7 +2020,7 @@ def test_chat_adapter_native_reasoning():
         )
         assert "reasoning" not in modified_signature.output_fields
         result = asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=MySignature,
@@ -2051,7 +2051,7 @@ def test_chat_adapter_parses_float_with_underscores(make_run):
         )
         lm = LM("openai/gpt-4o-mini")
         result = asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=MySignature,
@@ -2087,7 +2087,7 @@ def test_null_content_raises_adapter_parse_error(make_run):
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock, return_value=response):
         cot = ChainOfThought(ts("question -> answer"))
         with pytest.raises(AdapterParseError):
-            asyncio.run(cot.acall(question="test", run=run))
+            asyncio.run(cot(question="test", run=run))
 
 
 def test_empty_string_content_raises_adapter_parse_error(make_run):
@@ -2099,7 +2099,7 @@ def test_empty_string_content_raises_adapter_parse_error(make_run):
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock, return_value=response):
         cot = ChainOfThought(ts("question -> answer"))
         with pytest.raises(AdapterParseError):
-            asyncio.run(cot.acall(question="test", run=run))
+            asyncio.run(cot(question="test", run=run))
 
 
 def test_tool_call_with_null_content_does_not_raise():
@@ -2247,7 +2247,7 @@ def test_native_response_type_without_parse_lm_output_raises():
     lm = DummyLM([{}])
     with pytest.raises(TypeError, match="parse_lm_output"):
         asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=OpaqueSignature,

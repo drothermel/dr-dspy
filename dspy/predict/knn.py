@@ -30,7 +30,7 @@ class KNN:
             self.trainset_vectors = np.asarray(vectors, dtype=np.float32)
         return self.trainset_vectors
 
-    async def acall(self, *, inputs: Mapping[str, Any]) -> list[Example]:
+    async def __call__(self, *, inputs: Mapping[str, Any]) -> list[Example]:
         trainset_vectors = await self._ensure_train_vectors()
         input_example_vector = np.asarray(
             await self.embedding([_format_input_text(inputs, frozenset(inputs))]), dtype=np.float32
@@ -38,5 +38,3 @@ class KNN:
         scores = np.dot(trainset_vectors, input_example_vector.T).squeeze()
         nearest_samples_idxs = scores.argsort()[-self.k :][::-1]
         return [self.trainset[cur_idx] for cur_idx in nearest_samples_idxs]
-
-    __call__ = acall

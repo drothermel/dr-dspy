@@ -422,7 +422,7 @@ async def test_responses_api_with_none_usage_async(make_run):
         lm = LM(model="openai/gpt-5-mini", model_type="responses", temperature=1.0, max_tokens=16000)
         run = make_run(lm=lm)
         with track_usage(run) as tracker:
-            result = await lm.acall(_request(lm, prompt="test query"), run=run)
+            result = await lm(_request(lm, prompt="test query"), run=run)
         assert result.text == "Partial async response"
         assert lm.call_log[-1].usage == {}
         assert tracker.get_total_tokens() == {}

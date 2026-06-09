@@ -21,8 +21,8 @@ def test_inspect_call_log_basic(capsys, make_run):
     lm = DummyLM([{"response": "Hello"}, {"response": "How are you?"}])
     run = make_run(lm=lm)
     predictor = Predict(ts("query: str -> response: str"))
-    asyncio.run(predictor.acall(query="Hi", run=run))
-    asyncio.run(predictor.acall(query="What's up?", run=run))
+    asyncio.run(predictor(query="Hi", run=run))
+    asyncio.run(predictor(query="What's up?", run=run))
     call_log = run.call_log
     assert len(call_log) > 0
     assert isinstance(call_log, list)
@@ -94,7 +94,7 @@ def test_inspect_call_log_with_n(capsys, make_run):
     run = make_run(lm=lm)
     predictor = Predict(ts("query: str -> response: str"))
     for query in ("Hi", "What's up?", "Bye"):
-        asyncio.run(predictor.acall(query=query, run=run))
+        asyncio.run(predictor(query=query, run=run))
     run.inspect_call_log(n=2)
     captured = capsys.readouterr()
     assert captured.out.count("[") >= 2
@@ -104,7 +104,7 @@ def test_run_inspect_call_log(capsys, make_run):
     lm = DummyLM([{"response": "Hello"}])
     run = make_run(lm=lm)
     predictor = Predict(ts("query: str -> response: str"))
-    asyncio.run(predictor.acall(query="Hi", run=run))
+    asyncio.run(predictor(query="Hi", run=run))
     run.inspect_call_log()
     call_log = run.call_log
     assert len(call_log) == 1
@@ -114,6 +114,6 @@ def test_inspect_call_log_n_larger_than_history(capsys, make_run):
     lm = DummyLM([{"response": "Hello"}])
     run = make_run(lm=lm)
     predictor = Predict(ts("query: str -> response: str"))
-    asyncio.run(predictor.acall(query="Hi", run=run))
+    asyncio.run(predictor(query="Hi", run=run))
     run.inspect_call_log(n=5)
     assert len(run.call_log) == 1

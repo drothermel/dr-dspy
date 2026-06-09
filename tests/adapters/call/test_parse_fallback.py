@@ -21,7 +21,7 @@ async def test_chat_adapter_fallback_to_json_adapter_on_parse_error():
             model="openai/gpt-4o-mini",
         )
         lm = LM("openai/gpt-4o-mini")
-        result = await adapter.acall(
+        result = await adapter(
             lm=lm,
             config={},
             task_spec=signature,
@@ -53,7 +53,7 @@ async def test_chat_adapter_fallback_preserves_native_function_calling_flag():
             model="openai/gpt-4o-mini",
         )
         lm = LM("openai/gpt-4o-mini")
-        result = await adapter.acall(
+        result = await adapter(
             lm=lm,
             config={},
             task_spec=signature,
@@ -76,7 +76,7 @@ async def test_chat_adapter_respects_disabled_parse_fallback():
         )
         lm = LM("openai/gpt-4o-mini")
         with pytest.raises(AdapterParseError):
-            await adapter.acall(
+            await adapter(
                 lm=lm,
                 config={},
                 task_spec=signature,
@@ -95,7 +95,7 @@ async def test_fallback_does_not_run_on_lm_error():
         mock_completion.side_effect = LMError("rate limited", provider="openai")
         lm = LM("openai/gpt-4o-mini")
         with pytest.raises(LMError):
-            await adapter.acall(
+            await adapter(
                 lm=lm,
                 config={},
                 task_spec=signature,

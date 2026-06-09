@@ -19,6 +19,8 @@ class AdapterCallbackTarget(Protocol):
 
     def parse(self, *args: Any, **kwargs: Any) -> Any: ...
 
+    async def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
+
 
 @runtime_checkable
 class EvaluateCallbackTarget(Protocol):

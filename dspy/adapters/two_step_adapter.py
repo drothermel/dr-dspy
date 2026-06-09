@@ -49,7 +49,7 @@ class TwoStepAdapter(Adapter):
     @override
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
         raise NotImplementedError(
-            "TwoStepAdapter.parse is not supported. Structured extraction runs in TwoStepAdapter.acall."
+            "TwoStepAdapter.parse is not supported. Structured extraction runs in TwoStepAdapter.__call__."
         )
 
     async def _run_extraction(self, *, original_task_spec: TaskSpec, text: str, run: RunContext) -> dict[str, Any]:

@@ -38,8 +38,6 @@ def make_mock_predictor(responses: list[dict]):
         async def __call__(self, **kwargs: object):
             return self._next_response()
 
-        acall = __call__
-
     return MockPredictor()
 
 

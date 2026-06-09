@@ -71,8 +71,6 @@ class Embedder:
             embeddings_list.extend(await _acompute_embeddings(model=self.model, batch_inputs=batch, **kwargs))
         return self._postprocess(embeddings_list=embeddings_list, is_single_input=is_single_input)
 
-    acall = __call__
-
 
 async def _acompute_embeddings(model, batch_inputs, **kwargs):
     if isinstance(model, str):

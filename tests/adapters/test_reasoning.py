@@ -65,7 +65,7 @@ def test_reasoning_with_chain_of_thought(make_run):
     lm = DummyLM([{"reasoning": "Let me think step by step", "answer": "42"}])
     run = make_run(lm=lm)
     cot = ChainOfThought(ts("question -> answer"))
-    result = asyncio.run(cot.acall(question="What is the answer?", run=run))
+    result = asyncio.run(cot(question="What is the answer?", run=run))
     assert isinstance(result.reasoning, Reasoning)
     assert result.reasoning.strip() == "Let me think step by step"
     assert result.reasoning.lower() == "let me think step by step"

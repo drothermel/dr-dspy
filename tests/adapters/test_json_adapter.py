@@ -538,7 +538,7 @@ def test_json_adapter_passes_structured_output_when_supported_by_model(make_run)
     run = make_run(lm=LM(model="openai/gpt-4o"), adapter=JSONAdapter())
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = _structured_output_model_response()
-        asyncio.run(program.acall(input1="Test input", run=run))
+        asyncio.run(program(input1="Test input", run=run))
 
     def clean_schema_extra(field_name, field_info):
         attrs = dict(field_info.__repr_args__())
@@ -574,7 +574,7 @@ def test_json_adapter_not_using_structured_outputs_when_not_supported_by_model(m
             choices=[Choices(message=Message(content="{'output1': 'Test output', 'output2': True}"))],
             model="openai/gpt-4o",
         )
-        asyncio.run(program.acall(input1="Test input", run=run))
+        asyncio.run(program(input1="Test input", run=run))
     mock_completion.assert_called_once()
     _, call_kwargs = mock_completion.call_args
     assert "response_format" not in call_kwargs
@@ -600,7 +600,7 @@ def test_json_adapter_with_structured_outputs_does_not_mutate_original_signature
     program = Predict(TestSignature)
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = _structured_output_model_response()
-        asyncio.run(program.acall(input1="Test input", run=run))
+        asyncio.run(program(input1="Test input", run=run))
     assert program.task_spec.equals(TestSignature)
 
 
@@ -609,7 +609,7 @@ def test_json_adapter_sync_call():
     adapter = JSONAdapter()
     lm = DummyLM([{"answer": "Paris"}], adapter=JSONAdapter())
     result = asyncio.run(
-        adapter.acall(
+        adapter(
             lm=lm,
             config={},
             task_spec=signature,
@@ -626,7 +626,7 @@ async def test_json_adapter_async_call():
     signature = ts("question -> answer", instructions="Given the fields, produce the outputs.")
     adapter = JSONAdapter()
     lm = DummyLM([{"answer": "Paris"}], adapter=JSONAdapter())
-    result = await adapter.acall(
+    result = await adapter(
         lm=lm,
         config={},
         task_spec=signature,
@@ -671,7 +671,7 @@ def test_json_adapter_on_pydantic_model(make_run):
             model="openai/gpt-4o",
         )
         result = asyncio.run(
-            program.acall(
+            program(
                 user=User(id=5, name="name_test", email="email_test"),
                 question="What is the capital of France?",
                 run=run,
@@ -712,7 +712,7 @@ def test_json_adapter_parse_raise_error_on_mismatch_fields():
         lm = LM(model="openai/gpt-4o-mini")
         with pytest.raises(AdapterParseError) as e:
             asyncio.run(
-                adapter.acall(
+                adapter(
                     lm=lm,
                     config={},
                     task_spec=signature,
@@ -901,7 +901,7 @@ def test_json_adapter_with_tool():
         )
         lm = LM(model="openai/gpt-4o-mini")
         asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=MySignature,
@@ -959,7 +959,7 @@ def test_json_adapter_with_code():
             model="openai/gpt-4o-mini",
         )
         result = asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=CodeGeneration,
@@ -1034,7 +1034,7 @@ async def test_json_adapter_on_pydantic_model_async(make_run):
             model="openai/gpt-4o",
         )
         run = make_run(lm=LM(model="openai/gpt-4o"), adapter=JSONAdapter())
-        result = await program.acall(
+        result = await program(
             user=User(id=5, name="name_test", email="email_test"),
             question="What is the capital of France?",
             run=run,
@@ -1074,7 +1074,7 @@ def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_lm_err
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.side_effect = RuntimeError("Structured output failed!")
         with pytest.raises(LMUnexpectedError, match="Structured output failed"):
-            asyncio.run(program.acall(question="Dummy question!", run=run))
+            asyncio.run(program(question="Dummy question!", run=run))
         assert mock_completion.call_count == 1
         _, first_call_kwargs = mock_completion.call_args_list[0]
         assert issubclass(first_call_kwargs.get("response_format"), pydantic.BaseModel)
@@ -1097,7 +1097,7 @@ def test_json_adapter_json_mode_no_structured_outputs(make_run):
         )
         mock_get_supported_openai_params.return_value = ["response_format"]
         mock_supports_response_schema.return_value = False
-        result = asyncio.run(program.acall(question="Dummy question!", run=run))
+        result = asyncio.run(program(question="Dummy question!", run=run))
         assert mock_completion.call_count == 1
         assert result.answer == "Test output"
         _, call_kwargs = mock_completion.call_args_list[0]
@@ -1122,7 +1122,7 @@ async def test_json_adapter_json_mode_no_structured_outputs_async(make_run):
         mock_get_supported_openai_params.return_value = ["response_format"]
         mock_supports_response_schema.return_value = False
         run = make_run(lm=LM(model="openai/gpt-4o"), adapter=JSONAdapter())
-        result = await program.acall(question="Dummy question!", run=run)
+        result = await program(question="Dummy question!", run=run)
         assert mock_acompletion.call_count == 1
         assert result.answer == "Test output"
         _, call_kwargs = mock_acompletion.call_args_list[0]
@@ -1140,7 +1140,7 @@ async def test_json_adapter_does_not_fallback_to_json_mode_on_structured_output_
         mock_acompletion.side_effect = RuntimeError("Structured output failed!")
         run = make_run(lm=LM(model="openai/gpt-4o-mini"), adapter=JSONAdapter())
         with pytest.raises(LMUnexpectedError, match="Structured output failed"):
-            await program.acall(question="Dummy question!", run=run)
+            await program(question="Dummy question!", run=run)
         assert mock_acompletion.call_count == 1
         _, first_call_kwargs = mock_acompletion.call_args_list[0]
         assert issubclass(first_call_kwargs.get("response_format"), pydantic.BaseModel)
@@ -1156,11 +1156,11 @@ def test_error_message_on_json_adapter_failure(make_run):
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.side_effect = RuntimeError("RuntimeError!")
         with pytest.raises(LMUnexpectedError) as error:
-            asyncio.run(program.acall(question="Dummy question!", run=run))
+            asyncio.run(program(question="Dummy question!", run=run))
         assert "RuntimeError!" in str(error.value)
         mock_completion.side_effect = ValueError("ValueError!")
         with pytest.raises(LMUnexpectedError) as error:
-            asyncio.run(program.acall(question="Dummy question!", run=run))
+            asyncio.run(program(question="Dummy question!", run=run))
         assert "ValueError!" in str(error.value)
 
 
@@ -1175,11 +1175,11 @@ async def test_error_message_on_json_adapter_failure_async(make_run):
         run = make_run(lm=LM(model="openai/gpt-4o-mini"), adapter=JSONAdapter())
         mock_acompletion.side_effect = RuntimeError("RuntimeError!")
         with pytest.raises(LMUnexpectedError) as error:
-            await program.acall(question="Dummy question!", run=run)
+            await program(question="Dummy question!", run=run)
         assert "RuntimeError!" in str(error.value)
         mock_acompletion.side_effect = ValueError("ValueError!")
         with pytest.raises(LMUnexpectedError) as error:
-            await program.acall(question="Dummy question!", run=run)
+            await program(question="Dummy question!", run=run)
         assert "ValueError!" in str(error.value)
 
 
@@ -1222,7 +1222,7 @@ def test_json_adapter_toolcalls_native_function_calling():
             model="openai/gpt-4o-mini",
         )
         result = asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=MySignature,
@@ -1242,7 +1242,7 @@ def test_json_adapter_toolcalls_native_function_calling():
             choices=[Choices(message=Message(content="{'answer': 'Paris'}"))], model="openai/gpt-4o-mini"
         )
         result = asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=MySignature,
@@ -1279,7 +1279,7 @@ def test_json_adapter_toolcalls_no_native_function_calling():
             adapter = JSONAdapter(use_native_function_calling=False)
             lm = LM(model="openai/gpt-4o-mini")
             asyncio.run(
-                adapter.acall(
+                adapter(
                     lm=lm,
                     config={},
                     task_spec=MySignature,
@@ -1330,7 +1330,7 @@ def test_json_adapter_native_reasoning():
         )
         assert "reasoning" not in modified_signature.output_fields
         result = asyncio.run(
-            adapter.acall(
+            adapter(
                 lm=lm,
                 config={},
                 task_spec=MySignature,
@@ -1383,7 +1383,7 @@ def test_json_adapter_with_responses_api(make_run):
     run = make_run(lm=lm, adapter=JSONAdapter())
     program = Predict(TestSignature)
     with mock.patch("litellm.aresponses", new_callable=mock.AsyncMock, return_value=api_response) as mock_responses:
-        result = asyncio.run(program.acall(question="What is the capital of the USA?", run=run))
+        result = asyncio.run(program(question="What is the capital of the USA?", run=run))
     assert result.answer == "Washington, D.C."
     mock_responses.assert_called_once()
     call_kwargs = mock_responses.call_args.kwargs

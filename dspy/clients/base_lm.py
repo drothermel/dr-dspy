@@ -108,9 +108,6 @@ class BaseLM:
             )
         return self._finalize_lm_response(request=request, response=response, run=run, compiled=compiled)
 
-    async def acall(self, request: LMRequest, *, run: RunContext, compiled: CompiledCall | None = None) -> LMResponse:
-        return await self.__call__(request, run=run, compiled=compiled)
-
     @property
     def supports_function_calling(self) -> bool:
         return False

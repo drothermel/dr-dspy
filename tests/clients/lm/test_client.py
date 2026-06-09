@@ -322,7 +322,7 @@ async def test_base_lm_async_explicit_lm_request_returns_lm_response(make_run):
 
     custom_lm = CustomLM("custom-model")
     request = LMRequest.from_call(model="custom-model", prompt="Query")
-    response = await custom_lm.acall(request, run=make_run(lm=custom_lm))
+    response = await custom_lm(request, run=make_run(lm=custom_lm))
     assert isinstance(response, LMResponse)
     assert response.text == "Hi async!"
 
@@ -526,7 +526,7 @@ async def test_async_lm_call(make_run):
     with patch("litellm.acompletion") as mock_acompletion:
         mock_acompletion.return_value = mock_response
         lm = LM(model="openai/gpt-4o-mini")
-        result = await lm.acall(_request(lm, prompt="question"), run=make_run(lm=lm))
+        result = await lm(_request(lm, prompt="question"), run=make_run(lm=lm))
         assert result.text == "answer"
         mock_acompletion.assert_called_once()
 

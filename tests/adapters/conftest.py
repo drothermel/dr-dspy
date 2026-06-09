@@ -105,7 +105,7 @@ async def _format_messages_and_lm_kwargs(
     if run is None:
         run = make_adapter_run(lm=capturing_lm, adapter=adapter)
     with contextlib.suppress(StopAdapterCallCapture):
-        await adapter.acall(
+        await adapter(
             lm=capturing_lm,
             config=coerce_lm_config(config),
             task_spec=task_spec,

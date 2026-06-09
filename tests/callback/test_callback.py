@@ -172,7 +172,7 @@ async def test_callback_async_module(make_run):
         lm=DummyLM({"How are you?": {"answer": "test output", "reasoning": "No more responses"}}), callbacks=[callback]
     )
     cot = ChainOfThought(ts("question -> answer"), config=LMConfig(n=3))
-    result = await cot.acall(question="How are you?", run=run)
+    result = await cot(question="How are you?", run=run)
     assert result["answer"] == "test output"
     assert result["reasoning"] == "No more responses"
     assert len(callback.calls) == 6

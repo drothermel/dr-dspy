@@ -82,8 +82,6 @@ class Module(BaseModule, metaclass=ProgramMeta):
         finally:
             run.caller_modules.pop()
 
-    acall = __call__
-
     async def aforward(
         self,
         *,
@@ -170,7 +168,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
         attr = super().__getattribute__(name)
         if name == "aforward" and callable(attr):
             stack = inspect.stack()
-            aforward_called_directly = len(stack) <= 1 or stack[1].function not in {"__call__", "acall"}
+            aforward_called_directly = len(stack) <= 1 or stack[1].function != "__call__"
             if aforward_called_directly:
                 logger.warning(
                     f"Calling module.aforward(...) on {self.__class__.__name__} directly is discouraged. Please use await module(...) instead."

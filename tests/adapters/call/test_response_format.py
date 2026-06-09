@@ -12,7 +12,7 @@ async def test_json_adapter_passes_structured_output_when_supported():
     adapter = JSONAdapter()
     lm = CapturingLM(LM("openai/gpt-4o-mini"))
     with pytest.raises(StopAdapterCallCapture):
-        await adapter.acall(
+        await adapter(
             lm=lm,
             config={},
             task_spec=signature,
@@ -39,7 +39,7 @@ async def test_json_adapter_uses_json_object_mode_without_response_schema_suppor
 
     lm = NoSchemaLM(source_lm)
     with pytest.raises(StopAdapterCallCapture):
-        await adapter.acall(
+        await adapter(
             lm=lm,
             config={},
             task_spec=signature,

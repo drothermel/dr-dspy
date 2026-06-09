@@ -802,7 +802,7 @@ async def test_lm_usage_with_async(make_run):
         ),
     ):
         coroutines = [
-            program.acall(
+            program(
                 question="What is the capital of France?",
                 run=run.fork(usage_tracker=UsageTracker()),
             )
@@ -905,7 +905,7 @@ def test_field_constraints(adapter_type, make_run):
 async def test_async_predict(make_run):
     program = Predict(pspec("question -> answer"))
     run = make_run(lm=DummyLM([{"answer": "Paris"}]))
-    result = await program.acall(question="What is the capital of France?", run=run)
+    result = await program(question="What is the capital of France?", run=run)
     assert result.answer == "Paris"
 
 

@@ -308,10 +308,10 @@ async def test_usage_tracker_async_parallel(make_run):
         )
         run = make_run(lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter(), telemetry=TelemetryConfig(track_usage=True))
         coroutines = [
-            program.acall(question="What is the capital of France?", run=run),
-            program.acall(question="What is the capital of France?", run=run),
-            program.acall(question="What is the capital of France?", run=run),
-            program.acall(question="What is the capital of France?", run=run),
+            program(question="What is the capital of France?", run=run),
+            program(question="What is the capital of France?", run=run),
+            program(question="What is the capital of France?", run=run),
+            program(question="What is the capital of France?", run=run),
         ]
         results = await asyncio.gather(*coroutines)
         assert results[0].get_lm_usage() is not None
@@ -420,7 +420,7 @@ async def test_module_history_async(make_run):
 
         async def aforward(self, question: str, **kwargs: object) -> Prediction:
             run = kwargs["run"]
-            return await self.cot.acall(question=question, run=run)
+            return await self.cot(question=question, run=run)
 
     with patch("litellm.acompletion") as mock_completion:
         mock_completion.return_value = ModelResponse(
@@ -431,8 +431,8 @@ async def test_module_history_async(make_run):
         )
         program = MyProgram()
         run = make_run(lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter())
-        await program.acall(question="What is the capital of France?", run=run)
-        await program.cot.acall(question="What is the capital of France?", run=run)
+        await program(question="What is the capital of France?", run=run)
+        await program.cot(question="What is the capital of France?", run=run)
         assert len(program.call_log) == 1
         assert len(program.cot.call_log) == 2
         assert len(program.cot.predict.call_log) == 2
@@ -441,7 +441,7 @@ async def test_module_history_async(make_run):
         run = make_run(
             lm=LM("openai/gpt-4o-mini"), adapter=JSONAdapter(), telemetry=TelemetryConfig(call_log=CallLogMode.off)
         )
-        await program.acall(question="What is the capital of France?", run=run)
+        await program(question="What is the capital of France?", run=run)
         assert len(program.call_log) == 1
         assert len(program.cot.call_log) == 2
         assert len(program.cot.predict.call_log) == 2
@@ -452,7 +452,7 @@ async def test_module_history_async(make_run):
             init_run_log=False,
         )
         fresh_program = MyProgram()
-        await fresh_program.acall(question="What is the capital of France?", run=run)
+        await fresh_program(question="What is the capital of France?", run=run)
         assert len(fresh_program.call_log) == 1
         assert len(fresh_program.cot.call_log) == 1
         assert len(fresh_program.cot.predict.call_log) == 1

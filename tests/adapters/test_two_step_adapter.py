@@ -87,7 +87,7 @@ def test_two_step_adapter_call(make_run):
     main_lm = RecordingTextLM(["text from main LM"])
     extraction_lm = DummyLM([{"solution": "result", "answer": 12}])
     run = make_run(lm=main_lm, adapter=TwoStepAdapter(extraction_model=extraction_lm, extraction_adapter=ChatAdapter()))
-    result = asyncio.run(program.acall(question="What is 5 + 7?", run=run))
+    result = asyncio.run(program(question="What is 5 + 7?", run=run))
     assert result.answer == 12
     main_messages = [message_to_openai_chat(message) for message in main_lm.requests[0].messages]
     assert len(main_messages) == 2
@@ -126,7 +126,7 @@ async def test_two_step_adapter_async_call(make_run):
     main_lm = RecordingTextLM(["text from main LM"])
     extraction_lm = DummyLM([{"solution": "result", "answer": 12}])
     run = make_run(lm=main_lm, adapter=TwoStepAdapter(extraction_model=extraction_lm, extraction_adapter=ChatAdapter()))
-    result = await program.acall(question="What is 5 + 7?", run=run)
+    result = await program(question="What is 5 + 7?", run=run)
     assert result.answer == 12
     main_messages = [message_to_openai_chat(message) for message in main_lm.requests[0].messages]
     assert len(main_messages) == 2

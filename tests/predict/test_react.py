@@ -394,7 +394,7 @@ async def test_async_tool_calling_with_pydantic_args(make_run):
         ]
     )
     run = make_run(lm=lm)
-    outputs = await react.acall(
+    outputs = await react(
         participant_name="Alice",
         event_info=CalendarEvent(name="Science Fair", date="Friday", participants={"Alice": "female", "Bob": "male"}),
         run=run,
@@ -435,7 +435,7 @@ async def test_async_error_retry(make_run):
         ]
     )
     run = make_run(lm=lm)
-    outputs = await react.acall(a=1, b=2, max_iters=2, run=run)
+    outputs = await react(a=1, b=2, max_iters=2, run=run)
     turns = outputs.turn_log.turns
     control_expected = {
         "thought_0": "I need to add two numbers.",

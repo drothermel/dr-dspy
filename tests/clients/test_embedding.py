@@ -80,6 +80,6 @@ async def test_async_embedding():
 
         mock_litellm.aembedding = aembedding
         embedding = Embedder(model)
-        result = await embedding.acall(inputs)
+        result = await embedding(inputs)
         assert len(result) == len(inputs)
         np.testing.assert_allclose(result, mock_embeddings)

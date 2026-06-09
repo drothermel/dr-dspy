@@ -73,7 +73,7 @@ async def test_lm_preserves_existing_lm_error_without_self_cause_async(make_run)
         mock.patch("dspy.clients.lm.alitellm_completion", side_effect=error),
         pytest.raises(LMRateLimitError) as exc_info,
     ):
-        await lm.acall(_request(lm, prompt="question"), run=make_run(lm=lm))
+        await lm(_request(lm, prompt="question"), run=make_run(lm=lm))
     assert exc_info.value is error
     assert exc_info.value.__cause__ is None
 

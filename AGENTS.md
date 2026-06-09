@@ -35,8 +35,6 @@ results = await parallel([(module, example), ...])
 compiled = await teleprompter.compile(student, trainset=trainset, run=run)
 ```
 
-`Module.acall` and `BaseLM.acall` are compatibility aliases for `__call__`.
-
 ## TaskSpec (not Signature)
 
 Define tasks as `TaskSpec` subclasses (or with `make_task_spec` for dynamic cases) and pass an instance to predictors. Do not pass strings or legacy `Signature` classes to `Predict`.
@@ -135,7 +133,7 @@ result = await predict(
 
 - `Example.from_record(record, input_keys=(...))` and `example.as_inputs()` replace `Example(**kwargs)` / `example.inputs()`.
 - `LM(..., provider_options=LMProviderOptions(...))` replaces top-level provider kwargs such as `cache=` and `api_key=`.
-- `await knn.acall(inputs={...})` replaces positional KNN queries.
+- `await knn(inputs={...})` replaces positional KNN queries.
 
 See `docs/migration/call-options.md` for before/after examples.
 
@@ -145,4 +143,4 @@ Optimizer/bootstrap teacher contexts must include a configured `adapter` (use `o
 
 - Use keyword arguments for multi-arg calls to DSPy-internal functions when meaning is not obvious from position.
 - Do not add keyword-only `*` to public constructors or documented callback protocols (e.g. `metric(example, prediction, trace)`).
-- Spine APIs require keywords at call sites: `run_bounded(items=..., fn=...)`, `adapter.acall(lm=..., config=..., task_spec=..., demos=..., inputs=...)`.
+- Spine APIs require keywords at call sites: `run_bounded(items=..., fn=...)`, `await adapter(lm=..., config=..., task_spec=..., demos=..., inputs=..., run=...)`.
