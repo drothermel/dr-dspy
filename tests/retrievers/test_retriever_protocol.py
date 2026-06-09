@@ -36,7 +36,7 @@ def test_query_retriever_protocol_is_explicitly_exported() -> None:
 
 
 def test_databricks_rm_import_handles_missing_sdk_parent(monkeypatch: pytest.MonkeyPatch) -> None:
-    import dspy.retrievers.databricks_rm as databricks_rm
+    import dspy.integrations.retrieval.databricks as databricks_rm
 
     def missing_parent_package(name: str) -> object:
         if name == "databricks.sdk":
@@ -48,7 +48,7 @@ def test_databricks_rm_import_handles_missing_sdk_parent(monkeypatch: pytest.Mon
 
 
 def test_databricks_rm_direct_call_preserves_prediction_shape(monkeypatch: pytest.MonkeyPatch) -> None:
-    import dspy.retrievers.databricks_rm as databricks_rm
+    import dspy.integrations.retrieval.databricks as databricks_rm
 
     response = {
         "manifest": {"columns": [{"name": "id"}, {"name": "text"}, {"name": "score"}, {"name": "source"}]},
