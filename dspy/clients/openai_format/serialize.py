@@ -1,7 +1,6 @@
 # Internal: import from dspy.clients.openai_format.serialize only in tests and spine-adjacent code.
 from __future__ import annotations
 
-import os
 from typing import Any
 
 import pydantic
@@ -13,10 +12,12 @@ from dspy.clients.openai_format.media import (
     media_type_for_path,
     part_text,
     read_path_base64,
+    split_data_uri,
 )
 from dspy.clients.openai_format.reasoning_models import is_openai_reasoning_model
 from dspy.clients.openai_format.tool_calls import tool_call_part_to_openai
 from dspy.core.types.config import LMConfig, LMToolChoice, LMToolSpec
+from dspy.core.types.media_uri import data_uri
 from dspy.core.types.parts import (
     LMAudioPart,
     LMBinaryPart,
@@ -86,15 +87,23 @@ def image_to_openai(image: LMImagePart) -> dict[str, Any]:
 
 
 def audio_to_openai(audio: LMAudioPart) -> dict[str, Any]:
+    input_audio: dict[str, Any] = {"format": media_format(audio.media_type)}
     if audio.data is not None:
         data = audio.data
-        media_type = audio.media_type
+        if data.startswith("data:"):
+            media_type, data = split_data_uri(data)
+            input_audio["format"] = media_format(media_type)
+        input_audio["data"] = data
+    elif audio.url is not None:
+        input_audio["url"] = audio.url
+    elif audio.file_id is not None:
+        input_audio["file_id"] = audio.file_id
     elif audio.path is not None:
-        data = read_path_base64(audio.path)
-        media_type = media_type_for_path(audio.path, fallback=audio.media_type)
+        input_audio["data"] = read_path_base64(audio.path)
+        input_audio["format"] = media_format(media_type_for_path(audio.path, fallback=audio.media_type))
     else:
-        raise ValueError("OpenAI-format audio input requires base64 `data` or local `path`.")
-    return {"type": "input_audio", "input_audio": {"data": data, "format": media_format(media_type)}}
+        raise ValueError("OpenAI-format audio input requires base64 `data`, `url`, `file_id`, or local `path`.")
+    return {"type": "input_audio", "input_audio": input_audio}
 
 
 def document_to_openai_blocks(document: LMDocumentPart) -> list[dict[str, Any]]:
@@ -114,17 +123,18 @@ def document_to_openai_blocks(document: LMDocumentPart) -> list[dict[str, Any]]:
 
 
 def video_to_openai(video: LMVideoPart) -> dict[str, Any]:
-    filename = os.path.basename(video.path) if video.path is not None else None
-    return binary_to_openai(
-        LMBinaryPart(
-            data=video.data,
-            url=video.url,
-            file_id=video.file_id,
-            path=video.path,
-            media_type=video.media_type,
-            filename=filename,
-        )
-    )
+    block: dict[str, Any] = {"media_type": video.media_type}
+    if video.data is not None:
+        block["data"] = data_uri(media_type=video.media_type, data=video.data)
+    elif video.url is not None:
+        block["url"] = video.url
+    elif video.file_id is not None:
+        block["file_id"] = video.file_id
+    elif video.path is not None:
+        block["path"] = video.path
+    else:
+        raise ValueError("OpenAI-format video input requires `data`, `url`, `file_id`, or local `path`.")
+    return {"type": "video", "video": block}
 
 
 def tool_to_openai(tool: LMToolSpec) -> dict[str, Any]:
@@ -154,7 +164,10 @@ def assistant_tool_call_to_openai(call: LMToolCallPart) -> dict[str, Any]:
 
 
 def tool_result_to_openai(result: LMToolResultPart) -> dict[str, Any]:
-    return {"content": parts_to_openai_content(result.content)}
+    content = parts_to_openai_content(result.content)
+    if content == []:
+        content = ""
+    return {"content": content}
 
 
 def common_config_kwargs(config: LMConfig, *, model: str | None = None, endpoint: str = "chat") -> dict[str, Any]:

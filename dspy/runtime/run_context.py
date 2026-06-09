@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TextIO
 
 from pydantic import BaseModel, ConfigDict, Field, SkipValidation
 
+from dspy.clients.openai_format.chat_request import request_messages_as_openai
 from dspy.core.types import CallRecord
 from dspy.runtime.config import (
     CallSite,
@@ -171,7 +172,7 @@ class RunContext(BaseModel):
         for entry in records:
             if not isinstance(entry, CallRecord):
                 raise TypeError(f"call_log entry must be CallRecord, got {type(entry)!r}")
-        return [entry.to_dict() for entry in records]
+        return [{**entry.to_dict(), "messages": request_messages_as_openai(entry.request)} for entry in records]
 
 
 def resolve_run(

@@ -7,6 +7,8 @@ import sys
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, TextIO, cast
 
+from dspy.clients.openai_format.chat_request import request_messages_as_openai
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -53,7 +55,7 @@ def pretty_print_call_log(call_log: Sequence[CallRecord], n: int = 1, file: Text
             )
 
     for item in call_log[-n:]:
-        messages = item.messages_as_openai
+        messages = request_messages_as_openai(item.request)
         if not messages and item.prompt is not None:
             messages = [{"role": "user", "content": item.prompt}]
         outputs = item.outputs

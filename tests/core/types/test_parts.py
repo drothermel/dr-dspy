@@ -3,7 +3,7 @@ from typing import Any, cast
 import pytest
 
 from dspy.core.types import LMAudioPart, LMDocumentPart, LMMessage, LMToolCallPart, LMVideoPart, User
-from tests.core.types.conftest import history_entry
+from tests.core.types.conftest import history_messages_as_openai
 
 
 def test_message_content_and_tool_calls_normalize_for_dspy_history_surface():
@@ -16,7 +16,7 @@ def test_message_content_and_tool_calls_normalize_for_dspy_history_surface():
     assert [part for part in message.parts if isinstance(part, LMToolCallPart)] == [
         LMToolCallPart(id="call_1", name="search", args={"query": "dspy"})
     ]
-    assert history_entry(message).messages_as_openai == [
+    assert history_messages_as_openai(message) == [
         {
             "role": "assistant",
             "content": "Use search.",
@@ -37,7 +37,7 @@ def test_tool_result_content_none_normalizes_to_empty_parts():
     assert result.call_id == "call_1"
     assert result.name == "search"
     assert result.content == []
-    assert history_entry(message).messages_as_openai == [
+    assert history_messages_as_openai(message) == [
         {"role": "tool", "content": "", "tool_call_id": "call_1", "name": "search"}
     ]
 
@@ -50,7 +50,7 @@ def test_audio_content_accepts_url_and_history_preserves_url():
     audio = message.parts[0]
     assert isinstance(audio, LMAudioPart)
     assert audio.url == "https://example.com/audio.wav"
-    assert history_entry(message).messages_as_openai[0]["content"][0]["input_audio"] == {
+    assert history_messages_as_openai(message)[0]["content"][0]["input_audio"] == {
         "format": "wav",
         "url": "https://example.com/audio.wav",
     }
@@ -77,7 +77,7 @@ def test_image_content_requires_mapping_with_url():
 
 def test_video_data_round_trips_through_history_messages():
     message = User(LMVideoPart(data="YWJj", media_type="video/mp4"))
-    content = history_entry(message).messages_as_openai[0]["content"][0]
+    content = history_messages_as_openai(message)[0]["content"][0]
     round_tripped = cast("Any", LMMessage)(role="user", content=[content]).parts[0]
     assert content == {"type": "video", "video": {"media_type": "video/mp4", "data": "data:video/mp4;base64,YWJj"}}
     assert isinstance(round_tripped, LMVideoPart)
@@ -90,7 +90,7 @@ def test_document_source_url_stays_url_and_round_trips_through_history_messages(
         role="user", content=[{"type": "document", "source": "https://example.com/report.pdf", "title": "Report"}]
     )
     document = message.parts[0]
-    content = history_entry(message).messages_as_openai[0]["content"][0]
+    content = history_messages_as_openai(message)[0]["content"][0]
     round_tripped = cast("Any", LMMessage)(role="user", content=[content]).parts[0]
     assert isinstance(document, LMDocumentPart)
     assert document.url == "https://example.com/report.pdf"

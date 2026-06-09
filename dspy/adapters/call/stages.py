@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from dspy.clients.openai_format.chat_request import request_messages_as_openai
 from dspy.core.types import LMRequest, LMResponse  # noqa: TC001
 from dspy.core.types.config import LMConfig, coerce_lm_config
-from dspy.core.types.openai_compat import request_messages_as_openai
 from dspy.runtime.transparency import resolve_call, resolve_call_site, resolve_lm_config, validate_compiled_call
 from dspy.task_spec import TaskSpec  # noqa: TC001
 

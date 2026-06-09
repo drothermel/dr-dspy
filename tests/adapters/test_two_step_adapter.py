@@ -11,7 +11,7 @@ from dspy.adapters.two_step_adapter import TwoStepAdapter
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import ToolCalls
 from dspy.clients.base_lm import BaseLM
-from dspy.clients.openai_format.chat_request import message_to_openai_chat
+from dspy.clients.openai_format.chat_request import message_to_openai_chat, request_messages_as_openai
 from dspy.core.types import LMOutput, LMRequest, LMResponse, LMTextPart, LMThinkingPart, LMUsage
 from dspy.errors import AdapterParseError
 from dspy.history import TurnLog
@@ -132,7 +132,7 @@ def test_two_step_adapter_call(make_run):
     content = main_messages[1]["content"]
     assert "question:" in content.lower()
     assert "What is 5 + 7?" in content
-    extraction_messages = extraction_lm.call_log[0].messages_as_openai
+    extraction_messages = request_messages_as_openai(extraction_lm.call_log[0].request)
     assert len(extraction_messages) == 2
     assert extraction_messages[0]["role"] == "system"
     content = extraction_messages[0]["content"]
@@ -171,7 +171,7 @@ async def test_two_step_adapter_async_call(make_run):
     content = main_messages[1]["content"]
     assert "question:" in content.lower()
     assert "What is 5 + 7?" in content
-    extraction_messages = extraction_lm.call_log[0].messages_as_openai
+    extraction_messages = request_messages_as_openai(extraction_lm.call_log[0].request)
     assert len(extraction_messages) == 2
     assert extraction_messages[0]["role"] == "system"
     content = extraction_messages[0]["content"]

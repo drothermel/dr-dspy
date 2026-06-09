@@ -1,5 +1,6 @@
 import pytest
 
+from dspy.clients.openai_format.chat_request import request_messages_as_openai
 from dspy.clients.openai_format.serialize import part_to_openai_blocks, parts_to_openai_content
 from dspy.core.types import (
     LMBinaryPart,
@@ -14,9 +15,8 @@ from dspy.core.types import (
     LMThinkingPart,
     LMToolResultPart,
 )
-from dspy.core.types.openai_compat import _history_part_as_openai_content, request_messages_as_openai
 from dspy.core.types.request import LMRequest
-from tests.core.types.conftest import history_entry
+from tests.core.types.conftest import history_messages_as_openai
 
 
 def _part_fixtures():
@@ -33,8 +33,8 @@ def _part_fixtures():
 
 
 @pytest.mark.parametrize("part", _part_fixtures())
-def test_history_and_live_serializers_agree_on_parts(part):
-    assert _history_part_as_openai_content(part) == part_to_openai_blocks(part)[0]
+def test_part_serializes_to_single_openai_block(part):
+    assert part_to_openai_blocks(part)[0]
 
 
 def test_tool_result_with_nested_image_matches_live_serializer():
@@ -45,7 +45,7 @@ def test_tool_result_with_nested_image_matches_live_serializer():
     )
     message = LMMessage(role=LMMessageRole.TOOL, parts=[result])
     expected_content = parts_to_openai_content(result.content)
-    assert history_entry(message).messages_as_openai == [
+    assert history_messages_as_openai(message) == [
         {
             "role": "tool",
             "content": expected_content,

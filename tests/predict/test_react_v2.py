@@ -8,7 +8,7 @@ from typing_extensions import override
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool, ToolCalls
 from dspy.clients.base_lm import BaseLM
-from dspy.clients.openai_format.chat_request import message_to_openai_chat
+from dspy.clients.openai_format.chat_request import message_to_openai_chat, request_messages_as_openai
 from dspy.core.types import LMOutput, LMRequest, LMResponse, LMToolCallPart, LMUsage
 from dspy.history import TurnLog
 from dspy.predict.agent_termination import AgentTerminationReason
@@ -121,7 +121,7 @@ def test_react_v2_continuation_omits_missing_original_inputs(make_run):
         )
     )
     assert pred.answer == "found cats"
-    second_call_messages = lm.call_log[1].messages_as_openai
+    second_call_messages = request_messages_as_openai(lm.call_log[1].request)
     second_current_user_message = second_call_messages[-1]["content"]
     assert "[[ ## question ## ]]\nNone" not in second_current_user_message
     assert "[[ ## question ## ]]" not in second_current_user_message

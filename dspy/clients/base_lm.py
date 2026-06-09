@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING, Any, TextIO
 
 from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
 from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
+from dspy.clients.openai_format.chat_request import request_messages_as_openai
 from dspy.core.types import CallRecord, LMRequest, LMResponse
 from dspy.core.types.config import NativeAdaptationMode
 from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
-from dspy.core.types.openai_compat import request_messages_as_openai
 from dspy.runtime.callback import Callback, with_callbacks
 from dspy.runtime.config import disk_call_log_enabled, memory_call_log_enabled
 from dspy.runtime.inspect_call_log import pretty_print_call_log

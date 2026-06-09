@@ -15,16 +15,6 @@ from dspy.core.types.parts import LMToolCallPart, LMToolResultPart
 from dspy.core.types.request import LMRequest
 
 
-def to_openai_chat_request(request: LMRequest) -> dict[str, Any]:
-    data = {"model": request.model, "messages": [message_to_openai_chat(message) for message in request.messages]}
-    data.update(common_config_kwargs(request.config, model=request.model, endpoint="chat"))
-    if request.config.tool_choice is not None:
-        data.update(tool_choice_to_openai(request.config.tool_choice))
-    if request.tools:
-        data["tools"] = [tool_to_openai(tool) for tool in request.tools]
-    return data
-
-
 def message_to_openai_chat(message: LMMessage) -> dict[str, Any]:
     output: dict[str, Any] = {"role": message.role.value}
     if message.name is not None:
@@ -46,3 +36,17 @@ def message_to_openai_chat(message: LMMessage) -> dict[str, Any]:
         return output
     output["content"] = parts_to_openai_content(message.parts)
     return output
+
+
+def request_messages_as_openai(request: LMRequest) -> list[dict[str, Any]]:
+    return [message_to_openai_chat(message) for message in request.messages]
+
+
+def to_openai_chat_request(request: LMRequest) -> dict[str, Any]:
+    data = {"model": request.model, "messages": request_messages_as_openai(request)}
+    data.update(common_config_kwargs(request.config, model=request.model, endpoint="chat"))
+    if request.config.tool_choice is not None:
+        data.update(tool_choice_to_openai(request.config.tool_choice))
+    if request.tools:
+        data["tools"] = [tool_to_openai(tool) for tool in request.tools]
+    return data

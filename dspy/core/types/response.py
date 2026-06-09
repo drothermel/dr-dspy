@@ -8,11 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import override
 
 from dspy.core.types.messages import LMMessage
-from dspy.core.types.openai_compat import (
-    request_kwargs,
-    request_messages_as_openai,
-    request_prompt,
-)
 from dspy.core.types.parts import (
     LMAudioPart,
     LMBinaryPart,
@@ -29,6 +24,7 @@ from dspy.core.types.parts import (
 from dspy.core.types.parts.models import _coerce_part
 from dspy.core.types.parts.serialize import _part_to_value
 from dspy.core.types.request import LMRequest
+from dspy.core.types.request_views import request_kwargs, request_prompt
 
 
 class LMUsage(BaseModel):
@@ -277,10 +273,6 @@ class CallRecord(BaseModel):
         return self.request.messages
 
     @property
-    def messages_as_openai(self) -> list[dict[str, Any]]:
-        return request_messages_as_openai(self.request)
-
-    @property
     def kwargs(self) -> dict[str, Any]:
         return request_kwargs(self.request)
 
@@ -307,7 +299,6 @@ class CallRecord(BaseModel):
             "cost": self.cost,
             "model": self.model,
             "prompt": self.prompt,
-            "messages": self.messages_as_openai,
             "kwargs": self.kwargs,
             "response_model": self.response_model,
         }

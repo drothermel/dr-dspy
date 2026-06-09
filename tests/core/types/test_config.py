@@ -1,6 +1,7 @@
 import pydantic
 import pytest
 
+from dspy.clients.openai_format.chat_request import request_messages_as_openai
 from dspy.core.types import (
     CallRecord,
     LMConfig,
@@ -161,7 +162,7 @@ def test_history_entry_exposes_typed_derived_properties():
     assert entry.model == "model"
     assert entry.prompt == "hi"
     assert entry.messages == [message]
-    assert entry.messages_as_openai == [{"role": "user", "content": "hi"}]
+    assert request_messages_as_openai(entry.request) == [{"role": "user", "content": "hi"}]
     assert entry.outputs == ["ok"]
     assert entry.usage["input_tokens"] == 1
     assert entry.cost == 0.5
