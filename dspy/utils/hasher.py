@@ -1,11 +1,9 @@
 import hashlib
 from pickle import dumps
-from typing import Any, ClassVar
+from typing import Any
 
 
 class Hasher:
-    dispatch: ClassVar[dict] = {}
-
     def __init__(self) -> None:
         self.m = hashlib.sha256()
 

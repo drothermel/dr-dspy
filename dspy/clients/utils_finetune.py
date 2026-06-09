@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 import orjson
 from typing_extensions import NotRequired
 
-from dspy.utils.caching import DSPY_CACHEDIR
+from dspy.utils.constants import DSPY_CACHEDIR
 from dspy.utils.hasher import Hasher
 
 if TYPE_CHECKING:
