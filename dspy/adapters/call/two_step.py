@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from dspy.adapters.base.tool_calls import attach_tool_calls_to_parsed_value
+from dspy.adapters.call.postprocess import enrich_parsed_value_from_lm_output
 from dspy.runtime.config import CallSite
 
 if TYPE_CHECKING:
@@ -21,16 +21,14 @@ async def finalize_two_step_main_response(
 ) -> list[dict[str, Any]]:
     values = []
     for output in response.outputs:
-        output_logprobs = output.logprobs
         text = output.text
         value = await adapter._run_extraction(original_task_spec=original_task_spec, text=text or "", run=run)
-        value = attach_tool_calls_to_parsed_value(
+        value = enrich_parsed_value_from_lm_output(
+            adapter,
             value=value,
             output=output,
-            tool_call_output_field_name=adapter._get_tool_call_output_field_name(original_task_spec),
+            original_task_spec=original_task_spec,
         )
-        if output_logprobs is not None:
-            value["logprobs"] = output_logprobs
         values.append(value)
     return values
 

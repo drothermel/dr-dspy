@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.base.native import AdapterNativeMixin
 from dspy.adapters.base.protocols import ComposedAdapterT
-from dspy.adapters.base.tool_calls import attach_tool_calls_to_parsed_value
+from dspy.adapters.call.postprocess import enrich_parsed_value_from_lm_output
 from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.reasoning import Reasoning
@@ -102,7 +102,6 @@ class AdapterCallMixin(AdapterNativeMixin):
         values = []
         tool_call_output_field_name = self._get_tool_call_output_field_name(original_task_spec)
         for output in response.outputs:
-            output_logprobs = output.logprobs
             tool_calls = output.tool_calls
             text = output.text
             if text is not None and (not (tool_calls and tool_call_output_field_name)):
@@ -122,26 +121,12 @@ class AdapterCallMixin(AdapterNativeMixin):
                     lm_response=str(output),
                     message="The LM returned an empty or null response.",
                 )
-            for field_name in original_task_spec.output_fields:
-                value.setdefault(field_name, None)
-            if tool_calls and tool_call_output_field_name:
-                value = attach_tool_calls_to_parsed_value(
-                    value=value,
-                    output=output,
-                    tool_call_output_field_name=tool_call_output_field_name,
-                )
-            for name, field in original_task_spec.output_fields.items():
-                field_type = field.type_
-                if (
-                    isinstance(field_type, type)
-                    and field_type in self.native_response_types
-                    and issubclass(field_type, Type)
-                ):
-                    parsed_value = field_type.parse_lm_output(output)
-                    if parsed_value is not None:
-                        value[name] = parsed_value
-            if output_logprobs:
-                value["logprobs"] = output_logprobs
+            value = enrich_parsed_value_from_lm_output(
+                self,
+                value=value,
+                output=output,
+                original_task_spec=original_task_spec,
+            )
             values.append(value)
         return values
 

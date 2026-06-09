@@ -6,6 +6,7 @@ from dspy.adapters.base import Adapter
 from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.call.mode import AdapterCallMode
 from dspy.adapters.call.pipeline import AdapterCallPipeline
+from dspy.adapters.call.postprocess import strip_native_response_output_fields
 from dspy.clients.base_lm import BaseLM
 from dspy.core.types.config import LMConfig
 from dspy.errors import AdapterOperationError
@@ -116,12 +117,13 @@ class TwoStepAdapter(Adapter):
         return "\n\n".join(parts).strip()
 
     def _create_extractor_task_spec(self, original_task_spec: TaskSpec) -> TaskSpec:
+        extractable_spec = strip_native_response_output_fields(original_task_spec, self.native_response_types)
         new_fields = {
             "text": input_field(
                 "text", str, desc="Raw completion text from the main language model to extract structured fields from."
             ),
-            **dict(original_task_spec.output_fields),
+            **dict(extractable_spec.output_fields),
         }
-        outputs_str = ", ".join(f"`{field}`" for field in original_task_spec.output_fields)
+        outputs_str = ", ".join(f"`{field}`" for field in extractable_spec.output_fields)
         instructions = f"The input is a text that should contain all the necessary information to produce the fields {outputs_str}. Your job is to extract the fields from the text verbatim. Extract precisely the appropriate value (content) for each field."
         return make_task_spec(new_fields, instructions=instructions, name="framework.two_step.extractor")

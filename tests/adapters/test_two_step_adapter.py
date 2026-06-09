@@ -8,10 +8,11 @@ from typing_extensions import override
 from dspy.adapters.base.tool_calls import attach_tool_calls_to_parsed_value
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.two_step_adapter import TwoStepAdapter
+from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import ToolCalls
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format.chat_request import message_to_openai_chat
-from dspy.core.types import LMOutput, LMRequest, LMResponse
+from dspy.core.types import LMOutput, LMRequest, LMResponse, LMTextPart, LMThinkingPart, LMUsage
 from dspy.errors import AdapterParseError
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
@@ -199,6 +200,59 @@ async def test_two_step_adapter_extraction(make_run):
     result = await adapter._run_extraction(original_task_spec=ComplexSignature, text=first_response, run=run)
     assert result["tags"] == ["AI", "deep learning", "neural networks"]
     assert result["confidence"] == 0.87
+
+
+@pytest.mark.asyncio
+async def test_two_step_adapter_native_reasoning_from_main_output(make_run):
+    task_spec = make_task_spec(
+        {
+            "question": input_field("question", desc="The question."),
+            "reasoning": output_field("reasoning", type_=Reasoning, desc="The reasoning."),
+            "answer": output_field("answer", desc="The answer."),
+        },
+        instructions="Given the fields `question`, produce the fields `reasoning`, `answer`.",
+    )
+
+    class MainLM(BaseLM):
+        def __init__(self):
+            super().__init__("dummy", "chat", temperature=0.0, max_tokens=1000)
+            self.kwargs["reasoning"] = {"effort": "low"}
+
+        @property
+        @override
+        def supports_reasoning(self):
+            return True
+
+        @override
+        async def aforward(self, request: LMRequest) -> LMResponse:
+            _ = request
+            return LMResponse(
+                model=self.model,
+                outputs=[
+                    LMOutput(
+                        parts=[
+                            LMTextPart(text="answer: Paris"),
+                            LMThinkingPart(text="Native provider reasoning"),
+                        ]
+                    )
+                ],
+                usage=LMUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0),
+            )
+
+    main_lm = MainLM()
+    extraction_lm = DummyLM([{"answer": "Paris"}])
+    adapter = TwoStepAdapter(extraction_lm, extraction_adapter=ChatAdapter(), use_native_function_calling=True)
+    run = make_run(lm=main_lm, adapter=adapter)
+    results = await adapter(
+        lm=main_lm,
+        config={},
+        task_spec=task_spec,
+        demos=[],
+        inputs={"question": "What is the capital of France?"},
+        run=run,
+    )
+    assert results[0]["reasoning"] == Reasoning(content="Native provider reasoning")
+    assert results[0]["answer"] == "Paris"
 
 
 def test_attach_tool_calls_preserves_call_id_from_provider_dict():

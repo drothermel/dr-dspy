@@ -6,12 +6,14 @@ from dspy.adapters.call.mode import AdapterCallMode
 
 if TYPE_CHECKING:
     from dspy.adapters.base.adapter import Adapter
+    from dspy.adapters.types.base_type import Type
     from dspy.runtime.run_context import RunContext
     from dspy.task_spec import TaskSpec
 
 
 class TwoStepMainAdapter(Protocol):
     call_mode: AdapterCallMode
+    native_response_types: list[type[Type]]
 
     def _create_extractor_task_spec(self, original_task_spec: TaskSpec) -> TaskSpec: ...
 

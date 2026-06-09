@@ -9,6 +9,7 @@ from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCalls
 from dspy.clients.lm import LM
 from dspy.clients.openai_format.chat_request import message_to_openai_chat
+from dspy.core.types import LMOutput, LMRequest, LMResponse, LMTextPart, LMThinkingPart, LMUsage
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.testing import DummyLM
 from tests.adapters.conftest import CapturingLM, StopAdapterCallCapture, make_adapter_run
@@ -128,3 +129,61 @@ async def test_two_step_main_call_applies_preprocess_native_reasoning():
     request = main_lm.calls[0]["request"]
     assert request.config.reasoning is not None
     assert request.config.reasoning.effort == "low"
+
+
+class NativeReasoningMainLM(DummyLM):
+    @property
+    @override
+    def supports_reasoning(self):
+        return True
+
+    def __init__(self):
+        super().__init__([{}])
+        self.kwargs["reasoning"] = {"effort": "low"}
+
+    @override
+    async def aforward(self, request: LMRequest) -> LMResponse:
+        _ = request
+        return LMResponse(
+            model=self.model,
+            outputs=[
+                LMOutput(
+                    parts=[
+                        LMTextPart(text="answer: Paris"),
+                        LMThinkingPart(text="Native provider reasoning"),
+                    ]
+                )
+            ],
+            usage=LMUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0),
+        )
+
+
+@pytest.mark.asyncio
+async def test_two_step_finalize_merges_native_reasoning_from_main_output():
+    task_spec = make_task_spec(
+        {
+            "question": input_field("question", desc="The question."),
+            "reasoning": output_field("reasoning", type_=Reasoning, desc="The reasoning."),
+            "answer": output_field("answer", desc="The answer."),
+        },
+        instructions="Given the fields `question`, produce the fields `reasoning`, `answer`.",
+    )
+    main_lm = NativeReasoningMainLM()
+    extraction_lm = DummyLM([{"answer": "Paris"}])
+    adapter = TwoStepAdapter(
+        extraction_model=extraction_lm,
+        extraction_adapter=ChatAdapter(),
+        use_native_function_calling=True,
+    )
+    run = make_adapter_run(lm=main_lm, adapter=adapter)
+    results = await AdapterCallPipeline.execute(
+        adapter,
+        lm=main_lm,
+        config={},
+        task_spec=task_spec,
+        demos=[],
+        inputs={"question": "Q?"},
+        run=run,
+    )
+    assert results[0]["reasoning"] == Reasoning(content="Native provider reasoning")
+    assert results[0]["answer"] == "Paris"
