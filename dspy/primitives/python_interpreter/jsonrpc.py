@@ -28,7 +28,7 @@ def jsonrpc_request(method: str, params: dict[str, Any], id: int | str) -> str:
 
 def jsonrpc_notification(method: str, params: dict[str, Any] | None = None) -> str:
     msg: dict[str, Any] = {"jsonrpc": "2.0", "method": method}
-    if params:
+    if params is not None:
         msg["params"] = params
     return json.dumps(msg)
 

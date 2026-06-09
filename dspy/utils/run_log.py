@@ -69,10 +69,16 @@ def _redact_content_part(part: dict[str, Any]) -> dict[str, Any]:
     return {"type": part_type, "redacted": True, "keys": sorted(part.keys())}
 
 
+_MESSAGE_PASSTHROUGH_KEYS = ("name", "tool_call_id")
+
+
 def redact_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     redacted: list[dict[str, Any]] = []
     for message in messages:
         item = {"role": message.get("role")}
+        for key in _MESSAGE_PASSTHROUGH_KEYS:
+            if key in message:
+                item[key] = message[key]
         content = message.get("content")
         if isinstance(content, str):
             item["content"] = content

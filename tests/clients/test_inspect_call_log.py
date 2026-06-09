@@ -110,6 +110,34 @@ def test_run_inspect_call_log(capsys, make_run):
     assert len(call_log) == 1
 
 
+def test_inspect_call_log_preserves_empty_messages():
+    out = StringIO()
+    history = [
+        CallRecord(
+            request=LMRequest(model="test", messages=[]),
+            response=LMResponse.from_text("ok", model="test"),
+            timestamp="2024-01-01T00:00:00",
+            uuid="uuid-empty-messages",
+        )
+    ]
+    pretty_print_call_log(history, n=1, file=out)
+    assert "User message:" not in out.getvalue()
+
+
+def test_inspect_call_log_handles_empty_outputs():
+    out = StringIO()
+    history = [
+        CallRecord(
+            request=LMRequest(model="test", messages=[User("hi")]),
+            response=LMResponse.model_construct(model="test", outputs=[]),
+            timestamp="2024-01-01T00:00:00",
+            uuid="uuid-empty-outputs",
+        )
+    ]
+    pretty_print_call_log(history, n=1, file=out)
+    assert "Response:" not in out.getvalue()
+
+
 def test_inspect_call_log_n_larger_than_history(capsys, make_run):
     lm = DummyLM([{"response": "Hello"}])
     run = make_run(lm=lm)

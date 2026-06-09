@@ -8,6 +8,7 @@ from dspy.primitives.python_interpreter.deno_process import send_request
 if TYPE_CHECKING:
     from dspy.primitives.python_interpreter.interpreter import PythonInterpreter
 LARGE_VAR_THRESHOLD = 100 * 1024 * 1024
+DSPY_VARS_VPATH = "/tmp/dspy_vars"  # noqa: S108 — Pyodide virtual FS path, not host /tmp
 
 
 def to_json_compatible(value: Any) -> Any:
@@ -51,20 +52,24 @@ def serialize_value(value: Any) -> str:
 
 
 def inject_variables(interpreter: "PythonInterpreter", code: str, variables: dict[str, Any]) -> str:
-    for key in variables:
-        if not key.isidentifier() or keyword.iskeyword(key) or key == "json":
-            raise CodeInterpreterError(f"Invalid variable name: '{key}'")
-    large_vars = {}
-    small_assignments = []
+    large_vars: dict[str, str] = {}
+    small_assignments: list[str] = []
     for k, v in variables.items():
         serialized = serialize_value(v)
         if len(serialized) > LARGE_VAR_THRESHOLD:
             large_vars[k] = json.dumps(to_json_compatible(v))
         else:
             small_assignments.append(f"{k} = {serialized}")
+    for key in variables:
+        if not key.isidentifier() or keyword.iskeyword(key):
+            raise CodeInterpreterError(f"Invalid variable name: '{key}'")
+        if key == "json" and large_vars:
+            raise CodeInterpreterError("Invalid variable name: 'json'")
     interpreter._pending_large_vars = large_vars
     if large_vars:
-        large_assignments = [f"{k} = json.loads(open('/tmp/dspy_vars/{k}.json').read())" for k in large_vars]
+        large_assignments = [
+            f"{k} = json.loads(open('{DSPY_VARS_VPATH}/{k}.json').read())" for k in large_vars
+        ]
         assignments = ["import json"] + small_assignments + large_assignments
     else:
         assignments = small_assignments

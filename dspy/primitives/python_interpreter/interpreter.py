@@ -115,8 +115,11 @@ class PythonInterpreter:
             for name, value in self._pending_large_vars.items():
                 inject_large_var(interpreter=self, name=name, value=value)
             stdin = deno_process.deno_stdin(self)
-            stdin.write(input_data + "\n")
-            stdin.flush()
+            try:
+                stdin.write(input_data + "\n")
+                stdin.flush()
+            except BrokenPipeError as exc:
+                raise CodeInterpreterError("Deno process stdin unavailable during execution") from exc
         skipped = 0
         while skipped <= self._MAX_SKIP_LINES:
             output_line = read_response_line(self, "during execution")

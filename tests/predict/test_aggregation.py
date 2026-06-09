@@ -9,6 +9,10 @@ def test_majority_with_prediction():
     assert result.completions[0]["answer"] == "2"
 
 
+def test_completions_len_empty():
+    assert len(Completions({})) == 0
+
+
 def test_majority_with_completions():
     completions = Completions([{"answer": "2"}, {"answer": "2"}, {"answer": "3"}])
     result = majority(completions)

@@ -40,8 +40,8 @@ class REPLVariable(pydantic.BaseModel):
         desc = ""
         constraints = ""
         extra_dict: dict[str, Any] = {}
-        if field_info:
-            extra_dict |= cast("dict[str, Any]", field_info.json_schema_extra or {})
+        if field_info and isinstance(field_info.json_schema_extra, dict):
+            extra_dict.update(cast("dict[str, Any]", field_info.json_schema_extra))
         raw_desc = extra_dict.get("desc", "")
         if raw_desc and (not raw_desc.startswith("${")):
             desc = raw_desc

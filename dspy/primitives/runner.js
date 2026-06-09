@@ -3,6 +3,8 @@
 import pyodideModule from "npm:pyodide/pyodide.js";
 import { readLines } from "https://deno.land/std@0.186.0/io/mod.ts";
 
+const DSPY_VARS_VPATH = "/tmp/dspy_vars";
+
 // =============================================================================
 // Python Code Templates
 // =============================================================================
@@ -315,8 +317,8 @@ while (true) {
     const { name, value } = params;
     try {
       try { pyodide.FS.mkdir('/tmp'); } catch (e) { /* exists */ }
-      try { pyodide.FS.mkdir('/tmp/dspy_vars'); } catch (e) { /* exists */ }
-      pyodide.FS.writeFile(`/tmp/dspy_vars/${name}.json`, new TextEncoder().encode(value));
+      try { pyodide.FS.mkdir(DSPY_VARS_VPATH); } catch (e) { /* exists */ }
+      pyodide.FS.writeFile(`${DSPY_VARS_VPATH}/${name}.json`, new TextEncoder().encode(value));
       console.log(jsonrpcResult({ injected: name }, requestId));
     } catch (e) {
       console.log(jsonrpcError(JSONRPC_APP_ERRORS.RuntimeError, `Failed to inject var: ${e.message}`, requestId));

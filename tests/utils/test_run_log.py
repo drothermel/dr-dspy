@@ -29,6 +29,20 @@ def test_append_call_record_writes_jsonl(tmp_path, monkeypatch):
     assert json.loads(lines[0])["call_id"] == "abc"
 
 
+def test_redact_messages_preserves_tool_message_fields():
+    messages = [
+        {
+            "role": "tool",
+            "content": "result",
+            "name": "search",
+            "tool_call_id": "call_1",
+        }
+    ]
+    redacted = redact_messages(messages)
+    assert redacted[0]["name"] == "search"
+    assert redacted[0]["tool_call_id"] == "call_1"
+
+
 def test_redact_messages_image_data_url():
     messages = [
         {

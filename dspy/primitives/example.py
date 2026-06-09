@@ -66,7 +66,8 @@ class Example:
 
     @override
     def __hash__(self) -> int:
-        return hash((tuple(sorted(self._store.items())), self.input_keys))
+        hashable_items = tuple((key, repr(value)) for key, value in sorted(self._store.items()))
+        return hash((hashable_items, self.input_keys))
 
     def keys(self, include_dspy=False):
         return [k for k in self._store if not k.startswith("dspy_") or include_dspy]

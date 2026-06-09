@@ -51,7 +51,9 @@ def pretty_print_call_log(call_log: Sequence[CallRecord], n: int = 1, file: Text
             )
 
     for item in call_log[-n:]:
-        messages = item.messages_as_openai or [{"role": "user", "content": item.prompt}]
+        messages = item.messages_as_openai
+        if not messages and item.prompt is not None:
+            messages = [{"role": "user", "content": item.prompt}]
         outputs = item.outputs
         timestamp = item.timestamp
         print("\n\n\n", file=out)
@@ -66,11 +68,13 @@ def pretty_print_call_log(call_log: Sequence[CallRecord], n: int = 1, file: Text
                         print(c["text"].strip(), file=out)
                     elif c["type"] == "image_url":
                         image_str = ""
-                        if "base64" in c["image_url"].get("url", ""):
-                            len_base64 = len(c["image_url"]["url"].split("base64,")[1])
-                            image_str = f"<{c['image_url']['url'].split('base64,')[0]}base64,<IMAGE BASE 64 ENCODED({len_base64!s})>"
+                        url = c["image_url"].get("url", "")
+                        if "base64," in url:
+                            prefix, payload = url.split("base64,", 1)
+                            len_base64 = len(payload)
+                            image_str = f"<{prefix}base64,<IMAGE BASE 64 ENCODED({len_base64!s})>"
                         else:
-                            image_str = f"<image_url: {c['image_url']['url']}>"
+                            image_str = f"<image_url: {url}>"
                         print(_blue(image_str.strip(), use_colors=use_colors), file=out)
                     elif c["type"] == "input_audio":
                         audio_format = c["input_audio"]["format"]
@@ -86,6 +90,8 @@ def pretty_print_call_log(call_log: Sequence[CallRecord], n: int = 1, file: Text
                         print(_blue(file_str.strip(), use_colors=use_colors), file=out)
             print_tool_calls(msg.get("tool_calls"))
             print("\n", file=out)
+        if not outputs:
+            continue
         if isinstance(outputs[0], dict):
             if outputs[0].get("text"):
                 print(_red("Response:", use_colors=use_colors), file=out)
