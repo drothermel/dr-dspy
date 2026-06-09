@@ -1,10 +1,9 @@
 from collections.abc import Callable
 
 from dspy.core.types.call_options import ModuleCallOptions
-from dspy.errors import SamplingExhaustedError
 from dspy.predict.predict import Module, Prediction
+from dspy.predict.sampling import sample_with_reward
 from dspy.runtime.run_context import RunContext, resolve_run
-from dspy.teleprompt.trace_helpers import run_program_with_trace
 
 
 class BestOfN(Module):
@@ -30,28 +29,14 @@ class BestOfN(Module):
         **inputs,
     ):
         run = resolve_run(run=run, bound_run=self.run)
-        lm = self.module.optional_lm() or run.lm
-        best_pred, best_trace, best_reward = (None, None, -float("inf"))
-        failures_remaining = self.fail_count
-        last_exc: BaseException | None = None
-        for idx in range(self.N):
-            lm_ = lm.copy(temperature=1.0)
-            mod = self.module.deepcopy()
-            mod.set_lm(lm_)
-            try:
-                pred, trace = await run_program_with_trace(mod, inputs, run, options=options)
-                reward = self.reward_fn(inputs, pred)
-                if reward > best_reward:
-                    best_reward, best_pred, best_trace = (reward, pred, trace)
-                if reward >= self.threshold:
-                    break
-            except Exception as err:
-                last_exc = err
-                if idx > failures_remaining:
-                    raise
-                failures_remaining -= 1
-        if best_pred is None:
-            raise SamplingExhaustedError(n_attempts=self.N) from last_exc
-        if best_trace:
-            run.optimization_trace.extend(best_trace)
-        return best_pred
+        return await sample_with_reward(
+            module=self.module,
+            N=self.N,
+            fail_count=self.fail_count,
+            reward_fn=self.reward_fn,
+            threshold=self.threshold,
+            run=run,
+            options=options,
+            inputs=inputs,
+            should_stop=lambda _attempt, reward, _state: reward >= self.threshold,
+        )
