@@ -1,16 +1,12 @@
-from typing import TYPE_CHECKING
-
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.core.types.config import LMConfig
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
+from dspy.runtime.callback import Callback
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import TaskSpec, output_field
-
-if TYPE_CHECKING:
-    from dspy.runtime.callback import BaseCallback
 
 
 class ChainOfThought(Module):
@@ -19,7 +15,7 @@ class ChainOfThought(Module):
         task_spec: TaskSpec,
         *,
         config: LMConfig | None = None,
-        callbacks: list["BaseCallback"] | None = None,
+        callbacks: list[Callback] | None = None,
     ) -> None:
         super().__init__()
         if not isinstance(task_spec, TaskSpec):

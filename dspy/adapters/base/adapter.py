@@ -8,12 +8,13 @@ from dspy.adapters.base.format import AdapterFormatMixin
 from dspy.adapters.base.native import _DEFAULT_NATIVE_RESPONSE_TYPES
 from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.types.base_type import Type
-from dspy.runtime.callback import BaseCallback, with_callbacks
+from dspy.runtime.callback import with_callbacks
 from dspy.task_spec import TaskSpec
 
 if TYPE_CHECKING:
     from dspy.adapters.call.policies.parse_fallback import ParseFallbackPolicy
     from dspy.adapters.call.policies.response_format import ResponseFormatPolicy
+    from dspy.runtime.callback import Callback
 
 
 class Adapter(AdapterCallMixin, AdapterFormatMixin, AdapterConversationMixin):
@@ -24,7 +25,7 @@ class Adapter(AdapterCallMixin, AdapterFormatMixin, AdapterConversationMixin):
 
     def __init__(
         self,
-        callbacks: list[BaseCallback] | None = None,
+        callbacks: list[Callback] | None = None,
         use_native_function_calling: bool = False,
         native_response_types: list[type[Type]] | None = None,
         parallel_tool_calls: bool | None = None,

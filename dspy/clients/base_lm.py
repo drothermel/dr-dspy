@@ -10,7 +10,7 @@ from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.core.types import CallRecord, LMRequest, LMResponse
 from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
 from dspy.core.types.openai_compat import request_messages_as_openai
-from dspy.runtime.callback import BaseCallback, with_callbacks
+from dspy.runtime.callback import Callback, with_callbacks
 from dspy.runtime.config import disk_call_log_enabled, memory_call_log_enabled
 from dspy.runtime.inspect_call_log import pretty_print_call_log
 from dspy.runtime.run_context import RunContext
@@ -64,7 +64,7 @@ class BaseLM:
         model_type: str = "chat",
         temperature: float | None = None,
         max_tokens: int | None = None,
-        callbacks: list[BaseCallback] | None = None,
+        callbacks: list[Callback] | None = None,
         num_retries: int = 3,
         provider_options: LMProviderOptions | None = None,
     ) -> None:

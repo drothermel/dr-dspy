@@ -13,7 +13,7 @@ from dspy.adapters.utils import parse_output_field, validate_parsed_fields
 
 if TYPE_CHECKING:
     from dspy.adapters.types.base_type import Type
-    from dspy.runtime.callback import BaseCallback
+    from dspy.runtime.callback import Callback
     from dspy.task_spec import TaskSpec
 
 __all__ = ["ChatAdapter"]
@@ -26,7 +26,7 @@ class ChatAdapter(ChatFormatMixin, Adapter):
 
     def __init__(
         self,
-        callbacks: list[BaseCallback] | None = None,
+        callbacks: list[Callback] | None = None,
         use_native_function_calling: bool = False,
         native_response_types: list[type[Type]] | None = None,
         parallel_tool_calls: bool | None = None,

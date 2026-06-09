@@ -27,7 +27,7 @@ from dspy.task_spec.field_spec import FieldRole
 
 if TYPE_CHECKING:
     from dspy.adapters.types.base_type import Type
-    from dspy.runtime.callback import BaseCallback
+    from dspy.runtime.callback import Callback
     from dspy.task_spec import TaskSpec
 
 
@@ -40,7 +40,7 @@ class JSONAdapter(ChatFormatMixin, Adapter):
 
     def __init__(
         self,
-        callbacks: list[BaseCallback] | None = None,
+        callbacks: list[Callback] | None = None,
         use_native_function_calling: bool = True,
         parallel_tool_calls: bool | None = None,
         native_response_types: list[type[Type]] | None = None,

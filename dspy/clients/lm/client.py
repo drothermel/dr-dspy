@@ -34,7 +34,7 @@ from dspy.core.types import LMRequest, LMResponse
 from dspy.core.types.config import merge_lm_request_config
 from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.errors import ContextWindowExceededError, LMConfigurationError, LMError, LMUnsupportedFeatureError
-from dspy.runtime.callback import BaseCallback
+from dspy.runtime.callback import Callback
 
 from ..base_lm import BaseLM
 
@@ -54,7 +54,7 @@ class LM(BaseLM):
         model_type: Literal["chat", "text", "responses"] = "chat",
         temperature: float | None = None,
         max_tokens: int | None = None,
-        callbacks: list[BaseCallback] | None = None,
+        callbacks: list[Callback] | None = None,
         num_retries: int = 3,
         provider: Provider | None = None,
         finetuning_model: str | None = None,

@@ -11,7 +11,7 @@ from dspy.predict.call_validation import resolve_predict_options
 from dspy.predict.parameter import Parameter
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
-from dspy.runtime.callback import BaseCallback
+from dspy.runtime.callback import Callback
 from dspy.runtime.run_context import RunContext
 from dspy.runtime.transparency import resolve_call_site, resolve_lm_config
 from dspy.serialization.json import to_jsonable
@@ -41,7 +41,7 @@ class Predict(Module, Parameter):
         task_spec: TaskSpec,
         *,
         config: LMConfig | None = None,
-        callbacks: list[BaseCallback] | None = None,
+        callbacks: list[Callback] | None = None,
         run: RunContext | None = None,
     ) -> None:
         if isinstance(task_spec, str):

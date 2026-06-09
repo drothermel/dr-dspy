@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from dr_llm.llm.providers.core.registry import ProviderRegistry
 
     from dspy.core.types import LMRequest, LMResponse
-    from dspy.runtime.callback import BaseCallback
+    from dspy.runtime.callback import Callback
 
 
 class DrLlmDirectLM(BaseLM):
@@ -38,7 +38,7 @@ class DrLlmDirectLM(BaseLM):
         registry: ProviderRegistry | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
-        callbacks: list[BaseCallback] | None = None,
+        callbacks: list[Callback] | None = None,
         num_retries: int = 3,
         **kwargs: Any,
     ) -> None:

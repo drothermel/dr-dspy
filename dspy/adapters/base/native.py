@@ -12,12 +12,12 @@ from dspy.task_spec import TaskSpec
 if TYPE_CHECKING:
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types import LMMessage
-    from dspy.runtime.callback import BaseCallback
+    from dspy.runtime.callback import Callback
 _DEFAULT_NATIVE_RESPONSE_TYPES = [Citations, Reasoning]
 
 
 class AdapterMixinBase:
-    callbacks: list[BaseCallback]
+    callbacks: list[Callback]
     use_native_function_calling: bool
     parallel_tool_calls: bool | None
     native_response_types: list[type[Type]]

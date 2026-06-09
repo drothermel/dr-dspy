@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol, TextIO
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SkipValidation
 
 from dspy.core.types import CallRecord
 from dspy.runtime.config import (
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from dspy.adapters.base import Adapter
     from dspy.clients.base_lm import BaseLM
     from dspy.primitives.module import Module
-    from dspy.runtime.callback import BaseCallback
+    from dspy.runtime.callback import Callback
     from dspy.runtime.run_log import RunLogSession
     from dspy.runtime.usage_tracker import UsageTracker
 
@@ -34,7 +34,7 @@ class RunContext(BaseModel):
 
     lm: BaseLM
     adapter: Adapter
-    callbacks: list[BaseCallback] = Field(default_factory=list)
+    callbacks: SkipValidation[list[Callback]] = Field(default_factory=list)
     optimization_trace: list[Any] = Field(default_factory=list)
     call_log: list[CallRecord] = Field(default_factory=list)
     usage_tracker: UsageTracker | None = None
@@ -51,7 +51,7 @@ class RunContext(BaseModel):
         *,
         lm: BaseLM,
         adapter: Adapter,
-        callbacks: list[BaseCallback] | None = None,
+        callbacks: SkipValidation[list[Callback]] | None = None,
         optimization_trace: list[Any] | None = None,
         call_log: list[CallRecord] | None = None,
         usage_tracker: UsageTracker | None = None,
@@ -196,7 +196,7 @@ def _ensure_run_context_model() -> None:
     from dspy.clients.base_lm import BaseLM
     from dspy.core.types import CallRecord
     from dspy.primitives.module import Module
-    from dspy.runtime.callback import BaseCallback
+    from dspy.runtime.callback import Callback
     from dspy.runtime.run_log import RunLogSession
     from dspy.runtime.usage_tracker import UsageTracker
 
@@ -204,7 +204,7 @@ def _ensure_run_context_model() -> None:
         _types_namespace={
             "BaseLM": BaseLM,
             "Adapter": Adapter,
-            "BaseCallback": BaseCallback,
+            "Callback": Callback,
             "CallRecord": CallRecord,
             "UsageTracker": UsageTracker,
             "Module": Module,
