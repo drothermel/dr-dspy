@@ -19,13 +19,13 @@ AfterAttemptHook = Callable[
 ]
 ShouldStopFn = Callable[["SamplingAttempt", float, "SamplingState"], bool]
 
-_TRANSIENT_EXECUTION_ERRORS = (AdapterParseError, ValueError, RuntimeError)
+_TRANSIENT_EXECUTION_ERRORS = (AdapterParseError,)
 
 
-def is_transient_sampling_error(error: BaseException) -> bool:
+def is_transient_sampling_error(error: Exception) -> bool:
     if isinstance(error, _TRANSIENT_EXECUTION_ERRORS):
         return True
-    return isinstance(error, Exception) and is_retryable_lm_error(error)
+    return is_retryable_lm_error(error)
 
 
 class SamplingAttempt(BaseModel):
@@ -70,8 +70,8 @@ async def sample_with_reward(
 ) -> Prediction:
     lm = module.optional_lm() or run.lm
     state = SamplingState()
-    failures_remaining = fail_count
-    last_exc: BaseException | None = None
+    failures_seen = 0
+    last_exc: Exception | None = None
     execute = execute_attempt or default_execute_attempt
 
     for idx in range(num_samples):
@@ -85,13 +85,13 @@ async def sample_with_reward(
         )
         try:
             outputs, trace = await execute(attempt)
-        except BaseException as err:
+        except Exception as err:
             if not is_transient_sampling_error(err):
                 raise
             last_exc = err
-            if idx > failures_remaining:
-                raise
-            failures_remaining -= 1
+            failures_seen += 1
+            if failures_seen > fail_count:
+                raise SamplingExhaustedError(n_attempts=num_samples) from last_exc
             continue
 
         reward = reward_fn(inputs, outputs)
