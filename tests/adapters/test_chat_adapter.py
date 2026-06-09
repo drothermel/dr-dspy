@@ -644,7 +644,7 @@ def test_chat_adapter_format_exact_messages_with_citations_output_demo():
 
 
 def test_chat_adapter_format_exact_messages_and_lm_kwargs_with_native_citations():
-    from dspy.core.types.config import NativeAdaptationMode
+    from dspy.core.types import NativeAdaptationMode
 
     class AnthropicLM(DummyLM):
         def __init__(self):

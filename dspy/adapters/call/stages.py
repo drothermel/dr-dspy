@@ -5,8 +5,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from dspy.clients.openai_format.chat_request import request_messages_as_openai
-from dspy.core.types import LMRequest, LMResponse  # noqa: TC001
-from dspy.core.types.config import LMConfig, coerce_lm_config
+from dspy.core.types import LMConfig, LMRequest, LMResponse, coerce_lm_config
 from dspy.runtime.transparency.report import enforce_compiled_call_transparency
 from dspy.runtime.transparency.resolve import (
     merge_call_config,

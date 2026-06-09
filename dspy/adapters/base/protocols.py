@@ -5,8 +5,7 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 if TYPE_CHECKING:
     from dspy.adapters.types.field_type import NativeResponseFieldType
     from dspy.clients.base_lm import BaseLM
-    from dspy.core.types import LMMessage, UserMessageContent
-    from dspy.core.types.config import LMConfig
+    from dspy.core.types import LMConfig, LMMessage, UserMessageContent
     from dspy.runtime.callback import Callback
     from dspy.task_spec import TaskSpec
 

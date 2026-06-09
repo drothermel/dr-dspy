@@ -2,7 +2,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.clients.base_lm import BaseLM
-from dspy.core.types.config import LMConfig, LMReasoningConfig, NativeAdaptationMode, ReasoningEffort
+from dspy.core.types import LMConfig, LMReasoningConfig, NativeAdaptationMode, ReasoningEffort
 from dspy.task_spec import input_field, make_task_spec, output_field
 
 

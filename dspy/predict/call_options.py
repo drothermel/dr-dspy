@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import ConfigDict, SkipValidation
 
-from dspy.core.types.config import LMConfig  # noqa: TC001 — Pydantic field type
+from dspy.core.types import LMConfig  # noqa: TC001 — Pydantic field type
 from dspy.core.types.lm import LMForward
 from dspy.runtime.call_options import ModuleCallOptions
 from dspy.task_spec.task_spec import TaskSpec

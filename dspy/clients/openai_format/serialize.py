@@ -20,6 +20,7 @@ from dspy.core.types import (
     LMAudioPart,
     LMBinaryPart,
     LMCitationPart,
+    LMConfig,
     LMDocumentPart,
     LMImagePart,
     LMOpaquePart,
@@ -27,10 +28,11 @@ from dspy.core.types import (
     LMTextPart,
     LMThinkingPart,
     LMToolCallPart,
+    LMToolChoice,
     LMToolResultPart,
+    LMToolSpec,
     LMVideoPart,
 )
-from dspy.core.types.config import LMConfig, LMToolChoice, LMToolSpec
 from dspy.core.types.media_uri import data_uri
 from dspy.errors import LMUnsupportedFeatureError
 

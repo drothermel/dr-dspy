@@ -19,8 +19,8 @@ from dspy.core.types import (
     merge_lm_request_config,
     merge_provider_options,
 )
-from dspy.core.types.config import ReasoningEffort
 from dspy.core.types.embedding_options import EmbedderOptions, merge_embedder_options
+from dspy.core.types.lm_config import ReasoningEffort
 
 
 def test_merge_lm_config_merges_extensions():

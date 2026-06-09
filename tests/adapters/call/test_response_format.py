@@ -5,7 +5,7 @@ from dspy.adapters.call.policies.response_format import StructuredOutputPolicy
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.types.tool import ToolCalls
 from dspy.clients.lm import LM
-from dspy.core.types.config import LMConfig
+from dspy.core.types import LMConfig
 from dspy.task_spec import input_field, make_task_spec, output_field
 from tests.adapters.conftest import CapturingLM, StopAdapterCallCapture, make_adapter_run
 from tests.task_spec.helpers import ts

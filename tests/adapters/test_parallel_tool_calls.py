@@ -2,7 +2,7 @@ from typing_extensions import override
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.tool import Tool, ToolCalls
-from dspy.core.types.config import LMConfig, LMToolChoice
+from dspy.core.types import LMConfig, LMToolChoice
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.testing import DummyLM
 

@@ -8,8 +8,7 @@ from dr_llm.llm import CallMode, EffortSpec, Message, SamplingControls
 from dspy.clients.dr_llm.contract import reject_unsupported_merged_config
 from dspy.clients.dr_llm.provider_name import parse_dr_llm_provider
 from dspy.clients.model_id import split_provider_model
-from dspy.core.types import LMOutput, LMRequest, LMResponse, LMUsage
-from dspy.core.types.config import LMConfig, merge_lm_request_config
+from dspy.core.types import LMConfig, LMOutput, LMRequest, LMResponse, LMUsage, merge_lm_request_config
 from dspy.core.types.parts import (
     LMAudioPart,
     LMBinaryPart,

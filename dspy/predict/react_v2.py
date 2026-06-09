@@ -7,7 +7,7 @@ import pydantic
 
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
-from dspy.core.types.config import LMConfig, LMToolChoice
+from dspy.core.types import LMConfig, LMToolChoice
 from dspy.errors import AdapterParseError
 from dspy.history import TruncationExhaustedError, TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.agent_helpers import format_tool_exception

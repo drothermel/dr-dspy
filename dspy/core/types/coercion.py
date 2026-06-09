@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Protocol, cast, runtime_checkable
 
-from dspy.core.types.config import LMToolSpec
 from dspy.core.types.messages import LMMessage, LMMessageRole
 from dspy.core.types.parts.models import _coerce_part
+from dspy.core.types.tool_spec import LMToolSpec
 
 
 @runtime_checkable

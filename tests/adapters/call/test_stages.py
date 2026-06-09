@@ -7,7 +7,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCalls
-from dspy.core.types.config import NativeAdaptationMode
+from dspy.core.types import NativeAdaptationMode
 from dspy.task_spec import input_field, make_task_spec, output_field
 from dspy.testing import DummyLM
 from tests.adapters.call.test_pipeline import FunctionCallingLM, ReasoningFunctionCallingLM

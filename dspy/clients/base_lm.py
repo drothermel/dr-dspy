@@ -9,8 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
 from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
-from dspy.core.types import CallRecord, LMRequest, LMResponse
-from dspy.core.types.config import NativeAdaptationMode
+from dspy.core.types import CallRecord, LMRequest, LMResponse, NativeAdaptationMode
 from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
 from dspy.runtime.active_run import get_active_usage_tracker
 from dspy.runtime.call_log.coordinator import append_disk_call, record_call

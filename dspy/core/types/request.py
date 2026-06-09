@@ -7,9 +7,10 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from dspy.core.types.coercion import _coerce_message, _messages_from_items, coerce_tool_spec
-from dspy.core.types.config import LMConfig, LMToolSpec, merge_lm_config
+from dspy.core.types.lm_config import LMConfig, merge_lm_config
 from dspy.core.types.messages import LMMessage
 from dspy.core.types.parts import LMPart
+from dspy.core.types.tool_spec import LMToolSpec
 
 
 @dataclass

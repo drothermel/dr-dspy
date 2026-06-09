@@ -6,7 +6,7 @@ from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.errors import LMConfigurationError, LMUnsupportedFeatureError
 
 if TYPE_CHECKING:
-    from dspy.core.types.config import LMConfig
+    from dspy.core.types import LMConfig
 
 
 def provider_options_from_serialized_state(

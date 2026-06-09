@@ -6,7 +6,7 @@ Import ``create_dataset_summary`` from ``dspy.propose.dataset_summary_generator`
 import logging
 import re
 
-from dspy.core.types.config import LMConfig
+from dspy.core.types import LMConfig
 from dspy.predict.predict import Predict
 from dspy.propose.task_specs import (
     DatasetDescriptorTaskSpec,

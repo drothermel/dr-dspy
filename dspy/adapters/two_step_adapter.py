@@ -9,7 +9,7 @@ from dspy.adapters.call.pipeline import AdapterCallPipeline
 from dspy.adapters.prompt_format import get_field_spec_description_string
 from dspy.adapters.two_step.task_specs import build_extractor_task_spec
 from dspy.clients.base_lm import BaseLM
-from dspy.core.types.config import LMConfig
+from dspy.core.types import LMConfig
 from dspy.errors import AdapterOperationError
 from dspy.runtime.config import CallSite
 from dspy.runtime.run_context import RunContext

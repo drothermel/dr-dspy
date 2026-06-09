@@ -1,22 +1,19 @@
 from typing import Any
 
+from dspy.core.types.adaptation import NativeAdaptationMode
 from dspy.core.types.builders import Assistant, Developer, System, ToolCall, ToolResult, User
-from dspy.core.types.coercion import coerce_tool_spec
-from dspy.core.types.config import (
+from dspy.core.types.embedding_options import EmbedderOptions
+from dspy.core.types.lm import LMForward
+from dspy.core.types.lm_config import (
     LMConfig,
     LMPromptCacheConfig,
     LMReasoningConfig,
-    LMToolChoice,
-    LMToolSpec,
-    NativeAdaptationMode,
     ReasoningEffort,
     coerce_lm_config,
     lm_defaults_config,
     merge_lm_config,
     merge_lm_request_config,
 )
-from dspy.core.types.embedding_options import EmbedderOptions
-from dspy.core.types.lm import LMForward
 from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
 from dspy.core.types.messages import LMMessage, LMMessageRole
 from dspy.core.types.parts import (
@@ -54,6 +51,7 @@ from dspy.core.types.stream import (
     LMThinkingDelta,
     LMToolCallDelta,
 )
+from dspy.core.types.tool_spec import LMToolChoice, LMToolSpec, coerce_tool_spec
 
 UserMessageContent = str | list[dict[str, Any]]
 

@@ -19,8 +19,7 @@ from dspy.clients.openai_format.parse import (
 )
 from dspy.clients.openai_format.responses_request import to_openai_responses_request
 from dspy.clients.openai_format.text_request import to_openai_text_request
-from dspy.core.types import LMRequest, LMResponse
-from dspy.core.types.config import merge_lm_request_config
+from dspy.core.types import LMRequest, LMResponse, merge_lm_request_config
 from dspy.errors import LMConfigurationError
 
 LitellmCompletionFn = Callable[..., Awaitable[Any]]

@@ -22,8 +22,7 @@ from dspy.clients.lm.transport import (
 from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.clients.model_id import split_provider_model
 from dspy.clients.openai_format.reasoning_models import is_openai_reasoning_model
-from dspy.core.types import LMRequest, LMResponse
-from dspy.core.types.config import NativeAdaptationMode
+from dspy.core.types import LMRequest, LMResponse, NativeAdaptationMode
 from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.errors import ContextWindowExceededError, LMConfigurationError, LMError
 from dspy.runtime.callback import Callback

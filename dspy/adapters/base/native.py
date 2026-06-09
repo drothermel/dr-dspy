@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.field_type import NativeResponseFieldType, implements_parse_lm_output
 from dspy.adapters.types.reasoning import Reasoning
-from dspy.core.types.config import LMConfig, LMReasoningConfig, NativeAdaptationMode
+from dspy.core.types import LMConfig, LMReasoningConfig, NativeAdaptationMode
 from dspy.task_spec import TaskSpec
 
 if TYPE_CHECKING:

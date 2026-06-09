@@ -7,7 +7,7 @@ import pydantic
 
 from dspy.adapters.structured_output import get_structured_outputs_response_format, has_open_ended_mapping
 from dspy.adapters.types.tool import ToolCalls
-from dspy.core.types.config import LMConfig, coerce_lm_config
+from dspy.core.types import LMConfig, coerce_lm_config
 from dspy.errors import LMError
 
 if TYPE_CHECKING:

@@ -2,33 +2,19 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from dspy.core.types._from_value import _MISSING, config_data
 from dspy.core.types._merge_overlay import _merge_model_overlay
+from dspy.core.types.tool_spec import LMToolChoice
 
 
 class ReasoningEffort(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
-
-
-class NativeAdaptationMode(StrEnum):
-    ADAPT = "adapt"
-    SKIP = "skip"
-
-
-class LMToolSpec(BaseModel):
-    type: Literal["function"] = "function"
-    name: str
-    description: str | None = None
-    parameters: dict[str, Any] = Field(default_factory=dict)
-    metadata: dict[str, Any] = Field(default_factory=dict)
-    provider_data: dict[str, Any] = Field(default_factory=dict)
-    model_config = ConfigDict(extra="forbid")
 
 
 class LMReasoningConfig(BaseModel):
@@ -50,19 +36,6 @@ class LMReasoningConfig(BaseModel):
         data = config_data(value, str_field="effort")
         if isinstance(data.get("effort"), str):
             data["effort"] = ReasoningEffort(data["effort"])
-        data.update({key: value for key, value in overrides.items() if value is not _MISSING})
-        return cls(**data)
-
-
-class LMToolChoice(BaseModel):
-    mode: Literal["auto", "required", "none"] = "auto"
-    allowed: list[str] | None = None
-    parallel: bool | None = None
-    model_config = ConfigDict(extra="forbid")
-
-    @classmethod
-    def from_value(cls, value: Any = None, **overrides: Any) -> LMToolChoice:
-        data = config_data(value, str_field="mode")
         data.update({key: value for key, value in overrides.items() if value is not _MISSING})
         return cls(**data)
 

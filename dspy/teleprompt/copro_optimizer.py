@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from pydantic import BaseModel
 
-from dspy.core.types.config import LMConfig
+from dspy.core.types import LMConfig
 from dspy.predict.predict import Predict
 from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext

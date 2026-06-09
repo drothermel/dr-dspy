@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from dspy.clients.base_lm import BaseLM
-    from dspy.core.types.config import LMConfig
+    from dspy.core.types import LMConfig
     from dspy.runtime.config import CallSite
     from dspy.runtime.run_context import RunContext
 

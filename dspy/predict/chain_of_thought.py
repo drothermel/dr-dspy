@@ -1,5 +1,5 @@
 from dspy.adapters.types.reasoning import Reasoning
-from dspy.core.types.config import LMConfig
+from dspy.core.types import LMConfig
 from dspy.predict.predict import Predict
 from dspy.primitives import Module, Prediction
 from dspy.runtime.call_options import ModuleCallOptions

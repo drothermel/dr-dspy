@@ -7,7 +7,7 @@ from dspy.adapters.call.policies.response_format import NoOpResponseFormatPolicy
 from dspy.adapters.call.stages import invoke_adapter_lm, prepare_adapter_call
 from dspy.adapters.call.two_step import TWO_STEP_MAIN_CALL_SITE, finalize_two_step_main_response
 from dspy.adapters.call.two_step_protocol import is_two_step_adapter
-from dspy.core.types.config import coerce_lm_config
+from dspy.core.types import coerce_lm_config
 from dspy.errors import AdapterParseError, LMError
 from dspy.task_spec import validate_task_inputs
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     from dspy.adapters.base.adapter import Adapter
     from dspy.clients.base_lm import BaseLM
-    from dspy.core.types.config import LMConfig
+    from dspy.core.types import LMConfig
     from dspy.runtime.config import CallSite
     from dspy.runtime.run_context import RunContext
     from dspy.task_spec import TaskSpec

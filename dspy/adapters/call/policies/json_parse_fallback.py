@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
     from dspy.adapters.base.adapter import Adapter
     from dspy.clients.base_lm import BaseLM
-    from dspy.core.types.config import LMConfig
+    from dspy.core.types import LMConfig
     from dspy.errors import AdapterParseError
     from dspy.runtime.run_context import RunContext
     from dspy.task_spec import TaskSpec
