@@ -4,8 +4,8 @@ import random
 import uuid
 from typing import TYPE_CHECKING, cast
 
-from dspy.dsp.utils.utils import dotdict
 from dspy.primitives.example import Example
+from dspy.utils.dotdict import dotdict
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

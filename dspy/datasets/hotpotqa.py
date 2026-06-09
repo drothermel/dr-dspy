@@ -71,7 +71,7 @@ class HotPotQA(Dataset):
 
 
 if __name__ == "__main__":
-    from dspy.dsp.utils.utils import dotdict
+    from dspy.utils.dotdict import dotdict
 
     data_args = dotdict(train_seed=1, train_size=16, eval_seed=2023, dev_size=200 * 5, test_size=0)
     dataset = HotPotQA(**data_args)

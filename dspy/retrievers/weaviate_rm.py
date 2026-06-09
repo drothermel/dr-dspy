@@ -1,6 +1,6 @@
 from typing import Any, cast
 
-from dspy.dsp.utils.utils import dotdict
+from dspy.utils.dotdict import dotdict
 
 try:
     from uuid import uuid4

@@ -3,7 +3,7 @@ from typing import Any
 
 import requests
 
-from dspy.dsp.utils.utils import dotdict
+from dspy.utils.dotdict import dotdict
 
 
 class ColBERTv2:

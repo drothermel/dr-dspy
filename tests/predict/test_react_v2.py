@@ -8,8 +8,8 @@ from dspy.adapters.types.tool import Tool, ToolCalls
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import message_to_openai_chat
 from dspy.core.types import LMOutput, LMRequest, LMResponse, LMToolCallPart
-from dspy.dsp.utils.utils import dotdict
 from dspy.predict.react_v2 import ReActV2
+from dspy.utils.dotdict import dotdict
 from dspy.utils.dummies import DummyLM
 from tests.adapters.conftest import captured_lm_kwargs
 from tests.task_spec.helpers import ts
