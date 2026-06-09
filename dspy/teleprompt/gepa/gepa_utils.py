@@ -274,7 +274,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                         new_outputs[output_key] = str(output_val)
                 d = {"Inputs": new_inputs, "Generated Outputs": new_outputs}
                 if isinstance(outputs, FailedPrediction):
-                    from dspy.compile.resolve import resolve_adapter
+                    from dspy.transparency.resolve import resolve_adapter
 
                     if self.run is None:
                         raise ValueError("DspyAdapter requires a RunContext.")

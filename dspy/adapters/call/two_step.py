@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from dspy.adapters.call.tool_output import attach_tool_calls_to_value
-from dspy.compile.resolve import resolve_call, resolve_lm_config
 from dspy.core.types import LMRequest
 from dspy.core.types.config import coerce_lm_config, merge_lm_request_config
 from dspy.core.types.openai_compat import request_messages_as_openai
+from dspy.transparency.resolve import resolve_call, resolve_lm_config
 from dspy.utils.exceptions import AdapterParseError, LMError
 from dspy.utils.transparency import validate_compiled_call
 

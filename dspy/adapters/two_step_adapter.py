@@ -4,11 +4,11 @@ from typing_extensions import override
 
 from dspy.adapters.base import Adapter
 from dspy.clients.base_lm import BaseLM
-from dspy.compile.resolve import resolve_adapter, resolve_lm_config
 from dspy.core.types.config import LMConfig
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec
 from dspy.task_spec.formatting import get_field_spec_description_string
+from dspy.transparency.resolve import resolve_adapter, resolve_lm_config
 from dspy.utils.transparency import CallSite
 
 

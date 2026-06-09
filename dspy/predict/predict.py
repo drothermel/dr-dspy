@@ -5,7 +5,6 @@ from typing import Any
 from typing_extensions import override
 
 from dspy.clients.base_lm import BaseLM
-from dspy.compile.resolve import resolve_lm_config
 from dspy.core.types import LMConfig, coerce_lm_config, merge_lm_config
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
 from dspy.predict.call_validation import resolve_predict_options
@@ -14,6 +13,7 @@ from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec.task_spec import TaskSpec
+from dspy.transparency.resolve import resolve_lm_config
 from dspy.utils.callback import BaseCallback
 from dspy.utils.serialize import to_jsonable
 from dspy.utils.transparency import resolve_call_site

@@ -3,8 +3,8 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
-from dspy.compile.resolve import resolve_adapter
 from dspy.primitives.example import Example
+from dspy.transparency.resolve import resolve_adapter
 from dspy.utils.transparency import CallSite
 
 if TYPE_CHECKING:
