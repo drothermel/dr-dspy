@@ -263,7 +263,7 @@ ban-relative-imports = "all"
 ]
 "scripts/*.py" = ["T201"]  # CLI scripts may print status to stdout/stderr
 "dspy/core/types/builders.py" = ["N802"]  # Legacy message builder API (System, User, ...)
-"dspy/evaluate/dpr.py" = ["N802"]  # Legacy DPR_* tokenizer helpers
+"dspy/evaluate/dpr.py" = ["N802"]  # DPR_normalize matches upstream DPR naming
 "dspy/evaluate/metrics.py" = ["N802"]  # Legacy metric names (EM, F1, HotPotF1)
 "dspy/runtime/run_context.py" = ["E402", "TC001"]  # model_rebuild after class; transparency types at runtime
 "dspy/clients/openai_format/serialize.py" = ["TC001"]  # LMConfig/LMToolSpec used at runtime in serializers

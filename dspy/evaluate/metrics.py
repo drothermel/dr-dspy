@@ -3,8 +3,6 @@ import string
 import unicodedata
 from collections import Counter
 
-from dspy.evaluate.dpr import DPR_normalize, has_answer
-
 
 def EM(prediction, answers_list):
     if not isinstance(answers_list, list):
@@ -87,15 +85,6 @@ def precision_score(prediction, ground_truth):
     return 1.0 * num_same / len(prediction_tokens)
 
 
-def _passage_match(passages: list[str], answers: list[str]) -> bool:
-    def passage_has_answers(passage: str, answers: list[str]) -> bool:
-        return has_answer(
-            tokenized_answers=[DPR_normalize(normalize_text(s=ans)) for ans in answers], text=normalize_text(s=passage)
-        )
-
-    return any(passage_has_answers(passage=psg, answers=answers) for psg in passages)
-
-
 def _answer_match(prediction, answers, frac=1.0):
     if frac >= 1.0:
         return EM(prediction=prediction, answers_list=answers)
@@ -107,12 +96,4 @@ def answer_exact_match(example, pred, trace=None, frac=1.0):
         return _answer_match(prediction=pred.answer, answers=[example.answer], frac=frac)
     if isinstance(example.answer, list):
         return _answer_match(prediction=pred.answer, answers=example.answer, frac=frac)
-    raise ValueError(f"Invalid answer type: {type(example.answer)}")
-
-
-def answer_passage_match(example, pred, trace=None):
-    if isinstance(example.answer, str):
-        return _passage_match(passages=pred.context, answers=[example.answer])
-    if isinstance(example.answer, list):
-        return _passage_match(passages=pred.context, answers=example.answer)
     raise ValueError(f"Invalid answer type: {type(example.answer)}")
