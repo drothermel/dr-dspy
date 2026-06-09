@@ -14,6 +14,7 @@ from dspy.clients.openai_format.media import (
     part_text,
     read_path_base64,
 )
+from dspy.clients.openai_format.reasoning_models import is_openai_reasoning_model
 from dspy.core.types import (
     LMAudioPart,
     LMBinaryPart,
@@ -232,7 +233,7 @@ def reasoning_to_responses_kwargs(reasoning: Any) -> dict[str, Any]:
 
 
 def _validate_openai_reasoning_temperature(config: LMConfig, *, model: str | None, endpoint: str) -> None:
-    if not _is_openai_reasoning_model(model):
+    if not is_openai_reasoning_model(model):
         return
     effort = getattr(config.reasoning, "effort", None) if config.reasoning is not None else None
     if effort in {None, "none"}:
@@ -249,16 +250,7 @@ def _validate_openai_reasoning_temperature(config: LMConfig, *, model: str | Non
 
 
 def _uses_max_completion_tokens(model: str | None) -> bool:
-    return _is_openai_reasoning_model(model)
-
-
-def _is_openai_reasoning_model(model: str | None) -> bool:
-    if not isinstance(model, str):
-        return False
-    model_name = model.removeprefix("openai/").lower()
-    if "chat" in model_name:
-        return False
-    return model_name.startswith(("o1", "o3", "o4", "gpt-5"))
+    return is_openai_reasoning_model(model)
 
 
 def prompt_cache_to_kwargs(cache: Any) -> dict[str, Any]:

@@ -5,7 +5,7 @@ from typing import Any
 
 from dspy.adapters.base import Adapter
 from dspy.clients.base_lm import BaseLM
-from dspy.clients.lm_normalize import lm_kwargs_max_tokens
+from dspy.clients.lm_strict import lm_kwargs_max_tokens
 from dspy.core.types.config import LMConfig, _merge_lm_config, coerce_lm_config, lm_defaults_config
 from dspy.task_spec import TaskSpec
 from dspy.utils.transparency import CompiledCall, TransparencyViolation

@@ -449,7 +449,7 @@ def test_reasoning_model_load_state_round_trips_canonical_state(make_run):
     assert loaded_lm.dump_state() == lm.dump_state()
 
 
-def test_reasoning_model_load_state_accepts_max_completion_tokens_alias(make_run):
+def test_reasoning_model_load_state_rejects_max_completion_tokens_alias(make_run):
     state = {
         "_dspy_lm_class": "dspy.clients.lm.LM",
         "model": "openai/gpt-5-nano",
@@ -461,10 +461,8 @@ def test_reasoning_model_load_state_accepts_max_completion_tokens_alias(make_run
         "launch_kwargs": {},
         "train_kwargs": {},
     }
-    loaded_lm = BaseLM.load_state(state)
-    assert isinstance(loaded_lm, LM)
-    assert loaded_lm.kwargs["max_tokens"] == 16000
-    assert loaded_lm.dump_state()["max_tokens"] == 16000
+    with pytest.raises(ValueError, match="max_completion_tokens"):
+        BaseLM.load_state(state)
 
 
 def test_lm_load_state_forwards_allow_custom_lm_class(monkeypatch, make_run):

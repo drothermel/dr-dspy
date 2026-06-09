@@ -144,7 +144,13 @@ def _coerce_from_call_config_kwargs(kwargs: Mapping[str, Any]) -> dict[str, Any]
     data = dict(kwargs)
     prompt_cache = data.get("prompt_cache")
     if isinstance(prompt_cache, bool):
-        data["prompt_cache"] = LMPromptCacheConfig(enabled=prompt_cache)
+        raise TypeError(
+            "bool prompt_cache is not supported. Use LMPromptCacheConfig(enabled=...) or prompt_cache={'enabled': ...}."
+        )
+    if "max_completion_tokens" in data:
+        raise ValueError("max_completion_tokens is not supported in LMConfig. Use max_tokens instead.")
+    if "reasoning_effort" in data:
+        raise ValueError("reasoning_effort is not supported in LMConfig. Use reasoning={'effort': ...} instead.")
     return data
 
 
@@ -152,8 +158,6 @@ def _lm_config_data_from_kwargs(raw: Mapping[str, Any]) -> dict[str, Any]:
     if not raw:
         return {}
     data = dict(raw)
-    if "max_completion_tokens" in data and "max_tokens" not in data:
-        data["max_tokens"] = data.pop("max_completion_tokens")
     data = _coerce_from_call_config_kwargs(data)
     field_names = set(LMConfig.model_fields) - {"extensions"}
     filtered = {key: value for key, value in data.items() if key in field_names and value is not None}

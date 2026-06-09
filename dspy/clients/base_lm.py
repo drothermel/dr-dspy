@@ -5,8 +5,8 @@ import inspect
 import uuid
 from typing import Any, TextIO
 
-from dspy.clients.lm_normalize import normalize_lm_kwargs, normalize_lm_state
 from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
+from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.core.types import CallRecord, LMRequest, LMResponse
 from dspy.core.types.history import _history_request_messages_as_openai
 from dspy.core.types.lm_provider import LMProviderOptions, merge_provider_options
@@ -91,7 +91,7 @@ class BaseLM:
             kwargs["temperature"] = temperature
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
-        return normalize_lm_kwargs(kwargs)
+        return validate_lm_kwargs(kwargs)
 
     @with_callbacks(kind="lm")
     async def __call__(
@@ -248,7 +248,7 @@ class BaseLM:
             if "allow_custom_lm_class" in inspect.signature(lm_cls.load_state).parameters:
                 return lm_cls.load_state(state, allow_custom_lm_class=allow_custom_lm_class)
             return lm_cls.load_state(state)
-        state = normalize_lm_state(state)
+        state = validate_lm_state(state)
         model = state.pop("model")
         model_type = state.pop("model_type", "chat")
         num_retries = state.pop("num_retries", 3)

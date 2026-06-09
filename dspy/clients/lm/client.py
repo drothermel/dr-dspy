@@ -1,6 +1,5 @@
 import logging
 import os
-import re
 import threading
 from typing import Any, Literal
 
@@ -17,7 +16,7 @@ from dspy.clients.lm.errors import (
     _lm_error_class_from_status,
 )
 from dspy.clients.lm.headers import _add_dspy_identifier_to_headers
-from dspy.clients.lm_normalize import normalize_lm_kwargs, normalize_lm_state
+from dspy.clients.lm_strict import validate_lm_kwargs, validate_lm_state
 from dspy.clients.openai import OpenAIProvider
 from dspy.clients.openai_format import (
     completion_to_lm_response,
@@ -28,6 +27,7 @@ from dspy.clients.openai_format import (
     to_openai_text_request,
     usage_from_response,
 )
+from dspy.clients.openai_format.reasoning_models import is_openai_reasoning_model
 from dspy.clients.openai_format.responses_compat import convert_chat_request_to_responses_request
 from dspy.clients.provider import Provider, ReinforceJob, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat
@@ -44,14 +44,6 @@ logger = logging.getLogger(__name__)
 
 def _get_litellm():
     return get_litellm(feature="dspy.clients.lm.LM")
-
-
-def _is_openai_reasoning_model(model: str) -> bool:
-    model_family = model.split("/")[-1].lower() if "/" in model else model.lower()
-    return (
-        re.match("^(?:o[1345](?:-(?:mini|nano|pro))?(?:-\\d{4}-\\d{2}-\\d{2})?|gpt-5(?!-chat)(?:-.*)?)$", model_family)
-        is not None
-    )
 
 
 class LM(BaseLM):
@@ -96,7 +88,7 @@ class LM(BaseLM):
         max_tokens: int | None,
         provider_options: LMProviderOptions,
     ) -> dict[str, Any]:
-        if _is_openai_reasoning_model(self.model):
+        if is_openai_reasoning_model(self.model):
             if (temperature and temperature != 1.0) or (max_tokens and max_tokens < 16000):
                 raise LMConfigurationError(
                     "OpenAI's reasoning models require passing temperature=1.0 or None and max_tokens >= 16000 or None to `dspy.clients.lm.LM(...)`, e.g., `from dspy.clients.lm import LM; LM('openai/gpt-5', temperature=1.0, max_tokens=16000)`",
@@ -108,7 +100,7 @@ class LM(BaseLM):
                 initial_kwargs["temperature"] = temperature
             if max_tokens is not None:
                 initial_kwargs["max_tokens"] = max_tokens
-            return normalize_lm_kwargs(initial_kwargs)
+            return validate_lm_kwargs(initial_kwargs)
         return super()._get_initial_kwargs(
             temperature=temperature,
             max_tokens=max_tokens,
@@ -325,12 +317,12 @@ class LM(BaseLM):
         )
         if self.use_developer_role:
             state["use_developer_role"] = self.use_developer_role
-        return normalize_lm_state(state)
+        return validate_lm_state(state)
 
     @classmethod
     @override
     def load_state(cls, state: dict[str, Any], *, allow_custom_lm_class: bool = False):
-        return super().load_state(normalize_lm_state(dict(state)), allow_custom_lm_class=allow_custom_lm_class)
+        return super().load_state(validate_lm_state(dict(state)), allow_custom_lm_class=allow_custom_lm_class)
 
     def _check_truncation(self, results) -> None:
         if self.model_type != "responses" and any(c.finish_reason == "length" for c in results["choices"]):

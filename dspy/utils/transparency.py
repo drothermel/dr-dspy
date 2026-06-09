@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 if TYPE_CHECKING:
     from dspy.runtime.run_context import RunContext
 
-from dspy.clients.lm_normalize import lm_kwargs_max_tokens
+from dspy.clients.lm_strict import lm_kwargs_max_tokens
 from dspy.core.types import LMConfig
 from dspy.task_spec import TaskSpec
 
