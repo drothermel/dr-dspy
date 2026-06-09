@@ -1218,7 +1218,7 @@ def test_chat_adapter_format_exact_messages_with_non_native_tool_history():
         {"role": "user", "content": "[[ ## question ## ]]\nQ1"},
         {
             "role": "assistant",
-            "content": '[[ ## next_thought ## ]]\nI should search.\n\n[[ ## tool_calls ## ]]\n{"tool_calls": [{"name": "search", "args": {"query": "cats"}}]}\n\n[[ ## completed ## ]]\n',
+            "content": '[[ ## next_thought ## ]]\nI should search.\n\n[[ ## tool_calls ## ]]\n{"tool_calls": [{"name": "search", "args": {"query": "cats"}, "id": "call_1"}]}\n\n[[ ## completed ## ]]\n',
         },
         {
             "role": "user",

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from dspy.runtime.run_context import RunContext
 
 ACTIVE_CALL_ID: ContextVar[str | None] = ContextVar("active_call_id", default=None)
+ACTIVE_RUN: ContextVar[RunContext | None] = ContextVar("active_run", default=None)
 logger = logging.getLogger(__name__)
 
 
@@ -148,7 +149,7 @@ def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F |
             @functools.wraps(fn)
             async def async_wrapper(instance, *args, **kwargs):
                 run = kwargs.get("run")
-                callbacks = _get_active_callbacks(instance, run)
+                callbacks = _get_active_callbacks(instance, run, kind=kind)
                 if not callbacks:
                     return await fn(instance, *args, **kwargs)
                 call_id, parent_call_id = _begin_callback_scope(
@@ -185,7 +186,7 @@ def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F |
         @functools.wraps(fn)
         def sync_wrapper(instance, *args, **kwargs):
             run = kwargs.get("run")
-            callbacks = _get_active_callbacks(instance, run)
+            callbacks = _get_active_callbacks(instance, run, kind=kind)
             if not callbacks:
                 return fn(instance, *args, **kwargs)
             call_id, parent_call_id = _begin_callback_scope(
@@ -224,8 +225,9 @@ def with_callbacks(fn: F | None = None, *, kind: CallbackKind = "module") -> F |
     return decorator
 
 
-def _get_active_callbacks(instance: Any, run: RunContext | None = None) -> list[Callback]:
-    callbacks = list(run.callbacks) if run else []
+def _get_active_callbacks(instance: Any, run: RunContext | None = None, *, kind: CallbackKind) -> list[Callback]:
+    effective_run = run if run is not None else (ACTIVE_RUN.get() if kind == "tool" else None)
+    callbacks = list(effective_run.callbacks) if effective_run else []
     return callbacks + getattr(instance, "callbacks", [])
 
 

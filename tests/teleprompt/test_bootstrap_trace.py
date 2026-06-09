@@ -56,11 +56,11 @@ def test_bootstrap_trace_data(make_run):
     def completion_side_effect(*args: object, **kwargs: object):
         call_count = call_state["count"]
         call_state["count"] += 1
-        if call_count in (2, 3):
+        if call_count == 2:
             return ModelResponse(
                 choices=[Choices(message=Message(content="This is an invalid JSON!"))], model="openai/gpt-4o-mini"
             )
-        return successful_responses[call_count if call_count < 2 else call_count - 2]
+        return successful_responses[call_count if call_count < 2 else call_count - 1]
 
     with mock.patch("litellm.acompletion", new=mock.AsyncMock(side_effect=completion_side_effect)):
         results = asyncio.run(

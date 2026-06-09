@@ -26,7 +26,7 @@ def to_openai_chat_request(request: LMRequest) -> dict[str, Any]:
 
 
 def message_to_openai_chat(message: LMMessage) -> dict[str, Any]:
-    output: dict[str, Any] = {"role": message.role}
+    output: dict[str, Any] = {"role": message.role.value}
     if message.name is not None:
         output["name"] = message.name
     if message.role == "assistant":

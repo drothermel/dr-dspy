@@ -11,11 +11,6 @@ class TurnLog(BaseModel):
     turns: tuple[TurnEvent | dict[str, Any], ...] = ()
     model_config = ConfigDict(frozen=True)
 
-    @field_validator("turns", mode="after")
-    @classmethod
-    def _ensure_turn_events(cls, value: tuple[TurnEvent | dict[str, Any], ...]) -> tuple[TurnEvent, ...]:
-        return tuple(item if isinstance(item, TurnEvent) else TurnEvent.model_validate(item) for item in value)
-
     @field_validator("turns", mode="before")
     @classmethod
     def _coerce_turns(cls, value: Any) -> tuple[TurnEvent, ...]:
@@ -44,7 +39,7 @@ class TurnLog(BaseModel):
         return cls()
 
     def append_turn(self, event: TurnEvent) -> TurnLog:
-        if not event.model_dump(exclude_none=True):
+        if not event.model_dump(mode="json", exclude_none=True):
             raise ValueError("Cannot append an empty TurnEvent; at least one field must be set.")
         return TurnLog(turns=(*self.turns, event))
 

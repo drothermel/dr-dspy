@@ -52,7 +52,10 @@ class AdapterConversationMixin:
         messages = []
         for turn in conversation_history:
             message = turn.model_dump(mode="json", exclude_none=True)
-            tool_call_field_name, tool_calls = _tool_calls_from_message(message)
+            if turn.tool_calls is not None:
+                tool_call_field_name, tool_calls = "tool_calls", turn.tool_calls
+            else:
+                tool_call_field_name, tool_calls = _tool_calls_from_message(message)
             tool_call_results = (
                 ToolCallResults.model_validate(tool_calls.tool_call_results)
                 if tool_calls is not None and tool_calls.tool_call_results is not None

@@ -11,6 +11,7 @@ from dspy.primitives.base_module import BaseModule
 from dspy.primitives.example import Example
 from dspy.primitives.prediction import Prediction
 from dspy.runtime import RunContext, pretty_print_call_log, resolve_run, track_usage, with_callbacks
+from dspy.runtime.callback import ACTIVE_RUN
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
         **inputs: Any,
     ) -> Prediction:
         run = resolve_run(run=run, bound_run=self.run)
+        run_token = ACTIVE_RUN.set(run)
         run.caller_modules.append(self)
         try:
             if run.telemetry.track_usage and run.usage_tracker is None:
@@ -77,6 +79,7 @@ class Module(BaseModule, metaclass=ProgramMeta):
             return output
         finally:
             run.caller_modules.pop()
+            ACTIVE_RUN.reset(run_token)
 
     async def aforward(
         self,

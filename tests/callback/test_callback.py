@@ -201,8 +201,8 @@ def test_tool_calls(make_run):
             self.tools = [Tool(tool_1, description="Tool one."), Tool(tool_2, description="Tool two.")]
 
         async def aforward(self, *, query: str, run, options=None, **kwargs: object) -> str:
-            query = self.tools[0](query=query, run=run)
-            return self.tools[1](query=query, run=run)
+            query = self.tools[0](query=query)
+            return self.tools[1](query=query)
 
     module = MyModule()
     result = asyncio.run(module(query="query", run=run))
