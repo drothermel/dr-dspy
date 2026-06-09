@@ -2,6 +2,7 @@ import asyncio
 
 import pytest
 
+from dspy.errors import SamplingExhaustedError
 from dspy.predict.best_of_n import BestOfN
 from dspy.predict.predict import Predict
 from dspy.primitives import Module, Prediction
@@ -75,3 +76,34 @@ def test_refine_module_custom_fail_count(make_run):
     assert module_call_count[0] == 2, (
         "Module should have been called exactly 2 times, but was called %d times" % module_call_count[0]
     )
+
+
+def test_best_of_n_all_attempts_fail_raises_sampling_exhausted(make_run):
+    run = make_run(lm=DummyLM([{"answer": "Brussels"}]))
+
+    async def always_raise(self, *, run, options=None, **inputs):
+        raise ValueError("Deliberately failing")
+
+    predict = DummyModule(ts("question -> answer"), always_raise)
+    best_of_n = BestOfN(module=predict, N=3, reward_fn=lambda _, __: 1.0, threshold=0.0, fail_count=10)
+    with pytest.raises(SamplingExhaustedError) as exc_info:
+        asyncio.run(best_of_n(question="What is the capital of Belgium?", run=run))
+    assert exc_info.value.n_attempts == 3
+    assert isinstance(exc_info.value.__cause__, ValueError)
+
+
+def test_best_of_n_instance_reuse_preserves_fail_count(make_run):
+    run = make_run(lm=DummyLM([{"answer": "Brussels"}]))
+    call_counts = []
+
+    async def always_raise(self, *, run, options=None, **inputs):
+        call_counts.append(1)
+        raise ValueError("Deliberately failing")
+
+    predict = DummyModule(ts("question -> answer"), always_raise)
+    best_of_n = BestOfN(module=predict, N=3, reward_fn=lambda _, __: 1.0, threshold=0.0, fail_count=10)
+    for _ in range(2):
+        call_counts.clear()
+        with pytest.raises(SamplingExhaustedError):
+            asyncio.run(best_of_n(question="What is the capital of Belgium?", run=run))
+        assert len(call_counts) == 3

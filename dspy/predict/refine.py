@@ -5,6 +5,7 @@ import orjson
 
 from dspy.adapters.call.wrappers import HintInjectingAdapter
 from dspy.core.types.call_options import ModuleCallOptions
+from dspy.errors import SamplingExhaustedError
 from dspy.predict.predict import Predict, Prediction
 from dspy.propose.source_format import get_formatted_source
 from dspy.runtime.run_context import RunContext, resolve_run
@@ -76,6 +77,8 @@ class Refine(Module):
         best_pred, best_trace, best_reward = (None, None, -float("inf"))
         advice = None
         adapter, _ = resolve_adapter(run.adapter)
+        failures_remaining = self.fail_count
+        last_exc: BaseException | None = None
         for idx in range(self.N):
             lm_ = lm.copy(temperature=1.0)
             mod = self.module.deepcopy()
@@ -119,10 +122,13 @@ class Refine(Module):
                     for k, v in advise_kwargs.items()
                 }
                 advice = (await Predict(OfferFeedbackTaskSpec())(**advise_kwargs, run=run)).advice
-            except Exception:
-                if idx > self.fail_count:
+            except Exception as err:
+                last_exc = err
+                if idx > failures_remaining:
                     raise
-                self.fail_count -= 1
+                failures_remaining -= 1
+        if best_pred is None:
+            raise SamplingExhaustedError(n_attempts=self.N) from last_exc
         if best_trace:
             run.optimization_trace.extend(best_trace)
         return best_pred

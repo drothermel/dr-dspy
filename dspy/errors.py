@@ -167,6 +167,16 @@ def _format_adapter_parse_message(
     return text
 
 
+class SamplingExhaustedError(DSPyError):
+    """Raised when a sampling module exhausts all attempts without a successful prediction."""
+
+    default_code = "sampling_exhausted"
+
+    def __init__(self, *, n_attempts: int, message: str | None = None) -> None:
+        self.n_attempts = n_attempts
+        super().__init__(message or f"All {n_attempts} sampling attempts failed without producing a prediction.")
+
+
 class AdapterOperationError(DSPyError):
     """Raised when an adapter method is not a supported entrypoint."""
 
