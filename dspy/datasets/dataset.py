@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import random
 import uuid
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
+
+from pydantic import BaseModel, ConfigDict
 
 from dspy.primitives.example import Example
 
@@ -11,8 +12,9 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-@dataclass
-class DatasetSeedSplits:
+class DatasetSeedSplits(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     train_sets: list[list[Example]]
     eval_sets: list[list[Example]]
 

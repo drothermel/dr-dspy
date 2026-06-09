@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Protocol, TypeVar
+
+from pydantic import BaseModel, ConfigDict
 
 __all__ = ["QueryRetriever", "RetrievedPassage"]
 
@@ -9,8 +10,9 @@ QueryT = TypeVar("QueryT", contravariant=True)
 ResultT = TypeVar("ResultT", covariant=True)
 
 
-@dataclass
-class RetrievedPassage:
+class RetrievedPassage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     long_text: str
     score: float | None = None
     pid: int | None = None
