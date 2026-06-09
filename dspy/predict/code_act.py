@@ -3,7 +3,7 @@ import logging
 from typing_extensions import override
 
 from dspy.adapters.types.tool import Tool
-from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
+from dspy.history import TurnEvent, TurnLog, call_with_history_truncation
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.code_execution import execute_generated_code, parse_generated_code
@@ -76,7 +76,7 @@ class CodeAct(Module):
             max_iters = inputs.pop("max_iters", self.max_iters)
             loop_finished = False
             for _idx in range(max_iters):
-                extracted = await call_with_turn_log_truncation(
+                extracted = await call_with_history_truncation(
                     self.codeact, turn_log=turn_log, run=run, options=options, **inputs
                 )
                 turn_log = extracted.turn_log
@@ -98,7 +98,7 @@ class CodeAct(Module):
                     loop_finished = True
                     break
             termination_reason = AgentTerminationReason.SUBMIT if loop_finished else AgentTerminationReason.MAX_ITERS
-            extracted = await call_with_turn_log_truncation(
+            extracted = await call_with_history_truncation(
                 self.extractor, turn_log=turn_log, run=run, options=options, **inputs
             )
             return Prediction(

@@ -9,7 +9,7 @@ from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.core.types import LMConfig, LMToolChoice
 from dspy.errors import AdapterParseError
-from dspy.history import TruncationExhaustedError, TurnEvent, TurnLog, call_with_turn_log_truncation
+from dspy.history import TruncationExhaustedError, TurnEvent, TurnLog, call_with_history_truncation
 from dspy.predict.agent_helpers import format_tool_exception
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.call_options import PredictOptions
@@ -91,7 +91,7 @@ class ReActV2(Module):
         break_reason = AgentTerminationReason.MAX_ITERS
         for turn_index in range(max_iters):
             try:
-                extracted = await call_with_turn_log_truncation(
+                extracted = await call_with_history_truncation(
                     self.react,
                     turn_log=turn_log,
                     tools=list(self.tools.values()),
@@ -178,7 +178,7 @@ class ReActV2(Module):
         run: RunContext,
     ) -> Prediction:
         try:
-            extracted = await call_with_turn_log_truncation(
+            extracted = await call_with_history_truncation(
                 self.react,
                 turn_log=turn_log,
                 tools=list(self.tools.values()),

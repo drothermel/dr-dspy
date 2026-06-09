@@ -158,7 +158,7 @@ def test_codeact_tool_validation_rejects_callable_objects():
 
 
 def test_codeact_shuts_down_interpreter_when_extractor_raises(make_run):
-    from dspy.history import call_with_turn_log_truncation
+    from dspy.history import call_with_history_truncation
 
     lm = DummyLM(
         [
@@ -172,7 +172,7 @@ def test_codeact_shuts_down_interpreter_when_extractor_raises(make_run):
     run = make_run(lm=lm)
     program = CodeAct(BasicQA, tools=[ADD_TOOL])
 
-    original = call_with_turn_log_truncation
+    original = call_with_history_truncation
 
     async def failing_extractor(module, *args, **kwargs):
         if module is program.extractor:
@@ -180,7 +180,7 @@ def test_codeact_shuts_down_interpreter_when_extractor_raises(make_run):
         return await original(module, *args, **kwargs)
 
     with (
-        patch("dspy.predict.code_act.call_with_turn_log_truncation", side_effect=failing_extractor),
+        patch("dspy.predict.code_act.call_with_history_truncation", side_effect=failing_extractor),
         pytest.raises(RuntimeError, match="extractor failed"),
     ):
         asyncio.run(program(question="What is 1+1?", run=run))

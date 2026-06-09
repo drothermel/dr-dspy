@@ -2,7 +2,7 @@ import logging
 from typing import Any
 
 from dspy.adapters.types.tool import Tool
-from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
+from dspy.history import TurnEvent, TurnLog, call_with_history_truncation
 from dspy.predict.agent_helpers import format_tool_exception
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.chain_of_thought import ChainOfThought
@@ -73,7 +73,7 @@ class ReAct(Module):
         termination_reason = AgentTerminationReason.MAX_ITERS
         for _idx in range(max_iters):
             try:
-                extracted = await call_with_turn_log_truncation(
+                extracted = await call_with_history_truncation(
                     self.react, turn_log=turn_log, run=run, options=options, **input_args
                 )
                 pred = extracted.result
@@ -99,7 +99,7 @@ class ReAct(Module):
             if pred.next_tool_name == "finish":
                 termination_reason = AgentTerminationReason.SUBMIT
                 break
-        extracted = await call_with_turn_log_truncation(
+        extracted = await call_with_history_truncation(
             self.extract, turn_log=turn_log, run=run, options=options, **input_args
         )
         return Prediction(

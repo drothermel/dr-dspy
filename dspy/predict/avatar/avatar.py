@@ -1,7 +1,7 @@
 from typing import Any, cast
 
 from dspy.adapters.types.tool import Tool
-from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
+from dspy.history import TurnEvent, TurnLog, call_with_history_truncation
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.avatar.models import Action, ActionOutput
 from dspy.predict.predict import Predict
@@ -102,7 +102,7 @@ class Avatar(Module):
         remaining = max_iters
         termination_reason = AgentTerminationReason.MAX_ITERS
         while remaining > 0:
-            extracted = await call_with_turn_log_truncation(
+            extracted = await call_with_history_truncation(
                 self.actor,
                 turn_log=turn_log,
                 run=run,
@@ -130,7 +130,7 @@ class Avatar(Module):
                 TurnEvent(action=action, result=tool_output if tool_output is not None else "")
             )
             remaining -= 1
-        extracted = await call_with_turn_log_truncation(
+        extracted = await call_with_history_truncation(
             self.finish,
             turn_log=turn_log,
             run=run,

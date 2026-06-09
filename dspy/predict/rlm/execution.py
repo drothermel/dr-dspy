@@ -8,8 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 import pydantic
 
 from dspy.adapters.utils import parse_value
-from dspy.history import REPLEntry, REPLHistory, REPLVariable, TurnEvent
-from dspy.history.truncation import call_with_repl_history_truncation
+from dspy.history import REPLEntry, REPLHistory, REPLVariable, TurnEvent, call_with_history_truncation
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.code_execution import strip_python_fences
 from dspy.predict.rlm.tools import make_llm_tools
@@ -229,7 +228,7 @@ async def aexecute_iteration(
     options: ModuleCallOptions | None = None,
 ) -> Prediction | REPLHistory:
     variables_info = [variable.format() for variable in variables]
-    extracted = await call_with_repl_history_truncation(
+    extracted = await call_with_history_truncation(
         rlm.generate_action,
         turn_log=history,
         run=run,
