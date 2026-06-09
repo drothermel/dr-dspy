@@ -11,8 +11,8 @@ from dspy.clients.openai_format.serialize import (
     tool_result_to_openai,
     tool_to_openai,
 )
+from dspy.core.types import LMToolCallPart, LMToolResultPart
 from dspy.core.types.messages import LMMessage, LMMessageRole
-from dspy.core.types.parts import LMToolCallPart, LMToolResultPart
 from dspy.core.types.parts.models import _coerce_part
 from dspy.core.types.request import LMRequest
 

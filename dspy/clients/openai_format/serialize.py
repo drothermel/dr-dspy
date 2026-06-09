@@ -16,9 +16,7 @@ from dspy.clients.openai_format.media import (
 )
 from dspy.clients.openai_format.reasoning_models import is_openai_reasoning_model
 from dspy.clients.openai_format.tool_calls import tool_call_part_to_openai
-from dspy.core.types.config import LMConfig, LMToolChoice, LMToolSpec
-from dspy.core.types.media_uri import data_uri
-from dspy.core.types.parts import (
+from dspy.core.types import (
     LMAudioPart,
     LMBinaryPart,
     LMCitationPart,
@@ -32,6 +30,8 @@ from dspy.core.types.parts import (
     LMToolResultPart,
     LMVideoPart,
 )
+from dspy.core.types.config import LMConfig, LMToolChoice, LMToolSpec
+from dspy.core.types.media_uri import data_uri
 from dspy.errors import LMUnsupportedFeatureError
 
 

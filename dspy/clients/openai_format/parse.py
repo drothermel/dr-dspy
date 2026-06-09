@@ -7,7 +7,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from dspy.clients.openai_format.media import get_value, model_dump, split_data_uri
-from dspy.core.types.parts import (
+from dspy.core.types import (
     LMAudioPart,
     LMBinaryPart,
     LMCitationPart,

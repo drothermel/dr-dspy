@@ -8,6 +8,8 @@ subsequent work lands in the right package.
 
 ### P0.1 Core, client, and OpenAI wire-format boundary
 
+**Status:** Done (2026-06).
+
 **Sources:** Both reviews; External cross-package review.
 
 Problem:

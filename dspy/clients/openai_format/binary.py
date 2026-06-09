@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from dspy.core.types.media_uri import data_uri, data_uri_from_path
 
 if TYPE_CHECKING:
-    from dspy.core.types.parts import LMBinaryPart
+    from dspy.core.types import LMBinaryPart
 
 
 def binary_to_openai(binary: LMBinaryPart) -> dict[str, Any]:

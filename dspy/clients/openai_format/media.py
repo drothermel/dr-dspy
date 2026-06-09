@@ -4,6 +4,7 @@ from typing import Any
 
 import pydantic
 
+from dspy.core.types import LMAudioPart, LMBinaryPart, LMDocumentPart, LMImagePart, LMTextPart
 from dspy.core.types.media_uri import (
     data_uri,
     data_uri_from_path,
@@ -11,7 +12,6 @@ from dspy.core.types.media_uri import (
     read_path_base64,
     split_data_uri,
 )
-from dspy.core.types.parts.models import LMAudioPart, LMBinaryPart, LMDocumentPart, LMImagePart, LMTextPart
 
 __all__ = [
     "data_uri",

@@ -115,7 +115,8 @@ for binding in bindings:
 - `LMForward` (`dspy.core.types.lm`) — async `aforward(request) -> LMResponse` protocol for per-call `PredictOptions(lm=...)`.
 - `LMMessageRole` — `StrEnum` on `LMMessage.role` (`user`, `assistant`, `system`, `tool`, …).
 - `ReasoningEffort` — `StrEnum` on `LMReasoningConfig.effort` (`low`, `medium`, `high`).
-- OpenAI-compat helpers live in `dspy.core.types.openai_compat` (`request_prompt`, `request_messages_as_openai`, `request_kwargs`). Import private part helpers from `dspy.core.types.parts.models` / `parts.openai` / `parts.serialize`, not the public `parts` barrel.
+- Provider-neutral request views live in `dspy.core.types.request_views` (`request_prompt`, `request_kwargs`). Media URI helpers live in `dspy.core.types.media_uri`. Import private part helpers from `dspy.core.types.parts.models` / `parts.serialize`, not the public `parts` barrel.
+- OpenAI wire-format conversion lives in `dspy.clients.openai_format` submodules: `chat_request` (`message_to_openai_chat`, `message_from_openai_chat`, `request_messages_as_openai`), `parse` (`parts_from_openai_content`, `completion_to_lm_response`), `serialize`, `tool_calls` (`tool_call_part_to_openai`).
 
 ## Public `core/types` spine API
 
@@ -123,7 +124,6 @@ Cross-package code imports spine helpers from `dspy.core.types` only (not submod
 
 - Config merge/coercion: `merge_lm_config`, `merge_lm_request_config`, `coerce_lm_config`, `merge_provider_options`
 - Message/tool coercion: `coerce_tool_spec`
-- OpenAI part parsing: `parts_from_openai_content`
 
 ## Strict transparency and audit logging
 

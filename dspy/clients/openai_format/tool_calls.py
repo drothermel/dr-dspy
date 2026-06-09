@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from dspy.core.types.parts.models import LMToolCallPart
+from dspy.core.types import LMToolCallPart
 
 __all__ = ["tool_call_part_to_openai"]
 
