@@ -3,10 +3,8 @@ from typing import Any
 from typing_extensions import override
 
 from dspy.adapters.base import Adapter
-from dspy.adapters.utils import build_lm_message
 from dspy.clients.base_lm import BaseLM
 from dspy.compile.resolve import resolve_adapter, resolve_lm_config
-from dspy.core.types import LMMessage
 from dspy.core.types.config import LMConfig
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec
@@ -34,17 +32,6 @@ class TwoStepAdapter(Adapter):
             raise ValueError("extraction_model must be an instance of dspy.clients.base_lm.BaseLM")
         self.extraction_model = extraction_model
         self.extraction_adapter = extraction_adapter
-
-    @override
-    def format(self, task_spec: TaskSpec, demos: list[dict[str, Any]], inputs: dict[str, Any]) -> list[LMMessage]:
-        messages: list[LMMessage] = []
-        task_description = self.format_task_description(task_spec)
-        messages.append(build_lm_message(role="system", content=task_description))
-        messages.extend(self.format_demos(task_spec=task_spec, demos=demos))
-        messages.append(
-            build_lm_message(role="user", content=self.format_user_message_content(task_spec=task_spec, inputs=inputs))
-        )
-        return messages
 
     @override
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
@@ -76,7 +63,7 @@ class TwoStepAdapter(Adapter):
         return results[0]
 
     @override
-    def format_task_description(self, task_spec: TaskSpec) -> str:
+    def format_system_message(self, task_spec: TaskSpec) -> str:
         parts = []
         parts.append("You are a helpful assistant that can solve tasks based on user input.")
         parts.append(
@@ -87,6 +74,18 @@ class TwoStepAdapter(Adapter):
         if task_spec.instructions:
             parts.append(f"Specific instructions: {task_spec.instructions}")
         return "\n".join(parts)
+
+    @override
+    def format_field_description(self, task_spec: TaskSpec) -> str:
+        return ""
+
+    @override
+    def format_field_structure(self, task_spec: TaskSpec) -> str:
+        return ""
+
+    @override
+    def format_task_description(self, task_spec: TaskSpec) -> str:
+        return ""
 
     @override
     def format_user_message_content(

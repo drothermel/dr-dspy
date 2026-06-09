@@ -8,6 +8,7 @@ from dspy.adapters.two_step_adapter import TwoStepAdapter
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import message_to_openai_chat
 from dspy.core.types import LMRequest, LMResponse
+from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.task_spec import FieldSpec, make_task_spec
 from dspy.utils.dummies import DummyLM
@@ -72,6 +73,32 @@ def test_two_step_adapter_format_exact_messages_with_typed_outputs(make_run):
     assert messages == expected_messages
     expected_lm_kwargs = {}
     assert lm_kwargs == expected_lm_kwargs
+
+
+def test_two_step_adapter_format_includes_turn_log_history(make_run):
+    QAWithHistory = make_task_spec(
+        {
+            "history": FieldSpec.input("history", type_=TurnLog),
+            "question": FieldSpec.input("question"),
+            "answer": FieldSpec.output("answer"),
+        },
+        instructions="Given the fields `history`, `question`, produce the fields `answer`.",
+    )
+    adapter = TwoStepAdapter(DummyLM([{"answer": "x"}]), extraction_adapter=ChatAdapter())
+    history = TurnLog(turns=({"question": "Q1", "answer": "A1"},))
+    messages, _ = format_messages_and_lm_kwargs(
+        adapter=adapter,
+        task_spec=QAWithHistory,
+        demos=[],
+        inputs={"history": history, "question": "Q2"},
+    )
+    assert messages[0]["role"] == "system"
+    assert messages[1]["role"] == "user"
+    assert "question: Q1" in messages[1]["content"]
+    assert messages[2]["role"] == "assistant"
+    assert "answer: A1" in messages[2]["content"]
+    assert messages[3]["role"] == "user"
+    assert "question: Q2" in messages[3]["content"]
 
 
 def test_two_step_adapter_call(make_run):
