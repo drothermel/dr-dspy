@@ -4,11 +4,10 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.base.native import AdapterNativeMixin
-from dspy.adapters.base.tool_calls import _provider_tool_call_to_tool_call_dict
+from dspy.adapters.call.tool_output import attach_tool_calls_to_value
 from dspy.adapters.types.base_type import Type
 from dspy.adapters.types.citation import Citations
 from dspy.adapters.types.reasoning import Reasoning
-from dspy.adapters.types.tool import ToolCalls
 from dspy.core.types import (
     LMConfig,
     LMMessage,
@@ -122,8 +121,12 @@ class AdapterCallMixin(AdapterNativeMixin):
             for field_name in original_task_spec.output_fields:
                 value.setdefault(field_name, None)
             if tool_calls and tool_call_output_field_name:
-                tool_calls = [_provider_tool_call_to_tool_call_dict(tool_call) for tool_call in tool_calls]
-                value[tool_call_output_field_name] = ToolCalls.from_dict_list(tool_calls)
+                value = attach_tool_calls_to_value(
+                    value=value,
+                    output=output,
+                    original_task_spec=original_task_spec,
+                    get_tool_call_output_field_name=self._get_tool_call_output_field_name,
+                )
             for name, field in original_task_spec.output_fields.items():
                 field_type = field.type_
                 if (

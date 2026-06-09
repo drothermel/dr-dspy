@@ -1,13 +1,17 @@
 import asyncio
+from types import SimpleNamespace
+from typing import cast
 
 import pytest
 from typing_extensions import override
 
+from dspy.adapters.call.tool_output import attach_tool_calls_to_value
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.two_step_adapter import TwoStepAdapter
+from dspy.adapters.types.tool import ToolCalls
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format.chat_request import message_to_openai_chat
-from dspy.core.types import LMRequest, LMResponse
+from dspy.core.types import LMOutput, LMRequest, LMResponse
 from dspy.errors import AdapterParseError
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
@@ -195,6 +199,37 @@ async def test_two_step_adapter_extraction(make_run):
     result = await adapter._run_extraction(original_task_spec=ComplexSignature, text=first_response, run=run)
     assert result["tags"] == ["AI", "deep learning", "neural networks"]
     assert result["confidence"] == 0.87
+
+
+def test_attach_tool_calls_preserves_call_id_from_provider_dict():
+    adapter = ChatAdapter()
+    task_spec = make_task_spec(
+        {
+            "question": input_field("question", desc="The question."),
+            "tool_calls": output_field("tool_calls", type_=ToolCalls, desc="The tool calls."),
+        },
+        instructions="Given the fields `question`, produce the fields `tool_calls`.",
+    )
+
+    output = SimpleNamespace(
+        tool_calls=[
+            {
+                "function": {"name": "search", "arguments": '{"query": "cats",}'},
+                "call_id": "call_from_two_step",
+                "type": "function",
+            }
+        ]
+    )
+
+    value = attach_tool_calls_to_value(
+        value={},
+        output=cast(LMOutput, output),
+        original_task_spec=task_spec,
+        get_tool_call_output_field_name=adapter._get_tool_call_output_field_name,
+    )
+    assert value["tool_calls"] == ToolCalls(
+        tool_calls=[ToolCalls.ToolCall(id="call_from_two_step", name="search", args={"query": "cats"})]
+    )
 
 
 @pytest.mark.asyncio
