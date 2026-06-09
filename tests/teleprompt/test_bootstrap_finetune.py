@@ -4,7 +4,7 @@ from unittest.mock import patch
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module
 from dspy.teleprompt.bootstrap_finetune import BootstrapFinetune
-from dspy.teleprompt.compile_params import BootstrapFinetuneCompileParams
+from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 
@@ -49,7 +49,7 @@ def test_compile_with_predict_instances(make_run):
         mock_finetune.return_value = {(lm, None): lm}
         compiled_student = asyncio.run(
             bootstrap.compile(
-                student, params=BootstrapFinetuneCompileParams(trainset=trainset, teacher=teacher), run=run
+                student, params=BootstrapFewShotCompileParams(trainset=trainset, teacher=teacher), run=run
             )
         )
         assert compiled_student is not None, "Failed to compile student"
@@ -63,7 +63,7 @@ def test_error_handling_missing_lm(make_run):
     student = SimpleModule(ts("input -> output"))
     bootstrap = BootstrapFinetune(metric=simple_metric)
     try:
-        asyncio.run(bootstrap.compile(student, params=BootstrapFinetuneCompileParams(trainset=trainset), run=run))
+        asyncio.run(bootstrap.compile(student, params=BootstrapFewShotCompileParams(trainset=trainset), run=run))
         raise AssertionError("Should have raised ValueError for missing LM")
     except ValueError as e:
         assert "does not have an LM assigned" in str(e)

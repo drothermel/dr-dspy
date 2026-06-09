@@ -11,7 +11,7 @@ from dspy.predict.predict import Predict
 from dspy.primitives import Module
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.bootstrap_trace import bootstrap_trace_data
-from dspy.teleprompt.compile_params import BootstrapFinetuneCompileParams
+from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class BootstrapFinetune(FinetuneTeleprompter):
         self.max_concurrency = max_concurrency
 
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
-        params = BootstrapFinetuneCompileParams.model_validate(params)
+        params = BootstrapFewShotCompileParams.model_validate(params)
         trainset = params.trainset
         teacher = params.teacher
         logger.info("Preparing the student and teacher programs...")

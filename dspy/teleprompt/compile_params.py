@@ -37,13 +37,11 @@ class BootstrapOptunaCompileParams(BootstrapFewShotCompileParams):
     valset: list[Example] | None = None
 
 
-TelepromptOptunaCompileParams = BootstrapOptunaCompileParams
-
-
 class RandomSearchCompileParams(BootstrapFewShotCompileParams):
     valset: list[Example] | None = None
     restrict: list[int] | None = None
     labeled_sample: bool = True
+    include_baselines: bool = True
 
 
 class COPROCompileParams(BaseModel):
@@ -93,10 +91,6 @@ class EnsembleCompileParams(BaseModel):
     programs: list[Module]
 
 
-class BootstrapFinetuneCompileParams(BootstrapFewShotCompileParams):
-    pass
-
-
 class KNNFewShotCompileParams(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
@@ -127,5 +121,5 @@ class BetterTogetherCompileParams(BaseModel):
     seed: int | None = None
     valset_ratio: float = 0.1
     shuffle_trainset_between_steps: bool = True
-    strategy: str = "p -> w -> p"
+    strategy: list[str] = Field(default_factory=lambda: ["p", "w", "p"])
     optimizer_compile_args: dict[str, BaseModel] | None = None

@@ -1,6 +1,6 @@
 import logging
 import random
-from typing import Callable
+from typing import Callable, cast
 
 from pydantic import BaseModel, ConfigDict
 
@@ -18,7 +18,6 @@ from dspy.teleprompt.bootstrap_finetune import (
 from dspy.teleprompt.compile_params import (
     BetterTogetherCompileParams,
     BootstrapFewShotCompileParams,
-    BootstrapFinetuneCompileParams,
     GEPACompileParams,
     RandomSearchCompileParams,
 )
@@ -45,7 +44,7 @@ class PassthroughCompileParams(BaseModel):
 
 _OPTIMIZER_PARAMS_TYPES: dict[str, type[BaseModel]] = {
     "BootstrapFewShotWithRandomSearch": RandomSearchCompileParams,
-    "BootstrapFinetune": BootstrapFinetuneCompileParams,
+    "BootstrapFinetune": BootstrapFewShotCompileParams,
     "BootstrapFewShot": BootstrapFewShotCompileParams,
     "GEPA": GEPACompileParams,
 }
@@ -71,7 +70,7 @@ def _default_compile_params(
     if name == "BootstrapFewShotWithRandomSearch":
         return RandomSearchCompileParams(trainset=trainset, teacher=teacher_arg, valset=valset)
     if name == "BootstrapFinetune":
-        return BootstrapFinetuneCompileParams(trainset=trainset, teacher=teacher_arg)
+        return BootstrapFewShotCompileParams(trainset=trainset, teacher=teacher_arg)
     if name == "BootstrapFewShot":
         return BootstrapFewShotCompileParams(trainset=trainset, teacher=teacher_arg)
     if name == "GEPA":
@@ -97,7 +96,7 @@ class BetterTogether:
     async def compile(self, student: Module, *, params: BaseModel, run: RunContext) -> Module:
         params = BetterTogetherCompileParams.model_validate(params)
         logger.info(f"\n{BOLD}==> BETTERTOGETHER COMPILATION STARTED <=={ENDC}")
-        logger.info(f"{BLUE}Strategy:{ENDC} {params.strategy}")
+        logger.info(f"{BLUE}Strategy:{ENDC} {self.STRAT_SEP.join(params.strategy)}")
         logger.info(f"{BLUE}Trainset size:{ENDC} {len(params.trainset)}")
         logger.info(
             f"{BLUE}Validation ratio:{ENDC} {(params.valset_ratio if params.valset is None else 'using provided valset')}"
@@ -165,16 +164,15 @@ class BetterTogether:
         )
         return (trainset, valset)
 
-    def _prepare_strategy(self, strategy: str) -> list[str]:
-        if not strategy or not strategy.strip():
+    def _prepare_strategy(self, strategy: list[str]) -> list[str]:
+        if not strategy:
             raise ValueError("strategy cannot be empty")
-        parsed_strategy = strategy.split(self.STRAT_SEP)
-        invalid_steps = [s for s in parsed_strategy if s not in self.optimizers]
+        invalid_steps = [s for s in strategy if s not in self.optimizers]
         if invalid_steps:
             raise ValueError(
                 f"Strategy contains invalid optimizer keys: {invalid_steps}. Valid keys are: {list(self.optimizers.keys())}"
             )
-        return parsed_strategy
+        return strategy
 
     def _prepare_optimizer_compile_args(
         self, optimizer_compile_args: dict[str, BaseModel] | None, teacher: list[Module] | None
@@ -316,7 +314,10 @@ class BetterTogether:
         pred_lms_before = [pred.lm for pred in student.predictors()]
         student._compiled = False
         logger.info(f"{BLUE}Running {optimizer.__class__.__name__}...{ENDC}")
-        student = await optimizer.compile(student, params=compile_params, run=run)
+        student = cast(
+            "Module",
+            await optimizer.compile(student, params=compile_params, run=run),
+        )
         if not all_predictors_have_lms(student):
             logger.warning(
                 f"{YELLOW}Warning: {optimizer.__class__.__name__} incorrectly reset predictor LMs. Restoring to original LMs.{ENDC}"

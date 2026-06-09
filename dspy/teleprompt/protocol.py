@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 
     from dspy.primitives import Module
     from dspy.runtime.run_context import RunContext
+    from dspy.teleprompt.compilation import CompileResult
 
 
 @runtime_checkable
@@ -17,4 +18,4 @@ class Teleprompter(Protocol):
         *,
         params: BaseModel,
         run: RunContext,
-    ) -> Module: ...
+    ) -> CompileResult: ...

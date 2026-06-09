@@ -131,14 +131,14 @@ def test_bettertogether_initialization_invalid_optimizer(make_run):
 
 def test_strategy_validation(make_run):
     optimizer = BetterTogether(metric=simple_metric)
-    valid_strategies = ["p", "w", "p -> w", "w -> p", "p -> w -> p"]
+    valid_strategies = [["p"], ["w"], ["p", "w"], ["w", "p"], ["p", "w", "p"]]
     for strategy in valid_strategies:
         parsed = optimizer._prepare_strategy(strategy)
         assert parsed is not None, f"Failed to parse valid strategy: {strategy}"
     with pytest.raises(ValueError, match="invalid optimizer keys"):
-        optimizer._prepare_strategy("p -> x -> w")
+        optimizer._prepare_strategy(["p", "x", "w"])
     with pytest.raises(ValueError, match="cannot be empty"):
-        optimizer._prepare_strategy("")
+        optimizer._prepare_strategy([])
 
 
 def test_compile_basic(make_run):
@@ -160,7 +160,7 @@ def test_compile_basic(make_run):
     with patch("dspy.teleprompt.bettertogether.eval_candidate_program", new_callable=AsyncMock) as mock_eval:
         mock_eval.return_value = Mock(score=0.8)
         with patch("dspy.teleprompt.bettertogether.launch_lms"), patch("dspy.teleprompt.bettertogether.kill_lms"):
-            compiled = asyncio.run(optimizer.compile(student, params=_bt_params(strategy="p"), run=run))
+            compiled = asyncio.run(optimizer.compile(student, params=_bt_params(strategy=["p"]), run=run))
     assert compiled is not None, "Compilation returned None"
     assert hasattr(compiled, "candidate_programs"), "Missing candidate_programs attribute"
     assert hasattr(compiled, "flag_compilation_error_occurred"), "Missing flag_compilation_error_occurred attribute"
@@ -228,7 +228,7 @@ def test_compile_args_passed_to_optimizer(student_with_lm, mock_bt_dependencies,
         optimizer.compile(
             student_with_lm,
             params=_bt_params(
-                strategy="p",
+                strategy=["p"],
                 optimizer_compile_args={
                     "p": RandomSearchCompileParams(trainset=trainset, valset=valset, restrict=[0, 1]),
                 },
@@ -287,7 +287,7 @@ def test_compile_args_multi_optimizer_strategy(make_run):
             asyncio.run(
                 optimizer.compile(
                     student,
-                    params=_bt_params(strategy="p -> w", optimizer_compile_args=compile_args),
+                    params=_bt_params(strategy=["p", "w"], optimizer_compile_args=compile_args),
                     run=run,
                 )
             )
@@ -325,7 +325,7 @@ def test_compile_args_override_global_params(make_run):
             asyncio.run(
                 optimizer.compile(
                     student,
-                    params=_bt_params(teacher=None, strategy="p", optimizer_compile_args=compile_args),
+                    params=_bt_params(teacher=None, strategy=["p"], optimizer_compile_args=compile_args),
                     run=run,
                 )
             )
@@ -363,7 +363,7 @@ def test_trainset_shuffling_between_steps(make_run):
             asyncio.run(
                 optimizer.compile(
                     student,
-                    params=_bt_params(strategy="p -> w", shuffle_trainset_between_steps=True),
+                    params=_bt_params(strategy=["p", "w"], shuffle_trainset_between_steps=True),
                     run=run,
                 )
             )
@@ -408,7 +408,7 @@ def test_strategy_execution_order(make_run):
             patch("dspy.teleprompt.bettertogether.kill_lms"),
             patch.object(optimizer, "_models_changed", return_value=False),
         ):
-            asyncio.run(optimizer.compile(student, params=_bt_params(strategy="p -> w -> p"), run=run))
+            asyncio.run(optimizer.compile(student, params=_bt_params(strategy=["p", "w", "p"]), run=run))
     assert len(execution_log) == 3, "Should have executed 3 optimization steps"
     assert execution_log[0] == ("p", ["p"]), "First step should be 'p'"
     assert execution_log[1] == ("w", ["p", "w"]), "Second step should be 'w' receiving output from 'p'"
@@ -435,7 +435,7 @@ def test_lm_lifecycle_management(make_run):
             patch("dspy.teleprompt.bettertogether.kill_lms") as mock_kill,
             patch.object(optimizer, "_models_changed", return_value=True),
         ):
-            asyncio.run(optimizer.compile(student, params=_bt_params(strategy="p -> w"), run=run))
+            asyncio.run(optimizer.compile(student, params=_bt_params(strategy=["p", "w"]), run=run))
     assert mock_launch.called, "launch_lms should be called when models change"
     assert mock_kill.called, "kill_lms should be called when models change"
 
@@ -466,7 +466,7 @@ def test_error_handling_returns_best_program(make_run):
             patch("dspy.teleprompt.bettertogether.kill_lms"),
             patch.object(optimizer, "_models_changed", return_value=False),
         ):
-            result = asyncio.run(optimizer.compile(student, params=_bt_params(strategy="p -> w"), run=run))
+            result = asyncio.run(optimizer.compile(student, params=_bt_params(strategy=["p", "w"]), run=run))
     assert result is not None, "Should return a program even if a step fails"
     assert hasattr(result, "flag_compilation_error_occurred"), "Should have error flag"
     assert result.flag_compilation_error_occurred is True, "Error flag should be True"
@@ -495,7 +495,7 @@ def test_program_selection(student_with_lm, test_valset, expected_marker, test_d
             patch.object(optimizer, "_models_changed", return_value=False),
         ):
             result = asyncio.run(
-                optimizer.compile(student_with_lm, params=_bt_params(valset=test_valset, strategy="p -> w"), run=run)
+                optimizer.compile(student_with_lm, params=_bt_params(valset=test_valset, strategy=["p", "w"]), run=run)
             )
     assert hasattr(result, "marker"), "Result should have marker"
     assert result.marker == expected_marker, test_description
@@ -513,7 +513,7 @@ def test_candidate_programs_structure(student_with_lm, make_run):
             patch("dspy.teleprompt.bettertogether.kill_lms"),
             patch.object(optimizer, "_models_changed", return_value=False),
         ):
-            result = asyncio.run(optimizer.compile(student_with_lm, params=_bt_params(strategy="p -> w"), run=run))
+            result = asyncio.run(optimizer.compile(student_with_lm, params=_bt_params(strategy=["p", "w"]), run=run))
     assert hasattr(result, "candidate_programs"), "Result should have candidate_programs attribute"
     candidates = result.candidate_programs
     assert len(candidates) == 3, f"Should have 3 candidates, got {len(candidates)}"
@@ -542,7 +542,7 @@ def test_empty_valset_handling(student_with_lm, make_run):
         patch("dspy.teleprompt.bettertogether.kill_lms"),
         patch.object(optimizer, "_models_changed", return_value=False),
     ):
-        result = asyncio.run(optimizer.compile(student_with_lm, params=_bt_params(valset=[], strategy="p"), run=run))
+        result = asyncio.run(optimizer.compile(student_with_lm, params=_bt_params(valset=[], strategy=["p"]), run=run))
     assert hasattr(result, "marker"), "Result should have marker"
     assert result.marker == "optimized", "Should return the latest program when valset is empty list"
     assert hasattr(result, "candidate_programs"), "Should have candidate_programs"
@@ -557,6 +557,6 @@ def test_empty_valset_handling(student_with_lm, make_run):
         patch("dspy.teleprompt.bettertogether.kill_lms"),
         patch.object(optimizer2, "_models_changed", return_value=False),
     ):
-        result2 = asyncio.run(optimizer2.compile(student2, params=_bt_params(valset=None, strategy="p"), run=run))
+        result2 = asyncio.run(optimizer2.compile(student2, params=_bt_params(valset=None, strategy=["p"]), run=run))
     assert hasattr(result2, "marker"), "Result2 should have marker"
     assert result2.marker == "optimized", "Should return the latest program when valset is None"
