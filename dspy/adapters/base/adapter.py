@@ -18,6 +18,17 @@ if TYPE_CHECKING:
 
 
 class Adapter(AdapterCallMixin, AdapterFormatMixin):
+    """Base adapter for formatting task specs into LM requests and parsing responses.
+
+    Native function-calling defaults by adapter subclass:
+
+    | Adapter | ``use_native_function_calling`` default | Rationale |
+    |---------|----------------------------------------|-----------|
+    | ChatAdapter / XMLAdapter | ``False`` | Text marker parsing; FC optional |
+    | JSONAdapter / BAMLAdapter | ``True`` | Structured JSON + tool calls via provider FC |
+    | TwoStepAdapter | inherits kwargs | Main call text; extraction uses inner adapter |
+    """
+
     response_format_policy: ResponseFormatPolicy | None = None
     parse_fallback_policy: ParseFallbackPolicy | None = None
     call_mode: AdapterCallMode | None = None
@@ -31,6 +42,11 @@ class Adapter(AdapterCallMixin, AdapterFormatMixin):
         parallel_tool_calls: bool | None = None,
         allow_json_repair: bool = False,
     ) -> None:
+        """Configure adapter behavior.
+
+        ``parallel_tool_calls`` merges into ``LMToolChoice.parallel`` only when
+        ``tool_choice`` is ``None`` or ``tool_choice.parallel`` is ``None``.
+        """
         self.callbacks = callbacks or []
         self.use_native_function_calling = use_native_function_calling
         self.parallel_tool_calls = parallel_tool_calls

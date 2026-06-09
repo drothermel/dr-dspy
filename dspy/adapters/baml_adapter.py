@@ -28,7 +28,7 @@ def _render_type_str(annotation: object, depth: int = 0, indent: int = 0, seen_m
     try:
         origin = get_origin(annotation)
         args = get_args(annotation)
-    except Exception:
+    except (TypeError, AttributeError):
         return str(annotation)
     if origin in (types.UnionType, Union):
         non_none_args = [arg for arg in args if arg is not type(None)]

@@ -8,7 +8,6 @@ from typing_extensions import override
 from dspy.adapters.types.base_type import Type
 from dspy.core.types import LMToolSpec
 from dspy.runtime.callback import with_callbacks
-from dspy.runtime.run_context import RunContext
 
 from .schema import _resolve_json_schema_reference, jsonschema
 
@@ -155,7 +154,7 @@ class Tool(Type):
         )
 
     @with_callbacks(kind="tool")
-    def __call__(self, *, run: RunContext | None = None, **kwargs: object) -> object:
+    def __call__(self, **kwargs: object) -> object:
         parsed_kwargs = self._validate_and_parse_args(**kwargs)
         result = self.func(**parsed_kwargs)
         if asyncio.iscoroutine(result):

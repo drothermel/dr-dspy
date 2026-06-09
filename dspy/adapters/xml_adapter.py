@@ -5,6 +5,7 @@ from typing_extensions import override
 
 from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.chat_adapter import ChatAdapter
+from dspy.adapters.format_field_structure import build_field_structure_instructions
 from dspy.adapters.utils import (
     build_multimodal_user_message_content,
     inputs_include_multimodal_custom_type_values,
@@ -34,9 +35,6 @@ class XMLAdapter(ChatAdapter):
 
     @override
     def format_field_structure(self, task_spec: TaskSpec) -> str:
-        parts = []
-        parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
-
         def format_task_spec_fields_for_instructions(role: FieldRole) -> str:
             return self.format_field_with_value(
                 fields_with_values={
@@ -44,9 +42,10 @@ class XMLAdapter(ChatAdapter):
                 }
             )
 
-        parts.append(format_task_spec_fields_for_instructions(FieldRole.INPUT))
-        parts.append(format_task_spec_fields_for_instructions(FieldRole.OUTPUT))
-        return "\n\n".join(parts).strip()
+        return build_field_structure_instructions(
+            input_section=format_task_spec_fields_for_instructions(FieldRole.INPUT),
+            output_section=format_task_spec_fields_for_instructions(FieldRole.OUTPUT),
+        )
 
     @override
     def format_user_message_content(

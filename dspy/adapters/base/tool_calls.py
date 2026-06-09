@@ -21,7 +21,8 @@ def _load_provider_tool_arguments(arguments: str) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
-def _provider_value(value: object, key: str, default: object = None) -> object:
+def read_provider_field(value: object, key: str, default: object = None) -> object:
+    """Read a field from provider tool-call payloads (OpenAI dict or object shapes)."""
     if isinstance(value, dict):
         value = cast("dict[str, object]", value)
         return value.get(key, default)
@@ -36,8 +37,8 @@ def _provider_tool_call_to_tool_call_dict(tool_call: object) -> dict[str, Any]:
             if isinstance(raw_arguments, str):
                 args = _load_provider_tool_arguments(raw_arguments)
         return {"id": tool_call.id, "name": tool_call.name, "args": args}
-    function = _provider_value(value=tool_call, key="function", default={}) or {}
-    arguments = _provider_value(value=function, key="arguments", default={})
+    function = read_provider_field(value=tool_call, key="function", default={}) or {}
+    arguments = read_provider_field(value=function, key="arguments", default={})
     if isinstance(arguments, str):
         parsed_arguments = _load_provider_tool_arguments(arguments)
     elif isinstance(arguments, dict):
@@ -45,8 +46,8 @@ def _provider_tool_call_to_tool_call_dict(tool_call: object) -> dict[str, Any]:
     else:
         parsed_arguments = {}
     return {
-        "id": _provider_value(value=tool_call, key="id") or _provider_value(value=tool_call, key="call_id"),
-        "name": _provider_value(value=function, key="name") or _provider_value(value=tool_call, key="name"),
+        "id": read_provider_field(value=tool_call, key="id") or read_provider_field(value=tool_call, key="call_id"),
+        "name": read_provider_field(value=function, key="name") or read_provider_field(value=tool_call, key="name"),
         "args": parsed_arguments,
     }
 

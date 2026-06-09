@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Protocol
 
+import pydantic
+
 from dspy.adapters.structured_output import get_structured_outputs_response_format, has_open_ended_mapping
 from dspy.adapters.types.tool import ToolCalls
 from dspy.core.types.config import LMConfig, coerce_lm_config
@@ -84,7 +86,11 @@ class StructuredOutputPolicy:
             return await run_once(structured_config)
         except LMError:
             raise
-        except Exception:
-            logger.warning("Failed to use structured output format, falling back to JSON mode.")
+        except (ValueError, TypeError, pydantic.ValidationError) as exc:
+            logger.warning(
+                "Failed to use structured output format (%s), falling back to JSON mode.",
+                type(exc).__name__,
+                exc_info=True,
+            )
             json_config = resolved_config.model_copy(update={"response_format": {"type": "json_object"}})
             return await run_once(json_config)

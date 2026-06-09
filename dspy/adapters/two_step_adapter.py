@@ -8,6 +8,7 @@ from dspy.adapters.call.mode import AdapterCallMode
 from dspy.adapters.call.pipeline import AdapterCallPipeline
 from dspy.clients.base_lm import BaseLM
 from dspy.core.types.config import LMConfig
+from dspy.errors import AdapterOperationError
 from dspy.runtime.config import CallSite
 from dspy.runtime.run_context import RunContext
 from dspy.runtime.transparency import resolve_adapter, resolve_lm_config
@@ -16,6 +17,12 @@ from dspy.task_spec.formatting import get_field_spec_description_string
 
 
 class TwoStepAdapter(Adapter):
+    """Two-step adapter: main LM produces free text; extraction adapter parses fields.
+
+    ``parse`` is not a supported entrypoint — use ``AdapterCallPipeline.execute`` via
+    ``await adapter(...)`` / ``TwoStepAdapter.__call__``.
+    """
+
     call_mode = AdapterCallMode.TWO_STEP
     capabilities = AdapterCapabilities(
         supports_finetune=False,
@@ -33,8 +40,9 @@ class TwoStepAdapter(Adapter):
 
     @override
     def parse(self, task_spec: TaskSpec, completion: str) -> dict[str, Any]:
-        raise NotImplementedError(
-            "TwoStepAdapter.parse is not supported. Structured extraction runs in TwoStepAdapter.__call__."
+        _ = (task_spec, completion)
+        raise AdapterOperationError(
+            "TwoStepAdapter.parse is not supported. Use AdapterCallPipeline.execute via TwoStepAdapter.__call__."
         )
 
     async def _run_extraction(self, *, original_task_spec: TaskSpec, text: str, run: RunContext) -> dict[str, Any]:

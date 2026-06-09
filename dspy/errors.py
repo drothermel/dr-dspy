@@ -167,6 +167,12 @@ def _format_adapter_parse_message(
     return text
 
 
+class AdapterOperationError(DSPyError):
+    """Raised when an adapter method is not a supported entrypoint."""
+
+    default_code = "adapter_operation_error"
+
+
 class AdapterParseError(DSPyError):
     """Raised when an adapter cannot parse structured fields from an LM response."""
 

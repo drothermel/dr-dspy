@@ -4,7 +4,6 @@ from typing import Any
 import pytest
 
 from dspy.adapters.types.tool import Tool
-from dspy.testing import DummyLM
 from tests.adapters.types.tool.conftest import (
     Address,
     ContactInfo,
@@ -281,8 +280,7 @@ async def test_async_concurrent_calls():
     assert end_time - start_time < 0.3
 
 
-def test_async_tool_call_in_sync_mode_rejected(make_run):
+def test_async_tool_call_in_sync_mode_rejected():
     tool = Tool(async_dummy_function, description="An async dummy function for testing.")
-    run = make_run(lm=DummyLM([{}]))
     with pytest.raises(ValueError, match=r".*acall.*"):
-        tool(x=1, y="hello", run=run)
+        tool(x=1, y="hello")

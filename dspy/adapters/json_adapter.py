@@ -9,6 +9,7 @@ from typing_extensions import override
 from dspy.adapters.base import Adapter
 from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.call.policies.response_format import StructuredOutputPolicy
+from dspy.adapters.format_field_structure import build_field_structure_instructions
 from dspy.adapters.format_shared import ChatFormatMixin
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import load_json, parse_output_field, validate_parsed_fields
@@ -50,9 +51,6 @@ class JSONAdapter(ChatFormatMixin, Adapter):
 
     @override
     def format_field_structure(self, task_spec: TaskSpec) -> str:
-        parts = []
-        parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
-
         def format_task_spec_fields_for_instructions(role: FieldRole, role_label: str) -> str:
             return self.format_field_with_value(
                 fields_with_values={
@@ -61,11 +59,12 @@ class JSONAdapter(ChatFormatMixin, Adapter):
                 role=role_label,
             )
 
-        parts.append("Inputs will have the following structure:")
-        parts.append(format_task_spec_fields_for_instructions(FieldRole.INPUT, "user"))
-        parts.append("Outputs will be a JSON object with the following fields.")
-        parts.append(format_task_spec_fields_for_instructions(FieldRole.OUTPUT, "assistant"))
-        return "\n\n".join(parts).strip()
+        return build_field_structure_instructions(
+            input_preamble="Inputs will have the following structure:",
+            input_section=format_task_spec_fields_for_instructions(FieldRole.INPUT, "user"),
+            output_preamble="Outputs will be a JSON object with the following fields.",
+            output_section=format_task_spec_fields_for_instructions(FieldRole.OUTPUT, "assistant"),
+        )
 
     @override
     def user_message_output_requirements(self, task_spec: TaskSpec) -> str:
