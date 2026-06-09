@@ -20,7 +20,7 @@ from dspy._internal.unbatchify import Unbatchify
 from dspy.persistence.embeddings import load_embeddings_into, save_embeddings
 from dspy.retrievers.types import RetrievedPassage
 
-np = require("numpy")
+np = require("numpy", extra="numpy", feature="vector retrieval")
 
 __all__ = ["Embeddings", "EmbeddingsWithScores"]
 

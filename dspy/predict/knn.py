@@ -5,7 +5,7 @@ from dspy._internal.lazy_import import require
 from dspy.clients.embedding import Embedder
 from dspy.primitives import Example
 
-np = require("numpy")
+np = require("numpy", extra="numpy", feature="KNN few-shot")
 
 
 def _format_input_text(inputs: Mapping[str, Any], input_keys: frozenset[str]) -> str:

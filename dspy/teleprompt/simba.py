@@ -20,7 +20,7 @@ from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCand
 from dspy.teleprompt.compile_params import SIMBACompileParams
 from dspy.teleprompt.registry import register_teleprompter
 
-np = require("numpy")
+np = require("numpy", extra="numpy", feature="SIMBA optimization")
 logger = logging.getLogger(__name__)
 
 

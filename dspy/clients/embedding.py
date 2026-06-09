@@ -6,7 +6,7 @@ from dspy._internal.lazy_import import require
 from dspy.clients._litellm import get_litellm
 from dspy.core.types.embedding_options import EmbedderOptions, merge_embedder_options
 
-np = require("numpy")
+np = require("numpy", extra="numpy", feature="embedding vector operations")
 
 
 def _get_litellm():

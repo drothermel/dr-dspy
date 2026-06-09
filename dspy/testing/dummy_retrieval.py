@@ -6,7 +6,7 @@ import random
 
 from dspy._internal.lazy_import import require
 
-np = require("numpy")
+np = require("numpy", extra="numpy", feature="DummyVectorizer")
 
 
 class DummyVectorizer:

@@ -13,7 +13,7 @@ from dspy._internal.unbatchify import Unbatchify
 if TYPE_CHECKING:
     from dspy.retrievers.embeddings import Embedder, Embeddings
 
-np = require("numpy")
+np = require("numpy", extra="numpy", feature="embedding persistence")
 
 CONFIG_FILENAME = "config.json"
 CORPUS_EMBEDDINGS_FILENAME = "corpus_embeddings.npy"
