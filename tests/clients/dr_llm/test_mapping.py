@@ -3,7 +3,8 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from dr_llm.llm import EffortSpec, SamplingControls
+from dr_llm.backends import fingerprint_request
+from dr_llm.llm import EffortSpec
 
 from dspy.clients.dr_llm import DR_LLM_EXTENSION_KEY
 from dspy.clients.dr_llm.mapping import (
@@ -166,19 +167,19 @@ def test_lm_request_maps_reasoning_effort() -> None:
             "openrouter/openai/gpt-oss-20b",
             {
                 "reasoning": {"kind": "openrouter", "effort": "low"},
-                "sampling": {"temperature": None, "top_p": None},
+                "sampling": {"temperature": 0.7, "top_p": 0.95},
             },
             {"kind": "openrouter", "enabled": None, "effort": "low"},
-            (None, None),
+            (0.7, 0.95),
         ),
         (
             "openrouter/openai/gpt-5-nano",
             {
                 "reasoning": {"kind": "openrouter", "effort": "low"},
-                "sampling": {"temperature": None, "top_p": None},
+                "sampling": {"temperature": 0.7, "top_p": 0.95},
             },
             {"kind": "openrouter", "enabled": None, "effort": "low"},
-            (None, None),
+            (0.7, 0.95),
         ),
         (
             "openai/gpt-5-nano",
@@ -187,7 +188,7 @@ def test_lm_request_maps_reasoning_effort() -> None:
                 "sampling": {"temperature": None, "top_p": None},
             },
             {"kind": "openai", "thinking_level": "minimal"},
-            (None, None),
+            None,
         ),
         (
             "google/gemini-2.5-flash-lite",
@@ -239,8 +240,36 @@ def test_lm_request_maps_explicit_empty_sampling_controls() -> None:
         config=LMConfig(extensions={DR_LLM_EXTENSION_KEY: {"sampling": {"temperature": None, "top_p": None}}}),
     )
     backend_request = lm_request_to_backend_request(request, lm=lm)
-    assert isinstance(backend_request.sampling, SamplingControls)
-    assert backend_request.sampling.is_empty()
+    assert backend_request.sampling is None
+
+
+def test_empty_sampling_controls_match_omitted_sampling_fingerprint() -> None:
+    lm = DummyLM([{"answer": "x"}])
+    lm.kwargs = {}
+    omitted = LMRequest(
+        model="openrouter/openai/gpt-5-nano",
+        messages=[User(LMTextPart(text="hi"))],
+        config=LMConfig(extensions={DR_LLM_EXTENSION_KEY: {"reasoning": {"kind": "openrouter", "effort": "low"}}}),
+    )
+    empty = LMRequest(
+        model="openrouter/openai/gpt-5-nano",
+        messages=[User(LMTextPart(text="hi"))],
+        config=LMConfig(
+            extensions={
+                DR_LLM_EXTENSION_KEY: {
+                    "reasoning": {"kind": "openrouter", "effort": "low"},
+                    "sampling": {"temperature": None, "top_p": None},
+                }
+            }
+        ),
+    )
+
+    omitted_backend_request = lm_request_to_backend_request(omitted, lm=lm)
+    empty_backend_request = lm_request_to_backend_request(empty, lm=lm)
+
+    assert omitted_backend_request.sampling is None
+    assert empty_backend_request.sampling is None
+    assert fingerprint_request(omitted_backend_request) == fingerprint_request(empty_backend_request)
 
 
 def test_effort_from_config_raises_on_invalid_effort() -> None:

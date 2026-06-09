@@ -107,6 +107,12 @@ def _sampling_from_config(config: LMConfig) -> SamplingControls | None:
     return SamplingControls(temperature=temperature, top_p=top_p)
 
 
+def _normalize_sampling(sampling: SamplingControls | None) -> SamplingControls | None:
+    if sampling is None or sampling.is_empty():
+        return None
+    return sampling
+
+
 def _dr_llm_controls_from_config(config: LMConfig, *, lm: Any, model: str) -> DrLlmProviderControls:
     default_controls = getattr(lm, "_dr_llm_controls", None)
     data = (
@@ -131,7 +137,7 @@ def _sampling_from_merged_config(
 ) -> SamplingControls | None:
     del model
     if controls.sampling is not None:
-        return controls.sampling
+        return _normalize_sampling(controls.sampling)
     return _sampling_from_config(config)
 
 

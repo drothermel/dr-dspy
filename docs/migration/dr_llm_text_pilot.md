@@ -41,7 +41,7 @@ options = PredictOptions(
         extensions={
             DR_LLM_EXTENSION_KEY: {
                 "reasoning": {"kind": "openrouter", "effort": "low"},
-                "sampling": {"temperature": None, "top_p": None},
+                "sampling": {"temperature": 0.7, "top_p": 0.95},
             }
         }
     )
@@ -55,7 +55,7 @@ Default T1 controls:
 - OpenAI minimal thinking: `{"reasoning": {"kind": "openai", "thinking_level": "minimal"}}`.
 - Google thinking off: `{"reasoning": {"kind": "google", "thinking_level": "off"}}`.
 - Explicit sampling: `{"sampling": {"temperature": 0.7, "top_p": 0.95}}`.
-- No sampling override: `{"sampling": {"temperature": null, "top_p": null}}`.
+- No sampling override: `{"sampling": {"temperature": null, "top_p": null}}`, which resolves to `BackendRequest.sampling=None` before dr-llm fingerprinting.
 
 `metadata` is forwarded to `BackendRequest.metadata`, but dr-llm fingerprints
 exclude metadata and extensions. Use generation-relevant fields, a pool
