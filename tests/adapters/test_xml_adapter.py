@@ -11,7 +11,6 @@ try:
     from litellm import Choices, Message, ModelResponse
 except ImportError:
     pytest.skip(reason="litellm is not installed", allow_module_level=True)
-from dspy.adapters.format_shared import FieldInfoWithName
 from dspy.adapters.types.code import Code
 from dspy.adapters.types.image import Image
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
@@ -20,7 +19,7 @@ from dspy.clients.lm import LM
 from dspy.history import TurnLog
 from dspy.primitives.example import Example
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.task_spec.pydantic_bridge import task_spec_output_field_infos
+from dspy.task_spec.fields import FieldBinding
 from tests.adapters.conftest import adapter_format_as_openai, format_messages_and_lm_kwargs, make_adapter_run
 from tests.task_spec.helpers import ts
 
@@ -28,9 +27,7 @@ from tests.task_spec.helpers import ts
 def test_xml_adapter_format_and_parse_basic():
     TestSignature = ts("question -> answer", instructions="Given the fields `question`, produce the fields `answer`.")
     adapter = XMLAdapter()
-    fields_with_values = {
-        FieldInfoWithName(name="answer", info=task_spec_output_field_infos(TestSignature)["answer"]): "Paris"
-    }
+    fields_with_values = {FieldBinding(name="answer", field=TestSignature.output_fields["answer"]): "Paris"}
     xml = adapter.format_field_with_value(fields_with_values)
     assert xml.strip() == "<answer>\nParis\n</answer>"
     completion = "<answer>Paris</answer>"
@@ -105,9 +102,7 @@ def test_xml_adapter_format_and_parse_nested_model():
     )
     adapter = XMLAdapter()
     fields_with_values = {
-        FieldInfoWithName(name="result", info=task_spec_output_field_infos(TestSignature)["result"]): InnerModel(
-            value=5, label="foo"
-        )
+        FieldBinding(name="result", field=TestSignature.output_fields["result"]): InnerModel(value=5, label="foo")
     }
     xml = adapter.format_field_with_value(fields_with_values)
     assert xml.strip().startswith("<result>")
@@ -133,9 +128,7 @@ def test_xml_adapter_format_and_parse_list_of_models():
     )
     adapter = XMLAdapter()
     items = [Item(name="a", score=1.1), Item(name="b", score=2.2)]
-    fields_with_values = {
-        FieldInfoWithName(name="items", info=task_spec_output_field_infos(TestSignature)["items"]): items
-    }
+    fields_with_values = {FieldBinding(name="items", field=TestSignature.output_fields["items"]): items}
     xml = adapter.format_field_with_value(fields_with_values)
     assert xml.strip().startswith("<items>")
     assert '"name": "a"' in xml
@@ -172,11 +165,9 @@ def test_xml_adapter_with_tool_like_output():
         ToolCall(name="get_population", args={"country": "Japan", "year": 2023}, result="125M"),
     ]
     fields_with_values = {
-        FieldInfoWithName(
-            name="tool_calls", info=task_spec_output_field_infos(TestSignature)["tool_calls"]
-        ): tool_calls,
-        FieldInfoWithName(
-            name="answer", info=task_spec_output_field_infos(TestSignature)["answer"]
+        FieldBinding(name="tool_calls", field=TestSignature.output_fields["tool_calls"]): tool_calls,
+        FieldBinding(
+            name="answer", field=TestSignature.output_fields["answer"]
         ): "The weather is Sunny. Population is 125M.",
     }
     xml = adapter.format_field_with_value(fields_with_values)
@@ -286,7 +277,7 @@ def test_xml_adapter_full_prompt():
     assert messages[0]["role"] == "system"
     assert messages[1]["role"] == "user"
     union_type_repr = "Union[str, NoneType]" if sys.version_info >= (3, 14) else "UnionType[str, NoneType]"
-    expected_system = f"Your input fields are:\n1. `query` (str): \n2. `context` ({union_type_repr}):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<query>\n{{query}}\n</query>\n\n<context>\n{{context}}\n</context>\n\n<answer>\n{{answer}}\n</answer>\nIn adhering to this structure, your objective is: \n        Given the fields `query`, `context`, produce the fields `answer`."
+    expected_system = f"Your input fields are:\n1. `query` (str): The query.\n2. `context` ({union_type_repr}): The context.\nYour output fields are:\n1. `answer` (str): The answer.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<query>\n{{query}}\n</query>\n\n<context>\n{{context}}\n</context>\n\n<answer>\n{{answer}}\n</answer>\nIn adhering to this structure, your objective is: \n        Given the fields `query`, `context`, produce the fields `answer`."
     expected_user = "<query>\nwhen was Marie Curie born\n</query>\n\nRespond with the corresponding output fields wrapped in XML tags `<answer>`."
     assert messages[0]["content"] == expected_system
     assert messages[1]["content"] == expected_user
@@ -305,7 +296,7 @@ def test_xml_adapter_format_exact_messages_for_simple_signature():
     assert messages == [
         {
             "role": "system",
-            "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}\n</answer>\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`.",
+            "content": "Your input fields are:\n1. `question` (str): The question.\nYour output fields are:\n1. `answer` (str): The answer.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}\n</answer>\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`.",
         },
         {
             "role": "user",
@@ -375,7 +366,7 @@ def test_xml_adapter_format_exact_messages_for_two_input_signature():
     assert messages == [
         {
             "role": "system",
-            "content": "Your input fields are:\n1. `question` (str): \n2. `answer` (str):\nYour output fields are:\n1. `judgement` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}\n</answer>\n\n<judgement>\n{judgement}\n</judgement>\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `answer`, produce the fields `judgement`.",
+            "content": "Your input fields are:\n1. `question` (str): The question.\n2. `answer` (str): The answer.\nYour output fields are:\n1. `judgement` (str): The judgement.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}\n</answer>\n\n<judgement>\n{judgement}\n</judgement>\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `answer`, produce the fields `judgement`.",
         },
         {
             "role": "user",
@@ -404,7 +395,7 @@ def test_xml_adapter_format_exact_messages_with_demo_and_typed_output():
     assert messages == [
         {
             "role": "system",
-            "content": "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str): \n2. `score` (float):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}\n</answer>\n\n<score>\n{score}        # note: the value you produce must be a single float value\n</score>\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`, `score`.",
+            "content": "Your input fields are:\n1. `question` (str): The question.\nYour output fields are:\n1. `answer` (str): The answer.\n2. `score` (float): The score.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}\n</answer>\n\n<score>\n{score}        # note: the value you produce must be a single float value\n</score>\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`, `score`.",
         },
         {"role": "user", "content": "<question>\nQ1\n</question>"},
         {"role": "assistant", "content": "<answer>\nA1\n</answer>\n\n<score>\n0.9\n</score>"},
@@ -481,7 +472,7 @@ def test_xml_adapter_format_exact_messages_with_history_demo_pydantic_tools_and_
     expected_messages = [
         {
             "role": "system",
-            "content": 'Your input fields are:\n1. `history` (TurnLog): \n2. `image` (Image): \n3. `tools` (list[Tool]): \n4. `profile` (Profile): \n5. `question` (str):\nYour output fields are:\n1. `answer` (AnswerCard):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<history>\n{history}\n</history>\n\n<image>\n{image}\n</image>\n\n<tools>\n{tools}\n</tools>\n\n<profile>\n{profile}\n</profile>\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, "sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, "required": ["answer", "sources"], "title": "AnswerCard"}\n</answer>\nIn adhering to this structure, your objective is: \n        Answer using all supplied context.',
+            "content": 'Your input fields are:\n1. `history` (TurnLog): The history.\n2. `image` (Image): The image.\n3. `tools` (list[Tool]): The tools.\n4. `profile` (Profile): The profile.\n5. `question` (str): The question.\nYour output fields are:\n1. `answer` (AnswerCard): The answer.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<history>\n{history}\n</history>\n\n<image>\n{image}\n</image>\n\n<tools>\n{tools}\n</tools>\n\n<profile>\n{profile}\n</profile>\n\n<question>\n{question}\n</question>\n\n<answer>\n{answer}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "properties": {"answer": {"type": "string", "title": "Answer"}, "sources": {"type": "array", "items": {"type": "string"}, "title": "Sources"}}, "required": ["answer", "sources"], "title": "AnswerCard"}\n</answer>\nIn adhering to this structure, your objective is: \n        Answer using all supplied context.',
         },
         {
             "role": "user",
@@ -566,7 +557,7 @@ def test_xml_adapter_format_exact_messages_with_nested_pydantic_output():
     expected_messages = [
         {
             "role": "system",
-            "content": 'Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `summary` (XmlSummary):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<summary>\n{summary}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "$defs": {"XmlAddress": {"type": "object", "properties": {"city": {"type": "string", "title": "City"}, "country": {"type": "string", "title": "Country"}}, "required": ["city", "country"], "title": "XmlAddress"}}, "properties": {"address": {"$ref": "#/$defs/XmlAddress"}, "title": {"type": "string", "title": "Title"}}, "required": ["title", "address"], "title": "XmlSummary"}\n</summary>\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `summary`.',
+            "content": 'Your input fields are:\n1. `question` (str): The question.\nYour output fields are:\n1. `summary` (XmlSummary): The summary.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<summary>\n{summary}        # note: the value you produce must adhere to the JSON schema: {"type": "object", "$defs": {"XmlAddress": {"type": "object", "properties": {"city": {"type": "string", "title": "City"}, "country": {"type": "string", "title": "Country"}}, "required": ["city", "country"], "title": "XmlAddress"}}, "properties": {"address": {"$ref": "#/$defs/XmlAddress"}, "title": {"type": "string", "title": "Title"}}, "required": ["title", "address"], "title": "XmlSummary"}\n</summary>\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `summary`.',
         },
         {
             "role": "user",
@@ -597,7 +588,7 @@ def test_xml_adapter_format_exact_messages_with_incomplete_demo():
     expected_messages = [
         {
             "role": "system",
-            "content": "Your input fields are:\n1. `question` (str): \n2. `context` (str):\nYour output fields are:\n1. `answer` (str): \n2. `score` (float):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<context>\n{context}\n</context>\n\n<answer>\n{answer}\n</answer>\n\n<score>\n{score}        # note: the value you produce must be a single float value\n</score>\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `context`, produce the fields `answer`, `score`.",
+            "content": "Your input fields are:\n1. `question` (str): The question.\n2. `context` (str): The context.\nYour output fields are:\n1. `answer` (str): The answer.\n2. `score` (float): The score.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<context>\n{context}\n</context>\n\n<answer>\n{answer}\n</answer>\n\n<score>\n{score}        # note: the value you produce must be a single float value\n</score>\nIn adhering to this structure, your objective is: \n        Given the fields `question`, `context`, produce the fields `answer`, `score`.",
         },
         {
             "role": "user",
@@ -628,5 +619,5 @@ def test_format_system_message():
     )
     adapter = XMLAdapter()
     system_message = adapter.format_system_message(MySignature)
-    expected_system_message = 'Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answers` (list[str]): \n2. `scores` (list[float]):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<answers>\n{answers}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "string"}}\n</answers>\n\n<scores>\n{scores}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "number"}}\n</scores>\nIn adhering to this structure, your objective is: \n        Answer the question with multiple answers and scores'
+    expected_system_message = 'Your input fields are:\n1. `question` (str): The question.\nYour output fields are:\n1. `answers` (list[str]): The answers.\n2. `scores` (list[float]): The scores.\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n<question>\n{question}\n</question>\n\n<answers>\n{answers}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "string"}}\n</answers>\n\n<scores>\n{scores}        # note: the value you produce must adhere to the JSON schema: {"type": "array", "items": {"type": "number"}}\n</scores>\nIn adhering to this structure, your objective is: \n        Answer the question with multiple answers and scores'
     assert system_message == expected_system_message

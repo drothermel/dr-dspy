@@ -1,11 +1,9 @@
 import re
 from typing import Any
 
-from pydantic.fields import FieldInfo
 from typing_extensions import override
 
 from dspy.adapters.chat_adapter import ChatAdapter
-from dspy.adapters.format_shared import FieldInfoWithName
 from dspy.adapters.utils import (
     build_multimodal_user_message_content,
     format_field_value,
@@ -15,39 +13,35 @@ from dspy.adapters.utils import (
     validate_parsed_fields,
 )
 from dspy.task_spec import TaskSpec
-from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
+from dspy.task_spec.field_spec import FieldRole
+from dspy.task_spec.fields import FieldBinding, field_bindings
 
 
 class XMLAdapter(ChatAdapter):
     field_pattern = re.compile("<(?P<name>\\w+)>((?P<content>.*?))</\\1>", re.DOTALL)
 
     @override
-    def format_field_with_value(self, fields_with_values: dict[FieldInfoWithName, Any]) -> str:
+    def format_field_with_value(self, fields_with_values: dict[FieldBinding, Any]) -> str:
         output = []
-        for field, field_value in fields_with_values.items():
-            formatted = format_field_value(field_info=field.info, value=field_value)
-            output.append(f"<{field.name}>\n{formatted}\n</{field.name}>")
+        for binding, field_value in fields_with_values.items():
+            formatted = format_field_value(field=binding.field, value=field_value)
+            output.append(f"<{binding.name}>\n{formatted}\n</{binding.name}>")
         return "\n\n".join(output).strip()
 
     @override
     def format_field_structure(self, task_spec: TaskSpec) -> str:
         parts = []
         parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
-        input_field_infos = task_spec_input_field_infos(task_spec)
-        output_field_infos = task_spec_output_field_infos(task_spec)
 
-        def format_task_spec_fields_for_instructions(field_infos: dict[str, FieldInfo]) -> str:
+        def format_task_spec_fields_for_instructions(role: FieldRole) -> str:
             return self.format_field_with_value(
                 fields_with_values={
-                    FieldInfoWithName(name=field_name, info=field_info): translate_field_type(
-                        field_name=field_name, field_info=field_info
-                    )
-                    for field_name, field_info in field_infos.items()
+                    binding: translate_field_type(binding.field) for binding in field_bindings(task_spec, role=role)
                 }
             )
 
-        parts.append(format_task_spec_fields_for_instructions(input_field_infos))
-        parts.append(format_task_spec_fields_for_instructions(output_field_infos))
+        parts.append(format_task_spec_fields_for_instructions(FieldRole.INPUT))
+        parts.append(format_task_spec_fields_for_instructions(FieldRole.OUTPUT))
         return "\n\n".join(parts).strip()
 
     @override
@@ -70,14 +64,13 @@ class XMLAdapter(ChatAdapter):
                 output_requirements=output_requirements,
                 field_wrapper="xml",
             )
-        input_field_infos = task_spec_input_field_infos(task_spec)
         messages = [prefix]
         messages.append(
             self.format_field_with_value(
                 {
-                    FieldInfoWithName(name=k, info=input_field_infos[k]): inputs.get(k)
-                    for k in task_spec.input_fields
-                    if k in inputs
+                    FieldBinding(name=field_name, field=field): inputs.get(field_name)
+                    for field_name, field in task_spec.input_fields.items()
+                    if field_name in inputs
                 }
             )
         )
@@ -92,11 +85,10 @@ class XMLAdapter(ChatAdapter):
     def format_assistant_message_content(
         self, task_spec: TaskSpec, outputs: dict[str, Any], missing_field_message: str | None = None
     ) -> str:
-        output_field_infos = task_spec_output_field_infos(task_spec)
         return self.format_field_with_value(
             {
-                FieldInfoWithName(name=k, info=output_field_infos[k]): outputs.get(k, missing_field_message)
-                for k in task_spec.output_fields
+                FieldBinding(name=field_name, field=field): outputs.get(field_name, missing_field_message)
+                for field_name, field in task_spec.output_fields.items()
             }
         )
 
@@ -122,7 +114,7 @@ class XMLAdapter(ChatAdapter):
                 field_name=k,
                 raw_value=v,
                 lm_response=completion,
-                field_info=task_spec_output_field_infos(task_spec)[k],
+                field=task_spec.output_fields[k],
             )
             for k, v in raw_fields.items()
         }

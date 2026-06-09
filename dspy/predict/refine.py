@@ -4,13 +4,12 @@ from collections.abc import Callable
 import orjson
 
 from dspy.adapters.call.wrappers import HintInjectingAdapter
-from dspy.adapters.utils import get_field_description_string
 from dspy.compile.resolve import resolve_adapter
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.predict import Predict, Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, output_field
-from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
+from dspy.task_spec.formatting import get_field_spec_description_string
 from dspy.teleprompt.utils import run_program_with_trace
 from dspy.utils.source_format import get_formatted_source
 
@@ -139,15 +138,11 @@ def inspect_modules(program):
         output.append(f"Module {name}")
         output.append("\n\tInput Fields:")
         output.append(
-            ("\n" + "\t" * 2).join(
-                [""] + get_field_description_string(task_spec_input_field_infos(task_spec)).splitlines()
-            )
+            ("\n" + "\t" * 2).join([""] + get_field_spec_description_string(task_spec.input_fields).splitlines())
         )
         output.append("\tOutput Fields:")
         output.append(
-            ("\n" + "\t" * 2).join(
-                [""] + get_field_description_string(task_spec_output_field_infos(task_spec)).splitlines()
-            )
+            ("\n" + "\t" * 2).join([""] + get_field_spec_description_string(task_spec.output_fields).splitlines())
         )
         output.append(f"\tOriginal Instructions: {instructions}")
         output.append(separator)

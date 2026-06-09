@@ -9,7 +9,8 @@ from dspy.primitives.repl_types import REPLVariable
 
 if TYPE_CHECKING:
     from pydantic import GetCoreSchemaHandler
-    from pydantic.fields import FieldInfo
+
+    from dspy.task_spec.field_spec import FieldSpec
 
 __all__ = ["SandboxSerializable", "build_repl_variable"]
 
@@ -33,13 +34,13 @@ class SandboxSerializable(ABC):
             lambda v: v, serialization=core_schema.plain_serializer_function_ser_schema(lambda v: str(v))
         )
 
-    def to_repl_variable(self, name: str, field_info: FieldInfo | None = None) -> REPLVariable:
-        return build_repl_variable(self, name, field_info=field_info)
+    def to_repl_variable(self, name: str, field: FieldSpec | None = None) -> REPLVariable:
+        return build_repl_variable(self, name, field=field)
 
 
-def build_repl_variable(obj: SandboxSerializable, name: str, field_info: FieldInfo | None = None) -> REPLVariable:
+def build_repl_variable(obj: SandboxSerializable, name: str, field: FieldSpec | None = None) -> REPLVariable:
     preview = obj.rlm_preview()
-    var = REPLVariable.from_value(name, obj, field_info=field_info)
+    var = REPLVariable.from_value(name, obj, field=field)
     setup = obj.sandbox_setup().strip()
     desc = var.desc
     if setup:

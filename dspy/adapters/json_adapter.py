@@ -11,7 +11,7 @@ from typing_extensions import override
 from dspy.adapters.base import Adapter
 from dspy.adapters.call.capabilities import AdapterCapabilities
 from dspy.adapters.call.policies.response_format import StructuredOutputPolicy
-from dspy.adapters.format_shared import ChatFormatMixin, FieldInfoWithName
+from dspy.adapters.format_shared import ChatFormatMixin
 from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.utils import (
     format_field_value,
@@ -21,12 +21,11 @@ from dspy.adapters.utils import (
     translate_field_type,
     validate_parsed_fields,
 )
-from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
+from dspy.task_spec.field_spec import FieldRole
+from dspy.task_spec.fields import FieldBinding, field_bindings
 from dspy.utils.exceptions import AdapterParseError
 
 if TYPE_CHECKING:
-    from pydantic.fields import FieldInfo
-
     from dspy.adapters.types.base_type import Type
     from dspy.task_spec import TaskSpec
     from dspy.utils.callback import BaseCallback
@@ -58,24 +57,19 @@ class JSONAdapter(ChatFormatMixin, Adapter):
     def format_field_structure(self, task_spec: TaskSpec) -> str:
         parts = []
         parts.append("All interactions will be structured in the following way, with the appropriate values filled in.")
-        input_field_infos = task_spec_input_field_infos(task_spec)
-        output_field_infos = task_spec_output_field_infos(task_spec)
 
-        def format_task_spec_fields_for_instructions(field_infos: dict[str, FieldInfo], role: str) -> str:
+        def format_task_spec_fields_for_instructions(role: FieldRole, role_label: str) -> str:
             return self.format_field_with_value(
                 fields_with_values={
-                    FieldInfoWithName(name=field_name, info=field_info): translate_field_type(
-                        field_name=field_name, field_info=field_info
-                    )
-                    for field_name, field_info in field_infos.items()
+                    binding: translate_field_type(binding.field) for binding in field_bindings(task_spec, role=role)
                 },
-                role=role,
+                role=role_label,
             )
 
         parts.append("Inputs will have the following structure:")
-        parts.append(format_task_spec_fields_for_instructions(field_infos=input_field_infos, role="user"))
+        parts.append(format_task_spec_fields_for_instructions(FieldRole.INPUT, "user"))
         parts.append("Outputs will be a JSON object with the following fields.")
-        parts.append(format_task_spec_fields_for_instructions(field_infos=output_field_infos, role="assistant"))
+        parts.append(format_task_spec_fields_for_instructions(FieldRole.OUTPUT, "assistant"))
         return "\n\n".join(parts).strip()
 
     @override
@@ -98,10 +92,11 @@ class JSONAdapter(ChatFormatMixin, Adapter):
     def format_assistant_message_content(
         self, task_spec: TaskSpec, outputs: dict[str, Any], missing_field_message: str | None = None
     ) -> str:
-        output_field_infos = task_spec_output_field_infos(task_spec)
         fields_with_values = {
-            FieldInfoWithName(name=k, info=output_field_infos[k]): outputs.get(k, missing_field_message)
-            for k in task_spec.output_fields
+            FieldBinding(name=field_name, field=task_spec.output_fields[field_name]): outputs.get(
+                field_name, missing_field_message
+            )
+            for field_name in task_spec.output_fields
         }
         return self.format_field_with_value(fields_with_values=fields_with_values, role="assistant")
 
@@ -130,20 +125,20 @@ class JSONAdapter(ChatFormatMixin, Adapter):
                     field_name=k,
                     raw_value=v,
                     lm_response=completion,
-                    field_info=task_spec_output_field_infos(task_spec)[k],
+                    field=task_spec.output_fields[k],
                 )
         validate_parsed_fields(adapter_name="JSONAdapter", task_spec=task_spec, lm_response=completion, fields=fields)
         return fields
 
     @override
-    def format_field_with_value(self, fields_with_values: dict[FieldInfoWithName, Any], role: str = "user") -> str:
+    def format_field_with_value(self, fields_with_values: dict[FieldBinding, Any], role: str = "user") -> str:
         if role == "user":
             output = []
-            for field, field_value in fields_with_values.items():
-                formatted_field_value = format_field_value(field_info=field.info, value=field_value)
-                output.append(f"[[ ## {field.name} ## ]]\n{formatted_field_value}")
+            for binding, field_value in fields_with_values.items():
+                formatted_field_value = format_field_value(field=binding.field, value=field_value)
+                output.append(f"[[ ## {binding.name} ## ]]\n{formatted_field_value}")
             return "\n\n".join(output).strip()
-        d = {k.name: v for k, v in fields_with_values.items()}
+        d = {binding.name: value for binding, value in fields_with_values.items()}
         return json.dumps(serialize_for_json(d), indent=2, ensure_ascii=False)
 
 

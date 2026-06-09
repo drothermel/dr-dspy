@@ -6,10 +6,10 @@ from typing import Any, Literal, Union, cast, get_args, get_origin
 import json_repair
 import pydantic
 from pydantic import TypeAdapter
-from pydantic.fields import FieldInfo
 
 from dspy.adapters.types.base_type import Type as DspyType
 from dspy.adapters.utils.fields import _annotation_is_subclass
+from dspy.task_spec.field_spec import FieldSpec
 from dspy.utils.exceptions import AdapterParseError
 
 
@@ -36,10 +36,10 @@ def parse_output_field(
     field_name: str,
     raw_value: object,
     lm_response: str,
-    field_info: FieldInfo,
+    field: FieldSpec,
 ) -> object:
     try:
-        return parse_value(raw_value, field_info.annotation)
+        return parse_value(raw_value, field.type_)
     except Exception as exc:
         raise AdapterParseError(
             adapter_name=adapter_name,

@@ -6,7 +6,6 @@ from dspy.adapters.utils import translate_field_type
 from dspy.predict.rlm.tools import format_tool_docs
 from dspy.primitives.repl_types import REPLHistory
 from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
-from dspy.task_spec.pydantic_bridge import task_spec_output_field_infos
 
 if TYPE_CHECKING:
     from dspy.predict.rlm.module import RLM
@@ -23,8 +22,7 @@ class FrameworkRlmSubQueryTaskSpec(TaskSpec):
 def build_task_specs(rlm: RLM) -> tuple[TaskSpec, TaskSpec]:
     inputs_str = ", ".join(f"`{n}`" for n in rlm.task_spec.input_fields)
     final_output_names = ", ".join(rlm.task_spec.output_fields.keys())
-    output_field_infos = task_spec_output_field_infos(rlm.task_spec)
-    output_fields = "\n".join((f"- {translate_field_type(n, f)}" for n, f in output_field_infos.items()))
+    output_fields = "\n".join(f"- {translate_field_type(field)}" for field in rlm.task_spec.output_fields.values())
     task_instructions = f"{rlm.task_spec.instructions}\n\n" if rlm.task_spec.instructions else ""
     tool_docs = format_tool_docs(rlm._user_tools)
     action_sig = make_task_spec(

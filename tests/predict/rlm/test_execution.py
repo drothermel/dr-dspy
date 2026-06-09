@@ -7,7 +7,6 @@ from dspy.predict.rlm import RLM, _strip_code_fences
 from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
 from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
 from dspy.task_spec import input_field, make_task_spec, output_field
-from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
 from dspy.utils.dummies import DummyLM
 from tests.mock_interpreter import MockInterpreter
 from tests.predict.rlm.conftest import make_mock_predictor
@@ -175,8 +174,8 @@ class TestREPLTypes:
             },
             instructions="Query field.",
         )
-        field = task_spec_input_field_infos(spec)["query"]
-        var = REPLVariable.from_value("query", "What is 2+2?", field_info=field)
+        field = spec.input_fields["query"]
+        var = REPLVariable.from_value("query", "What is 2+2?", field=field)
         assert var.desc == "The user's question"
         assert "greater than or equal to" in var.constraints
         formatted = var.format()

@@ -2,38 +2,32 @@ from __future__ import annotations
 
 import re
 import textwrap
-from typing import TYPE_CHECKING, Any, NamedTuple, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from dspy.adapters.types.tool import ToolCalls
-from dspy.adapters.utils import (
-    build_multimodal_user_message_content,
+from dspy.adapters.utils import build_multimodal_user_message_content, inputs_include_multimodal_custom_type_values
+from dspy.clients.openai_format import message_to_openai_chat
+from dspy.task_spec.field_spec import FieldRole
+from dspy.task_spec.fields import (
+    FieldBinding,
+    field_bindings,
     format_field_value,
     get_annotation_name,
-    inputs_include_multimodal_custom_type_values,
     translate_field_type,
 )
-from dspy.clients.openai_format import message_to_openai_chat
 from dspy.task_spec.formatting import get_field_spec_description_string
-from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos, task_spec_output_field_infos
 
 if TYPE_CHECKING:
-    from pydantic.fields import FieldInfo
-
     from dspy.task_spec import TaskSpec
 
 FIELD_HEADER_PATTERN = re.compile(r"\[\[ ## (\w+) ## \]\]")
 
 
-class FieldInfoWithName(NamedTuple):
-    name: str
-    info: FieldInfo
-
-
-def format_fields_with_headers(fields_with_values: dict[FieldInfoWithName, Any]) -> str:
+def format_fields_with_headers(fields_with_values: dict[FieldBinding, Any]) -> str:
     output = []
-    for field, field_value in fields_with_values.items():
-        formatted_field_value = format_field_value(field_info=field.info, value=field_value)
-        output.append(f"[[ ## {field.name} ## ]]\n{formatted_field_value}")
+    for binding, field_value in fields_with_values.items():
+        formatted_field_value = format_field_value(field=binding.field, value=field_value)
+        output.append(f"[[ ## {binding.name} ## ]]\n{formatted_field_value}")
     return "\n\n".join(output).strip()
 
 
@@ -46,21 +40,16 @@ class ChatFormatMixin:
 
     def format_field_structure(self, task_spec: TaskSpec) -> str:
         parts = ["All interactions will be structured in the following way, with the appropriate values filled in."]
-        input_field_infos = task_spec_input_field_infos(task_spec)
-        output_field_infos = task_spec_output_field_infos(task_spec)
 
-        def format_task_spec_fields_for_instructions(field_infos: dict[str, FieldInfo]) -> str:
+        def format_task_spec_fields_for_instructions(role: FieldRole) -> str:
             return self.format_field_with_value(
                 fields_with_values={
-                    FieldInfoWithName(name=field_name, info=field_info): translate_field_type(
-                        field_name=field_name, field_info=field_info
-                    )
-                    for field_name, field_info in field_infos.items()
+                    binding: translate_field_type(binding.field) for binding in field_bindings(task_spec, role=role)
                 }
             )
 
-        parts.append(format_task_spec_fields_for_instructions(input_field_infos))
-        parts.append(format_task_spec_fields_for_instructions(output_field_infos))
+        parts.append(format_task_spec_fields_for_instructions(FieldRole.INPUT))
+        parts.append(format_task_spec_fields_for_instructions(FieldRole.OUTPUT))
         parts.append("[[ ## completed ## ]]\n")
         return "\n\n".join(parts).strip()
 
@@ -87,13 +76,12 @@ class ChatFormatMixin:
                 main_request=main_request,
                 output_requirements=output_requirements,
             )
-        input_field_infos = task_spec_input_field_infos(task_spec)
         messages = [prefix]
-        for k in task_spec.input_fields:
-            if k in inputs:
-                value = inputs.get(k)
-                formatted_field_value = format_field_value(field_info=input_field_infos[k], value=value)
-                messages.append(f"[[ ## {k} ## ]]\n{formatted_field_value}")
+        for field_name, field in task_spec.input_fields.items():
+            if field_name in inputs:
+                value = inputs.get(field_name)
+                formatted_field_value = format_field_value(field=field, value=value)
+                messages.append(f"[[ ## {field_name} ## ]]\n{formatted_field_value}")
         if main_request:
             output_requirements = self.user_message_output_requirements(task_spec)
             if output_requirements is not None:
@@ -122,17 +110,18 @@ class ChatFormatMixin:
         outputs: dict[str, Any],
         missing_field_message: str | None = None,
     ) -> str:
-        output_field_infos = task_spec_output_field_infos(task_spec)
         assistant_message_content = self.format_field_with_value(
             {
-                FieldInfoWithName(name=k, info=output_field_infos[k]): outputs.get(k, missing_field_message)
-                for k in task_spec.output_fields
+                FieldBinding(name=field_name, field=task_spec.output_fields[field_name]): outputs.get(
+                    field_name, missing_field_message
+                )
+                for field_name in task_spec.output_fields
             }
         )
         assistant_message_content += "\n\n[[ ## completed ## ]]\n"
         return assistant_message_content
 
-    def format_field_with_value(self, fields_with_values: dict[FieldInfoWithName, Any]) -> str:
+    def format_field_with_value(self, fields_with_values: dict[FieldBinding, Any]) -> str:
         return format_fields_with_headers(fields_with_values)
 
     def format_finetune_data(

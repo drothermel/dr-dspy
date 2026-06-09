@@ -3,11 +3,11 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 import pydantic
-from pydantic.fields import FieldInfo
 
 from dspy.adapters.types.base_type import Type as DspyType
-from dspy.adapters.utils.fields import format_field_value
 from dspy.task_spec import TaskSpec
+from dspy.task_spec.field_spec import FieldSpec
+from dspy.task_spec.fields import format_field_value
 
 _MULTIMODAL_BLOCK_TYPES = frozenset({"image_url", "input_image", "file", "input_audio", "input_file"})
 
@@ -91,7 +91,7 @@ def collect_multimodal_content_blocks(value: object) -> list[dict[str, Any]]:
 
 
 def field_value_to_content_blocks(
-    field_info: FieldInfo, field_name: str, value: object, *, prefix: str = "", field_wrapper: str | None = None
+    field: FieldSpec, field_name: str, value: object, *, prefix: str = "", field_wrapper: str | None = None
 ) -> list[dict[str, Any]]:
     if field_wrapper == "xml":
         open_tag = f"{prefix}<{field_name}>\n"
@@ -101,7 +101,7 @@ def field_value_to_content_blocks(
         nested_blocks = collect_multimodal_content_blocks(value)
         if nested_blocks:
             return [{"type": "text", "text": open_tag}, *nested_blocks, {"type": "text", "text": close_tag}]
-        formatted_field_value = format_field_value(field_info=field_info, value=value)
+        formatted_field_value = format_field_value(field=field, value=value)
         return [{"type": "text", "text": f"{open_tag}{formatted_field_value}{close_tag}"}]
     header = f"{prefix}[[ ## {field_name} ## ]]\n"
     if _is_openai_content_blocks(value):
@@ -111,7 +111,7 @@ def field_value_to_content_blocks(
     nested_blocks = collect_multimodal_content_blocks(value)
     if nested_blocks:
         return [{"type": "text", "text": header}, *nested_blocks]
-    formatted_field_value = format_field_value(field_info=field_info, value=value)
+    formatted_field_value = format_field_value(field=field, value=value)
     return [{"type": "text", "text": f"{header}{formatted_field_value}"}]
 
 
@@ -125,21 +125,18 @@ def build_multimodal_user_message_content(
     output_requirements: str | None = None,
     field_wrapper: str | None = None,
 ) -> list[dict[str, Any]]:
-    from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
-
     blocks: list[dict[str, Any]] = []
     if prefix:
         blocks.append({"type": "text", "text": prefix})
     field_blocks_added = False
-    input_field_infos = task_spec_input_field_infos(task_spec)
-    for field_name in task_spec.input_fields:
+    for field_name, field in task_spec.input_fields.items():
         if field_name not in inputs:
             continue
         field_prefix = "\n\n" if field_blocks_added else ""
         field_blocks_added = True
         blocks.extend(
             field_value_to_content_blocks(
-                field_info=input_field_infos[field_name],
+                field=field,
                 field_name=field_name,
                 value=inputs[field_name],
                 prefix=field_prefix,

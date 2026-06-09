@@ -9,7 +9,6 @@ from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.utils import build_multimodal_user_message_content, inputs_include_multimodal_custom_type_values
 from dspy.adapters.utils import format_field_value as original_format_field_value
 from dspy.task_spec import TaskSpec
-from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
 
 COMMENT_SYMBOL = "#"
 INDENTATION = "  "
@@ -136,16 +135,15 @@ class BAMLAdapter(JSONAdapter):
                 main_request=main_request,
                 output_requirements=output_requirements,
             )
-        input_field_infos = task_spec_input_field_infos(task_spec)
         messages = [prefix]
-        for key in task_spec.input_fields:
+        for key, field in task_spec.input_fields.items():
             if key in inputs:
                 value = inputs.get(key)
                 formatted_value = ""
                 if isinstance(value, BaseModel):
                     formatted_value = value.model_dump_json(indent=2, by_alias=True)
                 else:
-                    formatted_value = original_format_field_value(field_info=input_field_infos[key], value=value)
+                    formatted_value = original_format_field_value(field=field, value=value)
                 messages.append(f"[[ ## {key} ## ]]\n{formatted_value}")
         if main_request:
             output_requirements = self.user_message_output_requirements(task_spec)

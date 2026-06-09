@@ -7,15 +7,16 @@ from typing import TYPE_CHECKING, Any, NoReturn, cast
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
-from pydantic.fields import FieldInfo
 from typing_extensions import override
 
 from dspy.adapters.chat_adapter import ChatAdapter
-from dspy.adapters.format_shared import FIELD_HEADER_PATTERN, FieldInfoWithName
+from dspy.adapters.format_shared import FIELD_HEADER_PATTERN
 from dspy.clients.base_lm import BaseLM
 from dspy.clients.openai_format import provider_tool_call_to_part
 from dspy.core.types import LMOutput, LMPart, LMRequest, LMResponse, LMTextPart, LMThinkingPart
 from dspy.core.types.lm_provider import LMProviderOptions
+from dspy.task_spec import output_field
+from dspy.task_spec.fields import FieldBinding
 from dspy.utils.dotdict import dotdict
 from dspy.utils.lazy_import import require
 
@@ -63,24 +64,24 @@ class DummyLM(BaseLM):
         return None
 
     @staticmethod
-    def _field_info_for_dummy_value(value: object) -> FieldInfo:
+    def _field_spec_for_dummy_value(field_name: str, value: object):
         if isinstance(value, bool):
-            return FieldInfo(annotation=bool)
+            return output_field(field_name, bool, desc="dummy")
         if isinstance(value, int):
-            return FieldInfo(annotation=int)
+            return output_field(field_name, int, desc="dummy")
         if isinstance(value, float):
-            return FieldInfo(annotation=float)
+            return output_field(field_name, float, desc="dummy")
         if isinstance(value, list):
             if value and all(isinstance(item, str) for item in value):
-                return FieldInfo(annotation=list[str])
-            return FieldInfo(annotation=list[Any])
+                return output_field(field_name, list[str], desc="dummy")
+            return output_field(field_name, list[Any], desc="dummy")
         if isinstance(value, dict):
-            return FieldInfo(annotation=dict[str, Any])
-        return FieldInfo(annotation=str)
+            return output_field(field_name, dict[str, Any], desc="dummy")
+        return output_field(field_name, str, desc="dummy")
 
     def _format_answer_fields(self, field_names_and_values: dict[str, Any]):
         fields_with_values = {
-            FieldInfoWithName(name=field_name, info=self._field_info_for_dummy_value(value)): value
+            FieldBinding(name=field_name, field=self._field_spec_for_dummy_value(field_name, value)): value
             for field_name, value in field_names_and_values.items()
         }
         adapter = self.adapter

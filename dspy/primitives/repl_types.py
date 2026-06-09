@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import pydantic
 from pydantic import Field
@@ -12,7 +12,7 @@ from dspy.adapters.utils import serialize_for_json
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from pydantic.fields import FieldInfo
+    from dspy.task_spec.field_spec import FieldSpec
 __all__ = ["REPLVariable", "REPLEntry", "REPLHistory"]
 
 
@@ -27,7 +27,7 @@ class REPLVariable(pydantic.BaseModel):
 
     @classmethod
     def from_value(
-        cls, name: str, value: Any, field_info: FieldInfo | None = None, preview_chars: int = 1000
+        cls, name: str, value: Any, field: FieldSpec | None = None, preview_chars: int = 1000
     ) -> REPLVariable:
         jsonable = serialize_for_json(value)
         value_str = json.dumps(jsonable, indent=2) if isinstance(jsonable, (dict, list)) else str(jsonable)
@@ -37,15 +37,8 @@ class REPLVariable(pydantic.BaseModel):
             preview = value_str[:half] + "..." + value_str[-half:]
         else:
             preview = value_str
-        desc = ""
-        constraints = ""
-        extra_dict: dict[str, Any] = {}
-        if field_info and isinstance(field_info.json_schema_extra, dict):
-            extra_dict.update(cast("dict[str, Any]", field_info.json_schema_extra))
-        raw_desc = extra_dict.get("desc", "")
-        if raw_desc and (not raw_desc.startswith("${")):
-            desc = raw_desc
-        constraints = extra_dict.get("constraints", "")
+        desc = field.desc if field else ""
+        constraints = field.constraints or "" if field else ""
         return cls(
             name=name,
             type_name=type(value).__name__,

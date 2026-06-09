@@ -16,7 +16,6 @@ from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
 from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
-from dspy.task_spec.pydantic_bridge import task_spec_input_field_infos
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -39,13 +38,12 @@ def get_output_fields_info(rlm: RLM) -> list[dict]:
 
 def build_variables(rlm: RLM, **input_args: Any) -> list[REPLVariable]:
     variables = []
-    input_field_infos = task_spec_input_field_infos(rlm.task_spec)
     for name, value in input_args.items():
-        field_info = input_field_infos.get(name)
+        field = rlm.task_spec.input_fields.get(name)
         if isinstance(value, SandboxSerializable):
-            var = build_repl_variable(value, name, field_info=field_info)
+            var = build_repl_variable(value, name, field=field)
         else:
-            var = REPLVariable.from_value(name, value, field_info=field_info)
+            var = REPLVariable.from_value(name, value, field=field)
         variables.append(var)
     return variables
 
