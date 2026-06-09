@@ -22,6 +22,7 @@ Update these rows as you go. Use one of: `todo`, `in_progress`, `blocked`, `done
 | Exact `nl_latents` reproduction path remains dr-llm/native unless prompt parity is added elsewhere | todo |  |
 | Direct backend smoke checks pass | todo |  |
 | Pool backend smoke/integration checks pass or are blocked only by missing DSN | todo |  |
+| Live OpenRouter `gpt-5-nano` endpoint test passes | todo | Required for the plan to be considered fully tested; use the local OpenRouter API key environment variable. |
 | Cross-repo readiness note for dr-dspy is written | todo |  |
 
 ## Target Outcome
@@ -242,9 +243,11 @@ Run the relevant checks in `dr-llm`. Update the command, result, and notes colum
 | Provider-control unit tests you added or updated | todo |  |
 | Pool lifecycle/provenance tests you added or updated | todo |  |
 | Postgres pool integration test with `DR_LLM_TEST_DATABASE_URL` or `DR_LLM_DATABASE_URL` | todo |  |
-| Optional live provider smoke test | todo |  |
+| Live OpenRouter smoke test against `openrouter/openai/gpt-5-nano` | todo | Required before marking the plan fully tested. Use the repo's local OpenRouter API key environment variable, expected to be `OPENROUTER_API_KEY`, and verify the call actually reaches OpenRouter, returns nonempty text, and records OpenRouter/provider provenance. |
 
-If Postgres or live provider credentials are unavailable, mark the row `blocked` and include the missing environment variable or service.
+If Postgres credentials are unavailable, mark only the Postgres row `blocked` and include the missing environment variable or service. The OpenRouter `gpt-5-nano` live test is part of the full acceptance bar; if `OPENROUTER_API_KEY` is unexpectedly unavailable, mark the row `blocked`, explain the missing environment variable, and do not describe the plan as fully tested.
+
+For the live OpenRouter test, add or run a checked-in live test when possible. A CLI smoke command is acceptable only if it verifies the response and provenance, for example an equivalent of `uv run dr-llm query --provider openrouter --model openai/gpt-5-nano --message "Return exactly: dr-llm live ok"` plus an assertion that the returned content is nonempty and came from the OpenRouter provider path.
 
 ## Cross-Repo Readiness Checklist for dr-dspy
 
