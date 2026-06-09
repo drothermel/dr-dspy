@@ -7,9 +7,10 @@ from pathlib import Path
 import cloudpickle
 import orjson
 
+from dspy.persistence import get_dependency_versions
+from dspy.persistence import save_program as persist_program
 from dspy.predict.parameter import Parameter
 from dspy.predict.protocol import Predictor
-from dspy.utils.saving import get_dependency_versions
 
 logger = logging.getLogger(__name__)
 
@@ -128,29 +129,7 @@ class BaseModule:
         metadata["dependency_versions"] = get_dependency_versions()
         path = Path(path)
         if save_program:
-            if path.suffix:
-                raise ValueError(
-                    f"`path` must point to a directory without a suffix when `save_program=True`, but received: {path}"
-                )
-            if path.exists() and (not path.is_dir()):
-                raise NotADirectoryError(f"The path '{path}' exists but is not a directory.")
-            if not path.exists():
-                path.mkdir(parents=True)
-            logger.warning(
-                'Loading untrusted .pkl files can run arbitrary code, which may be dangerous. To avoid this, prefer saving using json format using module.save("module.json").'
-            )
-            try:
-                modules_to_serialize = modules_to_serialize or []
-                for module in modules_to_serialize:
-                    cloudpickle.register_pickle_by_value(module)
-                with (path / "program.pkl").open("wb") as f:
-                    cloudpickle.dump(self, f)
-            except Exception as e:
-                raise RuntimeError(
-                    f"Saving failed with error: {e}. Please remove the non-picklable attributes from your DSPy program, or consider using state-only saving by setting `save_program=False`."
-                )
-            with (path / "metadata.json").open("wb") as f:
-                f.write(orjson.dumps(metadata, option=orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE))
+            persist_program(self, path, modules_to_serialize=modules_to_serialize)
             return
         if path.suffix == ".json":
             state = self.dump_state()

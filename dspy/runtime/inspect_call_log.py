@@ -1,9 +1,11 @@
+"""Debug-only call log pretty-printing. Not part of the runtime spine."""
+
 from __future__ import annotations
 
 import json
 import sys
 from contextlib import suppress
-from typing import TYPE_CHECKING, TextIO
+from typing import TYPE_CHECKING, Any, TextIO, cast
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -33,7 +35,7 @@ def pretty_print_call_log(call_log: Sequence[CallRecord], n: int = 1, file: Text
     out = file or sys.stdout
     use_colors = file is None
 
-    def print_tool_calls(tool_calls) -> None:
+    def print_tool_calls(tool_calls: list[dict[str, Any]] | None) -> None:
         if tool_calls:
             print(_red("Tool calls:", use_colors=use_colors), file=out)
         for tool_call in tool_calls or []:
@@ -88,7 +90,7 @@ def pretty_print_call_log(call_log: Sequence[CallRecord], n: int = 1, file: Text
                         file_data = file_info.get("file_data", "")
                         file_str = f"<file: name:{filename}, id:{file_id}, data_length:{len(file_data)}>"
                         print(_blue(file_str.strip(), use_colors=use_colors), file=out)
-            print_tool_calls(msg.get("tool_calls"))
+            print_tool_calls(cast("list[dict[str, Any]] | None", msg.get("tool_calls")))
             print("\n", file=out)
         if not outputs:
             continue

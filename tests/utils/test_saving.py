@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 from typing_extensions import override
 
+from dspy.persistence import load
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
@@ -13,7 +14,6 @@ from dspy.task_spec import default_task_instructions, input_field, make_task_spe
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
 from dspy.utils.dummies import DummyLM
-from dspy.utils.saving import load
 from tests.task_spec.helpers import ts
 
 QA_TASK_SPEC = ts("question->answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",)))
@@ -93,7 +93,7 @@ def test_save_compiled_model(tmp_path, make_run):
 
 
 def test_load_with_version_mismatch(tmp_path):
-    from dspy.utils.saving import logger
+    from dspy.persistence import logger
 
     save_versions = {"python": "3.9", "dspy": "2.4.0", "cloudpickle": "2.0"}
     load_versions = {"python": "3.10", "dspy": "2.5.0", "cloudpickle": "2.1"}
@@ -113,13 +113,13 @@ def test_load_with_version_mismatch(tmp_path):
     logger.addHandler(handler)
     logger.setLevel(logging.WARNING)
     try:
-        with patch("dspy.primitives.base_module.get_dependency_versions", return_value=save_versions):
+        with patch("dspy.persistence.get_dependency_versions", return_value=save_versions):
             predict.save(tmp_path, save_program=True)
-        with patch("dspy.utils.saving.get_dependency_versions", return_value=load_versions):
+        handler.messages.clear()
+        with patch("dspy.persistence.get_dependency_versions", return_value=load_versions):
             loaded_predict = load(tmp_path, allow_pickle=True)
-        assert len(handler.messages) == 3
-        for msg in handler.messages:
-            assert "There is a mismatch of" in msg
+        mismatch_messages = [msg for msg in handler.messages if "There is a mismatch of" in msg]
+        assert len(mismatch_messages) == 3
         assert isinstance(loaded_predict, Predict)
         assert predict.task_spec == loaded_predict.task_spec
     finally:

@@ -17,6 +17,7 @@ except ImportError:
     pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.clients.lm import LM
+from dspy.persistence import load
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
@@ -27,7 +28,6 @@ from dspy.task_spec import default_task_instructions, input_field, make_task_spe
 from dspy.teleprompt.bootstrap import BootstrapFewShot
 from dspy.teleprompt.compile_params import BootstrapFewShotCompileParams
 from dspy.utils.dummies import DummyLM
-from dspy.utils.saving import load
 from tests.task_spec.helpers import ts
 
 QA_TASK_SPEC = ts("question->answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",)))
