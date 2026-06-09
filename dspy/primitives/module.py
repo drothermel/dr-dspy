@@ -3,6 +3,7 @@ from typing import Any, TextIO
 
 from typing_extensions import override
 
+from dspy.core.types import LMForward
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.parallel import Parallel
 from dspy.predict.protocol import Predictor
@@ -29,7 +30,7 @@ def _warn_direct_aforward_once(cls: type) -> None:
 
 
 class Module(BaseModule):
-    def __init__(self, callbacks=None, run: RunContext | None = None) -> None:
+    def __init__(self, callbacks: list[Any] | None = None, run: RunContext | None = None) -> None:
         self.callbacks = callbacks or []
         self.run = run
         self._compiled = False
@@ -99,21 +100,27 @@ class Module(BaseModule):
     ) -> Prediction:
         raise NotImplementedError(f"{type(self).__name__} must implement _aforward_impl().")
 
-    def named_predictors(self):
+    def named_predictors(self) -> list[tuple[str, Predictor]]:
         return [(name, param) for name, param in self.named_parameters() if isinstance(param, Predictor)]
 
-    def predictors(self):
+    def predictors(self) -> list[Predictor]:
         return [param for _, param in self.named_predictors()]
 
-    def set_lm(self, lm) -> None:
+    def set_lm(self, lm: LMForward | None) -> None:
         for _, param in self.named_predictors():
             param.lm = lm
 
-    def get_lm(self):
+    def get_lm(self) -> LMForward:
         all_used_lms = [param.lm for _, param in self.named_predictors()]
         if len(set(all_used_lms)) == 1:
-            return all_used_lms[0]
-        raise ValueError("Multiple LMs are being used in the module. There's no unique LM to return.")
+            lm = all_used_lms[0]
+            if lm is None:
+                raise ValueError("No LM is configured on this module's predictors.")
+            return lm
+        raise ValueError(
+            "Multiple LMs are configured on this module. Inspect per-predictor LMs via "
+            "named_predictors() and read param.lm on each predictor."
+        )
 
     @override
     def __repr__(self) -> str:

@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 from typing_extensions import override
@@ -91,7 +91,7 @@ class Example(_RecordBacked):
         input_keys = self.input_keys
         return {key: self._store[key] for key in self._store if key not in input_keys and not key.startswith("dspy_")}
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._store)
 
     def fork(self, **updates: Any) -> "Example":

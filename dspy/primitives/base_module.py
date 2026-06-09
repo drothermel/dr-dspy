@@ -1,25 +1,26 @@
+from __future__ import annotations
+
 import copy
 import logging
 from collections import deque
-from collections.abc import Generator
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, Any, cast
 
 import cloudpickle
 import orjson
+from typing_extensions import Self
 
 from dspy.persistence import get_dependency_versions, warn_dependency_version_drift
 from dspy.persistence import save_program as persist_program
-from dspy.predict.parameter import Parameter
 from dspy.predict.protocol import Predictor
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
 
 class BaseModule:
-    def __init__(self) -> None:
-        pass
-
     def _enqueue_graph_children(
         self,
         name: str,
@@ -59,12 +60,12 @@ class BaseModule:
             yield name, item
             self._enqueue_graph_children(name=name, item=item, queue=queue, seen=seen)
 
-    def named_parameters(self):
+    def named_parameters(self) -> list[tuple[str, Predictor]]:
         """Return ``(name, Parameter)`` pairs. Skips parameters inside compiled subgraphs."""
-        named_parameters = []
+        named_parameters: list[tuple[str, Predictor]] = []
         visited_parameters: set[int] = set()
         for name, item in self._walk_module_graph():
-            if not isinstance(item, Parameter):
+            if not isinstance(item, Predictor):
                 continue
             param_id = id(item)
             if param_id in visited_parameters:
@@ -73,7 +74,7 @@ class BaseModule:
             named_parameters.append((name, item))
         return named_parameters
 
-    def named_sub_modules(self, type_=None) -> Generator[tuple[str, "BaseModule"], None, None]:
+    def named_sub_modules(self, type_: type | None = None) -> Generator[tuple[str, BaseModule], None, None]:
         """Yield ``(name, module)`` pairs for modules of ``type_``.
 
         Compiled subgraphs are opaque by default (same policy as ``named_parameters``).
@@ -84,10 +85,10 @@ class BaseModule:
             if isinstance(item, type_):
                 yield name, cast("BaseModule", item)
 
-    def parameters(self):
+    def parameters(self) -> list[Predictor]:
         return [param for _, param in self.named_parameters()]
 
-    def deepcopy(self):
+    def deepcopy(self) -> Self:
         try:
             return copy.deepcopy(self)
         except Exception:
@@ -115,28 +116,30 @@ class BaseModule:
                         setattr(new_instance, attr, value)
         return new_instance
 
-    def reset_copy(self):
+    def reset_copy(self) -> Self:
         new_instance = self.deepcopy()
         for param in new_instance.parameters():
-            param.reset()
+            param.reset()  # ty: ignore[unresolved-attribute]
         return new_instance
 
-    def dump_state(self, json_mode=True):
+    def dump_state(self, json_mode: bool = True) -> dict[str, Any]:
         return {name: param.dump_state(json_mode=json_mode) for name, param in self.named_parameters()}
 
-    def load_state(self, state, *, allow_unsafe_lm_state=False) -> "BaseModule":
-        def _apply(module) -> None:
+    def load_state(self, state: dict[str, Any], *, allow_unsafe_lm_state: bool = False) -> Self:
+        def _apply(module: BaseModule) -> None:
             for name, param in module.named_parameters():
-                if isinstance(param, Predictor):
-                    param.load_state(state[name], allow_unsafe_lm_state=allow_unsafe_lm_state)
-                else:
-                    param.load_state(state[name])
+                param.load_state(state[name], allow_unsafe_lm_state=allow_unsafe_lm_state)
 
         _apply(self.deepcopy())
         _apply(self)
         return self
 
-    def save(self, path, save_program=False, modules_to_serialize=None) -> None:
+    def save(
+        self,
+        path: str | Path,
+        save_program: bool = False,
+        modules_to_serialize: list[object] | None = None,
+    ) -> None:
         metadata = {}
         metadata["dependency_versions"] = get_dependency_versions()
         path = Path(path)
@@ -164,7 +167,7 @@ class BaseModule:
         else:
             raise ValueError(f"`path` must end with `.json` or `.pkl` when `save_program=False`, but received: {path}")
 
-    def load(self, path, allow_pickle=False, allow_unsafe_lm_state=False) -> None:
+    def load(self, path: str | Path, allow_pickle: bool = False, allow_unsafe_lm_state: bool = False) -> None:
         path = Path(path)
         if path.suffix == ".json":
             with path.open("rb") as f:
