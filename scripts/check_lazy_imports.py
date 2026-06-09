@@ -25,8 +25,8 @@ ALLOWLIST_SUFFIXES = (
     "runtime/run_context_model.py",
     # lazy terminal pretty-print; keeps RunContext spine import light
     "runtime/call_log/inspect.py",
-    # breaks openai_format.parse ↔ core.types.coercion import cycle
-    "core/types/coercion.py",
+    # breaks openai_format.parse ↔ core.types.message_coercion import cycle
+    "core/types/message_coercion.py",
     # breaks runtime.batch ↔ primitives ↔ history import cycle
     "runtime/batch.py",
     "evaluate/metrics.py",

@@ -6,11 +6,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dspy.core.types.coercion import _coerce_message, _messages_from_items, coerce_tool_spec
 from dspy.core.types.lm_config import LMConfig, merge_lm_config
+from dspy.core.types.message_coercion import _coerce_message, _messages_from_items
 from dspy.core.types.messages import LMMessage
 from dspy.core.types.parts import LMPart
-from dspy.core.types.tool_spec import LMToolSpec
+from dspy.core.types.tool_spec import LMToolSpec, coerce_tool_spec
 
 
 @dataclass
@@ -70,8 +70,7 @@ class LMRequest(BaseModel):
         if messages is not None:
             normalized_messages = [_coerce_message(message) for message in messages]
         else:
-            normalized_messages, positional_tools = _messages_from_items(items, prompt=prompt)
-            collected_tools.extend(positional_tools)
+            normalized_messages = _messages_from_items(items, prompt=prompt)
         return cls(
             model=model,
             messages=normalized_messages,

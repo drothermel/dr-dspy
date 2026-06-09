@@ -4,7 +4,6 @@ from typing import Any, Protocol, cast, runtime_checkable
 
 from dspy.core.types.messages import LMMessage, LMMessageRole
 from dspy.core.types.parts.models import _coerce_part
-from dspy.core.types.tool_spec import LMToolSpec
 
 
 @runtime_checkable
@@ -34,7 +33,7 @@ def _is_message_sequence(value: Any) -> bool:
     )
 
 
-def _messages_from_items(items: tuple[Any, ...], *, prompt: str | None = None) -> tuple[list[LMMessage], list[Any]]:
+def _messages_from_items(items: tuple[Any, ...], *, prompt: str | None = None) -> list[LMMessage]:
     if prompt is not None:
         items = (prompt, *items)
     if not items:
@@ -49,26 +48,7 @@ def _messages_from_items(items: tuple[Any, ...], *, prompt: str | None = None) -
                 messages.append(item)
             else:
                 messages.extend(_messages_from_response(cast("LMResponseLike", item)))
-        return messages, []
+        return messages
 
     parts = [_coerce_part(item) for item in items]
-    return [LMMessage(role=LMMessageRole.USER, parts=parts)], []
-
-
-def coerce_tool_spec(tool: Any) -> LMToolSpec:
-    if isinstance(tool, LMToolSpec):
-        return tool
-    if hasattr(tool, "to_lm_tool_spec"):
-        return tool.to_lm_tool_spec()
-    if isinstance(tool, dict):
-        if "function" in tool:
-            function = tool["function"]
-            provider_data = {key: value for key, value in tool.items() if key not in {"type", "function"}}
-            return LMToolSpec(
-                name=function.get("name"),
-                description=function.get("description"),
-                parameters=function.get("parameters", {}),
-                provider_data=provider_data,
-            )
-        return LMToolSpec(**tool)
-    raise TypeError(f"Cannot convert {type(tool)!r} to LMToolSpec.")
+    return [LMMessage(role=LMMessageRole.USER, parts=parts)]
