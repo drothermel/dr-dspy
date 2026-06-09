@@ -2,7 +2,8 @@ import pytest
 
 from dspy.primitives import CodeInterpreterError
 from dspy.primitives.python_interpreter import PythonInterpreter
-from dspy.primitives.python_interpreter.serialize import inject_variables, serialize_value, to_json_compatible
+from dspy.primitives.python_interpreter.serialize import inject_variables, serialize_value
+from dspy.serialization.json import to_jsonable
 
 
 @pytest.mark.deno
@@ -124,9 +125,9 @@ def test_serialize_value_rejects_unsupported_types():
         serialize_value(object())
 
 
-def test_to_json_compatible_rejects_unsupported_types():
-    with pytest.raises(CodeInterpreterError, match="Unsupported value type"):
-        to_json_compatible(object())
+def test_to_jsonable_strict_rejects_unsupported_types():
+    with pytest.raises(TypeError, match="not JSON-serializable"):
+        to_jsonable(object(), strict=True)
 
 
 def test_inject_variables_rejects_invalid_names_before_side_effects():

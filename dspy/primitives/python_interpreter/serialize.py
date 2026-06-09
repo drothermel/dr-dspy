@@ -1,9 +1,10 @@
 import json
 import keyword
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from dspy.primitives.code_interpreter import CodeInterpreterError
 from dspy.primitives.python_interpreter.deno_process import send_request
+from dspy.serialization.json import to_jsonable
 
 if TYPE_CHECKING:
     from dspy.primitives.python_interpreter.interpreter import PythonInterpreter
@@ -11,14 +12,8 @@ if TYPE_CHECKING:
 LARGE_VAR_THRESHOLD = 100 * 1024 * 1024
 DSPY_VARS_VPATH = "/tmp/dspy_vars"  # noqa: S108 — Pyodide virtual FS path, not host /tmp
 
-JsonWalkMode = Literal["python_literal", "json"]
 
-
-def _format_leaf(value: Any, *, mode: JsonWalkMode) -> Any:
-    if mode == "json":
-        if value is None or isinstance(value, (str, int, float, bool)):
-            return value
-        raise CodeInterpreterError(f"Unsupported value type: {type(value).__name__}")
+def _format_python_literal_leaf(value: Any) -> str:
     if value is None:
         return "None"
     if isinstance(value, str):
@@ -37,35 +32,22 @@ def _sorted_set_items(value: set[Any]) -> list[Any]:
         return list(value)
 
 
-def _walk_jsonable(value: Any, *, mode: JsonWalkMode) -> Any:
+def _walk_python_literal(value: Any) -> Any:
     if isinstance(value, dict):
-        if mode == "json":
-            return {k: _walk_jsonable(v, mode=mode) for k, v in value.items()}
-        items = ", ".join(f"{_walk_jsonable(k, mode=mode)}: {_walk_jsonable(v, mode=mode)}" for k, v in value.items())
+        items = ", ".join(f"{_walk_python_literal(k)}: {_walk_python_literal(v)}" for k, v in value.items())
         return f"{{{items}}}"
     if isinstance(value, (list, tuple)):
-        if mode == "json":
-            return [_walk_jsonable(item, mode=mode) for item in value]
-        items = ", ".join(_walk_jsonable(item, mode=mode) for item in value)
+        items = ", ".join(_walk_python_literal(item) for item in value)
         return f"[{items}]"
     if isinstance(value, set):
         sorted_items = _sorted_set_items(value)
-        if mode == "json":
-            try:
-                return sorted(_walk_jsonable(item, mode=mode) for item in sorted_items)
-            except TypeError:
-                return [_walk_jsonable(item, mode=mode) for item in sorted_items]
-        items = ", ".join(_walk_jsonable(item, mode=mode) for item in sorted_items)
+        items = ", ".join(_walk_python_literal(item) for item in sorted_items)
         return f"[{items}]"
-    return _format_leaf(value, mode=mode)
-
-
-def to_json_compatible(value: Any) -> Any:
-    return _walk_jsonable(value, mode="json")
+    return _format_python_literal_leaf(value)
 
 
 def serialize_value(value: Any) -> str:
-    result = _walk_jsonable(value, mode="python_literal")
+    result = _walk_python_literal(value)
     if isinstance(result, str):
         return result
     raise CodeInterpreterError(f"Unsupported value type: {type(value).__name__}")
@@ -86,7 +68,11 @@ def inject_variables(interpreter: "PythonInterpreter", code: str, variables: dic
     for key, value in variables.items():
         serialized = serialize_value(value)
         if len(serialized) > LARGE_VAR_THRESHOLD:
-            large_vars[key] = json.dumps(to_json_compatible(value))
+            try:
+                jsonable = to_jsonable(value, strict=True)
+            except TypeError as exc:
+                raise CodeInterpreterError(f"Unsupported value type: {type(value).__name__}") from exc
+            large_vars[key] = json.dumps(jsonable)
         else:
             small_assignments.append(f"{key} = {serialized}")
 
