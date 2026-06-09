@@ -13,9 +13,9 @@ from dspy.adapters.format_field_structure import build_field_structure_instructi
 from dspy.adapters.format_shared import ChatFormatMixin, format_fields_with_headers, output_field_type_hint
 from dspy.adapters.utils import load_json, parse_output_field, validate_parsed_fields
 from dspy.errors import AdapterParseError
+from dspy.serialization.json import to_jsonable
 from dspy.task_spec import FieldBinding
 from dspy.task_spec.field_spec import FieldRole
-from dspy.task_spec.json_serialize import serialize_for_json
 
 if TYPE_CHECKING:
     from dspy.adapters.types.field_type import NativeResponseFieldType
@@ -122,4 +122,4 @@ class JSONAdapter(ChatFormatMixin, Adapter):
         if kwargs.get("role", "user") == "user":
             return format_fields_with_headers(fields_with_values)
         d = {binding.name: value for binding, value in fields_with_values.items()}
-        return json.dumps(serialize_for_json(d), indent=2, ensure_ascii=False)
+        return json.dumps(to_jsonable(d), indent=2, ensure_ascii=False)

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, Field, model_serializer
 from typing_extensions import override
 
-from dspy.task_spec.json_serialize import serialize_for_json
+from dspy.serialization.json import to_jsonable
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -30,7 +30,7 @@ class REPLVariable(BaseModel):
     def from_value(
         cls, name: str, value: Any, field: FieldSpec | None = None, preview_chars: int = 1000
     ) -> REPLVariable:
-        jsonable = serialize_for_json(value)
+        jsonable = to_jsonable(value)
         value_str = json.dumps(jsonable, indent=2) if isinstance(jsonable, (dict, list)) else str(jsonable)
         is_truncated = len(value_str) > preview_chars
         if is_truncated:

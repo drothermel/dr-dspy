@@ -7,7 +7,7 @@ from dspy.adapters.types.tool import ToolCalls
 from dspy.adapters.types.tool.tool_calls import normalize_tool_call_dict
 from dspy.adapters.utils.json_loads import load_json
 from dspy.core.types import LMToolCallPart
-from dspy.task_spec.json_serialize import serialize_for_json
+from dspy.serialization.json import to_jsonable
 
 if TYPE_CHECKING:
     from dspy.core.types import LMOutput
@@ -57,7 +57,7 @@ def _tool_calls_from_message(message: dict[str, Any]) -> tuple[str | None, ToolC
 def _tool_result_content(value: object) -> str:
     if isinstance(value, str):
         return value
-    return json.dumps(serialize_for_json(cast("Any", value)), ensure_ascii=False)
+    return json.dumps(to_jsonable(cast("Any", value)), ensure_ascii=False)
 
 
 def _tool_call_as_openai_message_tool_call(tool_call: ToolCalls.ToolCall) -> dict[str, Any]:
@@ -66,7 +66,7 @@ def _tool_call_as_openai_message_tool_call(tool_call: ToolCalls.ToolCall) -> dic
         "type": "function",
         "function": {
             "name": tool_call.name,
-            "arguments": json.dumps(serialize_for_json(tool_call.args), ensure_ascii=False),
+            "arguments": json.dumps(to_jsonable(tool_call.args), ensure_ascii=False),
         },
     }
 

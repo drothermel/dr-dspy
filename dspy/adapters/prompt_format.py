@@ -13,8 +13,8 @@ import pydantic
 from dspy.adapters.types.code import Code
 from dspy.adapters.types.field_type import extract_field_types_from_annotation
 from dspy.adapters.types.reasoning import Reasoning
+from dspy.serialization.json import to_jsonable
 from dspy.task_spec.field_spec import FieldRole, FieldSpec
-from dspy.task_spec.json_serialize import serialize_for_json
 
 
 def format_field_value(field: FieldSpec, value: object, assume_text: bool = True) -> str | dict[str, str]:
@@ -22,7 +22,7 @@ def format_field_value(field: FieldSpec, value: object, assume_text: bool = True
     if isinstance(value, list) and field.type_ is str:
         string_value = _format_input_list_field_value(value)
     else:
-        jsonable_value = serialize_for_json(value)
+        jsonable_value = to_jsonable(value)
         if isinstance(jsonable_value, (dict, list)):
             string_value = json.dumps(jsonable_value, ensure_ascii=False)
         else:
