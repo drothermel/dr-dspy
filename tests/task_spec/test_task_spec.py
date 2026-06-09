@@ -8,6 +8,7 @@ from dspy.task_spec import (
     input_field,
     make_task_spec,
     output_field,
+    parse_task_spec_string,
 )
 from tests.task_spec.helpers import ts
 
@@ -88,6 +89,11 @@ def test_task_spec_rejects_empty_fields_on_direct_construct():
 def test_make_task_spec_rejects_empty_fields():
     with pytest.raises(ValueError, match="at least one"):
         make_task_spec(inputs=[], outputs=[], instructions="Test.")
+
+
+def test_parse_task_spec_string_rejects_empty_spec():
+    with pytest.raises(ValueError, match="at least one input or output field"):
+        parse_task_spec_string(" -> ")
 
 
 def test_from_dict_rejects_empty_fields():

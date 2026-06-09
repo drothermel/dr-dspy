@@ -4,37 +4,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from dspy.task_spec.field_spec import _UNSET, FieldRole, FieldSpec, validate_field_name
+from dspy.task_spec.field_spec import _UNSET, FieldRole, FieldSpec
+from dspy.task_spec.invariants import validate_task_spec
 from dspy.task_spec.serialize import TASK_SPEC_VERSION, field_spec_from_dict, field_spec_to_dict
-
-
-def validate_task_spec(spec: "TaskSpec") -> None:
-    """Validate TaskSpec invariants: unique field names within/between roles and at least one field."""
-    validate_task_spec_field_names(spec.inputs, spec.outputs)
-    if not spec.inputs and not spec.outputs:
-        raise ValueError("TaskSpec must have at least one input or output field.")
-
-
-def validate_task_spec_field_names(
-    inputs: tuple[FieldSpec, ...],
-    outputs: tuple[FieldSpec, ...],
-) -> None:
-    def _check_within_role_duplicates(fields: tuple[FieldSpec, ...], role_label: str) -> None:
-        names = [field.name for field in fields]
-        duplicates = sorted({name for name in names if names.count(name) > 1})
-        if duplicates:
-            quoted = ", ".join(f"'{name}'" for name in duplicates)
-            raise ValueError(f"Duplicate {role_label} field name(s): {quoted}.")
-
-    _check_within_role_duplicates(inputs, "input")
-    _check_within_role_duplicates(outputs, "output")
-    for field in (*inputs, *outputs):
-        validate_field_name(field.name)
-    cross_role = sorted({field.name for field in inputs}.intersection(field.name for field in outputs))
-    if cross_role:
-        raise ValueError(
-            f"Input and output fields must have distinct names, but found duplicates: '{', '.join(cross_role)}'."
-        )
 
 
 class TaskSpec(BaseModel):

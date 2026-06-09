@@ -6,7 +6,7 @@ from typing import Any, cast
 from pydantic import Field
 
 from dspy.task_spec.field_spec import FieldSpec, field_desc_from_name, input_field, output_field
-from dspy.task_spec.task_spec import validate_task_spec_field_names
+from dspy.task_spec.invariants import validate_non_empty_fields, validate_task_spec_field_names
 from dspy.task_spec.type_registry import _union_from_args, resolve_type_name
 
 
@@ -31,6 +31,7 @@ def parse_task_spec_string(
     )
     outputs = tuple((output_field(name, type_, desc=field_desc_from_name(name)) for name, type_, _ in output_fields))
     validate_task_spec_field_names(inputs, outputs)
+    validate_non_empty_fields(inputs, outputs)
     return (inputs, outputs)
 
 
