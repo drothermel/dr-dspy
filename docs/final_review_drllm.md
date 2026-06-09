@@ -1,233 +1,293 @@
-# Final Review: dr-llm Updates
+# Prompt: Make dr-llm Ready for dr-dspy Direct and Pool Experiments
 
-Source: `docs/final_review.md`. This split keeps findings relevant when updating `../dr-llm`, its pool/backend behavior, provider-control surface, or experiment harnesses that bypass DSPy.
+You are a smart coding agent working in the `dr-llm` repository, currently located at `../dr-llm` relative to this `dr-dspy` checkout. Use this document as your working prompt and status tracker. Update the status tables in this file as you work so a reviewer can tell what is done, what changed, what remains blocked, and which verification commands passed.
 
-## Cross-Boundary Issues to Coordinate with dr-dspy
+The paired DSPy-side review is in `../dr-dspy/docs/final_review_dspy.md`. Read it before editing code. Your goal is not to reproduce every DSPy bugfix inside `dr-llm`; your goal is to make `dr-llm` expose clear, stable backend behavior and provider controls so the updated `dr-dspy` integration can immediately run text-only experiments through either `DrLlmDirectLM` or `DrLlmPoolLM`.
 
-Several findings are primarily implemented in dr-dspy but affect dr-llm-backed experiments. Track them alongside any dr-llm changes so the two repositories do not drift:
+## Current Status
 
-- dr-dspy disk call-log sessions use second-resolution timestamps; `DrLlmPoolLM` can derive pool acquisition session IDs from those timestamps.
-- dr-dspy cannot currently carry provider-specific dr-llm reasoning objects such as OpenRouter reasoning-off, OpenRouter provider-specific effort, or OpenAI minimal thinking.
-- dr-dspy `Predict(TaskSpec)` changes the prompt shape compared with raw single-message `nl_latents` encoder/decoder prompts.
-- dr-dspy `DrLlmPoolLM` uses `PoolBackend` request fingerprints, while existing `nl_latents` pools use a different grid-seeding system.
+Update these rows as you go. Use one of: `todo`, `in_progress`, `blocked`, `done`, or `not_applicable`.
 
-## High-Priority dr-llm-Relevant Findings
-
-### Exact experiment reproduction requires choosing the experiment family
-
-The reviewed experiment docs describe two distinct stacks. The `nl_latents` pool compression curves run outside DSPy through dr-llm `LlmConfig` and pool grids, with single-user-message prompts. The `nl-code` DSPy optimization and full-5x eval path runs through legacy `dspy.LM` / LiteLLM / OpenRouter with `Signature` plus `ChatAdapter` scaffolding.
-
-Impact: treating dr-dspy as a drop-in reproduction path for both families will produce non-comparable numbers. Pool experiments never went through DSPy, and DSPy optimization runs did not use the dr-llm pool grid.
-
-### Compression experiment surface reviewed
-
-The last-week optimization-shift baseline used `mimo-v2-flash`, `llama-3.3-nemotron-super-49b-v1.5`, `gpt-oss-20b`, and `gpt-5-nano` over prompted character budgets `32`, `64`, `128`, `256`, `512`, and `1024`. The encoder prompt was raw code plus "Provide a concise natural language description of the code using at most {{BUDGET}} characters." The decoder prompt was the generated description plus "Write functional code in Python according to the description." The main curve plotted representation compression ratio against decoder pass rate, with fixed lossless compression/minification baselines beside the raw representations.
-
-The two compression planning docs prioritize an encoder-only or representation-policy-only optimizer pass, with compressed-output length visible in the metric:
-
-| Plan | Optimizer | Target | Key setup |
-| --- | --- | --- | --- |
-| Optimizer ranking | MIPROv2 | encoder-only | `auto=medium`, demos disabled, `seed=9`, `init_temperature=1.0`, valset around `50` to `69`. |
-| Optimizer ranking | COPRO | encoder-only | `breadth=6`, `depth=2`, compression-aware metric on the compile set. |
-| Optimizer ranking | GEPA | encoder-only | `max_metric_calls=64` to `128`, `reflection_minibatch_size=3`, compression feedback. |
-| Optimizer ranking | SIMBA | encoder rules | `max_demos=0`, `bsize=16` to `32`, low candidate temperatures. |
-| Optimizer ranking | InferRules | encoder rules | `num_rules=3` to `5`, small demo budget. |
-| Shift plot | MIPROv2 | representation-policy section only | `auto=light` smoke, then `medium`, with heldout final paired eval. |
-| Shift plot fallback | GEPA | representation-policy section only | constrained `max_metric_calls=64` to `128`; inspect prompt bloat. |
-
-Impact: the optimizer surface mostly exists in dr-dspy, but the experiment harness still has to provide the mutable prompt section, compression-aware metric, exact split discipline, decoder scaffold accounting, and final paired curve evaluation.
-
-### Provider-specific model controls need a clear bridge
-
-The observed `nl_latents` compression curves used these request controls:
-
-| nl_latents config | Model string | Key request controls |
+| Area | Status | Notes |
 | --- | --- | --- |
-| `openrouter/xiaomi/mimo-v2-flash/off/v1` | `openrouter/xiaomi/mimo-v2-flash` | OpenRouter `reasoning.enabled=false`, `temperature=0.7`, `top_p=0.95` |
-| `openrouter/nvidia/llama-3.3-nemotron-super-49b-v1.5/off/v1` | `openrouter/nvidia/llama-3.3-nemotron-super-49b-v1.5` | OpenRouter `reasoning.enabled=false`, `temperature=0.7`, `top_p=0.95` |
-| `openrouter/openai/gpt-oss-20b/low/v1` | `openrouter/openai/gpt-oss-20b` | OpenRouter `reasoning.effort=low`, `BackendRequest.effort=na` |
-| `openrouter/openai/gpt-5-nano/low/v1` | `openrouter/openai/gpt-5-nano` | OpenRouter `reasoning.effort=low`, `BackendRequest.effort=na` |
-| `openai/gpt-5-nano/minimal/v1` | `openai/gpt-5-nano` | OpenAI `thinking_level=minimal`, no sampling override |
-| `google/gemini-2.5-flash-lite/off/v1` | `google/gemini-2.5-flash-lite` | Google `thinking_level=off`, `temperature=0.7`, `top_p=0.95` |
+| Read `../dr-dspy/docs/final_review_dspy.md` and this prompt | todo |  |
+| Inspect current `dr-llm` backend, pool, fingerprint, provider-control, and docs code | todo |  |
+| Provider-specific reasoning/config bridge supports dr-dspy experiment parity needs | todo |  |
+| Pool acquisition session identity is explicit and documented for direct `dr-llm` users | todo |  |
+| Pool batch-fill workflow docs are clear and still dr-llm-native | todo |  |
+| Pool fingerprint and metadata behavior are tested or documented | todo |  |
+| `PoolBackend.close()` is idempotent, or current idempotency is verified and documented | todo |  |
+| Acquire provenance remains stable for wrappers and direct backend users | todo |  |
+| dr-llm v1 unsupported feature scope is documented for DSPy callers | todo |  |
+| Exact `nl_latents` reproduction path remains dr-llm/native unless prompt parity is added elsewhere | todo |  |
+| Direct backend smoke checks pass | todo |  |
+| Pool backend smoke/integration checks pass or are blocked only by missing DSN | todo |  |
+| Cross-repo readiness note for dr-dspy is written | todo |  |
 
-References:
+## Target Outcome
+
+At the end of this work:
+
+- `dr-llm` can express the provider-specific controls required by the reviewed compression experiments, especially OpenRouter reasoning-off, OpenRouter provider-specific reasoning effort, OpenAI minimal thinking, Google thinking-off, ordinary sampling controls, and an explicit "no sampling override" case.
+- `dr-dspy` can map its updated direct and pool wrappers onto those `dr-llm` controls without guessing, falling back to lossy generic `effort`, or changing cache fingerprints unexpectedly.
+- Direct experiments can run through `DrLlmDirectLM` with explicit `RunContext`, adapter, model controls, and audit logs.
+- Pool experiments can run through `DrLlmPoolLM` with stable acquisition session identity, clear cache/fingerprint behavior, and predictable lifecycle behavior.
+- Exact `nl_latents` compression-curve reproduction remains on the raw `nl_latents` plus `dr-llm` harness until a raw single-message request path exists in `dr-dspy`; do not claim DSPy `Predict(TaskSpec)` prompts are bit-equivalent to those pools.
+- The repository contains tests or docs that prevent future drift on these boundaries.
+
+## Required Context
+
+Read these before implementing:
+
+- `../dr-dspy/docs/final_review_dspy.md`
+- `../dr-dspy/docs/final_review_drllm.md` after you start editing this prompt as your tracker
+- `src/dr_llm/backends/models.py`
+- `src/dr_llm/backends/pool.py`
+- `src/dr_llm/backends/fingerprint.py`
+- `src/dr_llm/llm/config.py`
+- `src/dr_llm/llm/names.py`
+- `src/dr_llm/llm/providers/concepts/reasoning.py`
+- `src/dr_llm/llm/providers/impls/openrouter/request_controls.py`
+- `src/dr_llm/llm/providers/impls/openai/request_controls.py`
+- `src/dr_llm/llm/providers/impls/google/request_controls.py`
+
+Also inspect these cross-repo callers and fixtures when validating compatibility:
+
+- `../dr-dspy/dspy/clients/dr_llm/base.py`
+- `../dr-dspy/dspy/clients/dr_llm/mapping.py`
+- `../dr-dspy/dspy/clients/dr_llm/contract.py`
+- `../dr-dspy/dspy/clients/dr_llm/pool.py`
 - `../nl_latents/src/nl_latents/sampling/llm/catalog.py`
-- `../dr-llm/src/dr_llm/llm/providers/impls/openrouter/request_controls.py`
-- `../dr-llm/src/dr_llm/llm/providers/impls/openai/request_controls.py`
-- `../dr-llm/src/dr_llm/llm/providers/impls/google/request_controls.py`
-- `dspy/clients/dr_llm/base.py`
-- `dspy/clients/dr_llm/mapping.py`
-
-Impact: dr-llm can express the native provider controls, but dr-dspy cannot yet pass them through exactly. If dr-llm changes these provider-control shapes, update the dr-dspy bridge and parity checks in the same review.
-
-### Default `nl_latents` T1 configs should remain dr-llm-native until the bridge is fixed
-
-The default T1 compression setup in `../nl_latents/scripts/code_comp_t1/shared_config.sh` uses `humaneval-plus`, budgets `64,128,256`, one encoder sample and one decoder sample per config, and same-as-encoder decoder LLM mode. Its default LLM config IDs are:
-
-- `openrouter/xiaomi/mimo-v2-flash/off/v1`
-- `openrouter/nvidia/llama-3.3-nemotron-super-49b-v1.5/off/v1`
-- `openrouter/openai/gpt-5-nano/low/v1`
-- `openrouter/openai/gpt-oss-20b/low/v1`
-- `openai/gpt-5-nano/minimal/v1`
-
-Those catalog entries use dr-llm-native `BackendRequest.reasoning` shapes: OpenRouter disabled reasoning (`{"kind": "openrouter", "enabled": false}`), OpenRouter effort (`{"kind": "openrouter", "effort": "low"}`), and OpenAI minimal thinking (`{"kind": "openai", "thinking_level": "minimal"}`).
-
-References:
 - `../nl_latents/scripts/code_comp_t1/shared_config.sh`
-- `../nl_latents/src/nl_latents/sampling/llm/catalog.py`
-- `../dr-llm/src/dr_llm/backends/models.py`
-- `../dr-llm/src/dr_llm/llm/config.py`
-- `../dr-llm/src/dr_llm/llm/providers/concepts/reasoning.py`
-- `dspy/clients/dr_llm/mapping.py`
-- `dspy/clients/dr_llm/contract.py`
-
-Impact: the dr-llm direct and pool backends can carry the exact requests, but dr-dspy currently rejects or misroutes them. Keep exact T1 reproduction on dr-llm/nl_latents until dr-dspy has an explicit dr-llm config/request path or provider-specific reasoning support.
-
-### Raw `nl_latents` prompts are not DSPy `Predict` prompts
-
-The `nl_latents` encoder/decoder pool prompts are raw single-user-message templates. The budgeted encoder prompt is exactly `{{CODE}}` followed by a character-budget instruction, and the decoder prompt is exactly `{{DESCRIPTION}}` followed by "Write functional code in Python according to the description." The encoder and decoder request builders both render one `role="user"` message and no system message.
-
-References:
-- `../nl_latents/prompt_spaces/t1-budgeted-encoder__code.json`
-- `../nl_latents/prompt_spaces/t1-description-decoder__code.json`
 - `../nl_latents/src/nl_latents/sampling/encoder/request.py`
 - `../nl_latents/src/nl_latents/sampling/decoder/request.py`
-- `dspy/adapters/base/adapter.py`
-- `dspy/adapters/format/message_assembler.py`
 
-Impact: exact `nl_latents` pool replication should stay on `nl_latents` plus dr-llm pool infrastructure, call dr-llm `build_request_from_config()` directly, or use a deliberately raw DSPy LM request path. Using `Predict(TaskSpec)` will change prompts and invalidate bit-exact comparisons.
+## Working Rules
 
-### `nl_latents` pools and `DrLlmPoolLM` pools are different systems
+- Make the smallest coherent `dr-llm` changes that let `dr-dspy` integrate cleanly. Do not redesign experiment harnesses unless the existing surface cannot support the required request shapes.
+- Preserve `dr-llm` as the source of truth for provider-native controls. `dr-dspy` should adapt to this API, not duplicate provider-specific payload construction.
+- Keep raw `nl_latents` pool reproduction separate from DSPy prompt generation unless you add and test a raw request path explicitly.
+- Add regression tests for behavior changes. If a check needs Postgres or live provider credentials, add a skipped integration test or document the exact command and blocker.
+- Update the status table and the "Implementation Log" as each phase completes.
 
-The existing `nl_latents` experiments use `dr_llm.pool.LlmPoolBackend` through a grid seeding workflow. Each row stores key axes such as prompt template, data sample, and LLM config ID, plus serialized `LlmConfig` and messages. `DrLlmPoolLM` uses `dr_llm.backends.PoolBackend`, where the primary key is `request_fingerprint` over a canonical `BackendRequest`.
+## Phase 1: Establish the Cross-Repo Contract
 
-References:
-- `../nl_latents/src/nl_latents/sampling/encoder/pool.py`
-- `../nl_latents/src/nl_latents/sampling/decoder/pool.py`
-- `../dr-llm/src/dr_llm/backends/pool.py`
-- `../dr-llm/src/dr_llm/backends/fingerprint.py`
-- `dspy/clients/dr_llm/pool.py`
+Status: `todo`
 
-Impact: pointing `DrLlmPoolLM` at an `nl_latents`-seeded encoder or decoder pool will not produce cache hits. Exact curve replication should stay on the `nl_latents` pool harness, or the requests must be re-seeded through `PoolBackend` after the dr-dspy request-shape gaps are fixed.
+Write down, in code comments, docs, or tests as appropriate, the contract between `dr-llm` and `dr-dspy`:
 
-## Pool and Backend Behavior
+- `dr-llm` owns provider/model routing, provider-native reasoning controls, provider-native sampling controls, backend request validation, fingerprinting, pool acquisition semantics, and aggregate acquire provenance.
+- `dr-dspy` owns `TaskSpec`/adapter prompt rendering, DSPy `LMRequest` to `BackendRequest` mapping, transparency/audit logging, `RunContext`, and DSPy optimizer call behavior.
+- Metadata may flow from DSPy into `BackendRequest.metadata`, but metadata and extensions must not become cache-key or claim-isolation fields unless a deliberate breaking change is made.
+- Exact `nl_latents` pool replication uses raw single-user-message prompts and the existing `dr-llm`/`nl_latents` pool harness; DSPy `Predict(TaskSpec)` prompt shape is a different experiment condition.
 
-### Pool acquisition session identity has unsafe cross-repo defaults
+Acceptance checks:
 
-From the dr-dspy wrapper, `resolve_pool_session_id` can derive session IDs from disk log sessions or generate a fresh random session per call. The dr-llm-side concern is that no-replacement acquisition semantics depend on stable session identity, regardless of which caller generated it.
+- There is a discoverable doc or test assertion that states metadata is not included in the backend fingerprint.
+- There is a discoverable doc or test assertion that states session identity, not metadata, controls no-replacement acquisition grouping.
+- There is a note for `dr-dspy` maintainers listing the exact `dr-llm` request fields they should map for provider-specific reasoning and sampling.
 
-References:
-- `../dr-llm/src/dr_llm/backends/pool.py`
-- `dspy/runtime/run_log_session.py`
-- `dspy/clients/dr_llm/pool.py`
-- `tests/clients/dr_llm/test_integration_pool.py`
+## Phase 2: Preserve and Expose Provider-Specific Controls
 
-Impact: pool-backed experiments can unintentionally share acquisition state or unintentionally reset it. dr-llm tests and docs should make acquisition session identity explicit for callers outside DSPy too.
+Status: `todo`
 
-### Batch-fill workflow remains a dr-llm-native workflow
+The reviewed compression experiments used these request controls:
 
-dr-llm's `PoolBackend` supports a batch flow with `submit_batch`, `await_drain`/`adrain`, and then acquire. `DrLlmPoolLM` exposes only `aforward` and `acquire_samples`, and it does not expose the `nl_latents` experiment harness around cross-product grids, encoder-to-decoder lineage, budget axis bindings, compression baselines, and curve aggregation.
+| Config family | Model string | Required provider-native controls |
+| --- | --- | --- |
+| MiMo off | `openrouter/xiaomi/mimo-v2-flash` | OpenRouter `reasoning.enabled=false`, `temperature=0.7`, `top_p=0.95` |
+| Nemotron off | `openrouter/nvidia/llama-3.3-nemotron-super-49b-v1.5` | OpenRouter `reasoning.enabled=false`, `temperature=0.7`, `top_p=0.95` |
+| GPT-OSS low | `openrouter/openai/gpt-oss-20b` | OpenRouter provider-specific `reasoning.effort=low`, not generic backend `effort` |
+| GPT-5 nano low through OpenRouter | `openrouter/openai/gpt-5-nano` | OpenRouter provider-specific `reasoning.effort=low`, not generic backend `effort` |
+| GPT-5 nano minimal through OpenAI | `openai/gpt-5-nano` | OpenAI `thinking_level=minimal`, no sampling override |
+| Gemini flash-lite off | `google/gemini-2.5-flash-lite` | Google `thinking_level=off`, `temperature=0.7`, `top_p=0.95` |
 
-References:
-- `../dr-llm/src/dr_llm/backends/pool.py`
-- `dspy/clients/dr_llm/pool.py`
+Implementation guidance:
 
-Impact: users who want to pre-seed a grid and drain workers must still use dr-llm's `PoolBackend` directly. `aforward` on a miss does generate and insert one sample, but that is not the same workflow as worker-backed batch fill or `nl_latents`-style curve orchestration.
+- Verify that current `BackendRequest.reasoning` and provider request-control models can represent every row above without lossy conversion.
+- If the existing public model is too awkward for `dr-dspy`, add a small explicit construction or parsing helper in `dr-llm` rather than making `dr-dspy` know provider internals.
+- Make sure "provider-specific reasoning effort" is distinct from generic `BackendRequest.effort`. The reviewed OpenRouter GPT-5 nano and GPT-OSS requests must not be represented as generic backend effort.
+- Preserve an explicit way to suppress provider-default sampling overrides when a catalog entry means "no sampling override".
+- Confirm whether `EffortSpec.MAX` is intentionally supported and document how callers should request it. DSPy's current generic `ReasoningEffort` stops at `high`, so a provider-native bridge may be needed for `max`.
 
-### Pool fingerprint and metadata behavior should be documented
+Acceptance checks:
 
-DSPy forwards `LMRequest.metadata` into `BackendRequest.metadata`, while dr-llm fingerprints exclude metadata and extensions. That is useful because run-specific metadata does not fragment the cache, but docs should make clear that metadata is not cache or claim isolation.
+- Add or update tests that build the six request families above and verify provider payload controls without live API calls.
+- Add a small parity test or fixture comparing `nl_latents` catalog request construction with direct `dr-llm` request construction for the five default T1 configs.
+- If you cannot add the parity test inside `dr-llm` because it would depend on `nl_latents`, document the exact external parity command and expected payload fields.
 
-References:
-- `../dr-llm/src/dr_llm/backends/fingerprint.py`
-- `dspy/clients/dr_llm/mapping.py`
+## Phase 3: Make Pool Acquisition Semantics Hard to Misuse
 
-Impact: users may tag requests with experiment IDs in metadata and expect separate pool cache keys or acquisition cells. They will instead share the same fingerprint when generation-relevant fields are identical.
+Status: `todo`
 
-### Pool wrapper lifecycle issue may benefit from backend idempotency
+`PoolBackend.aacquire(request, session_id, n)` implements no-replacement sampling by session. The unsafe behavior happens when callers accidentally reuse a session across independent experiments or accidentally generate a new session for repeated calls in one experiment.
 
-The immediate bug is in dr-dspy: `BaseLM.copy()` is shallow, so copied `DrLlmPoolLM` wrappers can close the same `_backend` twice, and calls after close still delegate to the torn-down backend. If `PoolBackend.close()` is not already idempotent, making that true in dr-llm would reduce blast radius for wrappers and direct backend users.
+Implementation guidance:
 
-References:
-- `../dr-llm/src/dr_llm/backends/pool.py`
-- `dspy/clients/base_lm.py`
-- `dspy/clients/dr_llm/pool.py`
+- Ensure docs and tests make `session_id` mandatory in spirit, even if the API can accept a generated value through a wrapper.
+- Explain that `session_id` controls acquisition state and metadata does not.
+- Confirm whether `PoolBackend` should reject empty session IDs or normalize them consistently.
+- Add examples for stable experiment session IDs, for example `experiment-name:split:seed` or a caller-provided run ID.
+- Coordinate with the DSPy-side fix: `dr-dspy` should stop relying on second-resolution log timestamps for unique pool acquisition sessions.
 
-Impact: optimizers and sampling utilities that copy LMs can accidentally tear down or double-teardown a shared Postgres-backed pool backend while another wrapper still appears usable.
+Acceptance checks:
 
-### Aggregate acquire provenance is not surfaced through DSPy
+- A test or doc example demonstrates two calls with the same `session_id` claiming without replacement.
+- A test or doc example demonstrates that different `session_id` values do not share claim state.
+- A doc note warns against deriving session IDs from low-resolution timestamps.
 
-dr-llm returns `AcquireResult(responses, claimed_from_cache, generated)`, but `DrLlmPoolLM.acquire_samples` returns only `list[LMResponse]`.
+## Phase 4: Clarify Pool Batch Fill Versus Cache-First Calls
 
-Reference:
-- `dspy/clients/dr_llm/pool.py`
+Status: `todo`
 
-Impact: the dr-llm backend already has the aggregate data. DSPy callers lose it unless the wrapper returns or records it somewhere. Keep this in mind if changing `AcquireResult` or provenance fields.
+`PoolBackend` supports a native batch-fill workflow with `submit_batch`, drain, and then acquire. `DrLlmPoolLM.aforward` is cache-first single-completion behavior; on a miss it generates and inserts one response. These are different experiment workflows.
 
-## Provider and Contract Scope
+Implementation guidance:
 
-### dr-llm v1 scope intentionally blocks major DSPy modules
+- Keep batch pre-fill as a direct `dr-llm` workflow unless you intentionally add a higher-level wrapper.
+- Document the lifecycle: seed or submit a request grid, drain workers, acquire with a stable session ID, aggregate results.
+- Document that `DrLlmPoolLM` does not reproduce `nl_latents` grid axes, encoder-to-decoder lineage, budget bindings, compression baselines, or curve aggregation.
 
-The dr-dspy mapping layer correctly rejects tools, multimodal parts, unsupported roles, structured response formats, stop sequences, logprobs, prompt cache, and unsupported reasoning fields before requests reach dr-llm. That aligns with dr-llm v1, but it means the dr-llm LM classes are not drop-in replacements for every DSPy program.
+Acceptance checks:
 
-References:
-- `../dr-llm/src/dr_llm/backends/models.py`
-- `dspy/clients/dr_llm/mapping.py`
-- `dspy/clients/dr_llm/contract.py`
+- There is a minimal docs example for direct `PoolBackend` batch-fill and acquire.
+- There is a clear contrast between `PoolBackend` batch-fill and wrapper-level cache-first `aforward`.
 
-Impact: text-only `Predict`, `ChainOfThought`, and `Evaluate` paths are the expected fit. `ReAct`, `ReActV2`, `CodeAct`, tool agents, multimodal programs, tool-call history, and native structured-output paths are not supported through these v1 backends.
+## Phase 5: Stabilize Pool Lifecycle and Provenance
 
-### `n=1` proposal calls are rejected by the dr-dspy contract
+Status: `todo`
 
-The dr-dspy contract rejects any non-`None` `config.n` but reports that `n>1` is unsupported. Focused validation confirmed `LMConfig(n=1)` raises `LMUnsupportedFeatureError`. This matters for optimizers: MIPRO's grounded proposer and dataset-summary flows use single-completion `n=1`, while COPRO proposal calls use `n=breadth-1`.
+The DSPy review found that shallow-copied `DrLlmPoolLM` wrappers can share a backend while each wrapper tracks its own `_closed` flag. `dr-dspy` should guard against use-after-close, but `dr-llm` can reduce blast radius by making backend teardown robust.
 
-References:
-- `dspy/clients/dr_llm/contract.py`
-- `dspy/teleprompt/copro_optimizer.py`
-- `dspy/propose/grounded_proposer.py`
-- `dspy/propose/dataset_summary_generator.py`
+Implementation guidance:
 
-Impact: this is a dr-dspy contract issue unless dr-llm also needs native or emulated multi-completion support. Allowing `n=1` would fix some MIPRO paths; COPRO breadth still needs either multi-completion support or an emulated loop of single completions.
+- Verify whether `PoolBackend.close()` is idempotent. If not, make it idempotent.
+- Verify whether async close/drain paths are safe to call multiple times or after partial initialization.
+- Preserve `AcquireResult(responses, claimed_from_cache, generated)` semantics. `dr-dspy` may expose or log aggregate provenance later, so avoid changing field names without a coordinated update.
+- Ensure per-response provenance such as cache/provider source remains available in response metadata or provider data.
 
-### Advanced option gaps around provider controls
+Acceptance checks:
 
-`EffortSpec.MAX` exists in dr-llm, but DSPy's `ReasoningEffort` currently stops at `high`, so `max` cannot be requested through `LMConfig`. More importantly for experiment parity:
+- Add or update a unit test for calling close twice.
+- Add or update a unit test that acquire provenance counts distinguish cache claims from generated responses.
+- If close-after-use behavior depends on external resources, document expected exceptions.
 
-- OpenRouter reasoning-off controls such as `reasoning_enabled=False` have no dr-dspy v1 equivalent; `EffortSpec.NA` is not the same as an explicit disabled toggle.
-- GPT-5 minimal thinking through dr-llm thinking-level controls is not representable by DSPy's `ReasoningEffort`.
-- OpenRouter effort controls are not equivalent to DSPy's generic `ReasoningEffort`; current mapping sends them as `BackendRequest.effort`, which OpenRouter rejects for the T1 GPT-5 nano and GPT-OSS configs.
-- Suppressing provider-default sampling with explicit empty sampling controls is not exposed on the dr-dspy constructor surface.
+## Phase 6: Fingerprint and Metadata Contract
 
-References:
-- `../dr-llm/src/dr_llm/llm/names.py`
-- `../dr-llm/src/dr_llm/llm/providers/concepts/reasoning.py`
-- `dspy/core/types/lm_config.py`
-- `dspy/clients/dr_llm/base.py`
-- `dspy/clients/dr_llm/mapping.py`
+Status: `todo`
 
-Impact: these are not correctness bugs for the default text-only path, but they should be explicit for experiments that rely on custom provider registries, dr-llm's maximum-effort mode, or exact parity with `nl_latents`/`nl-code` catalog controls.
+The current desired behavior is that generation-relevant request fields define `request_fingerprint`, while metadata and extensions do not. This lets run-specific tags avoid fragmenting the cache.
 
-## Alignment Notes
+Implementation guidance:
 
-The core request/response boundary mostly aligns with `../dr-llm`: text-only messages are converted to `BackendRequest`, provider/model splitting maps `openai/gpt-4.1-mini` to `ProviderName.OPENAI` plus `gpt-4.1-mini`, unsupported tools/multimodal/structured-output fields are rejected, response provenance is preserved in `provider_data`, error translation maps dr-llm backend/provider errors into the DSPy `LMError` hierarchy, and pool miss-to-hit plus session acquire semantics are covered by tests.
+- Confirm the fingerprint excludes `metadata` and `extensions`.
+- Confirm the fingerprint includes provider/model, messages, generation controls, provider-native reasoning controls, and any other fields that can affect model output.
+- If provider-specific reasoning controls are added or re-shaped, make sure they are included in the fingerprint.
 
-DSPy reasoning effort maps to `BackendRequest.effort` for providers that actually use dr-llm `EffortSpec`, but it does not cover provider-specific `BackendRequest.reasoning`. Capabilities probing through a dedicated `DirectBackend` for pool LMs also matches dr-llm's current design because `PoolBackend` has no public `.capabilities()` API.
+Acceptance checks:
 
-Direct path guidance: `DrLlmDirectLM` is ready for text-only programs with `JSONAdapter` or `XMLAdapter`. Configure auth and routing through the dr-llm registry/environment, not `LMProviderOptions`.
+- A test proves two requests differing only by metadata share a fingerprint.
+- A test proves two requests differing by provider-specific reasoning controls do not share a fingerprint.
+- Docs warn that metadata is not claim isolation.
 
-Pool path guidance: use `aforward` for cache-first single completions, and use `acquire_samples` only with an explicit stable session identity unless disk logging provides a known-safe session. Use dr-llm `PoolBackend.submit_batch` plus `await_drain` directly for batch pre-fill workflows today.
+## Phase 7: Document dr-llm v1 Scope for DSPy Callers
 
-Experiment parity guidance: keep `nl_latents` pool curves on the raw dr-llm/nl_latents infrastructure for exact replication until dr-dspy exposes provider-specific dr-llm reasoning/config controls and a raw single-message request path. For `nl-code` reproduction, port the code-spec programs and metrics to `TaskSpec`/`Predict`, run with `DrLlmDirectLM` plus `ChatAdapter`, match optimizer compile settings and splits, and disclose remaining LiteLLM-vs-dr-llm wire differences. Do not use the pool backend for optimizer runs unless cached sampling is an intentional new experiment condition.
+Status: `todo`
 
-Compression optimizer guidance: the documented optimizer knobs are present in dr-dspy for MIPROv2, COPRO, GEPA, SIMBA, and InferRules, but the experiment-specific pieces are not framework-native. "Optimize only the representation-policy section" needs experiment-layer TaskSpec composition, compression-aware scoring needs a custom metric over pass rate and representation length, and decoder scaffold accounting needs run metadata.
+The first stable `dr-dspy` bridge should target text-only programs:
 
-## dr-llm Verification Notes
+- Expected fit: `Predict`, `ChainOfThought`, `Evaluate`, text-only metrics, and explicit `RunContext` with `JSONAdapter` or `XMLAdapter`.
+- Not supported through v1 backends: tools, tool-call history, ReAct/ReActV2 tool agents, CodeAct execution loops, multimodal parts, native structured-output response formats, stop sequences if still unsupported, logprobs, and prompt-cache controls.
 
-The focused review ran:
+Implementation guidance:
 
-- `uv run pytest tests/backends/test_direct_backend.py tests/backends/test_pool_backend.py tests/backends/test_converters.py tests/backends/test_fingerprint.py tests/backends/test_validation.py tests/backends/test_async_bridge.py -q` in `../dr-llm`: 37 passed.
-- Postgres integration checks in both repos: skipped because no integration DSN was configured.
-- Source inspection and focused local scripts compared T1 dr-llm catalog payloads against dr-dspy `LMRequest` to `BackendRequest` mapping.
-- The no-provider-call validator check confirmed that all five default T1 configs are rejected through current dr-dspy mapping before any live API call.
+- Keep unsupported feature errors typed and early.
+- Do not make `dr-llm` silently ignore unsupported request fields.
+- Make docs clear enough that a `dr-dspy` user can choose direct, pool, or plain LiteLLM without reading provider internals.
 
-Experiment-parity checks not run: live provider calls, `nl-code` session replay, or `nl_latents` curve replay. Useful next checks would be a wire-parity probe comparing dr-llm `build_request_from_config()` payloads to `DrLlmDirectLM` backend requests for the same messages, a prompt-parity diff between `nl-code` `ChatAdapter` rendering and `nl_latents` raw templates, and a one-task HumanEval smoke optimizer after porting the TaskSpecs and metric.
+Acceptance checks:
+
+- Docs list the supported and unsupported DSPy-facing feature surface.
+- Tests still prove unsupported fields fail before opaque provider errors.
+
+## Phase 8: Experiment Parity Guidance
+
+Status: `todo`
+
+Do not collapse the two reviewed experiment families:
+
+- `nl_latents` compression curves: raw `dr-llm`/pool workflow, raw single-user-message encoder and decoder prompts, pool grids, compression baselines, representation compression ratio against decoder pass rate.
+- `nl-code` DSPy optimization and full-5x eval: legacy DSPy-style programs and optimizers, now needing a `TaskSpec`, explicit `RunContext`, and adapter-based port in `dr-dspy`.
+
+Implementation guidance:
+
+- For exact `nl_latents` replay, keep using `nl_latents` request builders or direct `dr-llm` `build_request_from_config()`-style construction.
+- For new `dr-dspy` experiments, disclose that `Predict(TaskSpec)` prompt rendering is a new prompt condition unless a raw LM request path is used.
+- For optimizer experiments, prefer `DrLlmDirectLM` until pool-backed cached sampling is an intentional condition. Optimizers can copy LMs and issue proposal calls with `n`; coordinate with `dr-dspy` on `n=1` and multi-completion behavior.
+
+Acceptance checks:
+
+- A doc section explains which path to use for exact replay versus new DSPy experiments.
+- A final readiness note states which experiment family is ready to run immediately and which one remains native-only.
+
+## Phase 9: Verification Commands
+
+Status: `todo`
+
+Run the relevant checks in `dr-llm`. Update the command, result, and notes columns.
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `uv run pytest tests/backends/test_direct_backend.py tests/backends/test_pool_backend.py tests/backends/test_converters.py tests/backends/test_fingerprint.py tests/backends/test_validation.py tests/backends/test_async_bridge.py -q` | todo |  |
+| Provider-control unit tests you added or updated | todo |  |
+| Pool lifecycle/provenance tests you added or updated | todo |  |
+| Postgres pool integration test with `DR_LLM_TEST_DATABASE_URL` or `DR_LLM_DATABASE_URL` | todo |  |
+| Optional live provider smoke test | todo |  |
+
+If Postgres or live provider credentials are unavailable, mark the row `blocked` and include the missing environment variable or service.
+
+## Cross-Repo Readiness Checklist for dr-dspy
+
+Status: `todo`
+
+Before declaring this done, write a short note for the `dr-dspy` implementer that answers:
+
+- What exact `BackendRequest` fields should `dr-dspy` set for OpenRouter reasoning-off?
+- What exact fields should it set for OpenRouter provider-specific effort?
+- What exact fields should it set for OpenAI minimal thinking and Google thinking-off?
+- How should it represent "no sampling override" versus explicit `temperature`/`top_p`?
+- Which fields affect the pool fingerprint?
+- What does `dr-dspy` need to pass as stable `session_id` for no-replacement pool acquisition?
+- Is `PoolBackend.close()` idempotent?
+- Are aggregate acquire provenance fields stable?
+- Which backend features remain unsupported and should be rejected in `dr-dspy` before provider calls?
+
+## Implementation Log
+
+Append short entries as you work:
+
+| Date | Agent | Change | Verification |
+| --- | --- | --- | --- |
+|  |  |  |  |
+
+## Original Review Findings Incorporated
+
+This prompt incorporates the following review findings from the prior `dr-llm` final review:
+
+- Cross-boundary coordination with `dr-dspy` disk log session identity, provider-specific reasoning gaps, DSPy prompt-shape differences, and pool fingerprint differences.
+- Exact compression reproduction requires choosing between the raw `nl_latents`/`dr-llm` family and the DSPy optimizer family.
+- The reviewed compression surface used MiMo, Nemotron, GPT-OSS 20B, GPT-5 nano, and Gemini Flash Lite with budgets `32`, `64`, `128`, `256`, `512`, and `1024`.
+- The default T1 configs use `humaneval-plus`, budgets `64,128,256`, one encoder sample and one decoder sample per config, same-as-encoder decoder mode, and five default LLM config IDs:
+  - `openrouter/xiaomi/mimo-v2-flash/off/v1`
+  - `openrouter/nvidia/llama-3.3-nemotron-super-49b-v1.5/off/v1`
+  - `openrouter/openai/gpt-5-nano/low/v1`
+  - `openrouter/openai/gpt-oss-20b/low/v1`
+  - `openai/gpt-5-nano/minimal/v1`
+- Raw `nl_latents` encoder and decoder prompts are single user messages, not DSPy `Predict(TaskSpec)` prompts.
+- `nl_latents` pools and `DrLlmPoolLM` pools use different seeding and keying systems.
+- Pool acquisition depends on explicit stable session identity.
+- Batch-fill remains a native `dr-llm` workflow.
+- Pool fingerprints exclude metadata and extensions by design, but provider-output-affecting controls must be included.
+- `dr-llm` v1 is intentionally text-only for the DSPy bridge.
+- `LMConfig(n=1)` and multi-completion proposal behavior are primarily `dr-dspy` contract issues unless `dr-llm` adds native or emulated multi-completion support.
+- `AcquireResult` aggregate provenance is already present in `dr-llm`; preserve it for future wrapper exposure.
