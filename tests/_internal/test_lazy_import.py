@@ -4,7 +4,14 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from dspy._internal.lazy_import import _INSTALL_HINTS, _detect_dspy_dist, _MissingModule, is_available, require
+from dspy._internal.lazy_import import (
+    _INSTALL_HINTS,
+    _detect_dspy_dist,
+    _MissingModule,
+    import_optional,
+    is_available,
+    require,
+)
 
 
 def test_is_available_true_for_stdlib():
@@ -107,6 +114,55 @@ def test_require_stub_falls_back_to_module_name():
     with pytest.raises(ImportError) as exc_info:
         _ = stub.something
     assert f"{dist}[nonexistent_xyz]" in str(exc_info.value)
+
+
+def test_import_optional_succeeds_for_stdlib():
+    mod = import_optional("json")
+    assert mod.dumps({"a": 1}) == '{"a": 1}'
+
+
+def test_import_optional_raises_with_extra_hint(monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "datasets":
+            raise ModuleNotFoundError("No module named 'datasets'", name="datasets")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    dist = _detect_dspy_dist()
+    with pytest.raises(ImportError) as exc_info:
+        import_optional("datasets", extra="datasets", feature="Test feature")
+    assert f"{dist}[datasets]" in str(exc_info.value)
+    assert "Test feature" in str(exc_info.value)
+
+
+def test_import_optional_uses_install_command_override():
+    with pytest.raises(ImportError) as exc_info:
+        import_optional(
+            "definitely_not_a_real_module_xyz",
+            feature="custom feature",
+            install_command="Run `pip install custom-pkg`.",
+        )
+    assert "Run `pip install custom-pkg`." in str(exc_info.value)
+    assert "custom feature" in str(exc_info.value)
+
+
+def test_import_optional_reraises_transitive_module_not_found(monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "optuna":
+            raise ModuleNotFoundError("No module named 'missing_transitive'", name="missing_transitive")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    with pytest.raises(ModuleNotFoundError, match="missing_transitive"):
+        import_optional("optuna", extra="optuna", feature="Optuna")
 
 
 def test_install_hints_match_pyproject_extras(pytestconfig):

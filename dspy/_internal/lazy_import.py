@@ -1,3 +1,11 @@
+"""Optional third-party dependency import helpers.
+
+Use ``require()`` for module-level lazy bindings that defer import until first
+attribute access. Use ``import_optional()`` for eager imports at call sites or
+when a base class must resolve at module load. Use ``is_available()`` for soft
+capability probes without importing.
+"""
+
 import functools
 import importlib
 import importlib.machinery
@@ -30,9 +38,26 @@ _INSTALL_HINTS: dict[str, str] = {
     "anthropic": "anthropic",
     "gepa": "gepa",
     "numpy": "numpy",
+    "datasets": "datasets",
 }
 _lazy_module_locks: dict[str, threading.RLock] = {}
 _lazy_module_locks_lock = threading.Lock()
+
+
+def _format_optional_import_error(
+    module: str,
+    *,
+    extra: str | None = None,
+    feature: str | None = None,
+    install_command: str | None = None,
+) -> str:
+    top = module.split(".", 1)[0]
+    feat = feature or "this feature"
+    if install_command is not None:
+        return f"{top} is required to use {feat}. {install_command}"
+    ext = extra or _INSTALL_HINTS.get(top, top)
+    dist = _detect_dspy_dist()
+    return f"{top} is required to use {feat}. Install with `pip install {dist}[{ext}]` or `pip install {top}`."
 
 
 def _get_lazy_module_lock(module: str) -> threading.RLock:
@@ -108,6 +133,28 @@ def is_available(module: str) -> bool:
         return False
 
 
+def import_optional(
+    module: str,
+    *,
+    extra: str | None = None,
+    feature: str | None = None,
+    install_command: str | None = None,
+) -> Any:
+    top = module.split(".", 1)[0]
+    try:
+        return importlib.import_module(module)
+    except ModuleNotFoundError as exc:
+        if exc.name not in {top, module}:
+            raise
+        message = _format_optional_import_error(
+            module,
+            extra=extra,
+            feature=feature,
+            install_command=install_command,
+        )
+        raise ImportError(message) from exc
+
+
 def require(module: str, *, extra: str | None = None, feature: str | None = None) -> Any:
     lock = _get_lazy_module_lock(module)
     with lock:
@@ -115,11 +162,7 @@ def require(module: str, *, extra: str | None = None, feature: str | None = None
             return sys.modules[module]
         spec = importlib.util.find_spec(module)
     if spec is None or spec.loader is None:
-        top = module.split(".", 1)[0]
-        feat = feature or "this feature"
-        ext = extra or _INSTALL_HINTS.get(top, top)
-        dist = _detect_dspy_dist()
-        message = f"{top} is required to use {feat}. Install with `pip install {dist}[{ext}]` or `pip install {top}`."
+        message = _format_optional_import_error(module, extra=extra, feature=feature)
         parent = inspect.stack()[1]
         frame_data = {
             "filename": parent.filename,
