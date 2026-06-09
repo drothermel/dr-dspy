@@ -1,6 +1,7 @@
 import pytest
 
-from dspy.primitives.prediction import Completions
+from dspy.primitives.example import Example
+from dspy.primitives.prediction import Completions, Prediction
 
 
 def test_completions_accepts_list_of_dicts():
@@ -21,3 +22,20 @@ def test_completions_rejects_non_list_values():
 def test_completions_rejects_mismatched_lengths():
     with pytest.raises(ValueError, match="All Completions lists must have the same length"):
         Completions({"answer": ["a", "b"], "reasoning": ["only-one"]})
+
+
+def test_prediction_from_record():
+    prediction = Prediction.from_record({"answer": "Paris"})
+    assert prediction.answer == "Paris"
+
+
+def test_prediction_from_record_rejects_input_keys():
+    with pytest.raises(TypeError):
+        Prediction.from_record({"answer": "Paris"}, input_keys=("answer",))
+
+
+def test_prediction_is_not_example():
+    prediction = Prediction.from_record({"answer": "Paris"})
+    example = Example.from_record({"answer": "Paris"})
+    assert not isinstance(prediction, Example)
+    assert prediction != example

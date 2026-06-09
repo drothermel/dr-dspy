@@ -78,10 +78,19 @@ def test_example_eq():
     assert example1 != ""
 
 
-def test_example_hash():
-    example1 = Example.from_record({"a": 1, "b": 2})
-    example2 = Example.from_record({"a": 1, "b": 2})
-    assert hash(example1) == hash(example2)
+def test_example_is_unhashable():
+    example = Example.from_record({"a": 1, "b": 2})
+    with pytest.raises(TypeError):
+        hash(example)
+
+
+def test_example_attr_store_collision():
+    example = Example.from_record({"get": 1})
+    assert example.get == 1
+    assert example["get"] == 1
+    example["fork"] = "stored"
+    assert example.fork == "stored"
+    assert example["fork"] == "stored"
 
 
 def test_example_keys_values_items():

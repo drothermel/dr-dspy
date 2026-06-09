@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class EvaluationResult(Prediction):
-    def __init__(self, score: float, results: list[tuple["Example", "Example", Any]]) -> None:
+    def __init__(self, score: float, results: list[tuple["Example", Prediction, Any]]) -> None:
         super().__init__(score=score, results=results)
 
     @override
@@ -140,7 +140,7 @@ class Evaluate:
         return EvaluationResult(score=round(100 * ncorrect / ntotal, 2), results=results)
 
     @staticmethod
-    def _prepare_results_output(results: list[tuple["Example", "Example", Any]], metric_name: str):
+    def _prepare_results_output(results: list[tuple["Example", Prediction, Any]], metric_name: str):
         return [
             merge_dicts(example, prediction) | {metric_name: score}
             if prediction_is_dictlike(prediction)
@@ -163,7 +163,7 @@ class Evaluate:
             json.dump(data, f)
 
     def _construct_result_table(
-        self, results: list[tuple["Example", "Example", Any]], metric_name: str
+        self, results: list[tuple["Example", Prediction, Any]], metric_name: str
     ) -> "pd.DataFrame":
         import pandas as pd
 

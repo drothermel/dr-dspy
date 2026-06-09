@@ -12,6 +12,7 @@ from dspy.evaluate.metrics import answer_exact_match
 from dspy.history import TurnLog
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
+from dspy.primitives.prediction import Prediction
 from dspy.runtime.callback import NoOpCallback
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
@@ -64,9 +65,9 @@ def test_construct_result_df(make_run):
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4"), new_example("What is 3+3?", "-1")]
     ev = Evaluate(devset=devset, metric=answer_exact_match)
     results = [
-        (devset[0], Example.from_record({"answer": "2"}), 100.0),
-        (devset[1], Example.from_record({"answer": "4"}), 100.0),
-        (devset[2], Example.from_record({"answer": "-1"}), 0.0),
+        (devset[0], Prediction.from_record({"answer": "2"}), 100.0),
+        (devset[1], Prediction.from_record({"answer": "4"}), 100.0),
+        (devset[2], Prediction.from_record({"answer": "-1"}), 0.0),
     ]
     result_df = ev._construct_result_table(results, answer_exact_match.__name__)
     pd.testing.assert_frame_equal(
@@ -207,7 +208,7 @@ def test_evaluate_callback(make_run):
 
 def test_evaluation_result_repr(make_run):
     result = EvaluationResult(
-        score=100.0, results=[(new_example("What is 1+1?", "2"), Example.from_record({"answer": "2"}), 100.0)]
+        score=100.0, results=[(new_example("What is 1+1?", "2"), Prediction.from_record({"answer": "2"}), 100.0)]
     )
     assert repr(result) == "EvaluationResult(score=100.0, results=<list of 1 results>)"
 

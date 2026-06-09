@@ -10,7 +10,7 @@ from dspy.teleprompt.compile_params import EnsembleCompileParams
 
 class Ensemble:
     def __init__(self, *, reduce_fn=None, size=None, deterministic=False) -> None:
-        assert deterministic is False, "TODO: Implement example hashing for deterministic ensemble."
+        assert deterministic is False, "Deterministic ensemble is not supported; Example is intentionally unhashable."
         self.reduce_fn = reduce_fn
         self.size = size
         self.deterministic = deterministic

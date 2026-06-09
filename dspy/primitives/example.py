@@ -3,18 +3,33 @@ from typing import Any
 
 from typing_extensions import override
 
-from dspy.serialization.json import to_jsonable
+from dspy.primitives.record_store import RecordStore
+
+_EXAMPLE_RESERVED = frozenset({"_store", "_demos", "_input_keys"})
 
 
 class Example:
-    def __init__(self, *, _store: dict[str, Any] | None = None, _input_keys: frozenset[str] | None = None) -> None:
-        self._store = _store or {}
-        self._demos: list[Any] = []
-        self._input_keys = _input_keys
+    __hash__ = None
+
+    def __init__(
+        self,
+        *,
+        _store: RecordStore | Mapping[str, Any] | None = None,
+        _input_keys: frozenset[str] | None = None,
+    ) -> None:
+        if _store is None:
+            store = RecordStore()
+        elif isinstance(_store, RecordStore):
+            store = _store
+        else:
+            store = RecordStore(_store)
+        object.__setattr__(self, "_store", store)
+        object.__setattr__(self, "_demos", [])
+        object.__setattr__(self, "_input_keys", _input_keys)
 
     @classmethod
     def from_record(cls, record: Mapping[str, Any], *, input_keys: tuple[str, ...] = ()) -> "Example":
-        return cls(_store=dict(record), _input_keys=frozenset(input_keys))
+        return cls(_store=RecordStore(record), _input_keys=frozenset(input_keys))
 
     @property
     def input_keys(self) -> frozenset[str]:
@@ -22,30 +37,32 @@ class Example:
             return frozenset()
         return self._input_keys
 
-    def __getattr__(self, key):
-        if key.startswith("__") and key.endswith("__"):
-            raise AttributeError
-        if key in self._store:
-            return self._store[key]
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
+    @override
+    def __getattribute__(self, key: str) -> Any:
+        if key in _EXAMPLE_RESERVED or key.startswith("_"):
+            return super().__getattribute__(key)
+        store = super().__getattribute__("_store")
+        if key in store:
+            return store[key]
+        return super().__getattribute__(key)
 
     @override
-    def __setattr__(self, key, value) -> None:
-        if key.startswith("_") or key in dir(self.__class__):
+    def __setattr__(self, key: str, value: Any) -> None:
+        if key in _EXAMPLE_RESERVED or key.startswith("_"):
             super().__setattr__(key, value)
         else:
-            self._store[key] = value
+            super().__getattribute__("_store")[key] = value
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         return self._store[key]
 
-    def __setitem__(self, key, value) -> None:
+    def __setitem__(self, key: str, value: Any) -> None:
         self._store[key] = value
 
-    def __delitem__(self, key) -> None:
+    def __delitem__(self, key: str) -> None:
         del self._store[key]
 
-    def __contains__(self, key) -> bool:
+    def __contains__(self, key: object) -> bool:
         return key in self._store
 
     def __len__(self) -> int:
@@ -64,19 +81,14 @@ class Example:
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Example) and self._store == other._store and self.input_keys == other.input_keys
 
-    @override
-    def __hash__(self) -> int:
-        hashable_items = tuple((key, repr(value)) for key, value in sorted(self._store.items()))
-        return hash((hashable_items, self.input_keys))
-
     def keys(self, include_dspy=False):
-        return [k for k in self._store if not k.startswith("dspy_") or include_dspy]
+        return self._store.keys(include_dspy=include_dspy)
 
     def values(self, include_dspy=False):
-        return [v for k, v in self._store.items() if not k.startswith("dspy_") or include_dspy]
+        return self._store.values(include_dspy=include_dspy)
 
     def items(self, include_dspy=False):
-        return [(k, v) for k, v in self._store.items() if not k.startswith("dspy_") or include_dspy]
+        return self._store.items(include_dspy=include_dspy)
 
     def get(self, key, default=None):
         return self._store.get(key, default)
@@ -93,7 +105,11 @@ class Example:
 
     def as_labels(self) -> dict[str, Any]:
         input_keys = self.input_keys
-        return {key: self._store[key] for key in self._store if key not in input_keys and not key.startswith("dspy_")}
+        return {
+            key: self._store[key]
+            for key in self._store
+            if key not in input_keys and not key.startswith("dspy_")
+        }
 
     def __iter__(self):
         return iter(dict(self._store))
@@ -105,7 +121,7 @@ class Example:
             if key == "_input_keys":
                 input_keys = value
             elif key == "_store":
-                store = value.copy()
+                store = value.copy() if isinstance(value, RecordStore) else RecordStore(value).copy()
             else:
                 store[key] = value
         return Example(_store=store, _input_keys=input_keys)
@@ -117,4 +133,4 @@ class Example:
         return copied
 
     def to_dict(self) -> dict[str, Any]:
-        return {key: to_jsonable(value) for key, value in self._store.items()}
+        return self._store.to_dict()

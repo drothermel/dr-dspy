@@ -53,8 +53,7 @@ ReflectiveExample = TypedDict(
 
 
 class ScoreWithFeedback(Prediction):
-    score: float
-    feedback: str
+    """Prediction carrying optimizer ``score`` and ``feedback`` fields."""
 
 
 class PredictorFeedbackFn(Protocol):

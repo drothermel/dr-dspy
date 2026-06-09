@@ -3,20 +3,19 @@ from typing import Any
 
 from typing_extensions import override
 
-from dspy.primitives.example import Example
+from dspy.primitives.record_store import RecordStore
+
+_PREDICTION_RESERVED = frozenset({"_store", "_completions", "_lm_usage"})
 
 
-class Prediction(Example):
+class Prediction:
     def __init__(self, **kwargs: Any) -> None:
-        super().__init__(_store=dict(kwargs))
-        del self._demos
-        del self._input_keys
-        self._completions = None
-        self._lm_usage = None
+        object.__setattr__(self, "_store", RecordStore(kwargs))
+        object.__setattr__(self, "_completions", None)
+        object.__setattr__(self, "_lm_usage", None)
 
     @classmethod
-    def from_record(cls, record: Mapping[str, Any], *, input_keys: tuple[str, ...] = ()) -> "Prediction":
-        del input_keys
+    def from_record(cls, record: Mapping[str, Any]) -> "Prediction":
         return cls(**dict(record))
 
     def get_lm_usage(self):
@@ -29,8 +28,48 @@ class Prediction(Example):
     def from_completions(cls, list_or_dict, task_spec=None):
         obj = cls()
         obj._completions = Completions(list_or_dict, task_spec=task_spec)
-        obj._store = {k: v[0] for k, v in obj._completions.items()}
+        object.__setattr__(obj, "_store", RecordStore({k: v[0] for k, v in obj._completions.items()}))
         return obj
+
+    @override
+    def __getattribute__(self, key: str) -> Any:
+        if key in _PREDICTION_RESERVED or key.startswith("_"):
+            return super().__getattribute__(key)
+        store = super().__getattribute__("_store")
+        if key in store:
+            return store[key]
+        return super().__getattribute__(key)
+
+    @override
+    def __setattr__(self, key: str, value: Any) -> None:
+        if key in _PREDICTION_RESERVED or key.startswith("_"):
+            super().__setattr__(key, value)
+        else:
+            super().__getattribute__("_store")[key] = value
+
+    def __getitem__(self, key: str) -> Any:
+        return self._store[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self._store[key] = value
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._store
+
+    def __iter__(self):
+        return iter(self._store)
+
+    def keys(self, include_dspy=False):
+        return self._store.keys(include_dspy=include_dspy)
+
+    def items(self, include_dspy=False):
+        return self._store.items(include_dspy=include_dspy)
+
+    def get(self, key, default=None):
+        return self._store.get(key, default)
+
+    def to_dict(self) -> dict[str, Any]:
+        return self._store.to_dict()
 
     @override
     def __repr__(self) -> str:
