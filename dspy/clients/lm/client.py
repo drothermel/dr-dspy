@@ -4,18 +4,18 @@ from typing import Any, Literal
 from typing_extensions import override
 
 from dspy.clients._litellm import is_litellm_context_window_error
-from dspy.clients.finetune import ReinforceJob, TrainDataFormat, TrainingJob
-from dspy.clients.finetune import lm as finetune_lm
-from dspy.clients.finetune.protocol import FinetuneProvider
-from dspy.clients.lm.errors import (
+from dspy.clients.errors import (
     _exception_message,
     _exception_provider_code,
     _exception_request_id,
     _exception_retry_after,
     _exception_status,
-    _lm_error_class_from_litellm_exception,
     _lm_error_class_from_status,
 )
+from dspy.clients.finetune import ReinforceJob, TrainDataFormat, TrainingJob
+from dspy.clients.finetune import lm as finetune_lm
+from dspy.clients.finetune.protocol import FinetuneProvider
+from dspy.clients.lm.errors import _lm_error_class_from_litellm_exception
 from dspy.clients.lm.litellm_access import _get_litellm
 from dspy.clients.lm.transport import (
     completion_fn_for_model_type,

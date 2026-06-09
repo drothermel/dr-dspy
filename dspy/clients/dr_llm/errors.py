@@ -10,7 +10,7 @@ from dr_llm.backends.errors import (
 )
 from dr_llm.errors import ProviderSemanticError, ProviderTransportError
 
-from dspy.clients.lm.errors import (
+from dspy.clients.errors import (
     _exception_message,
     _exception_status,
     _lm_error_class_from_status,
