@@ -2,7 +2,6 @@ import logging
 from typing import Any
 
 from dspy.adapters.types.tool import Tool
-from dspy.core.types.call_options import ModuleCallOptions
 from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.agent_helpers import format_tool_exception
 from dspy.predict.agent_termination import AgentTerminationReason
@@ -10,6 +9,7 @@ from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.predict import Predict
 from dspy.predict.tools import normalize_tools
 from dspy.primitives import Module, Prediction
+from dspy.runtime.call_options import ModuleCallOptions
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import TaskSpec, input_field, make_task_spec, output_field
 

@@ -1,10 +1,10 @@
 import logging
 
-from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.chain_of_thought import ChainOfThought
 from dspy.predict.code_execution import execute_generated_code, parse_generated_code
 from dspy.primitives import Module
 from dspy.primitives.python_interpreter import PythonInterpreter
+from dspy.runtime.call_options import ModuleCallOptions
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 

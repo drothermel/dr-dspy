@@ -10,8 +10,8 @@ from dspy.history.repl_history import REPLHistory  # noqa: TC001
 from dspy.history.turn_log import TurnLog  # noqa: TC001
 
 if TYPE_CHECKING:
-    from dspy.core.types.call_options import ModuleCallOptions
     from dspy.history.protocol import REPLHistoryModule, TurnLogModule
+    from dspy.runtime.call_options import ModuleCallOptions
     from dspy.runtime.run_context import RunContext
 
 logger = logging.getLogger(__name__)

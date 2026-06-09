@@ -55,8 +55,6 @@ from dspy.core.types.stream import (
     LMToolCallDelta,
 )
 
-from dspy.core.types.call_options import ModuleCallOptions, PredictOptions  # isort: skip
-
 UserMessageContent = str | list[dict[str, Any]]
 
 __all__ = [
@@ -78,8 +76,6 @@ __all__ = [
     "merge_lm_config",
     "merge_lm_request_config",
     "merge_provider_options",
-    "ModuleCallOptions",
-    "PredictOptions",
     "LMDocumentPart",
     "CallRecord",
     "LMImageDelta",

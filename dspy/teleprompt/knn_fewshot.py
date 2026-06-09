@@ -3,9 +3,9 @@ import types
 from pydantic import BaseModel
 
 from dspy.clients.embedding import Embedder
-from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.knn import KNN
 from dspy.primitives import Example, Module
+from dspy.runtime.call_options import ModuleCallOptions
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import KNNFewShotCompileParams

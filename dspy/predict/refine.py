@@ -5,12 +5,12 @@ import orjson
 
 from dspy.adapters.call.wrappers import HintInjectingAdapter
 from dspy.adapters.prompt_format import get_field_spec_description_string
-from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.predict import Predict
 from dspy.predict.sampling import SamplingAttempt, sample_with_reward
 from dspy.primitives import Module, Prediction
 from dspy.propose.source_format import get_formatted_source
 from dspy.runtime import run_with_trace
+from dspy.runtime.call_options import ModuleCallOptions
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.runtime.transparency.resolve import require_adapter
 from dspy.task_spec.framework.refine import OfferFeedbackTaskSpec

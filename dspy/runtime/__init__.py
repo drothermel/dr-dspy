@@ -10,6 +10,7 @@ import importlib
 from typing import Any
 
 from dspy.runtime.async_parallel import BoundedRunStats, resolve_max_concurrency, resolve_max_errors, run_bounded
+from dspy.runtime.call_options import ModuleCallOptions
 from dspy.runtime.callback import ACTIVE_CALL_ID, Callback, NoOpCallback, with_callbacks
 from dspy.runtime.config import CallLogMode, CallSite, ExecutionConfig, TelemetryConfig, TransparencyMode
 from dspy.runtime.inspect_call_log import pretty_print_call_log
@@ -33,6 +34,7 @@ __all__ = [
     "CallSite",
     "CompiledCall",
     "ExecutionConfig",
+    "ModuleCallOptions",
     "FailedPrediction",
     "RunContext",
     "TelemetryConfig",

@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class LMForward(Protocol):
-    """Async LM protocol for per-call overrides via ``PredictOptions(lm=...)``.
+    """Async LM protocol for per-call overrides via ``dspy.predict.call_options.PredictOptions(lm=...)``.
 
     Implementations must provide ``aforward(request) -> LMResponse``.
     ``BaseLM.__call__(request, run=..., compiled=...)`` is the runtime entry

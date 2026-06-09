@@ -5,9 +5,10 @@ from typing_extensions import override
 
 from dspy.clients.base_lm import BaseLM
 from dspy.core.types import LMConfig, coerce_lm_config, merge_lm_config
-from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
+from dspy.predict.call_options import PredictOptions
 from dspy.predict.options import reject_reserved_predict_inputs, resolve_predict_options
 from dspy.primitives import Module, Prediction
+from dspy.runtime.call_options import ModuleCallOptions
 from dspy.runtime.callback import Callback
 from dspy.runtime.run_context import RunContext
 from dspy.runtime.transparency.resolve import merge_call_config, resolve_call_site

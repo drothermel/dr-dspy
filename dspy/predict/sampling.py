@@ -6,10 +6,10 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from dspy.clients.base_lm import BaseLM  # noqa: TC001 — runtime SamplingAttempt fields
-from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.errors import AdapterParseError, SamplingExhaustedError, is_retryable_lm_error
 from dspy.primitives import Module, Prediction
 from dspy.runtime import run_with_trace
+from dspy.runtime.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.runtime.run_context import RunContext  # noqa: TC001 — runtime signature typing
 
 AttemptExecutor = Callable[["SamplingAttempt"], Awaitable[tuple[Prediction, list]]]

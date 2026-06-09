@@ -7,15 +7,16 @@ import pydantic
 
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
-from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
 from dspy.core.types.config import LMConfig, LMToolChoice
 from dspy.errors import AdapterParseError
 from dspy.history import TruncationExhaustedError, TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.agent_helpers import format_tool_exception
 from dspy.predict.agent_termination import AgentTerminationReason
+from dspy.predict.call_options import PredictOptions
 from dspy.predict.predict import Predict
 from dspy.predict.tools import normalize_tools
 from dspy.primitives import Module, Prediction
+from dspy.runtime.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 

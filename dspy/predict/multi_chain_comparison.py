@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from dspy.core.types import LMConfig, merge_lm_config
-from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.predict.predict import Predict
 from dspy.primitives import Module, Prediction
+from dspy.runtime.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.runtime.run_context import RunContext  # noqa: TC001 — runtime signature typing
 from dspy.task_spec import TaskSpec, input_field, output_field
 

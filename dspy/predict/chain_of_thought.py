@@ -1,8 +1,8 @@
 from dspy.adapters.types.reasoning import Reasoning
-from dspy.core.types.call_options import ModuleCallOptions
 from dspy.core.types.config import LMConfig
 from dspy.predict.predict import Predict
 from dspy.primitives import Module, Prediction
+from dspy.runtime.call_options import ModuleCallOptions
 from dspy.runtime.callback import Callback
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import TaskSpec, output_field

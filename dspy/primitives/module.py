@@ -22,9 +22,9 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     from dspy.clients.base_lm import BaseLM
-    from dspy.core.types.call_options import ModuleCallOptions
     from dspy.primitives.batch_result import BatchResult
     from dspy.primitives.example import Example
+    from dspy.runtime.call_options import ModuleCallOptions
 
 logger = logging.getLogger(__name__)
 

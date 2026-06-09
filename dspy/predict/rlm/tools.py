@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
 from dspy.adapters.types.tool import Tool  # noqa: TC001 — runtime validate_tools signature
-from dspy.core.types.call_options import PredictOptions
+from dspy.predict.call_options import PredictOptions
 from dspy.predict.rlm.sync_bridge import _run_sub_lm_async
 from dspy.predict.tools import RLM_RESERVED_TOOL_NAMES, validate_tool_names
 from dspy.runtime.config import CallSite

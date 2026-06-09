@@ -4,12 +4,12 @@ from typing import Any, cast
 
 from pydantic import BaseModel
 
-from dspy.core.types.call_options import ModuleCallOptions
 from dspy.evaluate.metric_invoke import invoke_metric
 from dspy.predict.parallel import Parallel
 from dspy.predict.predict import Predict
 from dspy.primitives import Example, Module
 from dspy.runtime import run_with_trace
+from dspy.runtime.call_options import ModuleCallOptions
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec.predictor_context import get_task_spec, set_task_spec
 from dspy.teleprompt.avatar.task_specs import (

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from dspy.core.types.call_options import PredictOptions, ensure_predict_options_built
+from dspy.predict.call_options import PredictOptions, ensure_predict_options_built
 
 RESERVED_PREDICT_INPUT_KEYS = frozenset(
     {"run", "options", "lm", "config", "demos", "task_spec", "_trace", "prediction"}

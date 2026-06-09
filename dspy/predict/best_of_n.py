@@ -1,8 +1,8 @@
 from collections.abc import Callable
 
-from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.sampling import sample_with_reward
 from dspy.primitives import Module, Prediction
+from dspy.runtime.call_options import ModuleCallOptions
 from dspy.runtime.run_context import RunContext, resolve_run
 
 

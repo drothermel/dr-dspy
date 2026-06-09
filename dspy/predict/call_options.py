@@ -2,18 +2,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, SkipValidation
+from pydantic import ConfigDict, SkipValidation
 
-from dspy.core.types.config import LMConfig
+from dspy.core.types.config import LMConfig  # noqa: TC001 — Pydantic field type
 from dspy.core.types.lm import LMForward
+from dspy.runtime.call_options import ModuleCallOptions
 from dspy.task_spec.task_spec import TaskSpec
 
 
-class ModuleCallOptions(BaseModel):
+class PredictOptions(ModuleCallOptions):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-
-class PredictOptions(ModuleCallOptions):
     lm: SkipValidation[LMForward | None] = None
     config: LMConfig | None = None
     demos: list[dict[str, Any]] | None = None

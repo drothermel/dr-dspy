@@ -8,7 +8,7 @@ from dspy.errors import AdapterParseError
 from dspy.primitives import Example, Module, Prediction
 
 if TYPE_CHECKING:
-    from dspy.core.types.call_options import ModuleCallOptions
+    from dspy.runtime.call_options import ModuleCallOptions
     from dspy.runtime.run_context import RunContext
     from dspy.task_spec import TaskSpec
 

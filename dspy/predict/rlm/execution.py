@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any, cast
 import pydantic
 
 from dspy.adapters.utils import parse_value
-from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.history import REPLEntry, REPLHistory, REPLVariable, TurnEvent
 from dspy.history.truncation import call_with_repl_history_truncation
 from dspy.predict.agent_termination import AgentTerminationReason
@@ -24,6 +23,7 @@ from dspy.primitives import (
 )
 from dspy.primitives.code_interpreter import SIMPLE_TYPES
 from dspy.primitives.python_interpreter import PythonInterpreter
+from dspy.runtime.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator

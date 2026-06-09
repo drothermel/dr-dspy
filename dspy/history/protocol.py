@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, Self, runtime_checkable
 
 if TYPE_CHECKING:
-    from dspy.core.types.call_options import ModuleCallOptions
     from dspy.history.repl_history import REPLHistory
     from dspy.history.turn_event import TurnEvent
     from dspy.history.turn_log import TurnLog
+    from dspy.runtime.call_options import ModuleCallOptions
     from dspy.runtime.run_context import RunContext
 
 

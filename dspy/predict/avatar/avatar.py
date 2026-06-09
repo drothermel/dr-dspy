@@ -1,13 +1,13 @@
 from typing import Any, cast
 
 from dspy.adapters.types.tool import Tool
-from dspy.core.types.call_options import ModuleCallOptions
 from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.agent_termination import AgentTerminationReason
 from dspy.predict.avatar.models import Action, ActionOutput
 from dspy.predict.predict import Predict
 from dspy.predict.tools import normalize_tools
 from dspy.primitives import Module, Prediction
+from dspy.runtime.call_options import ModuleCallOptions
 from dspy.runtime.run_context import RunContext
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
 
