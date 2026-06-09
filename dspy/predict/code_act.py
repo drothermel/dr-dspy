@@ -100,11 +100,11 @@ class CodeAct(Module):
             turn_log = turn_log.append_turn(event)
             if code_data.finished:
                 break
-        extract = await call_with_turn_log_truncation(
+        extracted = await call_with_turn_log_truncation(
             self.extractor, turn_log=turn_log, run=run, options=options, **inputs
         )
         self.interpreter.shutdown()
-        return Prediction(turn_log=turn_log, **extract)
+        return Prediction(turn_log=extracted.turn_log, **dict(extracted.result.items()))
 
     def _parse_code(self, code_data):
         code = getattr(code_data, "generated_code", "")

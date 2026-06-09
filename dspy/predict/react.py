@@ -78,9 +78,10 @@ class ReAct(Module):
         max_iters = input_args.pop("max_iters", self.max_iters)
         for _idx in range(max_iters):
             try:
-                pred = await self._call_with_potential_turn_log_truncation(
-                    self.react, turn_log, run, options=options, **input_args
+                extracted = await call_with_turn_log_truncation(
+                    self.react, turn_log=turn_log, run=run, options=options, **input_args
                 )
+                pred = extracted.result
             except ValueError as err:
                 logger.warning(f"Ending the agent loop: Agent failed to select a valid tool: {_fmt_exc(err)}")
                 break
@@ -99,10 +100,10 @@ class ReAct(Module):
             )
             if pred.next_tool_name == "finish":
                 break
-        extract = await call_with_turn_log_truncation(
+        extracted = await call_with_turn_log_truncation(
             self.extract, turn_log=turn_log, run=run, options=options, **input_args
         )
-        return Prediction(turn_log=turn_log, **extract)
+        return Prediction(turn_log=extracted.turn_log, **dict(extracted.result.items()))
 
 
 def _fmt_exc(err: BaseException, *, limit: int = 5) -> str:
