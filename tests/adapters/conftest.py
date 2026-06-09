@@ -43,7 +43,7 @@ class CapturingLM(BaseLM):
         super().__init__(model=source_lm.model, model_type=source_lm.model_type)
         self.source_lm = source_lm
         self.calls = []
-        for key in ("reasoning", "reasoning_effort"):
+        for key in ("reasoning",):
             if key in source_lm.kwargs:
                 self.kwargs[key] = source_lm.kwargs[key]
 

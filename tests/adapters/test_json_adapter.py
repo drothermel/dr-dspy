@@ -1308,7 +1308,7 @@ def test_json_adapter_native_reasoning():
 
     lm = LM(
         model="anthropic/claude-3-7-sonnet-20250219",
-        provider_options=LMProviderOptions(reasoning_effort="low"),
+        provider_options=LMProviderOptions(extensions={"reasoning": {"effort": "low"}}),
     )
     with mock.patch("litellm.acompletion", new_callable=mock.AsyncMock) as mock_completion:
         mock_completion.return_value = ModelResponse(

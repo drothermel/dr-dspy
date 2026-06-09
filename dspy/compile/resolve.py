@@ -5,6 +5,7 @@ from typing import Any
 
 from dspy.adapters.base import Adapter
 from dspy.clients.base_lm import BaseLM
+from dspy.clients.lm_normalize import lm_kwargs_max_tokens
 from dspy.core.types.config import LMConfig, _merge_lm_config, coerce_lm_config, lm_defaults_config
 from dspy.task_spec import TaskSpec
 from dspy.utils.transparency import CompiledCall, TransparencyMode
@@ -51,7 +52,7 @@ def resolve_lm_config(
     for field in ("temperature", "max_tokens", "n", "top_p"):
         lm_value = getattr(lm, "kwargs", {}).get(field)
         if lm_value is None and field == "max_tokens":
-            lm_value = getattr(lm, "kwargs", {}).get("max_completion_tokens")
+            lm_value = lm_kwargs_max_tokens(getattr(lm, "kwargs", {}))
         call_value = getattr(merged_request, field, None)
         if call_value is not None and call_value != lm_value:
             provenance[field] = "predict.config"

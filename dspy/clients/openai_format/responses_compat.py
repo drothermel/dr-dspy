@@ -3,7 +3,7 @@ from typing import Any
 import pydantic
 
 
-def _convert_chat_request_to_responses_request(request: dict[str, Any]):
+def convert_chat_request_to_responses_request(request: dict[str, Any]) -> dict[str, Any]:
     request = dict(request)
     if "messages" in request:
         input_items = []

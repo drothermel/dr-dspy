@@ -97,7 +97,9 @@ def test_reasoning_effort_responses_api(make_run):
 
 
 def test_responses_api_converts_images_correctly():
-    from dspy.clients.lm import _convert_chat_request_to_responses_request
+    from dspy.clients.openai_format.responses_compat import (
+        convert_chat_request_to_responses_request as _convert_chat_request_to_responses_request,
+    )
 
     request_with_base64_image = {
         "model": "openai/gpt-5-mini",
@@ -143,7 +145,9 @@ def test_responses_api_converts_images_correctly():
 
 
 def test_responses_api_converts_files_correctly():
-    from dspy.clients.lm import _convert_chat_request_to_responses_request
+    from dspy.clients.openai_format.responses_compat import (
+        convert_chat_request_to_responses_request as _convert_chat_request_to_responses_request,
+    )
 
     request_with_file = {
         "model": "openai/gpt-5-mini",
@@ -213,7 +217,9 @@ def test_responses_api_converts_files_correctly():
 
 
 def test_responses_api_preserves_multi_message_structure(make_run):
-    from dspy.clients.lm import _convert_chat_request_to_responses_request
+    from dspy.clients.openai_format.responses_compat import (
+        convert_chat_request_to_responses_request as _convert_chat_request_to_responses_request,
+    )
 
     request = {
         "model": "openai/gpt-5-mini",

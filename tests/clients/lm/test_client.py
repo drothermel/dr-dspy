@@ -128,12 +128,9 @@ def test_reasoning_model_token_parameter(make_run):
             max_tokens=16000 if is_reasoning_model else 1000,
         )
         if is_reasoning_model:
-            assert "max_completion_tokens" in lm.kwargs
-            assert "max_tokens" not in lm.kwargs
-            assert lm.kwargs["max_completion_tokens"] == 16000
+            assert lm.kwargs["max_tokens"] == 16000
         else:
             assert "max_completion_tokens" not in lm.kwargs
-            assert "max_tokens" in lm.kwargs
             assert lm.kwargs["max_tokens"] == 1000
 
 
@@ -145,10 +142,10 @@ def test_reasoning_model_requirements(model_name, make_run):
     ):
         LM(model=model_name, temperature=0.7, max_tokens=1000)
     lm = LM(model=model_name, temperature=1.0, max_tokens=16000)
-    assert lm.kwargs["max_completion_tokens"] == 16000
+    assert lm.kwargs["max_tokens"] == 16000
     lm = LM(model=model_name)
     assert lm.kwargs.get("temperature") is None
-    assert lm.kwargs.get("max_completion_tokens") is None
+    assert lm.kwargs.get("max_tokens") is None
 
 
 def test_gpt_5_chat_not_reasoning_model(make_run):
@@ -407,8 +404,7 @@ def test_dump_state():
 def test_reasoning_model_dump_state_uses_constructor_max_tokens():
     lm = LM(model="openai/gpt-5-nano", temperature=1.0, max_tokens=16000, num_retries=1)
     state = lm.dump_state()
-    assert lm.kwargs["max_completion_tokens"] == 16000
-    assert "max_completion_tokens" not in state
+    assert lm.kwargs["max_tokens"] == 16000
     assert state["max_tokens"] == 16000
 
 
@@ -449,7 +445,7 @@ def test_reasoning_model_load_state_round_trips_canonical_state(make_run):
     lm = LM(model="openai/gpt-5-nano", temperature=1.0, max_tokens=16000, num_retries=1)
     loaded_lm = BaseLM.load_state(lm.dump_state())
     assert isinstance(loaded_lm, LM)
-    assert loaded_lm.kwargs["max_completion_tokens"] == 16000
+    assert loaded_lm.kwargs["max_tokens"] == 16000
     assert loaded_lm.dump_state() == lm.dump_state()
 
 
@@ -467,8 +463,7 @@ def test_reasoning_model_load_state_accepts_max_completion_tokens_alias(make_run
     }
     loaded_lm = BaseLM.load_state(state)
     assert isinstance(loaded_lm, LM)
-    assert loaded_lm.kwargs["max_completion_tokens"] == 16000
-    assert "max_completion_tokens" not in loaded_lm.dump_state()
+    assert loaded_lm.kwargs["max_tokens"] == 16000
     assert loaded_lm.dump_state()["max_tokens"] == 16000
 
 

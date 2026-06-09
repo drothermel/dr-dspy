@@ -73,8 +73,6 @@ class AdapterNativeMixin(AdapterMixinBase):
             reasoning_effort = config.reasoning.effort
         elif isinstance(lm.kwargs.get("reasoning"), Mapping):
             reasoning_effort = lm.kwargs["reasoning"].get("effort")
-        elif lm.kwargs.get("reasoning_effort") is not None:
-            reasoning_effort = lm.kwargs["reasoning_effort"]
         else:
             reasoning_effort = None
         if reasoning_effort is None or not lm.supports_reasoning:

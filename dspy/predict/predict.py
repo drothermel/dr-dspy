@@ -85,7 +85,7 @@ class Predict(Module, Parameter):
     def load_state(
         self, state: dict, *, allow_unsafe_lm_state: bool = False, custom_types: dict[str, type] | None = None
     ) -> "Predict":
-        excluded_keys = ["task_spec", "extended_signature", "lm", "config"]
+        excluded_keys = ["task_spec", "lm", "config"]
         for name, value in state.items():
             if name not in excluded_keys:
                 setattr(self, name, value)

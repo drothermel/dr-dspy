@@ -42,7 +42,7 @@ def test_chain_of_thought_with_native_reasoning(make_run):
         model="anthropic/claude-3-7-sonnet-20250219",
         temperature=0.0,
         max_tokens=4000,
-        provider_options=LMProviderOptions(cache=False, reasoning_effort="low"),
+        provider_options=LMProviderOptions(cache=False, extensions={"reasoning": {"effort": "low"}}),
     )
     run = make_run(lm=lm, adapter=ChatAdapter())
     with mock.patch("litellm.acompletion") as mock_completion:

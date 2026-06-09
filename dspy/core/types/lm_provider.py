@@ -18,7 +18,6 @@ class LMProviderOptions(BaseModel):
     max_retries: int | None = None
     custom_llm_provider: str | None = None
     model_list: list[dict[str, Any]] | None = None
-    reasoning_effort: str | None = None
     response_format: Any | None = None
     extensions: dict[str, Any] = Field(default_factory=dict)
 

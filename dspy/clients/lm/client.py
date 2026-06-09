@@ -17,7 +17,7 @@ from dspy.clients.lm.errors import (
     _lm_error_class_from_status,
 )
 from dspy.clients.lm.headers import _add_dspy_identifier_to_headers
-from dspy.clients.lm.responses_compat import _convert_chat_request_to_responses_request
+from dspy.clients.lm_normalize import normalize_lm_kwargs, normalize_lm_state
 from dspy.clients.openai import OpenAIProvider
 from dspy.clients.openai_format import (
     completion_to_lm_response,
@@ -28,6 +28,7 @@ from dspy.clients.openai_format import (
     to_openai_text_request,
     usage_from_response,
 )
+from dspy.clients.openai_format.responses_compat import convert_chat_request_to_responses_request
 from dspy.clients.provider import Provider, ReinforceJob, TrainingJob
 from dspy.clients.utils_finetune import TrainDataFormat
 from dspy.core.types import LMRequest, LMResponse
@@ -106,8 +107,8 @@ class LM(BaseLM):
             if temperature is not None:
                 initial_kwargs["temperature"] = temperature
             if max_tokens is not None:
-                initial_kwargs["max_completion_tokens"] = max_tokens
-            return initial_kwargs
+                initial_kwargs["max_tokens"] = max_tokens
+            return normalize_lm_kwargs(initial_kwargs)
         return super()._get_initial_kwargs(
             temperature=temperature,
             max_tokens=max_tokens,
@@ -220,7 +221,7 @@ class LM(BaseLM):
         lm_defaults = {
             key: value
             for key, value in self.kwargs.items()
-            if value is not None and key not in {"cache", "reasoning_effort", "reasoning"}
+            if value is not None and key not in {"cache", "reasoning"}
         }
         return {**lm_defaults, **provider_request}
 
@@ -326,20 +327,12 @@ class LM(BaseLM):
         )
         if self.use_developer_role:
             state["use_developer_role"] = self.use_developer_role
-        if _is_openai_reasoning_model(self.model) and "max_completion_tokens" in state:
-            state["max_tokens"] = state.pop("max_completion_tokens")
-        return state
+        return normalize_lm_state(state)
 
     @classmethod
     @override
     def load_state(cls, state: dict[str, Any], *, allow_custom_lm_class: bool = False):
-        state = dict(state)
-        model = state.get("model")
-        if isinstance(model, str) and _is_openai_reasoning_model(model) and ("max_completion_tokens" in state):
-            if "max_tokens" not in state:
-                state["max_tokens"] = state["max_completion_tokens"]
-            state.pop("max_completion_tokens")
-        return super().load_state(state, allow_custom_lm_class=allow_custom_lm_class)
+        return super().load_state(normalize_lm_state(dict(state)), allow_custom_lm_class=allow_custom_lm_class)
 
     def _check_truncation(self, results) -> None:
         if self.model_type != "responses" and any(c.finish_reason == "length" for c in results["choices"]):
@@ -383,7 +376,7 @@ async def alitellm_responses_completion(request: dict[str, Any], num_retries: in
     cache = cache or {"no-cache": True, "no-store": True}
     request = dict(request)
     headers = request.pop("headers", None)
-    request = _convert_chat_request_to_responses_request(request)
+    request = convert_chat_request_to_responses_request(request)
     return await _get_litellm().aresponses(
         cache=cache,
         num_retries=num_retries,

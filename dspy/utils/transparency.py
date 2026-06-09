@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from dspy.clients.lm_normalize import lm_kwargs_max_tokens
 from dspy.core.types import LMConfig
 from dspy.task_spec import TaskSpec
 
@@ -65,9 +66,7 @@ def collect_task_spec_violations(task_spec: TaskSpec | None) -> list[str]:
 def collect_config_violations(*, config: LMConfig, lm_kwargs: dict[str, Any], cache: bool | None) -> list[str]:
     violations: list[str] = []
     temperature = config.temperature if config.temperature is not None else lm_kwargs.get("temperature")
-    max_tokens = config.max_tokens if config.max_tokens is not None else lm_kwargs.get("max_tokens")
-    if max_tokens is None and lm_kwargs.get("max_completion_tokens") is not None:
-        max_tokens = lm_kwargs.get("max_completion_tokens")
+    max_tokens = config.max_tokens if config.max_tokens is not None else lm_kwargs_max_tokens(lm_kwargs)
     if temperature is None:
         violations.append(
             "temperature is None (provider default). Fix: LM(..., temperature=0.0) or pass config={'temperature': ...}."

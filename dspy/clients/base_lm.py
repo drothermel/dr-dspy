@@ -5,6 +5,7 @@ import inspect
 import uuid
 from typing import Any, TextIO
 
+from dspy.clients.lm_normalize import normalize_lm_kwargs, normalize_lm_state
 from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
 from dspy.core.types import CallRecord, LMRequest, LMResponse
 from dspy.core.types.history import _history_request_messages_as_openai
@@ -90,7 +91,7 @@ class BaseLM:
             kwargs["temperature"] = temperature
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
-        return kwargs
+        return normalize_lm_kwargs(kwargs)
 
     @with_callbacks(kind="lm")
     async def __call__(
@@ -253,15 +254,13 @@ class BaseLM:
             if "allow_custom_lm_class" in inspect.signature(lm_cls.load_state).parameters:
                 return lm_cls.load_state(state, allow_custom_lm_class=allow_custom_lm_class)
             return lm_cls.load_state(state)
+        state = normalize_lm_state(state)
         model = state.pop("model")
         model_type = state.pop("model_type", "chat")
         num_retries = state.pop("num_retries", 3)
         provider_data = state.pop(PROVIDER_OPTIONS_STATE_KEY, None)
         temperature = state.pop("temperature", None)
         max_tokens = state.pop("max_tokens", None)
-        max_completion_tokens = state.pop("max_completion_tokens", None)
-        if max_tokens is None and max_completion_tokens is not None:
-            max_tokens = max_completion_tokens
         remaining = dict(state)
         if provider_data:
             remaining = {**provider_data, **remaining}
