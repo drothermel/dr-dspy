@@ -110,6 +110,17 @@ def test_lm_request_rejects_unsupported_reasoning_fields() -> None:
         lm_request_to_backend_request(request, lm=lm)
 
 
+def test_lm_request_rejects_reasoning_summary() -> None:
+    lm = DummyLM([{"answer": "x"}])
+    request = LMRequest(
+        model="openai/gpt-4.1-mini",
+        messages=[User(LMTextPart(text="hi"))],
+        config=LMConfig(reasoning=LMReasoningConfig(summary="auto")),
+    )
+    with pytest.raises(LMUnsupportedFeatureError, match=r"reasoning\.summary"):
+        lm_request_to_backend_request(request, lm=lm)
+
+
 def test_lm_request_maps_reasoning_effort() -> None:
     lm = DummyLM([{"answer": "x"}])
     request = LMRequest(
@@ -119,6 +130,7 @@ def test_lm_request_maps_reasoning_effort() -> None:
     )
     backend_request = lm_request_to_backend_request(request, lm=lm)
     assert backend_request.effort == EffortSpec.HIGH
+    assert backend_request.reasoning is None
 
 
 def test_effort_from_config_raises_on_invalid_effort() -> None:

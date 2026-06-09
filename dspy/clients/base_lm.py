@@ -288,7 +288,7 @@ class BaseLM:
         if max_tokens is not None:
             new_kwargs["max_tokens"] = max_tokens
         new_kwargs.update(new_instance.provider_options.to_kwargs())
-        new_instance.kwargs = new_kwargs
+        new_instance.kwargs = validate_lm_kwargs(new_kwargs)
         return new_instance
 
     def inspect_call_log(self, n: int = 1, file: "TextIO | None" = None) -> None:

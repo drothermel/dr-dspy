@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
+from dspy.errors import LMConfigurationError
+
 if TYPE_CHECKING:
     from dspy.clients.base_lm import BaseLM
 
@@ -26,4 +28,8 @@ def _lm_class_registry() -> dict[str, type]:
 
 
 def get_lm_class(class_path: str) -> type[BaseLM]:
-    return cast("type[BaseLM]", _lm_class_registry()[class_path])
+    registry = _lm_class_registry()
+    if class_path not in registry:
+        known = ", ".join(sorted(registry))
+        raise LMConfigurationError(f"Unknown serialized LM class `{class_path}`. Known builtin class paths: {known}.")
+    return cast("type[BaseLM]", registry[class_path])

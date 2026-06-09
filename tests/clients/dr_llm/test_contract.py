@@ -10,6 +10,11 @@ from dspy.clients.dr_llm import DrLlmDirectLM, DrLlmPoolLM
 from dspy.errors import LMConfigurationError
 
 
+def test_dr_llm_direct_lm_rejects_num_retries_kwarg() -> None:
+    with pytest.raises(TypeError, match="num_retries"):
+        DrLlmDirectLM("openai/gpt-4.1-mini", num_retries=3)
+
+
 def test_dr_llm_direct_lm_rejects_unknown_ctor_kwargs() -> None:
     with pytest.raises(TypeError, match="timeout"):
         DrLlmDirectLM("openai/gpt-4.1-mini", timeout=30)

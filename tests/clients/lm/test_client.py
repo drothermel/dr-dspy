@@ -19,6 +19,8 @@ except ImportError:
     pytest.skip(reason="litellm is not installed", allow_module_level=True)
 from dspy.clients.base_lm import LM_CLASS_STATE_KEY, BaseLM
 from dspy.clients.lm import LM
+from dspy.clients.lm_registry import BUILTIN_LM_CLASS_PATH, get_lm_class
+from dspy.clients.lm_strict import LegacyLMKeyError
 from dspy.core.types import (
     Assistant,
     CallRecord,
@@ -375,6 +377,31 @@ def test_base_lm_copy_is_shallow_runtime_copy_with_isolated_dspy_state():
     assert copied_lm.callbacks is not lm.callbacks
     assert copied_lm.kwargs == {"temperature": 0.2}
     assert lm.kwargs == {"temperature": 0.1}
+
+
+def test_base_lm_copy_rejects_legacy_kwargs_in_existing_state() -> None:
+    class CustomLM(BaseLM):
+        pass
+
+    lm = CustomLM(model="custom-model", temperature=0.1)
+    lm.kwargs["reasoning_effort"] = "high"
+    with pytest.raises(LegacyLMKeyError, match="reasoning_effort"):
+        lm.copy(temperature=0.5)
+
+
+def test_base_lm_copy_with_temperature_still_validates() -> None:
+    lm = LM(model="openai/gpt-4o-mini", temperature=0.1)
+    copied = lm.copy(temperature=0.5)
+    assert copied.kwargs["temperature"] == 0.5
+    assert lm.kwargs["temperature"] == 0.1
+
+
+def test_get_lm_class_unknown_path_lists_builtins() -> None:
+    with pytest.raises(LMConfigurationError, match=r"bogus\.path") as exc_info:
+        get_lm_class("bogus.path")
+    message = str(exc_info.value)
+    assert BUILTIN_LM_CLASS_PATH in message
+    assert "dspy.clients.dr_llm.direct.DrLlmDirectLM" in message
 
 
 def test_dump_state():

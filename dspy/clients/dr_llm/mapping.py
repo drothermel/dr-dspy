@@ -153,6 +153,9 @@ def lm_request_to_backend_request(
         messages=messages,
         max_tokens=merged.max_tokens,
         effort=_effort_from_config(merged, model=request.model),
+        # v1 maps only LMReasoningConfig.effort → BackendRequest.effort; provider-specific
+        # BackendRequest.reasoning objects are not wired. Extra reasoning fields are rejected
+        # in reject_unsupported_merged_config before this call.
         reasoning=None,
         sampling=_sampling_from_config(merged),
         metadata=dict(request.metadata),
