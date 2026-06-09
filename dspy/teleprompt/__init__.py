@@ -6,7 +6,6 @@ import importlib
 from typing import Any
 
 from dspy.teleprompt.compilation import CompileResult, CompileStats, ProgramCandidate
-from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.protocol import Teleprompter
 from dspy.teleprompt.registry import compile_params_type, register_teleprompter
 
@@ -40,6 +39,7 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "LabeledFewShotCompileParams": ("dspy.teleprompt.compile_params", "LabeledFewShotCompileParams"),
     "MIPROv2": ("dspy.teleprompt.mipro.optimizer", "MIPROv2"),
     "MIPROv2CompileParams": ("dspy.teleprompt.compile_params", "MIPROv2CompileParams"),
+    "OptimizerMetric": ("dspy.teleprompt.metrics", "OptimizerMetric"),
     "RandomSearchCompileParams": ("dspy.teleprompt.compile_params", "RandomSearchCompileParams"),
     "SIMBA": ("dspy.teleprompt.simba", "SIMBA"),
     "SIMBACompileParams": ("dspy.teleprompt.compile_params", "SIMBACompileParams"),

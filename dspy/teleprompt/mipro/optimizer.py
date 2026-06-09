@@ -1,12 +1,12 @@
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel
 
+from dspy.clients.lm import LM
 from dspy.runtime.async_parallel import resolve_max_errors
 from dspy.runtime.run_context import RunContext
 from dspy.teleprompt.compilation import CompileResult
 from dspy.teleprompt.compile_params import MIPROv2CompileParams
-from dspy.teleprompt.metrics import OptimizerMetric
 from dspy.teleprompt.mipro.bootstrap import bootstrap_fewshot_examples
 from dspy.teleprompt.mipro.propose import propose_instructions
 from dspy.teleprompt.mipro.search import optimize_prompt_parameters
@@ -21,14 +21,18 @@ from dspy.teleprompt.registry import register_teleprompter
 from dspy.teleprompt.task_spec_context import get_prompt_model
 from dspy.teleprompt.utils import make_optimizer_evaluator, optimizer_lm_context
 
+if TYPE_CHECKING:
+    from dspy.primitives import Module
+    from dspy.teleprompt.metrics import OptimizerMetric
+
 
 @register_teleprompter(params=MIPROv2CompileParams)
 class MIPROv2:
     def __init__(
         self,
-        metric: OptimizerMetric,
-        prompt_model: Any | None = None,
-        task_model: Any | None = None,
+        metric: "OptimizerMetric",
+        prompt_model: LM | None = None,
+        task_model: LM | None = None,
         teacher_run: RunContext | None = None,
         max_bootstrapped_demos: int = 4,
         max_labeled_demos: int = 4,
@@ -68,7 +72,7 @@ class MIPROv2:
         self.seed = seed
         self.rng = None
 
-    async def compile(self, student: Any, *, params: BaseModel, run: RunContext) -> CompileResult:
+    async def compile(self, student: "Module", *, params: BaseModel, run: RunContext) -> CompileResult:
         params = MIPROv2CompileParams.model_validate(params)
         trainset = params.trainset
         teacher = params.teacher
