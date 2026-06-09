@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["get_dependency_versions", "load", "save_program"]
+__all__ = ["get_dependency_versions", "load", "save_program", "warn_dependency_version_drift"]
 
 
 def get_dependency_versions() -> dict[str, str]:
@@ -27,6 +27,32 @@ def get_dependency_versions() -> dict[str, str]:
         "dspy": __version__,
         "cloudpickle": cloudpickle_version,
     }
+
+
+def warn_dependency_version_drift(
+    *,
+    saved: dict[str, str],
+    current: dict[str, str],
+    log: logging.Logger,
+) -> None:
+    for key in sorted(set(saved) | set(current)):
+        saved_version = saved.get(key)
+        current_version = current.get(key)
+        if saved_version is None and current_version is not None:
+            log.warning(
+                f"Saved metadata does not include `{key}` version tracking; current environment has `{key}=={current_version}`. "
+                "This file may predate dependency version checks — consider re-saving in the current environment."
+            )
+            continue
+        if current_version is None and saved_version is not None:
+            log.warning(
+                f"Current environment does not track `{key}` version, but saved metadata has `{key}=={saved_version}`."
+            )
+            continue
+        if saved_version != current_version:
+            log.warning(
+                f"There is a mismatch of {key} version between saved model and current environment. You saved with `{key}=={saved_version}`, but now you have `{key}=={current_version}`. This might cause errors or performance downgrade on the loaded model, please consider loading the model in the same environment as the saving environment."
+            )
 
 
 def save_program(
@@ -74,11 +100,11 @@ def load(path: str | Path, allow_pickle: bool = False) -> Any:
         metadata = orjson.loads(f.read())
     dependency_versions = get_dependency_versions()
     saved_dependency_versions = metadata["dependency_versions"]
-    for key, saved_version in saved_dependency_versions.items():
-        if dependency_versions[key] != saved_version:
-            logger.warning(
-                f"There is a mismatch of {key} version between saved model and current environment. You saved with `{key}=={saved_version}`, but now you have `{key}=={dependency_versions[key]}`. This might cause errors or performance downgrade on the loaded model, please consider loading the model in the same environment as the saving environment."
-            )
+    warn_dependency_version_drift(
+        saved=saved_dependency_versions,
+        current=dependency_versions,
+        log=logger,
+    )
     with (save_path / "program.pkl").open("rb") as f:
         loaded_program: Any = cloudpickle.load(f)
     return loaded_program

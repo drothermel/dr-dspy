@@ -8,7 +8,7 @@ from typing import cast
 import cloudpickle
 import orjson
 
-from dspy.persistence import get_dependency_versions
+from dspy.persistence import get_dependency_versions, warn_dependency_version_drift
 from dspy.persistence import save_program as persist_program
 from dspy.predict.parameter import Parameter
 from dspy.predict.protocol import Predictor
@@ -180,9 +180,9 @@ class BaseModule:
             raise ValueError(f"`path` must end with `.json` or `.pkl`, but received: {path}")
         dependency_versions = get_dependency_versions()
         saved_dependency_versions = state["metadata"]["dependency_versions"]
-        for key, saved_version in saved_dependency_versions.items():
-            if dependency_versions[key] != saved_version:
-                logger.warning(
-                    f"There is a mismatch of {key} version between saved model and current environment. You saved with `{key}=={saved_version}`, but now you have `{key}=={dependency_versions[key]}`. This might cause errors or performance downgrade on the loaded model, please consider loading the model in the same environment as the saving environment."
-                )
+        warn_dependency_version_drift(
+            saved=saved_dependency_versions,
+            current=dependency_versions,
+            log=logger,
+        )
         self.load_state(state, allow_unsafe_lm_state=allow_unsafe_lm_state)

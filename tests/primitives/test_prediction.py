@@ -15,7 +15,7 @@ def test_completions_accepts_dict_of_lists():
 
 def test_completions_rejects_non_list_values():
     with pytest.raises(ValueError, match="All Completions values must be lists"):
-        Completions({"answer": "not-a-list"})
+        Completions({"answer": "not-a-list"})  # ty: ignore[invalid-argument-type]
 
 
 def test_completions_rejects_mismatched_lengths():
@@ -58,3 +58,38 @@ def test_prediction_values():
     prediction = Prediction.from_record({"answer": "Paris", "dspy_hidden": 1})
     assert prediction.values() == ["Paris"]
     assert prediction.values(include_dspy=True) == ["Paris", 1]
+
+
+def test_prediction_score_numeric_ops():
+    low = Prediction(score=0.3)
+    high = Prediction(score=0.9)
+    assert float(low) == 0.3
+    assert low + 0.1 == pytest.approx(0.4)
+    assert 1.0 + high == pytest.approx(1.9)
+    assert high / 2 == pytest.approx(0.45)
+    assert 1.0 / high == pytest.approx(1.0 / 0.9)
+    assert low < high
+    assert high > low
+    assert low <= 0.3
+    assert high >= 0.9
+
+
+def test_prediction_score_comparison_requires_score_field():
+    prediction = Prediction.from_record({"answer": "Paris"})
+    with pytest.raises(ValueError, match="does not have a 'score' field"):
+        float(prediction)
+    with pytest.raises(ValueError, match="does not have a 'score' field"):
+        _ = prediction < 0.5
+
+
+def test_prediction_score_comparison_rejects_unsupported_types():
+    prediction = Prediction(score=0.5)
+    with pytest.raises(TypeError, match="Unsupported type for comparison"):
+        _ = prediction.__lt__("0.5")  # ty: ignore[invalid-argument-type]
+
+
+def test_prediction_lm_usage_round_trip():
+    usage = {"openai/gpt-4o-mini": {"total_tokens": 10}}
+    prediction = Prediction(score=1.0)
+    prediction.set_lm_usage(usage)
+    assert prediction.get_lm_usage() == usage

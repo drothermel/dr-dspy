@@ -215,12 +215,51 @@ def test_load_with_version_mismatch(tmp_path, make_run):
         logger.removeHandler(handler)
 
 
+def test_load_warns_when_saved_metadata_missing_dependency_keys(tmp_path):
+    save_versions = {"python": "3.9"}
+    load_versions = {"python": "3.9", "dspy": "2.5.0", "cloudpickle": "2.1"}
+    predict = Predict(QA_TASK_SPEC)
+
+    class ListHandler(logging.Handler):
+        def __init__(self):
+            super().__init__()
+            self.messages = []
+
+        @override
+        def emit(self, record):
+            self.messages.append(record.getMessage())
+
+    handler = ListHandler()
+    original_level = logger.level
+    logger.addHandler(handler)
+    logger.setLevel(logging.WARNING)
+    try:
+        save_path = tmp_path / "program.pkl"
+        with patch("dspy.primitives.base_module.get_dependency_versions", return_value=save_versions):
+            predict.save(save_path)
+        handler.messages.clear()
+        with patch("dspy.primitives.base_module.get_dependency_versions", return_value=load_versions):
+            loaded_predict = Predict(QA_TASK_SPEC)
+            loaded_predict.load(save_path, allow_pickle=True)
+        missing_key_messages = [
+            msg
+            for msg in handler.messages
+            if "does not include `dspy`" in msg or "does not include `cloudpickle`" in msg
+        ]
+        assert len(missing_key_messages) == 2
+        assert isinstance(loaded_predict, Predict)
+    finally:
+        logger.setLevel(original_level)
+        logger.removeHandler(handler)
+
+
 @pytest.mark.llm_call
 def test_single_module_call_with_usage_tracker(lm_for_test, make_run):
     make_run(lm=LM(lm_for_test, temperature=0.0), telemetry=TelemetryConfig(track_usage=True))
     predict = ChainOfThought(ts("question -> answer"))
     output = predict(question="What is the capital of France?")
     lm_usage = output.get_lm_usage()
+    assert lm_usage is not None
     assert len(lm_usage) == 1
     assert lm_usage[lm_for_test]["prompt_tokens"] > 0
     assert lm_usage[lm_for_test]["completion_tokens"] > 0
@@ -244,6 +283,7 @@ def test_multi_module_call_with_usage_tracker(lm_for_test, make_run):
     program = MyProgram()
     output = program(question="What is the capital of France?")
     lm_usage = output.get_lm_usage()
+    assert lm_usage is not None
     assert len(lm_usage) == 1
     assert lm_usage[lm_for_test]["prompt_tokens"] > 0
     assert lm_usage[lm_for_test]["prompt_tokens"] > 0
@@ -278,10 +318,12 @@ def test_usage_tracker_in_parallel(make_run):
         )
     ).results
     typed_results = cast("list[Prediction]", results)
-    assert typed_results[0].get_lm_usage() is not None
-    assert typed_results[1].get_lm_usage() is not None
-    assert typed_results[0].get_lm_usage().keys() == {"openai/gpt-4o-mini"}
-    assert typed_results[1].get_lm_usage().keys() == {"openai/gpt-3.5-turbo"}
+    usage0 = typed_results[0].get_lm_usage()
+    usage1 = typed_results[1].get_lm_usage()
+    assert usage0 is not None
+    assert usage1 is not None
+    assert usage0.keys() == {"openai/gpt-4o-mini"}
+    assert usage1.keys() == {"openai/gpt-3.5-turbo"}
 
 
 @pytest.mark.asyncio
