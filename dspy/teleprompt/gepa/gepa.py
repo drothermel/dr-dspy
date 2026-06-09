@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
 from typing_extensions import override
 
+from dspy._meta.experimental import experimental
 from dspy.primitives.prediction import Prediction
 from dspy.teleprompt.compile_params import GEPACompileParams
 from dspy.teleprompt.teleprompt import Teleprompter
-from dspy.utils.annotation import experimental
 
 if TYPE_CHECKING:
     from gepa import GEPAResult

@@ -5,7 +5,7 @@ import copy
 from typing_extensions import override
 
 
-class dotdict(dict):
+class dotdict(dict):  # noqa: N801
     def __getattr__(self, key):
         if key.startswith("__") and key.endswith("__"):
             return super().__getattribute__(key)

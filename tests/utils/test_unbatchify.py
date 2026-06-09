@@ -3,7 +3,7 @@ from concurrent.futures import Future
 from typing import Any, cast
 from unittest.mock import MagicMock
 
-from dspy.utils.unbatchify import Unbatchify
+from dspy._legacy.unbatchify import Unbatchify
 
 
 def simple_batch_processor(batch):

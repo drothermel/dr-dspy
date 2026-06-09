@@ -4,7 +4,7 @@ import functools
 import sys
 from typing import TYPE_CHECKING, Any, cast
 
-from dspy.utils.lazy_import import require
+from dspy._internal.lazy_import import require
 
 if TYPE_CHECKING:
     import types

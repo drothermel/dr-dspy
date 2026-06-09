@@ -3,8 +3,8 @@ from typing import Any, Literal
 import pydantic
 from typing_extensions import override
 
+from dspy._meta.experimental import experimental
 from dspy.adapters.types.base_type import Type
-from dspy.utils.annotation import experimental
 
 
 @experimental(version="3.0.4")

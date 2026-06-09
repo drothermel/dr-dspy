@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from dspy.utils.lazy_import import _INSTALL_HINTS, _detect_dspy_dist, _MissingModule, is_available, require
+from dspy._internal.lazy_import import _INSTALL_HINTS, _detect_dspy_dist, _MissingModule, is_available, require
 
 
 def test_is_available_true_for_stdlib():

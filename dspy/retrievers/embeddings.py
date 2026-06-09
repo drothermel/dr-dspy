@@ -8,9 +8,9 @@ from typing import Any, Protocol, cast
 import srsly
 from typing_extensions import override
 
+from dspy._internal.lazy_import import require
+from dspy._legacy.unbatchify import Unbatchify
 from dspy.primitives.prediction import Prediction
-from dspy.utils.lazy_import import require
-from dspy.utils.unbatchify import Unbatchify
 
 np = require("numpy")
 

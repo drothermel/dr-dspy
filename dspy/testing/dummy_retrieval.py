@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 
-from dspy.utils.lazy_import import require
+from dspy._internal.lazy_import import require
 
 np = require("numpy")
 

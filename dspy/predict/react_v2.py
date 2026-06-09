@@ -5,6 +5,7 @@ from typing import Any, get_args
 
 import pydantic
 
+from dspy._meta.experimental import experimental
 from dspy.adapters.types.reasoning import Reasoning
 from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
@@ -16,7 +17,6 @@ from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import FieldSpec, TaskSpec, input_field, make_task_spec, output_field
-from dspy.utils.annotation import experimental
 
 logger = logging.getLogger(__name__)
 

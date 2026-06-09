@@ -4,7 +4,7 @@ from typing import Any
 
 import requests
 
-from dspy.utils.dotdict import dotdict
+from dspy._legacy.dotdict import dotdict
 
 
 class ColBERTv2:

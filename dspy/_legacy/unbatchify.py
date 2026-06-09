@@ -1,7 +1,7 @@
-"""Background batching helper for sync callables.
+"""Legacy convenience types; prefer typed models for new code.
 
-Callers must invoke ``close()`` or use the context manager when done. Daemon
-threads are not reliably torn down by garbage collection.
+Background batching helper for sync callables. Callers must invoke ``close()``
+or use the context manager when done.
 """
 
 import queue

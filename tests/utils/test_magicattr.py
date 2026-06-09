@@ -2,7 +2,7 @@ from typing import Any, ClassVar, cast
 
 import pytest
 
-from dspy.utils import magicattr
+from dspy._legacy import magicattr
 
 
 class Test:

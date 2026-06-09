@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any, cast
 
-from dspy.utils.dotdict import dotdict
+from dspy._legacy.dotdict import dotdict
 
 try:
     from uuid import uuid4

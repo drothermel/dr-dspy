@@ -4,6 +4,7 @@ from typing import Any, TextIO
 
 from typing_extensions import override
 
+from dspy._legacy import magicattr
 from dspy.core.types.call_options import ModuleCallOptions
 from dspy.predict.parallel import Parallel
 from dspy.predict.protocol import Predictor
@@ -14,7 +15,6 @@ from dspy.runtime.callback import with_callbacks
 from dspy.runtime.inspect_call_log import pretty_print_call_log
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.runtime.usage_tracker import track_usage
-from dspy.utils import magicattr
 
 logger = logging.getLogger(__name__)
 

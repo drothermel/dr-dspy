@@ -1,9 +1,9 @@
 from collections.abc import Mapping
 from typing import Any
 
+from dspy._internal.lazy_import import require
 from dspy.clients.embedding import Embedder
 from dspy.primitives.example import Example
-from dspy.utils.lazy_import import require
 
 np = require("numpy")
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from dspy._meta.experimental import experimental
 from dspy.core.types.call_options import ModuleCallOptions  # noqa: TC001 — runtime signature typing
 from dspy.predict.predict import Predict
 from dspy.predict.rlm import execution as rlm_execution
@@ -13,7 +14,6 @@ from dspy.primitives.prediction import Prediction
 from dspy.primitives.repl_types import REPLHistory, REPLVariable
 from dspy.runtime.run_context import RunContext, resolve_run
 from dspy.task_spec import TaskSpec
-from dspy.utils.annotation import experimental
 
 if TYPE_CHECKING:
     from collections.abc import Callable

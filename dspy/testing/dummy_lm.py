@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 from typing_extensions import override
 
+from dspy._legacy.dotdict import dotdict
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.format_shared import FIELD_HEADER_PATTERN
 from dspy.clients.base_lm import BaseLM
@@ -17,7 +18,6 @@ from dspy.clients.openai_format import provider_tool_call_to_part
 from dspy.core.types import LMOutput, LMPart, LMRequest, LMResponse, LMTextPart, LMThinkingPart
 from dspy.core.types.lm_provider import LMProviderOptions
 from dspy.task_spec import FieldBinding, output_field
-from dspy.utils.dotdict import dotdict
 
 
 class DummyLM(BaseLM):

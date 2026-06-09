@@ -1,6 +1,6 @@
 from typing import Any, cast
 
-from dspy.utils.annotation import experimental, is_experimental
+from dspy._meta.experimental import experimental, is_experimental
 
 
 def test_experimental_decorator_on_function():

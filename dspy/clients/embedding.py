@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from dspy._internal.lazy_import import require
 from dspy.clients._litellm import get_litellm
 from dspy.core.types.embedding_options import EmbedderOptions, merge_embedder_options
-from dspy.utils.lazy_import import require
 
 np = require("numpy")
 

@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 
 from typing_extensions import override
 
+from dspy._internal.lazy_import import require
 from dspy.predict.parallel import Parallel
 from dspy.teleprompt.simba_utils import append_a_demo, append_a_rule, prepare_models_for_resampling, wrap_program
 from dspy.teleprompt.task_spec_context import get_prompt_model
 from dspy.teleprompt.teleprompt import Teleprompter
-from dspy.utils.lazy_import import require
 
 if TYPE_CHECKING:
     from pydantic import BaseModel

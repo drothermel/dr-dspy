@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Any, Self, cast
 import pydantic
 from typing_extensions import override
 
+from dspy._meta.experimental import experimental
 from dspy.adapters.types.base_type import Type
-from dspy.utils.annotation import experimental
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
