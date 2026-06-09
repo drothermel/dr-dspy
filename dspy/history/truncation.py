@@ -17,6 +17,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class TruncationExhaustedError(ValueError):
+    """Raised when context-window truncation retries are exhausted."""
+
+
 class TurnLogCallResult(BaseModel):
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
@@ -47,7 +51,9 @@ async def call_with_turn_log_truncation(
         except ContextWindowExceededError:
             logger.warning("Turn log exceeded the context window, truncating the oldest turn.")
             turn_log = turn_log.truncate_oldest()
-    raise ValueError(f"The context window was exceeded even after {max_attempts} attempts to truncate the turn log.")
+    raise TruncationExhaustedError(
+        f"The context window was exceeded even after {max_attempts} attempts to truncate the turn log."
+    )
 
 
 async def call_with_repl_history_truncation(
@@ -66,6 +72,6 @@ async def call_with_repl_history_truncation(
         except ContextWindowExceededError:
             logger.warning("REPL history exceeded the context window, truncating the oldest entry.")
             turn_log = turn_log.truncate_oldest()
-    raise ValueError(
+    raise TruncationExhaustedError(
         f"The context window was exceeded even after {max_attempts} attempts to truncate the REPL history."
     )

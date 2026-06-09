@@ -77,11 +77,15 @@ class ChatFormatMixin:
                 output_requirements=output_requirements,
             )
         messages = [prefix]
-        for field_name, field in task_spec.input_fields.items():
-            if field_name in inputs:
-                value = inputs.get(field_name)
-                formatted_field_value = format_field_value(field=field, value=value)
-                messages.append(f"[[ ## {field_name} ## ]]\n{formatted_field_value}")
+        field_sections = format_fields_with_headers(
+            {
+                FieldBinding(name=field_name, field=field): inputs[field_name]
+                for field_name, field in task_spec.input_fields.items()
+                if field_name in inputs
+            }
+        )
+        if field_sections:
+            messages.append(field_sections)
         if main_request:
             output_requirements = self.user_message_output_requirements(task_spec)
             if output_requirements is not None:

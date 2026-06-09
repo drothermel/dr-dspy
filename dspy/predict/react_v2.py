@@ -10,7 +10,7 @@ from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.core.types.call_options import ModuleCallOptions, PredictOptions
 from dspy.core.types.config import LMConfig, LMToolChoice
 from dspy.errors import AdapterParseError
-from dspy.history import TurnEvent, TurnLog, call_with_turn_log_truncation
+from dspy.history import TruncationExhaustedError, TurnEvent, TurnLog, call_with_turn_log_truncation
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
@@ -107,11 +107,11 @@ class ReActV2(Module):
                 pred = extracted.result
                 turn_log = extracted.turn_log
                 tool_calls = _coerce_tool_calls(getattr(pred, "tool_calls", None))
+            except TruncationExhaustedError as err:
+                logger.warning("Ending ReActV2 loop after context window exceeded: %s", err)
+                break_reason = "context_window_exceeded"
+                break
             except ValueError as err:
-                if "context window was exceeded even after" in str(err):
-                    logger.warning("Ending ReActV2 loop after context window exceeded: %s", err)
-                    break_reason = "context_window_exceeded"
-                    break
                 logger.warning("Ending ReActV2 loop after parse failure: %s", _fmt_exc(err))
                 break_reason = "parse_error"
                 break
@@ -195,11 +195,11 @@ class ReActV2(Module):
             pred = extracted.result
             turn_log = extracted.turn_log
             tool_calls = _ensure_tool_call_ids(_coerce_tool_calls(getattr(pred, "tool_calls", None)), turn_index)
+        except TruncationExhaustedError as err:
+            logger.warning("Forced submit failed after context window exceeded: %s", err)
+            return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
         except ValueError as err:
-            if "context window was exceeded even after" in str(err):
-                logger.warning("Forced submit failed after context window exceeded: %s", err)
-            else:
-                logger.warning("Forced submit failed: %s", _fmt_exc(err))
+            logger.warning("Forced submit failed: %s", _fmt_exc(err))
             return Prediction(turn_log=turn_log, termination_reason=break_reason or "failed")
         except AdapterParseError as err:
             logger.warning("Forced submit failed: %s", _fmt_exc(err))

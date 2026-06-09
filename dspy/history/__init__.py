@@ -6,6 +6,7 @@ from dspy.history.protocol import AgentHistory, ConversationTurnLog, TurnLogModu
 from dspy.history.repl_history import REPLEntry, REPLHistory, REPLVariable
 from dspy.history.truncation import (
     REPLHistoryCallResult,
+    TruncationExhaustedError,
     TurnLogCallResult,
     call_with_repl_history_truncation,
     call_with_turn_log_truncation,
@@ -24,6 +25,7 @@ __all__ = [
     "TurnLog",
     "TurnLogCallResult",
     "TurnLogModule",
+    "TruncationExhaustedError",
     "call_with_repl_history_truncation",
     "call_with_turn_log_truncation",
     "is_agent_history_type",

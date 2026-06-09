@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_serializer
+from pydantic import BaseModel, ConfigDict, Field, model_serializer
 from typing_extensions import override
+
+from dspy.task_spec.json_serialize import serialize_for_json
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -28,10 +30,7 @@ class REPLVariable(BaseModel):
     def from_value(
         cls, name: str, value: Any, field: FieldSpec | None = None, preview_chars: int = 1000
     ) -> REPLVariable:
-        try:
-            jsonable = TypeAdapter(type(value)).dump_python(value, mode="json")
-        except Exception:
-            jsonable = str(value)
+        jsonable = serialize_for_json(value)
         value_str = json.dumps(jsonable, indent=2) if isinstance(jsonable, (dict, list)) else str(jsonable)
         is_truncated = len(value_str) > preview_chars
         if is_truncated:
