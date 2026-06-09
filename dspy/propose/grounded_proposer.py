@@ -1,13 +1,10 @@
 import logging
 import random
 
-from typing_extensions import override
-
 from dspy.predict.predict import Predict
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.propose.dataset_summary_generator import create_dataset_summary
-from dspy.propose.propose_base import Proposer
 from dspy.propose.utils import (
     create_example_string,
     create_predictor_level_history_string,
@@ -255,7 +252,7 @@ class GenerateModuleInstruction(Module):
         return Prediction(proposed_instruction=proposed_instruction)
 
 
-class GroundedProposer(Proposer):
+class GroundedProposer:
     def __init__(
         self,
         prompt_model,
@@ -274,7 +271,6 @@ class GroundedProposer(Proposer):
         rng=None,
         init_temperature: float = 1.0,
     ) -> None:
-        super().__init__()
         self.program_aware = program_aware
         self.use_dataset_summary = use_dataset_summary
         self.use_task_demos = use_task_demos
@@ -310,9 +306,15 @@ class GroundedProposer(Proposer):
                 run=run,
             )
 
-    @override
     async def propose_instructions_for_program(
-        self, trainset, program, demo_candidates, trial_logs, N, *, run
+        self,
+        trainset,
+        program,
+        demo_candidates,
+        trial_logs,
+        N,
+        *,
+        run,  # noqa: N803
     ) -> dict[int, list[str]]:
         await self._ensure_data_summary(run=run)
         proposed_instructions = {}
@@ -355,7 +357,6 @@ class GroundedProposer(Proposer):
                 )
         return proposed_instructions
 
-    @override
     async def propose_instruction_for_predictor(
         self, program, predictor, pred_i, demo_candidates, demo_set_i, trial_logs, tip=None, *, run
     ) -> str:
