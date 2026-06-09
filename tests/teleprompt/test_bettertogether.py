@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from pydantic import BaseModel
-from typing_extensions import override
 
 from dspy.predict.predict import Predict
 from dspy.primitives.example import Example
@@ -14,7 +13,6 @@ from dspy.teleprompt.bettertogether import BetterTogether
 from dspy.teleprompt.bootstrap_finetune import BootstrapFinetune
 from dspy.teleprompt.compile_params import BetterTogetherCompileParams, RandomSearchCompileParams
 from dspy.teleprompt.random_search import BootstrapFewShotWithRandomSearch
-from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.testing import DummyLM
 from tests.task_spec.helpers import ts
 
@@ -58,28 +56,25 @@ class SimpleModule(Module):
         return await self.predictor(run=run, options=options, **inputs)
 
 
-class SimpleOptimizer(Teleprompter):
-    @override
+class SimpleOptimizer:
     async def compile(self, student, *, params: BaseModel, run: RunContext):
         return student
 
 
-class MarkedOptimizer(Teleprompter):
+class MarkedOptimizer:
     def __init__(self, marker):
         self.marker = marker
 
-    @override
     async def compile(self, student, *, params: BaseModel, run: RunContext):
         prog = SimpleModule(ts("input -> output"))
         cast("Any", prog).marker = self.marker
         return prog
 
 
-class CapturingOptimizer(Teleprompter):
+class CapturingOptimizer:
     def __init__(self):
         self.received_params = None
 
-    @override
     async def compile(self, student, *, params: BaseModel, run: RunContext):
         self.received_params = params
         return student
@@ -148,18 +143,15 @@ def test_strategy_validation(make_run):
 
 
 def test_compile_basic(make_run):
-    from dspy.teleprompt.teleprompt import Teleprompter
-
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "blue"}, {"output": "4"}])
     run = make_run(lm=lm)
     student.set_lm(lm)
 
-    class MockTeleprompter(Teleprompter):
+    class MockTeleprompter:
         def __init__(self):
             self.compile_called = False
 
-        @override
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             self.compile_called = True
             return student
@@ -253,8 +245,6 @@ def test_compile_args_passed_to_optimizer(student_with_lm, mock_bt_dependencies,
 def test_compile_args_multi_optimizer_strategy(make_run):
     from pydantic import ConfigDict
 
-    from dspy.teleprompt.teleprompt import Teleprompter
-
     class PromptTestParams(BaseModel):
         model_config = ConfigDict(extra="allow")
         num_trials: int | None = None
@@ -268,20 +258,18 @@ def test_compile_args_multi_optimizer_strategy(make_run):
     run = make_run(lm=lm)
     student.set_lm(lm)
 
-    class PromptOptimizer(Teleprompter):
+    class PromptOptimizer:
         def __init__(self):
             self.received_params = None
 
-        @override
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             self.received_params = params
             return student
 
-    class WeightOptimizer(Teleprompter):
+    class WeightOptimizer:
         def __init__(self):
             self.received_params = None
 
-        @override
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             self.received_params = params
             return student
@@ -311,18 +299,15 @@ def test_compile_args_multi_optimizer_strategy(make_run):
 
 
 def test_compile_args_override_global_params(make_run):
-    from dspy.teleprompt.teleprompt import Teleprompter
-
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     run = make_run(lm=lm)
     student.set_lm(lm)
 
-    class CapturingTeleprompter(Teleprompter):
+    class CapturingTeleprompter:
         def __init__(self):
             self.received_params = None
 
-        @override
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             self.received_params = params
             return student
@@ -355,16 +340,13 @@ def test_compile_args_override_global_params(make_run):
 
 
 def test_trainset_shuffling_between_steps(make_run):
-    from dspy.teleprompt.teleprompt import Teleprompter
-
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     run = make_run(lm=lm)
     student.set_lm(lm)
     trainsets_received = []
 
-    class TrainsetCapturingOptimizer(Teleprompter):
-        @override
+    class TrainsetCapturingOptimizer:
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             trainsets_received.append(getattr(params, "trainset", None))
             return student
@@ -396,19 +378,16 @@ def test_trainset_shuffling_between_steps(make_run):
 
 
 def test_strategy_execution_order(make_run):
-    from dspy.teleprompt.teleprompt import Teleprompter
-
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     run = make_run(lm=lm)
     student.set_lm(lm)
     execution_log = []
 
-    class LoggingOptimizer(Teleprompter):
+    class LoggingOptimizer:
         def __init__(self, name):
             self.name = name
 
-        @override
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             optimized = SimpleModule(ts("input -> output"))
             typed_student = cast("Any", student)
@@ -438,15 +417,12 @@ def test_strategy_execution_order(make_run):
 
 
 def test_lm_lifecycle_management(make_run):
-    from dspy.teleprompt.teleprompt import Teleprompter
-
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     run = make_run(lm=lm)
     student.set_lm(lm)
 
-    class SimpleOptimizer(Teleprompter):
-        @override
+    class SimpleOptimizer:
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             return student
 
@@ -466,22 +442,18 @@ def test_lm_lifecycle_management(make_run):
 
 
 def test_error_handling_returns_best_program(make_run):
-    from dspy.teleprompt.teleprompt import Teleprompter
-
     student = SimpleModule(ts("input -> output"))
     lm = DummyLM([{"output": "test"}])
     run = make_run(lm=lm)
     student.set_lm(lm)
 
-    class SuccessfulOptimizer(Teleprompter):
-        @override
+    class SuccessfulOptimizer:
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             optimized = SimpleModule(ts("input -> output"))
             cast("Any", optimized).step_name = "p_success"
             return optimized
 
-    class FailingOptimizer(Teleprompter):
-        @override
+    class FailingOptimizer:
         async def compile(self, student, *, params: BaseModel, run: RunContext):
             raise RuntimeError("Intentional failure for testing")
 
