@@ -52,5 +52,5 @@ def test_chain_of_thought_reasoning_field_has_explicit_desc():
         outputs: tuple = (output_field("answer", desc="Answer."),)
 
     cot = ChainOfThought(QATaskSpec())
-    reasoning_field = cot.predict.task_spec.output_fields["reasoning"]
+    reasoning_field = cot.task_spec.output_fields["reasoning"]
     assert reasoning_field.desc.strip()

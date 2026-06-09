@@ -22,7 +22,9 @@ def test_initialization_with_string_signature(make_run):
     predict = ChainOfThought(
         ts("question -> answer", instructions=default_task_instructions(inputs=("question",), outputs=("answer",)))
     )
-    assert list(predict.predict.task_spec.output_fields.keys()) == ["reasoning", "answer"]
+    assert list(predict.task_spec.output_fields.keys()) == ["reasoning", "answer"]
+    assert predict.task_spec is predict.predict.task_spec
+    assert predict.task_spec.fingerprint() == predict.predict.task_spec.fingerprint()
     assert asyncio.run(predict(question="What is 1+1?", run=run)).answer == "2"
 
 

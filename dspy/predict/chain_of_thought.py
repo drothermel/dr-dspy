@@ -22,7 +22,7 @@ class ChainOfThought(Module):
         extended_task_spec = task_spec.prepend(
             output_field("reasoning", Reasoning, desc="Step-by-step reasoning before producing the final outputs.")
         )
-        self.task_spec = task_spec
+        self.task_spec = extended_task_spec
         self.predict = Predict(extended_task_spec, config=config, callbacks=callbacks)
 
     async def _aforward_impl(
