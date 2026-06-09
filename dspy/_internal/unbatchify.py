@@ -1,7 +1,6 @@
-"""Legacy convenience types; prefer typed models for new code.
+"""Background batching helper for sync callables.
 
-Background batching helper for sync callables. Callers must invoke ``close()``
-or use the context manager when done.
+Callers must invoke ``close()`` or use the context manager when done.
 """
 
 import queue
