@@ -7,13 +7,13 @@ from dspy.core.types import (
     LMProviderOptions,
     LMReasoningConfig,
     LMToolChoice,
+    ReasoningEffort,
     coerce_lm_config,
     merge_lm_config,
     merge_lm_request_config,
     merge_provider_options,
 )
 from dspy.core.types.embedding_options import EmbedderOptions, merge_embedder_options
-from dspy.core.types.lm_config import ReasoningEffort
 
 
 def test_merge_lm_config_merges_extensions():

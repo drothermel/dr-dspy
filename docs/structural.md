@@ -332,6 +332,8 @@ interpreter remain separate responsibilities.
 
 ### P2.2 Split core type modules by domain concept
 
+**Status:** Done (2026-06).
+
 **Sources:** External review; Spine parallel review.
 
 Problem:
@@ -361,6 +363,15 @@ Details to preserve:
 - Package-barrel re-exports should keep public imports stable during migration.
 - Hash output must remain unchanged if callers still depend on it.
 - Merge helper consolidation needs focused tests to lock current edge cases.
+
+**Delivered:** Private `_merge_overlay.py` and `_from_value.py`; domain modules
+`adaptation.py`, `tool_spec.py`, `lm_config.py`, `message_coercion.py`,
+`usage.py`, `lm_output.py`, `lm_response.py`, `call_record.py`,
+`stream_events.py`, `stream_builder.py`; slim `stream.py` and `request.py`;
+deleted `config.py`, `coercion.py`, `response.py`, `LMRequestPatch`, and
+`dspy/core/hashing.py`; `hash_pickle` / `hash_bytes` in `dspy/_internal/hashing.py`;
+embedder merge aligned with LM-config overlay semantics; tests split into
+`test_call_record.py`; public API remains `dspy.core.types` barrel.
 
 ### P2.3 Make TaskSpec serialization and formatting contracts explicit
 
@@ -517,7 +528,7 @@ These chunks reduce confusion once the main owners and shared helpers exist.
 Problem:
 
 - Production code imports deeply from submodules such as
-  `dspy.core.types.config`, `dspy.task_spec.field_spec`, and
+  `dspy.core.types.lm_config`, `dspy.task_spec.field_spec`, and
   `dspy.runtime.transparency`.
 - Package barrels send mixed signals: some are empty, some expose user APIs, and
   some mix public optimizers with internal helpers.
