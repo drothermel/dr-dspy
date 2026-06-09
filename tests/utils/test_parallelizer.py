@@ -111,13 +111,25 @@ def test_sequential_max_errors_exceeded(make_run):
         asyncio.run(_run_bounded(items=data, fn=task, max_concurrency=1, max_errors=1))
 
 
-def test_compare_results():
+def test_progress_hook():
 
     async def task(item):
         return (item, item > 2)
 
+    def metric_progress(results, total):
+        completed = [r for r in results if r is not None]
+        total_score = sum(r[-1] for r in completed if isinstance(r, tuple))
+        pct = round(100 * total_score / total, 1) if total else 0
+        return f"Average Metric: {total_score:.2f} / {total} ({pct}%)"
+
     data = [1, 2, 3, 4, 5]
     results, _stats = asyncio.run(
-        _run_bounded(items=data, fn=task, max_concurrency=1, compare_results=True, disable_progress_bar=True)
+        _run_bounded(
+            items=data,
+            fn=task,
+            max_concurrency=1,
+            progress_hook=metric_progress,
+            disable_progress_bar=True,
+        )
     )
     assert results == [(1, False), (2, False), (3, True), (4, True), (5, True)]

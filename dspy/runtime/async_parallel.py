@@ -59,7 +59,7 @@ async def run_bounded(
     max_errors: int | None = None,
     provide_traceback: bool | None = None,
     disable_progress_bar: bool = False,
-    compare_results: bool = False,
+    progress_hook: Callable[[list[R | None], int], str | None] | None = None,
 ) -> tuple[list[R | None], BoundedRunStats]:
     if max_concurrency < 1:
         raise ValueError("max_concurrency must be at least 1.")
@@ -94,14 +94,11 @@ async def run_bounded(
                     cancel.set()
             return
         results[index] = outcome
-        if compare_results:
-            completed = [r for r in results if r is not None]
-            total_score = sum(r[-1] for r in completed if isinstance(r, tuple))
-            pct = round(100 * total_score / len(items), 1) if items else 0
-            pbar.set_description(f"Average Metric: {total_score:.2f} / {len(items)} ({pct}%)")
-        else:
+        description = progress_hook(results, len(items)) if progress_hook is not None else None
+        if description is None:
             completed = len([r for r in results if r is not None])
-            pbar.set_description(f"Processed {completed} / {len(items)} examples")
+            description = f"Processed {completed} / {len(items)} examples"
+        pbar.set_description(description)
         pbar.update()
 
     try:

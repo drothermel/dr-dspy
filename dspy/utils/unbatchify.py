@@ -1,3 +1,9 @@
+"""Background batching helper for sync callables.
+
+Callers must invoke ``close()`` or use the context manager when done. Daemon
+threads are not reliably torn down by garbage collection.
+"""
+
 import queue
 import threading
 import time
@@ -18,6 +24,7 @@ class Unbatchify(Generic[InputT, OutputT]):
         self.max_wait_time = max_wait_time
         self.input_queue: queue.Queue[tuple[InputT, Future[OutputT]]] = queue.Queue()
         self.stop_event = threading.Event()
+        self._closed = False
         self.worker_thread = threading.Thread(target=self._worker)
         self.worker_thread.daemon = True
         self.worker_thread.start()
@@ -57,6 +64,9 @@ class Unbatchify(Generic[InputT, OutputT]):
                 break
 
     def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
         if not self.stop_event.is_set():
             self.stop_event.set()
             self.worker_thread.join()
@@ -67,7 +77,4 @@ class Unbatchify(Generic[InputT, OutputT]):
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        self.close()
-
-    def __del__(self) -> None:
         self.close()

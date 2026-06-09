@@ -24,6 +24,12 @@ SearchResult = tuple[list[str], list[int], list[float]]
 
 
 class Embeddings:
+    """Embedding retriever with optional FAISS index.
+
+    Call ``close()`` when the retriever is no longer needed to stop the
+    background ``Unbatchify`` worker thread.
+    """
+
     def __init__(
         self,
         corpus: list[str],
@@ -49,6 +55,9 @@ class Embeddings:
     async def aforward(self, query: str) -> Prediction:
         passages, indices, _scores = await asyncio.to_thread(self.search_fn, query)
         return Prediction(passages=passages, indices=indices)
+
+    def close(self) -> None:
+        self.search_fn.close()
 
     def _batch_forward(self, queries: list[str]) -> list[SearchResult]:
         q_embeds = self.embedder(queries)

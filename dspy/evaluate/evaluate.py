@@ -98,6 +98,12 @@ class Evaluate:
             score = metric(example, prediction, trace)
             return (prediction, score)
 
+        def evaluation_progress(results: list, total: int) -> str:
+            completed = [r for r in results if r is not None]
+            total_score = sum(r[-1] for r in completed if isinstance(r, tuple))
+            pct = round(100 * total_score / total, 1) if total else 0
+            return f"Average Metric: {total_score:.2f} / {total} ({pct}%)"
+
         max_errors = resolve_max_errors(self.max_errors, run)
         provide_traceback = (
             self.provide_traceback if self.provide_traceback is not None else run.execution.provide_traceback
@@ -109,7 +115,7 @@ class Evaluate:
             disable_progress_bar=not display_progress,
             max_errors=max_errors,
             provide_traceback=provide_traceback,
-            compare_results=True,
+            progress_hook=evaluation_progress,
         )
         assert len(devset) == len(results)
         results = [(Prediction(), self.failure_score) if r is None else r for r in results]

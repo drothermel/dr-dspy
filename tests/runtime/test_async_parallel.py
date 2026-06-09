@@ -56,3 +56,23 @@ async def test_run_bounded_aborted_error_includes_stats():
 
     assert exc_info.value.stats.failed_indices == [0]
     assert isinstance(exc_info.value.stats.exceptions_map[0], ValueError)
+
+
+@pytest.mark.asyncio
+async def test_run_bounded_progress_hook():
+    async def succeed(item: int) -> tuple[int, bool]:
+        return (item, item > 1)
+
+    def metric_progress(results, total):
+        completed = [r for r in results if r is not None]
+        total_score = sum(r[-1] for r in completed if isinstance(r, tuple))
+        return f"score={total_score}/{total}"
+
+    results, _stats = await run_bounded(
+        items=[1, 2, 3],
+        fn=succeed,
+        max_concurrency=1,
+        progress_hook=metric_progress,
+        disable_progress_bar=True,
+    )
+    assert results == [(1, False), (2, True), (3, True)]
