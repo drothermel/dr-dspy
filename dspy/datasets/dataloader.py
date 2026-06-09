@@ -1,8 +1,9 @@
 import random
-from collections.abc import Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING, cast
 
 from dspy.datasets.dataset import Dataset
+from dspy.datasets.rows import rows_to_examples
 from dspy.primitives.example import Example
 from dspy.runtime.run_context import RunContext
 
@@ -10,104 +11,24 @@ if TYPE_CHECKING:
     import pandas as pd
 
 
-def _rows_to_examples(
-    rows: Iterable[Mapping[str, object]], fields: Sequence[str] | None, input_keys: tuple[str, ...]
-) -> list[Example]:
-    rows_list = list(rows)
-    if not rows_list:
-        return []
-    resolved_fields = list(fields) if fields is not None else list(rows_list[0])
-    return [
-        Example.from_record({field: row[field] for field in resolved_fields}, input_keys=input_keys)
-        for row in rows_list
-    ]
-
-
 class DataLoader(Dataset):
     def __init__(self) -> None:
         super().__init__()
-
-    def from_huggingface(
-        self,
-        dataset_name: str,
-        *args: Any,
-        input_keys: tuple[str, ...] = (),
-        fields: tuple[str, ...] | None = None,
-        **kwargs: Any,
-    ) -> Mapping[str, list[Example]] | list[Example]:
-        if fields and (not isinstance(fields, tuple)):
-            raise ValueError("Invalid fields provided. Please provide a tuple of fields.")
-        if not isinstance(input_keys, tuple):
-            raise TypeError("Invalid input keys provided. Please provide a tuple of input keys.")
-        from datasets import DatasetDict, load_dataset
-
-        dataset = load_dataset(dataset_name, *args, **kwargs)
-        if isinstance(dataset, list) and isinstance(kwargs.get("split"), list):
-            split_names = cast("list[str]", kwargs["split"])
-            return {
-                split_name: _rows_to_examples(
-                    rows=cast("Iterable[Mapping[str, object]]", split_rows), fields=fields, input_keys=input_keys
-                )
-                for split_name, split_rows in zip(split_names, dataset, strict=False)
-            }
-        if isinstance(dataset, DatasetDict):
-            return {
-                split_name: _rows_to_examples(rows=rows, fields=fields, input_keys=input_keys)
-                for split_name, rows in dataset.items()
-            }
-        return _rows_to_examples(
-            rows=cast("Iterable[Mapping[str, object]]", dataset), fields=fields, input_keys=input_keys
-        )
-
-    def from_csv(
-        self, file_path: str, fields: list[str] | None = None, input_keys: tuple[str, ...] = ()
-    ) -> list[Example]:
-        from datasets import load_dataset
-
-        loaded_dataset: Any = load_dataset("csv", data_files=file_path)
-        dataset = loaded_dataset["train"]
-        return _rows_to_examples(
-            rows=cast("Iterable[Mapping[str, object]]", dataset), fields=fields, input_keys=input_keys
-        )
 
     def from_pandas(
         self, df: "pd.DataFrame", fields: list[str] | None = None, input_keys: tuple[str, ...] = ()
     ) -> list[Example]:
         if fields is None:
             fields = list(df.columns)
-        return [
-            Example.from_record({field: row[field] for field in fields}, input_keys=input_keys)
-            for _, row in df.iterrows()
-        ]
-
-    def from_json(
-        self, file_path: str, fields: list[str] | None = None, input_keys: tuple[str, ...] = ()
-    ) -> list[Example]:
-        from datasets import load_dataset
-
-        loaded_dataset: Any = load_dataset("json", data_files=file_path)
-        dataset = loaded_dataset["train"]
-        return _rows_to_examples(
-            rows=cast("Iterable[Mapping[str, object]]", dataset), fields=fields, input_keys=input_keys
-        )
-
-    def from_parquet(
-        self, file_path: str, fields: list[str] | None = None, input_keys: tuple[str, ...] = ()
-    ) -> list[Example]:
-        from datasets import load_dataset
-
-        loaded_dataset: Any = load_dataset("parquet", data_files=file_path)
-        dataset = loaded_dataset["train"]
-        return _rows_to_examples(
-            rows=cast("Iterable[Mapping[str, object]]", dataset), fields=fields, input_keys=input_keys
-        )
+        rows = [{field: row[field] for field in fields} for _, row in df.iterrows()]
+        return rows_to_examples(rows=rows, fields=fields, input_keys=input_keys)
 
     def from_rm(self, run: RunContext, num_samples: int, fields: list[str], input_keys: list[str]) -> list[Example]:
         rm = run.retrieval
         if rm is None:
             raise ValueError("Retrieval module not found. Pass retrieval=... when creating RunContext.")
         try:
-            return _rows_to_examples(
+            return rows_to_examples(
                 rows=cast("Iterable[Mapping[str, object]]", rm.get_objects(num_samples=num_samples, fields=fields)),
                 fields=fields,
                 input_keys=tuple(input_keys),
