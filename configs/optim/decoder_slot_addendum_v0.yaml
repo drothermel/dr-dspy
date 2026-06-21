@@ -1,0 +1,63 @@
+id: decoder_slot_addendum_v0
+phase: opt-dec-format
+description: >
+  First restricted prompt-optimization variant for decoder formatting. The
+  templates keep the baseline decoder structure and add three short optimizer
+  controlled instruction slots that mimic the manual decoder improvements.
+
+templates:
+  variantA:
+    template_path: configs/prompts/templates/optim_dec_slot_addendum_variantA.md
+    baseline_path: configs/prompts/templates/baseline_dec_variantA.md
+    required_inputs:
+      - signature
+      - encoded_description
+  variantB:
+    template_path: configs/prompts/templates/optim_dec_slot_addendum_variantB.md
+    baseline_path: configs/prompts/templates/baseline_dec_variantB.md
+    required_inputs:
+      - encoded_description
+
+slot_policy:
+  over_limit_policy: truncate_for_rendering_and_record_raw
+  default_max_chars: 100
+  rationale: >
+    Keep optimizer freedom focused on compact decoder-control instructions
+    instead of full prompt rewriting. Character limits are easier to enforce
+    and report than word limits, and the 100-character cap keeps proposed slot
+    text short enough to inspect and compare directly.
+
+slots:
+  - name: task_instructions
+    max_chars: 100
+    purpose: >
+      Explain what kind of implementation the decoder should produce.
+  - name: output_instructions
+    max_chars: 100
+    purpose: >
+      Control output format, such as code-only output, no markdown, and a
+      complete Python snippet.
+  - name: failure_avoidance
+    max_chars: 100
+    purpose: >
+      Prevent common decoder failures, such as placeholders, tests, missing
+      entry points, invalid syntax, or unrelated top-level behavior.
+
+optimizer_methods:
+  - slot_optimization
+  - prompt_grid_best_of_n
+  - copro
+  - mipro_v2_zero_shot
+  - gepa
+
+reporting:
+  record:
+    - template_path
+    - variant
+    - rendered_prompt
+    - raw_slot_values
+    - rendered_slot_values
+    - slot_max_chars
+    - over_limit_policy
+    - optimizer_method
+    - metric_target

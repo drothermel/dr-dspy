@@ -1,0 +1,75 @@
+id: decoder_slot_grid_v0
+phase: opt-dec-format
+based_on: configs/optim/decoder_slot_addendum_v0.yaml
+method: exhaustive_grid
+description: >
+  Curated manual grid over the three decoder slot-addendum fields. This is the
+  first "optim" stage after baseline evaluation: a deterministic batch run over
+  compact hand-written slot choices before optimizer-generated slot text.
+
+templates:
+  variantA:
+    template_path: configs/prompts/templates/optim_dec_slot_addendum_variantA.md
+    required_inputs:
+      - signature
+      - encoded_description
+  variantB:
+    template_path: configs/prompts/templates/optim_dec_slot_addendum_variantB.md
+    required_inputs:
+      - encoded_description
+
+grid_policy:
+  max_chars_per_slot: 100
+  over_limit_policy: fail_config_validation
+  search: exhaustive
+  combinations_per_variant: 27
+  rationale: >
+    Three candidates per slot produces a small, fully enumerable grid. This is
+    large enough to show which instruction category choices help, but small
+    enough to analyze directly before running learned prompt optimizers.
+
+slots:
+  - name: task_instructions
+    candidates:
+      - id: implement_required_behavior
+        char_count: 60
+        text: "Implement the described function with the required behavior."
+      - id: correct_python_behavior
+        char_count: 70
+        text: "Write a correct Python implementation matching the described behavior."
+      - id: simple_idiomatic_reconstruction
+        char_count: 63
+        text: "Reconstruct the requested function as simple, idiomatic Python."
+  - name: output_instructions
+    candidates:
+      - id: code_only_no_markdown
+        char_count: 64
+        text: "Output only Python code, with no markdown fences or explanation."
+      - id: complete_snippet_no_commentary
+        char_count: 65
+        text: "Return a complete Python snippet only; do not include commentary."
+      - id: directly_parseable_python
+        char_count: 69
+        text: "Produce code only. The response must be directly parseable as Python."
+  - name: failure_avoidance
+    candidates:
+      - id: no_tests_placeholders_examples
+        char_count: 74
+        text: "Do not include tests, placeholders, examples, or unrelated top-level code."
+      - id: avoid_stubs_include_logic
+        char_count: 72
+        text: "Avoid stub implementations; include all logic needed by the description."
+      - id: expected_function_edge_cases
+        char_count: 71
+        text: "Ensure the expected function is defined and handles implied edge cases."
+
+reporting:
+  record:
+    - template_path
+    - variant
+    - rendered_prompt
+    - slot_candidate_ids
+    - slot_candidate_text
+    - slot_candidate_char_counts
+    - optimizer_method
+    - metric_target

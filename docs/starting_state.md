@@ -275,6 +275,26 @@ Initial prompt templates for this decoder-format phase live in
   handling implied edge cases, using straightforward standard-library Python,
   and avoiding tests/placeholders.
 
+The first restricted optimization template also lives in
+`configs/prompts/templates/` as
+`optim_dec_slot_addendum_variantA.md` and
+`optim_dec_slot_addendum_variantB.md`. Its config is
+`configs/optim/decoder_slot_addendum_v0.yaml`. This template intentionally
+starts from the baseline decoder structure and adds only three optimizer-owned
+slots: `{task_instructions}`, `{output_instructions}`, and
+`{failure_avoidance}`. Each slot is capped at 100 characters so standard prompt
+optimizers can search over compact addenda without turning the first experiment
+into full prompt rewriting, while keeping slot-level choices easy to inspect
+and compare.
+
+The first curated grid config is `configs/optim/decoder_slot_grid_v0.yaml`.
+It uses the same slot-addendum templates and 100-character cap, but enumerates
+three hand-written candidates for each slot, for 27 combinations per variant.
+The near-term evaluation order is: baseline batches for `baseline_dec`,
+`manual_dec_v0`, and `manual_dec_v1` across both variants; curated grid-search
+"optim" batches; then learned minimal templated optimization over the same
+three bounded slots.
+
 Option A is likely the best first mainline because it keeps the test-facing
 interface outside the compression budget. The encoder can then focus on
 implementation behavior: algorithm, edge cases, constants, imports, helper

@@ -95,6 +95,16 @@ metadata.
 - `manual_dec_v1_variantA.md` / `manual_dec_v1_variantB.md` - slightly stronger
   manual decoder baseline with compact guidance about interface preservation,
   standard-library Python, edge cases, and avoiding tests/placeholders.
+- `optim_dec_slot_addendum_variantA.md` /
+  `optim_dec_slot_addendum_variantB.md` - first optimizable decoder templates.
+  These keep the baseline decoder structure and add three bounded instruction
+  slots.
+
+Restricted optimization configs live under `configs/optim/`. The first one is
+`configs/optim/decoder_slot_addendum_v0.yaml`, which defines the reusable
+slot-addendum contract for learned prompt optimizers. The first curated grid is
+`configs/optim/decoder_slot_grid_v0.yaml`, which uses the same templates and
+slot cap but enumerates three hand-written candidates per slot.
 
 ## Decoder Template Options
 
@@ -228,36 +238,48 @@ hard to interpret.
 
 ### Target Optimizer Set
 
-1. Slot optimization over fixed templates.
+1. Curated prompt-grid search.
 
-   Keep most of the decoder template fixed and optimize only small, bounded
-   slots. Example slots include:
+   Use `configs/optim/decoder_slot_grid_v0.yaml` to exhaustively evaluate three
+   candidates for each of the three addendum slots, for 27 combinations per
+   variant. This is the first "optim" stage after baseline evaluation because
+   it is deterministic, cheap to inspect, and uses the same slot boundaries as
+   learned optimizers.
 
-   - a short role or skill phrase
-   - a compact warning list
-   - an output constraint phrase
-   - a failure-avoidance sentence
-   - a small verbosity or target-budget hint
+2. Minimal templated optimization over fixed templates.
 
-   This is the lowest-risk optimizer and should produce interpretable deltas.
+   Keep the baseline decoder template fixed and optimize only three short
+   addendum slots:
 
-2. Custom prompt-grid or best-of-N search.
+   - `{task_instructions}` - what kind of implementation the decoder should
+     produce.
+   - `{output_instructions}` - output format controls such as code only, no
+     markdown, and complete snippet.
+   - `{failure_avoidance}` - common failure prevention such as no placeholders,
+     no tests, valid syntax, and expected entry point recovery.
+
+   Each slot is capped at 100 characters. The cap keeps optimizer freedom
+   focused on compact decoder-control instructions instead of full prompt
+   rewriting. It also makes individual slot choices easier to inspect, compare,
+   and report.
+
+3. Custom prompt-grid or best-of-N search.
 
    Generate or enumerate larger prompt variants, evaluate them, and keep the
    best. This is broader than slot optimization and is the cleanest
    optimizer-loop smoke test.
 
-3. `COPRO`.
+4. `COPRO`.
 
    COPRO directly proposes and refines instructions/output prefixes, making it
    the best existing DSPy fit for decoder-format optimization.
 
-4. `MIPROv2`, configured zero-shot first.
+5. `MIPROv2`, configured zero-shot first.
 
    Start with `max_bootstrapped_demos=0` and `max_labeled_demos=0` so the first
    run tests instruction optimization alone. Add demos later only if useful.
 
-5. `GEPA`.
+6. `GEPA`.
 
    Use GEPA as the most complex reflective method once parse/test failures are
    well-instrumented enough to become useful feedback.
@@ -395,19 +417,33 @@ for quality and conceptual fit before practicality filtering.
 
 ## Proposed Experiment Sequence
 
-0. Run baseline prompts.
+Before numbered evaluation runs, build the decoder-only dataset view and freeze
+the split identifiers. For each HumanEval/HumanEval+ task, construct examples
+containing at least the ground-truth signature, the ground-truth docstring or
+prompt text, the expected entry point, and the test harness metadata needed for
+evaluation.
 
-   Evaluate both the original baseline and minimal manual baseline before any
-   optimization. These establish the parseability and pass-rate floor that
-   optimizer results must beat.
+0. Run baseline evaluation batches.
 
-1. Build the decoder-only dataset view.
+   Evaluate `baseline_dec`, `manual_dec_v0`, and `manual_dec_v1`, each crossed
+   with `variantA` and `variantB`. These establish the parseability and
+   pass-rate floor that later "optim" results must beat.
 
-   For each HumanEval/HumanEval+ task, construct examples containing at least
-   the ground-truth signature, the ground-truth docstring or prompt text, the
-   expected entry point, and the test harness metadata needed for evaluation.
+1. Run curated grid-search "optim" batches.
 
-2. Run a one-example exploitability smoke test.
+   Use `configs/optim/decoder_slot_grid_v0.yaml` with the two
+   `optim_dec_slot_addendum` templates. Evaluate all 27 slot combinations per
+   variant, then analyze results by full combination and by individual slot
+   candidate.
+
+2. Run minimal templated optimization.
+
+   Use `configs/optim/decoder_slot_addendum_v0.yaml` with learned prompt
+   optimizers such as COPRO, zero-shot-first MIPROv2, and GEPA. The optimizers
+   should produce only the three bounded slot values, not rewrite the full
+   decoder prompt.
+
+3. Run a one-example exploitability smoke test for learned optimizers.
 
    Use `train = val = test = one example` with minimal guardrails. Run this on
    every method that can tolerate the degenerate setup. The goal is to validate
@@ -417,41 +453,29 @@ for quality and conceptual fit before practicality filtering.
    This is not an optimization result. Treat it as an exploitability and
    observability test.
 
-3. Freeze a train/validation/test split for real experiments.
-
-   Keep the final test set fixed and use the full test set whenever reporting
-   final numbers. Train and validation sets may be subsampled per method, but
-   the selected task IDs, random seeds, and candidate budgets should be recorded
-   for interpretability.
-
-4. Confirm baselines for the selected decoder model and template option.
-
-   Record parse rate, entry-point recovery, signature compatibility, and pass
-   rate for both baseline prompts.
-
-5. Optimize for AST parseability method by method.
+4. Optimize for AST parseability method by method.
 
    Use the decoder-only task and a parseability metric first. This should expose
    whether the optimizer can improve simple formatting/control behavior and
    whether any model needs an even easier initial target.
 
-6. Measure pass rate after parseability optimization.
+5. Measure pass rate after parseability optimization.
 
    Do not assume parseability optimization improves correctness. Report pass
    rate on the parse-optimized prompt to understand the tradeoff.
 
-7. Cull methods before moving to harder objectives.
+6. Cull methods before moving to harder objectives.
 
    Drop methods that are brittle, too expensive, or hard to interpret. The goal
    is to finish this stage with a validated setup and a small set of methods
    worth applying to correctness and later encoder-compression optimization.
 
-8. Optimize for test pass rate.
+7. Optimize for test pass rate.
 
    Once parseability is stable, switch the metric to HumanEval/HumanEval+ test
    pass rate. Compare with both the baseline and the parse-optimized prompt.
 
-9. Select and freeze the decoder prompt/template.
+8. Select and freeze the decoder prompt/template.
 
    Prefer the prompt that gives stable parseability and the best pass rate while
    remaining compatible with later encoder-generated descriptions.

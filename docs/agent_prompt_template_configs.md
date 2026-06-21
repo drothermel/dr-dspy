@@ -69,6 +69,14 @@ Prompt template files:
   - `manual_dec_v1_variantB.md`
 - `variantA` means the template includes `{signature}` as side-channel context.
 - `variantB` means the template receives only `{encoded_description}`.
+- Store restricted prompt-optimization configs under `configs/optim/`.
+- The first slot-contract config is
+  `configs/optim/decoder_slot_addendum_v0.yaml`.
+- The first curated grid config is
+  `configs/optim/decoder_slot_grid_v0.yaml`.
+- The first optimizable decoder templates are:
+  - `optim_dec_slot_addendum_variantA.md`
+  - `optim_dec_slot_addendum_variantB.md`
 
 Step 0 baselines:
 
@@ -92,13 +100,39 @@ Step 0 baselines:
   preservation, standard-library code, edge cases, and avoiding tests,
   placeholders, or unrelated top-level behavior.
 
+First restricted optimization template:
+
+- Start from the baseline decoder structure rather than from the manual decoder
+  templates.
+- Add three optimizer-controlled instruction slots:
+  - `{task_instructions}`
+  - `{output_instructions}`
+  - `{failure_avoidance}`
+- Cap each slot at 100 characters.
+- The intent is to let standard prompt optimizers search for compact decoder
+  control instructions while keeping the fixed scaffold general. The tight cap
+  makes proposed slot text easier to inspect and compare, and makes failures
+  easier to attribute to optimizer behavior or model behavior rather than to a
+  highly opinionated hand-written template.
+
+First curated grid-search config:
+
+- `configs/optim/decoder_slot_grid_v0.yaml` uses the same slot-addendum
+  templates and the same 100-character slot cap.
+- It defines three hand-written candidates for each slot, for 27 combinations
+  per variant.
+- The grid is the first "optim" stage after baseline evaluation. It gives a
+  deterministic manual-search comparator before running learned prompt
+  optimizers against the same slot contract.
+
 Target optimizer methods:
 
-1. slot optimization over fixed templates
-2. custom prompt-grid / best-of-N search
-3. `COPRO`
-4. zero-shot-first `MIPROv2`
-5. `GEPA`
+1. curated prompt-grid search over fixed slot candidates
+2. minimal slot optimization over fixed templates
+3. custom prompt-grid / best-of-N search
+4. `COPRO`
+5. zero-shot-first `MIPROv2`
+6. `GEPA`
 
 ## Investigation Scope
 
