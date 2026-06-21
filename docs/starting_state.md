@@ -227,6 +227,11 @@ template and which facts must be recovered from the encoder output.
 
 Two fixed decoder template options are under consideration.
 
+For the decoder-only formatting probe, `{encoded_description}` means the
+HumanEval/HumanEval+ docstring text. It is not an encoder-generated description
+yet; the name is kept because this same decoder boundary will later receive
+encoder output in the full pathway.
+
 Option A gives the decoder the expected signature as side-channel context:
 
 ````text
@@ -258,7 +263,8 @@ Option B gives the decoder only the encoded description:
 ````
 
 The conclusion for now is to evaluate both options before deciding how to frame
-the full encode/decode optimization.
+the full encode/decode optimization. Treat Option A and Option B as
+equal-priority variants during the decoder-formatting pass.
 
 Initial prompt templates for this decoder-format phase live in
 `configs/prompts/templates/`. The current baseline encoder prompt is
@@ -267,8 +273,8 @@ Initial prompt templates for this decoder-format phase live in
 `variantA`/`variantB`:
 
 - `variantA` includes `{signature}` as side-channel context plus
-  `{encoded_description}`.
-- `variantB` receives only `{encoded_description}`.
+  `{encoded_description}` docstring text.
+- `variantB` receives only `{encoded_description}` docstring text.
 - `manual_dec_v0` is the minimal manual decoder baseline with code-only and
   parseability constraints.
 - `manual_dec_v1` adds compact guidance about preserving the interface,
@@ -295,19 +301,17 @@ The near-term evaluation order is: baseline batches for `baseline_dec`,
 "optim" batches; then learned minimal templated optimization over the same
 three bounded slots.
 
-Option A is likely the best first mainline because it keeps the test-facing
-interface outside the compression budget. The encoder can then focus on
-implementation behavior: algorithm, edge cases, constants, imports, helper
-logic, and invariants. This makes the optimization task easier to interpret and
-keeps decoder prompt validation closer to "fill in a correct implementation
-under a known interface."
+During the decoder-formatting pass, Option A and Option B are equal-priority
+probe variants. Option A keeps the test-facing interface outside the decoder's
+description input, so it tests formatting behavior when the public interface is
+known.
 
 Option B is more faithful to whole-program compression because the encoder must
 communicate the interface and the behavior. If it works cleanly, it is the
 stronger formulation. The concern is that it may be much noisier: failures can
 come from missing or malformed signatures, wrong entry points, invalid Python,
-or incorrect behavior. If Option B is fiddly, it should be treated as a future
-direction while Option A is used for the first end-to-end optimization pass.
+or incorrect behavior. Whether that noise is acceptable should be a conclusion
+from the formatting probe rather than an initial assumption.
 
 Concerns to keep in mind:
 

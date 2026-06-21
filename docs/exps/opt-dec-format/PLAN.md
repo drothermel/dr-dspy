@@ -111,6 +111,11 @@ slot cap but enumerates three hand-written candidates per slot.
 The main design question is which information is fixed decoder context and
 which information must be recovered from the encoder output.
 
+For this decoder-only formatting probe, `{encoded_description}` is the
+HumanEval/HumanEval+ docstring text. It is not an encoder-generated
+description yet. The variable name is retained because the selected decoder
+template will later receive encoder output in the full compression pathway.
+
 ### Option A: Signature Side Channel
 
 Option A gives the decoder the expected signature outside the encoded
@@ -132,10 +137,9 @@ description:
 {text_c}
 ````
 
-This is likely the first mainline option. It keeps the test-facing interface out
-of the compression budget, making the optimization task easier to interpret. The
-decoder is responsible for producing a valid implementation under a known
-interface.
+During the decoder-formatting pass, Option A has equal priority with Option B.
+It tests formatting behavior when the public interface is known and the decoder
+is responsible for producing a valid implementation under that interface.
 
 ### Option B: Description Only
 
@@ -156,6 +160,10 @@ communicate both interface and behavior. If it works cleanly, it is the stronger
 formulation. The risk is that failures become harder to diagnose: the generated
 code may be invalid, may omit the expected entry point, may expose an
 incompatible signature, or may implement the wrong behavior.
+
+During the decoder-formatting pass, Option B has equal priority with Option A.
+This pass is a probe: the goal is to observe the failure modes and collect
+evidence for later choices, not to pre-decide the final formulation.
 
 ## Baselines And Target Optimizers
 
@@ -419,9 +427,9 @@ for quality and conceptual fit before practicality filtering.
 
 Before numbered evaluation runs, build the decoder-only dataset view and freeze
 the split identifiers. For each HumanEval/HumanEval+ task, construct examples
-containing at least the ground-truth signature, the ground-truth docstring or
-prompt text, the expected entry point, and the test harness metadata needed for
-evaluation.
+containing at least the ground-truth signature, the docstring text used as
+`{encoded_description}`, the expected entry point, and the test harness metadata
+needed for evaluation.
 
 0. Run baseline evaluation batches.
 
@@ -472,8 +480,9 @@ evaluation.
 
 7. Optimize for test pass rate.
 
-   Once parseability is stable, switch the metric to HumanEval/HumanEval+ test
-   pass rate. Compare with both the baseline and the parse-optimized prompt.
+   After the formatting probe produces enough evidence to choose the next
+   objective, switch the metric to HumanEval/HumanEval+ test pass rate. Compare
+   with both the baseline and the parse-optimized prompt.
 
 8. Select and freeze the decoder prompt/template.
 
@@ -503,8 +512,9 @@ Report metrics by model/lane and template option.
 
 - Option A gives the signature for free. This should be stated clearly in any
   report because it changes the compression problem.
-- Option B may be too noisy for the first full optimization pass. If it is
-  brittle, use Option A first and treat Option B as future work.
+- Option A and Option B should be treated as equal-priority variants during the
+  decoder-formatting pass. If later results show that Option B is too noisy,
+  that should be a conclusion from the probe rather than an initial assumption.
 - The frozen decoder prompt should not overfit to docstring-style inputs. It
   should still work with dense, encoder-generated descriptions.
 - Parseability is necessary but not sufficient. A prompt can produce valid
@@ -523,13 +533,12 @@ Report metrics by model/lane and template option.
 
 ## Open Questions
 
-- Should Option A and Option B be optimized independently, or should Option B
-  only be attempted after Option A is stable?
-- What exact input should stand in for `{encoded_description}` during this
-  decoder-only stage: raw HumanEval prompt text, extracted docstring, or a
-  hand-normalized description?
-- What is the minimum success threshold for "decoder formatting solved" before
-  moving from AST parseability to test pass rate?
-- How should optimizer candidates be budgeted so results are interpretable
-  rather than another low-sample noisy run?
 - Which task should be used for the one-example exploitability smoke test?
+
+Deferred planning decisions:
+
+- Do not set a hard success threshold for "decoder formatting solved" before
+  the probe runs. Use the formatting results to choose future thresholds.
+- Do not set detailed optimizer candidate budgets in this plan. Use the probe
+  results to choose budgets for later, more conclusive experiments.
+- Leave implementation details for a later planning pass.
