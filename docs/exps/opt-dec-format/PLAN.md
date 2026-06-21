@@ -80,6 +80,22 @@ Current black-box pipeline surface:
 - `../dr-bottleneck/scripts/run_humaneval_demo.py` - current HumanEval sweep
   entry point.
 
+Initial prompt templates live in this repo under
+`configs/prompts/templates/`. They are plain Markdown templates so the first
+iteration can focus on exact prompt text before adding YAML sweep config or slot
+metadata.
+
+- `baseline_enc.md` - current encoder prompt from the HumanEval workflow.
+- `baseline_dec_variantA.md` - current decoder prompt adapted to include
+  `{signature}` side-channel context.
+- `baseline_dec_variantB.md` - current decoder prompt, using only
+  `{encoded_description}`.
+- `manual_dec_v0_variantA.md` / `manual_dec_v0_variantB.md` - minimal manual
+  decoder baseline with explicit code-only and parseability constraints.
+- `manual_dec_v1_variantA.md` / `manual_dec_v1_variantB.md` - slightly stronger
+  manual decoder baseline with compact guidance about interface preservation,
+  standard-library Python, edge cases, and avoiding tests/placeholders.
+
 ## Decoder Template Options
 
 The main design question is which information is fixed decoder context and
@@ -143,13 +159,18 @@ hard to interpret.
 
 1. Original baseline prompt.
 
-   This is the current minimal decoder instruction:
+   This is the current minimal decoder instruction, represented by
+   `configs/prompts/templates/baseline_dec_variantB.md`:
 
    ```text
    Write functional code in Python according to the description.
    ```
 
-2. Minimal manual baseline prompt.
+   `configs/prompts/templates/baseline_dec_variantA.md` is the same baseline
+   adapted for the signature side-channel variant, so it is not a literal
+   historical workflow prompt.
+
+2. Minimal manual baseline prompt (`manual_dec_v0`).
 
    This fixes the obvious formatting constraints while staying short and
    intentionally non-clever:
@@ -196,6 +217,14 @@ hard to interpret.
    {encoded_description}
    ```
    ````
+
+3. Stronger manual baseline prompt (`manual_dec_v1`).
+
+   This keeps the `manual_dec_v0` formatting constraints and adds only compact
+   behavioral guardrails: preserve the public interface, use straightforward
+   standard-library Python, handle implied edge cases, and avoid tests,
+   placeholders, or unrelated top-level behavior. It is intentionally still a
+   manual baseline, not an optimizer-generated template.
 
 ### Target Optimizer Set
 

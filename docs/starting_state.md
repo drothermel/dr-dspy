@@ -260,6 +260,21 @@ Option B gives the decoder only the encoded description:
 The conclusion for now is to evaluate both options before deciding how to frame
 the full encode/decode optimization.
 
+Initial prompt templates for this decoder-format phase live in
+`configs/prompts/templates/`. The current baseline encoder prompt is
+`baseline_enc.md`. Decoder templates are materialized as
+`baseline_dec`, `manual_dec_v0`, and `manual_dec_v1` crossed with
+`variantA`/`variantB`:
+
+- `variantA` includes `{signature}` as side-channel context plus
+  `{encoded_description}`.
+- `variantB` receives only `{encoded_description}`.
+- `manual_dec_v0` is the minimal manual decoder baseline with code-only and
+  parseability constraints.
+- `manual_dec_v1` adds compact guidance about preserving the interface,
+  handling implied edge cases, using straightforward standard-library Python,
+  and avoiding tests/placeholders.
+
 Option A is likely the best first mainline because it keeps the test-facing
 interface outside the compression budget. The encoder can then focus on
 implementation behavior: algorithm, edge cases, constants, imports, helper
