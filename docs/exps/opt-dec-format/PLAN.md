@@ -34,9 +34,14 @@ valid, testable Python before the encoder is introduced.
 
 ## Starting Assumptions
 
-- DSPy's default prompt formatting may be bypassed for this work.
-- LLM generations are expected to route through `../dr-providers/` rather than
-  the normal DSPy adapter formatting path.
+- DSPy's default prompt formatting is bypassed for this work. Optimizer
+  candidates are rendered into explicit prompt/template text and evaluated by
+  the sibling experiment runtime.
+- LLM generations route through `../dr-bottleneck/` and `../dr-providers/`
+  rather than the normal DSPy adapter formatting path.
+- Coordination between `dr-dspy` and `dr-bottleneck` is queue-based, not
+  filesystem-based. Filesystem exports may remain useful for inspection, but
+  they are not the control plane.
 - Initial runs should use one model: `openrouter/openai/gpt-oss-20b/low/v1`.
   This keeps cost and variance down while the optimization setup is being
   validated.
@@ -71,14 +76,82 @@ Provider/client surface:
 Current black-box pipeline surface:
 
 - `../dr-bottleneck/configs/workflows/humaneval_encode_decode.yaml` - current
-  encode/decode/evaluate workflow.
+  encode/decode workflow.
 - `../dr-bottleneck/src/dr_bottleneck/experiments/humaneval.py` - HumanEval+
-  loading, source construction, job expansion, and the current AST/compression
-  process handler.
+  loading, source construction, job expansion, and conversion into `dr-code`
+  attempt records.
+- `../dr-bottleneck/src/dr_bottleneck/candidate_eval/` - queue-facing
+  candidate-evaluation request/result schema, decoder-only evaluator, and
+  candidate worker.
 - `../dr-bottleneck/scripts/preview_humaneval_prompts.py` - prompt rendering
   helper for inspecting workflow prompts without LLM calls.
 - `../dr-bottleneck/scripts/run_humaneval_demo.py` - current HumanEval sweep
   entry point.
+- `../dr-code/src/dr_code/pipeline/export.py` - exposes persisted parse/test
+  outcomes for candidate-result aggregation.
+- `dspy/integrations/bottleneck/` - `dr-dspy` queue client for submitting
+  candidates and collecting optimizer-facing results.
+
+## Current Implementation State
+
+The first integration slice is implemented and committed across the sibling
+repos:
+
+- `dr-dspy` can submit candidate-evaluation requests and collect matching
+  results through `BottleneckQueueEvaluator`.
+- `dr-bottleneck` owns the candidate request/result models and a
+  `dr_bottleneck.candidate_eval.worker` process that consumes request jobs,
+  evaluates decoder-only candidates, and publishes result jobs.
+- `dr-bottleneck` derives decoder-only `{signature}` and
+  `{encoded_description}` values from HumanEval prompts, then runs a one-step
+  decode workflow through the normal `dr-providers` call path.
+- `dr-code` parse/test outcomes are reconstructed from persisted queue events
+  and summarized into candidate-level metrics and failure buckets.
+
+Supported now:
+
+- `decoder_format` and `decoder_correctness` candidate phases.
+- Signature-side-channel and description-only variants, selected by template
+  text usage.
+- Baseline/manual decoder templates and slot-addendum templates.
+- AST parse rate, test pass rate, failure buckets, per-example feedback, and
+  decoder-input byte/compression summaries.
+- Scaling through queue workers, task slices, lane lists, budgets, repeats, and
+  bottleneck/code-eval worker counts.
+
+Not supported yet:
+
+- Full `encoder_full_path` optimization.
+- Candidate-specific two-step encode/decode workflows.
+- Using encoder-generated descriptions as decoder input.
+- Meaningful correctness-then-compression scoring over encoder output.
+- Freezing a selected decoder prompt and evaluating encoder candidates against
+  it.
+
+## Settled Design Decisions
+
+- `dr-dspy` is the optimizer brain: it proposes prompt candidates, submits
+  candidate-evaluation requests, consumes results, and updates optimizer state.
+- `dr-bottleneck` is the evaluator/runtime: it owns provider calls, queue
+  execution, HumanEval job construction, linked `dr-code` evaluation, and
+  aggregation into optimizer-facing results.
+- The cross-repo API is a queue message contract:
+
+  ```text
+  CandidateEvalRequest -> dr-bottleneck evaluation -> CandidateEvalResult
+  ```
+
+- Requests and results are wrapped in `dr_queues.JobEnvelope`s. The request
+  lives under `payload["candidate_eval_request"]`; the result lives under
+  `step_records["candidate_eval"]`.
+- Queue result messages contain bounded optimizer-facing summaries. Mongo run
+  IDs remain the durable references for full prompts, raw outputs, LLM call
+  records, queue events, and code-eval artifacts.
+- One candidate maps to one bottleneck/code-eval run for now. This keeps
+  attribution and debugging simple while the experiment surface is still being
+  validated.
+- Full encoder optimization should reuse the same request/result contract
+  rather than introduce a second integration path.
 
 Initial prompt templates live in this repo under
 `configs/prompts/templates/`. They are plain Markdown templates so the first
@@ -425,11 +498,10 @@ for quality and conceptual fit before practicality filtering.
 
 ## Proposed Experiment Sequence
 
-Before numbered evaluation runs, build the decoder-only dataset view and freeze
-the split identifiers. For each HumanEval/HumanEval+ task, construct examples
-containing at least the ground-truth signature, the docstring text used as
-`{encoded_description}`, the expected entry point, and the test harness metadata
-needed for evaluation.
+Before numbered evaluation runs, freeze the dataset split identifiers. The
+decoder-only dataset view is now produced inside `dr-bottleneck` from
+HumanEval/HumanEval+ task prompts: `{signature}` comes from imports plus the
+function header, and `{encoded_description}` comes from the function docstring.
 
 0. Run baseline evaluation batches.
 
@@ -488,6 +560,39 @@ needed for evaluation.
 
    Prefer the prompt that gives stable parseability and the best pass rate while
    remaining compatible with later encoder-generated descriptions.
+
+## Remaining Implementation Steps
+
+Near-term evaluator work:
+
+- Run a live one-example queue smoke test with RabbitMQ, MongoDB, OpenRouter,
+  one candidate worker, and one result consumer.
+- Add thin CLIs or notebooks for submitting baseline/manual/grid candidates
+  through `BottleneckQueueEvaluator`.
+- Persist optimizer-run bookkeeping in `dr-dspy`: submitted candidate ids,
+  result status, metric target, score, feedback, and linked run ids.
+- Add analysis helpers that read candidate results and produce the planned
+  baseline/grid reports by variant, model lane, and failure bucket.
+
+Optimizer integration work:
+
+- Implement the curated 27-combination grid submission/collection loop.
+- Wrap the queue evaluator as the metric boundary for learned optimizers.
+- Start with scalar AST parse rate, then add test-pass scoring and GEPA-style
+  feedback strings from candidate failure buckets.
+- Decide after live probes which learned methods are worth keeping beyond the
+  grid baseline.
+
+Later encoder-path work:
+
+- Extend `dr-bottleneck` candidate evaluation to support two-step
+  encoder/decode workflows from `encoder_template_text` plus frozen decoder
+  template text.
+- Make compressed encoder-output size the secondary metric for
+  `correctness_then_compression`.
+- Reuse the existing queue request/result contract for encoder candidates, with
+  additional provenance for encoder prompt, encoder output, and compression
+  metrics.
 
 ## Metrics To Report
 
