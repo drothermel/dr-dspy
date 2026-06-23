@@ -975,6 +975,155 @@ The first planning emphasis is on understanding the interaction of breadth,
 depth, and `n_seeds_per_eval`; the other recorded controls are context for
 interpreting those runs.
 
+COPRO implementation investigation conclusions:
+
+- Do not subclass or invoke the existing `dspy.teleprompt.COPRO.compile` path
+  for this experiment. It still owns proposal `Predict(...)` calls, DSPy
+  program mutation, DSPy `Evaluate` scoring, `RunContext`/adapter execution, and
+  DSPy call logging. Reusing it directly would reintroduce a second LLM
+  execution path.
+- Reuse COPRO's algorithmic shape, not its runtime substrate:
+  - breadth/depth iteration;
+  - initial proposal from the current/incumbent candidate;
+  - refinement proposal from scored candidate history;
+  - first-round incumbent inclusion;
+  - best-so-far ranking and candidate history.
+- Adapt, rather than import unchanged, COPRO's proposal TaskSpecs. The current
+  COPRO specs produce `proposed_instruction` and
+  `proposed_prefix_for_output_field`; this experiment should produce the
+  candidate surface directly. For bounded slots, outputs should be exactly the
+  slot names such as `task_instructions`, `output_instructions`, and
+  `failure_avoidance`.
+- Reuse DSPy's TaskSpec and adapter machinery only for deterministic offline
+  formatting and parsing:
+  - render proposal prompts with `JSONAdapter().format(task_spec, demos=[],
+    inputs=...)`;
+  - serialize the rendered messages into the single prompt string submitted as
+    an `llm_query_static` workflow job;
+  - parse proposal `output_text` with `JSONAdapter.parse(...)` against the same
+    proposal TaskSpec.
+- Do not use DSPy's adapter `__call__`, native structured-output execution,
+  `Predict`, `LM`, caching, or call logs for proposal generation. `dr-bottleneck`
+  remains the only provider-facing execution path.
+- Own candidate evaluation outside the COPRO loop. The loop should see
+  candidate bundles, aggregate scores, and compact diagnostics; workflow
+  expansion, queue submission, raw output collection, and metric calculation
+  remain experiment/runtime responsibilities.
+
+The smallest clean-break module layout in `dr-dspy` should be experiment-owned,
+not a modification of the generic teleprompter:
+
+```text
+dspy/experiments/opt_dec_format/copro_loop.py
+dspy/experiments/opt_dec_format/proposal_specs.py
+dspy/experiments/opt_dec_format/slot_candidates.py
+dspy/experiments/opt_dec_format/prompt_rendering.py
+dspy/experiments/opt_dec_format/workflow_jobs.py
+dspy/experiments/opt_dec_format/scoring.py
+dspy/experiments/opt_dec_format/run_state.py
+```
+
+Responsibilities:
+
+- `copro_loop.py`: breadth/depth state machine, incumbent selection, candidate
+  history, and loop-level run statistics.
+- `proposal_specs.py`: initial/refinement TaskSpecs for bounded slots and full
+  prompt surfaces.
+- `slot_candidates.py`: strict Pydantic models for raw slot values, rendered
+  slot values, cap policy, deterministic candidate ids, and validation.
+- `prompt_rendering.py`: TaskSpec-to-proposal-prompt rendering and
+  candidate-to-decoder-template rendering.
+- `workflow_jobs.py`: expansion of candidate/sample/seed tuples into
+  `dr_bottleneck.workflow_jobs.spec` payloads imported directly from
+  `dr-bottleneck`.
+- `scoring.py`: aggregation of workflow outputs into optimizer-facing metric
+  ids. Compression metrics should reuse `dr-code`'s zstd22 helper rather than
+  reimplement compression.
+- `run_state.py`: persisted optimizer run, proposal jobs, candidates, workflow
+  jobs, aggregate scores, diagnostics, and selected incumbents.
+
+COPRO-style loop pseudocode:
+
+```python
+incumbent = baseline_slot_bundle()
+history = []
+
+for round_index in range(depth):
+    if round_index == 0:
+        proposal_prompt = render_initial_task_spec(incumbent, breadth - 1)
+    else:
+        proposal_prompt = render_refine_task_spec(
+            summarize_attempts(history),
+            breadth,
+        )
+
+    proposal_outputs = submit_llm_query_static_jobs(proposal_prompt)
+    proposed = parse_and_validate_slot_bundles(proposal_outputs)
+    candidates = [incumbent, *proposed] if round_index == 0 else proposed
+
+    for candidate in dedupe(candidates):
+        rendered_decoder_prompt = render_decoder_template(candidate)
+        jobs = expand_workflow_jobs(
+            candidate,
+            rendered_decoder_prompt,
+            train_samples,
+            seeds,
+        )
+        outputs = submit_and_collect(jobs)
+        score = score_outputs(outputs, metric_id)
+        persist_candidate_round(candidate, jobs, outputs, score)
+        history.append(scored(candidate, score, diagnostics(outputs)))
+
+    incumbent = max(history, key=lambda item: item.score).candidate
+```
+
+Bounded slot proposal validation:
+
+- Use a strict Pydantic `BaseModel` with exactly the expected slot fields and
+  `extra="forbid"`.
+- Preserve raw slot text and compute rendered slot text through the configured
+  cap policy.
+- Enforce per-slot max character policy at render time and record whether
+  truncation occurred.
+- Reject or explicitly mark invalid empty/whitespace-only slot values.
+- Treat invalid JSON, missing fields, extra fields, and invalid slot values as
+  proposal failures, not workflow execution failures.
+- Derive deterministic `candidate_id` values from optimizer run id, round,
+  proposal index, raw slot values, candidate surface, and template id.
+
+Persist per COPRO round/candidate:
+
+- `optimizer_run_id`, `round_index`, `candidate_id`, and
+  `parent_candidate_id`.
+- `proposal_phase`: `baseline`, `grid`, `initial`, or `refine`.
+- Proposal prompt, proposal workflow/job id, raw proposal output, parse status,
+  and validation errors.
+- Raw and rendered candidate values, candidate cap policy, candidate surface,
+  template id/path, and rendered decoder prompt text.
+- Workflow ids/job ids for each `(task_id, split, seed_index)` evaluation.
+- Required correlation metadata: `experiment_id`, `task_id`, `split`,
+  `metric_id`, `candidate_surface`, `evaluator_model_id`,
+  `proposal_model_id`, and related optional fields.
+- Result status, successful eval count, aggregate score, parse rate,
+  functional-recovery pass rate, failure buckets, and selected incumbent after
+  each round.
+
+Tests for the first COPRO-style implementation should prove:
+
+- Proposal rendering uses offline adapter formatting and does not call
+  `Predict`, `RunContext`, `BaseLM`, or adapter `__call__`.
+- Proposal parsing accepts valid JSON slot bundles and rejects missing, extra,
+  invalid, or empty fields.
+- Over-limit slot values preserve raw text while truncating only rendered text.
+- Round zero evaluates the incumbent plus `breadth - 1` proposal bundles.
+- Refinement prompts include scored history and compact diagnostics from prior
+  candidates.
+- Evaluation expands concrete `WorkflowJobPayload`s with required metadata.
+- Scoring uses workflow outputs only and returns the expected metric values.
+- A fake bottleneck client can drive two rounds where the second-round best
+  candidate becomes incumbent.
+- The clean-break path never invokes `dspy.teleprompt.COPRO.compile`.
+
 ## Method Selection Criteria
 
 Use two passes when selecting methods.
