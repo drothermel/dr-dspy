@@ -38,6 +38,7 @@ dependencies = [
     "gepa>=0.1.1",
     "weaviate>=0.1.2",
     "datasets>=3.6.0",
+    "dr-queues>=0.1.4",
 ]
 
 [project.optional-dependencies]

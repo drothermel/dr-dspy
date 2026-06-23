@@ -60,8 +60,8 @@ slots:
         char_count: 72
         text: "Avoid stub implementations; include all logic needed by the description."
       - id: expected_function_edge_cases
-        char_count: 71
-        text: "Ensure the expected function is defined and handles implied edge cases."
+        char_count: 78
+        text: "Define one arity-compatible top-level function and handle implied edge cases."
 
 reporting:
   record:

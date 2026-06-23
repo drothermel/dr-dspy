@@ -4,6 +4,10 @@ import time
 from importlib import import_module
 from typing import Any
 
+from dr_queues import JobEnvelope
+from dr_queues.amqp.publish import publish_job
+from dr_queues.amqp.session import broker_session
+from dr_queues.amqp.topology import declare_durable_queue, declare_durable_queues
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 CANDIDATE_EVAL_STAGE = "candidate_eval"
@@ -23,7 +27,7 @@ class BottleneckQueueEvaluator(BaseModel):
     _pending_results: list[Any] = PrivateAttr(default_factory=list)
 
     def submit(self, request: Any) -> str:
-        CandidateEvalRequest, _CandidateEvalResult, JobEnvelope, ChannelSession = _runtime_types()
+        CandidateEvalRequest, _CandidateEvalResult = _runtime_types()
         parsed = CandidateEvalRequest.model_validate(request)
         if parsed.result_queue != self.result_queue:
             parsed = parsed.model_copy(update={"result_queue": self.result_queue})
@@ -35,19 +39,16 @@ class BottleneckQueueEvaluator(BaseModel):
             pipeline_id=CANDIDATE_EVAL_STAGE,
             payload={REQUEST_PAYLOAD_KEY: parsed.model_dump(mode="json")},
         )
-        session = ChannelSession.open_session()
-        try:
-            ChannelSession.declare_durable_queue(
-                queue_name=self.request_queue,
-                channel=session.channel,
+        with broker_session() as broker:
+            declare_durable_queues(
+                broker.channel,
+                [self.request_queue, self.result_queue],
             )
-            ChannelSession.declare_durable_queue(
-                queue_name=self.result_queue,
-                channel=session.channel,
+            publish_job(
+                broker.channel,
+                self.request_queue,
+                job.to_json(),
             )
-            session.publish_job(self.request_queue, job.to_json())
-        finally:
-            session.close()
         return job.job_id
 
     def submit_many(self, requests: list[Any]) -> list[str]:
@@ -67,36 +68,33 @@ class BottleneckQueueEvaluator(BaseModel):
         if pending is not None:
             return pending
 
-        _CandidateEvalRequest, CandidateEvalResult, JobEnvelope, ChannelSession = _runtime_types()
+        _CandidateEvalRequest, CandidateEvalResult = _runtime_types()
         deadline = time.monotonic() + timeout_seconds
-        session = ChannelSession.open_session()
-        try:
-            ChannelSession.declare_durable_queue(
-                queue_name=self.result_queue,
-                channel=session.channel,
-            )
+        with broker_session() as broker:
+            declare_durable_queue(broker.channel, self.result_queue)
             while time.monotonic() < deadline:
-                method, _properties, body = session.channel.basic_get(
+                method, _properties, body = broker.channel.basic_get(
                     queue=self.result_queue,
                     auto_ack=False,
                 )
                 if method is None:
                     time.sleep(self.poll_interval_seconds)
                     continue
+                assert body is not None
+                assert method.delivery_tag is not None
+                delivery_tag = int(method.delivery_tag)
                 job = JobEnvelope.from_json(body)
                 result = CandidateEvalResult.model_validate(job.step_records[CANDIDATE_EVAL_STAGE])
                 if result.optimizer_run_id == optimizer_run_id and result.candidate_id == candidate_id:
-                    session.channel.basic_ack(
-                        delivery_tag=method.delivery_tag,
+                    broker.channel.basic_ack(
+                        delivery_tag=delivery_tag,
                     )
                     return result
-                session.channel.basic_ack(
-                    delivery_tag=method.delivery_tag,
+                broker.channel.basic_ack(
+                    delivery_tag=delivery_tag,
                 )
                 self._pending_results.append(result)
                 time.sleep(self.poll_interval_seconds)
-        finally:
-            session.close()
         msg = f"Timed out waiting for candidate_id={candidate_id!r} optimizer_run_id={optimizer_run_id!r}."
         raise TimeoutError(msg)
 
@@ -110,33 +108,30 @@ class BottleneckQueueEvaluator(BaseModel):
         if pending is not None:
             return pending
 
-        _CandidateEvalRequest, CandidateEvalResult, JobEnvelope, ChannelSession = _runtime_types()
+        _CandidateEvalRequest, CandidateEvalResult = _runtime_types()
         deadline = time.monotonic() + timeout_seconds
-        session = ChannelSession.open_session()
-        try:
-            ChannelSession.declare_durable_queue(
-                queue_name=self.result_queue,
-                channel=session.channel,
-            )
+        with broker_session() as broker:
+            declare_durable_queue(broker.channel, self.result_queue)
             while time.monotonic() < deadline:
-                method, _properties, body = session.channel.basic_get(
+                method, _properties, body = broker.channel.basic_get(
                     queue=self.result_queue,
                     auto_ack=False,
                 )
                 if method is None:
                     time.sleep(self.poll_interval_seconds)
                     continue
+                assert body is not None
+                assert method.delivery_tag is not None
+                delivery_tag = int(method.delivery_tag)
                 job = JobEnvelope.from_json(body)
                 result = CandidateEvalResult.model_validate(job.step_records[CANDIDATE_EVAL_STAGE])
                 if optimizer_run_id is None or result.optimizer_run_id == optimizer_run_id:
-                    session.channel.basic_ack(
-                        delivery_tag=method.delivery_tag,
+                    broker.channel.basic_ack(
+                        delivery_tag=delivery_tag,
                     )
                     return result
-                session.channel.basic_ack(delivery_tag=method.delivery_tag)
+                broker.channel.basic_ack(delivery_tag=delivery_tag)
                 self._pending_results.append(result)
-        finally:
-            session.close()
         msg = "Timed out waiting for a candidate eval result."
         raise TimeoutError(msg)
 
@@ -182,13 +177,9 @@ def candidate_score(result: Any, *, metric_target: str) -> float:
     raise ValueError(msg)
 
 
-def _runtime_types() -> tuple[Any, Any, Any, Any]:
+def _runtime_types() -> tuple[Any, Any]:
     candidate_eval = import_module("dr_bottleneck.candidate_eval")
-    dr_queues = import_module("dr_queues")
-    connection = import_module("dr_queues.amqp.connection")
     return (
         candidate_eval.CandidateEvalRequest,
         candidate_eval.CandidateEvalResult,
-        dr_queues.JobEnvelope,
-        connection.ChannelSession,
     )
