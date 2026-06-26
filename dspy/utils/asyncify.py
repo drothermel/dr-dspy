@@ -1,5 +1,6 @@
 import functools
-from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 
 import anyio
 from anyio import CapacityLimiter

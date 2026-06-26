@@ -41,7 +41,7 @@ def test_refine_forward_success_first_attempt():
     assert result.answer == "Brussels", "Result should be `Brussels`"
     assert reward_call_count[0] > 0, "Reward function should have been called"
     assert module_call_count[0] == 3, (
-        "Module should have been called exactly 3 times, but was called %d times" % module_call_count[0]
+        f"Module should have been called exactly 3 times, but was called {module_call_count[0]} times"
     )
 
 
@@ -76,5 +76,5 @@ def test_refine_module_custom_fail_count():
     with pytest.raises(ValueError):
         refine(question="What is the capital of Belgium?")
     assert module_call_count[0] == 2, (
-        "Module should have been called exactly 2 times, but was called %d times" % module_call_count[0]
+        f"Module should have been called exactly 2 times, but was called {module_call_count[0]} times"
     )

@@ -8,7 +8,8 @@ or uses a custom function to generate responses. Useful for:
 - Recording what code was submitted for execution
 """
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
 

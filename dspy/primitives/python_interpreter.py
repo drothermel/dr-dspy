@@ -15,10 +15,15 @@ import logging
 import os
 import subprocess
 import threading
+from collections.abc import Callable
 from os import PathLike
-from typing import Any, Callable
+from typing import Any
 
-from dspy.primitives.code_interpreter import SIMPLE_TYPES, CodeInterpreterError, FinalOutput
+from dspy.primitives.code_interpreter import (
+    SIMPLE_TYPES,
+    CodeInterpreterError,
+    FinalOutput,
+)
 
 __all__ = ["PythonInterpreter", "FinalOutput", "CodeInterpreterError"]
 

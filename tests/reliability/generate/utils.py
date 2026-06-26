@@ -10,13 +10,16 @@ import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import pydantic
 from datamodel_code_generator import InputFileType, generate
 
 import dspy
-from tests.reliability.utils import assert_program_output_correct, judge_dspy_configuration
+from tests.reliability.utils import (
+    assert_program_output_correct,
+    judge_dspy_configuration,
+)
 
 
 def _retry(retries):
@@ -46,7 +49,7 @@ def _retry(retries):
 
 
 @_retry(retries=5)
-def generate_test_program(dst_path: str, additional_instructions: Optional[str] = None) -> dspy.Module:
+def generate_test_program(dst_path: str, additional_instructions: str | None = None) -> dspy.Module:
     """
     Generate a DSPy program for a reliability test case and save it to a destination path.
 
@@ -81,7 +84,7 @@ def generate_test_program(dst_path: str, additional_instructions: Optional[str] 
             _remove_line_from_file(tmp_model_path, "from __future__ import annotations")
             # Remove comments inserted by datamodel-code-generator from the generated model file
             _remove_comments_from_file(tmp_model_path)
-            with open(tmp_model_path, "r") as f:
+            with open(tmp_model_path) as f:
                 return f.read()
 
     def rename_conflicting_fields(
@@ -155,7 +158,7 @@ def generate_test_inputs(
     dst_path: str,
     program_path: str,
     num_inputs: int,
-    additional_instructions: Optional[str] = None,
+    additional_instructions: str | None = None,
 ):
     """
     Generate test inputs for a reliability test case and save them to a destination path.
@@ -226,7 +229,7 @@ def generate_test_inputs(
         shutil.copytree(tmp_dir, dst_path, dirs_exist_ok=True)
 
 
-def load_generated_program(path) -> Tuple[dspy.Module, pydantic.BaseModel]:
+def load_generated_program(path) -> tuple[dspy.Module, pydantic.BaseModel]:
     """
     Loads a generated program from the specified file.
 
@@ -283,7 +286,7 @@ def load_generated_cases(dir_path) -> list[GeneratedTestCase]:
             # Load each JSON test input file in the inputs directory
             for input_file in os.listdir(inputs_path):
                 if input_file.endswith(".json"):
-                    with open(os.path.join(inputs_path, input_file), "r") as f:
+                    with open(os.path.join(inputs_path, input_file)) as f:
                         # Best effort to extract a meaningful enclosing directory name
                         # from the test path that can be used as part of the test case name
                         readable_dir_name = os.path.basename(os.path.dirname(os.path.dirname(root)))
@@ -343,7 +346,7 @@ def _get_test_program_signature_and_module_definition(program_description: str) 
     else:
         program_var_definition = "program = dspy.Predict(program_signature)"
 
-    return '''
+    return f'''
 import dspy
 
 class BaseSignature(dspy.Signature):
@@ -366,7 +369,7 @@ for output_field_name, output_field in ProgramOutputs.model_fields.items():
     )
 
 {program_var_definition}
-'''.format(program_description=program_description, program_var_definition=program_var_definition)
+'''
 
 
 def _get_test_program_generation_program() -> dspy.Module:
@@ -551,7 +554,7 @@ def _get_json_schema(signature: dspy.Signature) -> dict[str, Any]:
     return expand_refs(signature_schema_with_refs, definitions)
 
 
-def _split_schema(schema: dict[str, Any]) -> Tuple[dict[str, Any], dict[str, Any]]:
+def _split_schema(schema: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     """
     Split a JSON schema into input and output components based on DSPy field types.
 
@@ -664,7 +667,7 @@ def _remove_line_from_file(file_path: str, line_to_remove: str):
         line_to_remove: The line to remove from the file.
     """
     # Read all lines from the file
-    with open(file_path, "r") as file:
+    with open(file_path) as file:
         lines = file.readlines()
 
     # Write all lines back except the one to remove
@@ -682,7 +685,7 @@ def _remove_comments_from_file(file_path: str) -> None:
         file_path: Path to the file where comments should be removed.
     """
     # Read the file contents
-    with open(file_path, "r") as file:
+    with open(file_path) as file:
         lines = file.readlines()
 
     # Filter out lines that start with '#'
@@ -693,7 +696,7 @@ def _remove_comments_from_file(file_path: str) -> None:
         file.writelines(cleaned_lines)
 
 
-def _write_pretty_json(data: dict[str, Any], path: Optional[str] = None) -> Optional[str]:
+def _write_pretty_json(data: dict[str, Any], path: str | None = None) -> str | None:
     """
     Format JSON data with indentation, and write it to a file if specified.
 

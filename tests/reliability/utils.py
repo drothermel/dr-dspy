@@ -1,7 +1,7 @@
 import os
 from contextlib import contextmanager
-from functools import lru_cache, wraps
-from typing import Any, Dict, List, Union
+from functools import cache, wraps
+from typing import Any
 
 import pydantic
 import pytest
@@ -15,7 +15,7 @@ JUDGE_MODEL_NAME = "judge"
 def assert_program_output_correct(
     program_input: Any,
     program_output: Any,
-    grading_guidelines: Union[str, list[str]],
+    grading_guidelines: str | list[str],
 ):
     """
     With the help of an LLM judge, assert that the specified output of a DSPy program is correct,
@@ -118,10 +118,10 @@ class ReliabilityTestConf(pydantic.BaseModel):
     models: dict[str, Any]
 
 
-@lru_cache(maxsize=None)
+@cache
 def parse_reliability_conf_yaml(conf_file_path: str) -> ReliabilityTestConf:
     try:
-        with open(conf_file_path, "r") as file:
+        with open(conf_file_path) as file:
             conf = yaml.safe_load(file)
 
         model_dict = {}

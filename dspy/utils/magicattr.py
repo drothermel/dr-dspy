@@ -68,7 +68,7 @@ def lookup(obj, attr):
         return obj, _lookup_subscript_value(node.slice), True
     elif isinstance(node, ast.Name):
         return obj, node.id, False
-    raise NotImplementedError("Node is not supported: %s" % node)
+    raise NotImplementedError(f"Node is not supported: {node}")
 
 
 def _parse(attr):
@@ -77,7 +77,7 @@ def _parse(attr):
         raise TypeError("Attribute name must be a string")
     nodes = ast.parse(attr).body
     if not nodes or not isinstance(nodes[0], ast.Expr):
-        raise ValueError("Invalid expression: %s" % attr)
+        raise ValueError(f"Invalid expression: {attr}")
     return reversed([n for n in ast.walk(nodes[0]) if isinstance(n, _AST_TYPES)])
 
 
@@ -111,7 +111,7 @@ def _lookup_subscript_value(node):
         elif sys.version_info < (3, 14) and hasattr(ast, "Num") and isinstance(operand, ast.Num):
             return -operand.n
 
-    raise NotImplementedError("Subscript node is not supported: %s" % ast.dump(node))
+    raise NotImplementedError(f"Subscript node is not supported: {ast.dump(node)}")
 
 
 def _lookup(obj, node):
@@ -124,4 +124,4 @@ def _lookup(obj, node):
         return getattr(obj, node.id)
     elif isinstance(node, ast.Call):
         raise ValueError("Function calls are not allowed.")
-    raise NotImplementedError("Node is not supported: %s" % node)
+    raise NotImplementedError(f"Node is not supported: {node}")

@@ -13,21 +13,30 @@ from __future__ import annotations
 import base64
 import logging
 import threading
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any
 
 import pydantic
 
 import dspy
 from dspy.adapters.types.tool import Tool
 from dspy.adapters.utils import parse_value, translate_field_type
-from dspy.primitives.code_interpreter import SIMPLE_TYPES, CodeInterpreter, CodeInterpreterError, FinalOutput
+from dspy.primitives.code_interpreter import (
+    SIMPLE_TYPES,
+    CodeInterpreter,
+    CodeInterpreterError,
+    FinalOutput,
+)
 from dspy.primitives.module import Module
 from dspy.primitives.prediction import Prediction
 from dspy.primitives.python_interpreter import PythonInterpreter
 from dspy.primitives.repl_types import REPLEntry, REPLHistory, REPLVariable
-from dspy.primitives.sandbox_serializable import SandboxSerializable, build_repl_variable
+from dspy.primitives.sandbox_serializable import (
+    SandboxSerializable,
+    build_repl_variable,
+)
 from dspy.signatures.signature import ensure_signature
 from dspy.utils.annotation import experimental
 

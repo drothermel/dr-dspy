@@ -3,7 +3,6 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -24,14 +23,14 @@ class ObjectField(BaseModel):
 
 
 class NestedObjectField(BaseModel):
-    tupleField: Tuple[str, float]
+    tupleField: tuple[str, float]
     enumField: EnumField
     datetimeField: datetime
     literalField: LiteralField
 
 
 class ProgramInputs(BaseModel):
-    tupleField: Tuple[str, float]
+    tupleField: tuple[str, float]
     enumField: EnumField
     datetimeField: datetime
     literalField: LiteralField
@@ -44,7 +43,6 @@ class ProgramInputs(BaseModel):
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Tuple, Union
 
 from pydantic import BaseModel, Field
 
@@ -76,7 +74,7 @@ class LiteralField(Enum):
 
 
 class ProcessedNestedObjectField(BaseModel):
-    tupleField: Tuple[str, float]
+    tupleField: tuple[str, float]
     enumField: EnumField
     datetimeField: datetime
     literalField: LiteralField
@@ -84,7 +82,7 @@ class ProcessedNestedObjectField(BaseModel):
 
 
 class ProgramOutputs(BaseModel):
-    processedTupleField: Tuple[str, float]
+    processedTupleField: tuple[str, float]
     processedEnumField: ProcessedEnumField
     processedDatetimeField: datetime
     processedLiteralField: ProcessedLiteralField

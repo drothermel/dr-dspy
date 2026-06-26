@@ -1,5 +1,5 @@
 import os
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 import orjson
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from dspy.adapters.base import Adapter
 
 
-class TrainingStatus(str, Enum):
+class TrainingStatus(StrEnum):
     not_started = "not_started"
     pending = "pending"
     running = "running"
@@ -20,7 +20,7 @@ class TrainingStatus(str, Enum):
     cancelled = "cancelled"
 
 
-class TrainDataFormat(str, Enum):
+class TrainDataFormat(StrEnum):
     CHAT = "chat"
     COMPLETION = "completion"
     GRPO_CHAT = "grpo_chat"

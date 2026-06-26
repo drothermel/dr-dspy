@@ -3,8 +3,9 @@ import contextvars
 import logging
 import threading
 from asyncio import iscoroutinefunction
+from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 from queue import Queue
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Awaitable, Callable, Generator
+from typing import TYPE_CHECKING, Any
 
 import orjson
 from anyio import create_memory_object_stream, create_task_group
@@ -12,8 +13,15 @@ from anyio.streams.memory import MemoryObjectSendStream
 
 from dspy.dsp.utils.settings import settings
 from dspy.primitives.prediction import Prediction
-from dspy.streaming.messages import StatusMessage, StatusMessageProvider, StatusStreamingCallback
-from dspy.streaming.streaming_listener import StreamListener, find_predictor_for_stream_listeners
+from dspy.streaming.messages import (
+    StatusMessage,
+    StatusMessageProvider,
+    StatusStreamingCallback,
+)
+from dspy.streaming.streaming_listener import (
+    StreamListener,
+    find_predictor_for_stream_listeners,
+)
 from dspy.utils.asyncify import asyncify
 
 logger = logging.getLogger(__name__)

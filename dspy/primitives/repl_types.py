@@ -10,7 +10,8 @@ These types represent the state and history of REPL-based execution:
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Iterator
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any
 
 import pydantic
 from pydantic import Field

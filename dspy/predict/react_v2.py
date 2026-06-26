@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, get_args
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, get_args
 
 import pydantic
 

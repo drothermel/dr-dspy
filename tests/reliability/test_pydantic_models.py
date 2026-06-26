@@ -1,11 +1,12 @@
 from enum import Enum
-from typing import Any, List, Literal
+from typing import Any, Literal
 
 import pydantic
 import pytest
 
 import dspy
 from tests.reliability.utils import assert_program_output_correct, known_failing_models
+
 
 @pytest.mark.reliability
 def test_qa_with_pydantic_answer_model():

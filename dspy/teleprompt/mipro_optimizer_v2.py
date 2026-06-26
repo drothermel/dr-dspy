@@ -2,7 +2,8 @@ import logging
 import math
 import random
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable, Literal
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Literal
 
 import dspy
 from dspy.evaluate.evaluate import Evaluate
