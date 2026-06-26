@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import dspy
-from dspy.teleprompt.simba_utils import append_a_demo, append_a_rule, prepare_models_for_resampling, wrap_program
+from dspy.teleprompt.simba_utils import (
+    append_a_demo,
+    append_a_rule,
+    prepare_models_for_resampling,
+    wrap_program,
+)
 from dspy.teleprompt.teleprompt import Teleprompter
 from dspy.utils.lazy_import import require
 

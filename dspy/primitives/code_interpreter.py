@@ -7,7 +7,8 @@ code-executing modules to work with different interpreter implementations:
 - MockInterpreter: Scriptable responses for testing
 """
 
-from typing import Any, Callable, Protocol, runtime_checkable
+from collections.abc import Callable
+from typing import Any, Protocol, runtime_checkable
 
 # Types that can be used directly in Python function signatures for SUBMIT()
 SIMPLE_TYPES = (str, int, float, bool, list, dict, type(None))

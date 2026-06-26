@@ -9,7 +9,7 @@ authors = [
     { name = "Omar Khattab", email = "okhattab@stanford.edu" }  
 ]  
 license = { text = "MIT License" }  
-requires-python = ">=3.9" 
+requires-python = ">=3.12, <3.15"
 #replace_dspy_version_marker 
 dependencies = ["dspy>=3.3.0b1"]  
 urls = { "Homepage" = "https://github.com/stanfordnlp/dsp" }  

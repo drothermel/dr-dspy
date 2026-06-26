@@ -14,9 +14,14 @@ repos:
         entry: bash -c 'cd dr-dspy && uv run ty check'
         language: system
         pass_filenames: false
+      - id: py312-modernization-check
+        name: py312 modernization check
+        entry: uv run ruff check --isolated dspy dr-dspy/src dr-dspy/scripts tests --select UP --target-version py312
+        language: system
+        pass_filenames: false
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.0
+    rev: v0.15.10
     hooks:
       - id: ruff
         name: ruff (lint)

@@ -1,6 +1,6 @@
 # ruff: noqa: UP007
 
-from typing import Literal, Optional, Union
+from typing import Literal, Union
 
 import pytest
 from pydantic import BaseModel
@@ -79,11 +79,11 @@ def test_parse_value_literal():
 
 def test_parse_value_union():
     # Test Union with None (Optional)
-    assert parse_value("test", Optional[str]) == "test"
+    assert parse_value("test", str | None) == "test"
     assert parse_value("test", str | None) == "test"
     assert parse_value("5", int | None) == 5
-    assert parse_value(None, Optional[str]) is None
-    assert parse_value("text with [placeholder]", Optional[str]) == "text with [placeholder]"
+    assert parse_value(None, str | None) is None
+    assert parse_value("text with [placeholder]", str | None) == "text with [placeholder]"
     assert parse_value("text with [placeholder]", str | None) == "text with [placeholder]"
 
     # Test Union fallback to str

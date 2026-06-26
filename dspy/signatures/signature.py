@@ -22,8 +22,9 @@ import re
 import sys
 import types
 import typing
+from collections.abc import Iterator
 from copy import deepcopy
-from typing import Any, Iterator
+from typing import Any
 
 from pydantic import BaseModel, Field, create_model
 from pydantic.fields import FieldInfo
@@ -776,11 +777,11 @@ def _parse_type_node(node, names=None) -> Any:
 
         # Special handling for Union, Optional
         if base_type is typing.Union:
-            return typing.Union[arg_types]
+            return _make_pep604_union(arg_types)
         if base_type is typing.Optional:
             if len(arg_types) != 1:
                 raise ValueError("Optional must have exactly one type argument")
-            return typing.Optional[arg_types[0]]
+            return _make_pep604_union((arg_types[0], type(None)))
 
         return base_type[arg_types]
 
@@ -789,12 +790,7 @@ def _parse_type_node(node, names=None) -> Any:
         left = _parse_type_node(node.left, names)
         right = _parse_type_node(node.right, names)
 
-        # Optional[X] is Union[X, NoneType]
-        if right is type(None):
-            return typing.Optional[left]
-        if left is type(None):
-            return typing.Optional[right]
-        return typing.Union[left, right]
+        return _make_pep604_union((left, right))
 
     if isinstance(node, ast.Tuple):
         return tuple(_parse_type_node(elt, names) for elt in node.elts)
@@ -816,6 +812,16 @@ def _parse_type_node(node, names=None) -> Any:
         f"Failed to parse string-base Signature due to unhandled AST node type in annotation: {ast.dump(node)}. "
         "Please consider using class-based DSPy Signatures instead."
     )
+
+
+def _make_pep604_union(arg_types):
+    if not arg_types:
+        raise ValueError("Union must have at least one type argument")
+
+    union_type = type(None) if arg_types[0] is None else arg_types[0]
+    for arg_type in arg_types[1:]:
+        union_type = union_type | (type(None) if arg_type is None else arg_type)
+    return union_type
 
 
 def infer_prefix(attribute_name: str) -> str:

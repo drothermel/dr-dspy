@@ -1,6 +1,6 @@
 # Setting up DSPy
 
-Install DSPy with `pip install dspy` or run `uv add dspy` to add DSPy to a virtual environment. DSPy works in Python 3.10+ environments.
+Install DSPy with `pip install dspy` or run `uv add dspy` to add DSPy to a virtual environment. DSPy works in Python 3.12+ environments.
 
 ## Connecting to a language model
 
