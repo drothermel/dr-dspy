@@ -867,6 +867,7 @@ name = "dr-dspy"
 version = "0.1.0"
 source = { editable = "dr-dspy" }
 dependencies = [
+    { name = "datasets" },
     { name = "dbos" },
     { name = "dspy" },
     { name = "marimo", extra = ["recommended"] },
@@ -880,6 +881,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "datasets", specifier = ">=3.6.0" },
     { name = "dbos", specifier = ">=2.25.0" },
     { name = "dspy", editable = "." },
     { name = "marimo", extras = ["recommended"], specifier = ">=0.23.11" },
