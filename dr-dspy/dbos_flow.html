@@ -277,242 +277,110 @@ details.ex[open]>summary::before{transform:rotate(90deg);}
   </div>
 </div>
 
-<div class="section-label">// two pipelines, stacked &amp; aligned · scroll →</div>
-<p class="scroll-hint">Same columns top &amp; bottom: read down a column to compare the two pipelines. Stages outlined in <span class="warn">orange</span> are where they differ. Click a touchpoint to light it up in both rows.</p>
+<div class="section-label">// one unified pipeline · generation = a node-graph · scroll →</div>
+<p class="scroll-hint">After consolidation there is <b>one</b> pipeline and one table. The only thing that varies per experiment is <b>stage 4's graph</b>: <span style="color:var(--q);font-weight:600">direct</span> = 1 node, <span style="color:var(--sys);font-weight:600">enc-dec</span> = 2 nodes — both run by the same executor. Click a touchpoint to light it up.</p>
 
 <div class="flow-scroll">
+<div class="prow" style="background:rgba(80,70,229,.04);">
 
-  <!-- ================= DIRECT ROW ================= -->
-  <div class="prow direct">
-    <div class="rowlabel"><span class="rl-name">Direct</span><span class="rl-pill">baseline</span><span class="rl-sub">prompt → code<br>1 LLM call</span></div>
-
-    <div class="stage" data-stage>
-      <div class="lane k-cli">
-        <div class="lane-head"><span class="title"><span class="num">1</span>Driver <span class="kind cli">CLI</span></span>
-          <span class="meta"><code>submit</code> · <code>consume_queues=False</code></span></div>
-        <div class="lane-body steps">
-          <div class="step" data-tags="db"><div class="st-title">Record experiment <span class="op db">DB</span></div>
-            <ul><li><code>upsert_experiment()</code> → <code>*_eval_experiments</code></li>
-            <li><code>prepare_operation(SUBMIT)</code> → <code>dr_dspy_batch_operations</code> (<code>spec</code> + progress)</li></ul></div>
-          <div class="checkpoint"><span>then</span><span class="ln"></span></div>
-          <div class="step" data-tags="sys db"><div class="st-title">Launch dispatcher <span class="op sys">SYS</span></div>
-            <ul><li><code>start_workflow(submit_dispatcher)</code> under <code>SetWorkflowID</code> — launched, not queued</li>
-            <li><code>tail_operation_progress()</code> polls progress <span class="op db">DB read loop</span></li></ul></div>
-        </div>
+  <div class="stage" data-stage>
+    <div class="lane k-cli">
+      <div class="lane-head"><span class="title"><span class="num">1</span>Driver <span class="kind cli">CLI</span></span>
+        <span class="meta"><code>submit</code> · <code>consume_queues=False</code></span></div>
+      <div class="lane-body steps">
+        <div class="step" data-tags="db"><div class="st-title">Record experiment <span class="op db">DB</span></div>
+          <ul><li><code>upsert_experiment()</code> → <code>dr_dspy_experiments</code> (config JSONB)</li>
+          <li><code>prepare_operation(SUBMIT)</code> → <code>dr_dspy_batch_operations</code></li></ul></div>
+        <div class="checkpoint"><span>then</span><span class="ln"></span></div>
+        <div class="step" data-tags="sys db"><div class="st-title">Launch dispatcher <span class="op sys">SYS</span></div>
+          <ul><li><code>start_workflow(submit_dispatcher)</code> · <code>tail_operation_progress</code> <span class="op db">DB</span></li></ul></div>
       </div>
     </div>
-    <div class="connector-h"><span class="arrow">▶</span><span class="lbl">starts</span></div>
-
-    <div class="stage wide" data-stage>
-      <div class="lane k-wf">
-        <div class="lane-head"><span class="title"><span class="num">2</span>Submit dispatcher <span class="kind wf">WORKFLOW</span> <span class="samepill">same</span></span>
-          <span class="meta"><code>submit_dispatcher_workflow</code> · loop until <code>next_offset ≥ total_jobs</code> (OFFSET_TOTAL)</span></div>
-        <div class="lane-body steps">
-          <div class="step" data-tags="db"><div class="st-title">Loop <code>fetch_operation_progress</code> <span class="op db">DB</span></div>
-            <ul><li>complete → <code>mark_operation_completed</code>, else run a batch step ↓</li></ul></div>
-          <div class="checkpoint"><span>durable batch step · max_attempts=3</span><span class="ln"></span></div>
-          <div class="step" data-tags="db sys q"><div class="st-title"><code>submit_batch_step</code> <span class="kind step">STEP</span></div>
-            <ul>
-              <li><code>build_humaneval_samples(seed,n)</code> + <code>build_prediction_jobs_for_offsets()</code> (mixed-radix index → 1 job per sample×model×temp×…×rep; <code>prediction_id</code> = stable hash)</li>
-              <li><code>insert_prediction_jobs()</code> <code>ON CONFLICT DO NOTHING</code> <span class="op db">DB</span></li>
-              <li><code>_enqueue_generation_jobs()</code> → enqueue <code>generate_prediction_workflow</code> ×N <span class="op q">Q</span> <span class="op sys">SYS</span></li>
-              <li><code>record_operation_batch_success()</code> advances <code>next_offset</code> <span class="op db">DB</span></li>
-            </ul></div>
-        </div>
-      </div>
-    </div>
-    <div class="connector-h"><span class="arrow">▶</span><span class="lbl">enqueue ×N</span></div>
-
-    <div class="stage" data-stage data-tags="q">
-      <div class="lane k-queue differs">
-        <div class="lane-head"><span class="title"><span class="num">3</span>Generation queue <span class="kind queue">QUEUE</span> <span class="diffpill">differs</span></span>
-          <span class="meta"><code>…_generation_&lt;hash&gt;</code> · <code>worker_concurrency=</code><b style="color:var(--q)">200</b></span></div>
-        <div class="lane-body"><div class="step" data-tags="sys q"><div class="st-title">Worker pulls work</div>
-          <ul><li>up to <b>200</b> generation workflows in flight</li><li>queue rows in DBOS system DB <span class="op sys">SYS</span></li></ul></div></div>
-      </div>
-    </div>
-    <div class="connector-h"><span class="arrow">▶</span><span class="lbl">dequeue</span></div>
-
-    <div class="stage wide" data-stage>
-      <div class="lane k-wf differs">
-        <div class="lane-head"><span class="title"><span class="num">4</span>Generation workflow <span class="kind wf">WORKFLOW</span> <span class="diffpill">differs</span></span>
-          <span class="meta"><code>generate_prediction_workflow</code> · one per prediction</span></div>
-        <div class="lane-body steps">
-          <div class="step" data-tags="db llm"><div class="st-title"><code>generate_prediction_step</code> <span class="kind step">STEP</span></div>
-            <span class="note">retries_allowed · max_attempts=3 · should_retry_step</span>
-            <ul>
-              <li><code>mark_generation_started()</code> <span class="op db">DB</span> · <code>fetch_prediction_job()</code> <span class="op db">DB</span></li>
-              <li><b>Direct</b> — <code>generate_code_for_job()</code>: one <code>run_predictor(solve, {prompt})</code></li>
-              <li><span class="op llm">LLM ×1</span> single OpenRouter call → <code>code</code><span class="note"><code>dspy.Predict</code> → <code>LoggingOpenRouterLM.forward</code> → <code>chat.completions.create</code></span></li>
-              <li>usage + provider_cost via <code>LmEventBuffer</code></li>
-            </ul></div>
-          <div class="checkpoint"><span>checkpoint · ok ↓ / err → error step</span><span class="ln"></span></div>
-          <div class="step" data-tags="db"><div class="st-title"><code>record_generation_success_step</code> <span class="kind step">STEP</span></div>
-            <ul><li>status → <code>generated</code>, store output/usage/cost <span class="op db">DB</span></li>
-            <li class="note">err: <code>record_generation_error_step</code> → <code>generation_(recoverable_)error</code>; no scoring enqueued</li></ul></div>
-          <div class="checkpoint"><span>checkpoint</span><span class="ln"></span></div>
-          <div class="step" data-tags="sys db q"><div class="st-title">Enqueue scoring</div>
-            <ul><li><code>_enqueue_score_job()</code> → <code>score_prediction_workflow</code> <span class="op q">Q</span> <span class="op sys">SYS</span></li>
-            <li><code>mark_scoring_queued_step()</code> → <code>scoring_queued</code> <span class="op db">DB</span></li></ul></div>
-        </div>
-      </div>
-    </div>
-    <div class="connector-h"><span class="arrow">▶</span><span class="lbl">enqueue ×1</span></div>
-
-    <div class="stage" data-stage data-tags="q">
-      <div class="lane k-queue">
-        <div class="lane-head"><span class="title"><span class="num">5</span>Scoring queue <span class="kind queue">QUEUE</span> <span class="samepill">same</span></span>
-          <span class="meta"><code>…_scoring_&lt;hash&gt;</code> · <code>worker_concurrency=</code><b>32</b></span></div>
-        <div class="lane-body"><div class="step" data-tags="proc q"><div class="st-title">Throttled lower</div>
-          <ul><li>same worker on <b>both</b> queues (<code>QueueSelection.BOTH</code>)</li><li>lower cap — each step spawns subprocesses <span class="op proc">PROC</span></li></ul></div></div>
-      </div>
-    </div>
-    <div class="connector-h"><span class="arrow">▶</span><span class="lbl">dequeue</span></div>
-
-    <div class="stage wide" data-stage>
-      <div class="lane k-wf">
-        <div class="lane-head"><span class="title"><span class="num">6</span>Score workflow <span class="kind wf">WORKFLOW</span> <span class="samepill">same</span></span>
-          <span class="meta"><code>score_prediction_workflow</code> · <b class="warn">offline — no network</b></span></div>
-        <div class="lane-body steps">
-          <div class="step" data-tags="db proc"><div class="st-title"><code>score_prediction_step</code> <span class="kind step">STEP</span></div>
-            <ul><li><code>mark_scoring_started()</code> <span class="op db">DB</span> · <code>fetch_scoring_target()</code> (needs <code>generated</code>) <span class="op db">DB</span></li></ul>
-            <div class="checkpoint"><span>score_humaneval_prediction (local)</span><span class="ln"></span></div>
-            <ul>
-              <li><b>a.</b> <code>validate_python_source(raw)</code> ⇒ <code>raw_compile_ok</code></li>
-              <li><b>b.</b> <code>apply_cleaning()</code> — strip fences, split blocks, infer imports ⇒ candidates</li>
-              <li><b>c.</b> select first compiling candidate</li>
-              <li><b>d.</b> <code>evaluate_human_eval_code()</code> → per fn name <code>run_subprocess_batch()</code>:
-                <span class="note"><span class="op proc">PROC spawn</span> <code>subprocess.run([sys.executable,"-c",runner], input=json, timeout)</code></span>
-                <span class="note">untrusted code runs only in the child (stdin JSON). <code>timeout</code>=15s; <code>TimeoutExpired</code>⇒timeout. Process-isolation only.</span></li>
-              <li><b>e.</b> pass/fail ⇒ <code>score</code> 1.0/0.0 + status counts</li>
-              <li><b>f.</b> <code>compression_metrics()</code> (zlib/gzip/bz2/lzma/zstd, local) ⇒ ratios<span class="note">direct compares prompt vs code</span></li>
-            </ul></div>
-          <div class="checkpoint"><span>checkpoint · ok ↓ / err → error step</span><span class="ln"></span></div>
-          <div class="step" data-tags="db"><div class="st-title"><code>record_score_success_step</code> <span class="kind step">STEP</span></div>
-            <ul><li>status → <code>scored</code>; writes score, eval counts, compression metrics <span class="op db">DB</span></li>
-            <li class="note">err: <code>record_score_error_step</code> → <code>score_(recoverable_)error</code></li></ul></div>
-        </div>
-      </div>
-    </div>
-    <div class="connector-h end"><span class="arrow">●</span><span class="lbl">scored</span></div>
   </div>
+  <div class="connector-h"><span class="arrow">▶</span><span class="lbl">starts</span></div>
 
-  <!-- ================= ENC-DEC ROW ================= -->
-  <div class="prow encdec">
-    <div class="rowlabel"><span class="rl-name">Enc-Dec</span><span class="rl-pill">round-trip</span><span class="rl-sub">code → desc → code<br>2 LLM calls</span></div>
-
-    <div class="stage" data-stage>
-      <div class="lane k-cli">
-        <div class="lane-head"><span class="title"><span class="num">1</span>Driver <span class="kind cli">CLI</span></span>
-          <span class="meta"><code>submit</code> · <code>consume_queues=False</code></span></div>
-        <div class="lane-body steps">
-          <div class="step" data-tags="db"><div class="st-title">Record experiment <span class="op db">DB</span></div>
-            <ul><li><code>upsert_experiment()</code> → <code>*_eval_experiments</code></li>
-            <li><code>prepare_operation(SUBMIT)</code> → <code>dr_dspy_batch_operations</code> (<code>spec</code> + progress)</li></ul></div>
-          <div class="checkpoint"><span>then</span><span class="ln"></span></div>
-          <div class="step" data-tags="sys db"><div class="st-title">Launch dispatcher <span class="op sys">SYS</span></div>
-            <ul><li><code>start_workflow(submit_dispatcher)</code> under <code>SetWorkflowID</code> — launched, not queued</li>
-            <li><code>tail_operation_progress()</code> polls progress <span class="op db">DB read loop</span></li></ul></div>
-        </div>
+  <div class="stage wide" data-stage>
+    <div class="lane k-wf">
+      <div class="lane-head"><span class="title"><span class="num">2</span>Submit dispatcher <span class="kind wf">WORKFLOW</span></span>
+        <span class="meta"><code>submit_dispatcher_workflow</code> · loop until <code>next_offset ≥ total_jobs</code> (OFFSET_TOTAL)</span></div>
+      <div class="lane-body steps">
+        <div class="step" data-tags="db sys q"><div class="st-title"><code>submit_batch_step</code> <span class="kind step">STEP</span></div>
+          <ul>
+            <li>the sweep is pre-enumerated into a list of <b>GraphSpec</b>; mixed-radix offset → (sample × graph × repetition)</li>
+            <li><code>prediction_id</code> = hash(experiment, task, <b>graph</b>, repetition) · <code>dimensions_digest</code> = hash(graph)</li>
+            <li><code>insert_prediction_jobs()</code> → <code>dr_dspy_predictions</code> <code>ON CONFLICT DO NOTHING</code> <span class="op db">DB</span></li>
+            <li>enqueue <code>generate_prediction_workflow</code> ×N <span class="op q">Q</span> <span class="op sys">SYS</span></li>
+          </ul></div>
       </div>
     </div>
-    <div class="connector-h"><span class="arrow">▶</span><span class="lbl">starts</span></div>
-
-    <div class="stage wide" data-stage>
-      <div class="lane k-wf">
-        <div class="lane-head"><span class="title"><span class="num">2</span>Submit dispatcher <span class="kind wf">WORKFLOW</span> <span class="samepill">same</span></span>
-          <span class="meta"><code>submit_dispatcher_workflow</code> · loop until <code>next_offset ≥ total_jobs</code> (OFFSET_TOTAL)</span></div>
-        <div class="lane-body steps">
-          <div class="step" data-tags="db"><div class="st-title">Loop <code>fetch_operation_progress</code> <span class="op db">DB</span></div>
-            <ul><li>complete → <code>mark_operation_completed</code>, else run a batch step ↓</li></ul></div>
-          <div class="checkpoint"><span>durable batch step · max_attempts=3</span><span class="ln"></span></div>
-          <div class="step" data-tags="db sys q"><div class="st-title"><code>submit_batch_step</code> <span class="kind step">STEP</span></div>
-            <ul>
-              <li><code>build_humaneval_samples(seed,n)</code> + <code>build_prediction_jobs_for_offsets()</code> (here also sweeps <b>budget_ratio</b> &amp; encoder/decoder dims; <code>prediction_id</code> = stable hash)</li>
-              <li><code>insert_prediction_jobs()</code> <code>ON CONFLICT DO NOTHING</code> <span class="op db">DB</span></li>
-              <li><code>_enqueue_generation_jobs()</code> → enqueue <code>generate_prediction_workflow</code> ×N <span class="op q">Q</span> <span class="op sys">SYS</span></li>
-              <li><code>record_operation_batch_success()</code> advances <code>next_offset</code> <span class="op db">DB</span></li>
-            </ul></div>
-        </div>
-      </div>
-    </div>
-    <div class="connector-h"><span class="arrow">▶</span><span class="lbl">enqueue ×N</span></div>
-
-    <div class="stage" data-stage data-tags="q">
-      <div class="lane k-queue differs">
-        <div class="lane-head"><span class="title"><span class="num">3</span>Generation queue <span class="kind queue">QUEUE</span> <span class="diffpill">differs</span></span>
-          <span class="meta"><code>…_encdec_generation_&lt;hash&gt;</code> · <code>worker_concurrency=</code><b style="color:var(--sys)">64</b></span></div>
-        <div class="lane-body"><div class="step" data-tags="sys q"><div class="st-title">Worker pulls work</div>
-          <ul><li>up to <b>64</b> generation workflows in flight (lower — each does 2 calls)</li><li>queue rows in DBOS system DB <span class="op sys">SYS</span></li></ul></div></div>
-      </div>
-    </div>
-    <div class="connector-h"><span class="arrow">▶</span><span class="lbl">dequeue</span></div>
-
-    <div class="stage wide" data-stage>
-      <div class="lane k-wf differs">
-        <div class="lane-head"><span class="title"><span class="num">4</span>Generation workflow <span class="kind wf">WORKFLOW</span> <span class="diffpill">differs</span></span>
-          <span class="meta"><code>generate_prediction_workflow</code> · one per prediction</span></div>
-        <div class="lane-body steps">
-          <div class="step" data-tags="db llm"><div class="st-title"><code>generate_prediction_step</code> <span class="kind step">STEP</span></div>
-            <span class="note">retries_allowed · max_attempts=3 · should_retry_step</span>
-            <ul>
-              <li><code>mark_generation_started()</code> <span class="op db">DB</span> · <code>fetch_prediction_job()</code> <span class="op db">DB</span></li>
-              <li><b>Enc-Dec</b> — <code>generate_code_for_job_with_client()</code>: two sequential predictors, separate LMs</li>
-              <li><span class="op llm">LLM ×1 · enc</span> <code>run_predictor(encode,{ground_truth_code[,max_characters]})</code> → <code>description</code><span class="note">budgeted vs plain encoder signature chosen by <code>budget_ratio</code></span></li>
-              <li><span class="op llm">LLM ×2 · dec</span> <code>run_predictor(decode,{description})</code> → <code>code</code><span class="note">decoder input = encoder output ⇒ strictly sequential</span></li>
-              <li>enc &amp; dec usage/cost in separate <code>LmEventBuffer</code>s</li>
-            </ul></div>
-          <div class="checkpoint"><span>checkpoint · ok ↓ / err → error step</span><span class="ln"></span></div>
-          <div class="step" data-tags="db"><div class="st-title"><code>record_generation_success_step</code> <span class="kind step">STEP</span></div>
-            <ul><li>status → <code>generated</code>, store enc/dec output/usage/cost <span class="op db">DB</span></li>
-            <li class="note">err: <code>record_generation_error_step</code> → <code>generation_(recoverable_)error</code>; no scoring enqueued</li></ul></div>
-          <div class="checkpoint"><span>checkpoint</span><span class="ln"></span></div>
-          <div class="step" data-tags="sys db q"><div class="st-title">Enqueue scoring</div>
-            <ul><li><code>_enqueue_score_job()</code> → <code>score_prediction_workflow</code> <span class="op q">Q</span> <span class="op sys">SYS</span></li>
-            <li><code>mark_scoring_queued_step()</code> → <code>scoring_queued</code> <span class="op db">DB</span></li></ul></div>
-        </div>
-      </div>
-    </div>
-    <div class="connector-h"><span class="arrow">▶</span><span class="lbl">enqueue ×1</span></div>
-
-    <div class="stage" data-stage data-tags="q">
-      <div class="lane k-queue">
-        <div class="lane-head"><span class="title"><span class="num">5</span>Scoring queue <span class="kind queue">QUEUE</span> <span class="samepill">same</span></span>
-          <span class="meta"><code>…_encdec_scoring_&lt;hash&gt;</code> · <code>worker_concurrency=</code><b>32</b></span></div>
-        <div class="lane-body"><div class="step" data-tags="proc q"><div class="st-title">Throttled lower</div>
-          <ul><li>same worker on <b>both</b> queues (<code>QueueSelection.BOTH</code>)</li><li>lower cap — each step spawns subprocesses <span class="op proc">PROC</span></li></ul></div></div>
-      </div>
-    </div>
-    <div class="connector-h"><span class="arrow">▶</span><span class="lbl">dequeue</span></div>
-
-    <div class="stage wide" data-stage>
-      <div class="lane k-wf">
-        <div class="lane-head"><span class="title"><span class="num">6</span>Score workflow <span class="kind wf">WORKFLOW</span> <span class="samepill">same</span></span>
-          <span class="meta"><code>score_prediction_workflow</code> · <b class="warn">offline — no network</b></span></div>
-        <div class="lane-body steps">
-          <div class="step" data-tags="db proc"><div class="st-title"><code>score_prediction_step</code> <span class="kind step">STEP</span></div>
-            <ul><li><code>mark_scoring_started()</code> <span class="op db">DB</span> · <code>fetch_scoring_target()</code> (needs <code>generated</code>) <span class="op db">DB</span></li></ul>
-            <div class="checkpoint"><span>score_humaneval_prediction (local)</span><span class="ln"></span></div>
-            <ul>
-              <li><b>a.</b> <code>validate_python_source(raw)</code> ⇒ <code>raw_compile_ok</code></li>
-              <li><b>b.</b> <code>apply_cleaning()</code> — strip fences, split blocks, infer imports ⇒ candidates</li>
-              <li><b>c.</b> select first compiling candidate</li>
-              <li><b>d.</b> <code>evaluate_human_eval_code()</code> → per fn name <code>run_subprocess_batch()</code>:
-                <span class="note"><span class="op proc">PROC spawn</span> <code>subprocess.run([sys.executable,"-c",runner], input=json, timeout)</code></span>
-                <span class="note">untrusted code runs only in the child (stdin JSON). <code>timeout</code>=15s; <code>TimeoutExpired</code>⇒timeout. Process-isolation only.</span></li>
-              <li><b>e.</b> pass/fail ⇒ <code>score</code> 1.0/0.0 + status counts</li>
-              <li><b>f.</b> <code>compression_metrics()</code> (zlib/gzip/bz2/lzma/zstd, local) ⇒ ratios<span class="note">enc-dec compares <code>description</code> vs code</span></li>
-            </ul></div>
-          <div class="checkpoint"><span>checkpoint · ok ↓ / err → error step</span><span class="ln"></span></div>
-          <div class="step" data-tags="db"><div class="st-title"><code>record_score_success_step</code> <span class="kind step">STEP</span></div>
-            <ul><li>status → <code>scored</code>; writes score, eval counts, compression metrics <span class="op db">DB</span></li>
-            <li class="note">err: <code>record_score_error_step</code> → <code>score_(recoverable_)error</code></li></ul></div>
-        </div>
-      </div>
-    </div>
-    <div class="connector-h end"><span class="arrow">●</span><span class="lbl">scored</span></div>
   </div>
+  <div class="connector-h"><span class="arrow">▶</span><span class="lbl">enqueue ×N</span></div>
 
+  <div class="stage" data-stage data-tags="q">
+    <div class="lane k-queue">
+      <div class="lane-head"><span class="title"><span class="num">3</span>Generation queue <span class="kind queue">QUEUE</span></span>
+        <span class="meta"><code>…_generation_&lt;hash&gt;</code> · per-queue <code>worker_concurrency</code></span></div>
+      <div class="lane-body"><div class="step" data-tags="sys q"><div class="st-title">Worker dequeues</div>
+        <ul><li>queue rows live in the DBOS system DB <span class="op sys">SYS</span></li></ul></div></div>
+    </div>
+  </div>
+  <div class="connector-h"><span class="arrow">▶</span><span class="lbl">dequeue</span></div>
+
+  <div class="stage wide" data-stage>
+    <div class="lane k-wf differs">
+      <div class="lane-head"><span class="title"><span class="num">4</span>Generation workflow <span class="kind wf">WORKFLOW</span> <span class="diffpill">the graph</span></span>
+        <span class="meta"><code>generate_prediction_workflow</code> · generation = a node-graph</span></div>
+      <div class="lane-body steps">
+        <div class="step" data-tags="db llm"><div class="st-title"><code>generate_prediction_step</code> <span class="kind step">STEP</span></div>
+          <span class="note">retries_allowed · max_attempts=3</span>
+          <ul>
+            <li><code>mark_generation_started()</code> <span class="op db">DB</span> · <code>fetch_prediction_job()</code> <span class="op db">DB</span></li>
+            <li><code>node_runner.execute_graph(graph, task_inputs, run_node)</code> — topological walk; each node = one <span class="op llm">LLM</span> call whose signature is built from the node config (<b>instruction is an axis</b>)</li>
+          </ul>
+          <div class="checkpoint"><span>the graph · per experiment</span><span class="ln"></span></div>
+          <ul>
+            <li><b style="color:var(--q)">direct</b> &nbsp; <code>[ solve ]</code> → code<span class="note">1 LLM call · prompt → code</span></li>
+            <li><b style="color:var(--sys)">enc-dec</b> &nbsp; <code>[ encode ]</code> → <code>[ decode ]</code> → code<span class="note">2 LLM calls · code → description → code (encoder optionally budgeted)</span></li>
+          </ul>
+        </div>
+        <div class="checkpoint"><span>checkpoint · ok ↓ / err → error step</span><span class="ln"></span></div>
+        <div class="step" data-tags="db"><div class="st-title"><code>record_generation_success_step</code> <span class="kind step">STEP</span></div>
+          <ul><li>status → <code>generated</code>; <code>raw_generation</code> = terminal node output; <code>artifacts</code> JSONB = per-node <code>{output, usage, cost}</code>; <code>provider_cost</code> = Σ nodes <span class="op db">DB</span></li></ul></div>
+        <div class="checkpoint"><span>checkpoint</span><span class="ln"></span></div>
+        <div class="step" data-tags="sys db q"><div class="st-title">Enqueue scoring</div>
+          <ul><li>enqueue <code>score_prediction_workflow</code> <span class="op q">Q</span> <span class="op sys">SYS</span> · <code>mark_scoring_queued</code> <span class="op db">DB</span></li></ul></div>
+      </div>
+    </div>
+  </div>
+  <div class="connector-h"><span class="arrow">▶</span><span class="lbl">enqueue ×1</span></div>
+
+  <div class="stage" data-stage data-tags="q">
+    <div class="lane k-queue">
+      <div class="lane-head"><span class="title"><span class="num">5</span>Scoring queue <span class="kind queue">QUEUE</span></span>
+        <span class="meta"><code>…_scoring_&lt;hash&gt;</code> · throttled lower</span></div>
+      <div class="lane-body"><div class="step" data-tags="proc q"><div class="st-title">Worker dequeues</div>
+        <ul><li>same worker, both queues; each score step spawns subprocesses <span class="op proc">PROC</span></li></ul></div></div>
+    </div>
+  </div>
+  <div class="connector-h"><span class="arrow">▶</span><span class="lbl">dequeue</span></div>
+
+  <div class="stage wide" data-stage>
+    <div class="lane k-wf">
+      <div class="lane-head"><span class="title"><span class="num">6</span>Score workflow <span class="kind wf">WORKFLOW</span> <span class="samepill">unchanged</span></span>
+        <span class="meta"><code>score_prediction_workflow</code> · <b class="warn">offline — no network</b></span></div>
+      <div class="lane-body steps">
+        <div class="step" data-tags="db proc"><div class="st-title"><code>score_prediction_step</code> <span class="kind step">STEP</span></div>
+          <ul>
+            <li><code>fetch_scoring_target()</code> reads <code>raw_generation</code> + compression source <span class="op db">DB</span></li>
+            <li><code>score_humaneval_prediction()</code>: validate → extract → select → <span class="op proc">subprocess.run</span> tests → score + compression metrics</li>
+            <li><code>record_score_success_step</code> → <code>score</code> + metrics JSONB <span class="op db">DB</span></li>
+          </ul></div>
+      </div>
+    </div>
+  </div>
+  <div class="connector-h end"><span class="arrow">●</span><span class="lbl">scored</span></div>
+
+</div>
 </div>
 
 <!-- ============ SCHEMA COMPARISON ============ -->
