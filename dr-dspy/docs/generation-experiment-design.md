@@ -247,3 +247,110 @@ pool lifecycle owned by `run_worker_command` startup; revisit the FD budget
 > (`humaneval_*_dbos.py`, `humaneval_dbos_flow.py`) because those files were being
 > reformatted and line numbers drift; `scoring.py` / `human_eval.py` /
 > `worker_resources.py` citations are exact.
+
+---
+
+## 6. Implementation status & handoff (Phases 0–1)
+
+All work is on branch **`eval-platform-v1`** (a worktree off `enc-dec`). `_v1` is
+built **alongside** `_v0`; retire `_v0` only after live validation passes.
+Validation is done **jointly, step by step, with live runs** — automated agents
+do non-live checks only and check back before anything paid / daemon-based.
+
+### What's built (code complete, non-live validated)
+
+- **`src/dr_dspy/experiment_spec.py`** — the spec layer (pure data + validation +
+  hashing, dependency-light). `FieldSpec` (JSON-serializable signature field;
+  `type_name` ∈ {str,int,float,bool,code}), `NodeConfig`
+  (model/temperature/reasoning/**instruction**/signature_name/fields/
+  output_field/input_bindings/extra), `NodeSpec` (id/op/config; `dependencies()`
+  derived from bindings), `GraphSpec` (nodes/terminal_node_id/compression_source;
+  validates acyclic + terminal + refs; `topological_order()`). Identity:
+  `prediction_id(experiment_name, task_id, graph, repetition_seed)`,
+  `dimensions_digest(graph)`, `canonical_dimensions(graph)` =
+  `{"graph": graph.model_dump(mode="json")}` hashed via `stable_json` (mirrors
+  `humaneval_dbos_flow.stable_prediction_id_from_dimensions`). Payloads:
+  `ArtifactRecord`, `PredictionPayload`, `ExperimentConfig`.
+- **`src/dr_dspy/eval_records.py`** — unified DDL + row IO. `dr_dspy_experiments`
+  (PK `experiment_name`; `pipeline/script_kind/seed/sample_count/config JSONB/
+  metadata`) and `dr_dspy_predictions` (typed spine: `prediction_id` PK,
+  `experiment_name` FK, `pipeline`, `schema_version`, `script_kind`,
+  `submission_id`, `task_id`, `sample_index`, `repetition_seed`,
+  `dimensions_digest`, `generation_status`, `generation_failure_class`,
+  `scoring_status`, `scoring_failure_class`, `score`, `provider_cost`,
+  `raw_generation`, timestamps; JSONB: `dimensions`, `task_inputs`, `artifacts`,
+  `metrics`, `errors`; UNIQUE(experiment_name, task_id, dimensions_digest,
+  repetition_seed)). `eval_schema_statements()` also emits the shared
+  `batch_operation` tables. `PredictionRow`, `CREATION_COLUMNS`,
+  `parse_prediction_payload`.
+- **`src/dr_dspy/node_runner.py`** — `execute_graph(graph, *, task_inputs,
+  run_node)` → `GraphRun` (artifacts / terminal_output / `total_cost()` /
+  `compression_source_text()`). `build_node_signature(config)` builds + caches a
+  dspy signature **injecting the node instruction**. `make_llm_run_node(...)` =
+  the real `llm_call` op. Budgeted encoder: `extra.budget_ratio` →
+  `max_characters = max(50, round(ratio*len(source)))`.
+- **`src/dr_dspy/humaneval_eval_dbos.py`** — the single DBOS module replacing both
+  v0 modules. Unified `PredictionJob` (carries `graph: GraphSpec` + task fields)
+  and `EvalSubmitSpec` (carries `graphs: list[GraphSpec]` = the pre-enumerated
+  sweep; `total_jobs = sample_count × len(graphs) × repetitions`). Generation via
+  `execute_graph`; scoring via the unchanged `score_humaneval_prediction`.
+  Implements `ExperimentBackend` (`EvalExperiment`) and reuses the shared infra
+  exactly as v0. CLI: `init-db/submit/worker/enqueue-scores/repair`. DBOS
+  app/queue/workflow/step names are `*_v1`-suffixed to coexist with v0.
+- **`scripts/humaneval_eval_dbos_v1.py`** — builds the direct (1-node) + enc-dec
+  (2-node, budgeted encoder) graph families + sweeps (matches v0
+  models/instructions/defaults). `EVAL_V1_PIPELINE` selects pipeline.
+- **`dbos_flow.html`** — unified schema section + single node-graph pipeline.
+
+### Things the next phases MUST know
+
+- **Identity = the whole graph.** `prediction_id`/`dimensions_digest` hash the
+  entire GraphSpec (topology + every node's model/temperature/reasoning/
+  **instruction**/extra). Changing an instruction (COPRO) → new `prediction_id`s,
+  so every candidate's per-task outputs are individually addressable and logged.
+  Canonicalization is `stable_json` (key-order independent) — keep it the single
+  source of truth.
+- **Where data lives.** Failure *classes* are typed spine columns; full failure
+  detail is in the `errors` JSONB keyed `"generation"`/`"scoring"` (cleared on
+  success). All scoring detail (compile/extraction/`evaluation_*`/
+  `compression_metrics`/ratios) is in the `metrics` JSONB. Generation usage/cost
+  live inside `artifacts[node]`. The read-side (Phase 2) and optimizer (Phase 3)
+  read these from JSONB, not columns.
+- **Repair ordering** uses `dimension_columns=("dimensions_digest",)`,
+  `order_columns=("sample_index","repetition_seed")` — the per-axis columns are
+  gone.
+- **Sweep is data, not flags.** `submit` takes no model/temperature flags; the
+  sweep is the pre-enumerated `graphs` list from the script. To change the search
+  space (Phases 3–4) build a different `graphs` list — the offset/identity math is
+  agnostic. Offset mixed-radix order is (repetition_seed, graph_index,
+  sample_index).
+- **Deterministic sampler.** `human_eval_sampling.sample_human_eval_tasks(seed,
+  sample_count, ...)` is a seeded shuffle — partition its order to build the
+  pinned train/val/test split in Phase 3.
+- **`config → score` hook (Phase 3).** A candidate = a config → GraphSpec(s);
+  evaluate by submitting over a **pinned** task set and reading mean `score`
+  (+ distribution) grouped from `dr_dspy_predictions`. Content-addressing means
+  re-submitting an identical graph reuses cached rows (`ON CONFLICT DO NOTHING`)
+  → free dedup across a study, provided the eval set (seed/samples/reps) is fixed.
+- **COPRO (Phase 4).** Instruction is already a `NodeConfig` field — vary
+  `node.config.instruction` per candidate; reimplement the two proposal signatures
+  as own logged ops; keep `prompt_model ≠ task_model`; start single-node (encoder
+  instruction). Greedy ascent + noisy metric → pin a real val set, use reps,
+  hold out a test set.
+- **Retirement.** `experiment_dimensions.py` (the Dimension/dynamic-DDL
+  machinery) is unused by `_v1`; delete it with the v0 modules after live parity.
+
+### Validation status
+
+- **Done (non-live):** 99 unit tests (`test_experiment_spec`, `test_eval_records`,
+  `test_node_runner`, `test_eval_submit_offsets`); `ruff` + `ty` clean
+  (pre-commit enforced on every commit); **`init-db` applied the unified schema
+  to the real DB** (verified `dr_dspy_predictions` 26 cols / `dr_dspy_experiments`
+  9 cols); CLI registers all commands for both pipelines.
+- **Remaining (live, jointly):** the end-to-end smoke — `submit --sample-count 1`
+  → background `worker` → poll `dr_dspy_predictions` until `scored` → inspect rows
+  (direct: 1 artifact, score ∈ {0,1}, compression metrics present; enc-dec: 2
+  artifacts, compression source = encode output). Reframed gate: **no exact v0
+  score equality** (LLM non-determinism); the deterministic parts (offset/identity
+  math, schema) are unit-verified. Direct floor ≈16 cheap LLM calls; enc-dec ≈112.
+  **Nothing paid has run yet.**
