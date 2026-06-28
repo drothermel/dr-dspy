@@ -516,203 +516,107 @@ details.ex[open]>summary::before{transform:rotate(90deg);}
 </div>
 
 <!-- ============ SCHEMA COMPARISON ============ -->
-<div class="section-label">// database schemas · result logging · direct vs enc-dec</div>
-<p class="schema-intro">The orchestration tables are identical across both pipelines; the <b>result-logging</b> tables diverge in their experiment <b>axes</b> and their <b>generation outputs</b>. Differences are highlighted below.</p>
+<div class="section-label">// database schema · unified · one table for every pipeline</div>
+<p class="schema-intro">Consolidated <code>_v1</code> design: <b>one</b> predictions table and one experiments table serve every pipeline, discriminated by a <code>pipeline</code> column. A typed control-plane <b>spine</b> stays as columns; everything that varies by generation shape — the <b>graph spec</b> (topology + per-node model/instruction/…) and the per-node <b>outputs</b> — lives in JSONB. The <code>direct</code> and <code>enc-dec</code> example rows below are the <em>same</em> table.</p>
 <div class="ctag-legend">
   <span><span class="ctag pk">PK</span> primary key</span>
   <span><span class="ctag fk">FK</span> foreign key</span>
-  <span><span class="ctag dim">DIM</span> experiment axis (part of the identity key)</span>
-  <span><span class="ctag extra">+</span> exists only in this pipeline / differs</span>
+  <span><span class="ctag dim">JSONB</span> varies by pipeline (graph / artifacts)</span>
+  <span><span class="ctag extra">≡</span> identity = hash(experiment, task, graph, repetition_seed)</span>
 </div>
 
-<div class="schema-wrap">
-
-  <!-- ===== DIRECT column ===== -->
-  <div class="schema-col direct">
-    <div class="colhead">Direct <span class="cp">prompt → code</span></div>
+<div class="schema-wrap" style="grid-template-columns:1fr;">
+  <div class="schema-col">
+    <div class="colhead">Unified schema <span class="cp">pipeline-discriminated</span></div>
 
     <div class="tbl">
-      <div class="tbl-head">dr_dspy_eval_experiments</div>
-      <div class="tbl-body">
-        <div class="col-row"><span class="cn">experiment_name<span class="ctag pk">PK</span></span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">script_kind</span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">seed</span><span class="ct">INT</span></div>
-        <div class="col-row"><span class="cn">sample_count</span><span class="ct">INT</span></div>
-        <div class="col-row extra"><span class="cn">instruction<span class="ctag extra">+</span></span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">metadata</span><span class="ct">JSONB</span></div>
-        <div class="col-row"><span class="cn">created_at · updated_at</span><span class="ct">TS</span></div>
+      <div class="tbl-head">dr_dspy_experiments</div>
+      <div class="tbl-body" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:0 8px;">
+        <div><div class="tbl-group">spine</div>
+          <div class="col-row"><span class="cn">experiment_name<span class="ctag pk">PK</span></span><span class="ct">TEXT</span></div>
+          <div class="col-row dim"><span class="cn">pipeline</span><span class="ct">TEXT</span></div>
+          <div class="col-row"><span class="cn">script_kind</span><span class="ct">TEXT</span></div>
+          <div class="col-row"><span class="cn">seed · sample_count</span><span class="ct">INT</span></div>
+        </div>
+        <div><div class="tbl-group">payload + meta</div>
+          <div class="col-row dim"><span class="cn">config</span><span class="ct">JSONB</span></div>
+          <div class="col-row"><span class="cn">metadata</span><span class="ct">JSONB</span></div>
+          <div class="col-row"><span class="cn">created_at · updated_at</span><span class="ct">TS</span></div>
+        </div>
       </div>
+      <div class="ex-note" style="padding:0 13px 11px;">config JSONB collapses the old per-pipeline columns (direct <code>instruction</code> vs enc-dec <code>encoder_instruction</code> + <code>decoder_instruction</code>).</div>
     </div>
 
     <div class="tbl">
-      <div class="tbl-head">dr_dspy_eval_predictions
-        <span class="pkn">UNIQUE(experiment_name, task_id, model, temperature, reasoning, repetition_seed)</span></div>
-      <div class="tbl-body">
-        <div class="tbl-group">identity &amp; axes</div>
-        <div class="col-row"><span class="cn">prediction_id<span class="ctag pk">PK</span></span><span class="ct">TEXT · hash</span></div>
-        <div class="col-row"><span class="cn">experiment_name<span class="ctag fk">FK</span></span><span class="ct">TEXT</span></div>
-        <div class="col-row dim"><span class="cn">model<span class="ctag dim">DIM</span></span><span class="ct">TEXT</span></div>
-        <div class="col-row dim"><span class="cn">temperature<span class="ctag dim">DIM</span></span><span class="ct">FLOAT8</span></div>
-        <div class="col-row dim"><span class="cn">reasoning<span class="ctag dim">DIM</span></span><span class="ct">JSONB</span></div>
-        <div class="col-row"><span class="cn">repetition_seed</span><span class="ct">INT</span></div>
-        <div class="tbl-group">task &amp; provenance</div>
-        <div class="col-row"><span class="cn">script_kind · submission_id</span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">task_id · sample_index</span><span class="ct">TEXT·INT</span></div>
-        <div class="col-row"><span class="cn">prompt · test · entry_point</span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">canonical_solution · ground_truth_code</span><span class="ct">TEXT</span></div>
-        <div class="tbl-group">generation</div>
-        <div class="col-row"><span class="cn">generation_status</span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">generation_error · _failure_class</span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">generation_exception_type · _message</span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">raw_generation</span><span class="ct">TEXT</span></div>
-        <div class="col-row extra"><span class="cn">response_metadata<span class="ctag extra">+</span></span><span class="ct">JSONB</span></div>
-        <div class="col-row extra"><span class="cn">usage_metadata<span class="ctag extra">+</span></span><span class="ct">JSONB</span></div>
-        <div class="col-row extra"><span class="cn">provider_cost<span class="ctag extra">+</span></span><span class="ct">FLOAT8</span></div>
-        <div class="tbl-group">scoring (shared shape)</div>
-        <div class="col-row"><span class="cn">scoring_status · score</span><span class="ct">TEXT·FLOAT8</span></div>
-        <div class="col-row"><span class="cn">scoring_error · _failure_class · _exception_*</span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">raw_code · raw_compile_ok · raw_compile_error</span><span class="ct">TEXT·BOOL</span></div>
-        <div class="col-row"><span class="cn">extraction_candidate_count · selected_candidate_index</span><span class="ct">INT</span></div>
-        <div class="col-row"><span class="cn">extracted_compile_ok · _error · extraction_error</span><span class="ct">BOOL·TEXT</span></div>
-        <div class="col-row"><span class="cn">evaluation_function_names</span><span class="ct">JSONB</span></div>
-        <div class="col-row"><span class="cn">evaluation_total_cases · _failure_count</span><span class="ct">INT</span></div>
-        <div class="col-row"><span class="cn">evaluation_status_counts</span><span class="ct">JSONB</span></div>
-        <div class="tbl-group">compression (shared shape)</div>
-        <div class="col-row"><span class="cn">compression_metrics</span><span class="ct">JSONB</span></div>
-        <div class="col-row"><span class="cn">raw_compression_ratio</span><span class="ct">FLOAT8</span></div>
-        <div class="col-row"><span class="cn">best_compression_ratio · _percent_reduction</span><span class="ct">FLOAT8</span></div>
-        <div class="tbl-group">timestamps (shared)</div>
-        <div class="col-row"><span class="cn">created_at · updated_at · generated_at · scored_at</span><span class="ct">TS</span></div>
+      <div class="tbl-head">dr_dspy_predictions
+        <span class="pkn">one table, all pipelines · UNIQUE(experiment_name, task_id, dimensions_digest, repetition_seed)</span></div>
+      <div class="tbl-body" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:0 14px;">
+        <div>
+          <div class="tbl-group">control-plane spine (typed)</div>
+          <div class="col-row"><span class="cn">prediction_id<span class="ctag pk">PK</span></span><span class="ct">TEXT · hash</span></div>
+          <div class="col-row"><span class="cn">experiment_name<span class="ctag fk">FK</span></span><span class="ct">TEXT</span></div>
+          <div class="col-row dim"><span class="cn">pipeline · schema_version</span><span class="ct">TEXT·INT</span></div>
+          <div class="col-row"><span class="cn">script_kind · submission_id</span><span class="ct">TEXT</span></div>
+          <div class="col-row"><span class="cn">task_id · sample_index</span><span class="ct">TEXT·INT</span></div>
+          <div class="col-row"><span class="cn">repetition_seed</span><span class="ct">INT</span></div>
+          <div class="col-row"><span class="cn">dimensions_digest</span><span class="ct">TEXT</span></div>
+          <div class="col-row"><span class="cn">generation_status · _failure_class</span><span class="ct">TEXT</span></div>
+          <div class="col-row"><span class="cn">scoring_status · _failure_class</span><span class="ct">TEXT</span></div>
+          <div class="col-row"><span class="cn">score · provider_cost</span><span class="ct">FLOAT8</span></div>
+          <div class="col-row"><span class="cn">raw_generation</span><span class="ct">TEXT · terminal code</span></div>
+          <div class="col-row"><span class="cn">created_at · updated_at · generated_at · scored_at</span><span class="ct">TS</span></div>
+        </div>
+        <div>
+          <div class="tbl-group">JSONB payload (varies by pipeline)</div>
+          <div class="col-row dim"><span class="cn">dimensions</span><span class="ct">JSONB · the graph spec</span></div>
+          <div class="col-row dim"><span class="cn">artifacts</span><span class="ct">JSONB · per-node output</span></div>
+          <div class="col-row dim"><span class="cn">metrics</span><span class="ct">JSONB · eval + compression</span></div>
+          <div class="col-row dim"><span class="cn">errors</span><span class="ct">JSONB</span></div>
+          <div class="col-row dim"><span class="cn">task_inputs</span><span class="ct">JSONB · prompt/test/…</span></div>
+          <div class="tbl-group">how the shape varies</div>
+          <div class="ex-note" style="padding:2px 0;"><code>dimensions</code> = canonical graph (topology + per-node model / temperature / reasoning / <b>instruction</b>); hashed → <code>prediction_id</code> &amp; <code>dimensions_digest</code>.</div>
+          <div class="ex-note" style="padding:2px 0;"><code>artifacts</code> keyed by node id: <code>{output, usage, cost, response_metadata}</code> — 1 entry (direct), 2 (enc-dec), N for future graphs.</div>
+        </div>
       </div>
+
       <details class="ex">
-        <summary>Example logged row</summary>
+        <summary>Example rows — direct &amp; enc-dec in the same table</summary>
         <div class="ex-body">
           <p class="ex-note">Illustrative — synthesized from the schema to show field shapes, not a live DB dump.</p>
           <div class="ex-rec">
-            <div class="ex-rec-h">dr_dspy_eval_predictions · <span class="v"><span class="s">scored</span></span></div>
+            <div class="ex-rec-h">dr_dspy_predictions · <span class="v"><span class="s">pipeline=direct · scored</span></span></div>
             <div class="kv">
-              <span class="grp">identity &amp; axes</span>
+              <span class="grp">spine</span>
               <span class="k">prediction_id</span><span class="v"><span class="s">"3e9c…a7"</span></span>
-              <span class="k">experiment_name</span><span class="v"><span class="s">"humaneval_eval_only_dbos_v0"</span></span>
-              <span class="k">model</span><span class="v diffv"><span class="s">"openai/gpt-5.1-codex-mini"</span></span>
-              <span class="k">temperature</span><span class="v diffv"><span class="num">0.0</span></span>
-              <span class="k">reasoning</span><span class="v diffv">{}</span>
-              <span class="k">task_id · sample_index</span><span class="v"><span class="s">"HumanEval/0"</span> · <span class="num">0</span></span>
-              <span class="grp">generation</span>
-              <span class="k">generation_status</span><span class="v"><span class="s">"generated"</span></span>
-              <span class="k">raw_generation</span><span class="v">```python\ndef has_close_elements(numbers, threshold):\n    for i in range(len(numbers)):\n        for j in range(i+1, len(numbers)):\n            if abs(numbers[i]-numbers[j]) &lt; threshold:\n                return True\n    return False\n```</span>
-              <span class="k">usage_metadata</span><span class="v diffv">{"prompt_tokens":312,"completion_tokens":96}</span>
-              <span class="k">provider_cost</span><span class="v diffv"><span class="num">0.00021</span></span>
-              <span class="grp">scoring</span>
+              <span class="k">pipeline · task_id</span><span class="v"><span class="s">"direct"</span> · <span class="s">"HumanEval/0"</span></span>
               <span class="k">scoring_status · score</span><span class="v"><span class="s">"scored"</span> · <span class="num">1.0</span></span>
-              <span class="k">selected_candidate_index</span><span class="v"><span class="num">0</span></span>
-              <span class="k">evaluation_function_names</span><span class="v">["has_close_elements"]</span>
-              <span class="k">evaluation_total_cases · _failure_count</span><span class="v"><span class="num">9</span> · <span class="num">0</span></span>
-              <span class="k">evaluation_status_counts</span><span class="v">{"passed":9}</span>
-              <span class="k">raw_compression_ratio</span><span class="v"><span class="num">1.94</span></span>
-              <span class="k">scored_at</span><span class="v"><span class="s">2026-06-28T14:03:11Z</span></span>
+              <span class="k">provider_cost</span><span class="v"><span class="num">0.00021</span></span>
+              <span class="grp">dimensions (the graph)</span>
+              <span class="k">dimensions.graph</span><span class="v diffv">{"nodes":[{"id":"solve","op":"llm_call","config":{"model":"openai/gpt-5.1-codex-mini","temperature":0.0,"instruction":"Write code…","output_field":"code","input_bindings":{"prompt":"task.prompt"}}}],"terminal_node_id":"solve","compression_source":"task.prompt"}</span>
+              <span class="grp">artifacts (one per node)</span>
+              <span class="k">artifacts.solve.output</span><span class="v">```python\ndef has_close_elements(numbers, threshold): …```</span>
+              <span class="k">artifacts.solve.usage</span><span class="v">{"completion_tokens":96}</span>
+              <span class="grp">metrics</span>
+              <span class="k">metrics.evaluation_status_counts</span><span class="v">{"passed":9}</span>
+              <span class="k">metrics.raw_compression_ratio</span><span class="v"><span class="num">1.94</span></span>
             </div>
           </div>
-        </div>
-      </details>
-    </div>
-  </div>
-
-  <!-- ===== ENC-DEC column ===== -->
-  <div class="schema-col encdec">
-    <div class="colhead">Enc-Dec <span class="cp">code → desc → code</span></div>
-
-    <div class="tbl">
-      <div class="tbl-head">dr_dspy_encdec_eval_experiments</div>
-      <div class="tbl-body">
-        <div class="col-row"><span class="cn">experiment_name<span class="ctag pk">PK</span></span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">script_kind</span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">seed</span><span class="ct">INT</span></div>
-        <div class="col-row"><span class="cn">sample_count</span><span class="ct">INT</span></div>
-        <div class="col-row extra"><span class="cn">encoder_instruction<span class="ctag extra">+</span></span><span class="ct">TEXT</span></div>
-        <div class="col-row extra"><span class="cn">decoder_instruction<span class="ctag extra">+</span></span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">metadata</span><span class="ct">JSONB</span></div>
-        <div class="col-row"><span class="cn">created_at · updated_at</span><span class="ct">TS</span></div>
-      </div>
-    </div>
-
-    <div class="tbl">
-      <div class="tbl-head">dr_dspy_encdec_eval_predictions
-        <span class="pkn">UNIQUE(experiment_name, task_id, encoder_model, decoder_model, encoder_temperature, decoder_temperature, budget_ratio, encoder_reasoning, decoder_reasoning, repetition_seed)</span></div>
-      <div class="tbl-body">
-        <div class="tbl-group">identity &amp; axes</div>
-        <div class="col-row"><span class="cn">prediction_id<span class="ctag pk">PK</span></span><span class="ct">TEXT · hash</span></div>
-        <div class="col-row"><span class="cn">experiment_name<span class="ctag fk">FK</span></span><span class="ct">TEXT</span></div>
-        <div class="col-row dim"><span class="cn">encoder_model<span class="ctag dim">DIM</span></span><span class="ct">TEXT</span></div>
-        <div class="col-row dim"><span class="cn">decoder_model<span class="ctag dim">DIM</span></span><span class="ct">TEXT</span></div>
-        <div class="col-row dim"><span class="cn">encoder_temperature<span class="ctag dim">DIM</span></span><span class="ct">FLOAT8</span></div>
-        <div class="col-row dim"><span class="cn">decoder_temperature<span class="ctag dim">DIM</span></span><span class="ct">FLOAT8</span></div>
-        <div class="col-row dim"><span class="cn">budget_ratio<span class="ctag dim">DIM</span><span class="ctag extra">+</span></span><span class="ct">FLOAT8</span></div>
-        <div class="col-row dim"><span class="cn">encoder_reasoning<span class="ctag dim">DIM</span></span><span class="ct">JSONB</span></div>
-        <div class="col-row dim"><span class="cn">decoder_reasoning<span class="ctag dim">DIM</span></span><span class="ct">JSONB</span></div>
-        <div class="col-row"><span class="cn">repetition_seed</span><span class="ct">INT</span></div>
-        <div class="tbl-group">task &amp; provenance</div>
-        <div class="col-row"><span class="cn">script_kind · submission_id</span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">task_id · sample_index</span><span class="ct">TEXT·INT</span></div>
-        <div class="col-row"><span class="cn">prompt · test · entry_point</span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">canonical_solution · ground_truth_code</span><span class="ct">TEXT</span></div>
-        <div class="col-row extra"><span class="cn">encoder_char_budget<span class="ctag extra">+</span></span><span class="ct">INT</span></div>
-        <div class="tbl-group">generation</div>
-        <div class="col-row"><span class="cn">generation_status</span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">generation_error · _failure_class</span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">generation_exception_type · _message</span><span class="ct">TEXT</span></div>
-        <div class="col-row extra"><span class="cn">encoded_description<span class="ctag extra">+</span></span><span class="ct">TEXT</span></div>
-        <div class="col-row extra"><span class="cn">decoded_generation<span class="ctag extra">+</span></span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">raw_generation</span><span class="ct">TEXT</span></div>
-        <div class="col-row extra"><span class="cn">encoder_response_metadata<span class="ctag extra">+</span></span><span class="ct">JSONB</span></div>
-        <div class="col-row extra"><span class="cn">decoder_response_metadata<span class="ctag extra">+</span></span><span class="ct">JSONB</span></div>
-        <div class="col-row extra"><span class="cn">encoder_usage_metadata<span class="ctag extra">+</span></span><span class="ct">JSONB</span></div>
-        <div class="col-row extra"><span class="cn">decoder_usage_metadata<span class="ctag extra">+</span></span><span class="ct">JSONB</span></div>
-        <div class="col-row extra"><span class="cn">encoder_provider_cost · decoder_provider_cost<span class="ctag extra">+</span></span><span class="ct">FLOAT8</span></div>
-        <div class="col-row"><span class="cn">provider_cost</span><span class="ct">FLOAT8</span></div>
-        <div class="tbl-group">scoring (shared shape)</div>
-        <div class="col-row"><span class="cn">scoring_status · score</span><span class="ct">TEXT·FLOAT8</span></div>
-        <div class="col-row"><span class="cn">scoring_error · _failure_class · _exception_*</span><span class="ct">TEXT</span></div>
-        <div class="col-row"><span class="cn">raw_code · raw_compile_ok · raw_compile_error</span><span class="ct">TEXT·BOOL</span></div>
-        <div class="col-row"><span class="cn">extraction_candidate_count · selected_candidate_index</span><span class="ct">INT</span></div>
-        <div class="col-row"><span class="cn">extracted_compile_ok · _error · extraction_error</span><span class="ct">BOOL·TEXT</span></div>
-        <div class="col-row"><span class="cn">evaluation_function_names</span><span class="ct">JSONB</span></div>
-        <div class="col-row"><span class="cn">evaluation_total_cases · _failure_count</span><span class="ct">INT</span></div>
-        <div class="col-row"><span class="cn">evaluation_status_counts</span><span class="ct">JSONB</span></div>
-        <div class="tbl-group">compression (shared shape)</div>
-        <div class="col-row"><span class="cn">compression_metrics</span><span class="ct">JSONB</span></div>
-        <div class="col-row"><span class="cn">raw_compression_ratio</span><span class="ct">FLOAT8</span></div>
-        <div class="col-row"><span class="cn">best_compression_ratio · _percent_reduction</span><span class="ct">FLOAT8</span></div>
-        <div class="tbl-group">timestamps (shared)</div>
-        <div class="col-row"><span class="cn">created_at · updated_at · generated_at · scored_at</span><span class="ct">TS</span></div>
-      </div>
-      <details class="ex">
-        <summary>Example logged row</summary>
-        <div class="ex-body">
-          <p class="ex-note">Illustrative — synthesized from the schema to show field shapes, not a live DB dump.</p>
           <div class="ex-rec">
-            <div class="ex-rec-h">dr_dspy_encdec_eval_predictions · <span class="v"><span class="s">scored</span></span></div>
+            <div class="ex-rec-h">dr_dspy_predictions · <span class="v"><span class="s">pipeline=enc-dec · scored</span></span></div>
             <div class="kv">
-              <span class="grp">identity &amp; axes</span>
+              <span class="grp">spine</span>
               <span class="k">prediction_id</span><span class="v"><span class="s">"b1d4…f2"</span></span>
-              <span class="k">experiment_name</span><span class="v"><span class="s">"humaneval_eval_only_encdec_dbos_v0"</span></span>
-              <span class="k">encoder_model</span><span class="v diffv"><span class="s">"openai/gpt-5.1-codex-mini"</span></span>
-              <span class="k">decoder_model</span><span class="v diffv"><span class="s">"openai/gpt-5.1-codex-mini"</span> <span class="nul">(self-pair)</span></span>
-              <span class="k">encoder_temperature · decoder_temperature</span><span class="v diffv"><span class="num">0.0</span> · <span class="num">0.0</span></span>
-              <span class="k">budget_ratio</span><span class="v diffv"><span class="num">0.5</span></span>
-              <span class="k">task_id</span><span class="v"><span class="s">"HumanEval/0"</span></span>
-              <span class="grp">generation (two-call)</span>
-              <span class="k">encoder_char_budget</span><span class="v diffv"><span class="num">96</span> <span class="nul">= max(50, round(0.5·len(code)))</span></span>
-              <span class="k">encoded_description</span><span class="v diffv">"Return True if any two distinct elements of `numbers` are within `threshold` (absolute difference), else False. Compare all unordered pairs."</span>
-              <span class="k">decoded_generation</span><span class="v">```python\ndef has_close_elements(numbers, threshold):\n    for i, a in enumerate(numbers):\n        for b in numbers[i+1:]:\n            if abs(a-b) &lt; threshold:\n                return True\n    return False\n```</span>
-              <span class="k">encoder_provider_cost · decoder_provider_cost</span><span class="v diffv"><span class="num">0.00018</span> · <span class="num">0.00026</span></span>
-              <span class="k">provider_cost</span><span class="v"><span class="num">0.00044</span> <span class="nul">(enc+dec)</span></span>
-              <span class="grp">scoring</span>
+              <span class="k">pipeline · task_id</span><span class="v"><span class="s">"enc-dec"</span> · <span class="s">"HumanEval/0"</span></span>
               <span class="k">scoring_status · score</span><span class="v"><span class="s">"scored"</span> · <span class="num">1.0</span></span>
-              <span class="k">evaluation_status_counts</span><span class="v">{"passed":9}</span>
-              <span class="k">best_compression_ratio</span><span class="v diffv"><span class="num">3.10</span></span>
-              <span class="k">best_compression_percent_reduction</span><span class="v diffv"><span class="num">67.7</span></span>
-              <span class="k">scored_at</span><span class="v"><span class="s">2026-06-28T14:05:42Z</span></span>
+              <span class="k">provider_cost</span><span class="v"><span class="num">0.00044</span> <span class="nul">(enc+dec)</span></span>
+              <span class="grp">dimensions (the graph)</span>
+              <span class="k">dimensions.graph</span><span class="v diffv">{"nodes":[{"id":"encode",…,"config":{"instruction":"Encode…","output_field":"description","extra":{"budget_ratio":0.5},"input_bindings":{"code":"task.ground_truth_code"}}},{"id":"decode",…,"config":{"instruction":"Decode…","output_field":"code","input_bindings":{"description":"encode"}}}],"terminal_node_id":"decode","compression_source":"encode"}</span>
+              <span class="grp">artifacts (one per node)</span>
+              <span class="k">artifacts.encode.output</span><span class="v diffv">"Return True if any two elements are within threshold…"</span>
+              <span class="k">artifacts.decode.output</span><span class="v">```python\ndef has_close_elements(numbers, threshold): …```</span>
+              <span class="k">artifacts.*.cost</span><span class="v"><span class="num">0.00018</span> · <span class="num">0.00026</span></span>
+              <span class="grp">metrics</span>
+              <span class="k">metrics.best_compression_ratio</span><span class="v diffv"><span class="num">3.10</span></span>
             </div>
           </div>
         </div>
