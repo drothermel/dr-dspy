@@ -49,7 +49,7 @@ from dr_dspy.failure_policy import (
     should_retry_step,
     summarize_exception,
 )
-from dr_dspy.human_eval import HumanEvalTask
+from dr_dspy.human_eval import HumanEvalTask, parse_human_eval_dataset
 from dr_dspy.prediction_status import (
     GENERATION_RETRY_STATUSES,
     GenerationStatus,
@@ -702,6 +702,7 @@ def build_submit_spec(
     sample_count: int,
     repetitions: int,
     score_timeout: float,
+    graphs: Sequence[GraphSpec] | None = None,
 ) -> EvalSubmitSpec:
     config = experiment_config()
     return EvalSubmitSpec(
@@ -713,7 +714,7 @@ def build_submit_spec(
         repetitions=repetitions,
         score_timeout=score_timeout,
         max_completion_tokens=config.default_max_completion_tokens,
-        graphs=list(config.graphs),
+        graphs=list(config.graphs) if graphs is None else list(graphs),
     )
 
 
@@ -870,6 +871,32 @@ def insert_prediction_jobs(
         with conn.cursor() as cur:
             cur.executemany(insert_sql, rows)
             return cur.rowcount if cur.rowcount is not None else 0
+
+
+def enqueue_round_jobs(
+    database_url: str,
+    *,
+    submit_spec: EvalSubmitSpec,
+    submission_id: str,
+    samples: Sequence[EvalSample],
+    score_timeout: float,
+) -> tuple[int, int]:
+    """Insert + enqueue every job for one study round directly (no submit
+    operation bookkeeping). Generation auto-chains to scoring on success.
+    Returns ``(inserted, enqueued)``; content-addressing makes re-running
+    an identical round reuse cached rows."""
+    jobs = build_prediction_jobs_for_offsets(
+        spec=submit_spec,
+        submission_id=submission_id,
+        samples=samples,
+        start_offset=0,
+        limit=submit_spec.total_jobs(),
+    )
+    inserted = insert_prediction_jobs(database_url, jobs)
+    enqueue_result = _enqueue_generation_jobs(
+        database_url, jobs, score_timeout=score_timeout
+    )
+    return inserted, enqueue_result.enqueued
 
 
 def fetch_prediction_job(
@@ -1671,6 +1698,46 @@ def build_humaneval_samples(
         seed=seed,
         sample_count=sample_count,
     )
+
+
+def _eval_sample_from_task(
+    task: HumanEvalTask, sample_index: int
+) -> EvalSample:
+    return EvalSample(
+        task_id=task.task_id,
+        sample_index=sample_index,
+        prompt=task.prompt,
+        canonical_solution=task.canonical_solution,
+        ground_truth_code=(
+            task.ground_truth_code_without_comments or task.ground_truth_code
+        ),
+        test=task.test,
+        entry_point=task.entry_point,
+    )
+
+
+def build_humaneval_samples_for_task_ids(
+    *,
+    task_ids: Sequence[str],
+) -> list[EvalSample]:
+    """Build samples for an explicit, ordered task-id subset (the pinned
+    study eval set). ``sample_index`` is the position in ``task_ids`` so
+    the mixed-radix offset math stays contiguous."""
+    config = experiment_config()
+    rows = shared_human_eval_sampling.load_human_eval_rows(
+        dataset_name=config.dataset_name,
+        dataset_split=config.dataset_split,
+    )
+    tasks_by_id = {
+        task.task_id: task for task in parse_human_eval_dataset(rows)
+    }
+    samples: list[EvalSample] = []
+    for index, task_id in enumerate(task_ids):
+        task = tasks_by_id.get(task_id)
+        if task is None:
+            raise ValueError(f"unknown task_id for subset: {task_id}")
+        samples.append(_eval_sample_from_task(task, index))
+    return samples
 
 
 # --- CLI --------------------------------------------------------------

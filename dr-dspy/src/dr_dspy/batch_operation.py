@@ -25,6 +25,7 @@ class BatchOperationKind(StrEnum):
     SUBMIT = "submit"
     ENQUEUE_SCORES = "enqueue_scores"
     REPAIR = "repair"
+    STUDY = "study"
 
 
 class BatchOperationStatus(StrEnum):

@@ -248,6 +248,35 @@ def prediction_id(
     )
 
 
+# --- graph mutation ---------------------------------------------------
+
+
+def with_node_instruction(
+    graph: GraphSpec, node_id: str, instruction: str
+) -> GraphSpec:
+    """Return a copy of ``graph`` with one node's ``instruction`` replaced.
+
+    Everything else is held fixed, so the only axis that changes is the
+    instruction — and because the instruction is part of the hashed
+    dimensions, the returned graph has a different ``dimensions_digest``
+    (the COPRO candidate addressing relies on this).
+    """
+    new_nodes: list[NodeSpec] = []
+    found = False
+    for node in graph.nodes:
+        if node.id == node_id:
+            new_config = node.config.model_copy(
+                update={"instruction": instruction}
+            )
+            new_nodes.append(node.model_copy(update={"config": new_config}))
+            found = True
+        else:
+            new_nodes.append(node)
+    if not found:
+        raise KeyError(node_id)
+    return graph.model_copy(update={"nodes": tuple(new_nodes)})
+
+
 # --- run-time payloads ------------------------------------------------
 
 
