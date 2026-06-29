@@ -729,6 +729,7 @@ dependencies = [
     { name = "ruff" },
     { name = "ty" },
     { name = "typer" },
+    { name = "zstandard" },
 ]
 
 [package.metadata]
@@ -746,6 +747,7 @@ requires-dist = [
     { name = "ruff", specifier = ">=0.15.10" },
     { name = "ty", specifier = ">=0.0.54" },
     { name = "typer", specifier = ">=0.26.7" },
+    { name = "zstandard", specifier = ">=0.25.0" },
 ]
 
 [[package]]
