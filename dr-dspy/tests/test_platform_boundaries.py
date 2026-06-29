@@ -14,7 +14,11 @@ PURE_MODULE_PATHS = (
     SRC_ROOT / "serialization.py",
     SRC_ROOT / "lm" / "boundary.py",
 )
-FORBIDDEN_PURE_IMPORTS = (
+DSPY_FREE_PATHS = (
+    *PURE_PACKAGE_PATHS,
+    SRC_ROOT / "lm" / "boundary.py",
+)
+FORBIDDEN_PLATFORM_IMPORTS = (
     "dbos",
     "psycopg",
     "psycopg_pool",
@@ -22,7 +26,10 @@ FORBIDDEN_PURE_IMPORTS = (
     "dr_dspy.harness",
     "dr_dspy.runtime",
 )
+FORBIDDEN_DSPY_IMPORTS = ("dspy",)
 ALLOWED_EXISTING_IMPORTS = {
+    # recordable_jsonb is the documented JSONB adapter exception at the
+    # persistence boundary. The rest of eval_failures should stay DB-free.
     SRC_ROOT / "eval_failures" / "recording.py": {
         "psycopg.types.json",
     },
@@ -32,7 +39,7 @@ ALLOWED_EXISTING_IMPORTS = {
 def python_files() -> list[Path]:
     files = list(PURE_MODULE_PATHS)
     for package_path in PURE_PACKAGE_PATHS:
-        files.extend(package_path.glob("*.py"))
+        files.extend(package_path.rglob("*.py"))
     return sorted(files)
 
 
@@ -47,16 +54,36 @@ def imported_modules(path: Path) -> set[str]:
     return imports
 
 
-def is_forbidden_import(path: Path, module: str) -> bool:
-    if module in ALLOWED_EXISTING_IMPORTS.get(path, set()):
-        return False
+def is_relative_to(path: Path, base_path: Path) -> bool:
+    return path == base_path or path.is_relative_to(base_path)
+
+
+def matches_module(module: str, forbidden_modules: tuple[str, ...]) -> bool:
     return any(
         module == forbidden or module.startswith(f"{forbidden}.")
-        for forbidden in FORBIDDEN_PURE_IMPORTS
+        for forbidden in forbidden_modules
     )
 
 
-def test_pure_platform_modules_do_not_import_v0_or_runtime_surfaces() -> None:
+def forbids_dspy(path: Path) -> bool:
+    return any(
+        is_relative_to(path, dspy_free_path)
+        for dspy_free_path in DSPY_FREE_PATHS
+    )
+
+
+def is_forbidden_import(path: Path, module: str) -> bool:
+    if module in ALLOWED_EXISTING_IMPORTS.get(path, set()):
+        return False
+    if matches_module(module, FORBIDDEN_PLATFORM_IMPORTS):
+        return True
+    return forbids_dspy(path) and matches_module(
+        module,
+        FORBIDDEN_DSPY_IMPORTS,
+    )
+
+
+def test_pure_modules_do_not_import_legacy_or_runtime_surfaces() -> None:
     violations = []
     for path in python_files():
         for module in sorted(imported_modules(path)):
