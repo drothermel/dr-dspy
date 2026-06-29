@@ -41,6 +41,31 @@ uv run python -m dr_dspy.platform.worker submit-jsonl \
   --specs-file specs.jsonl
 ```
 
+Score one existing v1 generation run:
+
+```bash
+uv run python -m dr_dspy.platform.worker score-one \
+  --database-url "$DATABASE_URL" \
+  --generation-run-id "<generation-run-id>"
+```
+
+The default scoring surface persists one append-only
+`ScoreAttemptRecord` using scoring profile `humaneval@v1`, parser profile
+`humaneval-best-effort@v1`, and metrics profile `humaneval-metrics@v1`.
+The CLI exposes profile id/version options so parser or scoring changes create
+new score attempts instead of mutating old results. The default HumanEval task
+loader reads `evalplus/humanevalplus` split `test` and selects the task by the
+stored v1 prediction spec `task_id`.
+
+Score attempts use `status=success` for completed domain scoring, including
+zero-score outcomes such as failed tests, empty generations, extraction
+failure, or no top-level functions. They use `status=error` for infrastructure
+or workflow failures such as missing generation rows, task loading failures, or
+non-scoreable terminal output. The scorer writes extracted-code metadata,
+per-test results when evaluation runs, and versioned text, Python leakage,
+AST, compression, and per-stage metrics into JSONB payloads. It does not update
+generation/node-attempt rows, v0 tables, or projections.
+
 `submit-jsonl` streams JSONL parsing into the submit path, validates bounded
 windows of specs against the requested experiment, rejects duplicate
 `prediction_id` values within the submit operation, inserts the experiment row
