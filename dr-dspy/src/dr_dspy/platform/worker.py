@@ -11,6 +11,10 @@ from rich.console import Console
 from sqlalchemy import create_engine
 
 from dr_dspy.harness import dbos as shared_dbos
+from dr_dspy.humaneval.profiles import (
+    HUMANEVAL_SCORING_PROFILE_ID,
+    HUMANEVAL_SCORING_PROFILE_VERSION,
+)
 from dr_dspy.platform.graph_workflow import (
     platform_generation_workflow_id,
     run_prediction_graph_workflow_once,
@@ -20,11 +24,21 @@ from dr_dspy.platform.queue_worker import (
     listen_to_platform_generation_queue,
     register_platform_generation_queue,
 )
+from dr_dspy.platform.rescoring import (
+    DEFAULT_RESCORE_CHUNK_SIZE,
+    rescore_generation_runs,
+)
+from dr_dspy.platform.scoring_workflow import (
+    DEFAULT_HUMANEVAL_DATASET_NAME,
+    DEFAULT_HUMANEVAL_DATASET_SPLIT,
+    platform_scoring_workflow_id,
+    run_score_generation_workflow_once,
+)
 from dr_dspy.platform.submission import (
     DEFAULT_SUBMIT_CHUNK_SIZE,
     submit_prediction_specs,
 )
-from dr_dspy.records import PredictionSpecRecord
+from dr_dspy.records import GenerationRunStatus, PredictionSpecRecord
 from dr_dspy.runtime import load_env_file, run_typer_app
 
 DBOS_APP_NAME = "dr-dspy-platform-graph-v1"
@@ -117,6 +131,193 @@ def run_one(
         )
     finally:
         shared_dbos.destroy_dbos_runtime()
+
+
+@APP.command("score-one")
+def score_one(
+    generation_run_id: Annotated[
+        str,
+        typer.Option(
+            "--generation-run-id",
+            help="Existing v1 generation run id to score.",
+        ),
+    ],
+    score_attempt_index: Annotated[
+        int,
+        typer.Option("--score-attempt-index", min=0),
+    ] = 0,
+    scoring_profile_id: Annotated[
+        str,
+        typer.Option("--scoring-profile-id"),
+    ] = HUMANEVAL_SCORING_PROFILE_ID,
+    scoring_profile_version: Annotated[
+        str,
+        typer.Option("--scoring-profile-version"),
+    ] = HUMANEVAL_SCORING_PROFILE_VERSION,
+    dataset_name: Annotated[
+        str,
+        typer.Option("--dataset-name"),
+    ] = DEFAULT_HUMANEVAL_DATASET_NAME,
+    dataset_split: Annotated[
+        str,
+        typer.Option("--dataset-split"),
+    ] = DEFAULT_HUMANEVAL_DATASET_SPLIT,
+    database_url: Annotated[
+        str | None,
+        typer.Option(
+            "--database-url",
+            help="Postgres URL; defaults to DATABASE_URL.",
+        ),
+    ] = None,
+    dbos_system_database_url: Annotated[
+        str | None,
+        typer.Option(
+            "--dbos-system-database-url",
+            help="DBOS system database URL; defaults to DATABASE_URL.",
+        ),
+    ] = None,
+    env_file: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    load_env_file(env_file) if env_file is not None else load_env_file()
+    config = configure_platform_dbos_runtime(
+        database_url=database_url,
+        dbos_system_database_url=dbos_system_database_url,
+        consume_generation_queue=False,
+    )
+    try:
+        score_result = run_score_generation_workflow_once(
+            database_url=config.database_url,
+            generation_run_id=generation_run_id,
+            score_attempt_index=score_attempt_index,
+            scoring_profile_id=scoring_profile_id,
+            scoring_profile_version=scoring_profile_version,
+            dataset_name=dataset_name,
+            dataset_split=dataset_split,
+        )
+        CONSOLE.print(
+            {
+                "workflow_id": platform_scoring_workflow_id(
+                    score_result.score_attempt_id
+                ),
+                "generation_run_id": generation_run_id,
+                "score_attempt_id": score_result.score_attempt_id,
+                "insert_status": score_result.insert_status,
+            }
+        )
+    finally:
+        shared_dbos.destroy_dbos_runtime()
+
+
+@APP.command("rescore")
+def rescore(
+    experiment_name: Annotated[
+        str,
+        typer.Option(
+            "--experiment-name",
+            help="Existing v1 experiment name whose generation runs to score.",
+        ),
+    ],
+    generation_status: Annotated[
+        str,
+        typer.Option("--generation-status"),
+    ] = GenerationRunStatus.SUCCESS.value,
+    generation_attempt_index: Annotated[
+        int | None,
+        typer.Option("--generation-attempt-index", min=0),
+    ] = None,
+    score_attempt_index: Annotated[
+        int,
+        typer.Option("--score-attempt-index", min=0),
+    ] = 0,
+    scoring_profile_id: Annotated[
+        str,
+        typer.Option("--scoring-profile-id"),
+    ] = HUMANEVAL_SCORING_PROFILE_ID,
+    scoring_profile_version: Annotated[
+        str,
+        typer.Option("--scoring-profile-version"),
+    ] = HUMANEVAL_SCORING_PROFILE_VERSION,
+    dataset_name: Annotated[
+        str,
+        typer.Option("--dataset-name"),
+    ] = DEFAULT_HUMANEVAL_DATASET_NAME,
+    dataset_split: Annotated[
+        str,
+        typer.Option("--dataset-split"),
+    ] = DEFAULT_HUMANEVAL_DATASET_SPLIT,
+    chunk_size: Annotated[
+        int,
+        typer.Option("--chunk-size", min=1),
+    ] = DEFAULT_RESCORE_CHUNK_SIZE,
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", min=1),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run"),
+    ] = False,
+    database_url: Annotated[
+        str | None,
+        typer.Option(
+            "--database-url",
+            help="Postgres URL; defaults to DATABASE_URL.",
+        ),
+    ] = None,
+    dbos_system_database_url: Annotated[
+        str | None,
+        typer.Option(
+            "--dbos-system-database-url",
+            help="DBOS system database URL; defaults to DATABASE_URL.",
+        ),
+    ] = None,
+    env_file: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    load_env_file(env_file) if env_file is not None else load_env_file()
+    try:
+        resolved_generation_status = GenerationRunStatus(generation_status)
+    except ValueError as error:
+        raise typer.BadParameter(
+            f"generation-status must be one of: "
+            f"{', '.join(status.value for status in GenerationRunStatus)}"
+        ) from error
+
+    launched_dbos = False
+    if dry_run:
+        resolved_database_url = shared_dbos.resolve_database_url(
+            database_url=database_url,
+            error_suffix="for platform batch rescoring",
+        )
+    else:
+        config = configure_platform_dbos_runtime(
+            database_url=database_url,
+            dbos_system_database_url=dbos_system_database_url,
+            consume_generation_queue=False,
+        )
+        resolved_database_url = config.database_url
+        launched_dbos = True
+    engine = create_engine(resolved_database_url)
+    try:
+        result = rescore_generation_runs(
+            engine,
+            database_url=resolved_database_url,
+            experiment_name=experiment_name,
+            generation_status=resolved_generation_status,
+            generation_attempt_index=generation_attempt_index,
+            scoring_profile_id=scoring_profile_id,
+            scoring_profile_version=scoring_profile_version,
+            score_attempt_index=score_attempt_index,
+            dataset_name=dataset_name,
+            dataset_split=dataset_split,
+            chunk_size=chunk_size,
+            limit=limit,
+            dry_run=dry_run,
+        )
+        CONSOLE.print(result.model_dump(mode="json"))
+    finally:
+        engine.dispose()
+        if launched_dbos:
+            shared_dbos.destroy_dbos_runtime()
 
 
 @APP.command(help="Launch a queue-consuming v1 generation worker.")

@@ -8,7 +8,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    StrictBool,
     StrictFloat,
     StrictInt,
     StrictStr,
@@ -17,6 +16,7 @@ from pydantic import (
 
 from dr_dspy.eval_failures.types import FailureClass
 from dr_dspy.graph import GraphSpec, validate_task_bindings
+from dr_dspy.humaneval import metric_models
 from dr_dspy.humaneval.parsed_tests import HumanEvalTestCaseKind
 from dr_dspy.humaneval.scoring import GeneratedCodeOutcome
 from dr_dspy.humaneval.task import EvaluationCaseStatus, EvaluationCaseSummary
@@ -31,6 +31,13 @@ from dr_dspy.records.limits import (
     TASK_INPUTS_MAX_BYTES,
     validate_payload_size,
 )
+
+AstMetricsPayload = metric_models.AstMetricsPayload
+HumanEvalTaskTestMetricsPayload = metric_models.HumanEvalTaskTestMetricsPayload
+MetricsPayload = metric_models.MetricsPayload
+MetricsStagePayload = metric_models.MetricsStagePayload
+PythonLeakageMetricsPayload = metric_models.PythonLeakageMetricsPayload
+TextMetricsPayload = metric_models.TextMetricsPayload
 
 
 class NodeAttemptStatus(StrEnum):
@@ -234,56 +241,6 @@ class ExtractedCodePayload(BaseModel):
     parser_profile_id: StrictStr
     parser_version: StrictStr
     metadata: dict[StrictStr, Any] = Field(default_factory=dict)
-
-
-class MetricsPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    profile_id: StrictStr
-    profile_version: StrictStr
-    text: TextMetricsPayload | None = None
-    python_leakage: PythonLeakageMetricsPayload | None = None
-    ast: AstMetricsPayload | None = None
-    compression: dict[StrictStr, Any] = Field(default_factory=dict)
-    custom: dict[StrictStr, Any] = Field(default_factory=dict)
-
-
-class TextMetricsPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    character_count: StrictInt
-    byte_count: StrictInt
-    line_count: StrictInt
-    nonempty_line_count: StrictInt
-    word_count: StrictInt
-    average_word_length: StrictFloat | None = None
-    punctuation_count: StrictInt | None = None
-    symbol_count: StrictInt | None = None
-
-
-class PythonLeakageMetricsPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    keyword_count: StrictInt
-    code_marker_count: StrictInt
-    fenced_code_block_count: StrictInt
-    code_like_line_count: StrictInt
-    operator_count: StrictInt
-    punctuation_density: StrictFloat | None = None
-    task_name_hit_count: StrictInt | None = None
-
-
-class AstMetricsPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    parse_ok: StrictBool
-    parse_error: StrictStr | None = None
-    top_level_function_count: StrictInt = 0
-    class_count: StrictInt = 0
-    import_count: StrictInt = 0
-    ast_node_count: StrictInt = 0
-    statement_count: StrictInt = 0
-    branch_count: StrictInt = 0
 
 
 class PerTestResultPayload(BaseModel):

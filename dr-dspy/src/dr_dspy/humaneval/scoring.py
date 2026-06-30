@@ -10,12 +10,23 @@ records belongs to the schema/scoring-profile stage.
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StrictStr,
+)
 
-from dr_dspy.humaneval.code_extraction import (
-    apply_cleaning,
-    validate_python_source,
+from dr_dspy.humaneval.code_extraction import validate_python_source
+from dr_dspy.humaneval.code_parsing import (
+    CodeExtractionResult,
+    CodeParserProfile,
+    extract_best_effort_code,
+    extract_code_with_profile,
 )
 from dr_dspy.humaneval.compression import (
     CompressionMetric,
@@ -23,6 +34,7 @@ from dr_dspy.humaneval.compression import (
     compression_metrics,
 )
 from dr_dspy.humaneval.task import (
+    EvaluationCaseStatus,
     EvaluationTaskResult,
     EvaluationTaskSummary,
     HumanEvalTask,
@@ -85,6 +97,104 @@ class HumanEvalScoreResult(BaseModel):
     best_compression_percent_reduction: float | None = None
 
 
+class HumanEvalGenerationScore(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    raw_generation: str
+    extraction: CodeExtractionResult
+    outcome: GeneratedCodeOutcome
+    score: float
+    evaluation: EvaluationTaskResult | None = None
+
+
+class EvaluationAggregateMetrics(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    function_names: tuple[StrictStr, ...]
+    total_cases: StrictInt
+    result_count: StrictInt
+    passed_count: StrictInt
+    failed_count: StrictInt
+    error_count: StrictInt
+    timeout_count: StrictInt
+    failure_count: StrictInt
+    passed: StrictBool
+    status_counts: dict[StrictStr, StrictInt]
+
+
+def score_humaneval_generation(
+    *,
+    raw_generation: Any,
+    task: HumanEvalTask,
+    parser_profile: CodeParserProfile,
+    timeout_seconds: float,
+) -> HumanEvalGenerationScore:
+    extraction = extract_code_with_profile(
+        raw_generation,
+        profile=parser_profile,
+    )
+    raw_generation_text = extraction.raw_generation or ""
+    if extraction.extracted_code is None:
+        outcome = extraction_failure_outcome(extraction)
+        return HumanEvalGenerationScore(
+            raw_generation=raw_generation_text,
+            extraction=extraction,
+            outcome=outcome,
+            score=0.0,
+            evaluation=None,
+        )
+
+    evaluation = evaluate_human_eval_code(
+        task=task,
+        candidate_code=extraction.extracted_code,
+        timeout_seconds=timeout_seconds,
+    )
+    outcome = evaluation_outcome(evaluation)
+    return HumanEvalGenerationScore(
+        raw_generation=raw_generation_text,
+        extraction=extraction,
+        outcome=outcome,
+        score=1.0 if outcome is GeneratedCodeOutcome.PASSED else 0.0,
+        evaluation=evaluation,
+    )
+
+
+def extraction_failure_outcome(
+    extraction: CodeExtractionResult,
+) -> GeneratedCodeOutcome:
+    if extraction.extraction_error == "empty raw generation":
+        return GeneratedCodeOutcome.EMPTY_GENERATION
+    return GeneratedCodeOutcome.EXTRACTION_FAILED
+
+
+def evaluation_outcome(
+    evaluation: EvaluationTaskResult,
+) -> GeneratedCodeOutcome:
+    if not evaluation.function_names:
+        return GeneratedCodeOutcome.NO_TOP_LEVEL_FUNCTIONS
+    if evaluation.passed:
+        return GeneratedCodeOutcome.PASSED
+    return GeneratedCodeOutcome.TESTS_FAILED
+
+
+def evaluation_aggregate_metrics(
+    evaluation: EvaluationTaskResult,
+) -> EvaluationAggregateMetrics:
+    status_counts = evaluation.status_counts
+    return EvaluationAggregateMetrics(
+        function_names=tuple(evaluation.function_names),
+        total_cases=evaluation.total_cases,
+        result_count=len(evaluation.results),
+        passed_count=status_counts.get(EvaluationCaseStatus.PASSED.value, 0),
+        failed_count=status_counts.get(EvaluationCaseStatus.FAILED.value, 0),
+        error_count=status_counts.get(EvaluationCaseStatus.ERROR.value, 0),
+        timeout_count=status_counts.get(EvaluationCaseStatus.TIMEOUT.value, 0),
+        failure_count=len(evaluation.failures),
+        passed=evaluation.passed,
+        status_counts=status_counts,
+    )
+
+
 def best_compression_metric(
     metrics: CompressionMetrics,
 ) -> CompressionMetric | None:
@@ -124,25 +234,11 @@ def score_generated_code_for_humaneval(
         )
 
     raw_validation = validate_python_source(raw_generation)
-    candidates = apply_cleaning(raw_generation, apply_dedent=True)
-    selected_code: str | None = None
-    selected_index: int | None = None
-    extracted_compile_error: str | None = None
-    for index, candidate in enumerate(candidates):
-        candidate_validation = validate_python_source(candidate)
-        if candidate_validation.compile_ok:
-            selected_code = candidate
-            selected_index = index
-            extracted_compile_error = None
-            break
-        if extracted_compile_error is None:
-            extracted_compile_error = candidate_validation.compile_error
-
+    extraction = extract_best_effort_code(raw_generation)
+    selected_code = extraction.extracted_code
     if selected_code is None:
-        extraction_error = (
-            "no code candidates extracted"
-            if not candidates
-            else "no compilable extracted candidate"
+        extraction_error = extraction.extraction_error or (
+            "no compilable extracted candidate"
         )
         return GeneratedCodeScore(
             outcome=GeneratedCodeOutcome.EXTRACTION_FAILED,
@@ -151,10 +247,10 @@ def score_generated_code_for_humaneval(
             raw_code=None,
             raw_compile_ok=raw_validation.compile_ok,
             raw_compile_error=raw_validation.compile_error,
-            extraction_candidate_count=len(candidates),
+            extraction_candidate_count=extraction.candidate_count,
             selected_candidate_index=None,
             extracted_compile_ok=False,
-            extracted_compile_error=extracted_compile_error,
+            extracted_compile_error=extraction.compile_error,
             extraction_error=extraction_error,
         )
 
@@ -182,8 +278,8 @@ def score_generated_code_for_humaneval(
         raw_code=selected_code,
         raw_compile_ok=raw_validation.compile_ok,
         raw_compile_error=raw_validation.compile_error,
-        extraction_candidate_count=len(candidates),
-        selected_candidate_index=selected_index,
+        extraction_candidate_count=extraction.candidate_count,
+        selected_candidate_index=extraction.selected_candidate_index,
         extracted_compile_ok=True,
         extracted_compile_error=None,
         extraction_error=None,

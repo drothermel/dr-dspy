@@ -24,9 +24,9 @@ from dr_dspy.records import (
     NODE_OUTPUT_MAX_BYTES,
     PROVIDER_TELEMETRY_MAX_BYTES,
     TASK_INPUTS_MAX_BYTES,
-    BatchSubmitItemRecord,
     BatchSubmitItemEnqueueStatus,
     BatchSubmitItemInsertStatus,
+    BatchSubmitItemRecord,
     BatchSubmitOperationRecord,
     BatchSubmitOperationStatus,
     DimensionsPayload,
@@ -366,6 +366,7 @@ def test_score_attempt_row_includes_generated_code_outcome() -> None:
     assert row["metrics"] == {
         "profile_id": "humaneval",
         "profile_version": "v1",
+        "task_tests": None,
         "text": {
             "character_count": 12,
             "byte_count": 12,
@@ -379,6 +380,7 @@ def test_score_attempt_row_includes_generated_code_outcome() -> None:
         "python_leakage": None,
         "ast": None,
         "compression": {},
+        "stages": [],
         "custom": {"passed": True},
     }
 

@@ -41,6 +41,101 @@ uv run python -m dr_dspy.platform.worker submit-jsonl \
   --specs-file specs.jsonl
 ```
 
+Score one existing v1 generation run:
+
+```bash
+uv run python -m dr_dspy.platform.worker score-one \
+  --database-url "$DATABASE_URL" \
+  --generation-run-id "<generation-run-id>"
+```
+
+Dry-run or schedule scoring for completed generation runs in an existing
+experiment:
+
+```bash
+uv run python -m dr_dspy.platform.worker rescore \
+  --database-url "$DATABASE_URL" \
+  --experiment-name "<experiment-name>" \
+  --dry-run
+```
+
+Remove `--dry-run` to schedule the existing one-generation scoring workflow for
+each selected generation run. `rescore` defaults to successful v1 generation
+runs, scoring profile `humaneval@v1`, score attempt index `0`, and HumanEval
+dataset `evalplus/humanevalplus` split `test`. It also accepts
+`--generation-status`, `--generation-attempt-index`, `--scoring-profile-id`,
+`--scoring-profile-version`, `--score-attempt-index`, `--dataset-name`,
+`--dataset-split`, `--chunk-size`, and `--limit`.
+
+The default scoring surface persists one append-only
+`ScoreAttemptRecord` using scoring profile `humaneval@v1`. That profile owns
+the parser profile `humaneval-best-effort@v1`, metrics profile
+`humaneval-metrics@v1`, and HumanEval timeout. The CLI exposes scoring profile
+id/version options so parser, metric, timeout, or scoring changes create new
+score attempts instead of mutating old results. The default HumanEval task
+loader reads `evalplus/humanevalplus` split `test` and selects the task by the
+stored v1 prediction spec `task_id`. The command prints `insert_status` as
+`inserted` or `already_present`; rerunning the same generation/scoring-profile
+attempt is idempotent and reports `already_present`.
+
+Score attempts use `status=success` for completed domain scoring, including
+zero-score outcomes such as failed tests, empty generations, extraction
+failure, unsupported terminal-output shapes, or no top-level functions. They
+use `status=error` for infrastructure or workflow failures such as missing
+generation rows or task loading failures. The scorer writes extracted-code
+metadata, per-test results when evaluation runs, aggregate evaluation counts in
+`metrics.custom["evaluation"]`, typed HumanEval task/test shape metrics, and
+versioned text, Python leakage, AST/code-shape, compression, and per-stage
+metrics into JSONB payloads. The task/test metrics are derived from the parsed
+HumanEval test contract and include case counts, support/original test sizes,
+check/candidate names, input/expected representation sizes, and case-kind
+counts. The terminal metrics stage uses the original terminal output payload,
+while extracted-code metrics use the parser result. Extracted-code AST metrics
+use Python's standard-library `ast` parser and persist compact module/function
+summaries such as function counts, bounded top-level function names, async and
+nested functions, imports, classes, calls, assignments, comprehensions, return
+and yield counts, branch depth, argument totals, decorators, annotations,
+docstrings, body sizes, and line spans. When extraction fails, successful
+zero-score attempts still persist task/test and raw terminal metrics; when AST
+parsing fails for an extracted-code stage, the typed AST payload records the
+parse failure instead of dropping the stage. Node-output metrics include every
+output field; non-string values are converted to canonical JSON text at the
+platform boundary before metric extraction. It does not update
+generation/node-attempt rows, v0 tables, or projections.
+
+The HumanEval task loader uses a process-local cached task map keyed by dataset
+name and split. Direct `score-one` behavior is unchanged, while batch/rescore
+callers in the same worker process avoid reparsing the full HumanEval dataset
+for every generation run.
+
+The batch rescoring selector reads v1 `dr_dspy_generation_runs` joined to
+`dr_dspy_prediction_specs`, filters by experiment name, generation status, and
+optional generation attempt index, then orders candidates by
+`(fair_order_key, prediction_id, generation_run_id)`. For each candidate, it
+anti-joins any existing score attempt with the requested generation run,
+scoring profile id/version, parser profile id/version, and score attempt index.
+Rows without a matching score attempt are processed in `--chunk-size` pages.
+`--limit` caps the ordered unscored candidate rows, so large resume runs do not
+page through completed scores before finding work.
+
+For rows that need scoring, `rescore` computes the same stable score-attempt id
+used by `score-one` and schedules the existing scoring workflow with workflow id
+`platform-score-v1:<score_attempt_id>`. If DBOS already has that deterministic
+workflow id but no terminal score attempt exists yet, the summary reports the
+item as `workflow_already_present`. Scheduling failures are reported per item
+and do not stop later items in the batch. The command prints a JSON-like summary
+with selected, already-scored, needs-score, scheduled,
+workflow-already-present, and failed counts plus item ids for debugging small
+runs. Because the SQL selector filters out completed scores, already-scored
+normally stays at zero and only protects callers that inject stale candidates
+directly.
+
+Batch rescoring does not write generation rows, node-attempt rows, v0 tables,
+projection rows, or app-owned pending/running scoring lifecycle state. DBOS
+continues to own live workflow state. If a scheduled scoring workflow reaches a
+terminal scoring failure, the existing scoring path persists a terminal
+`ScoreAttemptRecord` with `status=error`.
+
 `submit-jsonl` streams JSONL parsing into the submit path, validates bounded
 windows of specs against the requested experiment, rejects duplicate
 `prediction_id` values within the submit operation, inserts the experiment row
@@ -74,6 +169,12 @@ The submit command does not start a queue worker. Its
 `--queue-registration-concurrency` option only registers the DBOS queue metadata
 that workers will later use; `--queue-worker-concurrency` remains accepted as a
 compatibility alias.
+
+The rescore command does not start a generation worker or consume the
+generation queue. A dry run opens only the application database selector path
+without resolving DBOS system configuration and does not launch DBOS. A
+scheduling run launches the platform DBOS runtime only to submit scoring
+workflows.
 
 During submission, `dr_dspy_batch_submit_operations.status` is set to
 `enqueuing` and its `requested_count` tracks the number of specs observed so
@@ -179,6 +280,9 @@ queue dispatch.
 - Extend the persisted provider config contract before allowing experiments to
   vary provider runtime details such as `base_url`, `api_key_env`, or capability
   flags from specs.
+- Add the separate explicit projection movement command after live validation
+  confirms expected score-attempt counts, failures, and model rankings/pass
+  rates. Batch rescoring intentionally does not move projections.
 - Add Postgres/DBOS integration coverage for submit/resume, throttle
   upsert/read, and workflow-level preflight behavior once the project has a
   standard live-fixture setup.

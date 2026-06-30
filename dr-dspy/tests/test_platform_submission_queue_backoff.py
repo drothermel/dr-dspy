@@ -32,6 +32,7 @@ from dr_dspy.records import (
     BatchSubmitItemEnqueueStatus,
     BatchSubmitItemInsertStatus,
     DimensionsPayload,
+    GenerationRunStatus,
     GraphSnapshotPayload,
     PredictionSpecRecord,
     ProviderConfigRef,
@@ -1083,6 +1084,34 @@ def test_queue_enqueue_uses_stable_workflow_ids(
     )
 
 
+def test_queue_enqueue_surfaces_unrelated_start_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    starts: list[Any] = []
+
+    monkeypatch.setattr(
+        queue_worker.DBOS,
+        "get_workflow_status",
+        lambda workflow_id: None if not starts else {"status": "PENDING"},
+    )
+
+    def fail_enqueue(*args: Any) -> None:
+        starts.append(args)
+        raise RuntimeError("dbos unavailable")
+
+    monkeypatch.setattr(
+        queue_worker.DBOS,
+        "enqueue_workflow",
+        fail_enqueue,
+    )
+
+    with pytest.raises(RuntimeError, match="dbos unavailable"):
+        queue_worker.enqueue_prediction_graph_workflow(
+            database_url="postgresql://example/db",
+            prediction_id="prediction-1",
+        )
+
+
 def test_register_platform_generation_queue_updates_existing_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1172,6 +1201,94 @@ def test_submit_jsonl_help_names_queue_registration_concurrency() -> None:
     assert "--queue-registration" in result.output
     assert "does not start a queue" in result.output
     assert "worker." in result.output
+
+
+def test_rescore_cli_dry_run_wires_options_without_launching_dbos(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    class FakeEngine:
+        def dispose(self) -> None:
+            captured["disposed"] = True
+
+    def fake_rescore(engine: FakeEngine, **kwargs: Any) -> Any:
+        captured["engine"] = engine
+        captured["kwargs"] = kwargs
+        return SimpleNamespace(
+            model_dump=lambda mode: {"dry_run": kwargs["dry_run"]}
+        )
+
+    def fail_configure_platform_dbos_runtime(**kwargs: Any) -> Any:
+        raise AssertionError("dry-run should not launch DBOS")
+
+    def fail_build_eval_dbos_config(**kwargs: Any) -> Any:
+        raise AssertionError("dry-run should not resolve DBOS config")
+
+    monkeypatch.setattr(
+        worker.shared_dbos,
+        "build_eval_dbos_config",
+        fail_build_eval_dbos_config,
+    )
+    monkeypatch.setattr(
+        worker,
+        "configure_platform_dbos_runtime",
+        fail_configure_platform_dbos_runtime,
+    )
+    monkeypatch.setattr(
+        worker,
+        "create_engine",
+        lambda database_url: FakeEngine(),
+    )
+    monkeypatch.setattr(worker, "rescore_generation_runs", fake_rescore)
+
+    result = CliRunner().invoke(
+        worker.APP,
+        [
+            "rescore",
+            "--database-url",
+            "postgresql://example/db",
+            "--experiment-name",
+            "exp",
+            "--generation-status",
+            "success",
+            "--generation-attempt-index",
+            "0",
+            "--score-attempt-index",
+            "1",
+            "--scoring-profile-id",
+            "humaneval",
+            "--scoring-profile-version",
+            "v1",
+            "--dataset-name",
+            "dataset",
+            "--dataset-split",
+            "split",
+            "--chunk-size",
+            "7",
+            "--limit",
+            "9",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert captured["disposed"] is True
+    assert captured["kwargs"] == {
+        "database_url": "postgresql://example/db",
+        "experiment_name": "exp",
+        "generation_status": GenerationRunStatus.SUCCESS,
+        "generation_attempt_index": 0,
+        "scoring_profile_id": "humaneval",
+        "scoring_profile_version": "v1",
+        "score_attempt_index": 1,
+        "dataset_name": "dataset",
+        "dataset_split": "split",
+        "chunk_size": 7,
+        "limit": 9,
+        "dry_run": True,
+    }
+    assert "{'dry_run': True}" in result.output
 
 
 def test_run_one_runtime_keeps_empty_queue_listener(

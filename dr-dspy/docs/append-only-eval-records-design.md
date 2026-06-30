@@ -158,6 +158,27 @@ terminal outcomes only. See
 clock-step boundaries, node-attempt indexing semantics, provider-config scope,
 pre-existing spec requirement, integration-test status, and follow-up work.
 
+For the HumanEval scoring and metrics stage, the first append-only scoring path
+is available under `dr_dspy.platform.scoring_workflow`. The behavior-bearing
+`humaneval@v1` scoring profile owns its parser profile, metrics profile, and
+HumanEval timeout. `humaneval-best-effort@v1` handles JSON/code-object unwrap
+and recoverable code extraction; `humaneval-field-marker@v1` is a narrower
+field-marker adherence parser, not a full mirror of DSPy ChatAdapter recovery.
+Score attempts persist per-test rows, aggregate evaluation counts under
+`metrics.custom["evaluation"]`, and text/code/compression metrics for terminal
+generation output, extracted code, and every node output field. Terminal and
+node-output metrics use the original payloads converted to text at the platform
+boundary; extraction metrics use the parser result. Non-string payloads are
+converted through the recordability boundary and canonical JSON before metric
+extraction.
+
+The scoring workflow is currently a one-generation DBOS workflow plus a
+`score-one` CLI. Task loading uses a process-local cached HumanEval task map
+keyed by dataset name and split, which avoids reparsing the dataset for each
+score in the same worker process. Batch/rescore orchestration, first-class
+profile record tables, projection movement, and live Postgres/DBOS integration
+coverage remain later phases.
+
 Two platform workflow concerns remain deferred. First, prompt configuration is
 currently a documented metadata contract on graph nodes; a later graph contract
 change should replace those string metadata keys with typed Pydantic fields.
@@ -490,7 +511,7 @@ The immediate rescoring flow should:
 
 The parser/scoring profile we discussed should include:
 
-- strict ChatAdapter extraction, for instruction-adherence measurement
+- strict field-marker extraction, for instruction-adherence measurement
 - best-effort extraction, for recoverable-code measurement
 - JSON `{"code": ...}` unwrap before code cleaning
 - existing HumanEval code cleaning
@@ -597,6 +618,14 @@ For extracted code, add AST/code metrics when parsing succeeds, such as
 top-level functions, classes, imports, AST node counts, and simple statement or
 branch counts. If parsing fails, still persist raw text metrics and the parse
 failure.
+
+Before the first v1 rescoring run, harden the scoring-owned metrics with
+deterministic HumanEval task/test shape metrics and richer stdlib `ast`
+code-shape summaries inside the existing metrics JSONB payload. Keep
+`humaneval-metrics@v1` for this pre-live hardening pass. External exploratory
+feature extraction such as textdescriptives/spaCy, MinHash, tree-sitter,
+radon/lizard/complexipy, parquet, and DuckDB belongs to a later analysis
+pipeline unless it is explicitly adopted into a future scoring profile.
 
 ## Schema and database tooling
 
