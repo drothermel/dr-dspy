@@ -641,9 +641,6 @@ def select_node_attempts_by_generation_run(
     )
 
 
-    )
-
-
 def select_rescore_generation_candidates(
     *,
     experiment_name: str,
