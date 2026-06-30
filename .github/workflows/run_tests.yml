@@ -4,8 +4,12 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "dr-dspy/**"
   pull_request:
     types: [opened, synchronize, reopened]
+    paths-ignore:
+      - "dr-dspy/**"
 
 permissions: {}
 
@@ -63,7 +67,7 @@ jobs:
             exit 1
           )
       - name: Check Python 3.12 modernization
-        run: uv run ruff check --isolated dspy dr-dspy/src dr-dspy/scripts tests --select UP --target-version py312
+        run: uv run ruff check --isolated dr-dspy/src dr-dspy/scripts dr-dspy/tests --select UP --target-version py312
 
   test:
     name: Run Tests
