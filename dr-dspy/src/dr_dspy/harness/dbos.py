@@ -529,11 +529,8 @@ WORKFLOW_START_RACE_ERRORS: tuple[type[BaseException], ...] = (
 
 def workflow_start_raced(*, workflow_id: str, error: BaseException) -> bool:
     """Return True when a concurrent start/enqueue won (idempotent caller)."""
+    _ = workflow_id
     if isinstance(error, WORKFLOW_START_RACE_ERRORS):
-        return True
-    if isinstance(error, Exception) and (
-        DBOS.get_workflow_status(workflow_id) is not None
-    ):
         return True
     return False
 
