@@ -14,8 +14,9 @@ from dr_dspy.eval_failures.types import FailureClass
 from dr_dspy.graph import GraphRunStatus, NodeError, NodeOutput
 from dr_dspy.humaneval.scoring import GeneratedCodeOutcome
 from dr_dspy.records import (
+    BatchSubmitItemEnqueueStatus,
+    BatchSubmitItemInsertStatus,
     BatchSubmitItemRecord,
-    BatchSubmitItemStatus,
     BatchSubmitOperationRecord,
     BatchSubmitOperationStatus,
     DimensionsPayload,
@@ -243,6 +244,7 @@ def batch_submit_operation_row(record: BatchSubmitOperationRecord) -> Row:
         "inserted_count": record.inserted_count,
         "already_present_count": record.already_present_count,
         "enqueued_count": record.enqueued_count,
+        "already_scheduled_count": record.already_scheduled_count,
         "failed_count": record.failed_count,
         "spec": record.spec,
         "metadata": record.metadata,
@@ -260,7 +262,8 @@ def batch_submit_item_row(record: BatchSubmitItemRecord) -> Row:
         "item_index": record.item_index,
         "prediction_id": record.prediction_id,
         "fair_order_key": record.fair_order_key,
-        "status": record.status.value,
+        "insert_status": record.insert_status.value,
+        "enqueue_status": record.enqueue_status.value,
         "enqueue_metadata": record.enqueue_metadata,
         "failure": _dump_optional(record.failure),
         "created_at": record.created_at,
@@ -415,7 +418,8 @@ def batch_submit_item_record_from_row(row: Row) -> BatchSubmitItemRecord:
         item_index=row["item_index"],
         prediction_id=row["prediction_id"],
         fair_order_key=row["fair_order_key"],
-        status=BatchSubmitItemStatus(row["status"]),
+        insert_status=BatchSubmitItemInsertStatus(row["insert_status"]),
+        enqueue_status=BatchSubmitItemEnqueueStatus(row["enqueue_status"]),
         enqueue_metadata=row["enqueue_metadata"],
         failure=_load_optional(FailureMetadataPayload, row["failure"]),
         created_at=row["created_at"],
