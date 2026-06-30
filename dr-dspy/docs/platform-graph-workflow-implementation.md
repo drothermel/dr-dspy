@@ -62,12 +62,18 @@ attempt is idempotent and reports `already_present`.
 
 Score attempts use `status=success` for completed domain scoring, including
 zero-score outcomes such as failed tests, empty generations, extraction
-failure, or no top-level functions. They use `status=error` for infrastructure
-or workflow failures such as missing generation rows, task loading failures, or
-non-scoreable terminal output. The scorer writes extracted-code metadata,
-per-test results when evaluation runs, and versioned text, Python leakage,
-AST, compression, and per-stage metrics into JSONB payloads. It does not update
+failure, unsupported terminal-output shapes, or no top-level functions. They
+use `status=error` for infrastructure or workflow failures such as missing
+generation rows or task loading failures. The scorer writes extracted-code
+metadata, per-test results when evaluation runs, aggregate evaluation counts in
+`metrics.custom["evaluation"]`, and versioned text, Python leakage, AST,
+compression, and per-stage metrics into JSONB payloads. It does not update
 generation/node-attempt rows, v0 tables, or projections.
+
+The HumanEval task loader uses a process-local cached task map keyed by dataset
+name and split. Direct `score-one` behavior is unchanged, while batch/rescore
+callers in the same worker process avoid reparsing the full HumanEval dataset
+for every generation run.
 
 `submit-jsonl` streams JSONL parsing into the submit path, validates bounded
 windows of specs against the requested experiment, rejects duplicate
